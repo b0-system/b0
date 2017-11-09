@@ -1,0 +1,26 @@
+true : bin_annot, safe_string, keep_locs
+true : package(unix)
+# true : package(landmarks.ppx,landmarks)
+
+<B0d> : -traverse
+
+<_b0> : not_hygienic
+<src-std> : include
+<src-std/b0_std.{cma,cmxa}> : record_b0_stubs
+<src-std/b0_std.cmxs> : link_b0_stubs
+
+<src-lib> : include
+<src-driver> : include
+<src-driver/**> : package(cmdliner)
+<src-care> : include
+<src-b0> : include
+<src-b0/**> : package(cmdliner)
+<src-b0/bzero*> : use_b0_stubs
+<src-d0> : include
+<src-d0/**> : package(cmdliner)
+<src-d0/dzero*> : use_b0_stubs
+<test> : include
+<test/**> : not_hygienic, use_b0_stubs
+<perf> : -traverse
+<examples> : -traverse
+<examples/**> : not_hygienic

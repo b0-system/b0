@@ -1,0 +1,11 @@
+# To run the b0 and d0 built from the repo as if they were in your
+# PATH issue:
+
+# source dev-env
+
+
+# Get dirname to current script
+ROOT=`pwd`
+
+alias b0=$ROOT/b0
+alias d0=$ROOT/d0

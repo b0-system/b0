@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Use this to run the d0 built from the repo
+
+# Get dirname to current script
+pushd `dirname $0` > /dev/null
+ROOT=`pwd`
+popd > /dev/null
+
+__B0_DEV_DIR=$ROOT _build/src-d0/dzero.native "$@"

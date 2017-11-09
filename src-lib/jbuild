@@ -1,0 +1,6 @@
+(jbuild_version 1)
+(library
+ ((name b0)
+  (public_name b0)
+  (wrapped false)
+  (libraries (b0.std))))
