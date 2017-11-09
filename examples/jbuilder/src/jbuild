@@ -1,0 +1,5 @@
+(jbuild_version 1)
+(library
+ ((name qj)
+  (public_name qj)
+  (c_names (qj_stub))))

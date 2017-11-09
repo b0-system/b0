@@ -1,0 +1,4 @@
+#!/bin/sh
+
+docker rmi -f b0-builder || true
+docker build --no-cache --tag b0-builder - < Dockerfile
