@@ -4,35 +4,77 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(* We could replace this by more recent and efficient hashes like
-   blake2, but this hardly seems to be a bottleneck. *)
+module Murmur3 = struct
+  (* Luckily, MurmurHash3_x64_128 has the same width as Digest.t, which means we
+   * can be a little dirty. *)
 
-type t = Digest.t
+  type t    = string
+  type seed = int
 
-let string = Digest.string
-let file p = Digest.file (B0_fpath.to_string p)
-(*
-  try Ok (Digest.file (Fpath.to_string p)) with
-  | Sys_error e -> R.error_msgf "%a: %s" Fpath.pp p e
-*)
+  external hash_unsafe : string -> int -> int -> seed -> t =
+    "caml_b0_murmurhash"
+  external hash_fd : Unix.file_descr -> seed -> t =
+    "caml_b0_murmurhash_fd"
 
-let zero = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+  let zero = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+  let no_seed = 0
 
-let raw_file = Digest.file
-let to_byte_string h = h
-let to_hex = Digest.to_hex
-let of_hex s = try Some (Digest.from_hex s) with Invalid_argument _ -> None
-let equal = Digest.equal
-let compare = Digest.compare
+  let to_byte_string t = t
+  let to_hex = Digest.to_hex
 
-let pp ppf h = match String.equal h zero with
+  let of_hex s = try Some (Digest.from_hex s) with Invalid_argument _ -> None
+
+  let equal, compare = String.(equal, compare)
+end
+
+module XXH = struct
+  (* XXH64 is fast, but only 64 bits wide. The probability of collision in a
+   * 10000-file repo is about 2.71e-12, which is probably lower than hardware
+   * faults. *)
+
+  type t    = int64
+  type seed = int64
+
+  external hash_unsafe : string -> int -> int -> seed -> t =
+    "caml_b0_xxhash"
+  external hash_fd : Unix.file_descr -> seed -> t =
+    "caml_b0_xxhash_fd"
+  external set_64u : Bytes.t -> int -> int64 -> unit =
+    "%caml_string_set64u"
+
+  let zero = 0L
+  let no_seed = 0L
+
+  let to_byte_string t =
+    let res = Bytes.create 8 in set_64u res 0 t; Bytes.unsafe_to_string res
+  let to_hex = Format.sprintf "%016Lx"
+
+  let of_hex s =
+    try Scanf.sscanf s "%LX%!" (fun x -> Some x) with Scanf.Scan_failure _ -> None
+
+  let equal, compare = Int64.(equal, compare)
+end
+
+include XXH
+
+let string s = hash_unsafe s 0 (String.length s) no_seed
+
+let raw_file ps =
+  let fd = Unix.(openfile ps [O_RDONLY] 0) in
+  match hash_fd fd no_seed with
+  | exception e -> Unix.close fd; raise e
+  | res -> Unix.close fd; res
+
+let file p = raw_file (B0_fpath.to_string p)
+
+let pp ppf h = match equal h zero with
 | true -> B0_fmt.none_str ppf ()
 | false -> B0_fmt.string ppf (to_hex h)
 
-module Set = Set.Make (Digest)
+module Set = Set.Make (XXH)
 type set = Set.t
 
-module Map = Map.Make (Digest)
+module Map = Map.Make (XXH)
 type 'a map = 'a Map.t
 
 (*---------------------------------------------------------------------------
