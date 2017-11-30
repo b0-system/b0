@@ -1,4 +1,4 @@
 b0_stubs.o
 b0_hash_stubs.o
-vendor/MurmurHash3.o
-vendor/xxhash.o
+MurmurHash3.o
+xxhash.o

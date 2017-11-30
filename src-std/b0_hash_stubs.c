@@ -6,9 +6,9 @@
 
 #include "b0.h"
 
-#include "vendor/MurmurHash3.h"
+#include "MurmurHash3.h"
 #define XXH_PRIVATE_API
-#include "vendor/xxhash.h"
+#include "xxhash.h"
 
 #include <caml/memory.h>
 #include <caml/alloc.h>
