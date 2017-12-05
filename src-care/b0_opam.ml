@@ -38,7 +38,7 @@ let env opam ~switch =
   let cmd = Cmd.(opam.cmd % "env" % "--sexp" % "--switch" % switch) in
   OS.Cmd.(run_out cmd |> to_string)
   >>= fun out -> Sexp.of_string ~src:(Sexp.File OS.File.dash) out
-  >>= fun sexps -> parse_env_sexp sexps
+  >>= fun se -> parse_env_sexp (Sexp.get_list se)
 
 (* Variants *)
 

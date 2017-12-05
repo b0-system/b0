@@ -26,6 +26,9 @@
 * Page `cmd` info, like we page `log`.
 * copy_file handle permissions
 * Add a flag to allow multiple writes
+* Reproducible builds. Should we force by default BUILD_PATH_PREFIX_MAP
+  in the environment ?
+  https://reproducible-builds.org/specs/build-path-prefix-map/
 
 # B0.Def
 
@@ -69,6 +72,7 @@ file sync.
 ** Implement per unit fast checks. This is less cheating, the parts
    that pass the check don't need to be trashed and relinked and
    we avoid computing all the commands.
+** Dolan. Make the cache read only.
    
 # `b0` driver
 

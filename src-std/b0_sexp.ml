@@ -41,6 +41,14 @@ let error e loc = raise (Error (e, loc))
 
 type t = [ `Atom of string | `List of t list ] * loc
 
+let get_atom = function
+| `Atom a, _ -> a
+| `List _, _ -> invalid_arg "expected atom found a list"
+
+let get_list = function
+| `List l, _ -> l
+| `Atom a, _ -> invalid_arg "expected list found an atom"
+
 let atom a loc = (`Atom a), loc
 let list a loc = (`List a), loc
 
@@ -152,14 +160,32 @@ let of_string ~src s =
         let a, rem = p_atom src ps in
         loop (a :: acc) rem
     | None ->
-        Ok (List.rev acc)
+        List.rev acc
   in
-  try loop [] (0, s) with
+  let loc = (src, (0, String.length s - 1)) in
+  try Ok (`List (loop [] (0, s)), loc) with
   | Error e -> R.error_msgf "%a" pp_error e
 
 let of_file f = B0_os.File.read f >>= fun s -> of_string ~src:(File f) s
 
-let list_to_string_map ?known:(is_known = fun _ -> true) l =
+let dump_locs ppf v = (* Not T.R. *)
+  let rec loop ppf = function
+  | `Atom at, loc -> B0_fmt.pf ppf "@[%a: Atom %S@]@," pp_loc loc at
+  | `List l, loc ->
+      B0_fmt.pf ppf "@[%a: List@]@," pp_loc loc;
+      List.iter (loop ppf) l
+  in
+  B0_fmt.pf ppf "@[<v>%a@]" loop v
+
+(* Parsing key-value maps *)
+
+type map = (t * loc) B0_string.Map.t * loc
+type 'a key = map -> 'a
+
+let to_string_map ?known:(is_known = fun _ -> true) s =
+  let err_atom loc =
+    R.error_msgf "%a: expected a list, found an atom" pp_loc loc
+  in
   let rec loop known unknown = function
   | [] -> Ok (known, unknown)
   | (`List ((`Atom k, _) :: v), loc) :: l ->
@@ -179,18 +205,53 @@ let list_to_string_map ?known:(is_known = fun _ -> true) l =
   | (`List [], loc) :: l ->
       R.error_msgf "%a: illegal empty list" pp_loc loc
   | (`Atom _, loc) :: l ->
-      R.error_msgf "%a: expected a list, found an atom" pp_loc loc
+      err_atom loc
   in
-  loop B0_string.Map.empty B0_string.Map.empty l
-
-let dump_locs ppf v = (* Not T.R. *)
-  let rec loop ppf = function
-  | `Atom at, loc -> B0_fmt.pf ppf "@[%a: Atom %S@]@," pp_loc loc at
+  match s with
+  | `Atom _, loc -> err_atom loc
   | `List l, loc ->
-      B0_fmt.pf ppf "@[%a: List@]@," pp_loc loc;
-      List.iter (loop ppf) l
-  in
-  B0_fmt.pf ppf "@[<v>%a@]" loop v
+      loop B0_string.Map.empty B0_string.Map.empty l
+      >>= fun (k, u) -> Ok ((k, loc), (u, loc))
+
+(* Extractors *)
+
+let failwithf fmt =
+  Format.kasprintf (fun s -> raise_notrace (Failure s)) fmt
+
+let parse_atom k = function
+| `Atom a, _ -> a
+| `List _, loc ->
+    failwithf "%a: key %s: expected an atom found a list" pp_loc loc k
+
+let parse_list ?(empty = true) k = function
+| `List [], loc when not empty ->
+    failwithf "%a: key %s: list cannot be empty" pp_loc loc k
+| `List l, _ -> l
+| `Atom _, loc ->
+    failwithf "%a: key %s: expected a list found an atom" pp_loc loc k
+
+let parse_atom_kind parse k se = match parse (parse_atom k se) with
+| exception Failure m -> failwithf "%a: key %s: %s" pp_loc (snd se) k m
+| v -> v
+
+let parse_list_kind ?empty parse_el k se =
+  List.map (parse_el k) (parse_list ?empty k se)
+
+let key ?absent parse k (m, loc) = match B0_string.Map.find k m with
+| (se, _) -> parse k se
+| exception Not_found ->
+    match absent with
+    | Some v -> v
+    | None -> failwithf "%a: mandatory key %s is missing" pp_loc loc k
+
+let atom_key ?absent parse k m =
+  key ?absent (parse_atom_kind parse) k m
+
+let list_key ?empty ?absent parse_el k m =
+  key ?absent (parse_list_kind ?empty parse_el) k m
+
+let atom_list_key ?empty ?absent parse k m =
+  list_key ?empty ?absent (parse_atom_kind parse) k m
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 b0

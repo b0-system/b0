@@ -3749,25 +3749,93 @@ module Sexp : sig
   type t = [ `Atom of string | `List of t list ] * loc
   (** The type for s-expressions. *)
 
-  val of_string : src:src -> string -> t list result
-  (** [of_string ~src s] inputs a sequence of s-expressions from [s]. *)
+  val get_atom : t -> string
+  (** [get_atom s] is the atom in [s]. @raise Invalid_argument if [s]
+      is not an atom. *)
 
-  val of_file : Fpath.t -> t list result
-  (** [of_file f] inputs a sequence of s-expressions from [s]. *)
+  val get_list : t -> t list
+  (** [get_list s] is the list in [s]. @raise Invalid_argument if [s]
+      is not a list. *)
 
-  val list_to_string_map :
-    ?known:(string -> bool) -> t list ->
-    ((t * loc) String.Map.t * (t * loc) String.Map.t) result
-  (** [list_to_string_map ~known ss] is [(known, unknown)]. Every
-      expression in [ss] is parsed as a key-value bindings [(k v)] where
-      [k] is an atom and [v] an s-expression. The resulting binding for [k] is
-      added to [known] or [unknown] tupled with the binding location depending
-      on whether [known s] is [true] or not. [known] defaults to
-      [fun _ -> true]. *)
+  (** {1:parsing Parsing s-expressions} *)
+
+  val of_string : src:src -> string -> t result
+  (** [of_string ~src s] inputs a top-level {e sequence} of s-expressions
+      from [s] and returns it as a list that spans the whole input. *)
+
+  val of_file : Fpath.t -> t result
+  (** [of_file f] inputs a top-level {e sequence} of s-expressions
+      from [s] and returns it as a list that spans the whole input. *)
 
   val dump_locs : t Fmt.t
   (** [dump_locs ppf se] dumps the location of the s-expressions [se]
       on [ppf]. *)
+
+  (** {1:key_value Parsing key-value maps}
+
+      {b WARNING.} Except {!to_string_map} all these functions and the
+      {{!type:key}keys} raise [Failure] on error. Catch the exception
+      in higher-level parsing functions on propagate them via [Error
+      (`Msg m)]. *)
+
+  type map = (t * loc) String.Map.t * loc
+  (** The type for key value maps. A string map that binds key name to their
+      location and value tupled with the location of the map. *)
+
+  type 'a key = map -> 'a
+  (** The type for key-value binding accessor keys.  Given an
+      s-expression map returns the key value. *)
+
+  val to_string_map : ?known:(string -> bool) -> t -> (map * map) result
+  (** [to_string_map ~known se] is [(known, unknown)]. [se] must be a
+      list of key-value bindings [(k v)] where [k] is an atom and [v]
+      an s-expression. The resulting binding for [k] is added to
+      [known] or [unknown] tupled with the binding location depending
+      on whether [known s] is [true] or not. [known] defaults to [fun
+      _ -> true]. *)
+
+  val key : ?absent:'a -> (string -> t -> 'a) -> string -> 'a key
+  (** [key ~absent parse name ] looks up key [name], parse its value
+      according [parse] (which should raise Failure with an error
+      that includes the location in case of error). If the key is
+      not in the key map and [absent] is returned, otherwise an
+      error is raised. *)
+
+  val atom_key : ?absent:'a -> (string -> 'a) -> string -> 'a key
+  (** [atom_key] is like {!key} but requires and parses an atom. *)
+
+  val list_key :
+    ?empty:bool -> ?absent:'a list -> (string -> t -> 'a) ->
+    string -> 'a list key
+  (** [list_key] is like {!key} but requires and parses a list of
+      elements. If [empty] is [false] (defaults to [true]) an error is
+      raised if the list is empty. *)
+
+  val atom_list_key :
+    ?empty:bool -> ?absent:'a list -> (string -> 'a) -> string -> 'a list key
+  (** [atom_list] is like {!list_key} but parses a list of atoms. *)
+
+  (** {2:valparse Value parsers} *)
+
+  val parse_atom : string -> t -> string
+  (** [parse_atom key se] parses an atom from [se] assuming this is for
+      a key named [key] (used for error reporting). *)
+
+  val parse_list :?empty:bool -> string -> t -> t list
+  (** [parse_list key se] parses a list from [se] assuming this is for
+      a key named [key] (used for error reporting). If [empty] is [false]
+      (defaults to [true]) the parse errors if the list is empty. *)
+
+  val parse_atom_kind : (string -> 'a) -> string -> t -> 'a
+  (** [parse_atom_kind parse key se] is like {!parse_atom} but
+      uses [parse] to transform the atom. [parse] should raise
+      [Failure] in case of error. *)
+
+  val parse_list_kind :
+    ?empty:bool -> (string -> t -> 'a) -> string -> t -> 'a list
+    (** [parse_list_kind parse key se] is like {!parse_list} but
+        uses [parse] to transform the atom. [parse] should raise
+        [Failure] in case of error. *)
 end
 
 (** JSON text encoder.
@@ -4201,7 +4269,7 @@ let myprogram =
     {- From [start] move to the parent directory [up] and:
       {ul
       {- If [up] has a description file and does not exclude [start] via the
-       {{!b0_field_ref}[subs] field} of an [up/B0.b0] file, let
+       {{!b0_key_ref}[subs] key} of an [up/B0.b0] file, let
        [start] be [up] and go to 2.}
       {- If there is no description in [up] or if it excludes [start] then
          [start] is the root directory.}}}}
@@ -4240,13 +4308,13 @@ v}
     Given a root directory with (a possibly empty) description, [b0]
     gathers and {{!b0_merge}merge} the descriptions files of all {e
     direct} subdirectories and recursively into the {e root
-    description}. The {{!b0_field_ref}[subs] field} of [B0.b0] files
+    description}. The {{!b0_key_ref}[subs] key} of [B0.b0] files
     can be used to control which {e direct} subdirectories are looked
     up. The OCaml sources of different sub descriptions cannot refer
     to each other directly; they are properly isolated and linked in
     any (but deterministic) order.
 
-    Assuming no [B0.b0] file makes use of the [subs] field in the
+    Assuming no [B0.b0] file makes use of the [subs] key in the
     above example, the root description in [root] takes into account
     all descriptions files except [d/root/p2/sub/a/B0.ml]. Here again
     adding an empty file [d/root/p2/sub/B0.b0] would allow to take it
@@ -4255,14 +4323,14 @@ v}
     {1:b0b0 B0.b0 description files}
 
     A [B0.b0] description file is a possibly empty sequence of
-    s-expressions of the form [(field value)]. Here's an annoted example:
+    s-expressions of the form [(key value)]. Here's an annoted example:
 {v
 (b0-version 0)       ; Mandatory, except if the file is empty
 (libs (b0_cmdliner)) ; Always compile with the external b0_cmdliner library
 
 ; Describe the sources that make up the description in dependency order.
 ; As a convention if you split your build in many build files put them
-; in a B0.d/ directory. If the [srcs] field is absent and a B0.ml file
+; in a B0.d/ directory. If the [srcs] key is absent and a B0.ml file
 ; exists next to the B0.b0 file it is always automatically added as if
 ; ("B0.ml" () "B0.ml file") was appended at the end of srcs.
 (srcs
@@ -4276,14 +4344,14 @@ v}
 (compile (-w -23)) ; Disable warning 23 for compiling the description
 v}
 
-    {2:b0_field_sem Field parsing and semantics}
+    {2:b0_key_sem Key parsing and semantics}
 
-    An [B0.b0] file without fields and without a [B0.ml] file sitting
+    An [B0.b0] file without keys and without a [B0.ml] file sitting
     next to it is an {e empty} and valid description.
 
-    If a field is defined more than once, the last one takes over;
-    other than that the field order is irrelevant. Except for fields
-    that start with [x-], unknown fields trigger parse warnings.
+    If a key is defined more than once, the last one takes over;
+    other than that the key order is irrelevant. Except for keys
+    that start with [x-], unknown keys trigger parse warnings.
 
     {b Relative file paths.} Relative file paths are relative to the
     description file directory.
@@ -4297,7 +4365,7 @@ v}
     Dependency resolution on the libraries is not performed and [cmi] files
     have to be in the corresponding [libname] directory.
 
-    {2:b0_field_ref Field reference}
+    {2:b0_key_ref Key reference}
 
     {ul
     {- [(b0-version 0)]. File format version, mandatory, except if
@@ -4352,17 +4420,17 @@ v}
     {- [(ocamlopt <bin>)]. [ocamlopt] binary to use. Ignored in
        subdescriptions. Can be overriden with the `--d-ocamlopt` option
        or by the [B0_D_OCAMLOPT] environment variable.}
-    {- [(x-<field> value)]. Arbitrary user defined field.}}
+    {- [(x-<key> value)]. Arbitrary user defined key.}}
 
-    {2:b0_merge [B0.b0] field merges}
+    {2:b0_merge [B0.b0] key merges}
 
     When multiple [B0.b0] file are used, their specification is merged
-    with the root description. During this process the field values of
+    with the root description. During this process the key values of
     subdescriptions are either:
 
     {ul
     {- Ignored (e.g. [ocamlc], [ocamlopt], etc.).}
-    {- Merged according to field specific strategies which can
+    {- Merged according to key specific strategies which can
        fail; one example of failure is when one subdescription mandates
        [(compile-kind native)] and another one [(compile-kind byte)].}} *)
 

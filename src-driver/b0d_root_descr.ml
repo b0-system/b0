@@ -66,10 +66,10 @@ let of_b0_file file ~b0_ml =
     let warn_unknown_key k (_, l) =
       Log.warn (fun m -> m "%a: unknown key %S" Sexp.pp_loc l k)
     in
-    let known = B0d_sexp_descr.is_field in
+    let known = B0d_sexp_descr.is_key in
     let rel_to = Fpath.parent file in
-    Sexp.of_file file >>= fun l ->
-    Sexp.list_to_string_map ~known l >>= fun (known, unknown) ->
+    Sexp.of_file file >>= fun se ->
+    Sexp.to_string_map ~known se >>= fun (known, (unknown, _)) ->
     String.Map.iter warn_unknown_key unknown;
     let libs = B0d_sexp_descr.libs known in
     let drop_libs = B0d_sexp_descr.drop_libs known in

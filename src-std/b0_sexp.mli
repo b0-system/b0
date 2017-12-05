@@ -22,15 +22,39 @@ val pp_loc : Format.formatter -> loc -> unit
 (** {1 S-expressions} *)
 
 type t = [ `Atom of string | `List of t list ] * loc
+val get_atom : t -> string
+val get_list : t -> t list
 
-val of_string : src:src -> string -> t list result
-val of_file : B0_fpath.t -> t list result
+(** {1 Parsers} *)
 
-val list_to_string_map :
-  ?known:(string -> bool) -> t list ->
-  ((t * loc) B0_string.Map.t * (t * loc) B0_string.Map.t) result
-
+val of_string : src:src -> string -> t result
+val of_file : B0_fpath.t -> t result
 val dump_locs : Format.formatter -> t -> unit
+
+(** {1 Parsing key-value maps} *)
+
+type map = (t * loc) B0_string.Map.t * loc
+type 'a key = map -> 'a
+
+val to_string_map : ?known:(string -> bool) -> t -> (map * map) result
+
+val key : ?absent:'a -> (string -> t -> 'a) -> string -> 'a key
+val atom_key : ?absent:'a -> (string -> 'a) -> string -> 'a key
+
+val list_key :
+  ?empty:bool -> ?absent:'a list -> (string -> t -> 'a) -> string ->
+  'a list key
+
+val atom_list_key :
+  ?empty:bool -> ?absent:'a list -> (string -> 'a) -> string -> 'a list key
+
+
+val parse_atom : string -> t -> string
+val parse_list :?empty:bool ->  string -> t -> t list
+val parse_atom_kind : (string -> 'a) -> string -> t -> 'a
+val parse_list_kind :
+  ?empty:bool -> (string -> t -> 'a) -> string -> t -> 'a list
+
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 b0
