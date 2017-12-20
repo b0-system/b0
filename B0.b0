@@ -7,7 +7,7 @@
   (B0.d ; FIXME this shouldn't exist but otherwise we go down;
        ; and get a dupe at least don't do it for a B0 dir which
        ; we can't have here because of the b0 tool
-   src-lib ; gets picked up on case insensitive fs because of src-lib/b0.ml
+   src-lib  ; gets picked up on case insensitive fs because of src-lib/b0.ml
    test
    examples
    )))

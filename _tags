@@ -5,6 +5,8 @@ true : package(unix)
 <B0d> : -traverse
 
 <_b0> : not_hygienic
+<_boot_b0> : not_hygienic
+<_boot> : not_hygienic
 <src-std> : include
 <src-std/b0_std.{cma,cmxa}> : record_b0_stubs
 <src-std/b0_std.cmxs> : link_b0_stubs

@@ -121,17 +121,17 @@ let lookup_b0_dev libdir lib_ext lib = match b0_dev_dir with
     (* FIXME can we do better than this *)
     match lib with
     | "b0.std" ->
-        Some (Fpath.(dir // v "_build/src-std/"), strf "b0_std%s" lib_ext)
+        Some (Fpath.(dir / lib), strf "b0_std%s" lib_ext)
     | "b0" ->
-        Some (Fpath.(dir // v "_build/src-lib/"), strf "b0%s" lib_ext)
+        Some (Fpath.(dir / lib), strf "b0%s" lib_ext)
     | "b0.driver" ->
-        Some (Fpath.(dir // v "_build/src-driver/"), strf "b0_driver%s" lib_ext)
+        Some (Fpath.(dir / lib), strf "b0_driver%s" lib_ext)
     | "b0.care" ->
-        Some (Fpath.(dir // v "_build/src-care/"), strf "b0_care%s" lib_ext)
+        Some (Fpath.(dir / lib), strf "b0_care%s" lib_ext)
     | "b0.b0" ->
-        Some (Fpath.(dir // v "_build/src-b0/"), strf "b0_b0%s" lib_ext)
+        Some (Fpath.(dir / lib), strf "b0_b0%s" lib_ext)
     | "d0" ->
-        Some (Fpath.(dir // v "_build/src-d0/"), strf "d0%s" lib_ext)
+        Some (Fpath.(dir / lib), strf "d0%s" lib_ext)
     | _ -> None
 
 let file_exists dir file =

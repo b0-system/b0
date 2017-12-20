@@ -7,4 +7,4 @@ pushd `dirname $0` > /dev/null
 ROOT=`pwd`
 popd > /dev/null
 
-__B0_DEV_DIR=$ROOT $ROOT/_build/src-b0/bzero.native "$@"
+__B0_DEV_DIR=$ROOT/_boot_b0/v/nop/b/ $ROOT/_boot_b0/v/nop/b/b0-exe/b0 "$@"

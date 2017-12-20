@@ -14,6 +14,7 @@ let is_exe f m = Fpath.Meta.flag B0_care.exe m
    the build dir. Maybe simply remove prefix to build dir. *)
 
 let exec_name (f, _m) = Fpath.to_string f
+let exec_exact_fname name (f, _m) = Fpath.filename f = name
 let exec_matches name f =
   let f_base, ext = Fpath.split_ext f in
   let f_base = Fpath.to_string f_base in
@@ -35,7 +36,10 @@ let lookup_exec name o =
          this could allow to specify a context to run cross-compiled
          binaries. *)
       Ok (f, `Host_os)
-  | l -> ambiguous l
+  | l ->
+      match List.find (exec_exact_fname name) l with
+      | exception Not_found -> ambiguous l
+      | (f, _) -> Ok (f, `Host_os)
 
 let list_execs o =
   let execs = Fpath.Map.filter is_exe (Outcome.fpath_meta o) in

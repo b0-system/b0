@@ -20,7 +20,6 @@ let srcs dir = (`Src_dirs [Fpath.v dir])
 (* Core libraries *)
 
 let pkg = Pkg.create "b0-lib" ~doc:"Software construction care"
-
 let b0_std = "b0.std"
 let b0 = "b0"
 let b0_care = "b0.care"
@@ -40,7 +39,6 @@ let care =
 (* b0 and d0 *)
 
 let pkg = Pkg.create "b0" ~doc:"Software construction care tools"
-
 let b0_driver = "b0.driver"
 let b0_b0 = "b0.b0"
 
@@ -49,12 +47,10 @@ let driver =
   B0_ocaml.Unit.lib ~pkg b0_driver (srcs "src-driver") ~lib_deps
 
 let driver_b0 =
-  (* FIXME remove bzero.ml from srcs *)
   let lib_deps = [result; cmdliner; b0; b0_care; b0_driver ] in
   B0_ocaml.Unit.lib ~pkg "b0.b0" (srcs "src-b0") ~lib_deps
 
 let exe =
-  (* FIXME better srcs selection *)
   let lib_deps = [b0_driver; b0_b0] in
-  let build = `Srcs [Fpath.v "src-b0/bzero.ml"] in
+  let build = `Srcs [Fpath.v "src-exe/bzero.ml"] in
   B0_ocaml.Unit.exe ~pkg ~name:"b0" "b0-exe" build ~lib_deps
