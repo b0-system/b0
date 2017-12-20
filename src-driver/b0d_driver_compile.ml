@@ -96,16 +96,24 @@ let b0_dev_dir = match OS.Env.var "__B0_DEV_DIR" with
 | None -> None
 | Some dir -> Some (Fpath.v dir)
 
+let find_libdir compiler = match OS.Env.var "B0_DRIVER_LIBDIR" with
+| Some dir -> Fpath.of_string dir
+| None ->
+    match OS.Env.var "OPAM_SWITCH_PREFIX" with
+    | Some dir -> Fpath.of_string dir >>| fun d -> Fpath.(d / "lib")
+    | None ->
+        OS.Cmd.(run_out Cmd.(v compiler % "-where") |> to_string)
+        >>= fun dir -> Fpath.of_string dir
+        >>| fun dir -> Fpath.parent dir
+
 let compiler_conf compiler =
   let compiler, lib_ext = match compiler with
   | `Native, compiler -> compiler, ".cmxa"
   | `Byte, compiler -> compiler, ".cma"
   in
-  OS.Cmd.(run_out Cmd.(v compiler % "-where") |> to_string)
-  >>= fun olib -> Fpath.of_string olib
-  >>| fun olib ->
-  (* FIXME Windows. Rather use -config and parse standard_library and ext_lib *)
-  Fpath.parent olib, lib_ext, ".a"
+  find_libdir compiler >>| fun libdir ->
+  let ar_ext = if Sys.win32 then ".lib" else ".a" in
+  libdir, lib_ext, ar_ext
 
 let lookup_b0_dev libdir lib_ext lib = match b0_dev_dir with
 | None -> None

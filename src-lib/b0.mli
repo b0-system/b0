@@ -4359,9 +4359,13 @@ v}
     {b Library lookup.} FIXME. Library lookup is currently quite restricted
     and done according to the following name mapping:
     {ul
-    {- [libname], [$(ocamlc -where)/../libname/libname.cm[x]a]}
-    {- [libname.sub], [$(ocamlc -where)/../libname/libname_sub.cm[x]a]}}
-
+    {- [libname], [$LIBDIR/libname/libname.cm[x]a]}
+    {- [libname.sub], [$LIBDIR/libname/libname_sub.cm[x]a]}}
+    With [$LIBDIR] being defined (first match) by:
+    {ol
+    {- The value of the environment variable [B0_DRIVER_LIBDIR]}
+    {- The value of the environment variable [OPAM_SWITCH_PREFIX] post}
+    {- The value of [$(ocamlc -where)/..]}}
     Dependency resolution on the libraries is not performed and [cmi] files
     have to be in the corresponding [libname] directory.
 

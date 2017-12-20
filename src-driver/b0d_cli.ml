@@ -198,6 +198,8 @@ let ctrl =
 let s_driver_opts = "OPTIONS FOR COMPILING DRIVER INSTANCE"
 let docs = s_driver_opts
 
+(* TODO document B0_DRIVER_LIBDIR *)
+
 let driver_dir =
   let doc = "Use $(docv) for building and storing drivers instances." in
   let env = Arg.env_var "B0_DRIVER_DIR" in
