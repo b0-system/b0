@@ -67,26 +67,21 @@ end
 
 (** {1:osinfo Operating system information} *)
 
-(** Build and host operating system information.
-
-    {b FIXME.} Some of the discovery functions rely on {!Sys.os_type} for
-    win32. This is strictly verboten. Basically we just need Windows
-    discovery. *)
+(** Build and host operating system information. *)
 module OS : sig
 
   (** {1:osinfo Operating system information} *)
 
   val name : string Conf.key
-  (** [name] is the operating system name. If {!Sys.os_type} is:
-      {ul
-      {- ["Unix"]. Determined by normalizing the output of [uname -s].
-       In particular ["darwin"] is normalized to ["macos"].}
-      {- Otherwise. The value of {!Sys.os_type} lowercased or ["unknown"].}}
-      FIXME this should be:
-      {ul
-      {- [uname -s] if [uname] can be found in the build's search path.}
-      {- Windows ? cygwin ?}
-      {- "unknown" otherwise.}} *)
+  (** [name] is the operating system name. Determine using the
+      following steps (in order):
+      {ol
+      {- If [uname] can be found in the environment. Determined
+         by normalizing the output of [uname -s]. In particular ["darwin"]
+         is normalized to ["macos"]}
+      {- If the [COMSPEC] environment variable is defined, then ["windows"]
+         is used.}
+      {- ["unknown"] otherwise.}} *)
 
   val arch : string Conf.key
   (** [arch] is the architecture of the operating system.

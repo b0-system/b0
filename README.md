@@ -56,7 +56,8 @@ Homepage: http://erratique.ch/software/b0
 * Supports build as a library. The core `B0` memoizing build library
   can be reused for its own good.
 
-To get started, continue with the [manual][doc].
+To get started, continue with the [manual][doc]. High-level design
+choices are motivated by the [RATIONALE.md](RATIONALE.md).
 
 ## Convenience descriptions
 

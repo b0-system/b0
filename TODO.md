@@ -30,6 +30,11 @@
   in the environment ?
   https://reproducible-builds.org/specs/build-path-prefix-map/
 
+
+* https://hub.docker.com/r/ocaml/opam2-staging/tags/
+* 
+
+
 # B0.Def
 
 * Provide a way to lock definitions so that any def afterwards raises.
