@@ -109,7 +109,7 @@ let conf b =
   in
   let exe_ext = Build.conf b B0_care.OS.exe_ext in
   let byte_ext = ".byte" ^ exe_ext in
-  let native_ext = ".native" ^ exe_ext in
+  let native_ext = exe_ext in
   let cobj_ext = Build.conf b B0_c.obj_ext in
   let clib_ext = Build.conf b B0_c.lib_ext in
   let cdll_ext = Build.conf b B0_c.dll_ext in
