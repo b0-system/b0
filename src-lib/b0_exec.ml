@@ -110,14 +110,17 @@ let exec_spawn h o =
   exec_op h o;
   spawn (B0_op.get_spawn o)
 
+let relax () = ignore (Unix.select [] [] [] 0.0001)
+
 let rec collect_spawns ~block h = match h.spawn_count = 0 with
 | true -> ()
 | false ->
     (* We don't collect with -1 or 0 because library-wise we might collect
        things we did not spawn. On Windows there wouldn't be the choice
        anyways. This means that on a blocking collection there's a bit
-       of busy waiting involved. FIXME use sigchld + self-pipe trick ?
-       would that work on windows ? We could also sleep a bit via select. *)
+       of busy waiting involved, which we mitigate with [relax].
+       TODO use sigchld + self-pipe trick ? would that work on windows ?
+       Signals are brittle. *)
     let old_spawn_count = h.spawn_count in
     let collect spawns (pid, o as p) =
       match B0_os.Cmd.collect ~block:false pid with
@@ -127,7 +130,7 @@ let rec collect_spawns ~block h = match h.spawn_count = 0 with
     in
     h.spawns <- List.fold_left collect [] h.spawns;
     match block && old_spawn_count = h.spawn_count with
-    | true -> collect_spawns ~block h (* busy waiting *)
+    | true -> (* busy waiting *) relax (); collect_spawns ~block h
     | false -> ()
 
 let exec_spawns h =
