@@ -12,16 +12,22 @@
 
 #include <caml/unixsupport.h>
 
-/* mmap */
+/* Portable mmap/munmap */
 
-/* Darwin and Linux */
+/* Darwin and POSIX */
+
 #if defined(OCAML_B0_DARWIN) || defined(OCAML_B0_POSIX)
+
 #include <sys/stat.h>
 #include <sys/mman.h>
 
-static inline void *_ocaml_b0_mmap (int fd, size_t *size)
+/* N.B. b0_ctx is not used by this implementation */
+#define b0_ctx void *
+
+static inline void *_ocaml_b0_mmap (b0_ctx *c, value fdv, size_t *size)
 {
-  void *buffer = NULL;
+  int fd = Int_val (fdv);
+  void *b = NULL;
 
   struct stat st;
 
@@ -30,31 +36,78 @@ static inline void *_ocaml_b0_mmap (int fd, size_t *size)
 
   *size = st.st_size;
 
-  if ((buffer = mmap (NULL, *size, PROT_READ, MAP_SHARED, fd, 0)) == MAP_FAILED)
+  if ((b = mmap (NULL, *size, PROT_READ, MAP_SHARED, fd, 0)) == MAP_FAILED)
     OCAML_B0_RAISE_SYS_ERROR ("mmap () failed");
 
-  if (madvise (buffer, *size, MADV_SEQUENTIAL | MADV_WILLNEED) == -1)
+  if (madvise (b, *size, MADV_SEQUENTIAL | MADV_WILLNEED) == -1)
     OCAML_B0_RAISE_SYS_ERROR ("madvise () failed");
 
-  return buffer;
+  return b;
 }
 
-static inline void _ocaml_b0_munmap (void *buffer, size_t size)
+static inline void _ocaml_b0_munmap (b0_ctx *c, void *b, size_t size)
 {
-  if (munmap (buffer, size) == -1)
+  if (munmap (b, size) == -1)
     OCAML_B0_RAISE_SYS_ERROR ("munmap () failed");
 }
 
 /* Windows */
+
 #elif defined(OCAML_B0_WINDOWS)
-static inline void *_ocaml_b0_mmap (int fd, size_t *size) { return NULL; }
-static inline void _ocaml_b0_munmap (void *buffer, int size) { }
+
+#include <windows.h>
+
+#define b0_ctx HANDLE
+
+static inline void *_ocaml_b0_mmap (b0_ctx *c, value fdv, size_t *size)
+{
+  HANDLE fd = Handle_val (fdv);
+  void *b = NULL;
+  LARGE_INTEGER fsize = {0};
+
+  if (!GetFileSizeEx (fd, &fsize))
+    OCAML_B0_RAISE_SYS_ERROR ("GetFileSizeEx () failed");
+
+  *size = (size_t)fsize.QuadPart;
+
+  if (*size == 0) return NULL; /* Mapping fails on empty files */
+
+  *c = CreateFileMapping (fd, NULL, PAGE_READONLY, 0, 0, NULL);
+  if (!*c)
+    OCAML_B0_RAISE_SYS_ERROR ("CreateFileMapping () failed");
+
+  b = MapViewOfFile (*c, FILE_MAP_READ, 0, 0, *size);
+  if (!b)
+  {
+    CloseHandle (c);
+    OCAML_B0_RAISE_SYS_ERROR ("MapViewOfFile () failed");
+  }
+
+  return b;
+}
+
+static inline void _ocaml_b0_munmap (b0_ctx c, void *b, size_t size)
+{
+  if (size == 0) return; /* The file was empty, no mapping was performed */
+
+  if (!UnmapViewOfFile (b))
+    OCAML_B0_RAISE_SYS_ERROR ("UnmapViewOfFile () failed");
+
+  if (!CloseHandle (c))
+    OCAML_B0_RAISE_SYS_ERROR ("CloseHandle () failed");
+}
 
 /* Unsupported */
+
 #else
 #warning OCaml B0 library: unsupported platform, hashing will fail.
-static inline void *_ocaml_b0_mmap (int fd, size_t *size) { return NULL; }
-static inline void _ocaml_b0_munmap (void *buffer, int size) { }
+
+#define b0_ctx void *
+
+static inline void *_ocaml_b0_mmap (b0_ctx *c, value fdv, size_t *size)
+{ return NULL; }
+
+static inline void _ocaml_b0_munmap (b0_ctx c, void *b, size_t size) {}
 #endif
 
 /* Platform independent */
@@ -74,10 +127,11 @@ CAMLprim value ocaml_b0_murmurhash_fd (value fdv, value seed)
   CAMLparam2 (fdv, seed);
   CAMLlocal1 (res);
   size_t size = 0;
-  void *buffer = _ocaml_b0_mmap (Int_val (fdv), &size);
+  b0_ctx ctx;
+  void *b = _ocaml_b0_mmap (&ctx, fdv, &size);
   res = caml_alloc_string (16);
-  MurmurHash3_x64_128 (buffer, size, Int_val (seed), Bp_val (res));
-  _ocaml_b0_munmap (buffer, size);
+  MurmurHash3_x64_128 (b, size, Int_val (seed), Bp_val (res));
+  _ocaml_b0_munmap (ctx, b, size);
   CAMLreturn (res);
 }
 
@@ -92,9 +146,10 @@ CAMLprim value ocaml_b0_xxhash_fd (value fdv, value seed)
 {
   CAMLparam2 (fdv, seed);
   size_t size = 0;
-  void *buffer = _ocaml_b0_mmap (Int_val (fdv), &size);
-  XXH64_hash_t res = XXH64 (buffer, size, Int64_val (seed));
-  _ocaml_b0_munmap (buffer, size);
+  b0_ctx ctx;
+  void *b = _ocaml_b0_mmap (&ctx, fdv, &size);
+  XXH64_hash_t res = XXH64 (b, size, Int64_val (seed));
+  _ocaml_b0_munmap (ctx, b, size);
   CAMLreturn (caml_copy_int64 (res));
 }
 
