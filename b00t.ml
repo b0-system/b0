@@ -8,11 +8,11 @@ let absolute p = String.concat "" [root_dir; "/"; p]
 let fpath ?(ext = "") ~dir f = String.concat "" [dir; "/"; f; ext]
 
 let boot_dir = absolute "_boot"
-let exe = fpath ~dir:boot_dir "b0"
 let libs = ["result"; "cmdliner"]
 let b0_ml_src = fpath ~dir:(absolute "B0.d") "B0.ml"
 let b0_lib_dirs = ["src-std"; "src-lib"; "src-care"; "src-driver"; "src-b0"]
 let b0_cstubs_dirs = ["src-std"]
+let exe = (fpath ~dir:boot_dir "b0") ^ (if Sys.win32 then ".exe" else "")
 
 (* Logging *)
 
@@ -95,7 +95,7 @@ let libdir = try Sys.getenv "B0_DRIVER_LIBDIR" with
     try fpath ~dir:(Sys.getenv "OPAM_SWITCH_PREFIX") "lib" with
     | Not_found ->
         err "No OCaml library installation prefix found.\n\
-             Set the B0_LIBDIR environment variable to a library\n\
+             Set the B0_DRIVER_LIBDIR environment variable to a library\n\
              directory or invoke 'eval $(opam env)'."
 
 let lib_dir lib = fpath ~dir:libdir lib

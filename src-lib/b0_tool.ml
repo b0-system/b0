@@ -9,7 +9,10 @@ open B0_result
 (* Env vars *)
 
 type env_vars = string list
-let tmp_vars = ["TMPDIR"; "TEMP"]
+let tmp_vars = ["TMPDIR"; "TEMP"; "TMP";
+                (* FIXME the following has nothing to do here
+                   Dirty Win port *)
+                "SystemRoot"; "INCLUDE"; "LIB"]
 
 (* Tool *)
 

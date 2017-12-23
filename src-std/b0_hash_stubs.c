@@ -14,8 +14,10 @@
 #include <caml/alloc.h>
 #include <caml/unixsupport.h>
 
+#if defined(OCAML_B0_DARWIN) || defined(OCAML_B0_POSIX)
 #include <sys/stat.h>
 #include <sys/mman.h>
+#endif
 
 static inline void *_caml_b0_mmap (int fd, size_t *size) {
   void *buffer = NULL;

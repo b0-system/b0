@@ -428,6 +428,7 @@ module Deps = struct
 
   let parse_dep_line n l f acc =
     let rev = true (* because windows drives... *) in
+    let l = String.trim l (* because ocamldep may output \r\n *) in
     match String.cut ~rev ~sep:":" l with
     | None -> failwith (strf ":%d: Could not parse line %S" n l)
     | Some (file, mods) ->

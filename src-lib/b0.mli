@@ -2671,6 +2671,10 @@ module Tool : sig
       variables that are read from the build's environment and that do
       not affect the tool's output (defaults to {!tmp_vars}).
 
+      {b WARNING Windows users.} Never add the [.exe] extension to the
+      tool name, this will be done by the {!Env.tool_lookup} function as
+      needed.
+
       @raise Invalid_argument if [name] contains {!Fpath.dir_sep}, use
       {!of_file} to specify tools as file paths. *)
 

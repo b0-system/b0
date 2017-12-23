@@ -477,14 +477,24 @@ module Cmd = struct
 
   let which_lookup_needed =
     let tool_need_lookup_win32 cmd =
-      B0_string.exists B0_fpath.char_is_dir_sep cmd
+      not (B0_string.exists B0_fpath.char_is_dir_sep cmd)
     in
     let tool_need_lookup_unix cmd =
       try ignore (B0_string.index cmd '/'); false with Not_found -> true
     in
     if Sys.win32 then tool_need_lookup_win32 else tool_need_lookup_unix
 
+  (* FIXME this is not the right place to do this try to lift that
+     up in B0_env *)
+  let patch_win32 = match Sys.win32 with
+  | false -> fun t -> t
+  | true ->
+      fun t -> match B0_string.is_suffix ~affix:".exe" t with
+      | true -> t
+      | false -> t ^ ".exe"
+
   let which_file ~dirs tool =
+    let tool = patch_win32 tool in
     let execable tool = match Unix.access tool [Unix.X_OK] with
     | () -> true
     | exception (Unix.Unix_error _) -> false
@@ -498,7 +508,7 @@ module Cmd = struct
         | d :: dirs ->
             let exec_path = match d.[String.length d - 1] with
             | c when B0_fpath.char_is_dir_sep c -> d ^ tool
-            | _ -> Printf.sprintf "%s/%s" d tool in
+            | _ -> Printf.sprintf "%s%c%s" d B0_fpath.dir_sep_char tool in
             if execable exec_path then Some exec_path else loop tool dirs
         in
         loop tool dirs
@@ -700,8 +710,8 @@ module Cmd = struct
   let rm_rf p =
     let p = B0_fpath.to_string p in
     let rm_rf = match Sys.win32 with
-    | true -> [| "rmdir"; p; "/S"; "/Q"; "/F" |]
-    | false ->[| "rm"; "-r"; "-f"; p |]
+    | true -> [| "rd"; "/s"; "/q"; p; |]
+    | false -> [| "rm"; "-r"; "-f"; p |]
     in
     try
       let pid = Unix.(create_process rm_rf.(0) rm_rf stdin stdout stderr) in
@@ -709,8 +719,9 @@ module Cmd = struct
         (fun m -> m pid (B0_cmd.(to_string @@ of_list (Array.to_list rm_rf))));
       Ok pid
     with
-    | Unix.Unix_error (e, _, _) -> R.error_msgf "rm -rf %s: %s"  p (uerror e)
-
+    | Unix.Unix_error (e, _, _) ->
+        (* TODO don't output rm here *)
+        R.error_msgf "rm -rf %s: %s"  p (uerror e)
 
   (* exec *)
 

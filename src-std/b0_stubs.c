@@ -58,7 +58,7 @@ static double freq;
 static void ocaml_b0_clock_init_freq (void)
 {
   LARGE_INTEGER f;
-  if (!QueryPerformanceFrequence(&f))
+  if (!QueryPerformanceFrequency(&f))
     OCAML_B0_RAISE_SYS_ERROR ("QueryPerformanceFrequency () failed");
   freq = (1000000000.0 / f.QuadPart);
 }

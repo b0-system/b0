@@ -59,8 +59,21 @@ module Scheme = struct
 
   (* Direct schemes *)
 
+  let patch_win32_env = match Sys.win32 with
+  | false -> fun e -> e
+  | true ->
+      fun e -> match B0_string.Map.mem "PATH" e with
+      | true -> e
+      | false ->
+          (* For some reason Unix.environment returns the path in this var.
+             In fact on Windows environment variables are case insensitive. *)
+          match B0_string.Map.find "Path" e with
+          | exception Not_found -> e
+          | v -> e |> B0_string.Map.remove "Path" |> B0_string.Map.add "PATH" v
+
   let default_env () = (* build program process environment *)
     B0_os.Env.current () >>= fun env ->
+    let env = patch_win32_env env in
     let host_forced_env, host_env = B0_env.split_forced_env env in
     Ok (B0_env.v ~host_forced_env host_env)
 
