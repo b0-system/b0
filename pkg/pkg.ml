@@ -9,7 +9,7 @@ let () =
       (* Pkg.opam_file ~install "b0-lib.opam" *) ]
   in
   Pkg.describe "b0" ~opams @@ fun c ->
-  Ok [ Pkg.mllib ~api:[] "src-std/b0_std.mllib";
+  Ok [ Pkg.mllib ~api:["B0_fpath"] "src-std/b0_std.mllib";
        Pkg.clib "src-std/libb0_stubs.clib";
        Pkg.mllib ~api:["B0"] "src-lib/b0.mllib";
        Pkg.mllib ~api:["B0_driver"] "src-driver/b0_driver.mllib";
