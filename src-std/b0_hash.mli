@@ -4,20 +4,27 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-type t
+(** Hash function.
 
-val string : string -> t
-val file : B0_fpath.t -> t
-val raw_file : string -> t
-val to_byte_string : t -> string
+    See {!B0.Hash}. *)
+
+(** {1 Hash values} *)
+
+type t
+val zero : t
+val to_bytes : t -> string
 val to_hex : t -> string
 val of_hex : string -> t option
-
-val pp : Format.formatter -> t -> unit
+val pp : t B0_fmt.t
 val equal : t -> t -> bool
 val compare : t -> t -> int
 
-val zero : t
+(** {1 Hashing} *)
+
+val string : string -> t
+val file : B0_fpath.t -> t
+
+(** {1 Sets and Maps} *)
 
 module Set : Set.S with type elt = t
 type set = Set.t

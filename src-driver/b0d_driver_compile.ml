@@ -284,7 +284,7 @@ let action cli descr ~driver_dir ~driver_name ~driver_libs ~bin =
 (* FIXME reuse B0 funs, also hash OCAMLLIB OCAMLPARAM etc. *)
 
 let action_stamp a =
-  let hash_file_to_bytes f = Hash.(to_byte_string @@ file f) in
+  let hash_file_to_bytes f = Hash.(to_bytes @@ file f) in
   let byte_lib_stamp acc l = hash_file_to_bytes l :: acc in
   let native_lib_stamp acc l =
     hash_file_to_bytes l :: hash_file_to_bytes Fpath.(l -+ a.clib_ext) :: acc
@@ -293,9 +293,10 @@ let action_stamp a =
   | `Native -> native_lib_stamp
   | `Byte -> byte_lib_stamp
   in
-  let cstamp = Hash.(to_byte_string @@ raw_file (snd a.compiler)) in
+  let comp = Fpath.v (snd a.compiler) in
+  let cstamp = Hash.(to_bytes @@ file comp) in
   let lib_stamps = List.fold_left hash_lib [] a.libs in
-  Ok (Hash.to_byte_string @@ Hash.string @@
+  Ok (Hash.to_bytes @@ Hash.string @@
       String.concat "" @@
       (a.src :: cstamp ::
        (List.rev_append lib_stamps @@

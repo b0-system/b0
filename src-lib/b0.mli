@@ -1985,33 +1985,22 @@ module Time : sig
       [s] and uses locale independent standard time scale abbreviations. *)
 end
 
-(** Hashing. *)
+(** Hash function.
+
+    The algorithm is unspecified but should be collision resistant, build
+    correctness depends on it. *)
 module Hash : sig
 
-  (** {1 Hashes} *)
+  (** {1 Hash values} *)
 
   type t
-  (** The type for hashes. The algorithm is unspecified but should be
-      collision resistant. *)
+  (** The type for hash values. *)
 
   val zero : t
   (** [zero] is the zero hash, a sequence of null bytes. *)
 
-  val string : string -> t
-  (** [string s] is the hash of [s]. *)
-
-  val file : Fpath.t -> t
-  (** [file p] is the hash of file path [p].
-
-      {b FIXME} This raises Sys_error. *)
-
-  (**/**)
-  (* FIXME remove this *)
-  val raw_file : string -> t
-  (**/**)
-
-  val to_byte_string : t -> string
-  (** [to_byte_string h] is the sequence of bytes of the hash [h]. *)
+  val to_bytes : t -> string
+  (** [to_bytes h] is the sequence of bytes of the hash [h]. *)
 
   val to_hex : t -> string
   (** [to_hex h] is the sequence of bytes of the hash [h] as US-ASCII
@@ -2025,23 +2014,43 @@ module Hash : sig
   (** [equal h0 h1] is [true] iff [h0] and [h1] are equal. *)
 
   val compare : t -> t -> int
-  (** [compare h0 h1] is a totally order [h0] and [h1]. The order is
-      compatible with {!equal}. *)
+  (** [compare h0 h1] is a total order on hashes compatible with {!equal}. *)
 
   val pp : t Fmt.t
-  (** [pp ppf h] prints an unspecified reprsentation of [h] on [ppf]. *)
+  (** [pp ppf h] prints an unspecified representation of [h] on [ppf]. *)
 
-  (** {1:setmap Hash map and sets} *)
+  (** {1:hashing Hashing} *)
 
-  module Set : Set.S with type elt = t
-  type set = Set.t
+  val string : string -> t
+  (** [string s] is the hash of [s]. *)
 
-  module Map : Map.S with type key = t
-  type 'a map = 'a Map.t
+  val file : Fpath.t -> t
+  (** [file p] is the hash of file path [p].
+
+      {b FIXME} This raises Sys_error or Unix.Error. *)
+
+  (** {1:setmap Hash sets and maps} *)
+
+  type set
+  (** The type for sets of hashes. *)
+
+  module Set : Set.S with type elt = t and type t = set
+  (** Hash sets. *)
+
+  type +'a map
+  (** The type for hash maps. *)
+
+  module Map : Map.S with type key = t and type 'a t = 'a map
+  (** Hash maps. *)
 end
 
-(** Freshness stamps. *)
+(** Freshness stamps.
+
+    For now this it basically {!Hash}. *)
 module Stamp : sig
+
+  (** {1:stamps Stamps} *)
+
   include module type of Hash
   val hash : t -> Hash.t
   val of_hash : Hash.t -> t

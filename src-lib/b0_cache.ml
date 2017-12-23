@@ -224,7 +224,7 @@ let rec put c t p = match c.copying with
                     B0_fpath.pp t B0_fpath.pp p (uerror e))
 
 let op_write_key o file =
-  let stamp = B0_stamp.to_byte_string @@ B0_op.stamp o in
+  let stamp = B0_stamp.to_bytes @@ B0_op.stamp o in
   B0_stamp.string (stamp ^ B0_fpath.to_string file)
 
 let log_exec o =
@@ -270,7 +270,7 @@ let rec put_writes_in_cache c o =
   loop o (B0_fpath.Set.elements (B0_op.writes o))
 
 let op_stamp_reads ?(init = []) c o =
-  let add_read f acc = B0_stamp.to_byte_string (_file_stamp c f) :: acc in
+  let add_read f acc = B0_stamp.to_bytes (_file_stamp c f) :: acc in
   B0_fpath.Set.fold add_read (B0_op.reads o) init
 
 let spawn_stamp c o s =
@@ -285,7 +285,7 @@ let spawn_stamp c o s =
   | [] -> assert false
   | exe :: _ as acc ->
       let exe_stamp = _file_stamp c (B0_fpath.v exe) in
-      let acc = B0_stamp.to_byte_string exe_stamp :: acc in
+      let acc = B0_stamp.to_bytes exe_stamp :: acc in
       B0_stamp.string (String.concat "" acc)
 
 let exec_spawn c o s =
