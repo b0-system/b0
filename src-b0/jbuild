@@ -5,10 +5,3 @@
   (wrapped false)
   (modules (:standard \ bzero))
   (libraries (result cmdliner b0 b0.care b0.driver))))
-
-(executable
-  ((name bzero)
-   (public_name bzero)
-   (modules bzero)
-   (flags -linkall)
-   (libraries (b0.driver b0.b0))))

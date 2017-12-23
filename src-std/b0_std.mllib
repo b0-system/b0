@@ -7,6 +7,7 @@ B0_mtime
 B0_os
 B0_result
 B0_rqueue
+B0_hash
 B0_sexp
 B0_json
 B0_string

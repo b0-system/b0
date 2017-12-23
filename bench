@@ -43,7 +43,7 @@ run_ocamlbuild ()
 time_jbuilder () { time (jbuilder build -j $JOBS $JB_TARGETS &> /dev/null); }
 run_jbuilder ()
 {
-	JB_TARGETS="@install src-b0/bzero.bc"
+	JB_TARGETS="@install src-exe/bzero.bc"
 	rm -rf _build
   start_cold "jbuilder"; time_jbuilder;
   start_zero "jbuilder"; time_jbuilder;
