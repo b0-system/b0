@@ -36,6 +36,8 @@ static inline void *_ocaml_b0_mmap (b0_ctx *c, value fdv, size_t *size)
 
   *size = st.st_size;
 
+  if (*size == 0) return NULL; /* Mapping fails on empty files */
+
   if ((b = mmap (NULL, *size, PROT_READ, MAP_SHARED, fd, 0)) == MAP_FAILED)
     OCAML_B0_RAISE_SYS_ERROR ("mmap () failed");
 
@@ -47,6 +49,7 @@ static inline void *_ocaml_b0_mmap (b0_ctx *c, value fdv, size_t *size)
 
 static inline void _ocaml_b0_munmap (b0_ctx *c, void *b, size_t size)
 {
+  if (size == 0) return; /* The file was empty, no mapping was performed */
   if (munmap (b, size) == -1)
     OCAML_B0_RAISE_SYS_ERROR ("munmap () failed");
 }
