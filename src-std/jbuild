@@ -8,4 +8,4 @@
   ; This doesn't work for jbuilder so we temporarily moved the vendored stubs
   ; to lib-std. Move them back there once we get rid of the jbuilder build.
   ; (c_names (b0_stubs b0_hash_stubs vendor/MurmurHash3 vendor/xxhash))
-  (c_names (b0_stubs b0_hash_stubs MurmurHash3 xxhash))))
+  (c_names (b0_time_stubs b0_hash_stubs MurmurHash3 xxhash))))

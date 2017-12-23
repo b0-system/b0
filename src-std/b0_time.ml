@@ -4,20 +4,28 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-type uint64 = int64
+(* Unsigned int64 *)
 
-(* Monotonic time spans *)
+type uint64 = int64
+let uint64_compare a b = Int64.(compare (sub a min_int) (sub b min_int))
+
+(* Monotonic time spans
+
+   Represented by a nanosecond magnitude stored in an unisigned 64-bit integer.
+   Allows to represent spans for ~584.5 Julian years. *)
 
 type span = uint64
 
 let zero = 0L
+let one = 1L
 let add = Int64.add
-let sub = Int64.sub
+let abs_diff s0 s1 =
+  if uint64_compare s0 s1 < 0 then Int64.sub s1 s0 else Int64.sub s0 s1
+
 let to_ns s = Int64.to_float s
 let to_uint64_ns s = s
 let of_uint64_ns ns = ns
-let compare_span a b =
-  Int64.(compare (sub a min_int) (sub b min_int)) (* unsigned comparison *)
+let compare_span = uint64_compare
 
 (* Monotonic time counter *)
 
@@ -30,12 +38,18 @@ let count c = Int64.sub (now_ns ()) c
 (* CPU time *)
 
 type cpu = Unix.process_times
-type cpu_counter = cpu
-let cpu_counter () = Unix.times ()
-
 let cpu_zero =
   Unix.{ tms_utime = 0.; tms_stime = 0.; tms_cutime = 0.; tms_cstime = 0. }
 
+let cpu_utime_s c = c.Unix.tms_utime
+let cpu_stime_s c = c.Unix.tms_stime
+let cpu_children_utime_s c = c.Unix.tms_cutime
+let cpu_children_stime_s c = c.Unix.tms_cstime
+
+(* CPU counters *)
+
+type cpu_counter = cpu
+let cpu_counter () = Unix.times ()
 let cpu_count c =
   let n = Unix.times () in
   Unix.{ tms_utime = n.tms_utime -. c.tms_utime;
@@ -43,15 +57,9 @@ let cpu_count c =
          tms_cutime = n.tms_cutime -. c.tms_cutime;
          tms_cstime = n.tms_cstime -. c.tms_cstime; }
 
-let cpu_utime_s c = c.Unix.tms_utime
-let cpu_stime_s c = c.Unix.tms_stime
-let cpu_children_utime_s c = c.Unix.tms_cutime
-let cpu_children_stime_s c = c.Unix.tms_cstime
-
 (* Pretty horrible code that was c&p from mtime. There's certainly
    a more clever way of achieving the same result but, time. *)
 
-let ns_to_s   = 1e-9
 let us_to_s   = 1e-6
 let ms_to_s   = 1e-3
 let min_to_s  = 60.

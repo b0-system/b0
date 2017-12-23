@@ -4,12 +4,17 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(* Monotonic time *)
+(** Measuring time.
+
+    See {!B0.Time}. *)
+
+(** {1 Monotonic wall-clock time} *)
 
 type span
 val zero : span
+val one : span
 val add : span -> span -> span
-val sub : span -> span -> span
+val abs_diff : span -> span -> span
 val to_ns : span -> float
 val to_uint64_ns : span -> int64
 val of_uint64_ns : int64 -> span
@@ -21,17 +26,21 @@ type counter
 val counter : unit -> counter
 val count : counter -> span
 
-(* CPU time *)
+(** {1 CPU time} *)
 
 type cpu
-type cpu_counter
-val cpu_counter : unit -> cpu_counter
-val cpu_count : cpu_counter -> cpu
 val cpu_zero : cpu
 val cpu_utime_s : cpu -> float
 val cpu_stime_s : cpu -> float
 val cpu_children_utime_s : cpu -> float
 val cpu_children_stime_s : cpu -> float
+
+type cpu_counter
+val cpu_counter : unit -> cpu_counter
+val cpu_count : cpu_counter -> cpu
+
+(** {1 Pretty-print float seconds *)
+
 val pp_float_s : Format.formatter -> float -> unit
 
 (*---------------------------------------------------------------------------

@@ -30,7 +30,7 @@ end
 
 module Cmd = B0_cmd
 module OS = B0_os
-module Time = B0_mtime
+module Time = B0_time
 module Hash = B0_hash
 module Stamp = B0_stamp
 module Cache = B0_cache

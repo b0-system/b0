@@ -1,4 +1,4 @@
-b0_stubs.o
+b0_time_stubs.o
 b0_hash_stubs.o
 MurmurHash3.o
 xxhash.o

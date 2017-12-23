@@ -68,8 +68,8 @@ val path_map : t -> elt B0_fpath.Map.t
 
 (* Build operations *)
 
-val set_dur_counter : t -> B0_mtime.counter -> unit (* FIXME *)
-val file_stamp_dur : t -> B0_mtime.span
+val set_dur_counter : t -> B0_time.counter -> unit (* FIXME *)
+val file_stamp_dur : t -> B0_time.span
 
 val exec : t -> B0_op.t -> bool
 val add_op : t -> B0_op.t -> unit

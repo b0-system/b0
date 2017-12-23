@@ -1886,10 +1886,13 @@ module OS : sig
   end
 end
 
-(** Timing. *)
+(** Measuring time.
+
+    Support to measure monotonic wall-clock {{!monotonic}time} and CPU
+    {{!cpu}time}. *)
 module Time : sig
 
-  (** {1:mon Monotonic time} *)
+  (** {1:monotonic Monotonic wall-clock time} *)
 
   type span
   (** The type for non-negative monotonic time spans. They represent
@@ -1898,11 +1901,14 @@ module Time : sig
   val zero : span
   (** [zero] is a span of 0ns. *)
 
-  val add : span -> span -> span
-  (** [add s0 s1] is [s0] + [s1]. *)
+  val one : span
+  (** [one] is a span of 1ns. *)
 
-  val sub : span -> span -> span
-  (** FIXME define abs_diff. *)
+  val add : span -> span -> span
+  (** [add s0 s1] is [s0] + [s1]. {b Warning.} Rolls over on overflow. *)
+
+  val abs_diff : span -> span -> span
+  (** [abs_diff s0 s1] is the aboslute difference between [s0] and [s1]. *)
 
   val to_ns : span -> float
   (** [to_ns s] is [s] in nanoseconds (1e-9). *)
@@ -1927,6 +1933,8 @@ module Time : sig
   val compare_span : span -> span -> int
   (** [compare_span s0 s1] orders span by increasing duration. *)
 
+  (** {2:count Monotonic time counters} *)
+
   type counter
   (** The type for monotonic wall-clock time counters. *)
 
@@ -1940,15 +1948,6 @@ module Time : sig
 
   type cpu
   (** The type for CPU execution time. *)
-
-  type cpu_counter
-  (** The type for CPU time counters. *)
-
-  val cpu_counter : unit -> cpu_counter
-  (** [cpu_counter ()] is a counter counting from now on. *)
-
-  val cpu_count : cpu_counter -> cpu
-  (** [cpu_count c] are CPU times since [c] was created. *)
 
   val cpu_zero : cpu
   (** [cpu_zero] is zero CPU times. *)
@@ -1966,6 +1965,19 @@ module Time : sig
   val cpu_children_stime_s : cpu -> float
   (** [cpu_utime_s cpu] is [cpu]'s system time in seconds for children
       processes. *)
+
+  (** {2:cpu_count CPU counters} *)
+
+  type cpu_counter
+  (** The type for CPU time counters. *)
+
+  val cpu_counter : unit -> cpu_counter
+  (** [cpu_counter ()] is a counter counting from now on. *)
+
+  val cpu_count : cpu_counter -> cpu
+  (** [cpu_count c] are CPU times since [c] was created. *)
+
+  (** {1:pp Pretty-printing [float] seconds} *)
 
   val pp_float_s : float Fmt.t
   (** [pp_span ppf s] prints an unspecified representation of [s] on [ppf].

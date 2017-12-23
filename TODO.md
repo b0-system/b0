@@ -29,10 +29,10 @@
 * Reproducible builds. Should we force by default BUILD_PATH_PREFIX_MAP
   in the environment ?
   https://reproducible-builds.org/specs/build-path-prefix-map/
-
-
 * https://hub.docker.com/r/ocaml/opam2-staging/tags/
-* 
+* B0_ocaml, stub changes do not retrigger some compilation.
+  Make library archive depend on stubs. May also be the reason
+  for spurious failures in examples.
 
 
 # B0.Def
@@ -42,6 +42,7 @@
   dynamically (e.g. conf keys, build units, variants schemes).
 * For B0 as a library. Provide a way to disable the retaining of
   definitions (Unit.list, Variant.Scheme.list). Related to locking.
+
 
 # B0.Conf
 

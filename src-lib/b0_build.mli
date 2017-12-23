@@ -13,12 +13,12 @@ open B0_result
 (* FIXME make that abstract *)
 
 type stats =
-  { mutable cpu_dur : B0_mtime.cpu;
+  { mutable cpu_dur : B0_time.cpu;
     mutable cmd_stamp_count : int; (* uncached *)
-    mutable cmd_stamp_dur : B0_mtime.span;
+    mutable cmd_stamp_dur : B0_time.span;
     mutable file_stamp_count : int; (* uncached *)
-    mutable file_stamp_dur : B0_mtime.span;
-    mutable total_dur : B0_mtime.span; }
+    mutable file_stamp_dur : B0_time.span;
+    mutable total_dur : B0_time.span; }
 
 type written_file = (* Information about a written file in the build. *)
   { w_age : int; (* Age in which the path was last linked/written. *)

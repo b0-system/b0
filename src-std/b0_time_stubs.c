@@ -14,7 +14,7 @@
 #include <mach/mach_time.h>
 
 static mach_timebase_info_data_t scale = {0};
-static void ocaml_b0_clock_init_scale (void)
+static void _ocaml_b0_clock_init_scale (void)
 {
   if (mach_timebase_info (&scale) != KERN_SUCCESS)
     OCAML_B0_RAISE_SYS_ERROR ("mach_timebase_info () failed");
@@ -25,7 +25,7 @@ static void ocaml_b0_clock_init_scale (void)
 
 CAMLprim value ocaml_b0_monotonic_now_ns (value unit)
 {
-  if (scale.denom == 0) { ocaml_b0_clock_init_scale (); }
+  if (scale.denom == 0) { _ocaml_b0_clock_init_scale (); }
   uint64_t now = mach_absolute_time ();
   return caml_copy_int64 ((now * scale.numer) / scale.denom);
 }
@@ -54,8 +54,8 @@ CAMLprim value ocaml_b0_monotonic_now_ns (value unit)
 
 #include <windows.h>
 
-static double freq;
-static void ocaml_b0_clock_init_freq (void)
+static double freq = 0;
+static void _ocaml_b0_clock_init_freq (void)
 {
   LARGE_INTEGER f;
   if (!QueryPerformanceFrequency(&f))
@@ -66,7 +66,7 @@ static void ocaml_b0_clock_init_freq (void)
 CAMLprim value ocaml_b0_monotonic_now_ns (value unit)
 {
   static LARGE_INTEGER now;
-  if (freq == 0) ocaml_b0_clock_init_freq;
+  if (freq == 0) _ocaml_b0_clock_init_freq ();
   if (!QueryPerformanceCounter(&now))
     OCAML_B0_RAISE_SYS_ERROR ("QueryPerformanceCounter () failed");
   return caml_copy_int64 ((uint64_t)(now.QuadPart * freq));

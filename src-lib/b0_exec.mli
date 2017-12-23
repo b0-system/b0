@@ -19,7 +19,7 @@ type handler
 (** The type for asynchronous operation handlers. *)
 
 val handler :
-  ?rand:Random.State.t -> max_spawn:int -> dur_counter:B0_mtime.counter ->
+  ?rand:Random.State.t -> max_spawn:int -> dur_counter:B0_time.counter ->
   tmp_path:B0_fpath.t -> unit -> handler
 (** [create ~max_spawn ~dur_counter ~tmp_path] is an OS asynchronous
     interaction handler which supports up to [max_spawn] process

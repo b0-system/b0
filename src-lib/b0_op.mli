@@ -32,25 +32,25 @@ val reads : t -> B0_fpath.set
 val writes : t -> B0_fpath.set
 (** [writes o] writes are the file paths written by [o]. *)
 
-val creation_time : t -> B0_mtime.span
+val creation_time : t -> B0_time.span
 (** [creation_time o] is [o]'s monotonic creation time. *)
 
-val exec_start_time : t -> B0_mtime.span
+val exec_start_time : t -> B0_time.span
 (** [exec_start_time o] is [o]'s monotonic operating system starting
     execution time. This is different from {!B0_mtime.zero} once the
     operation has been submitted to the OS. *)
 
-val set_exec_start_time : t -> B0_mtime.span -> unit
+val set_exec_start_time : t -> B0_time.span -> unit
 (** [set_submit_time o t] sets [o]'s submit time to [t]. *)
 
-val exec_end_time : t -> B0_mtime.span
+val exec_end_time : t -> B0_time.span
 (** [exec_end_time o] is [o]'s monotonic time when the operation's has
     been processed by the operating system. This is different from
     {!B0_mtime.zero} once the operation has been completed by the OS
     and collected and processed into [Executed] status by the build
     program. *)
 
-val set_exec_end_time : t -> B0_mtime.span -> unit
+val set_exec_end_time : t -> B0_time.span -> unit
 (** [set_exec_end_time o t] sets [o]'s return time to [t]. *)
 
 val cached : t -> bool
@@ -116,7 +116,7 @@ type spawn
 (** The type for process spawn operations. *)
 
 val spawn :
-  B0_unit.t -> B0_conf.build_aim -> B0_mtime.span -> reads:B0_fpath.set ->
+  B0_unit.t -> B0_conf.build_aim -> B0_time.span -> reads:B0_fpath.set ->
   writes:B0_fpath.set -> success:spawn_success_codes ->
   stdin:B0_fpath.t option -> stdout:spawn_stdo -> stderr:spawn_stdo ->
   cwd:B0_fpath.t -> spawn_env -> B0_cmd.t -> t
@@ -168,7 +168,7 @@ val set_spawn_result : spawn -> (spawn_pid * B0_os.Cmd.status) result -> unit
 type read
 (** The type for file read operations. *)
 
-val read : B0_unit.t -> B0_conf.build_aim -> B0_mtime.span -> B0_fpath.t -> t
+val read : B0_unit.t -> B0_conf.build_aim -> B0_time.span -> B0_fpath.t -> t
 (** [read f] reads the contents of file [f] in memory. *)
 
 val read_file : read -> B0_fpath.t
@@ -191,7 +191,7 @@ type write
 (** The type for (atomic) file write operations. *)
 
 val write :
-  B0_unit.t -> B0_conf.build_aim -> B0_mtime.span -> reads:B0_fpath.set ->
+  B0_unit.t -> B0_conf.build_aim -> B0_time.span -> reads:B0_fpath.set ->
   B0_fpath.t -> t
 (** [write u f], when submitted, starts to atomically set the
     contents of [f] to [write_data w]. *)
@@ -217,7 +217,7 @@ type copy_file
 (** The type for file copies. *)
 
 val copy_file :
-  ?linenum:int -> B0_unit.t -> B0_conf.build_aim -> B0_mtime.span ->
+  ?linenum:int -> B0_unit.t -> B0_conf.build_aim -> B0_time.span ->
   B0_fpath.t -> B0_fpath.t -> t
 (** [copy_file ?linenum src dst], when submitted, copies [src] to
     [dst].  If [linenum] is [true] the following line number directive
@@ -248,7 +248,7 @@ type delete
 (** The type for file deletions. *)
 
 val delete :
-  B0_unit.t -> B0_conf.build_aim -> B0_mtime.span -> B0_fpath.t -> t
+  B0_unit.t -> B0_conf.build_aim -> B0_time.span -> B0_fpath.t -> t
 (** [delete u t p] starts to delete path [p]. *)
 
 val delete_file : delete -> B0_fpath.t
@@ -266,7 +266,7 @@ type mkdir
 (** The type for directory creation operations. *)
 
 val mkdir :
-  B0_unit.t -> B0_conf.build_aim -> B0_mtime.span -> B0_fpath.t -> t
+  B0_unit.t -> B0_conf.build_aim -> B0_time.span -> B0_fpath.t -> t
 (** [mkdir u t] start to create directory path [d]. *)
 
 val mkdir_dir : mkdir -> B0_fpath.t
@@ -284,7 +284,7 @@ type sync
 (** The type for unit synchronisation. *)
 
 val sync :
-  B0_unit.t -> B0_conf.build_aim -> B0_mtime.span -> B0_unit.Idset.t -> t
+  B0_unit.t -> B0_conf.build_aim -> B0_time.span -> B0_unit.Idset.t -> t
 (** [sync u us] synchronises on the successful termination of [us]. *)
 
 val sync_units : sync -> B0_unit.Idset.t

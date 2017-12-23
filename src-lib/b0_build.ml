@@ -15,18 +15,18 @@ let strf = Format.asprintf
 (* Global build stats *)
 
 type stats =
-  { mutable cpu_dur : B0_mtime.cpu;
+  { mutable cpu_dur : B0_time.cpu;
     mutable cmd_stamp_count : int; (* uncached *)
-    mutable cmd_stamp_dur : B0_mtime.span;
+    mutable cmd_stamp_dur : B0_time.span;
     mutable file_stamp_count : int; (* uncached *)
-    mutable file_stamp_dur : B0_mtime.span;
-    mutable total_dur : B0_mtime.span; }
+    mutable file_stamp_dur : B0_time.span;
+    mutable total_dur : B0_time.span; }
 
 let zero_stats () =
-  { cpu_dur = B0_mtime.cpu_zero;
-    cmd_stamp_count = 0; cmd_stamp_dur = B0_mtime.zero;
-    file_stamp_count = 0; file_stamp_dur = B0_mtime.zero;
-    total_dur = B0_mtime.zero; }
+  { cpu_dur = B0_time.cpu_zero;
+    cmd_stamp_count = 0; cmd_stamp_dur = B0_time.zero;
+    file_stamp_count = 0; file_stamp_dur = B0_time.zero;
+    total_dur = B0_time.zero; }
 
 (* Outcome information *)
 
@@ -73,8 +73,8 @@ type unit_state =
 
 type build =
   { prev_outcome : outcome; (* Persistent build info *)
-    dur_counter : B0_mtime.counter;
-    cpu_counter : B0_mtime.cpu_counter;
+    dur_counter : B0_time.counter;
+    cpu_counter : B0_time.cpu_counter;
     dir : B0_fpath.t; (* Build directory *)
     trash : B0_fpath.t ; (* Trash directory *)
     age : int;
@@ -121,11 +121,11 @@ let cache b = b.b.cache
 let units b = List.map fst b.b.units
 let src_dir b = B0_unit.src_root b.unit
 let unit b = b.unit
-let time_stamp b = B0_mtime.count b.b.dur_counter
+let time_stamp b = B0_time.count b.b.dur_counter
 
 let create ?prev_outcome cache ctrl env conf fpath_meta ~dir ~universe units =
-  let dur_counter = B0_mtime.counter () in
-  let cpu_counter = B0_mtime.cpu_counter () in
+  let dur_counter = B0_time.counter () in
+  let cpu_counter = B0_time.cpu_counter () in
   let trash = B0_fpath.(dir / "trash") in
   let tmp = B0_fpath.(dir / "tmp") in
   B0_os.Dir.create ~path:true dir >>= fun _ ->
@@ -202,7 +202,7 @@ let log_finish b =
   let count = strf "%d/%d" succ tot in
   let d = b.b.stats.total_dur in
   B0_log.app (fun m -> m "[%a] units in %a"
-                 (B0_tty.pp_str style) count B0_mtime.pp_span d);
+                 (B0_tty.pp_str style) count B0_time.pp_span d);
   ()
 
 (* Failing builds *)
@@ -774,8 +774,8 @@ let finish b =
   collect_ops ~finish:true b;
   ignore ((B0_os.Cmd.rm_rf (trash b) |> B0_log.on_error_msg ~use:(fun _ -> 1)));
   resolve_blocked b;
-  b.b.stats.cpu_dur <- B0_mtime.cpu_count b.b.cpu_counter;
-  b.b.stats.total_dur <- B0_mtime.count b.b.dur_counter;
+  b.b.stats.cpu_dur <- B0_time.cpu_count b.b.cpu_counter;
+  b.b.stats.total_dur <- B0_time.count b.b.dur_counter;
   b.b.finished <- true;
   log_finish b;
   Ok ()

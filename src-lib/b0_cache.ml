@@ -44,30 +44,30 @@ type t =
     index_file : B0_fpath.t;
     disable : bool;
     mutable copying : bool; (* [true] if link(2) fails with EXDEV. *)
-    mutable dur_counter : B0_mtime.counter;
+    mutable dur_counter : B0_time.counter;
     mutable index : elt B0_hash.Map.t;
     mutable file_stamps : B0_stamp.t B0_fpath.map;
-    mutable file_stamp_dur : B0_mtime.span; }
+    mutable file_stamp_dur : B0_time.span; }
 
 let _file_stamp c file = match B0_fpath.Map.find file c.file_stamps with
 | s -> s
 | exception Not_found ->
-  let t = B0_mtime.counter () in
+  let t = B0_time.counter () in
   let stamp = B0_stamp.file file in
-  let dur = B0_mtime.count t in
+  let dur = B0_time.count t in
   c.file_stamps <- B0_fpath.Map.add file stamp c.file_stamps;
-  c.file_stamp_dur <- B0_mtime.add dur c.file_stamp_dur;
+  c.file_stamp_dur <- B0_time.add dur c.file_stamp_dur;
   stamp
 
 let file_stamp c file = _file_stamp c file (* FIXME catch Sys_error *)
 
 let empty ~index_file ~dir =
   { dir; index_file; index = B0_hash.Map.empty;
-    dur_counter = B0_mtime.counter ();
+    dur_counter = B0_time.counter ();
     disable = false;
     copying = false;
     file_stamps = B0_fpath.Map.empty;
-    file_stamp_dur = B0_mtime.zero; }
+    file_stamp_dur = B0_time.zero; }
 
 let is_empty c = B0_hash.Map.is_empty c.index
 let dir c = c.dir
@@ -89,9 +89,9 @@ let load ~index_file ~dir =
   | true ->
       B0_codec.read codec index_file >>= fun index ->
       Ok { dir; index_file; index; disable = false; copying = false;
-           dur_counter = B0_mtime.counter ();
+           dur_counter = B0_time.counter ();
            file_stamps = B0_fpath.Map.empty;
-           file_stamp_dur = B0_mtime.zero; }
+           file_stamp_dur = B0_time.zero; }
 
 let save c =
   B0_os.Dir.create (B0_fpath.parent c.index_file) >>= fun _ ->
@@ -170,7 +170,7 @@ let path_map c =
 (* Build ops *)
 
 let set_dur_counter c counter = c.dur_counter <- counter
-let time_stamp c = B0_mtime.count c.dur_counter
+let time_stamp c = B0_time.count c.dur_counter
 let cache_file c key = B0_fpath.(c.dir / B0_stamp.to_hex key)
 
 let uerror = Unix.error_message
@@ -242,7 +242,7 @@ let rec put_writes_from_cache c o =
       match put c (cache_file c key) f with
       | true -> loop o (f :: undo) fs
       | false ->
-          B0_op.set_exec_start_time o B0_mtime.zero; (* faux départ *)
+          B0_op.set_exec_start_time o B0_time.zero; (* faux départ *)
           List.iter unlink undo;
           false
   in

@@ -42,11 +42,11 @@ let spawn_counts o =
   (List.length uncached, List.length cached)
 
 let pp_timed_count ppf (c, t) =
-  B0_fmt.pf ppf "@[%d in %a@]" c B0_mtime.pp_span t
+  B0_fmt.pf ppf "@[%d in %a@]" c B0_time.pp_span t
 
 let pp_cpu_times ppf (u, s) =
   B0_fmt.pf ppf "@[user: %a sys: %a@]"
-    B0_mtime.pp_float_s u B0_mtime.pp_float_s s
+    B0_time.pp_float_s u B0_time.pp_float_s s
 
 let pp_previous pp_v ppf v = B0_tty.pp [`Faint] pp_v ppf v
 
@@ -68,30 +68,30 @@ let pp_file_stamps ppf s =
   pp_timed_count ppf (s.file_stamp_count, s.file_stamp_dur)
 
 let pp_x_time ppf (self, children) =
-  B0_mtime.pp_float_s ppf self;
+  B0_time.pp_float_s ppf self;
   B0_fmt.sp ppf ();
-  B0_fmt.field "children" B0_mtime.pp_float_s ppf children
+  B0_fmt.field "children" B0_time.pp_float_s ppf children
 
 let pp_user_time ppf s =
-  pp_x_time ppf B0_mtime.(cpu_utime_s @@ s.cpu_dur,
+  pp_x_time ppf B0_time.(cpu_utime_s @@ s.cpu_dur,
                           cpu_children_utime_s @@ s.cpu_dur)
 
 let pp_system_time ppf s =
-  pp_x_time ppf B0_mtime.(cpu_stime_s @@ s.cpu_dur,
+  pp_x_time ppf B0_time.(cpu_stime_s @@ s.cpu_dur,
                           cpu_children_stime_s @@ s.cpu_dur)
 
 let pp_duration ppf (n, p) =
   let dur_ratio now last =
-    truncate @@ B0_mtime.(to_ns now /. to_ns last) *. 100.
+    truncate @@ B0_time.(to_ns now /. to_ns last) *. 100.
   in
   let pp_last ppf p =
     B0_fmt.pf ppf "%d%% of prev. %a" (dur_ratio n.total_dur p.total_dur)
-      B0_mtime.pp_span p.total_dur
+      B0_time.pp_span p.total_dur
   in
   match p with
-  | None -> B0_mtime.pp_span ppf n.total_dur
+  | None -> B0_time.pp_span ppf n.total_dur
   | Some p ->
-      B0_fmt.pf ppf "%a %a" B0_mtime.pp_span n.total_dur (pp_previous pp_last) p
+      B0_fmt.pf ppf "%a %a" B0_time.pp_span n.total_dur (pp_previous pp_last) p
 
 let pp_stats ppf o =
   let cmp = match o.o_age with
@@ -137,7 +137,7 @@ let string_array_json a =
   B0_json.arr @@ Array.fold_left add B0_json.empty a
 
 let span_us_json s =
-  B0_json.int @@ Int64.(to_int @@ div (B0_mtime.to_uint64_ns s) 1000L)
+  B0_json.int @@ Int64.(to_int @@ div (B0_time.to_uint64_ns s) 1000L)
 
 let cmd_json c = B0_json.str @@ B0_cmd.to_string c
 let path_json p = B0_json.str @@ B0_fpath.to_string p
@@ -148,9 +148,9 @@ let path_set_json pset =
 let aim_json a =
   B0_json.str (match a with `Build_os -> "build OS" | `Host_os -> "host OS")
 
-let duration_json op =
-  let dur = B0_mtime.sub (B0_op.exec_end_time op) (B0_op.exec_start_time op) in
-  span_us_json dur
+let duration_json o =
+  let d = B0_time.abs_diff (B0_op.exec_end_time o) (B0_op.exec_start_time o) in
+  span_us_json d
 
 let args_json op =
   let open B0_json in

@@ -13,7 +13,7 @@ open B0_result
 
 type handler =
   { tmp_path : B0_fpath.t;
-    dur_counter : B0_mtime.counter;
+    dur_counter : B0_time.counter;
     todo : B0_op.t B0_rqueue.t; (* Operations waiting for OS submission *)
     collectable : B0_op.t Queue.t; (* Collectable operations *)
     to_spawn : (* Spawn ops dequeued from [todo] waiting to spawn *)
@@ -40,7 +40,7 @@ let all_done h = (* [true] iff nothing left todo in the handler *)
 
 let incr_spawn_count h = h.spawn_count <- h.spawn_count + 1
 let decr_spawn_count h = h.spawn_count <- h.spawn_count - 1
-let time_stamp h = B0_mtime.count h.dur_counter
+let time_stamp h = B0_time.count h.dur_counter
 
 let complete_op h o =
   B0_op.(set_status o Executed);

@@ -136,10 +136,10 @@ let on_error_msg ?(level = Error) ?header ~use = function
 (* Logging timings *)
 
 let time ?(level = Info) m f v =
-  let time = B0_mtime.counter () in
+  let time = B0_time.counter () in
   let r = f v in
-  let span = B0_mtime.count time in
-  let header = Format.asprintf "%a" B0_mtime.pp_span span in
+  let span = B0_time.count time in
+  let header = Format.asprintf "%a" B0_time.pp_span span in
   !_kmsg.kmsg (fun () -> r) level (fun w -> m r (w ~header))
 
 (*---------------------------------------------------------------------------

@@ -128,9 +128,9 @@ type t =
     mutable reads : B0_fpath.set;
     mutable writes : B0_fpath.set;
     kind : kind;
-    creation_time : B0_mtime.span;
-    mutable exec_start_time : B0_mtime.span;
-    mutable exec_end_time : B0_mtime.span;
+    creation_time : B0_time.span;
+    mutable exec_start_time : B0_time.span;
+    mutable exec_end_time : B0_time.span;
     mutable cached : bool;
     mutable status : status;
     mutable stamp : B0_stamp.t; }
@@ -141,8 +141,8 @@ let v
   =
   let id = uid () in
   let unit_id = B0_unit.id unit in
-  let exec_start_time = B0_mtime.zero in
-  let exec_end_time = B0_mtime.zero in
+  let exec_start_time = B0_time.zero in
+  let exec_end_time = B0_time.zero in
   { id; unit_id; aim; reads; writes; kind; creation_time; exec_start_time;
     exec_end_time; cached = false; status = Guarded;
     stamp = B0_stamp.zero  }
@@ -176,9 +176,9 @@ let dump_op ppf o =
      @,      exec end: %a@,status: %a@,cached: %b stamp: %a"
     o.id o.unit_id B0_fpath.Set.dump o.reads
     B0_fpath.Set.dump o.writes
-    B0_mtime.pp_span_uint_ns o.creation_time
-    B0_mtime.pp_span_uint_ns o.exec_start_time
-    B0_mtime.pp_span_uint_ns o.exec_end_time
+    B0_time.pp_span_uint_ns o.creation_time
+    B0_time.pp_span_uint_ns o.exec_start_time
+    B0_time.pp_span_uint_ns o.exec_end_time
     pp_status o.status
     o.cached B0_stamp.pp o.stamp
 
@@ -373,7 +373,7 @@ let cycle o0 o1 =
 let equal o0 o1 = (( = ) : int -> int -> bool) o0.id o1.id
 let compare o0 o1 = (compare : int -> int -> int) o0.id o1.id
 let compare_exec_start_time o0 o1 =
-  B0_mtime.compare_span o0.exec_start_time o1.exec_start_time
+  B0_time.compare_span o0.exec_start_time o1.exec_start_time
 
 (* Pretty-printing *)
 
@@ -451,10 +451,10 @@ let pp_log_line ppf o =
 
 let pp_long ppf o =
   let pp_span ppf s =
-    B0_fmt.pf ppf "%a (%ans)" B0_mtime.pp_span s B0_mtime.pp_span_uint_ns s
+    B0_fmt.pf ppf "%a (%ans)" B0_time.pp_span s B0_time.pp_span_uint_ns s
   in
   let pp_op ppf o =
-    let duration = B0_mtime.sub o.exec_end_time o.exec_start_time in
+    let duration = B0_time.abs_diff o.exec_end_time o.exec_start_time in
     B0_fmt.field "writes" B0_fpath.Set.dump ppf o.writes; B0_fmt.cut ppf ();
     B0_fmt.field "reads"B0_fpath.Set.dump ppf o.reads; B0_fmt.cut ppf ();
     B0_fmt.field "created" pp_span ppf o.creation_time; B0_fmt.cut ppf ();
