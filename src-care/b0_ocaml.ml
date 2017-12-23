@@ -32,7 +32,13 @@ module Tool = struct
       "OCAMLPROF_DUMP"; "OCAMLRUNPARAM"; "OCAML_COLOR"; "OCAML_FLEXLINK";
       "OCAML_INSTR_FILE"; "OCAML_INSTR_START"; "OCAML_INSTR_STOP";
       "OCAML_SPACETIME_INTERVAL"; "OCAML_SPACETIME_SNAPSHOT_DIR"; "PATH";
-      "TERM"; "__AFL_SHM_ID" ]
+      "TERM"; "__AFL_SHM_ID";
+
+      (* FIXME These are Windows specific and needed by cl.exe
+         For cc is likely that we need to add LD_LIBRARY_PATH,
+         C_INCLUDE_PATH, LIBRARY_PATH. Either we add them in bulk
+         or we make them depend on the configuration. *)
+      "SystemRoot"; "INCLUDE"; "LIB"; ]
 
   let tool tool ~doc =
     let tools = [Fpath.v (tool ^ ".opt"); Fpath.v tool ] in

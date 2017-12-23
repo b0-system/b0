@@ -2681,7 +2681,7 @@ module Tool : sig
   (** The type for lists of environment variable names. *)
 
   val tmp_vars : env_vars
-  (** [tmp_vars] is [["TMPDIR"; "TEMP"]]. *)
+  (** [tmp_vars] is [["TMPDIR"; "TEMP"; "TMP"]]. *)
 
   (** {1:tools Tools} *)
 

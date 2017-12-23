@@ -96,7 +96,7 @@ module File = struct
 
   (* Famous file paths *)
 
-  let null = B0_fpath.v (if Sys.os_type = "Win32" then "NUL" else "/dev/null")
+  let null = B0_fpath.v (if Sys.win32 then "NUL" else "/dev/null")
   let dash = B0_fpath.v "-"
   let is_dash = B0_fpath.equal dash
 
@@ -459,7 +459,7 @@ module Dir = struct
           | Error _ -> absent
           | Ok v -> v
     in
-    if Sys.os_type = "Win32" then from_env "TEMP" ~absent:B0_fpath.(v "./") else
+    if Sys.win32 then from_env "TEMP" ~absent:B0_fpath.(v "./") else
     from_env "TMPDIR" ~absent:(B0_fpath.v "/tmp")
 
   let default_tmp = ref default_tmp_init
@@ -713,7 +713,7 @@ module Cmd = struct
   let rm_rf p =
     let p = B0_fpath.to_string p in
     let rm_rf = match Sys.win32 with
-    | true -> [| "rd"; "/s"; "/q"; p; |]
+    | true -> [| "cmd.exe"; "/c"; "rd"; "/s"; "/q"; p; |]
     | false -> [| "rm"; "-r"; "-f"; p |]
     in
     try
@@ -723,8 +723,7 @@ module Cmd = struct
       Ok pid
     with
     | Unix.Unix_error (e, _, _) ->
-        (* TODO don't output rm here *)
-        R.error_msgf "rm -rf %s: %s"  p (uerror e)
+        R.error_msgf "remove file hierarchy: %s: %s" rm_rf.(0) (uerror e)
 
   (* exec
 

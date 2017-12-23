@@ -6,7 +6,7 @@
 
 (* Simplified port of fpath. *)
 
-let windows = Sys.os_type = "Win32"
+let windows = Sys.win32
 
 (* Errors *)
 

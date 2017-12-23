@@ -110,7 +110,8 @@ let instance_setup d cli descr =
       let driver_libs = d.libs in
       let driver_name = d.name in
       let driver_dir = find_driver_dir cli (Some descr) in
-      let bin = Fpath.(driver_dir / driver_name) in
+      let bin_name = driver_name ^ if Sys.win32 then ".exe" else "" in
+      let bin = Fpath.(driver_dir / bin_name) in
       match B0d_driver_cli.trust cli with
       | true -> Ok bin
       | false ->

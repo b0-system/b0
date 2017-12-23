@@ -3,9 +3,12 @@
 (* Usage: ocaml b00t.ml [reset|cold|build|full]
    See DEVEL.md *)
 
+let dir_sep = Filename.dir_sep
+let dir_sep_char = dir_sep.[0]
+
 let root_dir = Sys.getcwd ()
-let absolute p = String.concat "" [root_dir; "/"; p]
-let fpath ?(ext = "") ~dir f = String.concat "" [dir; "/"; f; ext]
+let absolute p = String.concat "" [root_dir; dir_sep; p]
+let fpath ?(ext = "") ~dir f = String.concat "" [dir; dir_sep; f; ext]
 
 let boot_dir = absolute "_boot"
 let libs = ["result"; "cmdliner"]
@@ -128,7 +131,7 @@ let sorted_lib_srcs dirs =
   (* We don't use absolute paths yet here because ocamldep -sort doesn't
      support paths with spaces, see MPR6968. *)
   let srcs = files_with_ext ~ext:"ml" dirs in
-  read_cmd (ocamldep :: "-slash" :: "-sort" :: srcs)
+  read_cmd (ocamldep :: "-sort" :: srcs)
   |> String.trim |> cuts ~sep:' '
 
 let add_ml_module buf ml_file =
@@ -139,7 +142,7 @@ let add_ml_module buf ml_file =
   let mli = ml ^ "i" in
   let mod_name =
     let f, _ext = get_rev_cut ~sep:'.' ml_file in
-    let _, base = get_rev_cut ~sep:'/' f in
+    let _, base = get_rev_cut ~sep:dir_sep_char f in
     String.capitalize_ascii base
   in
   Buffer.add_string buf @@ strf

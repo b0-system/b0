@@ -5,6 +5,7 @@ open B0
 
 let home = "HOME"
 
+(* FIXME this should force Build_aim lookup *)
 let env_bin b = match Build.conf b B0_care.OS.name with
 | "win32" -> "SET"
 | _ -> "env"

@@ -1,6 +1,19 @@
 # Bootstrap
 
-To boostrap b0 invoke from the root directory of the distribution:
+To boostrap B0 needs to be pointed to the  `cmdliner`, `result` and
+`unix` libraries. This can be done with or without `opam`.
+
+1. With `opam` (v2 is needed). irst install the prerequisistes and make
+   sure the opam environment is setup:
+   ```
+        opam install --deps-only .
+        eval $(opam env)
+   ```
+2. Without `opam`. Set the `B0_DRIVER_LIBDIR` environment variable to
+   a root library directory. This will lookup the `cmdliner`, `result`
+   and `ocaml/unix` directories for corresponding libraries.
+
+Now invoke from the root directory of the distribution:
 
     ocaml b00t.ml cold
 
@@ -20,12 +33,14 @@ To reset the `_boot` directory invoke:
 
     ocaml b00t.ml reset
     
-# Running the locally built `b0` and `d0` tools
+# Running the boostraped `b0` and `d0` tools
 
-The `b0` and `d0` scripts at the toplevel allow to run the `b0` and
-`d0` tools as built in `_boot_b0`. If you want them as if they were in
-your PATH do `source dev-env`. This aliases `b0` and `d0` to these
-scripts.
+The `b0` and `d0` shell scripts at the toplevel allow to run the `b0`
+and `d0` tools as built in `_boot_b0`. If you want those to be added
+to your `PATH` as `b0` and `d0` do a `source dev-env`.
+
+On Windows run `dev-env.bat`, this aliases `b0` and `d0` to the
+binaries built in `_boot_b0`.
 
 # Source tree organisation
 
