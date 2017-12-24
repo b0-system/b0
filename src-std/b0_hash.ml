@@ -43,9 +43,24 @@ module XXH = struct
     set_64u b 0 t; Bytes.unsafe_to_string b
 
   let to_hex = Printf.sprintf "%016Lx"
-  let of_hex s =
-    try Scanf.sscanf s "%LX%!" (fun x -> Some x) with
-    | Scanf.Scan_failure _ -> None
+  let of_hex s = match String.length s = 16 with
+  | false -> None
+  | true ->
+      try
+        let rec loop h i s = match i > 15 with
+        | true -> Some h
+        | false ->
+            let d = Int64.of_int @@ match s.[i] with
+            | '0' .. '9' as c -> Char.code c - 0x30
+            | 'A' .. 'F' as c -> Char.code c - 0x41 + 10
+            | 'a' .. 'f' as c -> Char.code c - 0x61 + 10
+            | _ -> raise_notrace Exit
+            in
+            loop (Int64.(add (shift_left h 4) d)) (i + 1) s
+        in
+        loop 0L 0 s
+      with
+      | Exit -> None
 
   let equal = Int64.equal
   let compare = Int64.compare
