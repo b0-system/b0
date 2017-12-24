@@ -86,7 +86,7 @@ end
 
 module Cmd : sig
   val path_dirs : ?sep:string -> string -> string list
-  val which_lookup_needed : string -> bool
+  val tool_is_path : string -> bool
   val which_file : dirs:string list -> string -> string option
   val which_raw : string -> string option
   val which : B0_cmd.t -> B0_fpath.t option result

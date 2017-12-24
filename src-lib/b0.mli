@@ -2668,7 +2668,11 @@ end
     is the value of these variables in the build's
     {{!Env.env}environment}, overriden by the variables specified
     during the {{!Build.spawn}spawn} operation overriden by the
-    build's {{!Env.forced_env}forced environment}. *)
+    build's {{!Env.forced_env}forced environment}.
+
+    {b WARNING.} Windows users, do not add the [.exe] extension to
+    tool names, this is handled transparently by the system for
+    portability. *)
 module Tool : sig
 
   (** {1:env_vars Environment variables} *)
@@ -2691,10 +2695,6 @@ module Tool : sig
       outputs (defaults to [[]]). [internal] are the environment
       variables that are read from the build's environment and that do
       not affect the tool's output (defaults to {!tmp_vars}).
-
-      {b WARNING Windows users.} Never add the [.exe] extension to the
-      tool name, this will be done by the {!Env.tool_lookup} function as
-      needed.
 
       @raise Invalid_argument if [name] contains {!Fpath.dir_sep}, use
       {!of_file} to specify tools as file paths. *)
@@ -4224,7 +4224,7 @@ b0
 {[
 let myprogram =
   (* NEVER DO THIS *)
-  let default = Conf.const (if Sys.win32 then "tool.exe" else "tool") in
+  let default = Conf.const (if Sys.win32 then "bla.exe" else "blu") in
   Conf.(key "myprogram" ~default)
 ]}
     As far as 2. is concerned. [B0] handles this automatically. In two manners:

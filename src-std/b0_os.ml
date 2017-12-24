@@ -469,49 +469,55 @@ end
 
 module Cmd = struct
 
-  (* which *)
+  let err_empty_line = "no command, empty command line"
 
-  let default_path_sep = if Sys.win32 then ";" else ":"
-  let path_dirs ?(sep = default_path_sep) path =
-    B0_string.cuts ~empty:false ~sep path
+  (* which and tool existence
 
-  let which_lookup_needed =
-    let tool_need_lookup_win32 cmd =
-      not (B0_string.exists B0_fpath.char_is_dir_sep cmd)
-    in
-    let tool_need_lookup_unix cmd =
-      try ignore (B0_string.index cmd '/'); false with Not_found -> true
-    in
-    if Sys.win32 then tool_need_lookup_win32 else tool_need_lookup_unix
+     Given a tool [tool] to lookup we search the first executable file
+     with matching name in a list of directories. If [tool] is is
+     already a path we skip the search and simply make sure that the
+     path is executable.
 
-  (* FIXME this is not the right place to do this try to lift that
-     up in B0_env *)
-  let patch_win32 = match Sys.win32 with
+     In all cases, on Windows, if [tool] has no `.exe` suffix one is
+     added before making the lookup. *)
+
+  let ensure_exe_suff_if_win32 = match Sys.win32 with
   | false -> fun t -> t
   | true ->
       fun t -> match B0_string.is_suffix ~affix:".exe" t with
       | true -> t
       | false -> t ^ ".exe"
 
-  let which_file ~dirs tool =
-    let tool = patch_win32 tool in
-    let execable tool = match Unix.access tool [Unix.X_OK] with
-    | () -> true
-    | exception (Unix.Unix_error _) -> false
-    in
-    if tool = "" then None else
-    match which_lookup_needed tool with
-    | false -> if execable tool then Some tool else None
-    | true ->
-        let rec loop tool = function
-        | [] -> None
-        | d :: dirs ->
-            let exec_path = match d.[String.length d - 1] with
-            | c when B0_fpath.char_is_dir_sep c -> d ^ tool
-            | _ -> Printf.sprintf "%s%c%s" d B0_fpath.dir_sep_char tool in
-            if execable exec_path then Some exec_path else loop tool dirs
-        in
-        loop tool dirs
+  let tool_is_path t =
+    try ignore (B0_string.index t B0_fpath.dir_sep_char); true with
+    | Not_found -> false
+
+  let tool_execable t = match Unix.access t [Unix.X_OK] with
+  | () -> true
+  | exception (Unix.Unix_error _) -> false
+
+  let which_file ~dirs tool = match tool with
+  | "" -> None
+  | tool ->
+      let tool = ensure_exe_suff_if_win32 tool in
+      match tool_is_path tool with
+      | true -> if tool_execable tool then Some tool else None
+      | false ->
+          let rec loop tool = function
+          | [] -> None
+          | d :: dirs ->
+              if d = "" then loop tool dirs else
+              let exec_path = match d.[String.length d - 1] with
+              | c when B0_fpath.char_is_dir_sep c -> d ^ tool
+              | _ -> String.concat B0_fpath.dir_sep  [d; tool]
+              in
+              if tool_execable exec_path then Some exec_path else loop tool dirs
+          in
+          loop tool dirs
+
+  let default_path_sep = if Sys.win32 then ";" else ":"
+  let path_dirs ?(sep = default_path_sep) path =
+    B0_string.cuts ~empty:false ~sep path
 
   let which_raw tool =
     let dirs = match Unix.getenv "PATH" with
@@ -520,9 +526,26 @@ module Cmd = struct
     in
     which_file ~dirs tool
 
-  (* FIXME this was c&p from topkg and should not use Sys.command *)
+  let cmd_tool cmd = try List.hd (B0_cmd.to_list cmd) with
+  | Failure _ -> failwith err_empty_line
 
-  let err_empty_line = "no command, empty command line"
+  let which cmd = match which_raw (cmd_tool cmd) with
+  | Some v -> Ok (Some (B0_fpath.v v))
+  | None -> Ok None
+  | exception Failure e -> R.error_msg e
+
+  let exists cmd = match which_raw (cmd_tool cmd) with
+  | Some _ -> Ok true
+  | None -> Ok false
+  | exception Failure e -> R.error_msg e
+
+  let must_exist cmd = exists cmd >>= function
+  | false -> R.error_msgf "%s: no such command" (cmd_tool cmd)
+  | true -> Ok cmd
+
+  (* Running commands *)
+
+  (* FIXME this was c&p from topkg and should not use Sys.command *)
 
   let line ?stdout ?stderr cmd =
     let strf = Printf.sprintf in
@@ -545,26 +568,6 @@ module Cmd = struct
       B0_log.debug (fun m -> m ~header:"EXEC" "@[<1>[%s]@]" line);
       Ok ((), (cmd, (`Exited (Sys.command line) :> status)))
     with Sys_error e | Failure e -> R.error_msg e
-
-  let cmd_bin cmd =
-    try List.hd (B0_cmd.to_list cmd) with
-    | Failure _ -> failwith err_empty_line
-
-  let exists cmd = match which_raw (cmd_bin cmd) with
-  | Some _ -> Ok true
-  | None -> Ok false
-  | exception Failure e -> R.error_msg e
-
-  let must_exist cmd = exists cmd >>= function
-  | false -> R.error_msgf "%s: no such command" (cmd_bin cmd)
-  | true -> Ok cmd
-
-  let which cmd = match which_raw (cmd_bin cmd) with
-  | Some v -> Ok (Some (B0_fpath.v v))
-  | None -> Ok None
-  | exception Failure e -> R.error_msg e
-
-  (* Running commands *)
 
   type run_status = B0_cmd.t * status
 
