@@ -723,13 +723,49 @@ module Cmd = struct
         (* TODO don't output rm here *)
         R.error_msgf "rm -rf %s: %s"  p (uerror e)
 
-  (* exec *)
+  (* exec
 
-  let rec execv_raw bin args = try Ok (Unix.execv bin args) with
-  | Unix.Unix_error (e, _, _) -> R.error_msgf "execv %s: %s" bin (uerror e)
+     On Windows when Unix.execv[e] is invoked, control is returned to
+     the controlling terminal when the child process starts (vs. child
+     process terminates on POSIX). This entails all sort of weird
+     behaviour. To workaround this, our execv[e] on Windows simply
+     runs the program as a sub-process on which we waitpid(2) and then
+     exit with the resulting status. *)
 
-  let rec execve_raw bin args ~env = try Ok (Unix.execve bin args env) with
-  | Unix.Unix_error (e, _, _) -> R.error_msgf "execve %s: %s" bin (uerror e)
+  let err_execv bin e = R.error_msgf "execv %s: %s" bin (uerror e)
+  let err_execve bin e = R.error_msgf "execve %s: %s" bin (uerror e)
+
+  let execv_raw_posix bin args = try Ok (Unix.execv bin args) with
+  | Unix.Unix_error (e, _, _) -> err_execv bin e
+
+  let execve_raw_posix bin args ~env = try Ok (Unix.execve bin args env) with
+  | Unix.Unix_error (e, _, _) -> err_execv bin e
+
+  let _win32_execv_exit pid = match Unix.waitpid [] pid with
+  | _, (Unix.WEXITED c) -> exit c
+  | _, (Unix.WSIGNALED sg) ->
+      Unix.(kill (getpid ()) sg);
+      (* In case we don't get killed, exit with bash convention. *)
+      exit (128 + sg)
+  | _ -> assert false
+
+  let execv_raw_win32 bin args =
+    try
+      _win32_execv_exit @@
+      Unix.(create_process bin args stdin stdout stderr)
+    with
+    | Unix.Unix_error (e, _, _) -> err_execv bin e
+
+  let execve_raw_win32 bin args ~env =
+    try
+      _win32_execv_exit @@
+      Unix.(create_process_env bin args env stdin stderr stderr)
+    with
+    | Unix.Unix_error (e, _, _) -> err_execve bin e
+
+  let execv_raw = if Sys.win32 then execv_raw_win32 else execv_raw_posix
+  let execve_raw = if Sys.win32 then execve_raw_win32 else execve_raw_posix
+
 end
 
 (*---------------------------------------------------------------------------
