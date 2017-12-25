@@ -348,7 +348,7 @@ let show_variant ?(ext = fun _ _ -> ()) =
 
 (* Editing *)
 
-let edit_files fs = match OS.Env.var "EDITOR" with
+let edit_files fs = match OS.Env.find "EDITOR" with
 | None -> R.error_msg "EDITOR environment variable undefined."
 | Some editor ->
     Cmd.of_string editor
@@ -356,23 +356,23 @@ let edit_files fs = match OS.Env.var "EDITOR" with
     >>= function
     | false -> R.error_msgf "Editor %a not in search path" Cmd.pp editor
     | true ->
-        OS.Cmd.(run_status Cmd.(editor %% of_values p fs)) >>= function
+        OS.Cmd.run_status Cmd.(editor %% of_values p fs) >>= function
         | `Exited n | `Signaled n -> Ok n
 
 let find_pager ~don't = match don't with
 | true -> Ok None
 | false ->
-    match OS.Env.var "TERM" with
+    match OS.Env.find "TERM" with
     | Some "dumb" | None -> Ok None
     | _ ->
         let cmds = ["less"; "more"] in
-        let cmds = match OS.Env.var "PAGER" with
+        let cmds = match OS.Env.find "PAGER" with
         | None -> cmds | Some c -> c :: cmds
         in
         let rec loop = function
         | [] -> Ok None
         | cmd :: cmds ->
-            OS.Cmd.which (Cmd.v cmd) >>= function
+            OS.Cmd.find_tool (Cmd.v cmd) >>= function
             | Some _ as v  -> Ok v
             | None -> loop cmds
         in

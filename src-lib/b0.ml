@@ -17,6 +17,7 @@ type fpath = B0_fpath.t
 
 module Codec = B0_codec (* FIXME remove that *)
 
+module Cmd = B0_cmd
 module Conv = B0_conv
 module Tty = B0_tty
 module Log = B0_log
@@ -28,7 +29,6 @@ module Fpath = struct
   include B0_fpath_meta
 end
 
-module Cmd = B0_cmd
 module OS = B0_os
 module Time = B0_time
 module Hash = B0_hash

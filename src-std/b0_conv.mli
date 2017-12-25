@@ -40,7 +40,8 @@ val string_non_empty : string t
 val fpath : B0_fpath.t t
 val file : B0_fpath.t t
 val dir : B0_fpath.t t
-val bin : B0_fpath.t t
+val tool : B0_cmd.t t
+val cmd : B0_cmd.t t
 val enum : ?docv:string -> (string * 'a) list -> 'a t
 val list : ?sep:string -> 'a t -> 'a list t
 val pair : ?sep:string -> 'a t -> 'b t -> ('a * 'b) t

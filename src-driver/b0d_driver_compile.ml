@@ -17,10 +17,10 @@ let find_tool descr_field arg ~absent cli descr =
       match descr_field descr with
       | Some tool -> tool
       | None -> absent
-  in
-  match OS.Cmd.which_raw tool with
-  | None -> R.error_msgf "%s: Command not found." tool
-  | Some tool -> Ok tool
+  in (* FIXME Cmd/Path churn *)
+  Fpath.of_string tool
+  >>= fun tool -> OS.Cmd.resolve Cmd.(v @@ p tool)
+
 
 let find_ocamlc cli descr =
   find_tool
@@ -92,17 +92,17 @@ let lib_flags libs =
    FIXME Generalize this to allow general driver dev.
    FIXME Try to reuse with what will be done for B0_ocaml *)
 
-let b0_dev_dir = match OS.Env.var "__B0_DEV_DIR" with
+let b0_dev_dir = match OS.Env.find "__B0_DEV_DIR" with
 | None -> None
 | Some dir -> Some (Fpath.v dir)
 
-let find_libdir compiler = match OS.Env.var "B0_DRIVER_LIBDIR" with
+let find_libdir compiler = match OS.Env.find "B0_DRIVER_LIBDIR" with
 | Some dir -> Fpath.of_string dir
 | None ->
-    match OS.Env.var "OPAM_SWITCH_PREFIX" with
+    match OS.Env.find "OPAM_SWITCH_PREFIX" with
     | Some dir -> Fpath.of_string dir >>| fun d -> Fpath.(d / "lib")
     | None ->
-        OS.Cmd.(run_out Cmd.(v compiler % "-where") |> to_string)
+        OS.Cmd.run_out Cmd.(compiler % "-where")
         >>= fun dir -> Fpath.of_string dir
         >>| fun dir -> Fpath.parent dir
 
@@ -261,7 +261,7 @@ type action =
     driver_dir : Fpath.t;
     driver_name : string;
     bin : Fpath.t;
-    compiler : [`Byte | `Native ] * string;
+    compiler : [`Byte | `Native ] * Cmd.t;
     clib_ext : string;
     cflags : Cmd.t;
     lflags : Cmd.t;
@@ -293,7 +293,7 @@ let action_stamp a =
   | `Native -> native_lib_stamp
   | `Byte -> byte_lib_stamp
   in
-  let comp = Fpath.v (snd a.compiler) in
+  let comp = Fpath.v @@ Cmd.get_line_tool @@ snd a.compiler in
   let cstamp = Hash.(to_bytes @@ file comp) in
   let lib_stamps = List.fold_left hash_lib [] a.libs in
   Ok (Hash.to_bytes @@ Hash.string @@
@@ -309,7 +309,7 @@ let compile a =
   let src_file = Fpath.(driver_dir / strf "%si.ml" driver_name) in
   let lib_flags = lib_flags a.libs in
   let cmd =
-    Cmd.(v (snd a.compiler) % "-o" % p a.bin % "-linkall" %%
+    Cmd.(snd a.compiler % "-o" % p a.bin % "-linkall" %%
          a.cflags %% a.lflags %% lib_flags % p src_file)
   in
   OS.Dir.create a.driver_dir

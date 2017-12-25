@@ -22,11 +22,14 @@ let p = B0_fpath.to_string
 
 (* Command lines *)
 
-let line_exec l = try Some List.(hd @@ rev l) with Failure _ -> None
-let get_line_exec l =
-  try List.(hd @@ rev l) with Failure _ -> invalid_arg "the command is empty"
+let line_tool l = match List.rev l with [] -> None | t :: _ -> Some t
+let get_line_tool l = match List.rev l with
+| t :: _ -> t
+| [] -> invalid_arg "the command is empty"
 
-let line_args l = try List.(tl @@ rev l) with Failure _ -> []
+let line_args l = match List.rev l with
+| _ :: args -> args
+| [] -> []
 
 (* Predicates and comparison *)
 
@@ -39,15 +42,12 @@ let compare l l' = Pervasives.compare l l'
    http://pubs.opengroup.org/onlinepubs/009695399/utilities/\
    xcu_chap02.html#tag_02_03 *)
 
-(* FIXME quickly ported from bos code based on Astring.String.sub
-   Rewrite. *)
-
 let parse_cmdline s =
   try
+    (* TODO Rewrite, this was quickly ported from bos code based on
+       Astring.String.sub *)
     let err_unclosed kind s =
-      failwith @@
-      B0_string.strf "unclosed %s quote delimited string"
-        (* (String.Sub.start_pos s) *) kind
+      failwith @@ B0_string.strf "unclosed %s quote delimited string" kind
     in
     let is_white = function ' ' | '\t' .. '\r'  -> true | _ -> false in
     let skip_white s = B0_string.drop ~sat:is_white s in
@@ -125,15 +125,12 @@ let of_values ?slip conv vs = match slip with
 
 let pp ppf cmd = match List.rev cmd with
 | [] -> ()
-| cmd :: [] -> Format.fprintf ppf "%s" cmd
-| cmd :: args ->
-    Format.fprintf ppf "@[<2>%s@ %a@]" cmd
-      Format.(pp_print_list ~pp_sep:pp_print_space pp_print_string) args
+| t :: [] -> B0_fmt.pf ppf "%s" t
+| t :: args -> B0_fmt.pf ppf "@[<2>%s@ %a@]" t B0_fmt.(list ~sep:sp string) args
 
 let dump ppf cmd =
-  let pp_arg ppf a = Format.fprintf ppf "%s" (Filename.quote a) in
-  Format.fprintf ppf "@[<h>[%a]@]"
-    Format.(pp_print_list ~pp_sep:pp_print_space pp_arg) (List.rev cmd)
+  let pp_arg ppf a = B0_fmt.pf ppf "%s" (Filename.quote a) in
+  B0_fmt.pf ppf "@[<h>[%a]@]" B0_fmt.(list ~sep:sp pp_arg) (List.rev cmd)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 b0

@@ -421,6 +421,154 @@ module Codec : sig
 end
 (**/**)
 
+(** Command lines.
+
+    Both command lines and command line fragments using the same are
+    represented with the same {{!t}type}.
+
+    When a command line is {{!section:OS.Cmd.run}run}, the first
+    element of the line defines the program name and each other
+    element is an argument that will be passed {e as is} in the
+    program's [argv] array: no shell interpretation or any form of
+    argument quoting and/or concatenation occurs.
+
+    See {{!ex}examples}. *)
+module Cmd : sig
+
+  (** {1:frags Command line fragments} *)
+
+  type t
+  (** The type for command line fragments. *)
+
+  val v : string -> t
+  (** [v cmd] is a new command line (or command line fragment)
+      whose first argument is [cmd]. *)
+
+  val empty : t
+  (** [empty] is an empty command line. *)
+
+  val is_empty : t -> bool
+  (** [is_empty l] is [true] iff [l] is empty. *)
+
+  val ( % ) : t -> string -> t
+    (** [l % arg] adds [arg] to the command line [l]. *)
+
+  val ( %% ) : t -> t -> t
+  (** [l %% frag] appends the line fragment [frag] to [l]. *)
+
+  val add_arg : t -> string -> t
+  (** [add_arg l arg] is [l % arg]. *)
+
+  val add_args : t -> t -> t
+  (** [add_args l frag] is [l %% frag]. *)
+
+  val on : bool -> t -> t
+  (** [on bool line] is [line] if [bool] is [true] and {!empty}
+      otherwise. *)
+
+  val p : fpath -> string
+  (** [p] is {!Fpath.to_string}. This combinator makes path argument
+      specification brief. *)
+
+  (** {1:lines Command lines} *)
+
+  val line_tool : t -> string option
+  (** [line_tool l] is [l]'s first element, usually the executable tool
+      name or file path. *)
+
+  val get_line_tool : t -> string
+  (** [get_line_tool l] is like {!line_tool} but @raise Invalid_argument
+      if there's no first element. *)
+
+  val line_args : t -> string list
+  (** [line_args] is [l]'s command line arguments, the elements of [l] without
+      the command name. *)
+
+  (** {1:predicates Predicates and comparison} *)
+
+  val equal : t -> t -> bool
+  (** [equal l l'] is [true] iff [l] and [l'] are litterally equal. *)
+
+  val compare : t -> t -> int
+  (** [compare l l'] is a total order on command lines. *)
+
+  (** {1:convert Conversions and pretty printing} *)
+
+  val of_string : string -> t result
+  (** [of_string s] tokenizes [s] into a command line. The tokens
+      are recognized according to the [token] production of the following
+      grammar which should be mostly be compatible with POSIX shell
+      tokenization.
+{v
+white   ::= ' ' | '\t' | '\n' | '\x0B' | '\x0C' | '\r'
+squot   ::= '\''
+dquot   ::= '\"'
+bslash  ::= '\\'
+tokens  ::= white+ tokens | token tokens | ϵ
+token   ::= ([^squot dquot white] | squoted | dquoted) token | ϵ
+squoted ::= squot [^squot]* squot
+dquoted ::= dquot (qchar | [^dquot])* dquot
+qchar   ::= bslash (bslash | dquot | '$' | '`' | '\n')
+v}
+      [qchar] are substitued by the byte they escape except for ['\n']
+      which removes the backslash and newline from the byte stream.
+      [squoted] and [dquoted] represent the bytes they enclose. *)
+
+  val to_string : t -> string
+  (** [to_string l] converts [l] to a string that can be passed
+      to the
+      {{:http://pubs.opengroup.org/onlinepubs/9699919799/functions/system.html}
+      [command(3)]} POSIX system call. *)
+
+  val to_list : t -> string list
+  (** [to_list l] is [l] as a list of strings. *)
+
+  val to_rev_list : t -> string list
+  (** [to_rev_list l] is [l] as a reversed list of strings. *)
+
+  val of_list : ?slip:string -> string list -> t
+  (** [of_list ?slip l] is a command line from the list of arguments
+      [l].  If [slip] is specified it is added on the command line
+      before each element of [l]. *)
+
+  val of_rev_list : string list -> t
+  (** [of_rev_list l] is a command line from the reversed list of
+      arguments [l]. *)
+
+  val of_values : ?slip:string -> ('a -> string) -> 'a list -> t
+  (** [of_values ?slip conv l] is like {!of_list} but acts on a list
+      of values, each converted to an argument with [conv]. *)
+
+  val pp : t Fmt.t
+  (** [pp ppf l] formats an unspecified representation of [l] on
+      [ppf]. *)
+
+  val dump : t Fmt.t
+  (** [dump ppf l] dumps and unspecified representation of [l]
+      on [ppf]. *)
+
+  (** {1:ex Examples}
+{[
+let ls path = Cmd.(v "ls" % "-a" % p path)
+
+let tar archive path = Cmd.(v "tar" % "-cvf" % p archive % p path)
+
+let opam cmd = Cmd.(v "opam" % cmd)
+
+let opam_install pkgs = Cmd.(opam "install" %% of_list pkgs)
+
+let ocamlc ?(debug = false) file =
+  Cmd.(v "ocamlc" % "-c" %% on debug (v "-g") % p file)
+
+let ocamlopt ?(profile = false) ?(debug = false) incs file =
+  let profile = Cmd.(on profile @@ v "-p") in
+  let debug = Cmd.(on debug @@ v "-g") in
+  let incs = Cmd.of_list ~slip:"-I" incs in
+  Cmd.(v "ocamlopt" % "-c" %% debug %% profile %% incs % p file)
+]} *)
+end
+
+
 (** Textual and type-safe binary value conversions. *)
 module Conv : sig
 
@@ -509,9 +657,16 @@ module Conv : sig
   (** [dir] is a converter for directories. The directory path is not checked
       for existence or directoryness. *)
 
-  val bin : fpath t
-  (** [bin] is a converter for a binary. The file path is not checked
-      for existence or executableness. *)
+  val tool : Cmd.t t
+  (** [tool] is a converter for a command line tool name or file
+      path. The resulting command line is {b non-empty} and has no
+      further arguments, see also {!cmd}. The tool is not checked for
+      existence or executableness. *)
+
+  val cmd : Cmd.t t
+  (** [cmd] is a converter for a command line parsed using
+      {!Cmd.of_string}. Note that the result can be {!Cmd.empty}.  See
+      also {!tool}. *)
 
   val enum : ?docv:string -> (string * 'a) list -> 'a t
   (** [enum ~docv alts] derives a converter from the association list
@@ -1162,9 +1317,12 @@ module Fpath : sig
 
   (** {1:segments Separators and segments} *)
 
+  val dir_sep_char : char
+  (** [dir_sep_char] is the platform dependent natural directory
+      separator.  This is / on POSIX and \ on Windows. *)
+
   val dir_sep : string
-  (** [dir_sep] is the platform dependent natural directory seperator.
-      This is / on POSIX and \ on Windows. *)
+  (** [dir_sep] is {!dir_sep_char} as a string. *)
 
   val is_seg : string -> bool
   (** [is_seg s] is [true] iff [s] does not contain a {!dir_sep}. *)
@@ -1434,152 +1592,6 @@ module Fpath : sig
   end
 end
 
-(** Command lines.
-
-    Both command lines and command line fragments using the same are
-    represented with the same {{!t}type}.
-
-    When a command line is {{!section:OS.Cmd.run}run}, the first
-    element of the line defines the program name and each other
-    element is an argument that will be passed {e as is} in the
-    program's [argv] array: no shell interpretation or any form of
-    argument quoting and/or concatenation occurs.
-
-    See {{!ex}examples}. *)
-module Cmd : sig
-
-  (** {1:frags Command line fragments} *)
-
-  type t
-  (** The type for command line fragments. *)
-
-  val v : string -> t
-  (** [v cmd] is a new command line (or command line fragment)
-      whose first argument is [cmd]. *)
-
-  val empty : t
-  (** [empty] is an empty command line. *)
-
-  val is_empty : t -> bool
-  (** [is_empty l] is [true] iff [l] is empty. *)
-
-  val ( % ) : t -> string -> t
-    (** [l % arg] adds [arg] to the command line [l]. *)
-
-  val ( %% ) : t -> t -> t
-  (** [l %% frag] appends the line fragment [frag] to [l]. *)
-
-  val add_arg : t -> string -> t
-  (** [add_arg l arg] is [l % arg]. *)
-
-  val add_args : t -> t -> t
-  (** [add_args l frag] is [l %% frag]. *)
-
-  val on : bool -> t -> t
-  (** [on bool line] is [line] if [bool] is [true] and {!empty}
-      otherwise. *)
-
-  val p : Fpath.t -> string
-  (** [p] is {!Fpath.to_string}. This combinator makes path argument
-      specification brief. *)
-
-  (** {1:lines Command lines} *)
-
-  val line_exec : t -> string option
-  (** [line_exec l] is [l]'s first element, usually the executable name. *)
-
-  val get_line_exec : t -> string
-  (** [get_line_exec l] is like {!line_exec} but @raise Invalid_argument
-      if there's no first element. *)
-
-  val line_args : t -> string list
-  (** [line_args] is [l]'s command line arguments, the elements of [l] without
-      the command name. *)
-
-  (** {1:predicates Predicates and comparison} *)
-
-  val equal : t -> t -> bool
-  (** [equal l l'] is [true] iff [l] and [l'] are litterally equal. *)
-
-  val compare : t -> t -> int
-  (** [compare l l'] is a total order on command lines. *)
-
-  (** {1:convert Conversions and pretty printing} *)
-
-  val of_string : string -> t result
-  (** [of_string s] tokenizes [s] into a command line. The tokens
-      are recognized according to the [token] production of the following
-      grammar which should be mostly be compatible with POSIX shell
-      tokenization.
-{v
-white   ::= ' ' | '\t' | '\n' | '\x0B' | '\x0C' | '\r'
-squot   ::= '\''
-dquot   ::= '\"'
-bslash  ::= '\\'
-tokens  ::= white+ tokens | token tokens | ϵ
-token   ::= ([^squot dquot white] | squoted | dquoted) token | ϵ
-squoted ::= squot [^squot]* squot
-dquoted ::= dquot (qchar | [^dquot])* dquot
-qchar   ::= bslash (bslash | dquot | '$' | '`' | '\n')
-v}
-      [qchar] are substitued by the byte they escape except for ['\n']
-      which removes the backslash and newline from the byte stream.
-      [squoted] and [dquoted] represent the bytes they enclose. *)
-
-  val to_string : t -> string
-  (** [to_string l] converts [l] to a string that can be passed
-      to the
-      {{:http://pubs.opengroup.org/onlinepubs/9699919799/functions/system.html}
-      [command(3)]} POSIX system call. *)
-
-  val to_list : t -> string list
-  (** [to_list l] is [l] as a list of strings. *)
-
-  val to_rev_list : t -> string list
-  (** [to_rev_list l] is [l] as a reversed list of strings. *)
-
-  val of_list : ?slip:string -> string list -> t
-  (** [of_list ?slip l] is a command line from the list of arguments
-      [l].  If [slip] is specified it is added on the command line
-      before each element of [l]. *)
-
-  val of_rev_list : string list -> t
-  (** [of_rev_list l] is a command line from the reversed list of
-      arguments [l]. *)
-
-  val of_values : ?slip:string -> ('a -> string) -> 'a list -> t
-  (** [of_values ?slip conv l] is like {!of_list} but acts on a list
-      of values, each converted to an argument with [conv]. *)
-
-  val pp : t Fmt.t
-  (** [pp ppf l] formats an unspecified representation of [l] on
-      [ppf]. *)
-
-  val dump : t Fmt.t
-  (** [dump ppf l] dumps and unspecified representation of [l]
-      on [ppf]. *)
-
-  (** {1:ex Examples}
-{[
-let ls path = Cmd.(v "ls" % "-a" % p path)
-
-let tar archive path = Cmd.(v "tar" % "-cvf" % p archive % p path)
-
-let opam cmd = Cmd.(v "opam" % cmd)
-
-let opam_install pkgs = Cmd.(opam "install" %% of_list pkgs)
-
-let ocamlc ?(debug = false) file =
-  Cmd.(v "ocamlc" % "-c" %% on debug (v "-g") % p file)
-
-let ocamlopt ?(profile = false) ?(debug = false) incs file =
-  let profile = Cmd.(on profile @@ v "-p") in
-  let debug = Cmd.(on debug @@ v "-g") in
-  let incs = Cmd.of_list ~slip:"-I" incs in
-  Cmd.(v "ocamlopt" % "-c" %% debug %% profile %% incs % p file)
-]} *)
-end
-
 (** OS interaction. *)
 module OS : sig
 
@@ -1588,13 +1600,32 @@ module OS : sig
 
     (** {1:var Variables} *)
 
-    val var : string -> string option
-    (** [var name] is the value of the environment variable [name],
-        if defined. *)
+    val find : ?empty_is_absent:bool -> string -> string option
+    (** [find ~empty_is_absent name] is the value of the process
+        environment variable [name], if defined. If [empty_is_absent]
+        is [true] (default), [None] is returned if the variable value
+        is the empty string. *)
 
-    val opt_var : string -> absent:string -> string
-    (** [opt_var name ~absent] is the value of the optionally defined
-        environment variable [name], if defined and absent if undefined. *)
+    val get : ?empty_is_absent:bool -> string -> absent:string -> string
+    (** [get ~empty_is_absent name ~absent] is the value of the
+        process environment variable environment variable [name], if
+        defined, and [absent] if undefined. If [empty_is_absent] is
+        [true] (default) and the variable value is the empty string,
+        [absent] is returned. *)
+
+    val value :
+      ?empty_is_absent:bool -> string -> 'a Conv.t -> absent:'a -> 'a result
+    (** [value ~empty_is_absent name conv ~absent] is like {!get}
+        except the variable value is parsed using [conv]'s
+        {{!Conv.parse}textual parser}. *)
+
+    val get_value :
+      ?log:Log.level -> ?empty_is_absent:bool -> string -> 'a Conv.t ->
+      absent:'a -> 'a
+    (** [value ~log ~empty_is_absent name conv ~absent] is like {!value}
+        except on parse errors, they are logged with level [log] (if
+        any) and [absent] is returned. [log] defaults to [Some
+        Log.Error]. *)
 
     (** {1:env Process environement} *)
 
@@ -1609,6 +1640,10 @@ module OS : sig
 
     val override : t -> by:t -> t
     (** [override env ~by:o] overrides the definitions in [env] by [o]. *)
+
+    val assignments : unit -> string list result
+    (** [assignements ()] is the current process environments as a list
+        of strings of the form ["var=value"]. *)
 
     val of_assignments : ?init:t -> string list -> t result
     (** [of_assignments ~init ss] folds over strings in [ss],
@@ -1656,6 +1691,11 @@ module OS : sig
     (** [link ~force ~target p] hard links [target] to path [p]. If [force]
         is [true] and [p] exists it is unlinked first. FIXME should we
         [rmdir -r] if [p] is a directory ? *)
+
+    (** {1:exec Executability} *)
+
+    val is_executable : Fpath.t -> bool
+    (** [is_executable file] is [true] iff [file] exists and is executable. *)
 
     (** {1:input Input}
 
@@ -1707,14 +1747,13 @@ module OS : sig
         returned [file] is left untouched except if {!Pervasives.stdout}
         is written. *)
 
-
     (** {1:tmpfiles Temporary files}
 
         FIXME. Make that bos-like. *)
 
     val with_tmp_oc :
-      ?mode:int -> Fpath.t -> (Fpath.t -> out_channel -> 'a -> 'b) ->
-      'a -> 'b result
+      ?flags:Unix.open_flag list -> ?mode:int -> Fpath.t ->
+      (Fpath.t -> out_channel -> 'a -> 'b) -> 'a -> 'b result
     (** [with_tmp_oc mode dir pat f v] is a new temporary file in
         [dir] (defaults to {!Dir.default_tmp}) named according to
         [pat] and atomically created and opened with permission [mode]
@@ -1801,86 +1840,193 @@ module OS : sig
         [p]. *)
   end
 
-  (** Running commands. *)
+  (** Executing commands.
+
+      {b IMPORTANT.} Do not execute commands with these functions in your build
+      system: they will not be searched in the build environment and will not
+      be cached. Running commands in builds must occur via {!Build.spawn}. *)
   module Cmd : sig
 
-    (** {1:exists Command existence} *)
+    (** {1:search Tool existence and search}
 
-    val exists : Cmd.t -> bool result
-    (** [exists cmd] is [true] if the executable of [cmd] can be found
-        by the [PATH] lookup procedure and [false] otherwise. *)
+      {b Tool search procedure.} Given a list of directories, the
+      {{!Cmd.line_tool}tool} of a command line is searched, in list
+      order, for the first matching {e executable} file. If the tool
+      name is already a file path (i.e. contains a
+      {!Fpath.dir_sep_char}) it is neither searched nor tested for
+      {{!File.is_executable}existence and executability}. In the
+      functions below if the list of directories [search] is
+      unspecified the result of parsing the [PATH] environment
+      variable with {!search_path_dirs} is used.
 
-    val must_exist : Cmd.t -> Cmd.t result
-    (** [must_exist cmd] is [cmd] if the executable of [cmd] can be found
-        in the [PATH] and an error otherwise. *)
+      {b Portability.} In order to maximize portability no [.exe]
+      suffix should be added to executable names on Windows, the tool
+      search procedure will add the suffix during the tool search
+      procedure if absent. *)
 
-    val which : Cmd.t -> Fpath.t option result
-    (** [which cmd] is the full path to the executable of [cmd] as found
-        in byte the [PATH] lookup procedure. *)
+    val find_tool : ?search:Fpath.t list -> Cmd.t -> Fpath.t option result
+    (** [find_tool ~search cmd] is the path to the {{!Cmd.line_tool}tool}
+        of [cmd] as found by the tool search procedure in [search]. *)
 
-    (**/**)
-    val which_raw : string -> string option
-    val execv_raw : string -> string array -> unit result
-    val execve_raw : string -> string array -> env:string array -> unit result
-    (**/**)
+    val get_tool : ?search:Fpath.t list -> Cmd.t -> Fpath.t result
+    (** [get_tool cmd] is like {!find_tool} except it errors if the
+        tool path cannot be found. *)
 
-    (** {1:run Running commands} *)
+    val exists : ?search:Fpath.t list -> Cmd.t -> bool result
+    (** [exists ~search cmd] is [Ok true] if {!find_tool} finds a path
+        and [Ok false] if it does not. *)
 
-    type status = [`Exited of int | `Signaled of int ]
+    val must_exist : ?search:Fpath.t list -> Cmd.t -> Cmd.t result
+    (** [must_exist ~search cmd] is [Ok cmd] if {!get_tool} succeeds. *)
+
+    val resolve : ?search:Fpath.t list -> Cmd.t -> Cmd.t result
+    (** [resolve ~search cmd] is like {!must_exist} except the tool of the
+        resulting command value has the path to the tool of [cmd] as
+        determined by {!get_tool}. *)
+
+    val search_path_dirs : ?sep:string -> string -> Fpath.t list result
+    (** [search_path_dirs ~sep s] parses [sep] seperated file paths
+        from [s]. [sep] is not allowed to appear in the file paths, it
+        defaults to [";"] if {!Sys.win32} is [true] and [":"]
+        otherwise. *)
+
+    (** {1:statuses Process completion statuses} *)
+
+    type status = [ `Exited of int | `Signaled of int ]
+    (** The type for process exit statuses. *)
 
     val pp_status : status Fmt.t
+    (** [pp_status] is a formatter for process exit statuses. *)
 
-    val run : ?err:Fpath.t -> Cmd.t -> unit result
-    (** [run cmd] runs the command [cmd]. [std{i,o,err}] are connected
-        to the invoking process' standard channels. If [err] is specified
-        [stderr] is redirected to the given file (e.g. {!File.null}). *)
+    val pp_cmd_status : (Cmd.t * status) Fmt.t
+    (** [pp_cmd_status] is a formatter for command process exit statuses. *)
 
-    val run_status : ?err:Fpath.t -> Cmd.t -> status result
-    (** [run_status cmd] is like {!run}, but doesn't error on non-zero
-        exit status. *)
+    (** {1:stdio Process standard inputs and outputs} *)
 
-    (** {1:stdout Capturing standard output} *)
+    type stdi
+    (** The type for representing the standard input of a process. *)
 
-    type run_status = Cmd.t * status
-    (** The type for run statuses, the command that was run and the run
-        status. *)
+    type stdo
+    (** The type for representing the standard output of a process. *)
 
-    val success : ('a * run_status) result -> 'a result
-    (** [success r] is:
-        {ul
-        {- [Ok v] if [r = Ok (v, (_, `Exited 0))]}
-        {- [Error _] otherwise. Non [`Exited 0] statuses are turned into
-           an error message.}} *)
+    val in_string : string -> stdi
+    (** [in_string s] is a standard input that reads the string [s]. *)
 
-    type run_out
-    (** The type for representing the standard output of a command run. *)
+    val in_file : Fpath.t -> stdi
+    (** [in_file f] is a standard input that reads from file [f]. *)
 
-    val out_string : ?trim:bool -> run_out -> (string * run_status) result
-    (** [out_string ~trim o] captures the standard output [o] as a [string].
-        If [trim] is [true] (default) the result is passed through
-        {!String.trim}. *)
+    val in_fd : close:bool -> Unix.file_descr -> stdi
+    (** [in_fd ~close fd] is a standard input that reads from file
+        descriptor [fd]. If [close] is [true], [fd] is closed after
+        the process spawn. *)
 
-    val out_file : Fpath.t -> run_out -> (unit * run_status) result
-    (** [out_file f o] writes the standard output [o] to file [f]. *)
+    val in_stdin : stdi
+    (** [in_stdin] is [in_fd ~close:false Unix.stdin], a standard
+        input that reads from the current process standard input. *)
 
-    val out_stdout : run_out -> (unit * run_status) result
-    (** [out_stdout o] redirects the standard output [o] to the current
-        process standard output. *)
+    val in_null : stdi
+    (** [in_null] is [in_file File.null]. *)
 
-    val to_string : ?trim:bool -> run_out -> string result
-    (** [to_string] is [(out_string ?trim o |> success)]. *)
+    val out_file : Fpath.t -> stdo
+    (** [out_file f] is a standard output that writes to file [f]. *)
 
-    val to_file : Fpath.t -> run_out -> unit result
-    (** [to_file f o] is [(out_file f o |> success)] *)
+    val out_fd : close:bool -> Unix.file_descr -> stdo
+    (** [out_fd ~close fd] is a standard output that writes to file
+        descriptor [fd]. If [close] is [true], [fd] is closed after
+        the process spawn. *)
 
-    val to_null : run_out -> unit result
-    (** [to_null] is [to_file Fpath.null]. *)
+    val out_stdout : stdo
+    (** [out_stdout] is [out_fd ~close:false Unix.stdout] *)
 
-    val run_out : ?err:Fpath.t -> Cmd.t -> run_out
-    (** [run_out cmd] represents the standard output of the command run [cmd].
-        [std{i,err}] are connected to the invoking prcoess stream and standard
-        output can be consumed with {!to_string}, {!to_file}.
-        If [err] is specified [stderr] is redirected to the given file. *)
+    val out_stderr : stdo
+    (** [out_stderr] is [out_fd ~close:false Unix.stderr] *)
+
+    val out_null : stdo
+    (** [out_null] is [out_file File.null] *)
+
+    (** {1:run Blocking command execution} *)
+
+    val run_status :
+      ?env:string list -> ?cwd:Fpath.t -> ?stdin:stdi -> ?stdout:stdo ->
+      ?stderr:stdo -> Cmd.t -> status result
+    (** [run_status ~env ~cwd ~stdin ~stdout ~stderr cmd] runs and
+        wait for the completion of [cmd] in environment [env] with
+        current directory [cwd] and standard IO connections [stdin],
+        [stdout] and [stderr]. [env] defaults to {!Env.assignments}[
+        ()], [cwd] to {!Dir.current}[ ()], [stdin] to {!in_stdin},
+        [stdout] to {!out_stdout} and [stderr] to {!out_stderr}. *)
+
+    val run_status_out :
+      ?trim:bool -> ?env:string list -> ?cwd:Fpath.t -> ?stdin:stdi ->
+      ?stderr:[`Stdo of stdo | `Out] -> Cmd.t -> (status * string) result
+    (** [run_status_out] is like {!run_status} except [stdout] is read
+        from the process as a string. The string is {!String.trim}ed
+        if [trim] is [true] (default). If [stderr] is [`Out] the
+        process' [stderr] is redirected to [stdout] and thus read back
+        aswell in the string. *)
+
+    val run :
+      ?env:string list -> ?cwd:Fpath.t -> ?stdin:stdi -> ?stdout:stdo ->
+      ?stderr:stdo -> Cmd.t -> unit result
+    (** [run] is {!run_status} with non-[`Exited 0] statuses turned into
+        errors via {!pp_cmd_status}. *)
+
+    val run_out :
+      ?trim:bool -> ?env:string list -> ?cwd:Fpath.t -> ?stdin:stdi ->
+      ?stderr:[`Stdo of stdo | `Out] -> Cmd.t -> string result
+    (** [run] is {!run_status_out} with non-[`Exited 0] statuses turned into
+        errors via {!pp_cmd_status}. *)
+
+    (** {1:spawn Non-blocking command execution}
+
+        {b Note.} In contrast to [waitpid(2)] the following API
+        doesn't allow to collect {e any} child process
+        completion. There are two reasons: first this is not supported
+        on Windows, second doing so could collect processes that need
+        to be collected by the build system API implementation. *)
+
+    type pid
+    (** The type for process identifiers. *)
+
+    val pid_to_int : pid -> int
+    (** [pid_to_int pid] is the system identifier for process
+        identifier [pid]. *)
+
+    val spawn :
+      ?env:string list -> ?cwd:Fpath.t -> ?stdin:stdi -> ?stdout:stdo ->
+      ?stderr:stdo -> Cmd.t -> pid result
+    (** [spawn ~env ~cwd ~stdin ~stdout ~stderr cmd] spawns command
+        [cmd] in environment [env] with current directory [cwd] and
+        standard IO connections [stdin], [stdout] and [stderr]. [env]
+        defaults to {!Env.assignments}[ ()], [cwd] to {!Dir.current}[
+        ()], [stdin] to {!in_stdin}, [stdout] to {!out_stdout} and
+        [stderr] to {!out_stderr}. *)
+
+    val collect : ?block:bool -> pid -> status option result
+    (** [collect ~block pid] tries to collect the exit status of
+        spawn [pid]. If [block] is [false] (default), [Ok None]
+        is returned if [pid] has not exited yet. If [block] is [true]
+        the call will return with [Ok (Some st)] once [pid] has exited. *)
+
+    (** {1:exec Executing files}
+
+        {b Windows.} On Windows a program executing an [execv*]
+        function yields back control to the terminal as soon as the
+        child starts (vs. ends on POSIX). This entails all sorts of
+        unwanted behaviours. To workaround this, the following
+        functions execute the file as a spawned child process which is
+        waited on for completion via [waitpid(2)]. Once the child
+        process has terminated the calling process is immediately
+        [exit]ed with the status of the child. *)
+
+    val execv :
+      ?env:string list -> ?cwd:Fpath.t -> Fpath.t -> Cmd.t -> unit result
+    (** [execv ~env ~cwd f argv] executes file [f] as a new process in
+        environment [env] with [args] as the {!Sys.argv} of this
+        process (in particular [Sys.argv.(0)] is the name of the
+        program not the first argument to the program). The function
+        only returns in case of error. [env] defaults to
+        {!B0.OS.Env.assignments}[ ()], [cwd] to {!Dir.current}[ ()]. *)
   end
 end
 

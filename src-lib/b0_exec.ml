@@ -21,7 +21,7 @@ type handler =
     max_spawn : int; (* Max number of spawned processes *)
     mutable spawn_count : int; (* Number of spawned processes *)
     mutable spawns : (* Spawned processes *)
-      (B0_os.Cmd.spawn_pid * B0_op.t) list;  }
+      (B0_os.Cmd.pid * B0_op.t) list;  }
 
 let handler
     ?(rand = Random.State.make_self_init ()) ~max_spawn ~dur_counter ~tmp_path
@@ -75,8 +75,8 @@ let complete_spawn h o result =
   complete_spawn_stdo_ui o s;
   complete_op h o
 
-let get_stdo_ui_file h = match B0_os.File.open_tmp_path h.tmp_path with
-| Ok (file, fd) -> `Fd (fd, true), `Tmp_file file
+let get_stdo_ui_file h = match B0_os.File.open_tmp h.tmp_path with
+| Ok (file, fd) -> B0_os.Cmd.out_fd ~close:true fd, `Tmp_file file
 | Error (`Msg e) -> failwith e
 
 let exec_spawn h o =
@@ -84,24 +84,24 @@ let exec_spawn h o =
     try
       let cmd = B0_op.spawn_cmd s in
       let env = B0_op.spawn_env s in
-      let cwd = B0_op.spawn_cwd s in
+      let cwd = B0_fpath.to_string @@ B0_op.spawn_cwd s in
       let stdin = match B0_op.spawn_stdin s with
-      | None -> `Fd (Unix.stdin, false)
-      | Some f -> `File f
+      | None -> B0_os.Cmd.in_fd ~close:false Unix.stdin
+      | Some f -> B0_os.Cmd.in_file f
       in
       let stdout, ui = match B0_op.spawn_stdout s with
-      | `File f | `Tee f -> `File f, `None
+      | `File f | `Tee f -> B0_os.Cmd.out_file f, `None
       | `Ui -> get_stdo_ui_file h
       in
       let stderr, ui = match B0_op.spawn_stderr s with
-      | `File f | `Tee f -> `File f, ui
+      | `File f | `Tee f -> B0_os.Cmd.out_file f, ui
       | `Ui ->
           match ui with
           | `Tmp_file _ -> stdout, ui
           | `None -> get_stdo_ui_file h
       in
       B0_op.set_spawn_stdo_ui s ui;
-      match B0_os.Cmd.spawn env ~cwd ~stdin ~stdout ~stderr cmd with
+      match B0_os.Cmd.spawn_low ~env ~cwd ~stdin ~stdout ~stderr cmd with
       | Ok pid -> h.spawns <- (pid, o) :: h.spawns
       | Error (`Msg e) -> failwith e
     with Failure e -> complete_spawn h o (Error (`Msg e))
@@ -123,10 +123,10 @@ let rec collect_spawns ~block h = match h.spawn_count = 0 with
        Signals are brittle. *)
     let old_spawn_count = h.spawn_count in
     let collect spawns (pid, o as p) =
-      match B0_os.Cmd.collect ~block:false pid with
+      match B0_os.Cmd.collect pid with
       | Error _ as e -> complete_spawn h o e; spawns
       | Ok None -> p :: spawns
-      | Ok (Some ret) -> complete_spawn h o (Ok ret); spawns
+      | Ok (Some st) -> complete_spawn h o (Ok (pid, st)); spawns
     in
     h.spawns <- List.fold_left collect [] h.spawns;
     match block && old_spawn_count = h.spawn_count with

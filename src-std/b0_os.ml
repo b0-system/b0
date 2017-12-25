@@ -6,19 +6,16 @@
 
 open B0_result
 
+let strf = Printf.sprintf
+
 (* A bit of randomness for functions that need unique filenames *)
 
 let rand_gen = lazy (Random.State.make_self_init ())
 
-(* String formatting *)
-
-let strf = Format.asprintf
-let failwithf fmt =
-  Format.kasprintf (fun s -> raise_notrace (Failure s)) fmt
-
-let uerror = Unix.error_message
-
 (* Error handling *)
+
+let failwithf fmt = Format.kasprintf (fun s -> raise_notrace (Failure s)) fmt
+let uerror = Unix.error_message
 
 let apply f x ~finally y =
   let result = try f x with
@@ -27,12 +24,30 @@ let apply f x ~finally y =
   finally y;
   result
 
+(* Environment variables *)
+
 module Env = struct
 
   (* Variables *)
 
-  let var name = try Some (Unix.getenv name) with Not_found -> None
-  let opt_var name ~absent = try Unix.getenv name with Not_found -> absent
+  let find ?(empty_is_absent = true) name = match Unix.getenv name with
+  | "" when empty_is_absent -> None
+  | v -> Some v
+  | exception Not_found -> None
+
+  let get ?(empty_is_absent = true) name ~absent = match Unix.getenv name with
+  | "" when empty_is_absent -> absent
+  | v -> v
+  | exception Not_found -> absent
+
+  let value ?empty_is_absent name conv ~absent =
+    match find ?empty_is_absent name with
+    | None -> Ok absent
+    | Some v -> B0_conv.parse conv v
+
+  let get_value ?(log = B0_log.Error) ?empty_is_absent name conv ~absent =
+    (value ?empty_is_absent name conv ~absent)
+    |>  B0_log.on_error_msg ~level:log ?header:None ~use:(fun _ -> absent)
 
   (* Environments *)
 
@@ -48,6 +63,10 @@ module Env = struct
       Ok (fold add init v)
     with
     | Failure e -> R.error_msg e
+
+  let assignments () = try Ok (Array.to_list @@ Unix.environment ()) with
+  | Unix.Unix_error (e, _, _) ->
+      R.error_msgf "process environment: %s" (Unix.error_message e)
 
   let of_assignments ?init l = _of_assignments ?init List.fold_left l
   let to_assignments env =
@@ -74,23 +93,7 @@ module Env = struct
     B0_string.Map.merge lean_right env by
 end
 
-module Path = struct
-  let trash p ~in_dir =
-    let p = B0_fpath.to_string p in
-    let dir = B0_fpath.(to_string @@ to_dir_path in_dir) in
-    let rec loop n = match n with
-    | 0 -> R.error_msgf "trash %s in %s: too many attempts" p dir
-    | n ->
-        let rand = Random.State.bits (Lazy.force rand_gen) land 0xFFFFFFF in
-        let dst = dir ^ Printf.sprintf "%07x" rand in
-        try Ok (Unix.rename p dst) with
-        | Unix.Unix_error (Unix.EEXIST, _, _) -> loop (n - 1)
-        | Unix.Unix_error (Unix.EINTR, _, _) -> loop n
-        | Unix.Unix_error (e, _, _) ->
-            R.error_msgf "trash %s in %s: %s" p dir (uerror e)
-    in
-    loop 10000
-end
+(* File operations *)
 
 module File = struct
 
@@ -99,6 +102,8 @@ module File = struct
   let null = B0_fpath.v (if Sys.win32 then "NUL" else "/dev/null")
   let dash = B0_fpath.v "-"
   let is_dash = B0_fpath.equal dash
+
+  (* Existence and deletion *)
 
   let rec exists file =
     try Ok (Unix.((stat @@ B0_fpath.to_string file).st_kind = S_REG)) with
@@ -129,6 +134,8 @@ module File = struct
     in
     unlink file
 
+  (* Hard links *)
+
   let rec link ~force ~target p =
     let rec unlink target p =
       try Ok (Unix.unlink (B0_fpath.to_string p)) with
@@ -144,6 +151,14 @@ module File = struct
     | Unix.Unix_error (e, _, _) ->
         R.error_msgf "link target %a to %a: %s"
           B0_fpath.pp target B0_fpath.pp p (uerror e)
+
+  (* Executability *)
+
+  let _is_executable file = match Unix.access file [Unix.X_OK] with
+  | () -> true
+  | exception (Unix.Unix_error _) -> false
+
+  let is_executable file = _is_executable (B0_fpath.to_string file)
 
   (* Input *)
 
@@ -168,6 +183,10 @@ module File = struct
     | End_of_file -> R.error_msgf "%a: unexpected end of file" B0_fpath.pp file
     | Sys_error e -> R.error_msg e
 
+  let err_file_too_large file len =
+    R.error_msgf "read %a: file too large (%d, max supported: %d)"
+      B0_fpath.pp file len Sys.max_string_length
+
   let read file =
     let input_stdin () =
       let blen = io_buffer_size in
@@ -184,18 +203,37 @@ module File = struct
     | false ->
         let len = in_channel_length ic in
         match len <= Sys.max_string_length with
+        | false -> err_file_too_large file len
         | true ->
             let s = Bytes.create len in
             (really_input ic s 0 len; Ok (Bytes.unsafe_to_string s))
-        | false ->
-            R.error_msgf
-              "read %a: file too large (%d, max supported: %d)"
-              B0_fpath.pp file len Sys.max_string_length
     in
     match with_ic file input () with
     | Ok (Ok _ as v) -> v
     | Ok (Error _ as e) -> e
     | Error _ as e -> e
+
+  let read_fd file fd =
+    try
+      let rec really_read fd b start len = match len <= 0 with
+      | true -> Ok (Bytes.unsafe_to_string b)
+      | false ->
+          match Unix.read fd b start len with
+          | 0 -> R.error_msgf "read %a: unexpected end of file" B0_fpath.pp file
+          | r -> really_read fd b (start + r) (len - r)
+          | exception Unix.Unix_error (Unix.EINTR, _, _) ->
+              really_read fd b start len
+      in
+      let len = Unix.lseek fd 0 Unix.SEEK_END in
+      match len <= Sys.max_string_length with
+      | false -> err_file_too_large file len
+      | true ->
+          let b = Bytes.create len in
+          ignore (Unix.lseek fd 0 Unix.SEEK_SET);
+          really_read fd b 0 len
+    with
+    | Unix.Unix_error (e, _, _) ->
+        R.error_msgf "read %a: %s" B0_fpath.pp file (uerror e)
 
   (* Handling tmp files *)
 
@@ -214,15 +252,15 @@ module File = struct
   let unlink_tmps () = B0_fpath.Set.iter unlink_tmp !tmps
   let () = at_exit unlink_tmps
 
-  let rec open_tmp_path ?(mode = 0o600) p =
+  let open_tmp
+      ?(flags = Unix.[O_WRONLY; O_CREAT; O_EXCL; O_SHARE_DELETE; O_CLOEXEC])
+      ?(mode = 0o600) p
+    =
     let p = B0_fpath.to_string p in
     let rec loop n = match n with
     | 0 -> R.error_msgf "tmp file %s-X.tmp: too many attempts" p
     | n ->
         let file = p ^ rand_suff () in
-        let flags =
-          Unix.([O_WRONLY; O_CREAT; O_EXCL; O_SHARE_DELETE; O_CLOEXEC;])
-        in
         try
           let fd = Unix.openfile file flags mode in
           let file = B0_fpath.v file in
@@ -235,9 +273,9 @@ module File = struct
     in
     loop 10000
 
-  let with_tmp_oc ?mode p f v =
+  let with_tmp_oc ?flags ?mode p f v =
     try
-      open_tmp_path ?mode p >>= fun (file, fd) ->
+      open_tmp ?flags ?mode p >>= fun (file, fd) ->
       let oc = Unix.out_channel_of_descr fd in
       let delete_close oc = tmps_rem file; close_out oc in
       try Ok (apply (f file oc) v ~finally:delete_close oc) with
@@ -276,6 +314,8 @@ module File = struct
     R.join @@ with_oc ?mode file write contents
 end
 
+(* Directory operations *)
+
 module Dir = struct
 
   let rec exists dir =
@@ -290,9 +330,9 @@ module Dir = struct
     | Unix.S_DIR -> Ok dir
     | _ -> R.error_msgf "%a: Not a directory" B0_fpath.pp dir
     with
+    | Unix.Unix_error (Unix.EINTR, _, _) -> must_exist dir
     | Unix.Unix_error (Unix.ENOENT, _, _) ->
         R.error_msgf "%a: No such directory" B0_fpath.pp dir
-    | Unix.Unix_error (Unix.EINTR, _, _) -> must_exist dir
     | Unix.Unix_error (e, _, _) ->
         R.error_msgf "directory  %a must exist: %s" B0_fpath.pp dir (uerror e)
 
@@ -324,16 +364,16 @@ module Dir = struct
             >>= fun () -> Ok true
 
   let delete ?(must_exist = false) ~contents d =
-    let err d msg =
-      raise_notrace (Failure (strf "delete %a: %s" B0_fpath.pp d msg))
-    in
+    let err d msg = failwithf "delete %a: %s" B0_fpath.pp d msg in
     let try_unlink file = match Unix.unlink (B0_fpath.to_string file) with
     | () -> true
     | exception Unix.Unix_error (e, _, _) ->
         match e with
         | Unix.ENOENT -> true
         | Unix.EISDIR (* Linux *) | Unix.EPERM (* POSIX *) -> false
-        | Unix.EACCES when Sys.win32 -> false (* FIXME need to check dir ? *)
+        | Unix.EACCES when Sys.win32 ->
+            (* This is what Unix.unlink returns on directories on Windows. *)
+            false
         | e -> err file (uerror e)
     in
     let rec delete_contents d dh todo = match Unix.readdir dh with
@@ -421,23 +461,23 @@ module Dir = struct
     try
       let p = Unix.getcwd () in
       match B0_fpath.of_string p with
+      | Error _ -> R.error_msgf "get cwd: cannot parse %S to a path" p
       | Ok dir ->
-          if B0_fpath.is_abs dir then Ok dir else
-          R.error_msgf
-            "get cwd: getcwd(3) returned a relative path: (%a)" B0_fpath.pp dir
-      | Error _ ->
-          R.error_msgf
-            "get cwd: cannot parse %S to a path" p
+          match B0_fpath.is_abs dir with
+          | true -> Ok dir
+          | false ->
+              R.error_msgf
+                "get cwd: getcwd(3) returned a relative path: (%a)"
+                B0_fpath.pp dir
     with
     | Unix.Unix_error (Unix.EINTR, _, _) -> current ()
     | Unix.Unix_error (e, _, _) ->
         R.error_msgf "get cwd: %s" (uerror e)
 
-  let rec set_current dir =
-    try Ok (Unix.chdir (B0_fpath.to_string dir)) with
-    | Unix.Unix_error (Unix.EINTR, _, _) -> set_current dir
-    | Unix.Unix_error (e, _, _) ->
-        R.error_msgf "set cwd to %a: %s" B0_fpath.pp dir (uerror e)
+  let rec set_current dir = try Ok (Unix.chdir (B0_fpath.to_string dir)) with
+  | Unix.Unix_error (Unix.EINTR, _, _) -> set_current dir
+  | Unix.Unix_error (e, _, _) ->
+      R.error_msgf "set cwd to %a: %s" B0_fpath.pp dir (uerror e)
 
   let with_current dir f v =
     current () >>= fun old ->
@@ -467,143 +507,143 @@ module Dir = struct
   let default_tmp () = !default_tmp
 end
 
+(* Executing commands *)
+
 module Cmd = struct
 
   let err_empty_line = "no command, empty command line"
 
-  (* which and tool existence
+  (* Tool existence and search *)
 
-     Given a tool [tool] to lookup we search the first executable file
-     with matching name in a list of directories. If [tool] is is
-     already a path we skip the search and simply make sure that the
-     path is executable.
+  let default_path_sep = if Sys.win32 then ";" else ":"
 
-     In all cases, on Windows, if [tool] has no `.exe` suffix one is
-     added before making the lookup. *)
+  let exe_is_path t =
+    try ignore (B0_string.index t B0_fpath.dir_sep_char); true with
+    | Not_found -> false
 
-  let ensure_exe_suff_if_win32 = match Sys.win32 with
+  let tool_file ~dir tool = match dir.[String.length dir - 1] with
+  | c when B0_fpath.char_is_dir_sep c -> dir ^ tool
+  | _ -> String.concat B0_fpath.dir_sep [dir; tool]
+
+  let search_in_path tool =
+    let rec loop tool = function
+    | "" -> None
+    | p ->
+        let dir, p = match B0_string.cut ~sep:default_path_sep p with
+        | None -> p, ""
+        | Some (dir, p) -> dir, p
+        in
+        if dir = "" then loop tool p else
+        let tool_file = tool_file ~dir tool in
+        match File._is_executable tool_file with
+        | false -> loop tool p
+        | true -> Some (B0_fpath.v tool_file)
+    in
+    match Unix.getenv "PATH" with
+    | p -> loop tool p
+    | exception Not_found -> None
+
+  let search_in_dirs ~dirs tool =
+    let rec loop tool = function
+    | [] -> None
+    | d :: dirs ->
+        let tool_file = tool_file ~dir:(B0_fpath.to_string d) tool in
+        match File._is_executable tool_file with
+        | false -> loop tool dirs
+        | trure -> Some (B0_fpath.v tool_file)
+    in
+    loop tool dirs
+
+  let ensure_exe_suffix_if_win32 = match Sys.win32 with
   | false -> fun t -> t
   | true ->
       fun t -> match B0_string.is_suffix ~affix:".exe" t with
       | true -> t
       | false -> t ^ ".exe"
 
-  let tool_is_path t =
-    try ignore (B0_string.index t B0_fpath.dir_sep_char); true with
-    | Not_found -> false
-
-  let tool_execable t = match Unix.access t [Unix.X_OK] with
-  | () -> true
-  | exception (Unix.Unix_error _) -> false
-
-  let which_file ~dirs tool = match tool with
-  | "" -> None
+  let _find_tool ?search tool = match tool with
+  | "" -> Ok None
   | tool ->
-      let tool = ensure_exe_suff_if_win32 tool in
-      match tool_is_path tool with
-      | true -> if tool_execable tool then Some tool else None
+      let tool = ensure_exe_suffix_if_win32 tool in
+      match exe_is_path tool with
+      | true -> B0_fpath.of_string tool >>| fun t -> Some t
       | false ->
-          let rec loop tool = function
-          | [] -> None
-          | d :: dirs ->
-              if d = "" then loop tool dirs else
-              let exec_path = match d.[String.length d - 1] with
-              | c when B0_fpath.char_is_dir_sep c -> d ^ tool
-              | _ -> String.concat B0_fpath.dir_sep  [d; tool]
-              in
-              if tool_execable exec_path then Some exec_path else loop tool dirs
+          match search with
+          | None -> Ok (search_in_path tool)
+          | Some dirs -> Ok (search_in_dirs ~dirs tool)
+
+  let find_tool ?search cmd = match B0_cmd.to_list cmd with
+  | [] -> Ok None
+  | c :: _ -> _find_tool ?search c
+
+  let err_not_found ?search cmd = match B0_cmd.is_empty cmd with
+  | true -> R.error_msg err_empty_line
+  | false ->
+      let pp_search ppf = function
+      | None -> B0_fmt.string ppf "PATH"
+      | Some dirs ->
+          let pp_dir ppf d =
+            B0_fmt.string ppf (Filename.quote @@ B0_fpath.to_string d)
           in
-          loop tool dirs
+          B0_fmt.(list ~sep:comma pp_dir) ppf dirs
+      in
+      let tool = List.hd @@ B0_cmd.to_list cmd in
+      R.error_msgf "%s: no such command in %a" tool pp_search search
 
-  let default_path_sep = if Sys.win32 then ";" else ":"
-  let path_dirs ?(sep = default_path_sep) path =
-    B0_string.cuts ~empty:false ~sep path
+  let get_tool ?search cmd = match find_tool ?search cmd with
+  | Ok (Some t) -> Ok t
+  | Ok None -> err_not_found ?search cmd
+  | Error _ as e -> e
 
-  let which_raw tool =
-    let dirs = match Unix.getenv "PATH" with
-    | p -> path_dirs p
-    | exception Not_found -> []
+  let exists ?search cmd = match find_tool ?search cmd with
+  | Ok (Some _) -> Ok true
+  | Ok None -> Ok false
+  | Error _ as e -> e
+
+  let must_exist ?search cmd = match find_tool ?search cmd with
+  | Ok (Some _) -> Ok cmd
+  | Ok None -> err_not_found ?search cmd
+  | Error _ as e -> e
+
+  let resolve ?search cmd = match find_tool ?search cmd with
+  | Ok (Some t) ->
+      let t = B0_fpath.to_string t in
+      Ok (B0_cmd.of_list (t :: List.tl (B0_cmd.to_list cmd)))
+  | Ok None -> err_not_found ?search cmd
+  | Error _ as e -> e
+
+  let search_path_dirs ?(sep = default_path_sep) path =
+    let rec loop acc = function
+    | ""  -> Ok (List.rev acc)
+    | p ->
+        let dir, p = match B0_string.cut ~sep p with
+        | None -> p, ""
+        | Some (dir, p) -> dir, p
+        in
+        if dir = "" then loop acc p else
+        match B0_fpath.of_string dir with
+        | Error (`Msg m) -> R.error_msgf "search path value %S: %s" path m
+        | Ok d -> loop (d :: acc) p
     in
-    which_file ~dirs tool
+    loop [] path
 
-  let cmd_tool cmd = try List.hd (B0_cmd.to_list cmd) with
-  | Failure _ -> failwith err_empty_line
-
-  let which cmd = match which_raw (cmd_tool cmd) with
-  | Some v -> Ok (Some (B0_fpath.v v))
-  | None -> Ok None
-  | exception Failure e -> R.error_msg e
-
-  let exists cmd = match which_raw (cmd_tool cmd) with
-  | Some _ -> Ok true
-  | None -> Ok false
-  | exception Failure e -> R.error_msg e
-
-  let must_exist cmd = exists cmd >>= function
-  | false -> R.error_msgf "%s: no such command" (cmd_tool cmd)
-  | true -> Ok cmd
-
-  (* Running commands *)
-
-  (* FIXME this was c&p from topkg and should not use Sys.command *)
-
-  let line ?stdout ?stderr cmd =
-    let strf = Printf.sprintf in
-    if B0_cmd.is_empty cmd then failwith err_empty_line else
-    let cmd = List.rev_map Filename.quote (B0_cmd.to_rev_list cmd) in
-    let cmd = String.concat " " cmd in
-    let redirect fd f =
-      strf " %d>%s" fd (Filename.quote @@ B0_fpath.to_string f)
-    in
-    let stdout = match stdout with None -> "" | Some f -> redirect 1 f in
-    let stderr = match stderr with None -> "" | Some f -> redirect 2 f in
-    let win_quote = if Sys.win32 then "\"" else "" in
-    strf "%s%s%s%s%s" win_quote cmd stdout stderr win_quote
+  (* Process completion statuses *)
 
   type status = [ `Exited of int | `Signaled of int ]
 
-  let exec ?stdout ?stderr cmd =
-    try
-      let line = line ?stdout ?stderr cmd in
-      B0_log.debug (fun m -> m ~header:"EXEC" "@[<1>[%s]@]" line);
-      Ok ((), (cmd, (`Exited (Sys.command line) :> status)))
-    with Sys_error e | Failure e -> R.error_msg e
+  let status_of_unix_status = function
+  | Unix.WEXITED n -> `Exited n
+  | Unix.WSIGNALED n -> `Signaled n
+  | Unix.WSTOPPED _ -> assert false
 
-  type run_status = B0_cmd.t * status
+  let pp_status ppf = function
+  | `Exited n -> B0_fmt.pf ppf "@[exited [%d]@]" n
+  | `Signaled n -> B0_fmt.pf ppf "@[signaled [%d]@]" n
 
-  let success r = r >>= function
-    | (v, (_, `Exited 0)) -> Ok v
-    | (v, (cmd, `Exited c)) ->
-        R.error_msgf "cmd [%s]: exited with %d" (B0_cmd.to_string cmd) c
-    | (v, (_, `Signaled _)) -> assert false
+  let pp_cmd_status ppf (cmd, st) =
+    B0_fmt.pf ppf "cmd [%s]: %a" (B0_cmd.to_string cmd) pp_status st
 
-  let run ?err:stderr cmd = exec ?stderr cmd |> success
-  let run_status ?err:stderr cmd =
-    exec ?stderr cmd >>= function ((), (_, st)) -> Ok st
-
-  type run_out = { cmd : B0_cmd.t; err : B0_fpath.t option }
-
-  let tmp () =
-    try
-      let f = Filename.temp_file (Filename.basename Sys.argv.(0)) "b0" in
-      at_exit (fun () -> ignore (File.delete (B0_fpath.v f)));
-      Ok (B0_fpath.v f)
-    with Sys_error e -> R.error_msg e
-
-  let out_string ?(trim = true) o =
-    tmp ()
-    >>= fun file -> exec ?stderr:o.err ~stdout:file o.cmd
-    >>= fun ((), st) -> File.read file
-    >>= fun out -> Ok ((if trim then String.trim out else out), st)
-
-  let out_file stdout o = exec ?stderr:o.err ~stdout o.cmd
-  let out_stdout o = exec ?stderr:o.err ?stdout:None o.cmd
-  let to_string ?trim o = out_string ?trim o |> success
-  let to_file stdout o = out_file stdout o |> success
-  let to_null o = to_file File.null o
-  let run_out ?err cmd = { cmd; err }
-
-  (* Spawn *)
+  (* Fd utils *)
 
   let rec openfile fn mode perm = try Unix.openfile fn mode perm with
   | Unix.Unix_error (Unix.EINTR, _, _) -> openfile fn mode perm
@@ -612,8 +652,6 @@ module Cmd = struct
   | Unix.Unix_error (Unix.EINTR, _, _) -> close fd
 
   let close_no_err fd = try close fd with e -> ()
-
-  (* Fd utils *)
 
   module Fds = struct (* Maintains a set of fds to close. *)
     module Fd = struct
@@ -629,103 +667,208 @@ module Cmd = struct
     let close fd s = if S.mem fd !s then (close_no_err fd; s := S.remove fd !s)
   end
 
-  type spawn_pid = int
-  type spawn_stdio = [ `Fd of Unix.file_descr * bool | `File of B0_fpath.t ]
+  (* Process standard inputs and outputs *)
 
-  let spawn_in fds = function
-  | `Fd (fd, close) -> if close then Fds.add fd fds; fd
-  | `File f ->
+  type stdi =
+  | In_string of string
+  | In_file of B0_fpath.t
+  | In_fd of { fd : Unix.file_descr; close : bool }
+
+  type stdo =
+  | Out_file of B0_fpath.t
+  | Out_fd of { fd : Unix.file_descr; close : bool }
+
+  let in_string s = In_string s
+  let in_file f = In_file f
+  let in_fd ~close fd = In_fd { fd; close }
+  let in_stdin = In_fd { fd = Unix.stdin; close = false }
+  let in_null = In_file File.null
+
+  let out_file f = Out_file f
+  let out_fd ~close fd = Out_fd { fd; close }
+  let out_stdout = Out_fd { fd = Unix.stdout; close = false }
+  let out_stderr = Out_fd { fd = Unix.stderr; close = false }
+  let out_null = Out_file File.null
+
+  let stdi_to_fd fds = function
+  | In_fd { fd; close } -> if close then Fds.add fd fds; fd
+  | In_string s ->
+      begin try
+        (* We write the input string to a temporary file. *)
+        let base = B0_fpath.v "b0-sdtin" in
+        let flags = Unix.[O_RDWR; O_CREAT; O_EXCL; O_SHARE_DELETE; O_CLOEXEC] in
+        let f, fd = R.failwith_error_msg @@ File.open_tmp ~flags base in
+        Fds.add fd fds;
+        File.tmps_rem f; (* We don't need the actual file. *)
+        ignore (Unix.write_substring fd s 0 (String.length s));
+        ignore (Unix.lseek fd 0 Unix.SEEK_SET);
+        fd
+      with
+      | Unix.Unix_error (e, _, _) ->
+          failwithf "tmp file for stdin: %s" (uerror e)
+      end
+  | In_file f ->
       try
         let f = B0_fpath.to_string f in
         let fd = openfile f Unix.[O_RDONLY] 0o644 in
         Fds.add fd fds; fd
       with Unix.Unix_error (e, _, _) ->
-        failwithf "open input %a: %s" B0_fpath.pp f (uerror e)
+        failwithf "open file %a for stdin: %s" B0_fpath.pp f (uerror e)
 
-  let spawn_out fds = function
-  | `Fd (fd, close) -> if close then Fds.add fd fds; fd
-  | `File f ->
+  let stdo_to_fd fds = function
+  | Out_fd { fd; close } -> if close then Fds.add fd fds; fd
+  | Out_file f ->
       try
         let f = B0_fpath.to_string f in
         let fd = openfile f Unix.[O_WRONLY; O_CREAT; O_TRUNC] 0o644 in
         Fds.add fd fds; fd
       with Unix.Unix_error (e, _, _) ->
-        failwithf "open output %a: %s" B0_fpath.pp f (uerror e)
+        failwithf "open file %a for stdout: %s" B0_fpath.pp f (uerror e)
+
+  (* Low-level command spawn *)
+
+  let spawn_err cmd msg = match B0_cmd.is_empty cmd with
+  | true -> R.error_msg msg
+  | false -> R.error_msgf "cmd %s: %s" (B0_cmd.to_string cmd) msg
 
   let rec spawn_getcwd () = try Unix.getcwd () with
   | Unix.Unix_error (Unix.EINTR, _, _) -> spawn_getcwd ()
 
-  let rec spawn_chdir cwd =
-    try Unix.chdir cwd with
-    | Unix.Unix_error (Unix.EINTR, _, _) -> spawn_chdir cwd
-    | Unix.Unix_error (e, _, _) ->
-        failwithf "chdir %s: %s" cwd (uerror e)
+  let rec spawn_chdir cwd = try Unix.chdir cwd with
+  | Unix.Unix_error (Unix.EINTR, _, _) -> spawn_chdir cwd
+  | Unix.Unix_error (e, _, _) -> failwithf "chdir %s: %s" cwd (uerror e)
 
-  let log_spawn args =
-    B0_log.debug (fun m ->
-        args (fun pid cmd -> m ~header:(strf "SPAWN:%d" pid) "@[<1>[%s]@]" cmd))
+  let spawn_env = function
+  | None -> Unix.environment ()
+  | Some e -> Array.of_list e
 
-  let spawn env ~cwd ~stdin ~stdout ~stderr cmd =
-    let err cmd msg = R.error_msgf "cmd %s: %s" (B0_cmd.to_string cmd) msg in
-    if B0_cmd.is_empty cmd then err cmd err_empty_line else
+  let spawn_cwd = function
+  | None -> spawn_getcwd ()
+  | Some cwd -> B0_fpath.to_string cwd
+
+  let _spawn fds ~env ~cwd ~stdin ~stdout ~stderr cmd =
+    if B0_cmd.is_empty cmd then failwith err_empty_line else
     let line = Array.of_list @@ B0_cmd.to_list cmd in
+    let stdin = stdi_to_fd fds stdin in
+    let stdout = stdo_to_fd fds stdout in
+    let stderr = stdo_to_fd fds stderr in
+    let old_cwd = spawn_getcwd () in
+    let change_cwd = old_cwd <> cwd in
+    if change_cwd then spawn_chdir cwd;
+    let pid = Unix.create_process_env line.(0) line env stdin stdout stderr in
+    if change_cwd then spawn_chdir old_cwd; (* Pid zombie on fail, oh well. *)
+    Fds.close_all fds;
+    pid
+
+  (* Blocking command execution *)
+
+  let rec run_collect pid cmd = match Unix.waitpid [] pid with
+  | _, status ->
+      B0_log.debug begin fun m ->
+        let header = match status with
+        | Unix.WEXITED 0 -> "EXEC"
+        | Unix.WEXITED n -> strf "EXEC [%d]" n
+        | Unix.WSIGNALED n -> strf "EXEC sig'd [%d]" n
+        | Unix.WSTOPPED _ -> assert false
+        in
+        m ~header "[%s]" (B0_cmd.to_string cmd)
+      end;
+      status_of_unix_status status
+  | exception Unix.Unix_error (Unix.EINTR, _, _) -> run_collect pid cmd
+  | exception Unix.Unix_error (e, _, _) ->
+      failwithf "waitpid %d: %s" pid (uerror e)
+
+  let run_status
+      ?env ?cwd ?(stdin = in_stdin) ?(stdout = out_stdout)
+      ?(stderr = out_stderr) cmd
+    =
     let fds = Fds.empty () in
     try
-      let stdin = spawn_in fds stdin in
-      let stdout = spawn_out fds stdout in
-      let stderr = spawn_out fds stderr in
-      let cwd = B0_fpath.to_string cwd in
-      let old_cwd = spawn_getcwd () in
-      let change_cwd = old_cwd <> cwd in
-      if change_cwd then spawn_chdir cwd;
-      let pid = Unix.create_process_env line.(0) line env stdin stdout stderr in
-      if change_cwd then spawn_chdir old_cwd; (* Pid zombie on fail, oh well. *)
-      Fds.close_all fds;
-      log_spawn (fun m -> m pid (B0_cmd.to_string cmd));
+      let env = spawn_env env in
+      let cwd = spawn_cwd cwd in
+      let pid = _spawn fds ~env ~cwd ~stdin ~stdout ~stderr cmd in
+      Ok (run_collect pid cmd)
+    with
+    | Failure e -> Fds.close_all fds; spawn_err cmd e
+    | Unix.Unix_error (e, _, _) -> Fds.close_all fds; spawn_err cmd (uerror e)
+
+  let run_status_out
+      ?(trim = true) ?env ?cwd ?(stdin = in_stdin) ?(stderr = `Stdo out_stderr)
+      cmd
+    =
+    let fds = Fds.empty () in
+    try
+      let env = spawn_env env in
+      let cwd = spawn_cwd cwd in
+      let base = B0_fpath.v "b0-sdtout" in
+      let flags = Unix.[O_RDWR; O_CREAT; O_EXCL; O_SHARE_DELETE; O_CLOEXEC] in
+      let tmpf, fd = R.failwith_error_msg @@ File.open_tmp ~flags base in
+      let stdout = out_fd ~close:false fd in
+      let stderr = match stderr with `Out -> stdout | `Stdo o -> o in
+      let pid = _spawn fds ~env ~cwd ~stdin ~stdout ~stderr cmd in
+      let status = run_collect pid cmd in
+      let out = R.failwith_error_msg @@ File.read_fd tmpf fd in
+      let out = if trim then String.trim out else out in
+      ignore (File.tmps_rem tmpf);
+      Ok (status, out)
+    with
+    | Failure e -> Fds.close_all fds; spawn_err cmd e
+    | Unix.Unix_error (e, _, _) -> Fds.close_all fds; spawn_err cmd (uerror e)
+
+  let run ?env ?cwd ?stdin ?stdout ?stderr cmd =
+    match run_status ?env ?cwd ?stdin ?stdout ?stderr cmd with
+    | Ok (`Exited 0) -> Ok ()
+    | Ok st -> R.error_msgf "%a" pp_cmd_status (cmd, st)
+    | Error _ as e -> e
+
+  let run_out ?trim ?env ?cwd ?stdin ?stderr cmd =
+    match run_status_out ?trim ?env ?cwd ?stdin ?stderr cmd with
+    | Ok (`Exited 0, v) -> Ok v
+    | Ok (st, _) -> R.error_msgf "%a" pp_cmd_status (cmd, st)
+    | Error _ as e -> e
+
+  (* Non-blocking command execution *)
+
+  type pid = int
+  let pid_to_int pid = pid
+
+  let spawn_low ~env ~cwd ~stdin ~stdout ~stderr cmd =
+    let fds = Fds.empty () in
+    try
+      let pid = _spawn fds ~env ~cwd ~stdin ~stdout ~stderr cmd in
+      B0_log.debug begin fun m ->
+        m ~header:(strf "SPAWN:%d" pid) "[%s]" (B0_cmd.to_string cmd)
+      end;
       Ok pid
     with
-    | Failure e -> Fds.close_all fds; (* FIXME omit cmd (or not) *) err cmd e
-    | Unix.Unix_error (e, _, _) -> Fds.close_all fds; err cmd (uerror e)
+    | Failure e -> Fds.close_all fds; spawn_err cmd e
+    | Unix.Unix_error (e, _, _) -> Fds.close_all fds; spawn_err cmd (uerror e)
 
-  let status_of_unix_status = function
-  | Unix.WEXITED n -> `Exited n
-  | Unix.WSIGNALED n -> `Signaled n
-  | Unix.WSTOPPED _ -> assert false
+  let spawn
+      ?env ?cwd ?(stdin = in_stdin) ?(stdout = out_stdout)
+      ?(stderr = out_stderr) cmd
+    =
+    try
+      spawn_low
+        ~env:(spawn_env env) ~cwd:(spawn_cwd cwd) ~stdin ~stdout ~stderr cmd
+    with
+    | Unix.Unix_error (e, _, _) -> spawn_err cmd (uerror e)
 
-  let pp_status ppf = function
-  | `Exited n -> B0_fmt.pf ppf "@[exit [%d]@]" n
-  | `Signaled n -> B0_fmt.pf ppf "@[signaled [%d]@]" n
-
-  let rec collect ~block pid =
+  let rec collect ?(block = false) pid =
     let flags = if not block then Unix.[WNOHANG] else [] in
     match Unix.waitpid flags pid with
     | 0, _ -> Ok None
-    | n, status ->
+    | _, status ->
         let status = status_of_unix_status status in
-        B0_log.debug
-          (fun m -> m ~header:(strf "COLLECT:%d" pid) "%a" pp_status status);
-        Ok (Some (n, status))
+        B0_log.debug begin fun m ->
+          m ~header:(strf "COLLECT:%d" pid) "%a" pp_status status
+        end;
+        Ok (Some status)
+    | exception Unix.Unix_error (Unix.EINTR, _, _) -> collect ~block pid
     | exception Unix.Unix_error (e, _, _) ->
-        match e with
-        | Unix.EINTR -> collect ~block pid
-        | e -> R.error_msgf "wait %d: %s" pid (uerror e)
+        R.error_msgf "waitpid %d: %s" pid (uerror e)
 
-  let rm_rf p =
-    let p = B0_fpath.to_string p in
-    let rm_rf = match Sys.win32 with
-    | true -> [| "cmd.exe"; "/c"; "rd"; "/s"; "/q"; p; |]
-    | false -> [| "rm"; "-r"; "-f"; p |]
-    in
-    try
-      let pid = Unix.(create_process rm_rf.(0) rm_rf stdin stdout stderr) in
-      log_spawn
-        (fun m -> m pid (B0_cmd.(to_string @@ of_list (Array.to_list rm_rf))));
-      Ok pid
-    with
-    | Unix.Unix_error (e, _, _) ->
-        R.error_msgf "remove file hierarchy: %s: %s" rm_rf.(0) (uerror e)
-
-  (* exec
+  (* execv
 
      On Windows when Unix.execv[e] is invoked, control is returned to
      the controlling terminal when the child process starts (vs. child
@@ -735,39 +878,81 @@ module Cmd = struct
      exit with the resulting status. *)
 
   let err_execv bin e = R.error_msgf "execv %s: %s" bin (uerror e)
-  let err_execve bin e = R.error_msgf "execve %s: %s" bin (uerror e)
 
-  let execv_raw_posix bin args = try Ok (Unix.execv bin args) with
-  | Unix.Unix_error (e, _, _) -> err_execv bin e
-
-  let execve_raw_posix bin args ~env = try Ok (Unix.execve bin args env) with
-  | Unix.Unix_error (e, _, _) -> err_execv bin e
-
-  let _win32_execv_exit pid = match Unix.waitpid [] pid with
-  | _, (Unix.WEXITED c) -> exit c
-  | _, (Unix.WSIGNALED sg) ->
-      Unix.(kill (getpid ()) sg);
-      (* In case we don't get killed, exit with bash convention. *)
-      exit (128 + sg)
-  | _ -> assert false
-
-  let execv_raw_win32 bin args =
+  let _execv_win32 ~env bin args =
+    let exit pid = match Unix.waitpid [] pid with
+    | _, (Unix.WEXITED c) -> exit c
+    | _, (Unix.WSIGNALED sg) ->
+        Unix.(kill (getpid ()) sg);
+        (* In case we don't get killed, exit with bash convention. *)
+        exit (128 + sg)
+    | _ -> assert false
+    in
     try
-      _win32_execv_exit @@
-      Unix.(create_process bin args stdin stdout stderr)
+      exit @@ match env with
+      | None -> Unix.(create_process bin args stdin stdout stderr)
+      | Some env ->
+          let env = Array.of_list env in
+          Unix.(create_process_env bin args env stdin stderr stderr)
     with
     | Unix.Unix_error (e, _, _) -> err_execv bin e
 
-  let execve_raw_win32 bin args ~env =
-    try
-      _win32_execv_exit @@
-      Unix.(create_process_env bin args env stdin stderr stderr)
+  let _execv_posix ~env bin args =
+    try match env with
+    | None -> Ok (Unix.execv bin args)
+    | Some env ->
+        let env = Array.of_list env in
+        Ok (Unix.execve bin args env)
     with
-    | Unix.Unix_error (e, _, _) -> err_execve bin e
+    | Unix.Unix_error (e, _, _) -> err_execv bin e
 
-  let execv_raw = if Sys.win32 then execv_raw_win32 else execv_raw_posix
-  let execve_raw = if Sys.win32 then execve_raw_win32 else execve_raw_posix
+  let _execv = if Sys.win32 then _execv_win32 else _execv_posix
 
+  let execv ?env ?cwd f cmd =
+    let cwd = match cwd with
+    | None -> Ok ()
+    | Some cwd -> Dir.set_current cwd
+    in
+    cwd >>= fun () ->
+    _execv ~env (B0_fpath.to_string f) (Array.of_list @@ B0_cmd.to_list cmd)
+end
+
+(* B0 internals *)
+
+module B0 = struct
+
+  let trash_path p ~in_dir =
+    let p = B0_fpath.to_string p in
+    let dir = B0_fpath.(to_string @@ to_dir_path in_dir) in
+    let rec loop n = match n with
+    | 0 -> R.error_msgf "trash %s in %s: too many attempts" p dir
+    | n ->
+        let rand = Random.State.bits (Lazy.force rand_gen) land 0xFFFFFFF in
+        let dst = dir ^ Printf.sprintf "%07x" rand in
+        try Ok (Unix.rename p dst) with
+        | Unix.Unix_error (Unix.EEXIST, _, _) -> loop (n - 1)
+        | Unix.Unix_error (Unix.EINTR, _, _) -> loop n
+        | Unix.Unix_error (e, _, _) ->
+            R.error_msgf "trash %s in %s: %s" p dir (uerror e)
+    in
+    loop 10000
+
+  let rm_rf p =
+    let p = B0_fpath.to_string p in
+    let rm_rf = match Sys.win32 with
+    | true -> [| "cmd.exe"; "/c"; "rd"; "/s"; "/q"; p; |]
+    | false -> [| "rm"; "-r"; "-f"; p |]
+    in
+    try
+      let pid = Unix.(create_process rm_rf.(0) rm_rf stdin stdout stderr) in
+      B0_log.debug begin fun m ->
+        let cmd = B0_cmd.of_list @@ Array.to_list rm_rf in
+        m ~header:(strf "SPAWN:%d" pid) "[%s]" (B0_cmd.to_string cmd)
+      end;
+      Ok pid
+    with
+    | Unix.Unix_error (e, _, _) ->
+        R.error_msgf "remove file hierarchy: %s: %s" rm_rf.(0) (uerror e)
 end
 
 (*---------------------------------------------------------------------------

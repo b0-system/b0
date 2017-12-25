@@ -12,10 +12,9 @@ type pkg = string
 type cmd = { cmd : Cmd.t; }
 
 let get () =
-  let opam = OS.Env.opt_var "B0_OPAM" ~absent:"opam" in
-  match OS.Cmd.which_raw opam with
-  | None -> R.error_msgf "opam: not found in PATH (as %s)" opam
-  | Some opam -> Ok { cmd = Cmd.v opam }
+  let absent = Cmd.v "opam" in
+  let opam = OS.Env.get_value "B0_OPAM" Conv.tool ~absent in
+  OS.Cmd.resolve opam >>= fun cmd -> Ok { cmd }
 
 let cmd opam = opam.cmd
 let env opam ~switch =
@@ -36,7 +35,7 @@ let env opam ~switch =
     | Failure e -> R.error_msg e
   in
   let cmd = Cmd.(opam.cmd % "env" % "--sexp" % "--switch" % switch) in
-  OS.Cmd.(run_out cmd |> to_string)
+  OS.Cmd.run_out cmd
   >>= fun out -> Sexp.of_string ~src:(Sexp.File OS.File.dash) out
   >>= fun se -> parse_env_sexp (Sexp.get_list se)
 

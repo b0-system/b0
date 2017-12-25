@@ -5,9 +5,6 @@
   from the ops !
 * Tool version example.
 * OCaml version example/scheme.
-* Fix build with system switches
-  http://erratique.ch/repos/b0/tree/src-driver/b0d_driver_compile.ml#n104
-  is too simplistic and doesn't work. Generate a `b0_conf.ml` file 
 * Doc vs synopsis, e.g. for variants. Maybe not. Lookup in the API.
 * `b0 env`,  `b0 exec-env` 
 * Consider reording tool & conf. Also `Conf` became a mess make it more
@@ -16,7 +13,6 @@
 * Build need a way to know if we are a root unit or not.
 * Serialization move away from Marshal, so that proxy build
   data can be read back.
-* Bring `B0.OS.Cmd` at the level of `bos`'s API.
 * Find something forwards looking w.r.t relative paths specified
   to units. We don't want to be in the build fun I think.
   src_root which defaults to sub description location ? 
@@ -34,7 +30,6 @@
   Make library archive depend on stubs. May also be the reason
   for spurious failures in examples.
 
-
 # B0.Def
 
 * Provide a way to lock definitions so that any def afterwards raises.
@@ -42,7 +37,6 @@
   dynamically (e.g. conf keys, build units, variants schemes).
 * For B0 as a library. Provide a way to disable the retaining of
   definitions (Unit.list, Variant.Scheme.list). Related to locking.
-
 
 # B0.Conf
 
@@ -66,8 +60,6 @@ file sync.
   `--no-prev`.
 
 * Incremental performance. Already pretty good but could be better:
-** Consider using MurmurHash3 128-bit. For files mmap the files
-   caml_md5 (aka: fadvise may be smarter).
 ** Consider not re-hashing the cache elements, keep their hash in the
    build outcome. I.e. trust that noone fiddles with _b0/cache
 ** Implement a fast check for the whole build on the roots. This is cheating
@@ -79,6 +71,8 @@ file sync.
    that pass the check don't need to be trashed and relinked and
    we avoid computing all the commands.
 ** Dolan. Make the cache read only.
+** Michel. Hash server using modern fs notification APIs. b0
+   simply consults the server.
    
 # `b0` driver
 
@@ -114,9 +108,6 @@ where we don't want to rsync all the local variants.
 *  Document/think about how a new scheme can be added e.g. to a whole
    opam switch. (Add a new package with the scheme, set environment
    variable `B0_D_LIBS`.
-* Usability of `variant create [VARIANT]` is seems that rather than the name
-   we are intersted in the scheme, so rather than specify it via an option.
-   It should maybe be `variant create [SCHEME] [VARIANT]`. 
 * Proxy results, they should be stored seperatly so that we don't
    try build them. 
 * Proxy we might want to access the namespaced name. E.g. for the docker

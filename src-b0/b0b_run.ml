@@ -66,10 +66,9 @@ let run_exec noenv v o exec args =
       | false -> Variant.Scheme.direct_env d () >>| fun env -> Env.env env aim
       in
       env >>= fun env ->
-      let exec = Fpath.to_string exec in
-      let env = Array.of_list @@ OS.Env.to_assignments env in
-      let args = Array.of_list (exec :: args) in
-      OS.Cmd.execve_raw exec args ~env >>= fun () -> assert false
+      let env = OS.Env.to_assignments env in
+      let argv = Cmd.of_list (Fpath.to_string exec :: args) in
+      OS.Cmd.execv ~env exec argv >>= fun () -> assert false
 
 (* Action *)
 

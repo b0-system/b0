@@ -158,8 +158,9 @@ let exec_instance d cli descr =
      Sys.argv and replace it by this one. The problem with this
      is the intepretation of relative files paths andinteraction
      with -C. *)
+  let argv = Cmd.of_list @@ Array.to_list @@ Sys.argv in
   OS.Dir.set_current (B0d_root_descr.dir descr)
-  >>= fun () -> OS.Cmd.execv_raw (Fpath.to_string bin) Sys.argv
+  >>= fun () -> OS.Cmd.execv bin argv
   >>| fun () -> (* should not happen *) B0d_cli.exit_driver_setup_err
 
 (* Wrapping driver commands *)

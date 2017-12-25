@@ -18,19 +18,24 @@ let pp_tool_alts ppf alts =
       B0_fmt.pf ppf "@[%a or %a@]" tool t B0_fmt.(list ~sep:comma tool) ts
 
 let env_tool_lookup ?sep ?(var = "PATH") env =
+  (* FIXME cleanup that *)
   let path = match B0_string.Map.find var env with
   | exception Not_found -> "" | path -> path
   in
-  let dirs = B0_os.Cmd.path_dirs ?sep path in
-  fun tools ->
-  let rec loop = function
-  | [] -> R.error_msgf "%a: not found in %s=%S" pp_tool_alts tools var path
-  | t :: ts ->
-      match B0_os.Cmd.which_file ~dirs (B0_fpath.to_string t) with
-      | Some t -> Ok (B0_fpath.v t)
-      | None -> loop ts
-  in
-  loop tools
+  match B0_os.Cmd.search_path_dirs ?sep path with
+  | Error _ as e -> (fun _ -> e)
+  | Ok search ->
+      fun tools ->
+        let rec loop = function
+        | [] ->
+            R.error_msgf "%a: not found in %s=%S" pp_tool_alts tools var path
+        | t :: ts ->
+            match B0_os.Cmd.find_tool ~search B0_cmd.(v (p t)) with
+            | Ok (Some t) -> Ok t
+            | Ok None -> loop ts
+            | Error _ as e -> e
+        in
+        loop tools
 
 type t =
   { host_env : B0_os.Env.t;

@@ -11,19 +11,23 @@
 open B0_result
 
 module Env : sig
- val var : string -> string option
- val opt_var : string -> absent:string -> string
+ val find : ?empty_is_absent:bool -> string -> string option
+ val get : ?empty_is_absent:bool -> string -> absent:string -> string
+
+ val value :
+   ?empty_is_absent:bool -> string -> 'a B0_conv.t -> absent:'a -> 'a result
+
+ val get_value :
+   ?log:B0_log.level -> ?empty_is_absent:bool -> string -> 'a B0_conv.t ->
+   absent:'a -> 'a
 
  type t = string B0_string.map
  val empty : t
  val current : unit -> t result
  val override : t -> by:t -> t
+ val assignments : unit -> string list result
  val of_assignments : ?init:t -> string list -> t result
  val to_assignments : t -> string list
-end
-
-module Path : sig
-  val trash : B0_fpath.t -> in_dir:B0_fpath.t -> unit result
 end
 
 module File : sig
@@ -36,9 +40,11 @@ module File : sig
   val delete : ?must_exist:bool -> B0_fpath.t -> unit result
 
   val link : force:bool -> target:B0_fpath.t -> B0_fpath.t -> unit result
+  val is_executable : B0_fpath.t -> bool
 
   val with_ic : B0_fpath.t -> (in_channel -> 'a -> 'b) -> 'a -> 'b result
   val read : B0_fpath.t -> string result
+  val read_fd : B0_fpath.t -> Unix.file_descr -> string result
 
   val with_oc :
       ?mode:int -> B0_fpath.t ->
@@ -46,20 +52,13 @@ module File : sig
       'b result
 
   val write : ?mode:int -> B0_fpath.t -> string -> unit result
-  val open_tmp_path :
-    ?mode:int -> B0_fpath.t -> (B0_fpath.t * Unix.file_descr) result
+  val open_tmp :
+    ?flags:Unix.open_flag list -> ?mode:int -> B0_fpath.t ->
+    (B0_fpath.t * Unix.file_descr) result
 
   val with_tmp_oc :
-      ?mode:int -> B0_fpath.t -> (B0_fpath.t -> out_channel -> 'a -> 'b) ->
-      'a -> 'b result
-    (** [with_tmp_oc mode dir pat f v] is a new temporary file in
-        [dir] (defaults to {!Dir.default_tmp}) named according to
-        [pat] and atomically created and opened with permission [mode]
-        (defaults to [0o600] only readable and writable by the
-        user). Returns [Ok (f file oc v)] with [file] the file path
-        and [oc] an output channel to write the file. After the
-        function returns (normally or via an exception), [oc] is
-        closed and [file] is deleted. *)
+    ?flags:Unix.open_flag list -> ?mode:int -> B0_fpath.t ->
+    (B0_fpath.t -> out_channel -> 'a -> 'b) -> 'a -> 'b result
 end
 
 module Dir : sig
@@ -85,54 +84,87 @@ module Dir : sig
 end
 
 module Cmd : sig
-  val path_dirs : ?sep:string -> string -> string list
-  val tool_is_path : string -> bool
-  val which_file : dirs:string list -> string -> string option
-  val which_raw : string -> string option
-  val which : B0_cmd.t -> B0_fpath.t option result
 
-  val exists : B0_cmd.t -> bool result
-  val must_exist : B0_cmd.t -> B0_cmd.t result
+  (* Tool existence and search *)
 
+  val exe_is_path : string -> bool
+  val find_tool :
+    ?search:B0_fpath.t list -> B0_cmd.t -> B0_fpath.t option result
+
+  val get_tool : ?search:B0_fpath.t list -> B0_cmd.t -> B0_fpath.t result
+  val exists : ?search:B0_fpath.t list -> B0_cmd.t -> bool result
+  val must_exist : ?search:B0_fpath.t list -> B0_cmd.t -> B0_cmd.t result
+  val resolve : ?search:B0_fpath.t list -> B0_cmd.t -> B0_cmd.t result
+  val search_path_dirs : ?sep:string -> string -> B0_fpath.t list result
+
+  (* Process completion statuses *)
 
   type status = [`Exited of int | `Signaled of int ]
   val pp_status : status B0_fmt.t
-  type run_status = B0_cmd.t * status
+  val pp_cmd_status : (B0_cmd.t * status) B0_fmt.t
 
-  val run : ?err:B0_fpath.t -> B0_cmd.t -> unit result
-  val run_status : ?err:B0_fpath.t -> B0_cmd.t -> status result
+  (* Process standard inputs and outputs *)
 
-  val success : ('a * run_status) result -> 'a result
+  type stdi
+  type stdo
 
-  type run_out
-  val out_string : ?trim:bool -> run_out -> (string * run_status) result
-  val out_file : B0_fpath.t -> run_out -> (unit * run_status) result
-  val out_stdout : run_out -> (unit * run_status) result
+  val in_string : string -> stdi
+  val in_file : B0_fpath.t -> stdi
+  val in_fd : close:bool -> Unix.file_descr -> stdi
+  val in_stdin : stdi
+  val in_null : stdi
 
-  val to_string : ?trim:bool -> run_out -> string result
-  val to_file : B0_fpath.t -> run_out -> unit result
-  val to_null : run_out -> unit result
+  val out_file : B0_fpath.t -> stdo
+  val out_fd : close:bool -> Unix.file_descr -> stdo
+  val out_stdout : stdo
+  val out_stderr : stdo
+  val out_null : stdo
 
-  val run_out : ?err:B0_fpath.t -> B0_cmd.t -> run_out
+  (* Blocking command execution *)
 
-  type spawn_pid = int
-  type spawn_stdio =
-    [ `Fd of Unix.file_descr * bool (* close *)
-    | `File of B0_fpath.t ]
+  val run_status :
+    ?env:string list -> ?cwd:B0_fpath.t -> ?stdin:stdi -> ?stdout:stdo ->
+    ?stderr:stdo -> B0_cmd.t -> status result
+
+  val run_status_out :
+    ?trim:bool -> ?env:string list -> ?cwd:B0_fpath.t -> ?stdin:stdi ->
+    ?stderr:[`Stdo of stdo | `Out] -> B0_cmd.t -> (status * string) result
+
+  val run :
+    ?env:string list -> ?cwd:B0_fpath.t -> ?stdin:stdi -> ?stdout:stdo ->
+    ?stderr:stdo -> B0_cmd.t -> unit result
+
+  val run_out :
+    ?trim:bool -> ?env:string list -> ?cwd:B0_fpath.t -> ?stdin:stdi ->
+    ?stderr:[`Stdo of stdo | `Out] -> B0_cmd.t -> string result
+
+  (* Non-blocking command execution *)
+
+  type pid = int
+  val pid_to_int : pid -> int
+
+  val spawn_low :
+    env:string array -> cwd:string -> stdin:stdi -> stdout:stdo ->
+    stderr:stdo -> B0_cmd.t -> pid result
 
   val spawn :
-    string array -> cwd:B0_fpath.t ->
-    stdin:spawn_stdio -> stdout:spawn_stdio -> stderr:spawn_stdio ->
-    B0_cmd.t -> spawn_pid result
+    ?env:string list -> ?cwd:B0_fpath.t -> ?stdin:stdi -> ?stdout:stdo ->
+    ?stderr:stdo -> B0_cmd.t -> pid result
 
-  val collect : block:bool -> spawn_pid -> (spawn_pid * status) option result
 
-  val rm_rf : B0_fpath.t -> spawn_pid result
+  val collect : ?block:bool -> pid -> status option result
 
-  (* exec *)
+  (* Executing files *)
 
-  val execv_raw : string -> string array -> unit result
-  val execve_raw : string -> string array -> env:string array -> unit result
+  val execv :
+    ?env:string list -> ?cwd:B0_fpath.t -> B0_fpath.t -> B0_cmd.t -> unit result
+end
+
+(* B0 internals *)
+
+module B0 : sig
+  val rm_rf : B0_fpath.t -> Cmd.pid result
+  val trash_path : B0_fpath.t -> in_dir:B0_fpath.t -> unit result
 end
 
 

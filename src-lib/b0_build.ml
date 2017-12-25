@@ -307,7 +307,7 @@ let start_unit b aim (u, func) =
     let rec prepare_unit_build_dir b =
       try Unix.mkdir (B0_fpath.to_string build_dir) 0o755 with
       | Unix.Unix_error (Unix.EEXIST, _, _) ->
-          fail_on_error_msg (B0_os.Path.trash build_dir ~in_dir:(trash b));
+          fail_on_error_msg (B0_os.B0.trash_path build_dir ~in_dir:(trash b));
           prepare_unit_build_dir b
       | Unix.Unix_error (e, _, _) ->
           fail (fun m ->  m "Create unit build dir %a: %s"
@@ -772,7 +772,7 @@ let resolve_blocked b =
 
 let finish b =
   collect_ops ~finish:true b;
-  ignore ((B0_os.Cmd.rm_rf (trash b) |> B0_log.on_error_msg ~use:(fun _ -> 1)));
+  ignore ((B0_os.B0.rm_rf (trash b) |> B0_log.on_error_msg ~use:(fun _ -> 1)));
   resolve_blocked b;
   b.b.stats.cpu_dur <- B0_time.cpu_count b.b.cpu_counter;
   b.b.stats.total_dur <- B0_time.count b.b.dur_counter;

@@ -169,6 +169,7 @@ end
 
 include T
 
+let unsafe_of_string s = s
 let of_string = if windows then Windows.of_string else Posix.of_string
 let v s = match of_string s with Ok p -> p | Error (`Msg m) -> invalid_arg m
 let to_string p = p

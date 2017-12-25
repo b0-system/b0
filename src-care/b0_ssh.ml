@@ -9,17 +9,17 @@ open B0
 type host = string
 
 let get_ssh () =
-  (* TODO abstract this pattern, see `B0_opam` *)
-  let ssh = OS.Env.opt_var "B0_SSH" ~absent:"ssh" in
-  match OS.Cmd.which_raw ssh with
-  | None -> R.error_msgf "ssh: not found in PATH (as %s)" ssh
-  | Some ssh -> Ok (Cmd.v ssh)
+  (* TODO abstract this pattern, see `B0_opam`.
+     Also review the which stuff again there's a lot of conversion
+     going on here. *)
+  let absent = Cmd.v "ssh" in
+  let ssh = OS.Env.get_value "B0_SSH" Conv.tool ~absent in
+  OS.Cmd.resolve ssh
 
 let get_rsync () =
-  let ssh = OS.Env.opt_var "B0_RSYNC" ~absent:"rsync" in
-  match OS.Cmd.which_raw ssh with
-  | None -> R.error_msgf "rsync: not found in PATH (as %s)" ssh
-  | Some rsync -> Ok (Cmd.v rsync)
+  let absent = Cmd.v "rsync" in
+  let rsync = OS.Env.get_value "B0_RSYNC" Conv.tool ~absent in
+  OS.Cmd.resolve rsync
 
 let run excludes remote_root host scheme conf cmd =
   let root =

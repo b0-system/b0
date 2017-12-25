@@ -22,6 +22,7 @@ val is_rel_seg : string -> bool
 
 type t
 
+val unsafe_of_string : string -> t
 val v : string -> t
 val to_string : t -> string
 val of_string : string -> t result

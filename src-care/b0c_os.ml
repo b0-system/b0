@@ -24,7 +24,7 @@ let warn_if_error e ~use:v =
 
 let uname env aim opts =
   tool env aim "uname" >>= fun uname ->
-  OS.Cmd.(run_out Cmd.(uname %% opts) |> to_string)
+  OS.Cmd.run_out Cmd.(uname %% opts)
 
 (* Architecture *)
 
@@ -110,7 +110,7 @@ let name =
 
 let android_version =
   let cmd = Cmd.(v "getprop" % "ro.build.version.release") in
-  let version = lazy (OS.Cmd.(run_out ~err:OS.File.null cmd |> to_string)) in
+  let version = lazy OS.Cmd.(run_out ~stderr:(`Stdo out_null) cmd) in
   fun () -> match Lazy.force version with
   | Error _ -> None
   | Ok v -> Some v
@@ -180,7 +180,7 @@ let distribution_linux os = match android_version () with
     | None -> os
     | Some v -> v
 
-let distribution_macos os =
+let distribution_macos os =  (* FIXME lookup in right env *)
   OS.Cmd.exists (Cmd.v "brew") >>= function
   | true -> Ok "homebrew"
   | false ->
@@ -214,11 +214,9 @@ let version_linux () = match android_version () with
     | None -> Ok "unknown"
     | Some v -> Ok v
 
-let version_macos () =
-  OS.Cmd.(run_out Cmd.(v "sw_vers" % "-productVersion") |> to_string)
-
+let version_macos () = OS.Cmd.run_out Cmd.(v "sw_vers" % "-productVersion")
 let version_windows () =
-  let wmic opts = OS.Cmd.(run_out Cmd.(v "wmic" %% opts) |> to_string) in
+  let wmic opts = OS.Cmd.run_out Cmd.(v "wmic" %% opts) in
   wmic Cmd.(v "os" % "get" % "Version" % "/value") >>= fun kv ->
   match String.cut ~sep:"=" kv with
   | None -> R.error_msgf "Could not parse wmic value from %S" kv

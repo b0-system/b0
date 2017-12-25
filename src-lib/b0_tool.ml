@@ -20,7 +20,7 @@ type t =
     unit : B0_unit.t option; }
 
 let v ?(internal = tmp_vars) ?(env_vars = []) name =
-  match B0_os.Cmd.tool_is_path name with
+  match B0_os.Cmd.exe_is_path name with
   | false -> invalid_arg (B0_string.strf "%S: not a tool name" name)
   | true -> { name = B0_fpath.v name; env_vars; internal; unit = None }
 

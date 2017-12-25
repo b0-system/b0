@@ -134,7 +134,22 @@ let fpath =
 
 let file = with_docv fpath "FILE"
 let dir = with_docv fpath "DIR"
-let bin = with_docv fpath "BIN"
+
+let tool =
+  let parse s = B0_fpath.of_string s >>| fun t -> B0_cmd.(v @@ p t) in
+  let print = B0_cmd.pp in
+  let decode = B0_cmd.of_string in
+  let encode t = Ok (B0_cmd.to_string t) in
+  let docv = "TOOL" in
+  { parse; print; decode; encode; docv; }
+
+let cmd =
+  let parse = B0_cmd.of_string in
+  let print = B0_cmd.pp in
+  let decode = B0_cmd.of_string in
+  let encode t = Ok (B0_cmd.to_string t) in
+  let docv = "CMDLINE" in
+  { parse; print; decode; encode; docv; }
 
 let enum ?(docv = "ENUM") alts =
   let incomplete () = invalid_arg "Incomplete enumeration for the type." in

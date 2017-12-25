@@ -21,8 +21,8 @@ val add_args : t -> t -> t
 val on : bool -> t -> t
 val p : B0_fpath.t -> string
 
-val line_exec : t -> string option
-val get_line_exec : t -> string
+val line_tool : t -> string option
+val get_line_tool : t -> string
 val line_args : t -> string list
 
 val equal : t -> t -> bool
@@ -37,8 +37,8 @@ val of_list : ?slip:string -> string list -> t
 val of_rev_list : string list -> t
 val of_values : ?slip:string -> ('a -> string) -> 'a list -> t
 
-val pp : Format.formatter -> t -> unit
-val dump : Format.formatter -> t -> unit
+val pp : t B0_fmt.t
+val dump : t B0_fmt.t
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 b0

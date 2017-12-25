@@ -13,10 +13,10 @@ type cmd = { cmd : Cmd.t; }
 let cmd d = d.cmd
 let get () =
   (* TODO abstract this pattern, see `B0_opam` *)
-  let docker = OS.Env.opt_var "B0_DOCKER" ~absent:"docker" in
-  match OS.Cmd.which_raw docker with
-  | None -> R.error_msgf "docker: not found in PATH (as %s)" docker
-  | Some docker -> Ok { cmd = Cmd.v docker }
+  let absent = Cmd.v "docker" in
+  let docker = OS.Env.get_value "B0_DOCKER" Conv.tool ~absent in
+  OS.Cmd.resolve docker >>= fun cmd -> Ok { cmd }
+
 
 (* Managing images. *)
 
@@ -41,12 +41,12 @@ let image_create d i b = match b.context with
          p b.dockerfile % c)
 
 let image_exists d i =
-  OS.Cmd.(run_out Cmd.(d.cmd % "images" % "-q" % i) |> to_string)
+  OS.Cmd.run_out Cmd.(d.cmd % "images" % "-q" % i)
   >>| fun id -> id <> ""
 
 let image_delete d i = image_exists d i >>= function
 | false -> Ok ()
-| true -> OS.Cmd.(run_out Cmd.(d.cmd % "rmi" % i) |> to_null)
+| true -> OS.Cmd.(run ~stdout:out_null Cmd.(d.cmd % "rmi" % i))
 
 (* Managing containers. *)
 
@@ -54,7 +54,7 @@ type container = string
 
 let container_exists d c =
   let c = strf "name=%s" c in
-  OS.Cmd.(run_out Cmd.(d.cmd % "ps" % "-a" % "-q" % "-f" % c) |> to_string)
+  OS.Cmd.run_out Cmd.(d.cmd % "ps" % "-a" % "-q" % "-f" % c)
   >>| fun id -> id <> ""
 
 let container_create d ?workdir:w ?(binds = []) i c =
