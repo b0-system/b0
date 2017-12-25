@@ -19,7 +19,7 @@ let reset_cache ~b0_dir ~cache_dir =
   delete cache
 
 let reset_variant ~b0_dir variant =
-  let log = Some Log.Error in
+  let log = Log.Error in
   let dir = B0_dir.variant_dir b0_dir in
   match B0b_cli.load_variant ~log ~dir variant with
   | Error exit -> Ok exit
@@ -30,7 +30,7 @@ let reset_variant ~b0_dir variant =
       Ok `Ok
 
 let reset_default_variant ~b0_dir =
-  let log = Some Log.Error in
+  let log = Log.Error in
   let variant = B0b_cli.find_variant_name ~cli:None b0_dir in
   match B0b_cli.need_variant_name ~log variant with
   | Error exit -> Ok exit

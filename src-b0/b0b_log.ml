@@ -8,7 +8,7 @@ open B0
 open B0_driver
 
 let find_units o names =
-  let log = Some Log.Error in
+  let log = Log.Error in
   let kind = Unit.value_kind in
   let list = fun () -> Outcome.unit_names o in
   let get_or_suggest n =
@@ -85,7 +85,7 @@ let out_log fmt units cached ids json no_pager color o =
 
 let log variant units cached ids fmt json no_pager setup =
   let b0_dir = Driver.b0_dir setup in
-  let log = Some Log.Error in
+  let log = Log.Error in
   begin
     match B0b_cli.get_variant ~log ~cli:variant ~b0_dir with
     | Error err -> Ok err

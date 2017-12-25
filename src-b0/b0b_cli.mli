@@ -11,7 +11,7 @@ open B0
 (** {1:dym Did you mean ?} *)
 
 val did_you_mean :
-  ?pre:string -> ?post:string -> log:Log.level option -> kind:string ->
+  ?pre:string -> ?post:string -> log:Log.level -> kind:string ->
   string * string list -> unit
 (** [level] default to [Log.Error], [pre] to "Unknown", [post] to "". *)
 
@@ -43,12 +43,12 @@ val no_pager : bool Cmdliner.Term.t
 (** {1:b0_dir B0 directory} *)
 
 val b0_dir_must_exist :
-  log:Log.level option -> B0_driver.B0_dir.t -> (unit, exit) Pervasives.result
+  log:Log.level -> B0_driver.B0_dir.t -> (unit, exit) Pervasives.result
 
 (** {1:variants Variants} *)
 
 val get_default_variant_name :
-  log:Log.level option -> [`Effective | `Stored] -> B0_driver.B0_dir.t ->
+  log:Log.level -> [`Effective | `Stored] -> B0_driver.B0_dir.t ->
   (string, exit) Pervasives.result
 
 val find_variant_name :
@@ -58,42 +58,42 @@ val find_variant_scheme_name :
   cli:string option -> B0_driver.B0_dir.t -> string option
 
 val get_variant_scheme :
-  log:Log.level option -> string option ->
+  log:Log.level -> string option ->
   (Variant.Scheme.t, exit) Pervasives.result
 
 val variant_suggest_name :
   dir:Fpath.t -> Variant.Scheme.t -> string result
 
 val need_variant_name :
-  log:Log.level option -> string option -> (string, exit) Pervasives.result
+  log:Log.level -> string option -> (string, exit) Pervasives.result
 
 val find_variant :
-  log:Log.level option -> dir:Fpath.t -> string option ->
+  log:Log.level -> dir:Fpath.t -> string option ->
   Variant.load option result
 
 val get_variant :
-  log:Log.level option -> cli:string option -> b0_dir:B0_driver.B0_dir.t ->
+  log:Log.level -> cli:string option -> b0_dir:B0_driver.B0_dir.t ->
   (Variant.load, exit) Pervasives.result
 
 val load_variant :
-  log:Log.level option -> dir:Fpath.t -> string ->
+  log:Log.level -> dir:Fpath.t -> string ->
   (Variant.load, exit) Pervasives.result
 
 val variant_create :
-  log:Log.level option -> b0_dir:B0_driver.B0_dir.t ->
+  log:Log.level -> b0_dir:B0_driver.B0_dir.t ->
   name:string option -> scheme:Variant.Scheme.t -> preset:bool ->
   make_default:bool -> (Variant.t, exit) Pervasives.result
 
 val variant_load_conf :
-  log:Log.level option -> Variant.t -> Conf.t result
+  log:Log.level -> Variant.t -> Conf.t result
 
 val variant_load_outcome : Variant.t -> Outcome.t option result
 val variant_get_outcome :
-  log:Log.level option -> Variant.t -> (Outcome.t, exit) Pervasives.result
+  log:Log.level -> Variant.t -> (Outcome.t, exit) Pervasives.result
 
 val variant_load_last_conf : Variant.t -> Conf.t option result
 val variant_save_conf :
-  ?exit:exit -> log:Log.level option -> B0.Variant.t -> B0.Conf.t -> exit
+  ?exit:exit -> log:Log.level -> B0.Variant.t -> B0.Conf.t -> exit
 
 (** {1:cache Cache directory} *)
 
@@ -102,7 +102,7 @@ val get_cache_dir : b0_dir:Fpath.t -> cache_dir:Fpath.t option -> Fpath.t
 (** {1:gen Generic operations on defined values. *)
 
 val find_named_values :
-  log:Log.level option -> kind:string -> list:(unit -> 'a list) ->
+  log:Log.level -> kind:string -> list:(unit -> 'a list) ->
   get_or_suggest:(string -> ('a, string list) Pervasives.result) ->
   string list -> 'a list * [> `Ok | `Unknown_name ]
 
@@ -138,7 +138,7 @@ val find_pager : don't:bool -> Fpath.t option result
 val units : doc:string -> string list Cmdliner.Term.t
 val show_unit : B0_driver.Cli.out_fmt -> Unit.t -> unit
 val find_units :
-  log:Log.level option -> string list -> Unit.t list * [> `Ok | `Unknown_name ]
+  log:Log.level -> string list -> Unit.t list * [> `Ok | `Unknown_name ]
 
 val units_of_pkgs : B0.Pkg.t list -> B0.Unit.t list
 
@@ -147,7 +147,7 @@ val units_of_pkgs : B0.Pkg.t list -> B0.Unit.t list
 val pkgs : doc:string -> string list Cmdliner.Term.t
 val show_pkg : B0_driver.Cli.out_fmt -> Pkg.t -> unit
 val find_pkgs :
-  log:Log.level option -> string list -> Pkg.t list * [> `Ok | `Unknown_name ]
+  log:Log.level -> string list -> Pkg.t list * [> `Ok | `Unknown_name ]
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 b0

@@ -31,7 +31,7 @@ val b0_dir : t -> Fpath.t option
 val color : t -> Tty.cap option
 (** [color i] is the requested terminal capability. *)
 
-val verbosity : t -> Log.level option
+val verbosity : t -> Log.level
 (** [verbosity i] is the requested log verbosity. *)
 
 val driver_dir : t -> Fpath.t option

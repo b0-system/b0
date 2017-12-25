@@ -12,7 +12,7 @@ let pp_scheme_hook_error ~hook v ppf (`Msg m) =
     Variant.pp_name v Variant.Scheme.pp_name (Variant.scheme v) hook m
 
 let find_variants dir =
-  let log = Some Log.Error in
+  let log = Log.Error in
   let kind = Variant.value_kind in
   let list () = (Variant.list ~dir) |> Log.on_error_msg ~use:(fun _ -> []) in
   let get_or_suggest n =
@@ -41,13 +41,12 @@ let default_set ~b0_dir v =
   Variant.get_or_suggest ~dir v >>= function
   | Ok v -> Ok `Ok
   | Error sugg ->
-      B0b_cli.did_you_mean ~log:(Some Log.Warning) ~kind:Variant.value_kind
+      B0b_cli.did_you_mean ~log:Log.Warning ~kind:Variant.value_kind
         ~pre:"Default set but" ~post:" unknown" (v, sugg);
       Ok `Ok
 
 let default_get ~b0_dir which =
-  let log = Some Log.Error in
-  match B0b_cli.get_default_variant_name ~log which b0_dir with
+  match B0b_cli.get_default_variant_name ~log:Log.Error which b0_dir with
   | Ok v -> Log.app (fun m -> m "%a" Variant.pp_name_str v); Ok `Ok
   | Error exit -> Ok exit
 
@@ -61,7 +60,7 @@ let info_action ~b0_dir =
   B0b_cli.value_info_action ~list_action:(list_action ~b0_dir)
 
 let create_action ~b0_dir name ~no_preset ~create_only args =
-  let log = Some Log.Error in
+  let log = Log.Error in
   let make_default = not create_only in
   let preset = not no_preset in
   let parse_scheme_name = function
@@ -124,7 +123,7 @@ let path_action ~b0_dir out_fmt path_which args =
   let dir = B0_dir.variant_dir b0_dir in
   let vs = match args with
   | [] ->
-      let log = Some Log.Error in
+      let log = Log.Error in
       B0b_cli.get_default_variant_name ~log `Effective b0_dir
       >>= fun name -> B0b_cli.load_variant ~log ~dir name >>| fun v -> [v]
   | vs ->

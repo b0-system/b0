@@ -6,23 +6,23 @@
 
 (* Reporting levels *)
 
-type level = App | Error | Warning | Info | Debug
-let _level = ref (Some Warning)
+type level = Quiet | App | Error | Warning | Info | Debug
+let _level = ref Warning
 let level () = !_level
 
 let set_level l = _level := l
 
 let level_to_string = function
-| None -> "quiet" | Some App -> "app" | Some Error -> "error"
-| Some Warning -> "warning" | Some Info -> "info" | Some Debug -> "debug"
+| Quiet -> "quiet" | App -> "app" | Error -> "error" | Warning -> "warning"
+| Info -> "info" | Debug -> "debug"
 
 let level_of_string = function
-| "quiet" -> Ok None
-| "app" -> Ok (Some App)
-| "error" -> Ok (Some Error)
-| "warning" -> Ok (Some Warning)
-| "info" -> Ok (Some Info)
-| "debug" -> Ok (Some Debug)
+| "quiet" -> Ok Quiet
+| "app" -> Ok App
+| "error" -> Ok Error
+| "warning" -> Ok Warning
+| "info" -> Ok Info
+| "debug" -> Ok Debug
 | l -> Error (`Msg (Printf.sprintf "%S: unknown log level" l))
 
 (* Reporting *)
@@ -39,6 +39,7 @@ let pp_level_str level ppf v = match level with
 | Warning -> B0_tty.pp_str warn_style ppf v
 | Info -> B0_tty.pp_str info_style ppf v
 | Debug -> B0_tty.pp_str debug_style ppf v
+| Quiet -> assert false
 
 let pp_level ppf level = match level with
 | App -> ()
@@ -46,16 +47,16 @@ let pp_level ppf level = match level with
 | Warning -> B0_tty.pp_str warn_style ppf "WARNING"
 | Info -> B0_tty.pp_str info_style ppf "INFO"
 | Debug -> B0_tty.pp_str debug_style ppf "DEBUG"
+| Quiet -> assert false
 
 let pp_header =
   let x = match Array.length Sys.argv with
   | 0 -> Filename.basename Sys.executable_name
   | n -> Filename.basename Sys.argv.(0)
   in
-  let pf = Format.fprintf in
   let pp_header ppf (l, h) = match h with
-  | None -> if l = App then () else pf ppf "%s: [%a] " x pp_level l
-  | Some h -> pf ppf "%s: [%a] " x (pp_level_str l) h
+  | None -> if l = App then () else B0_fmt.pf ppf "%s: [%a] " x pp_level l
+  | Some h -> B0_fmt.pf ppf "%s: [%a] " x (pp_level_str l) h
   in
   pp_header
 
@@ -93,12 +94,12 @@ let nop_kmsg =
 
 let default_kmsg =
   let kmsg k level msgf = match !_level with
-  | None -> k ()
-  | Some level' when level > level' ->
+  | Quiet -> k ()
+  | level' when level > level' ->
       (if level = Error then incr _err_count else
        if level = Warning then incr _warn_count else ());
       (k ())
-  | Some _ ->
+  | _ ->
       (if level = Error then incr _err_count else
        if level = Warning then incr _warn_count else ());
       report level k msgf
@@ -110,7 +111,6 @@ let set_kmsg kmsg = _kmsg := kmsg
 
 let kunit _ = ()
 let msg level msgf = !_kmsg.kmsg kunit level msgf
-let maybe l msgf = match l with None -> () | Some l -> msg l msgf
 let app msgf = !_kmsg.kmsg kunit App msgf
 let err msgf = !_kmsg.kmsg kunit Error msgf
 let warn msgf = !_kmsg.kmsg kunit Warning msgf
@@ -130,7 +130,7 @@ let on_error_msg ?(level = Error) ?header ~use = function
 | Ok v -> v
 | Error (`Msg msg) ->
     !_kmsg.kmsg use level @@ fun m ->
-    m ?header "@[%a@]" Format.pp_print_text msg
+    m ?header "@[%a@]" B0_fmt.text msg
 (*    m ?header "%s" msg*)
 
 (* Logging timings *)

@@ -7,7 +7,7 @@
 open B0
 
 let find_groups names =
-  let log = Some Log.Error in
+  let log = Log.Error in
   let kind = Conf.Group.value_kind in
   let list = Conf.Group.list in
   let get_or_suggest = Conf.Group.get_or_suggest in

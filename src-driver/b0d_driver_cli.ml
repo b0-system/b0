@@ -30,7 +30,7 @@ type t =
     cwd : Fpath.t;
     b0_dir : Fpath.t option;
     color : Tty.cap option;
-    verbosity : Log.level option;
+    verbosity : Log.level;
     driver_dir : Fpath.t option;
     force : bool;
     only : bool;

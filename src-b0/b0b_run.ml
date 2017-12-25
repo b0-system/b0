@@ -76,7 +76,7 @@ let run_exec noenv v o exec args =
 let run variant cmd noenv setup =
   begin
     let b0_dir = Driver.b0_dir setup in
-    let log = (Some Log.Error) in
+    let log = Log.Error in
     match B0b_cli.get_variant ~log ~cli:variant ~b0_dir with
     | Error err -> Ok err
     | Ok load ->

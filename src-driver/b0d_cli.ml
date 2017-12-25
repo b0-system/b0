@@ -92,11 +92,11 @@ let verbosity =
   let verbosity =
     let enum =
       [ "warning", None; (* Hack for the option's absent rendering *)
-        "quiet", Some None;
-        "error", Some (Some Log.Error);
-        "warning", Some (Some Log.Warning);
-        "info", Some (Some Log.Info);
-        "debug", Some (Some Log.Debug); ]
+        "quiet", Some Log.Quiet;
+        "error", Some Log.Error;
+        "warning", Some Log.Warning;
+        "info", Some Log.Info;
+        "debug", Some Log.Debug; ]
     in
     let log_level = Arg.enum enum in
     let enum_alts = Arg.doc_alts_enum List.(tl enum) in
@@ -111,13 +111,13 @@ let verbosity =
     Arg.(value & flag & info ["q"; "quiet"] ~doc ~docs)
   in
   let choose quiet verbosity vopts =
-    if quiet then None else match verbosity with
+    if quiet then Log.Quiet else match verbosity with
     | Some verbosity -> verbosity
     | None ->
         match List.length vopts with
-        | 0 -> Some Log.Warning
-        | 1 -> Some Log.Info
-        | n -> Some Log.Debug
+        | 0 -> Log.Warning
+        | 1 -> Log.Info
+        | n -> Log.Debug
   in
   Term.(const choose $ quiet $ verbosity $ vopts)
 

@@ -38,11 +38,11 @@ val import_file : Fpath.t -> unit
 type t
 (** The type for jbuild file stanzas *)
 
-val of_file : ?log:Log.level option -> Fpath.t -> t result
+val of_file : ?log:Log.level -> Fpath.t -> t result
 (** [of_file f] reads a jbuild file from [f]. [log] is used to report
     parse errors, for now it defaults to [Some Log.Debug]. *)
 
-val to_units : ?log:Log.level option -> t -> unit
+val to_units : ?log:Log.level -> t -> unit
 (** [add_units j] translate the [library] and [executable[s]] stanzas
     as {!B0_ocaml} build units.
 

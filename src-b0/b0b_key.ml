@@ -27,13 +27,12 @@ let show_binding kind out_fmt b = (* FIXME move the printers to Conf *)
 
 let get_variant ~b0_dir variant =
   let dir = B0_dir.variant_dir b0_dir in
-  B0b_cli.find_variant ~log:(Some Log.Warning) ~dir variant >>| function
+  B0b_cli.find_variant ~log:Log.Warning ~dir variant >>| function
   | None -> None
   | Some l -> Some (Variant.of_load l)
 
 let get_variant_confs variant =
   let err_conf _ = R.msgf "Could not get variant configurations" in
-  let log = Some Log.Error in
   let none = None, (None, None) in
   begin
     Lazy.force variant >>= function
@@ -43,7 +42,7 @@ let get_variant_confs variant =
         | `Proxy p -> R.error_msgf "proxy scheme TODO"
         | `Direct d ->
             Variant.Scheme.direct_env d ()
-            >>= fun env -> B0b_cli.variant_load_conf ~log v
+            >>= fun env -> B0b_cli.variant_load_conf ~log:Log.Error v
             >>= fun conf -> B0b_cli.variant_load_last_conf v
             >>= fun last_conf ->
             Ok (Some env, (last_conf, Some conf))
@@ -57,7 +56,7 @@ let no_keys key_sets keys = match key_sets, keys with
 | `Key_sets [], [] -> true | _ -> false
 
 let get_keys ?no_keys:(none = `Key_sets []) confs key_sets keys =
-  let log = Some Log.Error in
+  let log = Log.Error in
   let conf_keys (ks, exit) c = List.rev_append (Conf.keys c) ks, exit in
   let group_keys (ks, exit) g = match Conf.Group.get_or_suggest g with
   | Ok g -> (List.rev_append (Conf.Group.keys g) ks), exit
@@ -150,15 +149,14 @@ let get_stored confs key_sets keys =
   | Ok v -> (Conf.B (k, v) :: bs), exit
   | Error sugg ->
       let n = Conf.Key.(name (of_typed k)) in
-      let log = Some Log.Error in
       let kind = Conf.Key.value_kind in
-      B0b_cli.did_you_mean ~log ~pre:"No stored" ~kind (n, sugg);
+      B0b_cli.did_you_mean ~log:Log.Error ~pre:"No stored" ~kind (n, sugg);
       bs, `Undefined_key
   in
   List.fold_left add ([], exit) (List.rev keys)
 
 let get_preset preset confs key_sets keys =
-  let log = Some Log.Error in
+  let log = Log.Error in
   match Conf.Preset.get_or_suggest preset with
   | Error sugg ->
       B0b_cli.did_you_mean ~log ~kind:Conf.Preset.value_kind (preset, sugg);
@@ -200,7 +198,7 @@ let get_last confs key_sets keys = match fst @@ snd (Lazy.force confs) with
     let add (bs, exit) (Conf.Key.V k) = match Conf.get_or_suggest k c with
     | Error sugg ->
         let kind, post = Conf.Key.value_kind, " in last configuration" in
-        let log = Some Log.Error in
+        let log = Log.Error in
         let k = Conf.Key.(name (of_typed k)) in
         B0b_cli.did_you_mean ~log ~kind ~post (k, sugg); (bs, `Unknown_name)
       | Ok v -> Conf.B (k, v) :: bs, exit
@@ -222,7 +220,7 @@ let parse_bindings args =
               loop bs `Cli_error args
           end
       | Error sugg ->
-          let log = Some Log.Error in
+          let log = Log.Error in
           B0b_cli.did_you_mean ~log ~kind:Conf.Key.value_kind (k, sugg);
           (bs, `Unknown_name)
       end
@@ -278,7 +276,7 @@ let key action variant key_sets out_fmt pos_args setup =
     let variant = B0b_cli.find_variant_name ~cli:variant b0_dir in
     let variant = lazy (get_variant ~b0_dir variant) in
     let confs = lazy (get_variant_confs variant) in
-    let log = Some Log.Error in
+    let log = Log.Error in
     match action with
     | `List -> list_action out_fmt confs key_sets pos_args
     | `Info ->

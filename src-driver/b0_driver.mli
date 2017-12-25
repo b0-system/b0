@@ -90,7 +90,7 @@ module Driver : sig
   (** [color s] is the requested terminal capability.
       {b Note.} {!B0.Tty} is already setup accordingly. *)
 
-  val verbosity : setup -> Log.level option
+  val verbosity : setup -> Log.level
   (** [verbosity s] is the requested log verbosity.
       {b Note.} {!B0.Log} is already setup accoringly. *)
 
@@ -214,7 +214,7 @@ module Cli : sig
   val color : Tty.cap option Cmdliner.Term.t
   (** [color] specifies the end-user output mode. *)
 
-  val verbosity : Log.level option Cmdliner.Term.t
+  val verbosity : Log.level Cmdliner.Term.t
   (** [verbosity] specifies the log verbosity. *)
 
   (** {1:mcopts More common arguments} *)

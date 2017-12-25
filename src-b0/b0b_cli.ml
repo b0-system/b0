@@ -12,9 +12,9 @@ open Cmdliner
 
 let did_you_mean ?(pre = "Unknown") ?(post = "") ~log ~kind (n, hints) =
   match hints with
-  | [] -> Log.maybe log (fun m -> m "%s %s '%s'%s." pre kind n post)
+  | [] -> Log.msg log (fun m -> m "%s %s '%s'%s." pre kind n post)
   | hints ->
-      Log.maybe log
+      Log.msg log
         (fun m -> m "@[%s %s '%s'%s.@ Did you mean %a ?@]"
             pre kind n post Format.pp_print_text (Cmdliner.Arg.doc_alts hints))
 
@@ -113,7 +113,7 @@ let no_pager =
 (* B0 directory *)
 
 let b0_dir_must_exist ~log b0_dir = match B0_dir.must_exist b0_dir with
-| Error (`Msg msg) -> Log.maybe log (fun m -> m "%s" msg); Error `No_b0_dir
+| Error (`Msg msg) -> Log.msg log (fun m -> m "%s" msg); Error `No_b0_dir
 | Ok _ as v -> v
 
 (* Variants *)
@@ -135,17 +135,17 @@ let get_default_variant_name ~log which b0_dir = match which with
 | `Stored ->
     begin match B0_dir.default_variant_name b0_dir with
     | None | Some "" ->
-        Log.maybe log msg_no_stored_variant; Error `No_default_variant
+        Log.msg log msg_no_stored_variant; Error `No_default_variant
     | Some v -> Ok v
     end
 | `Effective -> (* FIXME abstract var name *)
-    let name = match OS.Env.var "B0_VARIANT" with
+    let name = match OS.Env.find "B0_VARIANT" with
     | None -> B0_dir.default_variant_name b0_dir
     | Some _ as v -> v
     in
     match name with
     | None | Some "" ->
-        Log.maybe log msg_no_effective_variant;
+        Log.msg log msg_no_effective_variant;
         Error `No_default_variant
     | Some v -> Ok v
 
@@ -164,7 +164,7 @@ let get_variant_scheme ~log scheme = match scheme with
     | Ok v -> Ok v
     | Error sugg ->
         let kind = Variant.Scheme.value_kind in
-        did_you_mean ~log:(Some Log.Error) ~kind (s, sugg);
+        did_you_mean ~log:Log.Error ~kind (s, sugg);
         Error `Unknown_name
 
 let variant_suggest_name ~dir scheme =
@@ -176,15 +176,15 @@ let variant_suggest_name ~dir scheme =
   R.reword_error_msg reword (String.unique ~exists name)
 
 let need_variant_name ~log = function
-| None | Some "" -> Log.maybe log msg_need_variant; Error `No_variant
+| None | Some "" -> Log.msg log msg_need_variant; Error `No_variant
 | Some n -> Ok n
 
 let find_variant ~log ~dir = function
-| None -> Log.maybe log (fun m -> m "No variant specified."); Ok None
+| None -> Log.msg log (fun m -> m "No variant specified."); Ok None
 | Some name ->
     match log with
-    | None -> Variant.find ~dir name
-    | Some level ->
+    | Log.Quiet -> Variant.find ~dir name
+    | level ->
         Variant.get_or_suggest ~dir name >>| function
         | Ok v -> Some v
         | Error sugg ->
@@ -214,7 +214,7 @@ let log_scheme_preset_errs ~log = function
     let pp_err ppf (k, (`Msg e)) =
       Fmt.pf ppf "%a: @[%a@]" Conf.Key.pp_name_str k Fmt.text e
     in
-    Log.maybe
+    Log.msg
       log (fun m -> m "@[<v>Scheme preset errors:@,%a@]" (Fmt.list pp_err) errs)
 
 let variant_create ~log ~b0_dir ~name ~scheme ~preset ~make_default =
@@ -245,11 +245,11 @@ let variant_create ~log ~b0_dir ~name ~scheme ~preset ~make_default =
 let variant_load_conf ~log v =
   let conf_dec_err (k, err) = match err with
   | `Unknown ->
-      Log.maybe log
+      Log.msg log
         (fun m -> m "Decoding stored key %a: unknown key"
             Conf.Key.pp_name_str k)
   | `Msg msg ->
-      Log.maybe log
+      Log.msg log
         (fun m -> m "Decoding stored key %a: %s" Conf.Key.pp_name_str k msg)
   in
   let file = Variant.conf_path v in
@@ -272,10 +272,10 @@ let msg_did_you_forget_to_build : ('a, 'b) Log.msgf = fun m ->
 let variant_get_outcome ~log v =
   let file = Variant.outcome_path v in
   begin OS.File.exists file >>= function
-  | false -> Log.maybe log msg_did_you_forget_to_build; Ok (Error `No_outcome)
+  | false -> Log.msg log msg_did_you_forget_to_build; Ok (Error `No_outcome)
   | true -> Outcome.read file >>= fun o -> Ok (Ok o)
   end
-  |> Log.on_error_msg ?level:log ~use:(fun _ -> Error `Some_error)
+  |> Log.on_error_msg ~level:log ~use:(fun _ -> Error `Some_error)
 
 
 let variant_load_last_conf v =
@@ -286,7 +286,7 @@ let variant_load_last_conf v =
 let variant_save_conf ?(exit = `Ok) ~log v conf =
   let conf_enc_err (k, err) = match err with
   | `Msg msg ->
-      Log.maybe log
+      Log.msg log
         (fun m -> m "Encoding stored key %a: %s, not stored"
             Conf.Key.pp_name_str k msg)
   in

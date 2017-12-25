@@ -612,24 +612,24 @@ module Log : sig
 
   (** {1:levels Reporting levels} *)
 
-  type level = App | Error | Warning | Info | Debug (** *)
+  type level = Quiet | App | Error | Warning | Info | Debug (** *)
   (** The type for reporting levels. *)
 
-  val level : unit -> level option
+  val level : unit -> level
   (** [level ()] is the current reporting level. *)
 
-  val set_level : level option -> unit
+  val set_level : level -> unit
   (** [set_level l] sets the current reporting level to [l]. *)
 
   val pp_level : level Fmt.t
   (** [pp_level ppf l] prints and unspecified representation of [l]
       on [ppf]. *)
 
-  val level_to_string : level option -> string
+  val level_to_string : level -> string
   (** [level_to_string l] converts [l] to a string representation. *)
 
   val level_of_string : string ->
-    (level option, [`Msg of string]) Pervasives.result
+    (level, [`Msg of string]) Pervasives.result
   (** [level_of_string s] parses a level from [s] according to the
       representation of {!level_to_string}. *)
 
@@ -645,9 +645,6 @@ module Log : sig
 
   val msg : level -> 'a log
   (** See {!Logs.msg}. *)
-
-  val maybe : level option -> 'a log
-  (** [maybe] is like {!msg} but logs nothing if [level] is [None]. *)
 
   val app : 'a log
   (** [app] is [msg App]. *)
@@ -705,7 +702,8 @@ module Log : sig
       functions are no longer relevant. *)
 
   type kmsg = { kmsg : 'a 'b. (unit -> 'b) -> level -> ('a, 'b) msgf -> 'b }
-  (** The type for the basic logging function. *)
+  (** The type for the basic logging function. The function is never
+      invoked with a level of [Quiet]. *)
 
   val set_kmsg : kmsg -> unit
   (** [set_kmsg kmsg] sets the logging function to [kmsg]. *)

@@ -15,7 +15,7 @@ let all_variants dir =
   |> List.map Variant.of_load
 
 let find_schemes names =
-  let log = Some Log.Error in
+  let log = Log.Error in
   let kind = Variant.Scheme.value_kind in
   let list = Variant.Scheme.list in
   let get_or_suggest = Variant.Scheme.get_or_suggest in

@@ -114,7 +114,7 @@ let outcome_stats o = Log.app (fun m -> m "@[%a@]" Outcome.pp_stats o)
 
 let outcome action variant out_fmt path_kind setup =
   let b0_dir = Driver.b0_dir setup in
-  let log = Some Log.Error in
+  let log = Log.Error in
   begin
     match B0b_cli.get_variant ~log ~cli:variant ~b0_dir with
     | Error err -> Ok err

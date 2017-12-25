@@ -21,9 +21,9 @@ type t = { file : Fpath.t; stanzas : stanza list; }
 
 (* Parsing *)
 
-let parse_stanzas ?log se =
+let parse_stanzas ~log se =
   let err_atom loc a =
-    Log.maybe log (fun m -> m "%a: unexpected atom %s" Sexp.pp_loc loc a);
+    Log.msg log (fun m -> m "%a: unexpected atom %s" Sexp.pp_loc loc a);
   in
   let rec parse_stanza acc = function
   | `List ((`Atom "jbuild_version", _) :: [_]), _ -> acc
@@ -31,7 +31,7 @@ let parse_stanzas ?log se =
   | `List ((`Atom "executable", _) :: [v]), loc -> (`Executable v, loc) :: acc
   | `List ((`Atom s, _) :: [v]), loc -> (`Unknown (s, v), loc) :: acc
   | `List _, loc ->
-      Log.maybe
+      Log.msg
         log (fun m -> m "%a: not a (key value) pair stanza" Sexp.pp_loc loc);
       acc
   | `Atom a, loc -> err_atom loc a; acc
@@ -40,16 +40,16 @@ let parse_stanzas ?log se =
   | `Atom a, loc -> err_atom loc a; []
   | `List l, _ -> List.fold_left parse_stanza [] l
 
-let parse_map ?log known se =
-  let log_unhandled_fields ?log m =
+let parse_map ~log known se =
+  let log_unhandled_fields ~log m =
     let pp_binding ppf (k, (_, loc)) =
       Fmt.pf ppf "%a: unhandled key %s" Sexp.pp_loc loc k
     in
     let pp_map = Fmt.iter_bindings String.Map.iter pp_binding in
-    Log.maybe log (fun msg -> msg "@[<v>%a@]" pp_map m)
+    Log.msg log (fun msg -> msg "@[<v>%a@]" pp_map m)
   in
   Sexp.to_string_map ~known se >>= fun (known, (unknown, _)) ->
-  log_unhandled_fields ?log unknown;
+  log_unhandled_fields ~log unknown;
   Ok known
 
 let string = fun s -> s
@@ -59,12 +59,12 @@ let public_name_key = Sexp.atom_key ~absent:None string_opt "public_name"
 let synopsis_key = Sexp.atom_key ~absent:None string_opt "synopsis"
 let libraries_key = Sexp.atom_list_key ~absent:[] string "libraries"
 
-let parse_library ?log file s lib =
+let parse_library ~log file s lib =
   let known = function
   | "name" | "public_name" | "synopsis" | "libraries" -> true | _ -> false
   in
   try
-    parse_map ?log known s >>= fun m ->
+    parse_map ~log known s >>= fun m ->
     let build = `Src_dirs [Fpath.parent file] in
     let name = name_key m in
     let name = match public_name_key m with (* For now *)
@@ -81,12 +81,12 @@ let parse_library ?log file s lib =
   with
   | Failure e -> Error (`Msg e)
 
-let parse_executable ?log file s exe =
+let parse_executable ~log file s exe =
   let known = function
   | "name" | "public_name" | "libraries" -> true | _ -> false
   in
   try
-    parse_map ?log known s >>= fun m ->
+    parse_map ~log known s >>= fun m ->
     let build = `Src_dirs [Fpath.parent file] in
     let name = name_key m in
     let name = match public_name_key m with (* For now *)
@@ -103,39 +103,39 @@ let parse_executable ?log file s exe =
   with
   | Failure e -> Error (`Msg e)
 
-let default_log = Some Log.Debug (* for now *)
+let default_log = Log.Debug (* for now *)
 
 let of_file ?(log = default_log) file =
   Sexp.of_file file >>= fun se ->
-  let stanzas = parse_stanzas se in
+  let stanzas = parse_stanzas ~log se in
   Ok { file; stanzas }
 
 (* Converting to units *)
 
-let library_to_unit ?log file l =
+let library_to_unit ~log file l =
   let lib ~lib_deps ~meta ?doc name build =
     ignore @@ B0_ocaml.Unit.lib ~lib_deps ~meta ?doc name build
   in
-  parse_library ?log file l lib
+  parse_library ~log file l lib
 
-let executable_to_unit ?log file e =
+let executable_to_unit ~log file e =
   let exe ~lib_deps ~meta ?doc name build =
     ignore @@ B0_ocaml.Unit.exe ~lib_deps ~meta ?doc name build
   in
-  parse_executable ?log file e exe
+  parse_executable ~log file e exe
 
-let stanza_to_unit ?log file s =
+let stanza_to_unit ~log file s =
   begin match s with
-  | `Library l, _ -> library_to_unit ?log file l
-  | `Executable e, _ -> executable_to_unit ?log file e
+  | `Library l, _ -> library_to_unit ~log file l
+  | `Executable e, _ -> executable_to_unit ~log file e
   | `Unknown (s, _), loc ->
-      Log.maybe log (fun m -> m "%a: unknown stanza %s" Sexp.pp_loc loc s);
+      Log.msg log (fun m -> m "%a: unknown stanza %s" Sexp.pp_loc loc s);
       Ok ()
   end
   |> Log.on_error_msg ~use:(fun _ -> ())
 
 let to_units ?(log = default_log) j =
-  List.iter (stanza_to_unit ?log j.file) j.stanzas
+  List.iter (stanza_to_unit ~log j.file) j.stanzas
 
 (* API for B0.ml files *)
 

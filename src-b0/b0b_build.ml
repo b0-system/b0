@@ -20,7 +20,7 @@ let need_variant_creation ~b0_dir create =
 
 let create_variant ~b0_dir variant scheme =
   let scheme = B0b_cli.find_variant_scheme_name ~cli:scheme b0_dir in
-  let log = Some Log.Error in
+  let log = Log.Error in
   match B0b_cli.get_variant_scheme ~log scheme with
   | Error _ as e -> e
   | Ok scheme ->
@@ -53,7 +53,7 @@ let proxy_conf_of_setup setup v =
   Variant.Scheme.proxy_conf ~root_dir ~b0_dir ~variant_dir ()
 
 let build_variant setup v cache ctrl units =
-  let log = Some (Log.Error) in
+  let log = Log.Error in
   let scheme = Variant.scheme v in
   match Variant.Scheme.kind scheme with
   | `Proxy p ->
@@ -98,11 +98,11 @@ let build_variant setup v cache ctrl units =
 (* Units *)
 
 let find_units pkgs units =
-  let find_units units = B0b_cli.find_units ~log:(Some Log.Error) units in
+  let find_units units = B0b_cli.find_units ~log:Log.Error units in
   match pkgs with
   | [] -> find_units units
   | pkgs ->
-      let pkgs, err = B0b_cli.find_pkgs ~log:(Some Log.Error) pkgs in
+      let pkgs, err = B0b_cli.find_pkgs ~log:Log.Error pkgs in
       match err with
       | `Unknown_name as e -> [], e
       | `Ok ->
@@ -120,7 +120,7 @@ let build ctrl cache_dir create variant scheme units pkgs setup =
   | `Instance ->
       let b0_dir = Driver.b0_dir setup in
       begin
-        let log = Some Log.Error in
+        let log = Log.Error in
         match get_variant ~log ~b0_dir ~create variant scheme with
         | Error exit -> Ok exit
         | Ok v ->

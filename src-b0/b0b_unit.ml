@@ -6,7 +6,7 @@
 
 open B0
 
-let find_units = B0b_cli.find_units ~log:(Some Log.Error)
+let find_units = B0b_cli.find_units ~log:Log.Error
 let show_unit = B0b_cli.show_unit
 
 let edit_units names =

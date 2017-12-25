@@ -10,15 +10,14 @@
 
 (* Reporting levels *)
 
-type level = App | Error | Warning | Info | Debug
+type level = Quiet | App | Error | Warning | Info | Debug
 
-val level : unit -> level option
-val set_level : level option -> unit
+val level : unit -> level
+val set_level : level -> unit
 
-val pp_level : Format.formatter -> level -> unit
-val level_to_string : level option -> string
-val level_of_string :
-  string -> (level option, [`Msg of string]) Pervasives.result
+val pp_level : level B0_fmt.t
+val level_to_string : level -> string
+val level_of_string : string -> (level, [`Msg of string]) Pervasives.result
 
 (* Log functions *)
 
@@ -28,7 +27,6 @@ type ('a, 'b) msgf =
 type 'a log = ('a, unit) msgf -> unit
 
 val msg : level -> 'a log
-val maybe : level option -> 'a log
 val app : 'a log
 val err : 'a log
 val warn : 'a log
@@ -39,8 +37,8 @@ val kmsg : (unit -> 'b) -> level -> ('a, 'b) msgf -> 'b
 (* Logging [result] value [Error]s} *)
 
 val on_error :
-  ?level:level -> ?header:string -> pp:(Format.formatter -> 'b -> unit) ->
-  use:('b -> 'a) -> ('a, 'b) result -> 'a
+  ?level:level -> ?header:string ->
+  pp:(Format.formatter -> 'b -> unit) -> use:('b -> 'a) -> ('a, 'b) result -> 'a
 
 val on_error_msg :
   ?level:level -> ?header:string -> use:(unit -> 'a) ->

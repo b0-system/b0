@@ -10,7 +10,7 @@ let err_missing_preset () =
   B0b_cli.err_missing_arg ~kind:Conf.Preset.value_kind; Ok `Cli_error
 
 let find_presets =
-  let log = Some Log.Error in
+  let log = Log.Error in
   let kind = Conf.Preset.value_kind in
   let list = Conf.Preset.list in
   let get_or_suggest = Conf.Preset.get_or_suggest in

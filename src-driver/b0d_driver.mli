@@ -17,7 +17,7 @@ type setup
 
 val b0_dir : setup -> B0d_dir.t
 val color : setup -> Tty.cap option
-val verbosity : setup -> Log.level option
+val verbosity : setup -> Log.level
 val exec : setup -> exec
 
 (** {1 Drivers} *)

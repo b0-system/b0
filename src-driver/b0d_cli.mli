@@ -35,7 +35,7 @@ val root : Fpath.t option Term.t
 val cwd : Fpath.t option Term.t
 val b0_dir : Fpath.t option Term.t
 val color : Tty.cap option Term.t
-val verbosity : Log.level option Term.t
+val verbosity : Log.level Term.t
 val variant : string option Term.t
 
 (** {1:mcopts More common arguments} *)

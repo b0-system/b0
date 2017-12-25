@@ -6,7 +6,7 @@
 
 open B0
 
-let find_pkgs = B0b_cli.find_pkgs ~log:(Some Log.Error)
+let find_pkgs = B0b_cli.find_pkgs ~log:Log.Error
 
 (* Actions *)
 
