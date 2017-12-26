@@ -3,7 +3,7 @@
 To boostrap B0 needs to be pointed to the  `cmdliner`, `result` and
 `unix` libraries. This can be done with or without `opam`.
 
-1. With `opam` (v2 is needed). irst install the prerequisistes and make
+1. With `opam` (v2 is needed). First install the prerequisistes and make
    sure the opam environment is setup:
    ```
         opam install --deps-only .
@@ -11,7 +11,7 @@ To boostrap B0 needs to be pointed to the  `cmdliner`, `result` and
    ```
 2. Without `opam`. Set the `B0_DRIVER_LIBDIR` environment variable to
    a root library directory. This will lookup the `cmdliner`, `result`
-   and `ocaml/unix` directories for corresponding libraries.
+   and `ocaml` (for `unix`) directories for corresponding libraries.
 
 Now invoke from the root directory of the distribution:
 
@@ -21,7 +21,7 @@ This produces a driver instance `_boot/b0` with b0's own `B0.ml`
 description. This executable can be run to build the libraries and the
 `b0` and `d0` tools in the `_boot_b0` directory by invoking:
 
-    ocaml b00t.ml build [ARG]...
+    ocaml b00t.ml b0 [ARG]...
 
 As long as the description `B0.ml` doesn't change this command can be
 used. If the description changes restart from cold. The two steps can

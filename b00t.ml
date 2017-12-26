@@ -1,6 +1,6 @@
 #!/usr/bin/env ocaml
 
-(* Usage: ocaml b00t.ml [reset|cold|build|full]
+(* Usage: ocaml b00t.ml [reset|cold|b0|full]
    See DEVEL.md *)
 
 let dir_sep = Filename.dir_sep
@@ -189,8 +189,8 @@ let compile_instance () =
   Sys.chdir root_dir
 
 let run_instance args =
-  log "Running instance %s\n" exe;
-  run_cmd (exe :: args @ ["--b0-dir"; "_boot_b0"]) (* bof *)
+  log "[NOTE] Running bootstrap instance\n";
+  run_cmd (exe :: args @ ["--b0-dir"; "_boot_b0"])
 
 (* Reset _boot *)
 
@@ -204,14 +204,14 @@ let reset () =
 let b00t = function
 | `Reset -> reset ()
 | `Cold -> compile_instance (); log "Done! Instance: %s\n" exe
-| `Build args -> run_instance args
+| `B0 args -> run_instance args
 | `Full -> compile_instance (); run_instance []
 
 let parse_cli () = match Array.to_list Sys.argv with
 | _ :: [ "reset" ] -> `Reset
 | _ :: [ "cold" ] -> `Cold
 | [] | [ _ ] | _ :: [ "full" ] -> `Full
-| _ :: "build" :: args  -> `Build args
+| _ :: "b0" :: args  -> `B0 args
 | cmd :: args ->
     err "%s: Unknown argument(s): %s\n" cmd @@ String.concat " " args
 
