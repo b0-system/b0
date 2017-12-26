@@ -130,8 +130,7 @@ let on_error_msg ?(level = Error) ?header ~use = function
 | Ok v -> v
 | Error (`Msg msg) ->
     !_kmsg.kmsg use level @@ fun m ->
-    m ?header "@[%a@]" B0_fmt.text msg
-(*    m ?header "%s" msg*)
+    m ?header "@[%a@]" B0_fmt.lines msg
 
 (* Logging timings *)
 
