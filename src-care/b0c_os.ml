@@ -216,11 +216,14 @@ let version_linux () = match android_version () with
 
 let version_macos () = OS.Cmd.run_out Cmd.(v "sw_vers" % "-productVersion")
 let version_windows () =
-  let wmic opts = OS.Cmd.run_out Cmd.(v "wmic" %% opts) in
-  wmic Cmd.(v "os" % "get" % "Version" % "/value") >>= fun kv ->
-  match String.cut ~sep:"=" kv with
-  | None -> R.error_msgf "Could not parse wmic value from %S" kv
-  | Some (_, v) -> Ok (String.trim v)
+  OS.Cmd.run_out Cmd.(v "cmd.exe" % "/c" % "ver") >>= fun out ->
+  (* Parse the V in Something [Version V] *)
+  let err () = R.error_msgf "Could not parse version from %S" out in
+  let last = String.length out - 2 in
+  if last < 0 then err () else
+  match String.rindex out ' ' with
+  | exception Not_found -> err ()
+  | i ->  Ok (String.with_index_range ~first:(i+1) ~last out)
 
 let version_discover env aim _ c =
   let version = get_dep env aim name c >>= fun os -> match os with
