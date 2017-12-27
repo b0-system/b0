@@ -26,10 +26,10 @@ let dump_file_contents ppf d =
 
 let pp_cmd ppf cmd =
   let bold_green = [`Faint; `Fg `Green;] in
-  let pp_brack = B0_tty.pp_str [`Fg `Yellow] in
-  let pp_exe ppf e = B0_tty.pp_str [`Fg `Red; `Bold] ppf (Filename.quote e) in
+  let pp_brack = B0_fmt.tty_str [`Fg `Yellow] in
+  let pp_exe ppf e = B0_fmt.tty_str [`Fg `Red; `Bold] ppf (Filename.quote e) in
   let pp_arg ppf a = B0_fmt.pf ppf "%s" (Filename.quote a) in
-  let pp_o_arg ppf a = B0_tty.pp_str bold_green ppf (Filename.quote a) in
+  let pp_o_arg ppf a = B0_fmt.tty_str bold_green ppf (Filename.quote a) in
   let rec pp_args last_was_o ppf = function
   | [] -> ()
   | a :: args ->
@@ -212,12 +212,12 @@ let dump_spawn ppf s =
   | `File f -> B0_fpath.dump ppf f
   | `Tee f -> B0_fmt.pf ppf "@[<hov><ui> and@ %a@]" B0_fpath.dump f
   in
-  let dump_opt_path = B0_fmt.(option ~none:none_str) B0_fpath.dump in
+  let dump_opt_path = B0_fmt.(option ~none:none_stub) B0_fpath.dump in
   let dump_stdo_ui ppf = function
   | `Tmp_file f -> B0_fpath.dump ppf f
   | `Stdo (Ok d) -> dump_file_contents ppf d
   | `Stdo (Error (`Msg e)) -> B0_fmt.pf ppf "error: %s" e
-  | `None -> B0_fmt.none_str ppf ()
+  | `None -> B0_fmt.none_stub ppf ()
   in
   let dump_spawn_success_codes ppf = function
   | None -> B0_fmt.string ppf "0"
@@ -404,14 +404,14 @@ let pp_spawn_fail ppf o =
   let pp_signaled ppf c = B0_fmt.pf ppf "signaled with %d" c in
   let pp_exited ppf c = B0_fmt.pf ppf "exited with %d" c in
   let pp_status ppf s = match s.spawn_result with
-  | Ok (_, `Signaled c) -> B0_tty.pp [`Fg `Red] pp_signaled ppf c
+  | Ok (_, `Signaled c) -> B0_fmt.tty [`Fg `Red] pp_signaled ppf c
   | Ok (_, `Exited c) ->
-      B0_fmt.pf ppf "%a%a" (B0_tty.pp [`Fg `Red] pp_exited) c pp_exp s
+      B0_fmt.pf ppf "%a%a" (B0_fmt.tty [`Fg `Red] pp_exited) c pp_exp s
   | Error (`Msg m) ->
       B0_fmt.pf ppf "%s" m
   in
   let pp_writes ppf s =
-    B0_fpath.Set.pp (B0_tty.pp [`Fg `Cyan] B0_fpath.dump) ppf s
+    B0_fpath.Set.pp (B0_fmt.tty [`Fg `Cyan] B0_fpath.dump) ppf s
   in
   match o.kind with
   | Spawn s ->
@@ -427,10 +427,10 @@ let pp_spawn_fail ppf o =
    We need a id -> name map here
    Path to build dir should be factored out as $B *)
 
-let op_kind ppf k = B0_tty.pp_str [`Fg `Green] ppf k
+let op_kind ppf k = B0_fmt.tty_str [`Fg `Green] ppf k
 let op_cached ppf o = match cached o with
 | false -> B0_fmt.nop ppf ()
-| true -> B0_fmt.pf ppf "[%a]" (B0_tty.pp_str [`Fg `Green]) "CACHED"
+| true -> B0_fmt.pf ppf "[%a]" (B0_fmt.tty_str [`Fg `Green]) "CACHED"
 
 let op_syn ppf o =
   B0_fmt.pf ppf "@[%a[%a:%d]@]" op_cached o op_kind (kind_to_string o.kind) o.id

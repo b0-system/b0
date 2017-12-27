@@ -154,15 +154,15 @@ let create ?prev_outcome cache ctrl env conf fpath_meta ~dir ~universe units =
 (* Logging, FIXME make that a data type and add a logger function. Better
    for IDE interaction. *)
 
-let pp_name ppf u = B0_tty.pp_str [] ppf (B0_unit.name u)
-let pp_name_red ppf u = B0_tty.pp_str [`Fg `Red] ppf (B0_unit.name u)
+let pp_name ppf u = B0_fmt.tty_str [] ppf (B0_unit.name u)
+let pp_name_red ppf u = B0_fmt.tty_str [`Fg `Red] ppf (B0_unit.name u)
 let pp_aim ppf = function
 | `Host_os -> ()
 | `Build_os -> B0_fmt.pf ppf "[AIM:BUILD]"
 
 let log_unit_start aim u =
   let build_style = [`Fg `Yellow] in
-  B0_log.app (fun m -> m "[%a]%a %a" (B0_tty.pp_str build_style) "START"
+  B0_log.app (fun m -> m "[%a]%a %a" (B0_fmt.tty_str build_style) "START"
                  pp_aim aim
                  pp_name u)
 
@@ -172,13 +172,13 @@ let log_unit_finish aim u =
   | "" -> ()
   | o -> B0_fmt.pf ppf "%s " o
   in
-  B0_log.app (fun m -> m "[%a]%a %a%a" (B0_tty.pp_str build_style) "BUILT"
+  B0_log.app (fun m -> m "[%a]%a %a%a" (B0_fmt.tty_str build_style) "BUILT"
                  pp_aim aim
                  pp_outcome u pp_name u)
 
 let log_unit_fail u msg =
   B0_log.app (fun m -> m "@[<v>[%a] %a:@,  @[%a@]@,@]"
-                 (B0_tty.pp_str [`Fg `Red]) "FAIL "
+                 (B0_fmt.tty_str [`Fg `Red]) "FAIL "
                  pp_name_red u msg ())
 
 let log_unit_abort u u_cause =
@@ -187,7 +187,7 @@ let log_unit_abort u u_cause =
   | Some u -> B0_fmt.pf ppf ": %a failed" pp_name u
   in
   B0_log.app (fun m -> m "[%a] %a%a"
-                 (B0_tty.pp_str [`Fg `Red]) "ABORT"
+                 (B0_fmt.tty_str [`Fg `Red]) "ABORT"
                  pp_name u msg u_cause)
 
 let log_finish b =
@@ -202,7 +202,7 @@ let log_finish b =
   let count = strf "%d/%d" succ tot in
   let d = b.b.stats.total_dur in
   B0_log.app (fun m -> m "[%a] units in %a"
-                 (B0_tty.pp_str style) count B0_time.pp_span d);
+                 (B0_fmt.tty_str style) count B0_time.pp_span d);
   ()
 
 (* Failing builds *)

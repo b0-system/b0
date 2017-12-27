@@ -34,19 +34,19 @@ let info_style = [`Fg `Blue]
 let debug_style = [`Faint; `Fg `Green]
 
 let pp_level_str level ppf v = match level with
-| App -> B0_tty.pp_str app_style ppf v
-| Error -> B0_tty.pp_str err_style ppf v
-| Warning -> B0_tty.pp_str warn_style ppf v
-| Info -> B0_tty.pp_str info_style ppf v
-| Debug -> B0_tty.pp_str debug_style ppf v
+| App -> B0_fmt.tty_str app_style ppf v
+| Error -> B0_fmt.tty_str err_style ppf v
+| Warning -> B0_fmt.tty_str warn_style ppf v
+| Info -> B0_fmt.tty_str info_style ppf v
+| Debug -> B0_fmt.tty_str debug_style ppf v
 | Quiet -> assert false
 
 let pp_level ppf level = match level with
 | App -> ()
-| Error -> B0_tty.pp_str err_style ppf "ERROR"
-| Warning -> B0_tty.pp_str warn_style ppf "WARNING"
-| Info -> B0_tty.pp_str info_style ppf "INFO"
-| Debug -> B0_tty.pp_str debug_style ppf "DEBUG"
+| Error -> B0_fmt.tty_str err_style ppf "ERROR"
+| Warning -> B0_fmt.tty_str warn_style ppf "WARNING"
+| Info -> B0_fmt.tty_str info_style ppf "INFO"
+| Debug -> B0_fmt.tty_str debug_style ppf "DEBUG"
 | Quiet -> assert false
 
 let pp_header =

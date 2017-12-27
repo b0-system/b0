@@ -43,7 +43,7 @@ module Scheme = struct
     let def_name_tty_color = `Blue
 
     let pp_opt_preset =
-      B0_fmt.(field "preset" (option ~none:none_str B0_conf.Preset.pp_name))
+      B0_fmt.(field "preset" (option ~none:none_stub B0_conf.Preset.pp_name))
 
     let pp_proxy_scheme =
       B0_fmt.(field "proxy-scheme" string)
@@ -156,11 +156,11 @@ let equal v0 v1 = B0_fpath.equal v0.path v1.path
 let compare v0 v1 = B0_fpath.compare v0.path v1.path
 let compare_by_name v0 v1 = B0_string.compare v0.name v1.name
 
-let pp_name_str ppf s = B0_tty.pp_str [`Fg `Cyan] ppf s
+let pp_name_str ppf s = B0_fmt.tty_str [`Fg `Cyan] ppf s
 let pp_name ppf v = pp_name_str ppf (name v)
 
 let pp_synopsis ppf v =
-  let bold pp_v ppf v = B0_tty.pp [`Bold] pp_v ppf v in
+  let bold pp_v ppf v = B0_fmt.tty [`Bold] pp_v ppf v in
   let scheme ppf v = Scheme.pp_name ppf (scheme v) in
   B0_fmt.pf ppf "%a [%a]" (bold pp_name) v scheme v
 

@@ -37,7 +37,7 @@ let select cache selection =
 
 let key_style = [`Fg `Yellow]
 let age_style = [`Fg `Green]
-let key_str k = Tty.str key_style (Cache.key_to_string @@ k)
+let key_str k = Cache.key_to_string k
 
 let exit_no_cache = 1
 let exit_no_elt = 2
@@ -49,8 +49,7 @@ let err_no_elts () =
 let list = function
 | [] -> err_no_elts ()
 | elts ->
-    let age elt =
-      Tty.str age_style (Printf.sprintf "%-4d" @@ Cache.elt_age elt)
+    let age elt = Printf.sprintf "%-4d" @@ Cache.elt_age elt
     in
     let key elt = key_str (Cache.elt_key elt) in
     let file elt = Fpath.to_string @@ Cache.elt_file_path elt in
@@ -72,7 +71,7 @@ let show = function
         "op", (fun e -> strf "%s" (Cmd.to_string @@ Cache.elt_op e)) ]
     in
     let show_field e (l, fmt) =
-      strf " %s: %s" (Tty.str [`Fg `Cyan] l) (fmt e)
+      strf " %s: %s" l (fmt e)
     in
     let show_elt e =
       let fields = List.map (show_field e) fields in
@@ -120,7 +119,7 @@ let verify ~repair cache = function
 let foreign ~ignore_keys cache =
   let pr_foreign (kind, p) =
     let path = match kind with
-    | `Key -> Tty.str key_style (Fpath.to_string p)
+    | `Key -> Fpath.to_string p
     | `Other -> Fpath.to_string p
     in
     Printf.printf "%s\n" path

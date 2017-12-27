@@ -14,9 +14,7 @@ val kind : out:Unix.file_descr -> kind
 type cap = Ansi | None
 val cap : kind -> cap
 
-val strip_escapes : string -> string
-
-(* ANSI styling *)
+(* ANSI escapes and styling *)
 
 type color =
 [ `Default | `Black | `Red | `Green | `Yellow | `Blue | `Magenta | `Cyan
@@ -26,16 +24,9 @@ type style =
 [ `Bold | `Faint | `Italic | `Underline | `Blink of [ `Slow | `Rapid ]
 | `Reverse | `Fg of color | `Bg of color ]
 
-val str_cap : cap -> style list -> string -> string
-
-val set_styling_cap : cap -> unit
-val styling_cap : unit -> cap
-
-val str : style list -> string -> string
-val pp_str : style list -> Format.formatter -> string -> unit
-val pp :
-  style list -> (Format.formatter -> 'a -> unit) ->
-  Format.formatter -> 'a -> unit
+val sgrs_of_styles : style list -> string
+val styled_str : cap -> style list -> string -> string
+val strip_escapes : string -> string
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers

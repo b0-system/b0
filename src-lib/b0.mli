@@ -21,7 +21,48 @@
 
 (** {1:prelims Preliminaries} *)
 
-(** {!Format} combinators. *)
+(** {{:http://www.ecma-international.org/publications/standards/Ecma-048.htm}
+      ANSI terminal} interaction. *)
+module Tty : sig
+
+  (** {1:kind Terminal kind and capabilities} *)
+
+  type kind = No_tty | Dumb | Term of string (** *)
+  (** The type for terminals. *)
+
+  val kind : out:Unix.file_descr -> kind
+  (** [kind out] determines the kind of terminal by consulting the the
+      [TERM] environment variable and using [Unix.isatty] on [out]. *)
+
+  type cap = Ansi | None (** *)
+  (** The type for terminal capabilities. Either
+      ANSI terminal or none. *)
+
+  val cap : kind -> cap
+  (** [cap kind] determines capabilities according to [kind]. *)
+
+  (** {1:style ANSI escapes and styling} *)
+
+  type color =
+  [ `Default | `Black | `Red | `Green | `Yellow | `Blue | `Magenta | `Cyan
+  | `White ]
+  (** The type for ANSI colors. *)
+
+  type style =
+  [ `Bold | `Faint | `Italic | `Underline | `Blink of [ `Slow | `Rapid ]
+  | `Reverse | `Fg of color | `Bg of color ]
+  (** The type for ANSI styles. *)
+
+  val styled_str : cap -> style list -> string -> string
+  (** [styled_str cap styles s] styles [s] according to [styles] and [cap]. *)
+
+  val strip_escapes : string -> string
+  (** [strip_escapes s] removes ANSI escapes from [s]. *)
+end
+
+(** {!Format} combinators.
+
+    A few helpers for quick and concise pretty-printer definition. *)
 module Fmt : sig
 
   (** {1:formatting Formatting} *)
@@ -57,6 +98,9 @@ module Fmt : sig
   val int : int t
   (** [int] is [pf ppf "%d"]. *)
 
+  val float : float t
+  (** [float] is [pf ppf "%g"]. *)
+
   val char : char t
   (** [char] is {!Format.pp_print_char}. *)
 
@@ -69,30 +113,39 @@ module Fmt : sig
       separated by [sep] (defaults to {!cut}). *)
 
   val list : ?sep:unit t -> 'a t -> 'a list t
-  (** [list sep pp_v] formats list elements. Each element of the list is
+  (** [list ~sep pp_v] formats list elements. Each element of the list is
       formatted in order with [pp_v]. Elements are separated by [sep]
       (defaults to {!cut}). If the list is empty, this is {!nop}. *)
+
+  val array :?sep:unit t -> 'a t -> 'a array t
+  (** [array ~sep pp_v] formats array elements. Each element of the
+      array is formatted in in order with [pp_v]. Elements are
+      seperated by [sep] (defaults to {!cut}). If the array is empty
+      this is {!nop}. *)
 
   val option : ?none:unit t -> 'a t -> 'a option t
   (** [option ~none pp_v] formats an optional value. The [Some] case
       uses [pp_v] and [None] uses [none] (defaults to {!nop}). *)
+
+  val none_stub : unit t
+  (** [none_stub] is [unit "<none>"]. *)
 
   val iter : ?sep:unit t -> (('a -> unit) -> 'b -> unit) -> 'a t -> 'b t
   (** [iter ~sep iter pp_elt] formats the iterations of [iter] over a
       value using [pp_elt]. Iterations are separated by [sep] (defaults to
       {!cut}). *)
 
-  val iter_bindings : ?sep:unit t -> (('a -> 'b -> unit) -> 'c -> unit) ->
-    ('a * 'b) t -> 'c t
+  val iter_bindings :
+    ?sep:unit t -> (('a -> 'b -> unit) -> 'c -> unit) -> ('a * 'b) t -> 'c t
   (** [iter_bindings ~sep iter pp_binding] formats the iterations of
       [iter] over a value using [pp_binding]. Iterations are separated
       by [sep] (defaults to {!cut}). *)
 
   val text : string t
-  (** [text] is {Format.pp_print_text}. *)
+  (** [text] is {!Format.pp_print_text}. *)
 
   val lines : string t
-  (** [lines] formats lines by replacing newlines ('\n') in the string
+  (** [lines] formats lines by replacing newlines (['\n']) in the string
       with calls to {!Format.pp_force_newline}. *)
 
   val exn : exn t
@@ -132,17 +185,32 @@ module Fmt : sig
   val braces : 'a t -> 'a t
   (** [braces pp_v ppf] is [pf "@[<1>{%a}@]" pp_v]. *)
 
+  (** {1:tty ANSI TTY styling} *)
+
+  val set_tty_styling_cap : Tty.cap -> unit
+  (** [set_tty_styling_cap c] sets the global styling capabilities to
+      [c]. Affects the output of {!tty_str} and {!tty}. *)
+
+  val tty_styling_cap : unit -> Tty.cap
+  (** [tty_styling_cap ()] is the global styling capability. *)
+
+  val tty_str : Tty.style list -> string t
+  (** [tty_str styles ppf s] prints [s] on [ppf] according to [styles]
+      and the value of {!tty_styling_cap}. *)
+
+  val tty : Tty.style list -> 'a t -> 'a t
+  (** [tty styles pp_v ppf v] prints [v] with [pp_v] on [ppf]
+      according to [styles] and the value of {!tty_styling_cap}. *)
+
   (** {1:fields Fields} *)
 
-  val field_label : string t
-  (** [field_label l] pretty prints a field label [l]. *)
-
-  val field : string -> 'a t -> 'a t
-  (** [field l pp_v] pretty prints a field with label [l] using
-      [pp_v] to print the value. *)
+  val field : ?style:Tty.style list -> string -> 'a t -> 'a t
+  (** [field ~style l pp_v] pretty prints a named field with label [l]
+      styled according to [style] (defaults to [[`Fg `Yellow]]),
+      using [pp_v] to print the value. *)
 end
 
-(** Result value combinators. *)
+(** {!Pervasives.result} value combinators. *)
 module R : sig
 
   (** {1:composing Composing results} *)
@@ -190,7 +258,7 @@ module R : sig
   (** [failwith_error_msg r] raises [Failure m] if [r] is [Error (`Msg m)] *)
 end
 
-type 'a result = ('a, [`Msg of string]) Pervasives.result
+type 'a result = ('a, R.msg) Pervasives.result
 (** The type for [B0] results of type ['a]. *)
 
 val ( >>= ) :
@@ -960,66 +1028,6 @@ module Conv : sig
       denote [None] in textual converters. In a textual parse [None] is
       unconditionally returned on [none], it takes over a potential
       decode of that string by [c]. *)
-end
-
-(** ANSI terminal interaction. *)
-module Tty : sig
-
-  (** {1:kind Terminal kind and capabilities} *)
-
-  type kind = No_tty | Dumb | Term of string (** *)
-  (** The type for terminals. *)
-
-  val kind : out:Unix.file_descr -> kind
-  (** [kind out] determines the kind of terminal by consulting the the
-      [TERM] environment variable and using [Unix.isatty] on [out]. *)
-
-  type cap = Ansi | None (** *)
-  (** The type for terminal capabilities. Either
-      {{:http://www.ecma-international.org/publications/standards/Ecma-048.htm}
-      ANSI} terminal or none. *)
-
-  val cap : kind -> cap
-  (** [cap kind] determines capabilities according to [kind]. *)
-
-  val strip_escapes : string -> string
-  (** [strip_escapes s] removes ANSI escapes from [s]. *)
-
-  (** {1:style ANSI styling} *)
-
-  type color =
-  [ `Default | `Black | `Red | `Green | `Yellow | `Blue | `Magenta | `Cyan
-  | `White ]
-  (** The type for ANSI colors. *)
-
-  type style =
-  [ `Bold | `Faint | `Italic | `Underline | `Blink of [ `Slow | `Rapid ]
-  | `Reverse | `Fg of color | `Bg of color ]
-  (** The type for ANSI styles. *)
-
-  val str_cap : cap -> style list -> string -> string
-  (** [str_cap cap styles s] styles [s] according to [styles] and [cap]. *)
-
-  (** {2:glob Global styling specification} *)
-
-  val set_styling_cap : cap -> unit
-  (** [set_styling_cap c] sets the global styling capabilities to
-      [c]. Affects the output of {!str}, {!pp} and {!pp_str}. *)
-
-  val styling_cap : unit -> cap
-  (** [styling_cap ()] is the global styling capability. *)
-
-  val str : style list -> string -> string
-  (** [str styles s] styles [s] according to [styles] and the value of
-      {!styling_cap}. *)
-
-  val pp_str : style list -> string Fmt.t
-  (** [pp_str styles ppf s] prints [s] on [ppf] according to [styles] and
-      the value of {!styling_cap}. *)
-
-  val pp : style list -> 'a Fmt.t -> 'a Fmt.t
-  (** [pp styles pp_v ppf v] prints [v] with [pp_v] on [ppf] according
-      to [styles] and the value of {!styling_cap}. *)
 end
 
 (** The [B0] program  log.

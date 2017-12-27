@@ -48,7 +48,7 @@ let pp_cpu_times ppf (u, s) =
   B0_fmt.pf ppf "@[user: %a sys: %a@]"
     B0_time.pp_float_s u B0_time.pp_float_s s
 
-let pp_previous pp_v ppf v = B0_tty.pp [`Faint] pp_v ppf v
+let pp_previous pp_v ppf v = B0_fmt.tty [`Faint] pp_v ppf v
 
 let pp_cmp pp_v ppf (now, prev) = match prev with
 | None -> pp_v ppf now

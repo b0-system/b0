@@ -23,29 +23,7 @@ let kind ~out =
 type cap = Ansi | None
 let cap kind = match kind with No_tty | Dumb -> None | Term _ -> Ansi
 
-let strip_escapes s =
-  let len = String.length s in
-  let b = Buffer.create len in
-  let max = len - 1 in
-  let flush start stop = match start < 0 || start > max with
-  | true -> ()
-  | false -> Buffer.add_substring b s start (stop - start + 1)
-  in
-  let rec skip_esc i = match i > max with
-  | true -> loop i i
-  | false -> let k = i + 1 in if s.[i] = 'm' then loop k k else skip_esc k
-  and loop start i = match i > max with
-  | true ->
-      if Buffer.length b = len then s else
-      (flush start max; Buffer.contents b)
-  | false ->
-      match s.[i] with
-      | '\027' -> flush start (i - 1); skip_esc (i + 1)
-      | _ -> loop start (i + 1)
-  in
-  loop 0 0
-
-(* ANSI styling *)
+(* ANSI escapes and styling *)
 
 type color =
 [ `Default | `Black | `Red | `Green | `Yellow | `Blue | `Magenta | `Cyan
@@ -75,33 +53,31 @@ let sgr_of_style = function
 
 let sgrs_of_styles styles = String.concat ";" (List.map sgr_of_style styles)
 
-let str_cap cap styles s = match cap with
+let styled_str cap styles s = match cap with
 | None -> s
 | Ansi -> Printf.sprintf "\027[%sm%s\027[m" (sgrs_of_styles styles) s
 
-(* N.B. what we are doing here is a bit less subtle than what we did
-   in Fmt where capability was associated to formatters (and hence
-   could distinguish between stdout/stderr. For now that seems
-   sufficient. *)
-
-let _styling_cap = ref None
-let set_styling_cap cap = _styling_cap := cap
-let styling_cap () = !_styling_cap
-
-let str styles s = str_cap !_styling_cap styles s
-
-let pp_str styles ppf s = match !_styling_cap with
-| None -> Format.pp_print_string ppf s
-| Ansi ->
-    Format.fprintf ppf "@<0>%s%s@<0>%s"
-      (Printf.sprintf "\027[%sm" @@ sgrs_of_styles styles) s "\027[m"
-
-let pp styles pp_v ppf v = match !_styling_cap with
-| None -> pp_v ppf v
-| Ansi ->
-    let reset ppf = Format.fprintf ppf "@<0>%s" "\027[m" in
-    Format.kfprintf reset ppf "@<0>%s%a"
-      (Printf.sprintf "\027[%sm" @@ sgrs_of_styles styles) pp_v v
+let strip_escapes s =
+  let len = String.length s in
+  let b = Buffer.create len in
+  let max = len - 1 in
+  let flush start stop = match start < 0 || start > max with
+  | true -> ()
+  | false -> Buffer.add_substring b s start (stop - start + 1)
+  in
+  let rec skip_esc i = match i > max with
+  | true -> loop i i
+  | false -> let k = i + 1 in if s.[i] = 'm' then loop k k else skip_esc k
+  and loop start i = match i > max with
+  | true ->
+      if Buffer.length b = len then s else
+      (flush start max; Buffer.contents b)
+  | false ->
+      match s.[i] with
+      | '\027' -> flush start (i - 1); skip_esc (i + 1)
+      | _ -> loop start (i + 1)
+  in
+  loop 0 0
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers

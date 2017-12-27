@@ -47,7 +47,7 @@ module Unit = struct
   let def_name_tty_color = `Green
   let def_pp_info ppf u =
     B0_fmt.cut ppf ();
-    B0_fmt.(field "pkg" (option ~none:none_str B0_pkg.pp_name)) ppf u.pkg;
+    B0_fmt.(field "pkg" (option ~none:none_stub B0_pkg.pp_name)) ppf u.pkg;
     B0_fmt.cut ppf ();
     B0_fmt.(field "meta" B0_fmt.(vbox @@ B0_meta.Unit.pp)) ppf u.meta;
     B0_fmt.cut ppf ();

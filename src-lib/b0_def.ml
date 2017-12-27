@@ -22,9 +22,9 @@ module Loc = struct
   let equal s0 s1 = (s0 = s1)
   let compare s0 s1 = Pervasives.compare s0 s1
   let pp ppf = function
-  | None_ -> B0_tty.pp_str [`Fg `Red] ppf "unknown"
+  | None_ -> B0_fmt.tty_str [`Fg `Red] ppf "unknown"
   | File f -> B0_fpath.pp ppf f
-  | Lib l -> B0_tty.pp_str [`Fg `Green] ppf l
+  | Lib l -> B0_fmt.tty_str [`Fg `Green] ppf l
 
   (* Current root, location and namespacing *)
 
@@ -215,7 +215,7 @@ module Make (V : DEFINED) = struct
 
   let pp_doc ppf v = B0_fmt.text ppf (doc v)
 
-  let pp_name_str ppf s = B0_tty.pp_str [`Fg V.def_name_tty_color] ppf s
+  let pp_name_str ppf s = B0_fmt.tty_str [`Fg V.def_name_tty_color] ppf s
   let pp_name ppf v = pp_name_str ppf (name v)
   let pp_synopsis = B0_fmt.synopsis ~name:pp_name ~doc:pp_doc
 

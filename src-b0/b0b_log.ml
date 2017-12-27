@@ -43,14 +43,14 @@ let pp_ops fmt o ppf ops =
 let dump_log fmt o ops colorize pager =
   let tmp = Fpath.(OS.Dir.default_tmp () / "log") in
   let write_log log_file oc o =
-    let cap = B0.Tty.styling_cap () in
+    let cap = Fmt.tty_styling_cap () in
     begin match colorize with (* FIXME add with_styling_cap *)
-    | true -> B0.Tty.set_styling_cap B0.Tty.Ansi
-    | false -> B0.Tty.set_styling_cap B0.Tty.None
+    | true -> Fmt.set_tty_styling_cap Tty.Ansi
+    | false -> Fmt.set_tty_styling_cap Tty.None
     end;
     let ppf = Format.formatter_of_out_channel oc in
     Fmt.pf ppf "%a@?" (pp_ops fmt o) ops;
-    B0.Tty.set_styling_cap cap;
+    Fmt.set_tty_styling_cap cap;
     OS.Cmd.run Cmd.(pager % p log_file)
   in
   OS.File.with_tmp_oc tmp write_log o

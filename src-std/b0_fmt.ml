@@ -4,9 +4,13 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-type 'a t = Format.formatter -> 'a -> unit
+(* Formatting *)
 
 let pf = Format.fprintf
+
+(* Formatters *)
+
+type 'a t = Format.formatter -> 'a -> unit
 
 let nop ppf _ = ()
 let sp = Format.pp_print_space
@@ -14,30 +18,24 @@ let cut = Format.pp_print_cut
 let comma ppf () = pf ppf ",@ "
 let unit fmt ppf () = pf ppf fmt
 
+(* Base type formatters *)
+
 let bool = Format.pp_print_bool
 let int = Format.pp_print_int
+let float ppf f = pf ppf "%g" f
 let char = Format.pp_print_char
 let string = Format.pp_print_string
 
 let pair ?sep:(pp_sep = cut) pp_fst pp_snd ppf (fst, snd) =
   pp_fst ppf fst; pp_sep ppf (); pp_snd ppf snd
 
-let iter ?sep:(pp_sep = cut) iter pp_elt ppf v =
-  let is_first = ref true in
-  let pp_elt v =
-    if !is_first then (is_first := false) else pp_sep ppf ();
-    pp_elt ppf v
-  in
-  iter pp_elt v
-
 let list ?sep:pp_sep = Format.pp_print_list ?pp_sep
-let array ?sep pp_elt = iter ?sep Array.iter pp_elt
 
 let option ?none:(pp_none = nop) pp_v ppf = function
 | None -> pp_none ppf ()
 | Some v -> pp_v ppf v
 
-let none_str ppf () = string ppf "<none>"
+let none_stub ppf () = string ppf "<none>"
 
 let iter ?sep:(pp_sep = cut) iter pp_elt ppf v =
   let is_first = ref true in
@@ -46,6 +44,8 @@ let iter ?sep:(pp_sep = cut) iter pp_elt ppf v =
     pp_elt ppf v
   in
   iter pp_elt v
+
+let array ?sep pp_elt = iter ?sep Array.iter pp_elt
 
 let iter_bindings ?sep:(pp_sep = cut) iter pp_binding ppf v =
   let is_first = ref true in
@@ -117,14 +117,42 @@ let parens pp_v ppf v = pf ppf "@[<1>(%a)@]" pp_v v
 let brackets pp_v ppf v = pf ppf "@[<1>[%a]@]" pp_v v
 let braces pp_v ppf v = pf ppf "@[<1>{%a}@]" pp_v v
 
+(* Tty
+
+   N.B. what we are doing here is a bit less subtle than what we did
+   in Fmt where capability was associated to formatters (and hence
+   could distinguish between stdout/stderr. For now that seems
+   sufficient. *)
+
+let _tty_styling_cap = ref B0_tty.None
+let set_tty_styling_cap cap = _tty_styling_cap := cap
+let tty_styling_cap () = !_tty_styling_cap
+
+let tty_str styles ppf s = match !_tty_styling_cap with
+| B0_tty.None -> Format.pp_print_string ppf s
+| B0_tty.Ansi ->
+    Format.fprintf ppf "@<0>%s%s@<0>%s"
+      (Printf.sprintf "\027[%sm" @@ B0_tty.sgrs_of_styles styles) s "\027[m"
+
+let tty styles pp_v ppf v = match !_tty_styling_cap with
+| B0_tty.None -> pp_v ppf v
+| B0_tty.Ansi ->
+    (* This doesn't compose well, we should get the current state
+       and restore it afterwards rather than resetting. *)
+    let reset ppf = Format.fprintf ppf "@<0>%s" "\027[m" in
+    Format.kfprintf reset ppf "@<0>%s%a"
+      (Printf.sprintf "\027[%sm" @@ B0_tty.sgrs_of_styles styles) pp_v v
+
 (* Fields *)
 
-let field_label ppf l = B0_tty.pp_str [`Fg `Yellow] ppf l
-let field f pp_v ppf v = pf ppf "@[%a: @[%a@]@]" field_label f pp_v v
+let field ?(style = [`Fg `Yellow]) f pp_v ppf v =
+  pf ppf "@[%a: @[%a@]@]" (tty_str style) f pp_v v
 
-(* Synopses & info *)
+(* Synopses & info
 
-let bold ppf v = B0_tty.pp [`Bold] ppf v
+   FIXME this should go somewhere  *)
+
+let bold ppf v = tty [`Bold] ppf v
 let synopsis ~name ~doc ppf v =
   pf ppf "@[<h>%a: %a@]" (bold name) v doc v
 

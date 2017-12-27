@@ -4,6 +4,7 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
+module Tty = B0_tty
 module Fmt = B0_fmt
 
 module R = B0_result.R
@@ -19,7 +20,6 @@ module Codec = B0_codec (* FIXME remove that *)
 
 module Cmd = B0_cmd
 module Conv = B0_conv
-module Tty = B0_tty
 module Log = B0_log
 module Def = B0_def
 module Hmap = B0_hmap

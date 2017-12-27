@@ -4,13 +4,15 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** Format helpers
+(** Format helpers See {!B0.Fmt}. *)
 
-    See {!B0.Fmt}. *)
-
-type 'a t = Format.formatter -> 'a -> unit
+(* Formatting *)
 
 val pf : Format.formatter -> ('a, Format.formatter, unit) format -> 'a
+
+(* Fromatters *)
+
+type 'a t = Format.formatter -> 'a -> unit
 
 val nop : 'a t
 val cut : unit t
@@ -18,24 +20,24 @@ val sp : unit t
 val comma : unit t
 val unit : (unit, Format.formatter, unit) Pervasives.format -> unit t
 
+(* Base type formatters *)
+
 val bool : bool t
 val int : int t
+val float : float t
 val char : char t
 val string : string t
-
 val pair : ?sep:unit t -> 'a t -> 'b t -> ('a * 'b) t
 val list : ?sep:unit t -> 'a t -> 'a list t
 val array : ?sep:unit t -> 'a t -> 'a array t
 val option : ?none:unit t -> 'a t -> 'a option t
-val none_str : unit t
-
+val none_stub : unit t
 val iter : ?sep:unit t -> (('a -> unit) -> 'b -> unit) -> 'a t -> 'b t
 val iter_bindings :
   ?sep:unit t -> (('a -> 'b -> unit) -> 'c -> unit) -> ('a * 'b) t -> 'c t
 
 val text : string t
 val lines : string t
-
 val exn : exn t
 val exn_backtrace : (exn * Printexc.raw_backtrace) t
 
@@ -52,10 +54,16 @@ val parens : 'a t -> 'a t
 val brackets : 'a t -> 'a t
 val braces : 'a t -> 'a t
 
+(* Tty *)
+
+val set_tty_styling_cap : B0_tty.cap -> unit
+val tty_styling_cap : unit -> B0_tty.cap
+val tty_str : B0_tty.style list -> string t
+val tty : B0_tty.style list -> 'a t -> 'a t
+
 (* Fields *)
 
-val field_label : string t
-val field : string -> 'a t -> 'a t
+val field : ?style:B0_tty.style list -> string -> 'a t -> 'a t
 
 (* Synopses and info *)
 

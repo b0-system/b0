@@ -57,9 +57,9 @@ let pp_index =
 let out_short = Fpath.pp
 let out_normal roots builts ppf p =
   let kind ppf () = match kind roots builts p with
-  | `Root -> Tty.pp_str [`Fg `Green] ppf "R"
-  | `Built -> Tty.pp_str [`Faint; `Fg `Green] ppf "B"
-  | `Unknown -> Tty.pp_str [`Fg `Red] ppf "?"
+  | `Root -> Fmt.tty_str [`Fg `Green] ppf "R"
+  | `Built -> Fmt.tty_str [`Faint; `Fg `Green] ppf "B"
+  | `Unknown -> Fmt.tty_str [`Fg `Red] ppf "?"
   in
   Fmt.pf ppf "%a %a" kind () Fpath.pp p
 

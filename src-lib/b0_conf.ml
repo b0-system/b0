@@ -70,7 +70,7 @@ end = struct
 
   let pp_value pp_v ppf = function
   | Const v -> pp_v ppf v
-  | Discover _ -> B0_tty.pp_str [`Fg `Green] ppf "discovered"
+  | Discover _ -> B0_fmt.tty_str [`Fg `Green] ppf "discovered"
 
   type 'a t = { group : Group.t; default : 'a value; }
   let key_kind = "key"

@@ -12,7 +12,7 @@ let setup_tty_and_log color verbosity =
   | None -> Tty.cap @@ Tty.kind ~out:Unix.stdout
   | Some cap -> cap
   in
-  Tty.set_styling_cap cap;
+  Fmt.set_tty_styling_cap cap;
   Log.set_level verbosity
 
 let setup_cwd cwd_arg =

@@ -102,7 +102,7 @@ module H = (val impl)
 include H
 
 let pp ppf h = match equal h zero with
-| true -> B0_fmt.none_str ppf ()
+| true -> B0_fmt.none_stub ppf ()
 | false -> B0_fmt.string ppf (to_hex h)
 
 (* Hashing *)
