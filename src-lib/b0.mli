@@ -21,66 +21,6 @@
 
 (** {1:prelims Preliminaries} *)
 
-type 'a result = ('a, [`Msg of string]) Pervasives.result
-(** The type for [B0] results of type ['a]. *)
-
-val ( >>= ) :
-  ('a, 'b) Pervasives.result -> ('a -> ('c, 'b) Pervasives.result) ->
-  ('c, 'b) Pervasives.result
-(** [r >>= f] is [f v] if [r = Ok v] and [r] otherwise. *)
-
-val ( >>| ) :
-  ('a, 'b) Pervasives.result -> ('a -> 'c) -> ('c, 'b) Pervasives.result
-(** [r >>| f] is [f >>= fun v -> Ok (f v)]. *)
-
-(** Result value combinators. *)
-module R : sig
-
-  (** {1:composing Composing results} *)
-
-  val reword_error :
-    ('b -> 'c) -> ('a, 'b) Pervasives.result -> ('a, 'c) Pervasives.result
-  (** [reword_error reword r] is:
-      {ul
-      {- [r] if [r = Ok v]}
-      {- [Error (reword e)] if [r = Error e]}} *)
-
-  val join :
-    (('a, 'b) Pervasives.result, 'b) Pervasives.result ->
-    ('a, 'b) Pervasives.result
-  (** [join r] is [v] if [r = Ok v] and [r] otherwise. *)
-
-  (** {1:errmsg Error messages} *)
-
-  type msg = [ `Msg of string ]
-  (** The type for (error) messages. *)
-
-  val msgf : ('a, Format.formatter, unit, [> msg]) format4 -> 'a
-  (** [msgf fmt ...] is a {!msg} formatted according to [fmt]. *)
-
-  val error_msg : string -> ('b, [> msg]) Pervasives.result
-  (** [error_msg s] is [Error (`Msg s)]. *)
-
-  val error_msgf :
-    ('a, Format.formatter, unit, ('b, [> msg]) Pervasives.result) format4 -> 'a
-  (** [error_msgf fmt ...] is an error formatted according to [fmt]. *)
-
-  val reword_error_msg :
-    ?replace:bool -> (string -> msg) -> ('a, msg) Pervasives.result ->
-    ('a, [> msg]) Pervasives.result
-  (** [reword_error_msg ~replace reword r] is like {!reword_error} except
-      if [replace] is [false] (default), the result of [reword old_msg] is
-      concatened, on a new line to the old message. *)
-
-  val open_error_msg :
-    ('a, msg) Pervasives.result -> ('a, [> msg]) Pervasives.result
-  (** [open_error_msg r] allows to combine a closed error message
-      variant with other variants. *)
-
-  val failwith_error_msg : ('a , msg) Pervasives.result -> 'a
-  (** [failwith_error_msg r] raises [Failure m] if [r] is [Error (`Msg m)] *)
-end
-
 (** {!Format} combinators. *)
 module Fmt : sig
 
@@ -201,6 +141,66 @@ module Fmt : sig
   (** [field l pp_v] pretty prints a field with label [l] using
       [pp_v] to print the value. *)
 end
+
+(** Result value combinators. *)
+module R : sig
+
+  (** {1:composing Composing results} *)
+
+  val reword_error :
+    ('b -> 'c) -> ('a, 'b) Pervasives.result -> ('a, 'c) Pervasives.result
+  (** [reword_error reword r] is:
+      {ul
+      {- [r] if [r = Ok v]}
+      {- [Error (reword e)] if [r = Error e]}} *)
+
+  val join :
+    (('a, 'b) Pervasives.result, 'b) Pervasives.result ->
+    ('a, 'b) Pervasives.result
+  (** [join r] is [v] if [r = Ok v] and [r] otherwise. *)
+
+  (** {1:errmsg Error messages} *)
+
+  type msg = [ `Msg of string ]
+  (** The type for (error) messages. *)
+
+  val msgf : ('a, Format.formatter, unit, [> msg]) format4 -> 'a
+  (** [msgf fmt ...] is a {!msg} formatted according to [fmt]. *)
+
+  val error_msg : string -> ('b, [> msg]) Pervasives.result
+  (** [error_msg s] is [Error (`Msg s)]. *)
+
+  val error_msgf :
+    ('a, Format.formatter, unit, ('b, [> msg]) Pervasives.result) format4 -> 'a
+  (** [error_msgf fmt ...] is an error formatted according to [fmt]. *)
+
+  val reword_error_msg :
+    ?replace:bool -> (string -> msg) -> ('a, msg) Pervasives.result ->
+    ('a, [> msg]) Pervasives.result
+  (** [reword_error_msg ~replace reword r] is like {!reword_error} except
+      if [replace] is [false] (default), the result of [reword old_msg] is
+      concatened, on a new line to the old message. *)
+
+  val open_error_msg :
+    ('a, msg) Pervasives.result -> ('a, [> msg]) Pervasives.result
+  (** [open_error_msg r] allows to combine a closed error message
+      variant with other variants. *)
+
+  val failwith_error_msg : ('a , msg) Pervasives.result -> 'a
+  (** [failwith_error_msg r] raises [Failure m] if [r] is [Error (`Msg m)] *)
+end
+
+type 'a result = ('a, [`Msg of string]) Pervasives.result
+(** The type for [B0] results of type ['a]. *)
+
+val ( >>= ) :
+  ('a, 'b) Pervasives.result -> ('a -> ('c, 'b) Pervasives.result) ->
+  ('c, 'b) Pervasives.result
+(** [r >>= f] is [f v] if [r = Ok v] and [r] otherwise. *)
+
+val ( >>| ) :
+  ('a, 'b) Pervasives.result -> ('a -> 'c) -> ('c, 'b) Pervasives.result
+(** [r >>| f] is [f >>= fun v -> Ok (f v)]. *)
 
 val strf : ('a, Format.formatter, unit, string) Pervasives.format4 -> 'a
 (** [strf] is {!Format.asprintf}. *)
@@ -353,6 +353,9 @@ module String : sig
 
   (** String sets. *)
   module Set : sig
+
+    (** {1 String sets} *)
+
     include Set.S with type elt := string
                    and type t := set
 
@@ -409,25 +412,289 @@ module String : sig
   end
 end
 
-(**/**)
-type fpath = B0_fpath.t (* needed to cut the def -> hmap -> fpath cycle. *)
+(** File paths.
 
+    A file system {e path} specifies a file or a directory in a file
+    system hierarchy. It is made of three parts:
+
+    {ol
+    {- An optional, platform-dependent, volume.}
+    {- An optional root directory separator {!dir_sep} whose presence
+       distiguishes absolute paths (["/a"]) from {e relative} ones
+       (["a"])}
+    {- A non-empty list of {!dir_sep} separated segments. {e Segments}
+       are non empty strings except for maybe the last one. The latter
+       syntactically distiguishes {e directory paths} (["a/b/"]) from
+       file paths (["a/b"]).}}
+
+    The paths segments ["."] and [".."] are relative path segments
+    that respectively denote the current and parent directory. The
+    {{!basename}basename} of a path is its last non-empty segment if
+    it is not a relative path segment or the empty string otherwise (e.g.
+    on ["/"]). *)
+module Fpath : sig
+
+  (** {1:segments Separators and segments} *)
+
+  val dir_sep_char : char
+  (** [dir_sep_char] is the platform dependent natural directory
+      separator.  This is / on POSIX and \ on Windows. *)
+
+  val dir_sep : string
+  (** [dir_sep] is {!dir_sep_char} as a string. *)
+
+  val is_seg : string -> bool
+  (** [is_seg s] is [true] iff [s] does not contain a {!dir_sep}. *)
+
+  val is_rel_seg : string -> bool
+  (** [is_rel_seg s] is [true] iff [s] is a relative segment in other
+      words either ["."] or [".."]. *)
+
+  (** {1:paths File paths} *)
+
+  type t
+  (** The type for paths *)
+
+  val v : string -> t
+  (** [v s] is the string [s] as a path.
+
+      {b Warning.} In code only use ["/"] as the directory separator
+      even on Windows platforms (don't be upset, the module will give them
+      back to you with backslashes).
+
+      @raise Invalid_argument if [s] is not a {{!of_string}valid
+      path}.  Use {!of_string} to deal with untrusted input. *)
+
+  val of_string : string -> t result
+  (** [of_string s] is the string [s] as a path. The following transformations
+      are performed on the string:
+      {ul
+      {- On Windows any / occurence is converted to \ }}
+      An error returned if [s] is [""]. *)
+
+  val to_string : t -> string
+  (** [to_string p] is the path [p] as a string. The result can
+      be safely converted back with {!v}. *)
+
+  val add_seg : t -> string -> t
+  (** [add_seg p seg] if [p]'s last segment is non-empty this is
+      [p] with [seg] added. If [p]'s last segment is empty, this is
+      [p] with the empty segment replaced by [seg].
+
+      @raise Invalid_argument if [is_seg seg] is [false]. *)
+
+  val append : t -> t -> t
+  (** [append p q] appends [q] to [p] as follows:
+      {ul
+      {- [q] is absolute or has a non-empty volume then [q] is returned.}
+      {- Otherwise appends [q]'s segment to [p] using {!add_seg}.}} *)
+
+  val ( / ) : t -> string -> t
+  (** [p / seg] is [add_seg p seg]. Left associative. *)
+
+  val ( // ) : t -> t -> t
+  (** [p // p'] is [append p p']. Left associative. *)
+
+  (** {1:filedirpaths File and directory paths}
+
+      {b Note.} The following functions use syntactic semantic
+      properties of paths. Given a path, these properties can be
+      different from the ones your file system attributes to it. *)
+
+  val is_dir_path : t -> bool
+  (** [is_dir_path p] is [true] iff [p] syntactically represents
+      a directory. This means that [p] is [.], [..] or ends
+      with [/], [/.] or [/..]. *)
+
+  val is_file_path : t -> bool
+  (** [is_file_path p] is [true] iff [p] syntactically represents
+      a file. This is the negation of {!is_dir_path}. *)
+
+  val to_dir_path : t -> t
+  (** [to_dir_path p] is [add_seg p ""]. It ensures that the resulting
+      path represents a {{!is_dir_path}directory} and, if converted
+      to a string, that it ends with a {!dir_sep}. *)
+
+  val filename : t -> string
+  (** [filename p] is the file name of [p]. This is the last segment
+      of [p] if [p] is a {{!is_file_path}file path} and the empty
+      string otherwise. See also {!basename}. *)
+
+  val filename_equal : t -> t -> bool
+  (** [filename_equal p0 p1] is [String.equal (filename p0) (filename p1)]. *)
+
+  val basename : t -> string
+  (** [basename p] is the last non-empty segment of [p] or the empty
+      string otherwise. The latter occurs only on root paths and on paths
+      whose last non-empty segment is a relative segment. *)
+
+  val basename_equal : t -> t -> bool
+  (** [basename p0 p1] is [String.equal (filename p0) (basename p1)]. *)
+
+  val parent : t -> t
+  (** [parent p] is a {{!is_dir_path}directory path} that contains
+      [p]. If [p] is a {{!is_root}root path} this is [p] itself. *)
+
+  (** {1:preds Predicates and comparison} *)
+
+  val is_rel : t -> bool
+  (** [is_rel p] is [true] iff [p] is a relative path, i.e. the root
+      directory separator is missing in [p]. *)
+
+  val is_abs : t -> bool
+  (** [is_abs p] is [true] iff [p] is an absolute path, i.e. the root
+      directory separator is present in [p]. *)
+
+  val is_root : t -> bool
+  (** [is_root p] is [true] iff [p] is a root directory, i.e. [p] has
+      the root directory separator and a single, empty, segment. *)
+
+  val equal : t -> t -> bool
+  (** [equal p0 p1] is true iff [p0] and [p1] are stringwise equal. *)
+
+  val compare : t -> t -> int
+  (** [compare p0 p1] is a total order on paths compatible with {!equal}. *)
+
+  (** {1 File extensions}
+
+      The {e file extension} (resp. {e multiple file extension}) of a
+      path segment is the suffix that starts at the last (resp. first)
+      occurence of a ['.'] that is preceeded by at least one non ['.']
+      character.  If there is no such occurence in the segment, the
+      extension is empty.  With these definitions, ["."], [".."],
+      ["..."] and dot files like [".ocamlinit"] or ["..ocamlinit"] have
+      no extension, but [".emacs.d"] and ["..emacs.d"] do have one. *)
+
+  type ext = string
+  (** The type for file extensions, ['.'] seperator included.  *)
+
+  val get_ext : ?multi:bool -> t -> ext
+  (** [get_ext p] is [p]'s {{!basename}basename} file extension or the empty
+      string if there is no extension. If [multi] is [true] (defaults to
+      [false]), returns the mutiple file extension. *)
+
+  val has_ext : ext -> t -> bool
+  (** [has_ext ext p] is [true] iff
+      [get_ext p = e || get_ext ~multi:true p = e]. *)
+
+  val mem_ext : ext list -> t -> bool
+  (** [mem_ext exts p] is [List.exists (fun e -> has_ext e p) exts] *)
+
+  val add_ext : ext -> t -> t
+  (** [add_ext ext p] is [p] with [ext] concatenated to [p]'s
+      {{!basename}basename}. *)
+
+  val rem_ext : ?multi:bool -> t -> t
+  (** [rem_ext ?multi p] is [p] with the extension of [p]'s
+      {{!basename}basename} removed. If [multi] is [true] (defaults to
+      [false]), the multiple file extension is removed. *)
+
+  val set_ext : ?multi:bool -> ext -> t -> t
+  (** [set_ext ?multi p] is [add_ext ext (rem_ext ?multi p)]. *)
+
+  val split_ext : ?multi:bool -> t -> t * ext
+  (** [split_ext ?multi p] is [(rem_ext ?multi p, get_ext ?multi p)]. *)
+
+  val ( + ) : t -> ext -> t
+  (** [p + ext] is [add_ext p ext]. Left associative. *)
+
+  val ( -+ ) : t -> ext -> t
+  (** [p -+ ext] is [set_ext p ext]. Left associative. *)
+
+  (** {1:pp Pretty printing} *)
+
+  val pp : t Fmt.t
+  (** [pp ppf p] prints path [p] on [ppf] using {!to_string}. *)
+
+  val dump : t Fmt.t
+  (** [dump ppf p] prints path [p] on [ppf] using {!String.dump}. *)
+
+  (** {1:unique Uniqueness} *)
+
+  val uniquify : t list -> t list
+  (** [uniquify ps] is [ps] without duplicates, the list order is
+      preserved. *)
+
+  (** {1:setmap Paths map and sets} *)
+
+  type set
+  (** The type for sets of paths. *)
+
+  (** Path sets. *)
+  module Set : sig
+
+    (** {1 Path sets} *)
+
+    include Set.S with type elt := t
+                   and type t := set
+
+    val pp : ?sep:unit Fmt.t -> t Fmt.t -> set Fmt.t
+    (** [pp ~sep pp_elt ppf ss] formats the elements of [ss] on
+        [ppf]. Each element is formatted with [pp_elt] and elements
+        are separated by [~sep] (defaults to
+        {!Format.pp_print_cut}). If the set is empty leaves [ppf]
+        untouched. *)
+
+    val dump : set Fmt.t
+    (** [dump ppf ss] prints an unspecified representation of [ss] on
+        [ppf]. *)
+
+    type t = set
+    (** The type for path sets. *)
+  end
+
+  type +'a map
+  (** The type for maps from paths to values of type ['a]. *)
+
+  (** Path maps. *)
+  module Map : sig
+
+    (** {1 Path maps} *)
+
+    include Map.S with type key := t
+                   and type 'a t := 'a map
+
+    val dom : 'a map -> set
+    (** [dom m] is the domain of [m]. *)
+
+    val of_list : (t * 'a) list -> 'a map
+    (** [of_list bs] is [List.fold_left (fun m (k, v) -> add k v m) empty
+        bs]. *)
+
+    val pp : ?sep:unit Fmt.t -> (t * 'a) Fmt.t -> 'a map Fmt.t
+    (** [pp ~sep pp_binding ppf m] formats the bindings of [m] on
+        [ppf]. Each binding is formatted with [pp_binding] and
+        bindings are separated by [sep] (defaults to
+        {!Format.pp_print_cut}). If the map is empty leaves [ppf]
+        untouched. *)
+
+    val dump : 'a Fmt.t -> 'a map Fmt.t
+    (** [dump pp_v ppf m] prints an unspecified representation of [m] on
+        [ppf] using [pp_v] to print the map codomain elements. *)
+
+    type 'a t = 'a map
+    (** The type for path maps. *)
+  end
+end
+
+
+(**/**)
 (* FIXME remove this *)
 module Codec : sig
   type 'a t
   val v : id:string -> 'a t
-  val write : 'a t -> fpath -> 'a -> unit result
-  val read : 'a t -> fpath -> 'a result
+  val write : 'a t -> Fpath.t -> 'a -> unit result
+  val read : 'a t -> Fpath.t -> 'a result
 end
 (**/**)
 
 (** Command lines.
 
-    Both command lines and command line fragments using the same are
-    represented with the same {{!t}type}.
+    Both command lines and command line fragments are represented with
+    the same {{!t}type}.
 
-    When a command line is {{!section:OS.Cmd.run}run}, the first
-    element of the line defines the program name and each other
+    When a command line is {{!section:OS.Cmd}executed}, the first
+    element of the line defines the tool (program) name and each other
     element is an argument that will be passed {e as is} in the
     program's [argv] array: no shell interpretation or any form of
     argument quoting and/or concatenation occurs.
@@ -466,7 +733,7 @@ module Cmd : sig
   (** [on bool line] is [line] if [bool] is [true] and {!empty}
       otherwise. *)
 
-  val p : fpath -> string
+  val p : Fpath.t -> string
   (** [p] is {!Fpath.to_string}. This combinator makes path argument
       specification brief. *)
 
@@ -646,14 +913,14 @@ module Conv : sig
   val string_non_empty : string t
   (** [string_non_empty] is a converter for non-empty strings. *)
 
-  val fpath : fpath t
+  val fpath : Fpath.t t
   (** [fpath] is a converter for file paths. *)
 
-  val file : fpath t
+  val file : Fpath.t t
   (** [file] is a converter for files. The file path is not checked for
       existence or non-directoryness. *)
 
-  val dir : fpath t
+  val dir : Fpath.t t
   (** [dir] is a converter for directories. The directory path is not checked
       for existence or directoryness. *)
 
@@ -902,13 +1169,13 @@ module Def : sig
     val lib : string -> loc
     (** [lib l] locates in library [l]. *)
 
-    val file : fpath -> loc
+    val file : Fpath.t -> loc
     (** [file f] locates in [f]. *)
 
     val is_none : loc -> bool
     (** [is_none l] is [true] iff [l] is {!none}. *)
 
-    val find_file : loc -> fpath option
+    val find_file : loc -> Fpath.t option
     (** [find_file l] is [Some f] is [l] is located in [f]. *)
 
     val equal : loc -> loc -> bool
@@ -925,16 +1192,16 @@ module Def : sig
         {b WARNING.} Do not invoke these function they are invoked
         by driver libraries (e.g. {!B0_driver}). *)
 
-    val set_root : fpath option -> unit
+    val set_root : Fpath.t option -> unit
     (** [set_root r] sets the file source root to [r]. *)
 
-    val get_root : unit -> fpath option
+    val get_root : unit -> Fpath.t option
     (** [get_root ()] is the current file source root. *)
 
-    val set_sub_root : fpath option -> unit
+    val set_sub_root : Fpath.t option -> unit
     (** [set_sub_root r] sets the file source sub root to [r]. *)
 
-    val get_sub_root : unit -> fpath option
+    val get_sub_root : unit -> Fpath.t option
     (** [get_sub_root ()] is the file source sub root. *)
 
     val set_current : loc -> unit
@@ -1291,305 +1558,6 @@ module Hmap : sig
       maps with information key [Key_info]. Maps in different
       universes can create keys with the same name without being
       subject to {{!S.Key.uniq}renaming}. *)
-end
-
-(** File paths.
-
-    A file system {e path} specifies a file or a directory in a file
-    system hierarchy. It is made of three parts:
-
-    {ol
-    {- An optional, platform-dependent, volume.}
-    {- An optional root directory separator {!dir_sep} whose presence
-       distiguishes absolute paths (["/a"]) from {e relative} ones
-       (["a"])}
-    {- A non-empty list of {!dir_sep} separated segments. {e Segments}
-       are non empty strings except for maybe the last one. The latter
-       syntactically distiguishes {e directory paths} (["a/b/"]) from
-       file paths (["a/b"]).}}
-
-    The paths segments ["."] and [".."] are relative path segments
-    that respectively denote the current and parent directory. The
-    {{!basename}basename} of a path is its last non-empty segment if
-    it is not a relative path segment or the empty string otherwise (e.g.
-    on ["/"]). *)
-module Fpath : sig
-
-  (** {1:segments Separators and segments} *)
-
-  val dir_sep_char : char
-  (** [dir_sep_char] is the platform dependent natural directory
-      separator.  This is / on POSIX and \ on Windows. *)
-
-  val dir_sep : string
-  (** [dir_sep] is {!dir_sep_char} as a string. *)
-
-  val is_seg : string -> bool
-  (** [is_seg s] is [true] iff [s] does not contain a {!dir_sep}. *)
-
-  val is_rel_seg : string -> bool
-  (** [is_rel_seg s] is [true] iff [s] is a relative segment in other
-      words either ["."] or [".."]. *)
-
-  (** {1:paths File paths} *)
-
-  type t = fpath
-  (** The type for paths *)
-
-  val v : string -> t
-  (** [v s] is the string [s] as a path.
-
-      {b Warning.} In code only use ["/"] as the directory separator
-      even on Windows platforms (don't be upset, the module will give them
-      back to you with backslashes).
-
-      @raise Invalid_argument if [s] is not a {{!of_string}valid
-      path}.  Use {!of_string} to deal with untrusted input. *)
-
-  val of_string : string -> t result
-  (** [of_string s] is the string [s] as a path. The following transformations
-      are performed on the string:
-      {ul
-      {- On Windows any / occurence is converted to \ }}
-      An error returned if [s] is [""]. *)
-
-  val to_string : t -> string
-  (** [to_string p] is the path [p] as a string. The result can
-      be safely converted back with {!v}. *)
-
-  val add_seg : t -> string -> t
-  (** [add_seg p seg] if [p]'s last segment is non-empty this is
-      [p] with [seg] added. If [p]'s last segment is empty, this is
-      [p] with the empty segment replaced by [seg].
-
-      @raise Invalid_argument if [is_seg seg] is [false]. *)
-
-  val append : t -> t -> t
-  (** [append p q] appends [q] to [p] as follows:
-      {ul
-      {- [q] is absolute or has a non-empty volume then [q] is returned.}
-      {- Otherwise appends [q]'s segment to [p] using {!add_seg}.}} *)
-
-  val ( / ) : t -> string -> t
-  (** [p / seg] is [add_seg p seg]. Left associative. *)
-
-  val ( // ) : t -> t -> t
-  (** [p // p'] is [append p p']. Left associative. *)
-
-  (** {1:filedirpaths File and directory paths}
-
-      {b Note.} The following functions use syntactic semantic
-      properties of paths. Given a path, these properties can be
-      different from the ones your file system attributes to it. *)
-
-  val is_dir_path : t -> bool
-  (** [is_dir_path p] is [true] iff [p] syntactically represents
-      a directory. This means that [p] is [.], [..] or ends
-      with [/], [/.] or [/..]. *)
-
-  val is_file_path : t -> bool
-  (** [is_file_path p] is [true] iff [p] syntactically represents
-      a file. This is the negation of {!is_dir_path}. *)
-
-  val to_dir_path : t -> t
-  (** [to_dir_path p] is [add_seg p ""]. It ensures that the resulting
-      path represents a {{!is_dir_path}directory} and, if converted
-      to a string, that it ends with a {!dir_sep}. *)
-
-  val filename : t -> string
-  (** [filename p] is the file name of [p]. This is the last segment
-      of [p] if [p] is a {{!is_file_path}file path} and the empty
-      string otherwise. See also {!basename}. *)
-
-  val filename_equal : t -> t -> bool
-  (** [filename_equal p0 p1] is [String.equal (filename p0) (filename p1)]. *)
-
-  val basename : t -> string
-  (** [basename p] is the last non-empty segment of [p] or the empty
-      string otherwise. The latter occurs only on root paths and on paths
-      whose last non-empty segment is a relative segment. *)
-
-  val basename_equal : t -> t -> bool
-  (** [basename p0 p1] is [String.equal (filename p0) (basename p1)]. *)
-
-  val parent : t -> t
-  (** [parent p] is a {{!is_dir_path}directory path} that contains
-      [p]. If [p] is a {{!is_root}root path} this is [p] itself. *)
-
-  (** {1:preds Predicates and comparison} *)
-
-  val is_rel : t -> bool
-  (** [is_rel p] is [true] iff [p] is a relative path, i.e. the root
-      directory separator is missing in [p]. *)
-
-  val is_abs : t -> bool
-  (** [is_abs p] is [true] iff [p] is an absolute path, i.e. the root
-      directory separator is present in [p]. *)
-
-  val is_root : t -> bool
-  (** [is_root p] is [true] iff [p] is a root directory, i.e. [p] has
-      the root directory separator and a single, empty, segment. *)
-
-  val equal : t -> t -> bool
-  (** [equal p0 p1] is true iff [p0] and [p1] are stringwise equal. *)
-
-  val compare : t -> t -> int
-  (** [compare p0 p1] is a total order on paths compatible with {!equal}. *)
-
-  (** {1 File extensions}
-
-      The {e file extension} (resp. {e multiple file extension}) of a
-      path segment is the suffix that starts at the last (resp. first)
-      occurence of a ['.'] that is preceeded by at least one non ['.']
-      character.  If there is no such occurence in the segment, the
-      extension is empty.  With these definitions, ["."], [".."],
-      ["..."] and dot files like [".ocamlinit"] or ["..ocamlinit"] have
-      no extension, but [".emacs.d"] and ["..emacs.d"] do have one. *)
-
-  type ext = string
-  (** The type for file extensions, ['.'] seperator included.  *)
-
-  val get_ext : ?multi:bool -> t -> ext
-  (** [get_ext p] is [p]'s {{!basename}basename} file extension or the empty
-      string if there is no extension. If [multi] is [true] (defaults to
-      [false]), returns the mutiple file extension. *)
-
-  val has_ext : ext -> t -> bool
-  (** [has_ext ext p] is [true] iff
-      [get_ext p = e || get_ext ~multi:true p = e]. *)
-
-  val mem_ext : ext list -> t -> bool
-  (** [mem_ext exts p] is [List.exists (fun e -> has_ext e p) exts] *)
-
-  val add_ext : ext -> t -> t
-  (** [add_ext ext p] is [p] with [ext] concatenated to [p]'s
-      {{!basename}basename}. *)
-
-  val rem_ext : ?multi:bool -> t -> t
-  (** [rem_ext ?multi p] is [p] with the extension of [p]'s
-      {{!basename}basename} removed. If [multi] is [true] (defaults to
-      [false]), the multiple file extension is removed. *)
-
-  val set_ext : ?multi:bool -> ext -> t -> t
-  (** [set_ext ?multi p] is [add_ext ext (rem_ext ?multi p)]. *)
-
-  val split_ext : ?multi:bool -> t -> t * ext
-  (** [split_ext ?multi p] is [(rem_ext ?multi p, get_ext ?multi p)]. *)
-
-  val ( + ) : t -> ext -> t
-  (** [p + ext] is [add_ext p ext]. Left associative. *)
-
-  val ( -+ ) : t -> ext -> t
-  (** [p -+ ext] is [set_ext p ext]. Left associative. *)
-
-  (** {1:pp Pretty printing} *)
-
-  val pp : t Fmt.t
-  (** [pp ppf p] prints path [p] on [ppf] using {!to_string}. *)
-
-  val dump : t Fmt.t
-  (** [dump ppf p] prints path [p] on [ppf] using {!String.dump}. *)
-
-  (** {1:unique Uniqueness} *)
-
-  val uniquify : t list -> t list
-  (** [uniquify ps] is [ps] without duplicates, the list order is
-      preserved. *)
-
-  (** {1:setmap Paths map and sets} *)
-
-  type set
-  (** The type for sets of paths. *)
-
-  (** Path sets. *)
-  module Set : sig
-
-    (** {1 Path sets} *)
-
-    include Set.S with type elt := t
-                   and type t := set
-
-    val pp : ?sep:unit Fmt.t -> t Fmt.t -> set Fmt.t
-    (** [pp ~sep pp_elt ppf ss] formats the elements of [ss] on
-        [ppf]. Each element is formatted with [pp_elt] and elements
-        are separated by [~sep] (defaults to
-        {!Format.pp_print_cut}). If the set is empty leaves [ppf]
-        untouched. *)
-
-    val dump : set Fmt.t
-    (** [dump ppf ss] prints an unspecified representation of [ss] on
-        [ppf]. *)
-
-    type t = set
-    (** The type for path sets. *)
-  end
-
-  type +'a map
-  (** The type for maps from paths to values of type ['a]. *)
-
-  (** Path maps. *)
-  module Map : sig
-
-    (** {1 Path maps} *)
-
-    include Map.S with type key := t
-                   and type 'a t := 'a map
-
-    val dom : 'a map -> set
-    (** [dom m] is the domain of [m]. *)
-
-    val of_list : (t * 'a) list -> 'a map
-    (** [of_list bs] is [List.fold_left (fun m (k, v) -> add k v m) empty
-        bs]. *)
-
-    val pp : ?sep:unit Fmt.t -> (t * 'a) Fmt.t -> 'a map Fmt.t
-    (** [pp ~sep pp_binding ppf m] formats the bindings of [m] on
-        [ppf]. Each binding is formatted with [pp_binding] and
-        bindings are separated by [sep] (defaults to
-        {!Format.pp_print_cut}). If the map is empty leaves [ppf]
-        untouched. *)
-
-    val dump : 'a Fmt.t -> 'a map Fmt.t
-    (** [dump pp_v ppf m] prints an unspecified representation of [m] on
-        [ppf] using [pp_v] to print the map codomain elements. *)
-
-    type 'a t = 'a map
-    (** The type for path maps. *)
-  end
-
-  (** {1:metadata Metadata} *)
-
-  (** Heterogeneous value maps for storing file path metadata. *)
-  module Meta : Hmap.S with type 'a Key.info = unit
-
-  (** Map file paths to metadata. *)
-  module Meta_map : sig
-
-    type t = Meta.t map
-    (** The type for maps from file paths to metadata. *)
-
-    val empty : t
-    (** [empty] is the empty map. *)
-
-    val mem : fpath -> 'a Meta.key -> t -> bool
-    (** [mem p k m] is [true] iff path [p] has a binding for [k] in [m]. *)
-
-    val add : fpath -> 'a Meta.key -> 'a -> t -> t
-    (** [add p k v m] adds key [k] with value [v] to [p]'s metadata in [m]. *)
-
-    val rem : fpath -> 'a Meta.key -> t -> t
-    (** [rem p k m] removes the key [k] from [p]'s metadata in [m]. *)
-
-    val find : fpath -> 'a Meta.key -> t -> 'a option
-    (** [find p k m] is the value of [p]'s metadata key [k] in [m]. *)
-
-    val get : fpath -> 'a Meta.key -> t -> 'a
-    (** [get p k m] is like {!find} but @raise Invalid_argument if [k] is no
-        in [m]. *)
-
-    val get_all : fpath -> t -> Meta.t
-    (** [get_all p m] is all the metadata for [p] in [m]. *)
-  end
 end
 
 (** OS interaction. *)
@@ -2210,6 +2178,58 @@ end
 type build
 (** The type for builds. See {!Build.t}. *)
 
+(** Metadata types.
+
+    Metadata types associated arbitrary, user-defined, typed key values
+    bindings to certain values.
+
+    This module gathers the different metadata type used by [b0]. *)
+module Meta : sig
+
+  (** File path metadata. *)
+  module Fpath : sig
+    include Hmap.S with type 'a Key.info = unit
+
+    (** Map file paths to metadata. *)
+    module Map : sig
+
+      type meta = t
+      (** The type for file path metadata. *)
+
+      type t = meta Fpath.map
+      (** The type for maps from file paths to metadata. *)
+
+      val empty : t
+      (** [empty] is the empty map. *)
+
+      val mem : Fpath.t -> 'a key -> t -> bool
+      (** [mem p k m] is [true] iff path [p] has a binding for [k] in [m]. *)
+
+      val add : Fpath.t -> 'a key -> 'a -> t -> t
+      (** [add p k v m] adds key [k] with value [v] to [p]'s metadata in [m]. *)
+
+      val rem : Fpath.t -> 'a key -> t -> t
+      (** [rem p k m] removes the key [k] from [p]'s metadata in [m]. *)
+
+      val find : Fpath.t -> 'a key -> t -> 'a option
+      (** [find p k m] is the value of [p]'s metadata key [k] in [m]. *)
+
+      val get : Fpath.t -> 'a key -> t -> 'a
+      (** [get p k m] is like {!find} but @raise Invalid_argument if [k] is no
+          in [m]. *)
+
+      val get_all : Fpath.t -> t -> meta
+      (** [get_all p m] is all the metadata for [p] in [m]. *)
+    end
+  end
+
+  (** {{!Pkg}Package} metadata *)
+  module Pkg : Hmap.S with type 'a Key.info = unit
+
+  (** {{!Unit}Build unit} metadata. *)
+  module Unit : Hmap.S with type 'a Key.info = unit
+end
+
 (** Build environment.
 
     The build environment controls build tool lookups and spawn
@@ -2571,9 +2591,6 @@ module Pkg : sig
 
   (** {1:pkg Packages} *)
 
-  (** Heterogeneous value maps for storing package metadata. *)
-  module Meta : Hmap.S with type 'a Key.info = unit
-
   type t
   (** The type for packages. *)
 
@@ -2581,7 +2598,7 @@ module Pkg : sig
   (** The type for package unique identifiers. {b Warning.} The same
       package can be given different ids in different program runs. *)
 
-  val create : ?loc:Def.loc -> ?doc:string -> ?meta:Meta.t -> string -> t
+  val create : ?loc:Def.loc -> ?doc:string -> ?meta:Meta.Pkg.t -> string -> t
   (** [create ~doc n b] is a package with name [n] documented by
       [doc].
 
@@ -2596,20 +2613,20 @@ module Pkg : sig
   val id : t -> id
   (** [id u] is [u]'s unique identifier for the program run. *)
 
-  val meta : t -> Meta.t
+  val meta : t -> Meta.Pkg.t
   (** [meta u] is [u]'s metadata. *)
 
-  val meta_mem : 'a Meta.key -> t -> bool
+  val meta_mem : 'a Meta.Pkg.key -> t -> bool
   (** [meta_mem k u] is [true] iff [k] is defined in [u]'s meta. *)
 
-  val meta_find : 'a Meta.key -> t -> 'a option
+  val meta_find : 'a Meta.Pkg.key -> t -> 'a option
   (** [meta_find k u] is [k]'s value in [u]'s meta (if any). *)
 
-  val meta_get : 'a Meta.key -> t -> 'a
+  val meta_get : 'a Meta.Pkg.key -> t -> 'a
   (** [meta_get k u] is like {!meta_find} but @raise Invalid_argument
       if [k] is not bound in [u]. *)
 
-  val has_tag : bool Meta.key -> t -> bool
+  val has_tag : bool Meta.Pkg.key -> t -> bool
   (** [has_tag k u] is [true] iff [k]'s value in [u]'s meta is [true]. *)
 
   (** {1:idsetmap Package id maps and sets} *)
@@ -2674,9 +2691,6 @@ module Unit : sig
 
   (** {1:units Units} *)
 
-  (** Heterogeneous value maps for storing unit metadata. *)
-  module Meta : Hmap.S with type 'a Key.info = unit
-
   type t
   (** The type for build units. *)
 
@@ -2691,7 +2705,7 @@ module Unit : sig
     ?doc_outcome:string ->
     ?only_aim:Env.build_aim ->
     ?pkg:Pkg.t ->
-    ?meta:Meta.t ->
+    ?meta:Meta.Unit.t ->
     string -> (build -> unit) -> t
   (** [create ~doc n b] is a build unit with unique name [n] build
       function [b] and documented by [doc] and which logs
@@ -2730,23 +2744,23 @@ module Unit : sig
   val pkg : t -> Pkg.t option
   (** [pkg u] is [u]'s package (if any). *)
 
-  val meta : t -> Meta.t
+  val meta : t -> Meta.Unit.t
   (** [meta u] is [u]'s metadata. *)
 
-  val meta_mem : 'a Meta.key -> t -> bool
+  val meta_mem : 'a Meta.Unit.key -> t -> bool
   (** [meta_mem k u] is [true] iff [k] is defined in [u]'s meta. *)
 
-  val meta_add : 'a Meta.key -> 'a -> t -> unit
+  val meta_add : 'a Meta.Unit.key -> 'a -> t -> unit
   (** [meta_add k v u] binds [k] to [v] in [u]'s meta. *)
 
-  val meta_find : 'a Meta.key -> t -> 'a option
+  val meta_find : 'a Meta.Unit.key -> t -> 'a option
   (** [meta_find k u] is [k]'s value in [u]'s meta (if any). *)
 
-  val meta_get : 'a Meta.key -> t -> 'a
+  val meta_get : 'a Meta.Unit.key -> t -> 'a
   (** [meta_get k u] is like {!meta_find} but @raise Invalid_argument
       if [k] is not bound in [u]. *)
 
-  val has_tag : bool Meta.key -> t -> bool
+  val has_tag : bool Meta.Unit.key -> t -> bool
   (** [has_tag k u] is [true] iff [k]'s value in [u]'s meta is [true]. *)
 
   (** {1:idsetmap Unit id map and sets} *)
@@ -2900,7 +2914,7 @@ module Outcome : sig
   val write : Fpath.t -> t -> unit result
   (** [write file o] writes the build outcome [o] to file [file]. *)
 
-  val fpath_meta : t -> Fpath.Meta_map.t
+  val fpath_meta : t -> Meta.Fpath.Map.t
   (** [fpath_meta o] is the file metadata for the build. *)
 
   val conf : t -> Conf.t
@@ -3563,12 +3577,12 @@ ready b src; src
 
   (** {1:fpathmeta File path metadata} *)
 
-  val find_path_meta : build -> Fpath.t -> 'a Fpath.Meta.key -> 'a option
+  val find_path_meta : build -> Fpath.t -> 'a Meta.Fpath.key -> 'a option
   (** [find_path_meta b f k] is [f]'s meta binding for [k] in build [b]
       (if any). *)
 
   val add_path_meta :
-    ?force:bool -> build -> Fpath.t -> 'a Fpath.Meta.key -> 'a -> unit
+    ?force:bool -> build -> Fpath.t -> 'a Meta.Fpath.key -> 'a -> unit
   (** [add_path_meta ~force b f k v] sets [f]'s meta binding for [k] to [v].
       Unless [force] is [true] (defaults to [false]) the built unit fails
       if [k] is already bound for [f]. *)
@@ -3601,7 +3615,7 @@ ready b src; src
 
   val create :
     ?prev_outcome:Outcome.t -> Cache.t -> ctrl -> Env.t -> Conf.t ->
-    Fpath.Meta_map.t -> dir:Fpath.t -> universe:Unit.t list -> Unit.t list ->
+    Meta.Fpath.Map.t -> dir:Fpath.t -> universe:Unit.t list -> Unit.t list ->
     build result
   (** [init cache ctrl ~dir] initializes a new build using [dir] as the build
       directory.

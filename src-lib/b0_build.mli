@@ -50,7 +50,7 @@ type build_unit = B0_unit.t * (t -> unit)
 
 val create :
   ?prev_outcome:outcome -> cache -> ctrl -> B0_env.t -> B0_conf.t ->
-  B0_fpath_meta.Meta_map.t -> dir:B0_fpath.t -> universe:build_unit list ->
+  B0_meta.Fpath.Map.t -> dir:B0_fpath.t -> universe:build_unit list ->
   build_unit list -> t result
 
 val start : t -> unit
@@ -71,9 +71,9 @@ val conf : t -> 'a B0_conf.key -> 'a
 val tool : t -> B0_tool.t -> B0_cmd.t -> run
 val conf_tool : t -> B0_tool.t B0_conf.key -> B0_cmd.t -> run
 
-val find_path_meta : t -> B0_fpath.t -> 'a B0_fpath_meta.Meta.key -> 'a option
+val find_path_meta : t -> B0_fpath.t -> 'a B0_meta.Fpath.key -> 'a option
 val add_path_meta :
-  ?force:bool -> t -> B0_fpath.t -> 'a B0_fpath_meta.Meta.key -> 'a -> unit
+  ?force:bool -> t -> B0_fpath.t -> 'a B0_meta.Fpath.key -> 'a -> unit
 
 val cache : t -> cache
 

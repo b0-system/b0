@@ -4,36 +4,26 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** Build outcomes.
+(** Metadata types. See {!B0.Meta}. *)
 
-    See {!B0.Outcome} *)
-
-open B0_result
-
-type t = B0_build.outcome
-val read : B0_fpath.t -> t result
-val write : B0_fpath.t -> t -> unit result
-
-val fpath_meta : t -> B0_meta.Fpath.Map.t
-val root_files : t -> B0_fpath.set
-val built_files : t -> B0_fpath.set
-
-val conf : t -> B0_conf.t
-val units : t -> B0_unit.marshalable list
-val unit_names : t -> string list
-val pp_stats : t B0_fmt.t
-
-(* Operations *)
-
-module Op : sig
-  include module type of B0_op
+module Fpath : sig
+  include B0_hmap.S with type 'a Key.info = unit
+  module Map : sig
+    type meta = t
+    type t = meta B0_fpath.map
+    val empty : t
+    val mem : B0_fpath.t -> 'a key -> t -> bool
+    val add : B0_fpath.t -> 'a key -> 'a -> t -> t
+    val rem : B0_fpath.t -> 'a key -> t -> t
+    val find : B0_fpath.t -> 'a key -> t -> 'a option
+    val get : B0_fpath.t -> 'a key -> t -> 'a
+    val get_all : B0_fpath.t -> t -> meta
+  end
 end
 
-val ops : t -> Op.t list
+module Unit : B0_hmap.S with type 'a Key.info = unit
+module Pkg : B0_hmap.S with type 'a Key.info = unit
 
-val unit_id_name_map : t -> string B0_unit.Idmap.t
-val unit_id_set : string list -> t -> B0_unit.Idset.t
-val ops_to_json : t -> Op.t list -> string
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers

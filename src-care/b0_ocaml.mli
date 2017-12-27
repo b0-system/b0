@@ -345,34 +345,34 @@ module Unit : sig
 
   val exe :
     ?loc:Def.loc -> ?src_root:Fpath.t -> ?doc:string ->
-    ?only_aim:Env.build_aim -> ?pkg:Pkg.t -> ?meta:Unit.Meta.t ->
+    ?only_aim:Env.build_aim -> ?pkg:Pkg.t -> ?meta:Meta.Unit.t ->
     ?resolver:Lib.resolver -> ?lib_deps:Lib.name list ->
     ?name:string -> string -> build -> Unit.t
   (** [exe] is an executable named [name]. *)
 
   val lib :
     ?loc:Def.loc -> ?src_root:Fpath.t -> ?doc:string ->
-    ?only_aim:Env.build_aim -> ?pkg:Pkg.t -> ?meta:Unit.Meta.t ->
+    ?only_aim:Env.build_aim -> ?pkg:Pkg.t -> ?meta:Meta.Unit.t ->
     ?resolver:Lib.resolver -> ?lib_deps:Lib.name list ->
     ?name:string -> string -> build -> Unit.t
   (** [lib name] is a library named [name]. *)
 
   (** {1 Low level interface} *)
 
-  val tag : bool Unit.Meta.key
+  val tag : bool Meta.Unit.key
   (** [tag] indicates the unit deals with OCaml related outcomes. *)
 
-  val lib_deps : Lib.name list Unit.Meta.key
+  val lib_deps : Lib.name list Meta.Unit.key
   (** [lib_deps] is a list of OCaml libraries {{!Lib.name}names} the
       unit needs to produce its outcomes. *)
 
-  val lib_name : Lib.name Unit.Meta.key
+  val lib_name : Lib.name Meta.Unit.key
   (** [lib_name] is the name of a library built by the unit. *)
 
-  val exe_meta : lib_deps:Lib.name list -> string -> Unit.Meta.t
+  val exe_meta : lib_deps:Lib.name list -> string -> Meta.Unit.t
   (** [exe_meta] is the default metadata for {!exe}. *)
 
-  val lib_meta : lib_deps:Lib.name list -> string -> Unit.Meta.t
+  val lib_meta : lib_deps:Lib.name list -> string -> Meta.Unit.t
   (** [exe_meta] is the default metadata for {!lib}. *)
 end
 

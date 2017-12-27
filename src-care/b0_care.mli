@@ -15,7 +15,7 @@ open B0
 
     {b TODO} Move that to a Fpath submodule. *)
 
-val exe : bool Fpath.Meta.key
+val exe : bool Meta.Fpath.key
 (** [exe] indicates the file is executable. This is used by the [b0]
     [run] command to identify runnable candidates. *)
 
@@ -27,11 +27,11 @@ type install =
     path in the destination. If unspecified the file is installed at
     the root with the same file name of the source. *)
 
-val install : install Fpath.Meta.key
+val install : install Meta.Fpath.key
 (** [install] indicates the file is installable at the given install
     specification.  *)
 
-val dist : bool Fpath.Meta.key
+val dist : bool Meta.Fpath.key
 (** [dist] indicates that a built file generated in the hierarchy
     rooted at {!B0.build.src_dir} should be kept for distribution. *)
 
@@ -42,26 +42,26 @@ module Unit : sig
 
   (** {1:outcome Outcome tags} *)
 
-  val exe : bool Unit.Meta.key
+  val exe : bool Meta.Unit.key
   (** [exe] is for units with executable outcomes. *)
 
-  val lib : bool Unit.Meta.key
+  val lib : bool Meta.Unit.key
   (** [lib] is for units with library outcomes. *)
 
-  val test : bool Unit.Meta.key
+  val test : bool Meta.Unit.key
   (** [test] is for units with testing outcomes. *)
 
-  val bench : bool Unit.Meta.key
+  val bench : bool Meta.Unit.key
   (** [bench] is for units with benchmarking outcomes. *)
 
-  val doc : bool Unit.Meta.key
+  val doc : bool Meta.Unit.key
   (** [doc] is for units with documentation outcomes. *)
 
-  val build : bool Unit.Meta.key
+  val build : bool Meta.Unit.key
   (** [build] is for units with outcomes used by the build
       system itself. *)
 
-  val dev : bool Unit.Meta.key
+  val dev : bool Meta.Unit.key
   (** [dev] is for units with outcomes used during development. *)
 end
 

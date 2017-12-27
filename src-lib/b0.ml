@@ -4,16 +4,16 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
+module Fmt = B0_fmt
+
+module R = B0_result.R
 type 'a result = ('a, [`Msg of string]) Pervasives.result
 let ( >>= ) = B0_result.( >>= )
 let ( >>| ) = B0_result.( >>| )
-module R = B0_result.R
 
 let strf = B0_string.strf
-module Fmt = B0_fmt
-
 module String = B0_string
-type fpath = B0_fpath.t
+module Fpath = B0_fpath
 
 module Codec = B0_codec (* FIXME remove that *)
 
@@ -24,11 +24,6 @@ module Log = B0_log
 module Def = B0_def
 module Hmap = B0_hmap
 
-module Fpath = struct
-  include B0_fpath
-  include B0_fpath_meta
-end
-
 module OS = B0_os
 module Time = B0_time
 module Hash = B0_hash
@@ -36,8 +31,9 @@ module Stamp = B0_stamp
 module Cache = B0_cache
 module Env = B0_env
 module Conf = B0_conf
-type build = B0_build.t
 
+type build = B0_build.t
+module Meta = B0_meta
 module Tool = B0_tool
 module Pkg = B0_pkg
 module Unit = struct

@@ -18,7 +18,7 @@ let write p o = B0_codec.write codec p o
 
 let fpath_meta o =
   let decode l =
-    let m, _errs (* FIXME *) = B0_fpath_meta.Meta.decode l in
+    let m, _errs (* FIXME *) = B0_meta.Fpath.decode l in
     m
   in
   B0_fpath.Map.map decode o.o_fpath_meta

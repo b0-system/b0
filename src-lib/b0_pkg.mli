@@ -8,23 +8,21 @@
 
     See {!B0.Pkg}. *)
 
-module Meta : B0_hmap.S with type 'a Key.info = unit
-
 type t
 type id = int
 
 val create :
-  ?loc:B0_def.loc -> ?doc:string -> ?meta:Meta.t -> string -> t
+  ?loc:B0_def.loc -> ?doc:string -> ?meta:B0_meta.Pkg.t -> string -> t
 
 include B0_def.S with type t := t
 
 val id : t -> id
 val basename : t -> string
-val meta : t -> Meta.t
-val meta_mem : 'a Meta.key -> t -> bool
-val meta_find :'a Meta.key -> t -> 'a option
-val meta_get : 'a Meta.key -> t -> 'a
-val has_tag : bool Meta.key -> t -> bool
+val meta : t -> B0_meta.Pkg.t
+val meta_mem : 'a B0_meta.Pkg.key -> t -> bool
+val meta_find :'a B0_meta.Pkg.key -> t -> 'a option
+val meta_get : 'a B0_meta.Pkg.key -> t -> 'a
+val has_tag : bool B0_meta.Pkg.key -> t -> bool
 
 (* Pkg id map and sets *)
 

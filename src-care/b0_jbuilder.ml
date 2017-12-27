@@ -10,7 +10,7 @@ let loc = Def.Loc.lib "B0_jbuilder"
 
 let jbuilder = (* Metadata key added to units defined via a jbuild file *)
   let doc = "Unit translated from a jbuild file" in
-  Unit.Meta.Key.v ~loc "jbuilder" Conv.bool () ~doc
+  Meta.Unit.Key.v ~loc "jbuilder" Conv.bool () ~doc
 
 type stanza =
   [ `Library of Sexp.t
@@ -75,7 +75,7 @@ let parse_library ~log file s lib =
     let lib_deps = libraries_key m in
     let meta =
       B0_ocaml.Unit.lib_meta ~lib_deps name |>
-      Unit.Meta.add_tag jbuilder
+      Meta.Unit.add_tag jbuilder
     in
     Ok (lib ~lib_deps ~meta ?doc name build)
   with
@@ -97,7 +97,7 @@ let parse_executable ~log file s exe =
     let lib_deps = libraries_key m in
     let meta =
       B0_ocaml.Unit.exe_meta ~lib_deps name |>
-      Unit.Meta.add_tag jbuilder
+      Meta.Unit.add_tag jbuilder
     in
     Ok (exe ~lib_deps ~meta ?doc name build)
   with

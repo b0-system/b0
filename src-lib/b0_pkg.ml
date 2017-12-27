@@ -6,16 +6,6 @@
 
 (* Metadata *)
 
-module Key_info = struct
-  type 'a t = unit
-  let key_kind = "package metadata key"
-  let key_namespaced = true
-  let key_name_tty_color = `Default
-  let pp _ = B0_fmt.nop
-end
-
-module Meta = B0_hmap.Make (Key_info) ()
-
 (* Id map and sets *)
 
 let uid =
@@ -45,7 +35,7 @@ type pkg =
   { def : B0_def.t;
     basename : string;
     uid : int;
-    mutable meta : Meta.t; }
+    mutable meta : B0_meta.Pkg.t; }
 
 module Pkg = struct
   type t = pkg
@@ -54,7 +44,8 @@ module Pkg = struct
   let def_namespaced = true
   let def_name_tty_color = `Magenta
   let def_pp_info ppf u =
-    if not (Meta.is_empty u.meta) then (B0_fmt.cut ppf (); Meta.pp ppf u.meta)
+    if not (B0_meta.Pkg.is_empty u.meta)
+    then (B0_fmt.cut ppf (); B0_meta.Pkg.pp ppf u.meta)
 
   let compare u0 u1 = (compare : int -> int -> int) u0.uid u1.uid
 end
@@ -65,7 +56,7 @@ let basename u = u.basename
 let equal p0 p1 = p0.uid = p1.uid
 let compare = Pkg.compare
 
-let create ?loc ?doc ?(meta = Meta.empty) n =
+let create ?loc ?doc ?(meta = B0_meta.Pkg.empty) n =
   let def = def ?loc ?doc n in
   let uid = uid () in
   let basename = n in
@@ -75,11 +66,13 @@ let create ?loc ?doc ?(meta = Meta.empty) n =
 let id u = u.uid
 let meta u = u.meta
 let set_meta u m = u.meta <- m
-let meta_mem k u = Meta.mem k (meta u)
-let meta_add k v u = set_meta u (Meta.add k v (meta u))
-let meta_find k u = Meta.find k (meta u)
-let meta_get k u = Meta.get k (meta u)
-let has_tag k u = match Meta.find k (meta u) with None -> false | Some b -> b
+let meta_mem k u = B0_meta.Pkg.mem k (meta u)
+let meta_add k v u = set_meta u (B0_meta.Pkg.add k v (meta u))
+let meta_find k u = B0_meta.Pkg.find k (meta u)
+let meta_get k u = B0_meta.Pkg.get k (meta u)
+let has_tag k u = match B0_meta.Pkg.find k (meta u) with
+| None -> false
+| Some b -> b
 
 (* Unit map and sets *)
 
@@ -100,7 +93,7 @@ type 'a map = 'a Map.t
 
 type marshalable = string * (id * (string * string) list)
 let to_marshalable u =
-  let encs, _errs (* FIXME *) = Meta.encode u.meta in
+  let encs, _errs (* FIXME *) = B0_meta.Pkg.encode u.meta in
   (name u), ((id u), encs)
 
 (*---------------------------------------------------------------------------

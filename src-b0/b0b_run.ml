@@ -7,7 +7,7 @@
 open B0
 open B0_driver
 
-let is_exe f m = Fpath.Meta.flag B0_care.exe m
+let is_exe f m = Meta.Fpath.flag B0_care.exe m
 
 (* FIXME find a notation that specifies executable starting
    from unit names, we don't care about what leads us to

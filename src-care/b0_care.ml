@@ -10,7 +10,7 @@ let loc = Def.Loc.lib "B0_care"
 
 let exe =
   let doc = "true if the file is executable" in
-  Fpath.Meta.Key.v ~loc "b0.exe" Conv.bool () ~doc
+  Meta.Fpath.Key.v ~loc "b0.exe" Conv.bool () ~doc
 
 type install =
   [ `Bin | `Doc | `Etc | `Lib | `Lib_root | `Libexec | `Libexec_root
@@ -41,42 +41,42 @@ let install_conv : install Conv.t = Conv.(pair install_dst_conv (option fpath))
 
 let install =
   let doc = "Install location" in
-  Fpath.Meta.Key.v ~loc "b0.install" install_conv () ~doc
+  Meta.Fpath.Key.v ~loc "b0.install" install_conv () ~doc
 
 let dist =
   let doc = "Keep built file for distribution" in
-  Fpath.Meta.Key.v ~loc "b0.dist" Conv.bool () ~doc
+  Meta.Fpath.Key.v ~loc "b0.dist" Conv.bool () ~doc
 
 (* Build unit metadata *)
 
 module Unit = struct
   let exe =
     let doc = "A unit with executable outcomes" in
-    Unit.Meta.Key.v ~loc "b0.exe" Conv.bool () ~doc
+    Meta.Unit.Key.v ~loc "b0.exe" Conv.bool () ~doc
 
   let lib =
     let doc = "A unit with library outcomes" in
-    Unit.Meta.Key.v ~loc "b0.lib" Conv.bool () ~doc
+    Meta.Unit.Key.v ~loc "b0.lib" Conv.bool () ~doc
 
   let test =
     let doc = "A unit with testing outcomes" in
-    Unit.Meta.Key.v ~loc "b0.test" Conv.bool () ~doc
+    Meta.Unit.Key.v ~loc "b0.test" Conv.bool () ~doc
 
   let bench =
     let doc = "A unit with benchmarking outcomes" in
-    Unit.Meta.Key.v ~loc "b0.bench" Conv.bool () ~doc
+    Meta.Unit.Key.v ~loc "b0.bench" Conv.bool () ~doc
 
   let doc =
     let doc = "A unit with documentation outcomes" in
-    Unit.Meta.Key.v ~loc "b0.doc" Conv.bool () ~doc
+    Meta.Unit.Key.v ~loc "b0.doc" Conv.bool () ~doc
 
   let build =
     let doc = "A unit with build system outcomes" in
-    Unit.Meta.Key.v ~loc "b0.build" Conv.bool () ~doc
+    Meta.Unit.Key.v ~loc "b0.build" Conv.bool () ~doc
 
   let dev =
     let doc = "A unit with development time outcomes" in
-    Unit.Meta.Key.v ~loc "b0.dev" Conv.bool () ~doc
+    Meta.Unit.Key.v ~loc "b0.dev" Conv.bool () ~doc
 end
 
 (* Operating system information. *)

@@ -86,7 +86,7 @@ type build =
     universe : build_unit list;
     units : build_unit list;
     mutable conf_last : B0_conf.t;
-    mutable fpath_meta : B0_fpath_meta.Meta_map.t;
+    mutable fpath_meta : B0_meta.Fpath.Map.t;
     mutable finished : bool;
     mutable written_files : written_file B0_fpath.map;
     mutable source_files : source_file B0_fpath.map;
@@ -225,17 +225,17 @@ let conf b k = match B0_conf.get_effective b.b.env b.aim k b.b.conf with
     end;
     v
 
-let find_path_meta b p k = B0_fpath_meta.Meta_map.find p k b.b.fpath_meta
+let find_path_meta b p k = B0_meta.Fpath.Map.find p k b.b.fpath_meta
 let add_path_meta ?(force = false) b p k v =
   match B0_fpath.Map.mem p b.b.fpath_meta && not force with
   | true ->
       fail (fun m -> m "%a: file metadata redefinition for key %a"
-               B0_fpath.pp p B0_fpath_meta.Meta.Key.pp_name
-               (B0_fpath_meta.Meta.Key.of_typed k))
+               B0_fpath.pp p B0_meta.Fpath.Key.pp_name
+               (B0_meta.Fpath.Key.of_typed k))
   | false ->
     (* Could check and warn if the path not either a source or in the current
        bdir *)
-             b.b.fpath_meta <- B0_fpath_meta.Meta_map.add p k v b.b.fpath_meta
+             b.b.fpath_meta <- B0_meta.Fpath.Map.add p k v b.b.fpath_meta
 
 (* Unit state handling *)
 
@@ -785,7 +785,7 @@ let finish b =
 let outcome b =
   let outcome_fpath_meta b =
     let encode meta =
-      let encs, _errs (* FIXME *) = B0_fpath_meta.Meta.encode meta in
+      let encs, _errs (* FIXME *) = B0_meta.Fpath.encode meta in
       encs
     in
     B0_fpath.Map.map encode b.b.fpath_meta

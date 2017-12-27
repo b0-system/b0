@@ -13,15 +13,13 @@
     level (identification and synchronization in B0_op and
     B0_guard). *)
 
-module Meta : B0_hmap.S with type 'a Key.info = unit
-
 type t
 type id = int
 
 val create :
   ?loc:B0_def.loc -> ?src_root:B0_fpath.t ->
   ?doc:string -> ?doc_outcome:string -> ?only_aim:B0_conf.build_aim ->
-  ?pkg:B0_pkg.t -> ?meta:Meta.t -> string -> t
+  ?pkg:B0_pkg.t -> ?meta:B0_meta.Unit.t -> string -> t
 
 val nil : t
 val src_root : t -> B0_fpath.t
@@ -31,12 +29,12 @@ include B0_def.S with type t := t
 val basename : t -> string
 val doc_outcome : t -> string
 val only_aim : t -> B0_conf.build_aim option
-val meta : t -> Meta.t
-val meta_mem : 'a Meta.key -> t -> bool
-val meta_add : 'a Meta.key -> 'a -> t -> unit
-val meta_find :'a Meta.key -> t -> 'a option
-val meta_get : 'a Meta.key -> t -> 'a
-val has_tag : bool Meta.key -> t -> bool
+val meta : t -> B0_meta.Unit.t
+val meta_mem : 'a B0_meta.Unit.key -> t -> bool
+val meta_add : 'a B0_meta.Unit.key -> 'a -> t -> unit
+val meta_find :'a B0_meta.Unit.key -> t -> 'a option
+val meta_get : 'a B0_meta.Unit.key -> t -> 'a
+val has_tag : bool B0_meta.Unit.key -> t -> bool
 val pkg : t -> B0_pkg.t option
 
 (* Unit id map and sets *)

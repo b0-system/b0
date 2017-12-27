@@ -10,18 +10,6 @@
 
    B0_hmap needs B0_def which needs B0_fpath. *)
 
-module Meta : B0_hmap.S with type 'a Key.info = unit
-
-module Meta_map : sig
-  type t = Meta.t B0_fpath.map
-  val empty : t
-  val mem : B0_fpath.t -> 'a Meta.key -> t -> bool
-  val add : B0_fpath.t -> 'a Meta.key -> 'a -> t -> t
-  val rem : B0_fpath.t -> 'a Meta.key -> t -> t
-  val find : B0_fpath.t -> 'a Meta.key -> t -> 'a option
-  val get : B0_fpath.t -> 'a Meta.key -> t -> 'a
-  val get_all : B0_fpath.t -> t -> Meta.t
-end
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers

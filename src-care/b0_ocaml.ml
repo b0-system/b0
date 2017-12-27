@@ -13,15 +13,15 @@ let group = Conf.Group.v ~loc "ocaml" ~doc:"OCaml language support"
 
 let tag =
   let doc = "A unit with OCaml related outcomes" in
-  Unit.Meta.Key.v ~loc "ocaml" Conv.bool () ~doc
+  Meta.Unit.Key.v ~loc "ocaml" Conv.bool () ~doc
 
 let lib_deps =
   let doc = "OCaml libraries needed by the unit" in
-  Unit.Meta.Key.v ~loc "ocaml.lib_deps" Conv.(list string) () ~doc
+  Meta.Unit.Key.v ~loc "ocaml.lib_deps" Conv.(list string) () ~doc
 
 let lib_name =
   let doc = "OCaml library name produced by the unit" in
-  Unit.Meta.Key.v ~loc "ocaml.lib_name" Conv.string () ~doc
+  Meta.Unit.Key.v ~loc "ocaml.lib_name" Conv.string () ~doc
 
 (* Configuration keys *)
 
@@ -882,10 +882,10 @@ module Unit = struct
   let lib_deps = lib_deps
   let lib_name = lib_name
 
-  let add_lib_deps libs m = Unit.Meta.add lib_deps libs m
+  let add_lib_deps libs m = Meta.Unit.add lib_deps libs m
 
   let base_meta =
-    Unit.Meta.(add_tag tag empty)
+    Meta.Unit.(add_tag tag empty)
 
   type build =
     [ `Src_dirs of Fpath.t list
@@ -896,7 +896,7 @@ module Unit = struct
   (* Executables *)
 
   let exe_meta ~lib_deps name =
-    Unit.Meta.(base_meta |> add_tag B0_care.Unit.exe |> add_lib_deps lib_deps)
+    Meta.Unit.(base_meta |> add_tag B0_care.Unit.exe |> add_lib_deps lib_deps)
 
   let exe_func_of_build ?resolver ~lib_deps name = function
   | `Src_dirs [] -> (* FIXME remove that *)
@@ -923,7 +923,7 @@ module Unit = struct
   (* Libraries *)
 
   let lib_meta ~lib_deps name =
-    Unit.Meta.(base_meta |> add_tag B0_care.Unit.lib |> add_lib_deps lib_deps |>
+    Meta.Unit.(base_meta |> add_tag B0_care.Unit.lib |> add_lib_deps lib_deps |>
                add lib_name name)
 
   let lib_doc_outcome = "\xF0\x9F\x90\xAB  lib"

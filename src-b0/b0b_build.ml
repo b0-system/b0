@@ -77,7 +77,7 @@ let build_variant setup v cache ctrl units =
           | false -> Ok None
           | true -> Outcome.read outcome >>| fun o -> Some o
         in
-        let fmeta = Fpath.Meta_map.empty in
+        let fmeta = Meta.Fpath.Map.empty in
         Log.info (fun m -> m "Building variant %a" Variant.pp_name v);
         prev_outcome
         >>= fun prev_outcome -> B0b_cli.variant_load_conf ~log v

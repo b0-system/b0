@@ -87,7 +87,7 @@ let out_long ireads iwrites roots builts meta ppf p =
   | exception Not_found -> ()
   | m ->
       Fmt.cut ppf ();
-      Fmt.(field "meta" Fmt.(vbox @@ Fpath.Meta.pp)) ppf m;
+      Fmt.(field "meta" Fmt.(vbox @@ Meta.Fpath.pp)) ppf m;
   end;
   Fmt.pf ppf "@]"
 
