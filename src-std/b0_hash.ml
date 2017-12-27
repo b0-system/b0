@@ -25,7 +25,7 @@ module Murmur3 = struct
   let compare = String.compare
 end
 
-module XXH = struct
+module Xxash = struct
   (* XXH64 is fast, but only 64 bits wide. The probability of
      collision in a 10000-file repo is about 2.71e-12, which is
      probably lower than hardware faults. *)
@@ -37,7 +37,7 @@ module XXH = struct
   external hash_unsafe : string -> int -> int -> seed -> t = "ocaml_b0_xxhash"
   external set_64u : Bytes.t -> int -> int64 -> unit = "%caml_string_set64u"
 
-  let name = "xxh"
+  let name = "xxhash"
   let zero = 0L
   let no_seed = 0L
   let to_bytes t =
@@ -85,13 +85,18 @@ end
 
 (* Hash values *)
 
+(* NOTE. The following is a bit dirty we could store the impl in a ref and
+   expose toggling at the API level. Another alternative would be to
+   pass the module to the build as a first class value (though we then
+   need to construct maps and sets there. *)
+
 let murmur3 = (module Murmur3 : S)
-let xxh = (module XXH : S)
+let xxhash = (module Xxash : S)
 
 let impl = match Unix.getenv "B0_HASH" with
 | "murmur3" -> murmur3
-| "xxh" | _ (* can't log warning at that point *) -> xxh
-| exception Not_found -> xxh
+| "xxhash" | _ (* Can't log warning at that point *) -> xxhash
+| exception Not_found -> xxhash
 
 module H = (val impl)
 include H
