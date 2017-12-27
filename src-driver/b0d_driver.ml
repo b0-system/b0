@@ -145,7 +145,7 @@ let instance_setup_only d cli =
 (* Executing drivers and instances. *)
 
 let exec_driver ?(msg = "") d cmd cli =
-  Log.info (fun m -> m "%s %s: driver run%s" d.name d.version msg);
+  Log.info (fun m -> m "%s %s %s: driver run%s" d.name Hash.name d.version msg);
   let setup = setup cli (find_b0_dir cli None) `Driver in
   Ok (cmd setup)
 
@@ -185,7 +185,7 @@ let wrap_driver_run d cmd exec_need =
 let wrap_instance_run d cmd =
   let run cli cmd =
     begin cli >>= fun cli ->
-      Log.info (fun m -> m "%s %s: instance run" d.name d.version);
+      Log.info (fun m -> m "%s %s %s: instance run" d.name Hash.name d.version);
       let setup = setup cli (find_b0_dir cli None) `Instance in
       Ok (cmd setup)
     end

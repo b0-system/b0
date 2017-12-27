@@ -15,6 +15,7 @@ module Murmur3 = struct
   external hash_unsafe : string -> int -> int -> seed -> t =
     "ocaml_b0_murmurhash"
 
+  let name = "murmur3"
   let zero = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
   let no_seed = 0
   let to_bytes t = t
@@ -36,6 +37,7 @@ module XXH = struct
   external hash_unsafe : string -> int -> int -> seed -> t = "ocaml_b0_xxhash"
   external set_64u : Bytes.t -> int -> int64 -> unit = "%caml_string_set64u"
 
+  let name = "xxh"
   let zero = 0L
   let no_seed = 0L
   let to_bytes t =
@@ -66,9 +68,32 @@ module XXH = struct
   let compare = Int64.compare
 end
 
+module type S = sig
+  type t
+  type seed
+  val no_seed : seed
+  val name : string
+  val zero : t
+  val to_bytes : t -> string
+  val to_hex : t -> string
+  val of_hex : string -> t option
+  val hash_fd : Unix.file_descr -> seed -> t
+  val hash_unsafe : string -> int -> int -> seed -> t
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+end
+
 (* Hash values *)
 
-module H = XXH
+let murmur3 = (module Murmur3 : S)
+let xxh = (module XXH : S)
+
+let impl = match Unix.getenv "B0_HASH" with
+| "murmur3" -> murmur3
+| "xxh" | _ (* can't log warning at that point *) -> xxh
+| exception Not_found -> xxh
+
+module H = (val impl)
 include H
 
 let pp ppf h = match equal h zero with
@@ -77,11 +102,11 @@ let pp ppf h = match equal h zero with
 
 (* Hashing *)
 
-let string s = hash_unsafe s 0 (String.length s) no_seed
+let string s = H.hash_unsafe s 0 (String.length s) H.no_seed
 let file p =
   let p = B0_fpath.to_string p in
   let fd = Unix.(openfile p [O_RDONLY] 0) in
-  match hash_fd fd no_seed with
+  match H.hash_fd fd H.no_seed with
   | exception e -> Unix.close fd; raise e (* FIXME *)
   | res -> Unix.close fd; res
 

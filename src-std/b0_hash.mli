@@ -11,6 +11,7 @@
 (** {1 Hash values} *)
 
 type t
+val name : string
 val zero : t
 val to_bytes : t -> string
 val to_hex : t -> string

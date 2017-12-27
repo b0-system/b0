@@ -2137,6 +2137,11 @@ module Hash : sig
 
   (** {1 Hash values} *)
 
+  val name : string
+  (** [name] is the name of the hash function. The hash function can
+      be selected by using the [B0_HASH] environment variables. Available
+      values are [murmur3] and [xxh] (default). *)
+
   type t
   (** The type for hash values. *)
 
