@@ -1,5 +1,5 @@
 (*---------------------------------------------------------------------------
-   Copyright (c) 2017 b0. All rights reserved.
+   Copyright (c) 2017 The b0 programmers. All rights reserved.
    Distributed under the ISC license, see terms at the end of the file.
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
@@ -23,7 +23,7 @@ val length : 'a t -> int
 (** [length q] is the number of elements in [q]. *)
 
 (*---------------------------------------------------------------------------
-   Copyright (c) 2017 b0
+   Copyright (c) 2017 The b0 programmers
 
    Permission to use, copy, modify, and/or distribute this software for any
    purpose with or without fee is hereby granted, provided that the above

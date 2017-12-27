@@ -42,7 +42,7 @@ let () =
   B0_driver.Driver.set d
 
 (*---------------------------------------------------------------------------
-   Copyright (c) 2017 b0
+   Copyright (c) 2017 The b0 programmers
 
    Permission to use, copy, modify, and/or distribute this software for any
    purpose with or without fee is hereby granted, provided that the above

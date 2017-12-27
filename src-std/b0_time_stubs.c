@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------
-   Copyright (c) 2017 b0. All rights reserved.
+   Copyright (c) 2017 The b0 programmers. All rights reserved.
    Distributed under the ISC license, see license at the end of the file.
    %%NAME%% release %%VERSION%%
    --------------------------------------------------------------------------*/
@@ -86,7 +86,7 @@ CAMLprim value ocaml_b0_monotonic_now_ns (value unit)
 #endif
 
 /*---------------------------------------------------------------------------
-   Copyright (c) 2017 b0
+   Copyright (c) 2017 The b0 programmers
 
    Permission to use, copy, modify, and/or distribute this software for any
    purpose with or without fee is hereby granted, provided that the above

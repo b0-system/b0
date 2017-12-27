@@ -3,8 +3,8 @@ maintainer: "Daniel Bünzli <daniel.buenzl i@erratique.ch>"
 authors: ["The b0 programmers"]
 homepage: "http://erratique.ch/software/b0"
 doc: "http://erratique.ch/software/b0/doc"
-license: "ISC"
-dev-repo: "http://erratique.ch/repos/b0.git"
+license: ["ISC" "BSD-2-Clause"]
+dev-repo: "git+http://erratique.ch/repos/b0.git"
 bug-reports: "https://github.com/dbuenzli/b0/issues"
 tags: [ "org:erratique" "build" "b0" ]
 available: [ ocaml-version >= "4.03.0"]
