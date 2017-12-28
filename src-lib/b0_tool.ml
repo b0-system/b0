@@ -21,8 +21,8 @@ type t =
 
 let v ?(internal = tmp_vars) ?(env_vars = []) name =
   match B0_os.Cmd.exe_is_path name with
-  | false -> invalid_arg (B0_string.strf "%S: not a tool name" name)
-  | true -> { name = B0_fpath.v name; env_vars; internal; unit = None }
+  | true -> invalid_arg (B0_string.strf "%S: not a tool name" name)
+  | false -> { name = B0_fpath.v name; env_vars; internal; unit = None }
 
 let of_file ?(internal = tmp_vars) ?(env_vars = []) name =
   { name; env_vars; internal; unit = None }
