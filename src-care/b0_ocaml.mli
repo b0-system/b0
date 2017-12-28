@@ -210,6 +210,10 @@ module Lib : sig
   (** [cmxas s] is the ordered set of [cmxa] files needed to native
       link against the library set. *)
 
+  val cmxa_clibs : set -> Fpath.t list
+  (** [cmxa_clibs s] is the ordered set of C archives associated
+      to [cmxa]s needed to native link against the library set. *)
+
 (*
   val cmxss : set -> Fpath.t list
   (** [cmxss s] is the ordered set of [cmxs] files needed to dynlink

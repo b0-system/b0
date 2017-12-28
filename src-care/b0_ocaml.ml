@@ -186,11 +186,12 @@ module Lib = struct
       incs_link : Fpath.t list;
       cmas : Fpath.t list;
       cmxas : Fpath.t list;
+      cmxa_clibs : Fpath.t list;
       cmxss : Fpath.t list; }
 
   let empty =
     { root_libs = []; libs = []; incs_comp = []; incs_link = [];
-      cmas = []; cmxas = []; cmxss = [] }
+      cmas = []; cmxas = []; cmxa_clibs = []; cmxss = [] }
 
   let is_empty s = s.root_libs = []
   let root_libs s = s.root_libs
@@ -199,7 +200,9 @@ module Lib = struct
   let incs_link s = s.incs_link
   let cmas s = s.cmas
   let cmxas s = s.cmxas
+  let cmxa_clibs s = s.cmxa_clibs
   let cmxss s = s.cmxss
+
 
   let ars_of_rev_libs doit b fext rev_libs =
     let add_env_file f fs = match R.failwith_error_msg @@ OS.File.exists f with
@@ -225,15 +228,17 @@ module Lib = struct
     let rev_libs = sort_libs ~rev:true libs names in
     let incs_comp = List.fold_left add_inc [] rev_root_libs in
     let incs_link = List.fold_left add_inc [] rev_libs in
+    let clib_ext = Build.conf b B0_c.lib_ext in
     let cmas = ars_of_rev_libs conf.build_byte b ".cma" rev_libs in
     let cmxas = ars_of_rev_libs conf.build_native b ".cmxa" rev_libs in
+    let cmxa_clibs = ars_of_rev_libs conf.build_native b clib_ext rev_libs in
     let cmxss =
       (* FIXME This is not needed for building
       ars_of_rev_libs conf.build_native_dynlink b ".cmxs" rev_libs *) []
     in
     let root_libs = List.rev rev_root_libs in
     let libs = List.rev rev_libs in
-    { root_libs; libs; incs_comp; incs_link; cmas; cmxas; cmxss }
+    { root_libs; libs; incs_comp; incs_link; cmas; cmxas; cmxa_clibs; cmxss }
 
   (* Resolvers *)
 
@@ -637,12 +642,15 @@ let link_native ?(lib_deps = Lib.empty) b c rev_mods ~cobjs ~dst name =
   if not (Conf.build_native c) then () else
   let compiler = Conf.native_compiler c in
   let cmxs = List.rev_map (fun m -> cmx_file dst m.name) rev_mods in
+  let cmx_cobjs = List.rev_map (fun m -> cobj_file c dst m.name) rev_mods in
   let cmxas = Lib.cmxas lib_deps in
+  let cmxa_clibs = Lib.cmxa_clibs lib_deps in
   let objs = List.concat [cmxas; cobjs; cmxs] in
+  let reads = List.concat [cmxas; cmxa_clibs; cmx_cobjs] in
   let incs = Cmd.(of_values ~slip:"-I" p (dst :: Lib.incs_link lib_deps)) in
   let exe = native_file c dst name in
   let straces = Conf.stacktraces c in
-  Build.spawn b ~reads:objs ~writes:[exe] @@
+  Build.spawn b ~reads ~writes:[exe] @@
   compiler Cmd.(incs %% straces % "-o" % p exe %% of_values p objs);
   Build.add_path_meta b exe B0_care.exe true;
   ()
@@ -718,6 +726,8 @@ let archive_native b c rev_mods ~cstubs ~dst name =
   if not (Conf.build_native c) then () else
   let compiler = Conf.native_compiler c in
   let cmxs = List.rev_map (fun m -> cmx_file dst m.name) rev_mods in
+  let cmx_cobjs = List.map (fun m -> cobj_file c dst m.name) rev_mods in
+  let reads = List.concat [cmxs; cmx_cobjs] in
   let cmxa = cmxa_file dst name in
   let clib = clib_file c dst name in
   let cstubs = match cstubs with
@@ -725,7 +735,7 @@ let archive_native b c rev_mods ~cstubs ~dst name =
   | true -> Cmd.(v "-cclib" % (strf "-l%s" @@ archive_cobjs_base name))
   in
   let stacktraces = Conf.stacktraces c in
-  Build.spawn b ~reads:cmxs ~writes:[cmxa; clib] @@
+  Build.spawn b ~reads ~writes:[cmxa; clib] @@
   compiler Cmd.(stacktraces % "-a" % "-o" % p cmxa %% of_values p cmxs %%
                 cstubs)
 
@@ -736,13 +746,14 @@ let archive_native_dynlink b c rev_mods ~cstubs ~dst name =
       archive_native b c rev_mods ~cstubs ~dst name;
     let compiler = Conf.native_compiler c in
     let cmxa = cmxa_file dst name in
+    let cmxa_clib = clib_file c dst name in
     let cmxs = cmxs_file dst name in
     let incs = Cmd.(of_values ~slip:"-I" p [dst]) in
     let c_ar, reads = match cstubs with
-    | false -> Cmd.empty, [cmxa]
+    | false -> Cmd.empty, [cmxa; cmxa_clib]
     | true ->
         let c_ar = archive_cobjs_clib dst c name in
-        Cmd.(v @@ p c_ar), [c_ar; cmxa]
+        Cmd.(v @@ p c_ar), [c_ar; cmxa; cmxa_clib]
     in
     let stacktraces = Conf.stacktraces c in
     Build.spawn b ~reads ~writes:[cmxs] @@
