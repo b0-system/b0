@@ -628,10 +628,10 @@ let abort_awaiting_on_failures b never gs =
       | Finished | Failed _ -> assert false
       | Aborted -> loop (res_count + 1) (add_never_written o None never) unr gs
       | Active ->
-          let awaits = B0_guard.awaiting_files g in
+          let awaits = B0_guard.awaiting_files b.b.guards g in
           match B0_fpath.Set.is_empty awaits with
           | true ->
-              let units = B0_guard.awaiting_units g in
+              let units = B0_guard.awaiting_units b.b.guards g in
               let never_read uid acc =
                 match get_unit_status (get_unit_state b aim uid) with
                 | Finished | Active -> acc
@@ -697,8 +697,8 @@ let fail_cycles b never gs = (* O (n^2) *)
                   let never = add_never_written o1 (Some u1) never in
                   loop (count + 1) never unr gs
               | None ->
-                  let o0_needs = B0_guard.awaiting_units g0 in
-                  let o1_needs = B0_guard.awaiting_units g1 in
+                  let o0_needs = B0_guard.awaiting_units b.b.guards g0 in
+                  let o1_needs = B0_guard.awaiting_units b.b.guards g1 in
                   match B0_unit.Idset.mem u1 o0_needs,
                         B0_unit.Idset.mem u1 o1_needs
                   with
@@ -737,20 +737,20 @@ let never_became_ready b never gs =
       | Finished | Aborted -> assert false
       | Failed _ -> loop never unr gs
       | Active ->
-          let files = B0_guard.awaiting_files g in
+          let files = B0_guard.awaiting_files b.b.guards g in
           match B0_fpath.Set.is_empty files with
           | false ->
               fail_unit b aim uid (pp_never uid files);
               loop never unr gs
           | true ->
-              let units = B0_guard.awaiting_units g in
+              let units = B0_guard.awaiting_units b.b.guards g in
               fail_unit b aim uid (pp_never_units b aim uid units);
               loop never unr gs
   in
   loop never [] gs
 
 let resolve_blocked b =
-  match B0_guard.blocked b.b.guards with
+  match B0_guard.guards b.b.guards with
   | [] ->
       B0_log.debug (fun m -> m "No guards blocked.")
   | gs ->

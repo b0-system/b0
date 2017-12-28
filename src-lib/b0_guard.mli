@@ -18,12 +18,6 @@ type handler
 val handler : unit -> handler
 (** [handler ()] is a guard handler. *)
 
-val files_ready : handler -> B0_fpath.set
-(** [files_ready h] is the set of files that are ready in [h]. *)
-
-val units_ready : handler -> B0_unit.Idset.t
-(** [units_ready h] is the set of build units that are ready in [h]. *)
-
 val set_file_ready : handler -> B0_fpath.t -> unit
 (** [set_file_ready h f] indicates to guards in [h] that [f] is ready. *)
 
@@ -31,7 +25,7 @@ val set_unit_ready : handler -> B0_unit.id -> unit
 (** [set_unit_ready h u] indicates to guards in [h] that [u] is ready. *)
 
 val add : handler -> B0_op.t -> unit
-(** [add h op] guards [op] in [h] until it is {{!collect}collectable}. *)
+(** [add h op] guards [op] in [h] until it is {{!ready}ready}. *)
 
 val ready : handler -> B0_op.t option
 (** [ready h] is an operation that is ready in [h] (if any).
@@ -42,17 +36,17 @@ val ready : handler -> B0_op.t option
 type t
 (** The type for build operation guards. *)
 
-val awaiting_files : t -> B0_fpath.set
-(** [awaiting_files g] are [g]'s files that are waiting to be ready. *)
-
-val awaiting_units : t -> B0_unit.Idset.t
-(** [awaiting_units g] are [g]'s units that are waiting to be ready. *)
+val guards : handler -> t list
+(** [guards h] is the list of (awaiting) guards in [h]. *)
 
 val op : t -> B0_op.t
 (** [op g] is the build operation guarded by [g]. *)
 
-val blocked : handler -> t list
-(** [blocked h] is the list of guards that are blocked in [h]. *)
+val awaiting_files : handler -> t -> B0_fpath.set
+(** [awaiting_files g] are [g]'s files that are waiting to be ready. *)
+
+val awaiting_units : handler -> t -> B0_unit.Idset.t
+(** [awaiting_units g] are [g]'s units that are waiting to be ready. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers
