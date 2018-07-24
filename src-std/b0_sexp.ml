@@ -120,7 +120,7 @@ let p_qatom src (pos, s) =
   in
   loop [] (pos + 1) (B0_string.with_index_range ~first:1 s) (* waste *)
 
-let rec p_list src (pos, s) = (* TODO not t.r. *)
+let rec p_list src (pos, s) = (* XXX not t.r. *)
   let start_pos = pos in
   let rec loop acc ps =
     let (sspos, s as ps) = skip ps in

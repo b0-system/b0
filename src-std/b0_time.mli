@@ -4,9 +4,7 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** Measuring time.
-
-    See {!B0.Time}. *)
+(** Measuring time. See {!B0.Time}. *)
 
 (** {1 Monotonic wall-clock time} *)
 

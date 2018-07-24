@@ -13,19 +13,20 @@
 
 open B0_result
 
-(** {1:handlers Operation handlers} *)
+(** {1:handlers Operation execution handlers} *)
 
 type handler
-(** The type for asynchronous operation handlers. *)
+(** The type for operation execution handlers. *)
 
 val handler :
-  ?rand:Random.State.t -> max_spawn:int -> dur_counter:B0_time.counter ->
+  ?rand:Random.State.t -> max_spawn:int -> clock:B0_time.counter ->
   tmp_path:B0_fpath.t -> unit -> handler
-(** [create ~max_spawn ~dur_counter ~tmp_path] is an OS asynchronous
+(** [create ~max_spawn ~clock ~tmp_path] is an OS asynchronous
     interaction handler which supports up to [max_spawn] process
-    spawns. [tmp_path] is a prefix for temporary files, it's directory
-    name should exist. [rand] is the randomness used for internal
-    queues it defaults to {!Random.State.make_self_init}. *)
+    spawns. [clock] is used to generate timestamps. [tmp_path] is a
+    prefix for temporary files, it's directory name should
+    exist. [rand] is the randomness used for internal queues it
+    defaults to {!Random.State.make_self_init}. *)
 
 val submit : handler -> B0_op.t -> unit
 (** [submit h o] submits operation [o] to handler [h] (but not necessarily

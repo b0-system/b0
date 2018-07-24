@@ -7,9 +7,8 @@ open B0
 
 let echo = Tool.v "echo"
 let cat = Tool.v "cat"
-let ocamlc = Tool.v "ocamlc"
 
-let stdout =
+let stdout_stderr_redirect =
   let build b =
     let echo = Build.tool b echo in
     let cat = Build.tool b cat in
@@ -24,26 +23,34 @@ let stdout =
     assert_file b x data;
     assert_file b y data;
   in
-  Unit.create "stdout_redirect" build ~doc:"Test stdin/stdout redirections"
+  Unit.create "stdout_redirect" build ~doc:"Test stdin/stdout redirection"
+
+let stdout_tee =
+  let build b =
+    let echo = Build.tool b echo in
+    let x = Build.build_file b "x" in
+    Build.spawn b ~writes:[x] ~stdout:(`Tee x) @@
+    echo Cmd.(v "hey");
+    Build.read b x (fun d -> assert (d <> ""))
+  in
+  Unit.create "stdout_tee" build ~doc:"Test stderr tee redirection"
 
 let stderr_redirect =
   let build b =
-    let ocamlc = Build.tool b ocamlc in
-    let never = Build.build_file b "never" in
+    let cat = Build.tool b cat in
     let x = Build.build_file b "x" in
-    Build.spawn b ~writes:[x] ~stderr:(`File x) ~success:[] @@
-    ocamlc Cmd.(v @@ p never);
+    Build.spawn b ~writes:[x] ~stderr:(`File x) ~exits:[] @@
+    cat Cmd.(v "-7");
     Build.read b x (fun d -> assert (d <> ""))
   in
-  Unit.create "stderr_redirect" build ~doc:"Test stderr redirections"
+  Unit.create "stderr_redirect" build ~doc:"Test stderr redirection"
 
 let stderr_tee =
   let build b =
-    let ocamlc = Build.tool b ocamlc in
-    let never = Build.build_file b "never" in
+    let cat = Build.tool b cat in
     let x = Build.build_file b "x" in
-    Build.spawn b ~writes:[x] ~stderr:(`Tee x) @@
-    ocamlc Cmd.(v @@ p never);
+    Build.spawn b ~writes:[x] ~stderr:(`Tee x) ~exits:[] @@
+    cat Cmd.(v "-7");
     Build.read b x (fun d -> assert (d <> ""))
   in
-  Unit.create "stderr_tee" build ~doc:"Test stdin/stderr redirections"
+  Unit.create "stderr_tee" build ~doc:"Test stderr tee redirection"

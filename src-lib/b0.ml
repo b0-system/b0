@@ -4,9 +4,12 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
+(* Preliminaries *)
+
+module Codec = B0_codec (* FIXME remove that *)
+
 module Tty = B0_tty
 module Fmt = B0_fmt
-
 module R = B0_result.R
 type 'a result = ('a, [`Msg of string]) Pervasives.result
 let ( >>= ) = B0_result.( >>= )
@@ -15,26 +18,22 @@ let ( >>| ) = B0_result.( >>| )
 let strf = B0_string.strf
 module String = B0_string
 module Fpath = B0_fpath
-
-module Codec = B0_codec (* FIXME remove that *)
-
 module Cmd = B0_cmd
 module Conv = B0_conv
 module Log = B0_log
 module Def = B0_def
 module Hmap = B0_hmap
-
 module OS = B0_os
 module Time = B0_time
 module Hash = B0_hash
 module Stamp = B0_stamp
-module Cache = B0_cache
-module Env = B0_env
-module Conf = B0_conf
+
+(* Builds *)
 
 type build = B0_build.t
 module Meta = B0_meta
-module Tool = B0_tool
+module Env = B0_env
+module Conf = B0_conf
 module Pkg = B0_pkg
 module Unit = struct
 
@@ -59,21 +58,24 @@ module Unit = struct
 
 end
 
-module Outcome = B0_outcome
-
+module Tool = B0_tool
+module Cache = B0_cache
 module Build = struct
   include B0_build
 
-  let create ?prev_outcome cache ctrl env conf meta ~dir ~universe units =
+  let create cache ctrl env conf meta ~dir ~universe units =
     let pair u = u, Unit.func u in
     let universe = List.rev_map pair universe in
     let units = List.rev_map pair units in
-    create ?prev_outcome cache ctrl env conf meta ~dir ~universe units
+    create cache ctrl env conf meta ~dir ~universe units
 end
+
+module Outcome = B0_outcome
+
+(* Organizing and deploying builds *)
 
 module Variant = B0_variant
 module Sexp = B0_sexp
-module Json = B0_json
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers

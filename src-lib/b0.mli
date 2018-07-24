@@ -12,7 +12,7 @@
     a fully integrated and customizable software construction
     experience from development to deployment.
 
-    See the {{!manual}manual} or the {{!Build}build API}.
+    See the {{!manual}manual} and the {{!Build}build API}.
 
     Open the module to use it, it defines only types, modules and
     result combinators in your scope.
@@ -31,12 +31,12 @@ module Tty : sig
   (** The type for terminals. *)
 
   val kind : out:Unix.file_descr -> kind
-  (** [kind out] determines the kind of terminal by consulting the the
-      [TERM] environment variable and using [Unix.isatty] on [out]. *)
+  (** [kind out] determines the kind of terminal by consulting the
+      [TERM] environment variable and using [Unix.isatty] on [out]'s
+      file descriptor. *)
 
-  type cap = Ansi | None (** *)
-  (** The type for terminal capabilities. Either
-      ANSI terminal or none. *)
+  type cap = Ansi (** ANSI terminal *) | None (** No capability *)
+  (** The type for terminal capabilities. *)
 
   val cap : kind -> cap
   (** [cap kind] determines capabilities according to [kind]. *)
@@ -400,7 +400,9 @@ module String : sig
   val suggest : ?dist:int -> string list -> string -> string list
   (** [suggest ~dist candidates s] are the elements of [candidates]
       whose {{!edit_distance}edit distance} is the smallest to [s] and
-      at most at a distance of [dist] of [s] (defaults to [2]). *)
+      at most at a distance of [dist] of [s] (defaults to [2]). If
+      multiple results are returned the order of [candidates] is
+      preserved. *)
 
   (** {1:vers Parsing version strings} *)
 
@@ -674,6 +676,9 @@ module Fpath : sig
   val pp : t Fmt.t
   (** [pp ppf p] prints path [p] on [ppf] using {!to_string}. *)
 
+  val pp_quoted : t Fmt.t
+  (** [pp_quoted p] prints path [p] on [ppf] using {!Filename.quote}. *)
+
   val dump : t Fmt.t
   (** [dump ppf p] prints path [p] on [ppf] using {!String.dump}. *)
 
@@ -874,6 +879,10 @@ v}
   (** [of_values ?slip conv l] is like {!of_list} but acts on a list
       of values, each converted to an argument with [conv]. *)
 
+  val of_fpaths : ?slip:string ->  Fpath.t list -> t
+  (** [of_fpaths ?slip ps] is like {!of_list} but acts on a list
+      of paths. *)
+
   val pp : t Fmt.t
   (** [pp ppf l] formats an unspecified representation of [l] on
       [ppf]. *)
@@ -934,7 +943,7 @@ module Conv : sig
       [codec] is [None] the printer of [text] {b must be} the inverse
       of its parser as it is used to derive a {!codec}. [docv] is a
       documentation meta-variable used in documentation to stand for
-      the configuration value, it defaults to ["VALUE"]. *)
+      the value, it defaults to ["VALUE"]. *)
 
   val with_docv : 'a t -> string -> 'a t
   (** [with_docv c docv] is [c] with [docv] as a documentation
@@ -1028,15 +1037,19 @@ module Conv : sig
       denote [None] in textual converters. In a textual parse [None] is
       unconditionally returned on [none], it takes over a potential
       decode of that string by [c]. *)
+
+  val some : 'a t -> 'a option t
+  (** [option c] wraps parses of [c] with [Some _] note that this is
+      exactly [c]: [None] can't be converted in either direction. *)
 end
 
-(** The [B0] program  log.
+(** The [B0] program log.
 
     This log should be used to log general program activity not for
     logging build operations.
 
-    This module is modelled after {!Logs} logging, see the
-    {{!Logs.basics}quick introduction} there. It can be made
+    The module is modelled after {!Logs} logging, see
+    {{!Logs.basics}this quick introduction}. It can be made
     to log on a {!Logs} source, see {{!logger}here}. *)
 module Log : sig
 
@@ -1376,9 +1389,8 @@ end
 
 (** Type-safe, serializable, heterogeneous value maps.
 
-    Type-safe serialization is enabled by mandating, on
-    {{!S.Key.v}key creation} unique key names and a key value
-    {{!Conv}converter}.
+    Type-safe serialization is enabled by mandating, on {{!S.Key.v}key
+    creation} unique key names and a key value {{!Conv}converter}.
 
     Deserialization must be aware of key definitions, this means that
     all the keys in a serialized map must be created before attempting
@@ -1571,7 +1583,7 @@ end
 (** OS interaction. *)
 module OS : sig
 
-  (** Environment variables *)
+  (** Environment variables. *)
   module Env : sig
 
     (** {1:var Variables} *)
@@ -1643,8 +1655,8 @@ module OS : sig
         and returns end of file on reads. *)
 
     val dash : Fpath.t
-    (** [dash] is ["-"]. This value is is used by {!read} and {!write}
-        to respectively denote [stdin] and [stdout]. *)
+    (** [dash] is ["-"]. This value is used by {!read} and {!write} to
+        respectively denote [stdin] and [stdout]. *)
 
     (** {1:exdel Existence and deletion} *)
 
@@ -1678,8 +1690,7 @@ module OS : sig
         {b Stdin.} In the following functions if the path is {!dash},
         bytes are read from [stdin]. *)
 
-    val with_ic :
-      Fpath.t -> (in_channel -> 'a -> 'b) -> 'a -> 'b result
+    val with_ic : Fpath.t -> (in_channel -> 'a -> 'b) -> 'a -> 'b result
     (** [with_ic file f v] opens [file] as a channel [ic] and returns
         [Ok (f ic v)]. After the function returns (normally or via an
         exception), [ic] is ensured to be closed.  If [file] is
@@ -1723,22 +1734,20 @@ module OS : sig
         returned [file] is left untouched except if {!Pervasives.stdout}
         is written. *)
 
-    (** {1:tmpfiles Temporary files}
-
-        FIXME. Make that bos-like. *)
+    (** {1:tmpfiles Temporary files} *)
 
     val with_tmp_oc :
-      ?flags:Unix.open_flag list -> ?mode:int -> Fpath.t ->
+      ?flags:Unix.open_flag list -> ?mode:int -> ?ext:Fpath.ext -> Fpath.t ->
       (Fpath.t -> out_channel -> 'a -> 'b) -> 'a -> 'b result
-    (** [with_tmp_oc mode dir pat f v] is a new temporary file in
-        [dir] (defaults to {!Dir.default_tmp}) named according to
-        [pat] and atomically created and opened with permission [mode]
-        (defaults to [0o600] only readable and writable by the
-        user). Returns [Ok (f file oc v)] with [file] the file path
-        and [oc] an output channel to write the file. After the
+    (** [with_tmp_oc ~flags ~mode ~ext p f v] is [Ok (f file oc v)]
+        with [file] a file path atomatically created and opened with
+        permission [mode] (defaults to [0o600] only readable and
+        writable by the user) on the output channel [oc]. After the
         function returns (normally or via an exception), [oc] is
-        closed and [file] is deleted. *)
-
+        closed and [file] is deleted. The [file] name is
+        constructed with [strf "%a%06x%s" Fpath.pp f rand ext] with
+        [rand] a default number ([ext] defaults to [.tmp]). The client
+        needs to make sure the directories to [file] exist. *)
   end
 
   (** Directory operations. *)
@@ -1784,7 +1793,7 @@ module OS : sig
     val dirs : ?dotfiles:bool -> ?rel:bool -> Fpath.t -> Fpath.t list result
     (** [dirs] is like {!contents} but only returns directories. *)
 
-    (** {1:current Current working directory} *)
+    (** {1:current Current working directory and user directory} *)
 
     val current : unit -> Fpath.t result
     (** [current ()] is the current working directory. The resulting
@@ -1798,10 +1807,17 @@ module OS : sig
         bound to [dir]. After the function returns the current working
         directory is back to its initial value. *)
 
+    val user : unit -> Fpath.t result
+    (** [user ()] is the home directory of the user executing the process.
+        Determined by consulting [passwd] database with the user if of the
+        process. If this fails or on Windows falls back to parse a papth
+        from the [HOME] environment variables. *)
+
     (** {1:tmp Default Temporary directory} *)
 
     val default_tmp : unit -> Fpath.t
-    (** [default_tmp ()] is the directory used as a default value for
+    (** [default_tmp ()] is a default directory that can be used
+        as a default directory for
         creating {{!File.tmpfiles}temporary files} and
         {{!tmpdirs}directories}. If {!set_default_tmp} hasn't been
         called this is:
@@ -1809,7 +1825,7 @@ module OS : sig
         {- On POSIX, the value of the [TMPDIR] environment variable or
            [Fpath.v "/tmp"] if the variable is not set or empty.}
         {- On Windows, the value of the [TEMP] environment variable or
-           {!Fpath.cur_dir} if it is not set or empty}} *)
+           [Fpath.v "."] if it is not set or empty}} *)
 
     val set_default_tmp : Fpath.t -> unit
     (** [set_default_tmp p] sets the value returned by {!default_tmp} to
@@ -1990,10 +2006,11 @@ module OS : sig
         function yields back control to the terminal as soon as the
         child starts (vs. ends on POSIX). This entails all sorts of
         unwanted behaviours. To workaround this, the following
-        functions execute the file as a spawned child process which is
-        waited on for completion via [waitpid(2)]. Once the child
-        process has terminated the calling process is immediately
-        [exit]ed with the status of the child. *)
+        function executes, on Windows, the file as a spawned child
+        process which is waited on for completion via
+        [waitpid(2)]. Once the child process has terminated the
+        calling process is immediately [exit]ed with the status of the
+        child. *)
 
     val execv :
       ?env:string list -> ?cwd:Fpath.t -> Fpath.t -> Cmd.t -> unit result
@@ -2116,7 +2133,7 @@ module Hash : sig
   val name : string
   (** [name] is the name of the hash function. The hash function can
       be selected by using the [B0_HASH] environment variables. Available
-      values are [murmur3] and [xxh] (default). *)
+      values are [murmur3] and [xxhash] (default). *)
 
   type t
   (** The type for hash values. *)
@@ -2149,10 +2166,13 @@ module Hash : sig
   val string : string -> t
   (** [string s] is the hash of [s]. *)
 
-  val file : Fpath.t -> t
-  (** [file p] is the hash of file path [p].
+  val fd : Unix.file_descr -> t
+  (** [fd fd] mmaps and hashes the object pointed by [fd].
 
-      {b FIXME} This raises Sys_error or Unix.Error. *)
+      @raise Unix.Unix_error on mmaping errors. *)
+
+  val file : Fpath.t -> t result
+  (** [file p] is the hash of file path [p]. *)
 
   (** {1:setmap Hash sets and maps} *)
 
@@ -2188,10 +2208,8 @@ type build
 
 (** Metadata types.
 
-    Metadata types associated arbitrary, user-defined, typed key values
-    bindings to certain values.
-
-    This module gathers the different metadata type used by [b0]. *)
+    Metadata types associate arbitrary, user-defined, typed key-value
+    bindings to certain values. *)
 module Meta : sig
 
   (** File path metadata. *)
@@ -2254,7 +2272,7 @@ module Env : sig
       {ul
       {- [`Build_os] is the OS on which the build tools are executed.}
       {- [`Host_os] is the OS on which the build outcomes are eventually
-         hosted and run.}}
+         hosted and executed}}
 
       Most of the time the build OS coincides with the host OS. The
       build OS does however differ in cross-compiled builds. In this
@@ -2279,7 +2297,7 @@ module Env : sig
       in the environment.
 
       The expected semantics is similar to a lookup made in a POSIX
-      [PATH] environment variable. Notably if a given path has
+      [PATH] environment variable. Notably if a given path has a
       {!Fpath.dir_sep} no search should occur and the path be returned
       as is. However this is left to the discretion of the entity that
       setups the environment.
@@ -2341,7 +2359,7 @@ module Env : sig
 
   val tool : t -> build_aim -> Fpath.t list -> Fpath.t result
   (** [tool e aim tools] is the first file executable which can be found
-      among [tools] for runs which aim at producing artefacts for [aim].
+      among [tools] for spawns which aim at producing artefacts for [aim].
 
       @raise Invalid_argument if [tools] is empty. *)
 end
@@ -2900,361 +2918,8 @@ module Tool : sig
       configuration key named [name], and that can manifest itself as
       one of [tools] (defaults to [[Fpath.v name]]). The first match
       is taken, files are looked up like in {!of_file} and [None] is
-      returned if none can be found. *)
-end
-
-(** Build outcomes.
-
-    A build outcome holds information about a finished build. In particular
-    remembers all the build operation and their metadata.
-
-    {b TODO} This should be revamped a bit. *)
-module Outcome : sig
-
-  (** {1:outcomes Outcomes} *)
-
-  type t
-  (** The type for build outcomes.  *)
-
-  val read : Fpath.t -> t result
-  (** [read file] reads a build outcome from [file]. *)
-
-  val write : Fpath.t -> t -> unit result
-  (** [write file o] writes the build outcome [o] to file [file]. *)
-
-  val fpath_meta : t -> Meta.Fpath.Map.t
-  (** [fpath_meta o] is the file metadata for the build. *)
-
-  val conf : t -> Conf.t
-  (** [conf o] is the effective configuration used by the build. *)
-
-  val unit_names : t -> string list
-  (** [unit_names o] are the names of the units that were built. *)
-
-  val unit_id_name_map : t -> string Unit.Idmap.t
-  (** [unit_id_name_map o] maps identifiers of units built in [o] to their
-      name. *)
-
-  val unit_id_set : string list -> t -> Unit.Idset.t
-  (** [unit_id_set names o] is the set of unit identifers that matches
-      names in [o]. *)
-
-  val root_files : t -> Fpath.set
-  (** [root_file o] is the set of root files in [o]. *)
-
-  val built_files : t -> Fpath.set
-  (** [built_files o] is the of files that are written in [o]. *)
-
-  (** {1:ops Build operations} *)
-
-  (** Build operations *)
-  module Op : sig
-
-    (** {1:op Operations} *)
-
-    type id = int
-    (** The type for build operation identifiers. *)
-
-    type t
-    (** The type for build operations. *)
-
-    val id : t -> id
-    (** [id o] is the identifier of operation [o]. *)
-
-    val unit_id : t -> Unit.id
-    (** [unit_id o] is the identifier of the unit in which the operation was
-        submitted. {b Warning} This should be used to look up units defined
-        in the current program run. But only matched against unit metadata
-        present in the build outcome itself, see {!unit_id_name_map}. *)
-
-    val aim : t -> Env.build_aim
-    (** [aim o] is the build target for which the operation was submitted. *)
-
-    val reads : t -> Fpath.set
-    (** [reads o] are the file paths read by operation. *)
-
-    val writes : t -> Fpath.set
-    (** [writes o] writes are the file paths written by [o]. *)
-
-    val creation_time : t -> Time.span
-    (** [creation_time o] is [o]'s monotonic creation time. *)
-
-    val exec_start_time : t -> Time.span
-    (** [exec_start_time o] is [o]'s monotonic operating system starting
-        execution time. This is different from {!Time.zero} once the
-        operation has been submitted to the OS for execution. *)
-
-    val exec_end_time : t -> Time.span
-    (** [exec_end_time o] is [o]'s monotonic time when the operation's has
-        been processed by the operating system. This is different from
-        {!Time.zero} once the operation has been completed by the OS
-        and collected and processed into [Executed] status by the build
-        program. *)
-
-    val cached : t -> bool
-    (** [cached o] is [true] if the result of the operation was looked up
-        in the cache. *)
-
-    type status =
-      | Guarded
-      | Ready
-      | Executed
-      | Finished (** *)
-      (** The type for operation statuses.
-          {ul
-          {- [Guarded] the operation is guarded from execution (initial state).}
-          {- [Ready] the operation is ready to be submitted for execution.}
-          {- [Executed] is [true] iff [o] has been executed by the OS
-             (but it may not have succeded), see the individual operation
-             results.}
-          {- [Finished] the effects of the operation have been applied.}} *)
-
-    val status : t -> status
-    (** [status o] is [o]'s status. *)
-
-    val pp_status : status Fmt.t
-    (** [pp_status] is a formatter for statuses. *)
-
-    val stamp : t -> Stamp.t
-    (** [stamp o] is [o]'s stamp. *)
-
-    (** {1:spawn Process spawns} *)
-
-    type spawn_pid = int
-    (** The type for OS specific process identifiers. *)
-
-    type spawn_stdo = [ `Ui | `File of Fpath.t | `Tee of Fpath.t ]
-    (** The type for spawn standard output redirections. *)
-
-    type spawn_stdo_ui =
-      [ `Tmp_file of Fpath.t | `Stdo of string result | `None ]
-    (** The type for spawn standard output [`Ui] redirection result. When
-        submitted this becomes [`Tmp_file], once read back this is [`Stdo]. *)
-
-    type spawn_env = string array
-    (** The type for spawn process environments. *)
-
-    type spawn_success_codes = int list option
-    (** The list of exit codes that indicates success. If this is [None]
-        only zero is success. If the list is empty this any exit code. *)
-
-    type spawn
-    (** The type for process spawn operations. *)
-
-    val spawn_cmd : spawn -> Cmd.t
-    (** [spawn_cmd s] is [s]'s invocation. *)
-
-    val spawn_env : spawn -> spawn_env
-    (** [spawn_env s] is the environment in which [s] was run. *)
-
-    val spawn_cwd : spawn -> Fpath.t
-    (** [spawn_cwd s] is the current working directory in which [s] was run. *)
-
-    val spawn_stdin : spawn -> Fpath.t option
-    (** [spawn_stdin s] is file where stdin was read from for [s] (if any). *)
-
-    val spawn_stdout : spawn -> spawn_stdo
-    (** [spawn_stdout s] is destination to which stdout was written for [s]. *)
-
-    val spawn_stderr : spawn -> spawn_stdo
-    (** [spawn_stderr s] is destination to which stderr was written for [s]. *)
-
-    val spawn_success_codes : spawn -> int list option
-    (** [spawn_success_codes s] is the list of exit codes denoting success
-        for the oparation. *)
-
-    val spawn_stdo_ui : spawn -> spawn_stdo_ui
-    (** [spawn_stdo_ui s] is the [`Ui] redirection result of [s]. *)
-
-    val set_spawn_stdo_ui : spawn -> spawn_stdo_ui -> unit
-    (** [set_spawn_stdo_ui s st] sets the [`Ui] redirection result to
-        [st]. *)
-
-    val spawn_result : spawn -> (spawn_pid * OS.Cmd.status) result
-    (** [spawn_result s] is [s]'s OS completion result or an error. *)
-
-    (** {1:read File reads} *)
-
-    type read
-    (** The type for file read operations. *)
-
-    val read_file : read -> Fpath.t
-    (** [read_file r] is [r]'s read file. *)
-
-    val read_result : read -> string result
-    (** [read_result r] is [r]'s result. Either the read data or an
-    error. *)
-
-    (** {1:write File writes} *)
-
-    type write
-    (** The type for (atomic) file write operations. *)
-
-    val write :
-      Unit.t -> Env.build_aim -> Time.span -> reads:Fpath.set ->
-      Fpath.t -> t
-    (** [write u f], when submitted, starts to atomically set the
-        contents of [f] to [write_data w]. *)
-
-    val write_file : write -> Fpath.t
-    (** [write_file w] is [w]'s written file. *)
-
-    val write_data : write -> string
-    (** [write_data w] is [w]'s written data. *)
-
-    val set_write_data : write -> string -> unit
-    (** [write_data w] sets [w]'s written data to [w]. *)
-
-    val write_result : write -> unit result
-    (** [write_result w] is [w]'s result. Either unit or an error. *)
-
-    (** {1:copyfile File copies} *)
-
-    type copy_file
-    (** The type for file copies. *)
-
-    val copy_file_src : copy_file -> Fpath.t
-    (** [copy_file_src c] is [c]'s source file. *)
-
-    val copy_file_dst : copy_file -> Fpath.t
-    (** [copy_file_dst c] is [c]'s destination file. *)
-
-    val copy_file_linenum : copy_file -> int option
-    (** [copy_file_linenum c]  is [c]'s line number directive value (if any). *)
-
-    val copy_file_result : copy_file -> unit result
-    (** [copy_file_result c] is [c]'s result. Either the unit or an error. *)
-
-    (** {1:delete File deletions} *)
-
-    type delete
-    (** The type for file deletions. *)
-
-    val delete_file : delete -> Fpath.t
-    (** [delete_file d] is [d]'s deleted file. *)
-
-    val delete_result : delete -> unit result
-    (** [delete_result d] is [d]'s result. *)
-
-    (** {1:mkdir Directory creation} *)
-
-    type mkdir
-    (** The type for directory creation operations. *)
-
-    val mkdir_dir : mkdir -> Fpath.t
-    (** [mkdir_dir mk] is [mk]'s created directory. *)
-
-    val mkdir_result : mkdir -> unit result
-    (** [mkdir_result mk] is [mk]'s result. *)
-
-    (** {1:unit Unit sychronisation} *)
-
-    type sync
-    (** The type for unit synchronisation. *)
-
-    val sync_units : sync -> Unit.Idset.t
-    (** [sync_units s] is the units on which [s] synchronizes. *)
-
-    (** {1:kind Operation kinds} *)
-
-    type kind =
-      | Spawn of spawn
-      | Read of read
-      | Write of write
-      | Copy_file of copy_file
-      | Delete of delete
-      | Mkdir of mkdir
-      | Sync of sync (** *)
-    (** The type for asynchronous operation kinds. *)
-
-    val kind : t -> kind
-    (** [kind o] is [o]'s kind. *)
-
-    (** {1:preds Predicates} *)
-
-    val cycle : t -> t -> (Fpath.t * Fpath.t) option
-    (** [cycle o0 o1] is [Some (r0, r1)] with [r0] a file read by [o0]
-        and written by [o1] and [r1] a file read by [o1] and written by
-        [o0] or [None] if there no such two files. *)
-
-    val equal : t -> t -> bool
-    (** [equal o0 o1] is [true] iff [o0] and [o1] are the same operation. *)
-
-    val compare : t -> t -> int
-    (** [compare o0 o1] is a total order on operation compatible with
-        {!equal}. *)
-
-    val compare_exec_start_time : t -> t -> int
-    (** [compare o0 o1] is a total order on operations according to their
-        {!exec_start_time}. *)
-
-    (** {1:pretty Pretty printing} *)
-
-    val pp : t Fmt.t
-    val dump : t Fmt.t
-    val pp_spawn_fail : t Fmt.t
-    val pp_log_line : t Fmt.t
-    val pp_long : t Fmt.t
-    (** {1:setmap Sets and maps} *)
-
-    type set
-    (** The type for sets of operations. *)
-
-    (** Sets of operations. *)
-    module Set : sig
-      include Set.S with type elt := t
-                     and type t = set
-    end
-
-    type +'a map
-    (** The type for operation maps. *)
-
-    (** Operation maps. *)
-    module Map : sig
-      include Map.S with type key := t
-                     and type 'a t := 'a map
-      val dom : 'a map -> set
-      val of_list : (t * 'a) list -> 'a map
-      type 'a t = 'a map
-    end
-  end
-
-  val ops : t -> Op.t list
-  (** [ops o] are the build's operations. *)
-
-  val ops_to_json : t -> Op.t list -> string
-  (** [ops_to_json o ops] outputs JSON text in
-      {{:https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview}Trace Event Format}.
-
-      {b TODO} This should be moved somewhere else so that we can
-      get rid of {!Json} in the core library. *)
-
-  (** {1:stats Run statistics} *)
-
-(*
-    val age : outcome -> int
-    (** [age o] is the build age of [o]. *)
-*)
-
-(*
-    val op_count : outcome -> int
-    (** [op_count o] is the number of build operations performed
-        (cached or not). *)
-
-    val prev_op_count : outcome -> int
-    (** [prev_op_count] is the {!op_count} of the previous age. *)
-
-    val duration : outcome -> int64
-    (** [duration o] is the monotonic wall-clock time span it took
-        between the build {!init} and {!finish} as an unsigned [int64]
-        number. *)
-
-    val prev_duration : outcome -> int64
-    (** [prev_duration] is the {!duration} of the previous age. *)
-
-*)
-  val pp_stats : t Fmt.t
-  (** [pp_stats ppf o] prints [o]'s statistics on [ppf]. *)
+      returned if none can be found. FIXME I guess it errors, also att
+      opt_key that doesn't error. *)
 end
 
 (** Build cache. *)
@@ -3494,7 +3159,7 @@ ready b src; src
 
   val spawn :
     build -> ?reads:Fpath.t list -> ?writes:Fpath.t list ->
-    ?success:int list -> ?env:OS.Env.t -> ?cwd:Fpath.t -> ?stdin:Fpath.t ->
+    ?exits:int list -> ?env:OS.Env.t -> ?cwd:Fpath.t -> ?stdin:Fpath.t ->
     ?stdout:stdo -> ?stderr:stdo -> run -> unit
   (** [spawn b ~reads ~writes ~success ~env ~cwd ~stdin ~stdout ~stderr
       run] spawns [run] once [reads] files are ready and makes files
@@ -3509,7 +3174,7 @@ ready b src; src
          outputs of the command, see {!stdo}. {b Warning.} File redirections
          are not automatically added to [writes]; this allows for example
          to use {!OS.File.null}.}
-      {- [success] the exit codes that determine if the build operation
+      {- [exits] the exit codes that determine if the build operation
          is successful (defaults to [0], use [[]] to always succeed)}
       {- [env], environment variables added to the build environment.
          This overrides environment variables read by the tool in the
@@ -3622,25 +3287,34 @@ ready b src; src
          to [Tty.None].}} *)
 
   val create :
-    ?prev_outcome:Outcome.t -> Cache.t -> ctrl -> Env.t -> Conf.t ->
-    Meta.Fpath.Map.t -> dir:Fpath.t -> universe:Unit.t list -> Unit.t list ->
-    build result
+    Cache.t -> ctrl -> Env.t -> Conf.t -> Meta.Fpath.Map.t ->
+    dir:Fpath.t -> universe:Unit.t list -> Unit.t list -> build result
   (** [init cache ctrl ~dir] initializes a new build using [dir] as the build
       directory.
 
       {b WARNING.} Anything can happen in that directory do not use
       a [dir] that contains data you might want to keep. *)
 
+  val env : build -> Env.t
+  (** [env b] is [b]'s environment. *)
+
   val dir : build -> Fpath.t
   (** [dir b] is the absolute path to [b]'s build directory. It is unlikely
       you will have to use this. *)
 
   val cache : build -> Cache.t
-  val stored_conf : build -> Conf.t
-  val outcome : build -> Outcome.t
-  (** [outcome b] is [b]'s outcome.
 
-      @raise Invalid_argument if [b] is not {{!finish}finished}. *)
+  val stored_conf : build -> Conf.t
+
+  val cpu_dur : build -> Time.cpu
+  (** [cpu_dur d] is the current cpu duration. The value freezes
+      after {!finish}. *)
+
+  val total_dur : build -> Time.span
+  (** [total_dur b] is the current total wall-time duration. The value
+      frezzes after {!finish}. *)
+
+  val finished : build -> bool
 
   (** {1:running Running the build} *)
 
@@ -3649,7 +3323,355 @@ ready b src; src
 
   val finish : build -> unit result
   (** [finish b] finishes the build [b]. *)
+
 end
+
+(** Build outcomes.
+
+    A build outcome holds information about a finished build. In particular
+    remembers all the build operation and their metadata.
+
+    {b TODO} This should be revamped a bit. *)
+module Outcome : sig
+
+  (** {1:outcomes Outcomes} *)
+
+  type t
+  (** The type for build outcomes.  *)
+
+  val of_build : ?prev:t -> build -> t
+  (** [of_build ?prev b] is the build outcome of [b], [prev] if specified
+      indicates a previous build outcome.
+
+      @raise Invalid_argument if [b] is not {{!Build.finish}finished}. *)
+
+  val read : Fpath.t -> t result
+  (** [read file] reads a build outcome from [file]. *)
+
+  val write : Fpath.t -> t -> unit result
+  (** [write file o] writes the build outcome [o] to file [file]. *)
+
+  val fpath_meta : t -> Meta.Fpath.Map.t
+  (** [fpath_meta o] is the file metadata for the build. *)
+
+  val conf : t -> Conf.t
+  (** [conf o] is the effective configuration used by the build. *)
+
+  val unit_names : t -> string list
+  (** [unit_names o] are the names of the units that were built. *)
+
+  val unit_id_name_map : t -> string Unit.Idmap.t
+  (** [unit_id_name_map o] maps identifiers of units built in [o] to their
+      name. *)
+
+  val unit_id_set : string list -> t -> Unit.Idset.t
+  (** [unit_id_set names o] is the set of unit identifers that matches
+      names in [o]. *)
+
+  val root_files : t -> Fpath.set
+  (** [root_file o] is the set of root files in [o]. *)
+
+  val built_files : t -> Fpath.set
+  (** [built_files o] is the of files that are written in [o]. *)
+
+  (** {1:ops Build operations} *)
+
+  (** Build operations *)
+  module Op : sig
+
+    (** {1:op Operations} *)
+
+    type id = int
+    (** The type for build operation identifiers. *)
+
+    type t
+    (** The type for build operations. *)
+
+    val id : t -> id
+    (** [id o] is the identifier of operation [o]. *)
+
+    val unit_id : t -> Unit.id
+    (** [unit_id o] is the identifier of the unit in which the operation was
+        submitted. {b Warning} This should be used to look up units defined
+        in the current program run. But only matched against unit metadata
+        present in the build outcome itself, see {!unit_id_name_map}. *)
+
+    val aim : t -> Env.build_aim
+    (** [aim o] is the build target for which the operation was submitted. *)
+
+    val reads : t -> Fpath.set
+    (** [reads o] are the file paths read by operation. *)
+
+    val writes : t -> Fpath.set
+    (** [writes o] writes are the file paths written by [o]. *)
+
+    val creation_time : t -> Time.span
+    (** [creation_time o] is [o]'s monotonic creation time. *)
+
+    val exec_start_time : t -> Time.span
+    (** [exec_start_time o] is [o]'s monotonic operating system starting
+        execution time. This is different from {!Time.zero} once the
+        operation has been submitted to the OS for execution. *)
+
+    val exec_end_time : t -> Time.span
+    (** [exec_end_time o] is [o]'s monotonic time when the operation's has
+        been processed by the operating system. This is different from
+        {!Time.zero} once the operation has been completed by the OS
+        and collected and processed into [Executed] status by the build
+        program. *)
+
+    type status = Guarded | Ready | Executed | Cached | Aborted (** *)
+    (** The type for operation statuses.
+        {ul
+        {- [Guarded] the operation is guarded from execution (initial state).}
+        {- [Ready] the operation is ready to be submitted for execution.}
+        {- [Executed] the operation has been executed by the OS
+             (but it may not have succeded), see the individual operation
+             results.}
+        {- [Cached] the operation is successful and has been executed
+           from the cache.}
+        {- [Aborted] the operation did not execute.}} *)
+
+    val status : t -> status
+    (** [status o] is [o]'s status. *)
+
+    val cached : t -> bool
+    (** [cached o] is [true] iff [status o = Cached]. *)
+
+    val pp_status : status Fmt.t
+    (** [pp_status] is a formatter for statuses. *)
+
+    val stamp : t -> Stamp.t
+    (** [stamp o] is [o]'s stamp. *)
+
+    (** {1:spawn Process spawns} *)
+
+    type spawn_pid = int
+    (** The type for OS specific process identifiers. *)
+
+    type spawn_stdo = [ `Ui | `File of Fpath.t | `Tee of Fpath.t ]
+    (** The type for spawn standard output redirections. *)
+
+    type spawn_stdo_ui =
+      [ `Tmp_file of Fpath.t | `Stdo of string result | `None ]
+    (** The type for spawn standard output [`Ui] redirection result. When
+        submitted this becomes [`Tmp_file], once read back this is [`Stdo]. *)
+
+    type spawn_env = string array
+    (** The type for spawn process environments. *)
+
+    type spawn_allowed_exits = int list option
+    (** The list of exit codes that indicates success. If this is [None]
+        only zero is success. If the list is empty this any exit code. *)
+
+    type spawn
+    (** The type for process spawn operations. *)
+
+    val spawn_cmd : spawn -> Cmd.t
+    (** [spawn_cmd s] is [s]'s invocation. *)
+
+    val spawn_env : spawn -> spawn_env
+    (** [spawn_env s] is the environment in which [s] was run. *)
+
+    val spawn_cwd : spawn -> Fpath.t
+    (** [spawn_cwd s] is the current working directory in which [s] was run. *)
+
+    val spawn_stdin : spawn -> Fpath.t option
+    (** [spawn_stdin s] is file where stdin was read from for [s] (if any). *)
+
+    val spawn_stdout : spawn -> spawn_stdo
+    (** [spawn_stdout s] is destination to which stdout was written for [s]. *)
+
+    val spawn_stderr : spawn -> spawn_stdo
+    (** [spawn_stderr s] is destination to which stderr was written for [s]. *)
+
+    val spawn_allowed_exits : spawn -> int list option
+    (** [spawn_allowed_exits s] is the list of exit codes denoting success
+        for the operation. *)
+
+    val spawn_stdo_ui : spawn -> spawn_stdo_ui
+    (** [spawn_stdo_ui s] is the [`Ui] redirection result of [s]. *)
+
+    val spawn_result : spawn -> (spawn_pid * OS.Cmd.status) result
+    (** [spawn_result s] is [s]'s OS completion result or an error. *)
+
+    (** {1:read File reads} *)
+
+    type read
+    (** The type for file read operations. *)
+
+    val read_file : read -> Fpath.t
+    (** [read_file r] is [r]'s read file. *)
+
+    val read_result : read -> string result
+    (** [read_result r] is [r]'s result. Either the read data or an
+    error. *)
+
+    (** {1:write File writes} *)
+
+    type write
+    (** The type for (atomic) file write operations. *)
+
+    val write :
+      Unit.t -> Env.build_aim -> Time.span -> reads:Fpath.set ->
+      Fpath.t -> t
+    (** [write u f], when submitted, starts to atomically set the
+        contents of [f] to [write_data w]. *)
+
+    val write_file : write -> Fpath.t
+    (** [write_file w] is [w]'s written file. *)
+
+    val write_data : write -> string
+    (** [write_data w] is [w]'s written data. *)
+
+    val write_result : write -> unit result
+    (** [write_result w] is [w]'s result. Either unit or an error. *)
+
+    (** {1:copyfile File copies} *)
+
+    type copy_file
+    (** The type for file copies. *)
+
+    val copy_file_src : copy_file -> Fpath.t
+    (** [copy_file_src c] is [c]'s source file. *)
+
+    val copy_file_dst : copy_file -> Fpath.t
+    (** [copy_file_dst c] is [c]'s destination file. *)
+
+    val copy_file_linenum : copy_file -> int option
+    (** [copy_file_linenum c]  is [c]'s line number directive value (if any). *)
+
+    val copy_file_result : copy_file -> unit result
+    (** [copy_file_result c] is [c]'s result. Either the unit or an error. *)
+
+    (** {1:delete File deletions} *)
+
+    type delete
+    (** The type for file deletions. *)
+
+    val delete_file : delete -> Fpath.t
+    (** [delete_file d] is [d]'s deleted file. *)
+
+    val delete_result : delete -> unit result
+    (** [delete_result d] is [d]'s result. *)
+
+    (** {1:mkdir Directory creation} *)
+
+    type mkdir
+    (** The type for directory creation operations. *)
+
+    val mkdir_dir : mkdir -> Fpath.t
+    (** [mkdir_dir mk] is [mk]'s created directory. *)
+
+    val mkdir_result : mkdir -> unit result
+    (** [mkdir_result mk] is [mk]'s result. *)
+
+    (** {1:unit Unit sychronisation} *)
+
+    type sync
+    (** The type for unit synchronisation. *)
+
+    val sync_units : sync -> Unit.Idset.t
+    (** [sync_units s] is the units on which [s] synchronizes. *)
+
+    (** {1:kind Operation kinds} *)
+
+    type kind =
+      | Spawn of spawn
+      | Read of read
+      | Write of write
+      | Copy_file of copy_file
+      | Delete of delete
+      | Mkdir of mkdir
+      | Sync of sync (** *)
+    (** The type for asynchronous operation kinds. *)
+
+    val kind : t -> kind
+    (** [kind o] is [o]'s kind. *)
+
+    val kind_to_string : kind -> string
+    (** [kind_to_string k] is a string token for [k]. *)
+
+    (** {1:preds Predicates} *)
+
+    val cycle : t -> t -> (Fpath.t * Fpath.t) option
+    (** [cycle o0 o1] is [Some (r0, r1)] with [r0] a file read by [o0]
+        and written by [o1] and [r1] a file read by [o1] and written by
+        [o0] or [None] if there no such two files. *)
+
+    val equal : t -> t -> bool
+    (** [equal o0 o1] is [true] iff [o0] and [o1] are the same operation. *)
+
+    val compare : t -> t -> int
+    (** [compare o0 o1] is a total order on operation compatible with
+        {!equal}. *)
+
+    val compare_exec_start_time : t -> t -> int
+    (** [compare o0 o1] is a total order on operations according to their
+        {!exec_start_time}. *)
+
+    (** {1:pretty Pretty printing} *)
+
+    val pp : t Fmt.t
+    val pp_spawn_fail : t Fmt.t
+    val pp_log_line : t Fmt.t
+    val pp_long : t Fmt.t
+
+    (** {1:setmap Sets and maps} *)
+
+    type set
+    (** The type for sets of operations. *)
+
+    (** Sets of operations. *)
+    module Set : sig
+      include Set.S with type elt := t
+                     and type t = set
+    end
+
+    type +'a map
+    (** The type for operation maps. *)
+
+    (** Operation maps. *)
+    module Map : sig
+      include Map.S with type key := t
+                     and type 'a t := 'a map
+      val dom : 'a map -> set
+      val of_list : (t * 'a) list -> 'a map
+      type 'a t = 'a map
+    end
+  end
+
+  val ops : t -> Op.t list
+  (** [ops o] are the build's operations. *)
+
+  (** {1:stats Build statistics} *)
+
+(*
+    val age : outcome -> int
+    (** [age o] is the build age of [o]. *)
+*)
+
+(*
+    val op_count : outcome -> int
+    (** [op_count o] is the number of build operations performed
+        (cached or not). *)
+
+    val prev_op_count : outcome -> int
+    (** [prev_op_count] is the {!op_count} of the previous age. *)
+
+    val duration : outcome -> int64
+    (** [duration o] is the monotonic wall-clock time span it took
+        between the build {!init} and {!finish} as an unsigned [int64]
+        number. *)
+
+    val prev_duration : outcome -> int64
+    (** [prev_duration] is the {!duration} of the previous age. *)
+
+*)
+  val pp_stats : t Fmt.t
+  (** [pp_stats ppf o] prints [o]'s statistics on [ppf]. *)
+end
+
 
 (** {1 Organizing and deploying builds}
 
@@ -4032,74 +4054,6 @@ module Sexp : sig
     (** [parse_list_kind parse key se] is like {!parse_list} but
         uses [parse] to transform the atom. [parse] should raise
         [Failure] in case of error. *)
-end
-
-(** JSON text encoder.
-
-    {b Warning.} The module assumes strings are UTF-8 encoded. *)
-module Json : sig
-  (** {1 Generation sequences} *)
-
-  type 'a seq
-  (** The type for sequences. *)
-
-  val empty : 'a seq
-  (** An empty sequence. *)
-
-  val ( ++ ) : 'a seq -> 'a seq -> 'a seq
-  (** [s ++ s'] is sequence [s'] concatenated to [s]. *)
-
-  (** {1 JSON values} *)
-
-  type t
-  (** The type for JSON values. *)
-
-  type mem
-  (** The type for JSON members. *)
-
-  type el
-  (** The type for JSON array elements. *)
-
-  val null : t
-  (** [null] is the JSON null value. *)
-
-  val bool : bool -> t
-  (** [bool b] is [b] as a JSON boolean value. *)
-
-  val int : int -> t
-  (** [int i] is [i] as a JSON number. *)
-
-  val str : string -> t
-  (** [str s] is [s] as a JSON string value. *)
-
-  val el : t -> el seq
-  (** [el v] is [v] as a JSON array element. *)
-
-  val el_if : bool -> (unit -> t) -> el seq
-  (** [el_if c v] is [el (v ())] if [c] is [true] and {!empty} otherwise. *)
-
-  val arr : el seq -> t
-  (** [arr els] is an array whose values are defined by the elements [els]. *)
-
-  val mem : string -> t -> mem seq
-  (** [mem n v] is an object member whose name is [n] and value is [v]. *)
-
-  val mem_if : bool -> string -> (unit -> t) -> mem seq
-  (** [mem_if c n v] is [mem n v] if [c] is [true] and {!empty} otherwise. *)
-
-  val obj : mem seq -> t
-  (** [obj mems] is an object whose members are [mems]. *)
-
-  (** {1 Output} *)
-
-  val buffer_add : Buffer.t -> t -> unit
-  (** [buffer_add b j] adds the JSON value [j] to [b]. *)
-
-  val to_string : t -> string
-  (** [to_string j] is the JSON value [j] as a string. *)
-
-  val output : out_channel -> t -> unit
-  (** [output oc j] outputs the JSON value [j] on [oc]. *)
 end
 
 (** {1:manual Manual}

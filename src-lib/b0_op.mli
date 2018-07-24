@@ -4,7 +4,7 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** Build operations.*)
+(** Build operations. See {!B0.Outcome.Op}. *)
 
 open B0_result
 
@@ -53,27 +53,16 @@ val exec_end_time : t -> B0_time.span
 val set_exec_end_time : t -> B0_time.span -> unit
 (** [set_exec_end_time o t] sets [o]'s return time to [t]. *)
 
-val cached : t -> bool
-(** [cached o] is [true] if the result of the operation was looked up
-    in the cache. *)
-
-val set_cached : t -> bool -> unit
-(** [set_cached o c] sets {!cached} to [c] for [o]. *)
-
-type status =
-| Guarded
-| Ready
-| Executed
-| Finished
+type status = Guarded | Ready | Executed | Cached | Aborted (** *)
 (** The type for operation statuses.
     {ul
     {- [Guarded] the operation is guarded from execution (initial state).}
-    {- [Ready] the operation is ready to be submitted for execution. This
-       does not mean that the operation has been submitted to the OS yet,
-       see {!seq}.}
-    {- [Executed] is [true] iff [o] has been executed by the OS (but it may not
+    {- [Ready] the operation is ready to be submitted for execution.}
+    {- [Executed] the operation has been executed by the OS (but it may not
        have succeded), see the individual operation results.}
-    {- [Finished] the effects of the operation have been applied.}} *)
+    {- [Cached] the operation is successful and has been executed
+       from the cache.}
+    {- [Aborted] the operation did not execute.}} *)
 
 val status : t -> status
 (** [status o] is [o]'s status. *)
@@ -83,6 +72,9 @@ val set_status : t -> status -> unit
 
 val pp_status : status B0_fmt.t
 (** [pp_status] is a formatter for statuses. *)
+
+val cached : t -> bool
+(** [cached o] is [true] iff [status o = Cached]. *)
 
 val stamp : t -> B0_stamp.t
 (** [stamp o] is [o]'s stamp. This should be {!B0_stamp.zero} until
@@ -108,7 +100,7 @@ type spawn_stdo_ui =
 type spawn_env = string array
 (** The type for spawn process environments. *)
 
-type spawn_success_codes = int list option
+type spawn_allowed_exits = int list option
 (** The list of exit codes that indicates success. If this is [None]
     only zero is success. If the list is empty this any exit code. *)
 
@@ -117,7 +109,7 @@ type spawn
 
 val spawn :
   B0_unit.t -> B0_conf.build_aim -> B0_time.span -> reads:B0_fpath.set ->
-  writes:B0_fpath.set -> success:spawn_success_codes ->
+  writes:B0_fpath.set -> exits:spawn_allowed_exits ->
   stdin:B0_fpath.t option -> stdout:spawn_stdo -> stderr:spawn_stdo ->
   cwd:B0_fpath.t -> spawn_env -> B0_cmd.t -> t
 (** [spawn u t reads writes success stdin stdout stderr cwd env cmd],
@@ -146,9 +138,9 @@ val spawn_stdout : spawn -> spawn_stdo
 val spawn_stderr : spawn -> spawn_stdo
 (** [spawn_stderr s] is destination to which stderr was written for [s]. *)
 
-val spawn_success_codes : spawn -> int list option
-(** [spawn_success_codes s] is the list of exit codes denoting success
-    for the oparation. *)
+val spawn_allowed_exits : spawn -> int list option
+(** [spawn_allowed_exits s] is the list of exit codes denoting success
+    for the operation. *)
 
 val spawn_stdo_ui : spawn -> spawn_stdo_ui
 (** [spawn_stdo_ui s] is the [`Ui] redirection result of [s]. *)
@@ -156,6 +148,9 @@ val spawn_stdo_ui : spawn -> spawn_stdo_ui
 val set_spawn_stdo_ui : spawn -> spawn_stdo_ui -> unit
 (** [set_spawn_stdo_ui s st] sets the [`Ui] redirection result to
     [st]. *)
+
+val spawn_has_stdo_ui : spawn -> bool
+(** [spawn_has_stdo_ui s] is [true] if [spawn_stdo_ui] is [`Stdo _]. *)
 
 val spawn_result : spawn -> (spawn_pid * B0_os.Cmd.status) result
 (** [spawn_result s] is [s]'s OS completion result or an error. *)
@@ -356,10 +351,10 @@ val compare_exec_start_time : t -> t -> int
 (** {1:pretty Pretty printing} *)
 
 val pp : t B0_fmt.t
-val dump : t B0_fmt.t
 val pp_spawn_fail : t B0_fmt.t
 val pp_log_line : t B0_fmt.t
 val pp_long : t B0_fmt.t
+val pp_spawn_stdo_ui : spawn_stdo_ui B0_fmt.t
 
 (** {1:setmap Sets and maps} *)
 

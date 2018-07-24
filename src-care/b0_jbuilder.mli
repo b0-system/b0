@@ -4,7 +4,7 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** [jbuilder] compatiblity.
+(** [jbuilder] compatibility.
 
     This module reads [jbuild] files and expose them as
     {!B0_ocaml.Unit} build units. For the time being you need to

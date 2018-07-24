@@ -4,9 +4,7 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** File paths.
-
-    See {!B0.Fpath}. *)
+(** File paths. See {!B0.Fpath}. *)
 
 open B0_result
 
@@ -66,8 +64,9 @@ val ( -+ ) : t -> ext -> t
 
 (** {1 Pretty printing} *)
 
-val pp : Format.formatter -> t -> unit
-val dump : Format.formatter -> t -> unit
+val pp : t B0_fmt.t
+val pp_quoted : t B0_fmt.t
+val dump : t B0_fmt.t
 
 (** {1 Sets and maps} *)
 

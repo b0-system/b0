@@ -5,7 +5,7 @@ points see the [manual][manual]. For a short summary of b0's features,
 see the [propaganda][propaganda].
 
 [manual]: http://erratique.ch/software/b0/doc
-[propaganda]: README.md#Propaganda
+[propaganda]: README.md#propaganda
 
 ## Goals
 

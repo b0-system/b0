@@ -18,7 +18,7 @@ let err s = Error (`Msg (B0_string.(strf "%a: invalid path" dump s)))
 
 module Windows = struct
 
-  (* FIXME the {of_string,path_start} needs reviewing/testing *)
+  (* XXX the {of_string,path_start} needs reviewing/testing *)
 
   let dir_sep_char = '\\'
   let char_is_dir_sep c = c = '\\' || c = '/'
@@ -359,6 +359,7 @@ let ( -+ ) p e = set_ext e p
 (* Pretty printing *)
 
 let pp = B0_string.pp
+let pp_quoted ppf p = B0_string.pp ppf (Filename.quote p)
 let dump = B0_string.dump
 
 (* String map and sets *)

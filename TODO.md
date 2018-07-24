@@ -9,7 +9,6 @@
 * `b0 env`,  `b0 exec-env` 
 * Consider reording tool & conf. Also `Conf` became a mess make it more
   `Build`-like.
-* What about making error messages `Msg of unit B0_fmt`. 
 * Build need a way to know if we are a root unit or not.
 * Serialization move away from Marshal, so that proxy build
   data can be read back.
@@ -29,6 +28,8 @@
 * B0_ocaml, stub changes do not retrigger some compilation.
   Make library archive depend on stubs. May also be the reason
   for spurious failures in examples.
+* b0 log [-f] [-n] [-i]  [--failure] [--reads] [--writes] [--file] [--pkg]
+* Distingish paths in `Cmd.t` ? 
 
 # B0.Def
 

@@ -101,7 +101,6 @@ let drop ~sat s =
   in
   loop max s 0
 
-
 let err_empty_sep = "~sep is an empty string"
 
 let fcut ~sep s =
@@ -330,7 +329,7 @@ let suggest ?(dist = 2) candidates s =
     min, acc
   in
   let d, suggs = List.fold_left add (max_int, []) candidates in
-  if d <= dist (* suggest only if not too far *) then suggs else []
+  if d <= dist (* suggest only if not too far *) then List.rev suggs else []
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers

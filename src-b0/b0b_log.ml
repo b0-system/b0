@@ -64,7 +64,10 @@ let out_log fmt units cached ids json no_pager color o =
   | names, ret ->
       let ops = select_ops o names cached ids in
       match json with
-      | true -> Log.app (fun m -> m "%s" (Outcome.ops_to_json o ops)); Ok `Ok
+      | true ->
+          let json = B0_extra.ops_to_trace_event_format o ops in
+          let json = B0_json.G.to_string json in
+          Log.app (fun m -> m "%s" json); Ok `Ok
       | false ->
           match no_pager with
           | true -> log_outcome fmt o ops
@@ -86,16 +89,15 @@ let out_log fmt units cached ids json no_pager color o =
 let log variant units cached ids fmt json no_pager setup =
   let b0_dir = Driver.b0_dir setup in
   let log = Log.Error in
-  begin
-    match B0b_cli.get_variant ~log ~cli:variant ~b0_dir with
-    | Error err -> Ok err
-    | Ok load ->
-        let variant = Variant.of_load load in
-        match B0b_cli.variant_get_outcome ~log variant with
-        | Error exit -> Ok exit
-        | Ok o ->
-            let color = Driver.color setup in
-            out_log fmt units cached ids json no_pager color o
+  begin match B0b_cli.get_variant ~log ~cli:variant ~b0_dir with
+  | Error err -> Ok err
+  | Ok load ->
+      let variant = Variant.of_load load in
+      match B0b_cli.variant_get_outcome ~log variant with
+      | Error exit -> Ok exit
+      | Ok o ->
+          let color = Driver.color setup in
+          out_log fmt units cached ids json no_pager color o
   end
   |> B0b_cli.to_exit_code |> B0_driver.Cli.handle_error
 

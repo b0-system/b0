@@ -73,7 +73,7 @@ val file_stamp_dur : t -> B0_time.span
 
 val exec : t -> B0_op.t -> bool
 val add_op : t -> B0_op.t -> unit
-val file_stamp : t -> B0_fpath.t -> B0_stamp.t
+val file_stamp : t -> B0_fpath.t -> B0_stamp.t option result
 val file_stamps : t -> B0_stamp.t B0_fpath.Map.t
 
 (*---------------------------------------------------------------------------

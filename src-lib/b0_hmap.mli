@@ -4,9 +4,7 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** Type-safe, serializable, heterogeneous value maps.
-
-    See {!B0.Hmap}. *)
+(** Type-safe, serializable, heterogeneous value maps. See {!B0.Hmap}. *)
 
 open B0_result
 

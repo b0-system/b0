@@ -10,13 +10,13 @@ development to deployment.
 
 B0's core build library provides reliable, efficient and minimal
 rebuilds by parallel invocation of memoized build commands. See the
-[propaganda][#Propaganda] for more information.
+[propaganda](#propaganda) for more information.
 
 B0 provides the following packages and tooling.
 
 * `b0-lib` provides `B0`, the build library that implements a generic,
   memoizing build system and `B0_care` a set of (optional)
-  [convenience descriptions](#Convenience_descriptions).
+  [convenience descriptions](#convenience-descriptions).
 
 * `b0` provide the `b0` and `d0` command line tool that configure, build
    and deploy software described in composable `B0.ml` description files.
@@ -24,8 +24,10 @@ B0 provides the following packages and tooling.
 The B0 package suite is distributed under the ISC license. `b0-lib` has
 no dependencies and `b0` depends on [cmdliner][cmdliner].
 
-Homepage: http://erratique.ch/software/b0  
 [cmdliner]: http://erratique.ch/software/cmdliner
+
+Homepage: http://erratique.ch/software/b0  
+
 
 ## Propaganda
 
@@ -84,7 +86,7 @@ b0 can be installed with `opam`:
 
     opam install b0
 
-If you don't use `opam` consult the [`opam`](opam) file for build
+If you don't use `opam` consult the [`b0.opam`](b0.opam) file for build
 instructions.
 
 ## Documentation & manual

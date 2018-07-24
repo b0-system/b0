@@ -284,24 +284,27 @@ let action cli descr ~driver_dir ~driver_name ~driver_libs ~bin =
 (* FIXME reuse B0 funs, also hash OCAMLLIB OCAMLPARAM etc. *)
 
 let action_stamp a =
-  let hash_file_to_bytes f = Hash.(to_bytes @@ file f) in
-  let byte_lib_stamp acc l = hash_file_to_bytes l :: acc in
-  let native_lib_stamp acc l =
-    hash_file_to_bytes l :: hash_file_to_bytes Fpath.(l -+ a.clib_ext) :: acc
-  in
-  let hash_lib = match fst a.compiler with
-  | `Native -> native_lib_stamp
-  | `Byte -> byte_lib_stamp
-  in
-  let comp = Fpath.v @@ Cmd.get_line_tool @@ snd a.compiler in
-  let cstamp = Hash.(to_bytes @@ file comp) in
-  let lib_stamps = List.fold_left hash_lib [] a.libs in
-  Ok (Hash.to_bytes @@ Hash.string @@
-      String.concat "" @@
-      (a.src :: cstamp ::
-       (List.rev_append lib_stamps @@
-        List.rev_append (Cmd.to_rev_list a.cflags) @@
-        Cmd.to_rev_list a.lflags)))
+  try
+    let hash_file f = Hash.to_bytes @@ R.failwith_error_msg @@ Hash.file f in
+    let byte_lib_stamp acc l = hash_file l :: acc in
+    let native_lib_stamp acc l =
+      hash_file l :: hash_file Fpath.(l -+ a.clib_ext) :: acc
+    in
+    let hash_lib = match fst a.compiler with
+    | `Native -> native_lib_stamp
+    | `Byte -> byte_lib_stamp
+    in
+    let comp = Fpath.v @@ Cmd.get_line_tool @@ snd a.compiler in
+    let cstamp = hash_file comp in
+    let lib_stamps = List.fold_left hash_lib [] a.libs in
+    Ok (Hash.to_bytes @@ Hash.string @@
+        String.concat "" @@
+        (a.src :: cstamp ::
+         (List.rev_append lib_stamps @@
+          List.rev_append (Cmd.to_rev_list a.cflags) @@
+          Cmd.to_rev_list a.lflags)))
+  with
+  | Failure msg -> Error (`Msg msg)
 
 let compile a =
   let driver_dir = a.driver_dir in

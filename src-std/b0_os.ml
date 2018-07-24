@@ -237,11 +237,6 @@ module File = struct
 
   (* Handling tmp files *)
 
-  let rand_suff =
-    fun () ->
-      let rand = Random.State.bits (Lazy.force rand_gen) land 0xFFFFFF in
-      Printf.sprintf "-%06x.tmp" rand
-
   let rec unlink_tmp file = try Unix.unlink (B0_fpath.to_string file) with
   | Unix.Unix_error (Unix.EINTR, _, _) -> unlink_tmp file
   | Unix.Unix_error (e, _, _) -> ()
@@ -254,13 +249,14 @@ module File = struct
 
   let open_tmp
       ?(flags = Unix.[O_WRONLY; O_CREAT; O_EXCL; O_SHARE_DELETE; O_CLOEXEC])
-      ?(mode = 0o600) p
+      ?(mode = 0o600) ?(ext = ".tmp") p
     =
+    let rand_num () = Random.State.bits (Lazy.force rand_gen) land 0xFFFFFF in
     let p = B0_fpath.to_string p in
     let rec loop n = match n with
-    | 0 -> R.error_msgf "tmp file %s-X.tmp: too many attempts" p
+    | 0 -> R.error_msgf "tmp file %sX%s: too many attempts" p ext
     | n ->
-        let file = p ^ rand_suff () in
+        let file = strf "%s%06x%s" p (rand_num ()) ext in
         try
           let fd = Unix.openfile file flags mode in
           let file = B0_fpath.v file in
@@ -273,9 +269,9 @@ module File = struct
     in
     loop 10000
 
-  let with_tmp_oc ?flags ?mode p f v =
+  let with_tmp_oc ?flags ?mode ?ext p f v =
     try
-      open_tmp ?flags ?mode p >>= fun (file, fd) ->
+      open_tmp ?flags ?mode ?ext p >>= fun (file, fd) ->
       let oc = Unix.out_channel_of_descr fd in
       let delete_close oc = tmps_rem file; close_out oc in
       try Ok (apply (f file oc) v ~finally:delete_close oc) with
@@ -349,7 +345,7 @@ module Dir = struct
     | true -> Ok false
     | false ->
         match path with
-        | false -> mkdir dir mode >>= fun () -> Ok false
+        | false -> mkdir dir mode >>= fun () -> Ok true
         | true ->
             let rec dirs_to_create p acc = exists p >>= function
               | true -> Ok acc
@@ -488,19 +484,40 @@ module Dir = struct
     with
     | exn -> ignore (set_current old); raise exn
 
+  let user () =
+    let env_var_fallback () =
+      Env.value "HOME" B0_conv.(some fpath) ~absent:None >>= function
+      | Some p -> Ok p
+      | None -> R.error_msgf "Cannot determine user home directory: \
+                              HOME environment variable is undefined"
+    in
+    match Sys.win32 with
+    | true -> env_var_fallback ()
+    | false ->
+        try
+          let uid = Unix.getuid () in
+          let home = (Unix.getpwuid uid).Unix.pw_dir in
+          match B0_fpath.of_string home with
+          | Ok _ as v -> v
+          | Error _ ->
+              B0_log.debug begin fun m ->
+                m "OS.Dir.user: could not parse path from passwd entry (%S)"
+                  home
+              end;
+              env_var_fallback ()
+        with
+        | Not_found -> env_var_fallback ()
+        | Unix.Unix_error (e, _, _) ->
+            B0_log.debug (fun m -> m "OS.Dir.user: %s" (uerror e));
+            env_var_fallback ()
+
   (* Default temporary directory *)
 
   let default_tmp_init =
-    let from_env var ~absent =
-      match try Some (Sys.getenv var) with Not_found -> None with
-      | None -> absent
-      | Some v ->
-          match B0_fpath.of_string v with
-          | Error _ -> absent
-          | Ok v -> v
-    in
-    if Sys.win32 then from_env "TEMP" ~absent:B0_fpath.(v "./") else
-    from_env "TMPDIR" ~absent:(B0_fpath.v "/tmp")
+    let from_env var ~absent = Env.get_value var B0_conv.fpath ~absent in
+    match Sys.win32 with
+    | true -> from_env "TEMP" ~absent:B0_fpath.(v "./")
+    | false -> from_env "TMPDIR" ~absent:(B0_fpath.v "/tmp")
 
   let default_tmp = ref default_tmp_init
   let set_default_tmp p = default_tmp := p

@@ -83,14 +83,14 @@ let build_variant setup v cache ctrl units =
         >>= fun prev_outcome -> B0b_cli.variant_load_conf ~log v
         >>= fun conf -> Variant.Scheme.direct_env d ()
         >>= fun env ->
-        Build.create ?prev_outcome cache ctrl env conf fmeta ~dir:build_dir
+        Build.create cache ctrl env conf fmeta ~dir:build_dir
           ~universe:units units
         >>= fun b -> Build.start b; Build.finish b
-        >>= fun () -> Ok b) ()
-      >>= fun b ->
+        >>= fun () -> Ok (b, prev_outcome)) ()
+      >>= fun (b, prev_outcome) ->
       Log.time (fun _ m -> m "Writing build metadata")
         (fun () ->
-           Outcome.write outcome (Build.outcome b)
+           Outcome.write outcome (Outcome.of_build ?prev:prev_outcome b)
            >>= fun () -> Cache.save (Build.cache b)
            >>= fun () ->
            Ok (B0b_cli.variant_save_conf ~log v (Build.stored_conf b))) ()
@@ -162,7 +162,7 @@ let man =
   [ `S Manpage.s_description;
     `P "The $(tname) command runs the build.";
     `P "If no variant exists, one is automatically created and made default
-        using the variant scheme and made default.";
+        with the default variant scheme.";
     `S Manpage.s_common_options;
     `S Cli.s_driver_opts;
     `S Manpage.s_environment;

@@ -167,7 +167,7 @@ let enum ?(docv = "ENUM") alts =
   let docv = docv in
   { parse; print; decode; encode; docv }
 
-let err_to_exn f v = match f v with Ok v -> v | Error (`Msg m) -> failwith m
+let err_to_exn f v = R.failwith_error_msg @@ f v
 
 let list ?(sep = ",") c =
   let splits ~sep s =
@@ -235,6 +235,16 @@ let option ?(none = "") c =
   in
   let docv = c.docv in
   { parse; print; decode; encode; docv }
+
+let some c =
+  let parse s = c.parse s >>| fun v -> Some v in
+  let print ppf = function Some v -> c.print ppf v | None -> B0_fmt.nop ppf ()in
+  let decode s = c.decode s >>| fun v -> Some v in
+  let encode = function
+  | None -> R.error_msgf "None can't be encoded"
+  | Some v -> c.encode v
+  in
+  { parse; print; decode; encode; docv = c.docv }
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers

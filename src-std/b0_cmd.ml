@@ -44,7 +44,7 @@ let compare l l' = Pervasives.compare l l'
 
 let parse_cmdline s =
   try
-    (* TODO Rewrite, this was quickly ported from bos code based on
+    (* XXX Rewrite, this was quickly ported from bos code based on
        Astring.String.sub *)
     let err_unclosed kind s =
       failwith @@ B0_string.strf "unclosed %s quote delimited string" kind
@@ -122,6 +122,8 @@ let of_rev_list l = l
 let of_values ?slip conv vs = match slip with
 | None -> List.rev_map conv vs
 | Some slip -> List.fold_left (fun acc v -> conv v :: slip :: acc) [] vs
+
+let of_fpaths ?slip ps = of_values ?slip B0_fpath.to_string ps
 
 let pp ppf cmd = match List.rev cmd with
 | [] -> ()

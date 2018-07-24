@@ -9,7 +9,6 @@ B0_result
 B0_rqueue
 B0_hash
 B0_sexp
-B0_json
 B0_string
 B0_tid
 B0_tty

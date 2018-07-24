@@ -114,6 +114,25 @@ let has_tag k u = match B0_meta.Unit.find k (meta u) with
 
 let pkg u = u.pkg
 
+(* Build state *)
+
+type build_status =
+| Active | Failed of unit B0_fmt.t
+| Aborted | Finished
+
+type build_state =
+  { unit : t;
+    mutable status : build_status;
+    mutable activity : int; (* Unfinished ops + konts *) }
+
+let build_state_create u = { unit = u; status = Active; activity = 0 }
+let build_state_unit s = s.unit
+let build_state_status s = s.status
+let build_state_set_status s st = s.status <- st
+let build_state_activity s = s.activity
+let build_state_incr_activity s = s.activity <- s.activity + 1
+let build_state_decr_activity s = s.activity <- s.activity - 1
+
 (* Unit map and sets *)
 
 module Set = struct

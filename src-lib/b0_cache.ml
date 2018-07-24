@@ -49,17 +49,38 @@ type t =
     mutable file_stamps : B0_stamp.t B0_fpath.map;
     mutable file_stamp_dur : B0_time.span; }
 
-let _file_stamp c file = match B0_fpath.Map.find file c.file_stamps with
-| s -> s
+
+let _file_stamp c file = (* FIXME remove *)
+  match B0_fpath.Map.find file c.file_stamps with
+  | s -> s
+  | exception Not_found ->
+      let t = B0_time.counter () in
+      let stamp = R.failwith_error_msg @@ B0_stamp.file file in
+      let dur = B0_time.count t in
+      c.file_stamps <- B0_fpath.Map.add file stamp c.file_stamps;
+      c.file_stamp_dur <- B0_time.add dur c.file_stamp_dur;
+      stamp
+
+let file_stamp c file = match B0_fpath.Map.find file c.file_stamps with
+| s -> Ok (Some s)
 | exception Not_found ->
   let t = B0_time.counter () in
-  let stamp = B0_stamp.file file in
-  let dur = B0_time.count t in
-  c.file_stamps <- B0_fpath.Map.add file stamp c.file_stamps;
-  c.file_stamp_dur <- B0_time.add dur c.file_stamp_dur;
-  stamp
-
-let file_stamp c file = _file_stamp c file (* FIXME catch Sys_error *)
+  let err p e = R.error_msgf "%a: %s" B0_fpath.pp p (Unix.error_message e) in
+  match Unix.(openfile (B0_fpath.to_string file) [O_RDONLY] 0) with
+  | exception Unix.Unix_error (Unix.ENOENT, _, _) -> Ok None
+  | exception Unix.Unix_error (e, _, _) -> err file e
+  | fd ->
+      match B0_stamp.fd fd with
+      | exception Unix.Unix_error (e, _, _)  ->
+          (try Unix.close fd with _ -> ()); err file e
+      | stamp ->
+          match Unix.close fd with
+          | exception Unix.Unix_error (e, _, _) -> err file e
+          | () ->
+              let dur = B0_time.count t in
+              c.file_stamps <- B0_fpath.Map.add file stamp c.file_stamps;
+              c.file_stamp_dur <- B0_time.add dur c.file_stamp_dur;
+              Ok (Some stamp)
 
 let empty ~index_file ~dir =
   { dir; index_file; index = B0_hash.Map.empty;
@@ -133,7 +154,9 @@ let verify ~repair c k = match B0_hash.Map.find k c.index with
     | false ->
         if repair then (c.index <- B0_hash.Map.remove k c.index); Ok `Miss_file
     | true ->
-        let cstamp = B0_stamp.file cached in
+        let cstamp = (* FIXME *)
+          R.failwith_error_msg @@ B0_stamp.file cached
+        in
         match B0_stamp.equal (elt_file_stamp e) cstamp with
         | true -> Ok `Ok
         | false ->
@@ -233,10 +256,9 @@ let log_exec o =
 let rec put_writes_from_cache c o =
   let rec loop o undo = function
   | [] ->
-      B0_op.set_cached o true;
-      B0_op.(set_status o Executed);
+      B0_op.(set_status o Cached);
       B0_op.set_exec_end_time o (time_stamp c);
-      log_exec o; true;
+      log_exec o; true
   | f :: fs ->
       let key = op_write_key o f in
       match put c (cache_file c key) f with
@@ -269,11 +291,11 @@ let rec put_writes_in_cache c o =
   in
   loop o (B0_fpath.Set.elements (B0_op.writes o))
 
-let op_stamp_reads ?(init = []) c o =
-  let add_read f acc = B0_stamp.to_bytes (_file_stamp c f) :: acc in
-  B0_fpath.Set.fold add_read (B0_op.reads o) init
-
 let spawn_stamp c o s =
+  let op_stamp_reads ?(init = []) c o =
+    let add_read f acc = B0_stamp.to_bytes (_file_stamp c f) :: acc in
+    B0_fpath.Set.fold add_read (B0_op.reads o) init
+  in
   let acc = match B0_op.spawn_stdin s with
   | None -> []
   | Some f -> [B0_fpath.to_string f]

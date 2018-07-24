@@ -4,9 +4,7 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** Hash function.
-
-    See {!B0.Hash}. *)
+(** Hash function. See {!B0.Hash}. *)
 
 (** {1 Hash values} *)
 
@@ -23,7 +21,8 @@ val compare : t -> t -> int
 (** {1 Hashing} *)
 
 val string : string -> t
-val file : B0_fpath.t -> t
+val fd : Unix.file_descr -> t
+val file : B0_fpath.t -> t B0_result.result
 
 (** {1 Sets and Maps} *)
 

@@ -4,13 +4,11 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** Human and type-safe binary value conversions.
-
-    See {!B0.conv}. *)
+(** Human and type-safe binary value conversions. See {!B0.conv}. *)
 
 open B0_result
 
-(* Converters *)
+(** {1 Converters} *)
 
 type 'a codec
 val codec : (string -> 'a result) * ('a -> string result) -> 'a codec
@@ -27,7 +25,7 @@ val decode : 'a t -> (string -> 'a result)
 val encode : 'a t -> ('a -> string result)
 val docv : 'a t -> string
 
-(* Predefined converters *)
+(** {2 Predefined converters} *)
 
 val bool : bool t
 val char : char t
@@ -46,6 +44,7 @@ val enum : ?docv:string -> (string * 'a) list -> 'a t
 val list : ?sep:string -> 'a t -> 'a list t
 val pair : ?sep:string -> 'a t -> 'b t -> ('a * 'b) t
 val option : ?none:string -> 'a t -> 'a option t
+val some : 'a t -> 'a option t
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers

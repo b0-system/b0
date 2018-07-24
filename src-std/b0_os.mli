@@ -53,12 +53,12 @@ module File : sig
 
   val write : ?mode:int -> B0_fpath.t -> string -> unit result
   val open_tmp :
-    ?flags:Unix.open_flag list -> ?mode:int -> B0_fpath.t ->
-    (B0_fpath.t * Unix.file_descr) result
+    ?flags:Unix.open_flag list -> ?mode:int -> ?ext:B0_fpath.ext ->
+    B0_fpath.t -> (B0_fpath.t * Unix.file_descr) result
 
   val with_tmp_oc :
-    ?flags:Unix.open_flag list -> ?mode:int -> B0_fpath.t ->
-    (B0_fpath.t -> out_channel -> 'a -> 'b) -> 'a -> 'b result
+    ?flags:Unix.open_flag list -> ?mode:int -> ?ext:B0_fpath.ext ->
+    B0_fpath.t -> (B0_fpath.t -> out_channel -> 'a -> 'b) -> 'a -> 'b result
 end
 
 module Dir : sig
@@ -78,6 +78,7 @@ module Dir : sig
   val current : unit -> B0_fpath.t result
   val set_current : B0_fpath.t -> unit result
   val with_current : B0_fpath.t -> ('a -> 'b) -> 'a -> 'b result
+  val user : unit -> B0_fpath.t result
 
   val default_tmp : unit -> B0_fpath.t
   val set_default_tmp : B0_fpath.t -> unit
@@ -166,7 +167,6 @@ module B0 : sig
   val rm_rf : B0_fpath.t -> Cmd.pid result
   val trash_path : B0_fpath.t -> in_dir:B0_fpath.t -> unit result
 end
-
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers

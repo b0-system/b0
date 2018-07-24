@@ -9,15 +9,12 @@
 type t
 
 val v : string -> t
-
 val empty : t
 val is_empty : t -> bool
-
 val ( % ) : t -> string -> t
 val ( %% ) : t -> t -> t
 val add_arg : t -> string -> t
 val add_args : t -> t -> t
-
 val on : bool -> t -> t
 val p : B0_fpath.t -> string
 
@@ -30,12 +27,12 @@ val compare : t -> t -> int
 
 val of_string : string -> t B0_result.result
 val to_string : t -> string
-
 val to_list : t -> string list
 val to_rev_list : t -> string list
 val of_list : ?slip:string -> string list -> t
 val of_rev_list : string list -> t
 val of_values : ?slip:string -> ('a -> string) -> 'a list -> t
+val of_fpaths : ?slip:string -> B0_fpath.t list -> t
 
 val pp : t B0_fmt.t
 val dump : t B0_fmt.t

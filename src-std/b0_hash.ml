@@ -108,12 +108,20 @@ let pp ppf h = match equal h zero with
 (* Hashing *)
 
 let string s = H.hash_unsafe s 0 (String.length s) H.no_seed
+let fd fd = H.hash_fd fd H.no_seed
 let file p =
   let p = B0_fpath.to_string p in
-  let fd = Unix.(openfile p [O_RDONLY] 0) in
-  match H.hash_fd fd H.no_seed with
-  | exception e -> Unix.close fd; raise e (* FIXME *)
-  | res -> Unix.close fd; res
+  let err p e = B0_result.R.error_msgf "%s: %s" p (Unix.error_message e) in
+  match Unix.(openfile p [O_RDONLY] 0) with
+  | exception Unix.Unix_error (e, _, _) -> err p e
+  | fd ->
+      match H.hash_fd fd H.no_seed with
+      | exception Unix.Unix_error (e, _, _)  ->
+          (try Unix.close fd with _ -> ()); err p e
+      | hash ->
+          match Unix.close fd with
+          | exception Unix.Unix_error (e, _, _)  -> err p e
+          | () -> Ok hash
 
 (* Sets and maps *)
 

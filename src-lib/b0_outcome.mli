@@ -4,26 +4,26 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** Build outcomes.
-
-    See {!B0.Outcome} *)
+(** Build outcomes. See {!B0.Outcome} *)
 
 open B0_result
 
-type t = B0_build.outcome
+type t
+
+val of_build : ?prev:t -> B0_build.t -> t
 val read : B0_fpath.t -> t result
 val write : B0_fpath.t -> t -> unit result
 
 val fpath_meta : t -> B0_meta.Fpath.Map.t
-val root_files : t -> B0_fpath.set
-val built_files : t -> B0_fpath.set
-
 val conf : t -> B0_conf.t
 val units : t -> B0_unit.marshalable list
 val unit_names : t -> string list
-val pp_stats : t B0_fmt.t
+val unit_id_name_map : t -> string B0_unit.Idmap.t
+val unit_id_set : string list -> t -> B0_unit.Idset.t
+val root_files : t -> B0_fpath.set
+val built_files : t -> B0_fpath.set
 
-(* Operations *)
+(** {1 Build operations} *)
 
 module Op : sig
   include module type of B0_op
@@ -31,9 +31,9 @@ end
 
 val ops : t -> Op.t list
 
-val unit_id_name_map : t -> string B0_unit.Idmap.t
-val unit_id_set : string list -> t -> B0_unit.Idset.t
-val ops_to_json : t -> Op.t list -> string
+(** {1 Run statistics} *)
+
+val pp_stats : t B0_fmt.t
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers

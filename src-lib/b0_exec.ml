@@ -13,7 +13,7 @@ open B0_result
 
 type handler =
   { tmp_path : B0_fpath.t;
-    dur_counter : B0_time.counter;
+    clock : B0_time.counter;
     todo : B0_op.t B0_rqueue.t; (* Operations waiting for OS submission *)
     collectable : B0_op.t Queue.t; (* Collectable operations *)
     to_spawn : (* Spawn ops dequeued from [todo] waiting to spawn *)
@@ -23,14 +23,12 @@ type handler =
     mutable spawns : (* Spawned processes *)
       (B0_os.Cmd.pid * B0_op.t) list;  }
 
-let handler
-    ?(rand = Random.State.make_self_init ()) ~max_spawn ~dur_counter ~tmp_path
-    ()
+let handler ?rand ~max_spawn ~clock ~tmp_path ()
   =
-  let todo = B0_rqueue.empty ~rand () in
+  let todo = B0_rqueue.empty ?rand () in
   let collectable = Queue.create () in
   let to_spawn = Queue.create () in
-  { tmp_path; dur_counter; todo; collectable; to_spawn;
+  { tmp_path; clock; todo; collectable; to_spawn;
     max_spawn; spawn_count = 0; spawns = []; }
 
 let all_done h = (* [true] iff nothing left todo in the handler *)
@@ -40,47 +38,51 @@ let all_done h = (* [true] iff nothing left todo in the handler *)
 
 let incr_spawn_count h = h.spawn_count <- h.spawn_count + 1
 let decr_spawn_count h = h.spawn_count <- h.spawn_count - 1
-let time_stamp h = B0_time.count h.dur_counter
+let timestamp h = B0_time.count h.clock
 
 let complete_op h o =
   B0_op.(set_status o Executed);
-  B0_op.set_exec_end_time o (time_stamp h);
+  B0_op.set_exec_end_time o (timestamp h);
   Queue.add o h.collectable
 
 let exec_op h o =
   B0_log.debug (fun m -> m ~header:"EXEC" "%a" B0_op.pp_log_line o);
-  B0_op.set_exec_start_time o (time_stamp h)
-
-let complete_spawn_stdo_ui o s =
-  let get_ui_file s = match B0_op.spawn_stdo_ui s with
-  | `Tmp_file f -> f | `Stdo _ | `None -> assert false
-  in
-  let append f0 f1 =
-    B0_os.File.read f0 >>= fun f0 ->
-    B0_os.File.read f1 >>= fun f1 -> Ok (B0_string.strf "%s\n%s" f0 f1)
-  in
-  let set ui = B0_op.set_spawn_stdo_ui s (`Stdo ui) in
-  match B0_op.spawn_stdout s, B0_op.spawn_stderr s with
-  | `Ui, `Ui -> set @@ B0_os.File.read (get_ui_file s)
-  | `Ui, `File _ | `File _, `Ui -> set @@ B0_os.File.read (get_ui_file s)
-  | `File _, `File _ -> ()
-  | `Ui, `Tee f | `Tee f, `Ui -> set @@ append f (get_ui_file s)
-  | `Tee f0, `Tee f1 -> set @@ append f0 f1
-  | `Tee f, `File _ | `File _, `Tee f -> set @@ B0_os.File.read f
+  B0_op.set_exec_start_time o (timestamp h)
 
 let complete_spawn h o result =
+  let complete_spawn_stdo_ui o s =
+    let get_ui_file s = match B0_op.spawn_stdo_ui s with
+    | `Tmp_file f -> f | `Stdo _ | `None -> assert false
+    in
+    let append f0 f1 =
+      B0_os.File.read f0 >>= fun f0 ->
+      B0_os.File.read f1 >>= fun f1 ->
+      Ok (String.trim @@ B0_string.strf "%s\n%s" f0 f1)
+    in
+    let set ui = match ui with
+    | Ok "" -> B0_op.set_spawn_stdo_ui s `None
+    | ui -> B0_op.set_spawn_stdo_ui s (`Stdo ui)
+    in
+    match B0_op.spawn_stdout s, B0_op.spawn_stderr s with
+    | `Ui, `Ui -> set @@ B0_os.File.read (get_ui_file s)
+    | `Ui, `File _ | `File _, `Ui -> set @@ B0_os.File.read (get_ui_file s)
+    | `File _, `File _ -> ()
+    | `Ui, `Tee f | `Tee f, `Ui -> set @@ append f (get_ui_file s)
+    | `Tee f0, `Tee f1 -> set @@ append f0 f1
+    | `Tee f, `File _ | `File _, `Tee f -> set @@ B0_os.File.read f
+  in
   let s = B0_op.get_spawn o in
   decr_spawn_count h;
   B0_op.set_spawn_result s result;
   complete_spawn_stdo_ui o s;
   complete_op h o
 
-let get_stdo_ui_file h = match B0_os.File.open_tmp h.tmp_path with
-| Ok (file, fd) -> B0_os.Cmd.out_fd ~close:true fd, `Tmp_file file
-| Error (`Msg e) -> failwith e
-
 let exec_spawn h o =
   let spawn s =
+    let get_stdo_ui_file h = match B0_os.File.open_tmp h.tmp_path with
+    | Ok (file, fd) -> B0_os.Cmd.out_fd ~close:true fd, `Tmp_file file
+    | Error (`Msg e) -> failwith e
+    in
     try
       let cmd = B0_op.spawn_cmd s in
       let env = B0_op.spawn_env s in
@@ -110,33 +112,32 @@ let exec_spawn h o =
   exec_op h o;
   spawn (B0_op.get_spawn o)
 
-let relax () = ignore (Unix.select [] [] [] 0.0001)
-
-let rec collect_spawns ~block h = match h.spawn_count = 0 with
-| true -> ()
-| false ->
-    (* We don't collect with -1 or 0 because library-wise we might collect
-       things we did not spawn. On Windows there wouldn't be the choice
-       anyways. This means that on a blocking collection there's a bit
-       of busy waiting involved, which we mitigate with [relax].
-       TODO use sigchld + self-pipe trick ? would that work on windows ?
-       Signals are brittle. *)
-    let old_spawn_count = h.spawn_count in
-    let collect spawns (pid, o as p) =
-      match B0_os.Cmd.collect pid with
+let rec collect_spawns ~block h =
+  let relax () = ignore (Unix.select [] [] [] 0.0001) in
+  match h.spawn_count = 0 with
+  | true -> ()
+  | false ->
+      (* We don't collect with -1 or 0 because library-wise we might collect
+         things we did not spawn. On Windows there wouldn't be the choice
+         anyways. This means that on a blocking collection there's a bit
+         of busy waiting involved, which we mitigate with [relax]. Sys.sigchild
+         and a self-pipe trick could be used, but again library wise it's
+         better if we can avoid fiddling with signal handlers. *)
+      let old_spawn_count = h.spawn_count in
+      let collect spawns (pid, o as p) = match B0_os.Cmd.collect pid with
       | Error _ as e -> complete_spawn h o e; spawns
       | Ok None -> p :: spawns
       | Ok (Some st) -> complete_spawn h o (Ok (pid, st)); spawns
-    in
-    h.spawns <- List.fold_left collect [] h.spawns;
-    match block && old_spawn_count = h.spawn_count with
-    | true -> (* busy waiting *) relax (); collect_spawns ~block h
-    | false -> ()
+      in
+      h.spawns <- List.fold_left collect [] h.spawns;
+      match block && old_spawn_count = h.spawn_count with
+      | true -> (* busy waiting *) relax (); collect_spawns ~block h
+      | false -> ()
 
 let exec_spawns h =
   let free = h.max_spawn - h.spawn_count in
   let may_spawn = Queue.length h.to_spawn in
-  let to_spawn = if may_spawn > free then free else may_spawn in
+  let spawn_limit = if may_spawn > free then free else may_spawn in
   let rec loop = function
   | 0 -> ()
   | n ->
@@ -148,7 +149,7 @@ let exec_spawns h =
           | B0_op.Executed (* Error'ed *) -> loop n
           | _ -> loop (n - 1)
   in
-  loop to_spawn
+  loop spawn_limit
 
 let exec_read h o r = (* synchronous *)
   exec_op h o;

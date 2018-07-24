@@ -4,9 +4,7 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** [B0] program log.
-
-    See {!B0.Log}. *)
+(** [B0] program log. See {!B0.Log}. *)
 
 (* Reporting levels *)
 
@@ -14,7 +12,6 @@ type level = Quiet | App | Error | Warning | Info | Debug
 
 val level : unit -> level
 val set_level : level -> unit
-
 val pp_level : level B0_fmt.t
 val level_to_string : level -> string
 val level_of_string : string -> (level, [`Msg of string]) Pervasives.result
@@ -37,8 +34,8 @@ val kmsg : (unit -> 'b) -> level -> ('a, 'b) msgf -> 'b
 (* Logging [result] value [Error]s} *)
 
 val on_error :
-  ?level:level -> ?header:string ->
-  pp:(Format.formatter -> 'b -> unit) -> use:('b -> 'a) -> ('a, 'b) result -> 'a
+  ?level:level -> ?header:string -> pp:(Format.formatter -> 'b -> unit) ->
+  use:('b -> 'a) -> ('a, 'b) result -> 'a
 
 val on_error_msg :
   ?level:level -> ?header:string -> use:(unit -> 'a) ->

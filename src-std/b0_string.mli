@@ -4,9 +4,7 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** Strings.
-
-    See {!B0.String}. *)
+(** Strings. See {!B0.String}. *)
 
 val strf : ('a, Format.formatter, unit, string) format4 -> 'a
 

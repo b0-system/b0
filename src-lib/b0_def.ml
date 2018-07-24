@@ -217,7 +217,9 @@ module Make (V : DEFINED) = struct
 
   let pp_name_str ppf s = B0_fmt.tty_str [`Fg V.def_name_tty_color] ppf s
   let pp_name ppf v = pp_name_str ppf (name v)
-  let pp_synopsis = B0_fmt.synopsis ~name:pp_name ~doc:pp_doc
+  let pp_synopsis ppf v =
+    let bold = B0_fmt.tty [`Bold] in
+    B0_fmt.pf ppf "@[<h>%a: %a@]" (bold pp_name) v pp_doc v
 
   let pp_info_ext ext =
     let src ppf v = B0_fmt.field "loc" Loc.pp ppf (loc v)in

@@ -17,7 +17,6 @@ let get () =
   let docker = OS.Env.get_value "B0_DOCKER" Conv.tool ~absent in
   OS.Cmd.resolve docker >>= fun cmd -> Ok { cmd }
 
-
 (* Managing images. *)
 
 type image = string

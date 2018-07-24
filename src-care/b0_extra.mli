@@ -1,40 +1,22 @@
 (*---------------------------------------------------------------------------
-   Copyright (c) 2016 Daniel C. Bünzli. All rights reserved.
+   Copyright (c) 2017 The b0 programmers. All rights reserved.
    Distributed under the ISC license, see terms at the end of the file.
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** JSON generation.
+(** Additional tools for drivers. *)
 
-    See {!B0.Json}.  *)
+open B0
 
-type 'a seq
-val empty : 'a seq
-val ( ++ ) : 'a seq -> 'a seq -> 'a seq
+(** {1 Build outcome processing} *)
 
-type t
-type mem
-type el
-
-val null : t
-val bool : bool -> t
-val int : int -> t
-val str : string -> t
-
-val el : t -> el seq
-val el_if : bool -> (unit -> t) -> el seq
-val arr : el seq -> t
-
-val mem : string -> t -> mem seq
-val mem_if : bool -> string -> (unit -> t) -> mem seq
-val obj : mem seq -> t
-
-val buffer_add : Buffer.t -> t -> unit
-val to_string : t -> string
-val output : out_channel -> t -> unit
+val ops_to_trace_event_format : Outcome.t -> Outcome.Op.t list -> B0_json.G.t
+(** [ops_to_json o ops] outputs operations [ops] of outcome [o] as
+    JSON text in
+    {{:https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview}Trace Event Format}. *)
 
 (*---------------------------------------------------------------------------
-   Copyright (c) 2016 Daniel C. Bünzli
+   Copyright (c) 2017 The b0 programmers
 
    Permission to use, copy, modify, and/or distribute this software for any
    purpose with or without fee is hereby granted, provided that the above

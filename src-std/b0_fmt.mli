@@ -65,9 +65,8 @@ val tty : B0_tty.style list -> 'a t -> 'a t
 
 val field : ?style:B0_tty.style list -> string -> 'a t -> 'a t
 
-(* Synopses and info *)
+(* Info *)
 
-val synopsis : name:'a t -> doc:'a t -> 'a t
 val info : name:'a t -> ?doc:'a t -> 'a t -> 'a t
 
 (*---------------------------------------------------------------------------

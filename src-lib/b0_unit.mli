@@ -4,7 +4,7 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** Build units.
+(** Build units. See {!B0.Unit}.
 
     Build units are associated with their build function only at the
     API level in B0.ml. This allows to cut an invasive recursive
@@ -36,6 +36,22 @@ val meta_find :'a B0_meta.Unit.key -> t -> 'a option
 val meta_get : 'a B0_meta.Unit.key -> t -> 'a
 val has_tag : bool B0_meta.Unit.key -> t -> bool
 val pkg : t -> B0_pkg.t option
+
+(* Unit build state *)
+
+type build_state
+type build_status =
+| Active | Failed of unit B0_fmt.t
+| Aborted (* Happens if depends on a failed unit. *)
+| Finished
+
+val build_state_create : t -> build_state
+val build_state_unit : build_state -> t
+val build_state_status : build_state -> build_status
+val build_state_set_status : build_state -> build_status -> unit
+val build_state_activity : build_state -> int
+val build_state_incr_activity : build_state -> unit
+val build_state_decr_activity : build_state -> unit
 
 (* Unit id map and sets *)
 

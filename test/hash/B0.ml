@@ -8,8 +8,8 @@ let build b =
   in
   let zero = Build.src b Fpath.(v "zero") in
   let hashme = Build.src b Fpath.(v "hashme") in
-  assert_file_hash b zero (Hash.file zero);
-  assert_file_hash b hashme (Hash.file hashme);
+  assert_file_hash b zero (Build.fail_on_error_msg @@ Hash.file zero);
+  assert_file_hash b hashme (Build.fail_on_error_msg @@ Hash.file hashme);
   ()
 
 let hash =

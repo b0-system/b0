@@ -54,7 +54,6 @@ let v ~b0_dir =
   let rec d = { b0_dir; defaults = lazy (read_defaults d) } in
   d
 
-
 let default_variant_name d = match (get_defaults d).variant with
 | None | Some "" -> None
 | Some v -> Some v
@@ -67,7 +66,6 @@ let default_variant_scheme_name d = (get_defaults d).variant_scheme
 let set_default_variant_scheme_name d n =
   (get_defaults d).variant_scheme <- n;
   write_defaults d
-
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers

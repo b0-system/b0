@@ -15,6 +15,8 @@ module R = struct
 
   let join r = match r with Ok v -> v | Error _ as e -> e
 
+  (* Error messages *)
+
   type msg = [`Msg of string ]
 
   let msgf fmt =

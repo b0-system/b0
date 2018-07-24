@@ -148,18 +148,16 @@ let tty styles pp_v ppf v = match !_tty_styling_cap with
 let field ?(style = [`Fg `Yellow]) f pp_v ppf v =
   pf ppf "@[%a: @[%a@]@]" (tty_str style) f pp_v v
 
-(* Synopses & info
+(* Synopses
 
-   FIXME this should go somewhere  *)
+   TODO this should go somewhere else.  *)
 
-let bold ppf v = tty [`Bold] ppf v
-let synopsis ~name ~doc ppf v =
-  pf ppf "@[<h>%a: %a@]" (bold name) v doc v
-
-let info ~name ?doc info ppf v = match doc with
-| None ->  pf ppf "@[<v 1>%a:@,%a@]" (bold name) v info v
-| Some doc ->
-    pf ppf "@[<v 1>%a:@,%a%a@]" (bold name) v (field "doc" doc) v info v
+let info ~name ?doc info ppf v =
+  let bold ppf v = tty [`Bold] ppf v in
+  match doc with
+  | None ->  pf ppf "@[<v 1>%a:@,%a@]" (bold name) v info v
+  | Some doc ->
+      pf ppf "@[<v 1>%a:@,%a%a@]" (bold name) v (field "doc" doc) v info v
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers

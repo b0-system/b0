@@ -147,7 +147,6 @@ module OS : sig
       on the operating system. Derived from {!name}. *)
 end
 
-
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers
 
