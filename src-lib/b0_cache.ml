@@ -234,11 +234,14 @@ let rec copy p0 p1 =
   | Unix.Unix_error (e, _, _) ->
       failwith (B0_string.strf "stat %a: %s" B0_fpath.pp p0 (uerror e))
 
-let rec put c t p = match c.copying with
-| true -> copy t p
-| false ->
-    try Unix.link (B0_fpath.to_string t) (B0_fpath.to_string p); true with
-    | Unix.Unix_error (Unix.ENOENT, _, _) -> false
+let rec put c t p =
+  (* Make sure destination directory exists *)
+  ignore @@ R.failwith_error_msg @@ B0_os.Dir.create (B0_fpath.parent p);
+  match c.copying with
+  | true -> copy t p
+  | false ->
+      try Unix.link (B0_fpath.to_string t) (B0_fpath.to_string p); true with
+      | Unix.Unix_error (Unix.ENOENT, _, _) -> false
     | Unix.Unix_error (Unix.EINTR, _, _) -> put c t p
     | Unix.Unix_error (Unix.EXDEV, _, _) ->
         log_xdev (); c.copying <- true; copy t p
