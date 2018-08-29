@@ -65,6 +65,10 @@ val tty : B0_tty.style list -> 'a t -> 'a t
 
 val field : ?style:B0_tty.style list -> string -> 'a t -> 'a t
 
+(* Magnitudes *)
+
+val byte_size : int t
+
 (* Info *)
 
 val info : name:'a t -> ?doc:'a t -> 'a t -> 'a t

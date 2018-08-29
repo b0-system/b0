@@ -148,6 +148,47 @@ let tty styles pp_v ppf v = match !_tty_styling_cap with
 let field ?(style = [`Fg `Yellow]) f pp_v ppf v =
   pf ppf "@[%a: @[%a@]@]" (tty_str style) f pp_v v
 
+
+(* Magnitudes *)
+
+let div_round_up x y = (x + y - 1) / y
+let ilog10 x =
+  let rec loop p = function 0 -> p | x -> loop (p + 1) (x / 10) in loop (-1) x
+
+let ipow10 n =
+  let rec loop r = function 0 -> r | y -> loop (r * 10) (y - 1) in loop 1 n
+
+let si_max = 8
+let si_symb =
+  let prefix = [|""; "k"; "M"; "G"; "T"; "P"; "E"; "Z"; "Y"|] in
+  fun p -> if p > si_max then prefix.(si_max) else prefix.(p)
+
+let rec si_prefix u ppf s =
+  let pow = if s = 0 then 0 else ilog10 s in
+  let prefix = pow / 3 in
+  match prefix with
+  | 0 -> pf ppf "%d%s" s u
+  | prefix ->
+      let prefix = if prefix > si_max then si_max else prefix in
+      let div = ipow10 (prefix * 3) in
+      let size = s / div in
+      match size with
+      | size when size >= 100 ->
+          let size = div_round_up s div in
+          let s' = size * div in
+          let pow' = ilog10 s' in
+          if pow' > pow then si_prefix u ppf s' else
+          pf ppf "%d%s%s" size (si_symb prefix) u
+      | _ ->
+          let frac = div_round_up (s mod div) (div / 10) in
+          match frac with
+          | f when f = 0 || s >= 10 ->
+              pf ppf "%d%s%s" (div_round_up s div) (si_symb prefix) u
+          | _ ->
+              pf ppf "%d.%d%s%s" size frac (si_symb prefix) u
+
+let byte_size ppf s = si_prefix "B" ppf s
+
 (* Synopses
 
    TODO this should go somewhere else.  *)

@@ -18,4 +18,5 @@ let () =
        Pkg.mllib ~api:[] "src-d0/d0.mllib";
        Pkg.test "test/test_hmap";
        Pkg.bin "src-exe/bzero" ~dst:"b0";
-       Pkg.bin "src-exe/dzero" ~dst:"d0"; ]
+       Pkg.bin "src-exe/dzero" ~dst:"d0";
+       Pkg.bin "src-exe/bzsize" ~dst:"bzsize"; ]

@@ -23,6 +23,7 @@ true : package(unix)
 <src-exe/**> : package(cmdliner)
 <src-exe/bzero*> : use_b0_stubs
 <src-exe/dzero*> : use_b0_stubs
+<src-exe/bzsize*> : use_b0_stubs
 <test> : include
 <test/**> : not_hygienic, use_b0_stubs
 <perf> : -traverse

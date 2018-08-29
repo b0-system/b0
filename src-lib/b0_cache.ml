@@ -11,6 +11,16 @@ open B0_result
 let uerror = Unix.error_message
 
 let rec unlink p = try Unix.unlink (B0_fpath.to_string p) with
+| Unix.Unix_error (Unix.EINTR, _, _) -> unlink p
+| Unix.Unix_error (e, _, _) ->
+    failwith (B0_string.strf "unlink %a: %s" B0_fpath.pp p (uerror e))
+
+let rec stat p = try Unix.stat (B0_fpath.to_string p) with
+| Unix.Unix_error (Unix.EINTR, _, _) -> stat p
+| Unix.Unix_error (e, _, _) ->
+    failwith (B0_string.strf "stat %a: %s" B0_fpath.pp p (uerror e))
+
+let rec unlink p = try Unix.unlink (B0_fpath.to_string p) with
 | Unix.Unix_error (Unix.ENOENT, _, _) -> ()
 | Unix.Unix_error (Unix.EINTR, _, _) -> unlink p
 | Unix.Unix_error (e, _, _) ->
@@ -52,6 +62,9 @@ let dir c = c.dir
 let file_stamp_dur c = c.file_stamp_dur
 let file_stamps c = c.file_stamps
 let cache_file c key = B0_fpath.(c.dir / B0_stamp.to_hex key)
+let is_cache_file fpath = match B0_stamp.of_hex (B0_fpath.filename fpath) with
+| None -> false | Some _ -> true
+
 let time_stamp c = B0_time.count c.dur_counter
 
 let create ~dir =
@@ -208,8 +221,98 @@ let add_op c o = try match c.disable with
         | B0_op.Read _
         | B0_op.Write _ | B0_op.Delete _ | B0_op.Mkdir _ | B0_op.Sync _ -> ()
 with
-| Failure e ->
-    B0_log.err (fun m -> m "Cache put: op %d: %s" (B0_op.id o) e)
+| Failure e -> B0_log.err (fun m -> m "Cache put: op %d: %s" (B0_op.id o) e)
+
+let files c = B0_os.Dir.contents ~dotfiles:true ~rel:false c.dir
+
+let suspicious_files c =
+  files c >>| List.filter (fun f -> not @@ is_cache_file f)
+
+let delete_unused_files c =
+  files c >>= fun fs ->
+  let rec loop = function
+  | [] -> ()
+  | f :: fs when (stat f).Unix.st_nlink = 1 -> unlink f; loop fs
+  | _ :: fs -> loop fs
+  in
+  try Ok (loop fs) with Failure msg -> Error (`Msg msg)
+
+let sort_files_by_deletion c =
+  (* Order by unused files then access time, break ties by deacreasing size *)
+  let order_atime_size (a0, s0, _) (a1, s1, _) =
+    match Pervasives.compare (a0 : float) (a1 : float) with
+    | 0 -> -1 * Pervasives.compare (s0 : int) (s1 : int)
+    | cmp -> cmp
+  in
+  files c >>= fun fs ->
+  let rec loop total_size acc = function
+  | [] -> total_size, List.sort order_atime_size acc
+  | f :: fs ->
+      let st = stat f in
+      let f = match st.Unix.st_nlink = 1 with
+      | true -> -.max_float (* order unused before *), st.Unix.st_size, f
+      | false -> st.Unix.st_atime, st.Unix.st_size, f
+      in
+      loop (total_size + st.Unix.st_size) (f :: acc) fs
+  in
+  try Ok (loop 0 [] fs) with Failure msg -> Error (`Msg msg)
+
+let delete_files c ~pct ~dir_byte_size =
+  try
+    sort_files_by_deletion c >>= fun (total_size, fs) ->
+    let pct_size = truncate @@ (float total_size /. 100.) *. float pct in
+    let budget = match dir_byte_size with
+    | None -> pct_size | Some s -> min s pct_size
+    in
+    let rec delete_files current budget = function
+    | [] -> ()
+    | _ when current <= budget -> ()
+    | (_, size, f) :: fs -> (unlink f; delete_files (current - size) budget fs)
+    in
+    Ok (delete_files total_size budget fs)
+  with Failure msg -> Error (`Msg msg)
+
+(* Cache directory statistics *)
+
+module Dir_stats = struct
+  type t =
+    { file_count : int;
+      files_byte_size : int;
+      unused_file_count : int;
+      unused_files_byte_size : int; }
+
+  let file_count s = s.file_count
+  let files_byte_size s = s.files_byte_size
+  let unused_file_count s = s.unused_file_count
+  let unused_files_byte_size s = s.unused_files_byte_size
+  let pp ppf s =
+    let pp_f c s ppf () =
+      B0_fmt.pf ppf "%a in %d file(s)" B0_fmt.byte_size s c
+    in
+    B0_fmt.pf ppf "@[<v>";
+    B0_fmt.field "total" (pp_f s.file_count s.files_byte_size) ppf ();
+    B0_fmt.cut ppf ();
+    B0_fmt.field "unused"
+      (pp_f s.unused_file_count s.unused_files_byte_size) ppf ();
+    B0_fmt.pf ppf "@]";
+    ()
+end
+
+let dir_stats c =
+  files c >>= fun fs ->
+  let rec loop c cs u us = function
+  | [] ->
+      Dir_stats.{ file_count = c; files_byte_size = cs;
+                  unused_file_count = u; unused_files_byte_size = us }
+  | f :: fs ->
+      let st = stat f in
+      let u, us = match st.Unix.st_nlink with
+      | 1 -> u + 1, us + st.Unix.st_size
+      | _ -> u, us
+      in
+      loop (c + 1) (cs + st.Unix.st_size) u us fs
+  in
+  try Ok (loop 0 0 0 0 fs) with Failure msg -> Error (`Msg msg)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers

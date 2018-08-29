@@ -54,3 +54,10 @@ let exe =
   let lib_deps = [b0_driver; b0_b0] in
   let build = `Srcs [Fpath.v "src-exe/bzero.ml"] in
   B0_ocaml.Unit.exe ~pkg ~name:"b0" "b0-exe" build ~lib_deps
+
+(* Other tools *)
+
+let bzsize =
+  let lib_deps = [result; cmdliner; b0;] in
+  let build = `Srcs [Fpath.v "src-exe/bzsize.ml"] in
+  B0_ocaml.Unit.exe ~pkg "bzsize" build ~lib_deps

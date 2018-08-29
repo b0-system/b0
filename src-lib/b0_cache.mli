@@ -19,6 +19,20 @@ val file_stamp_dur : t -> B0_time.span
 val exec : t -> B0_op.t -> bool
 val add_op : t -> B0_op.t -> unit
 
+val suspicious_files : t -> B0_fpath.t list result
+val delete_unused_files : t -> unit result
+val delete_files : t -> pct:int -> dir_byte_size:int option -> unit result
+
+module Dir_stats : sig
+  type t
+  val file_count : t -> int
+  val files_byte_size : t -> int
+  val unused_file_count : t -> int
+  val unused_files_byte_size : t -> int
+  val pp : t B0_fmt.t
+end
+
+val dir_stats : t -> Dir_stats.t result
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers

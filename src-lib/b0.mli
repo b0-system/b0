@@ -208,6 +208,13 @@ module Fmt : sig
   (** [field ~style l pp_v] pretty prints a named field with label [l]
       styled according to [style] (defaults to [[`Fg `Yellow]]),
       using [pp_v] to print the value. *)
+
+  (** {1:mag Magnitudes} *)
+
+  val byte_size : int t
+  (** [byte_size] formats a byte size according to its magnitude using
+      {{:https://www.bipm.org/en/publications/si-brochure/chapter3.html}
+      SI prefixes}. Rounds towards positive infinity. *)
 end
 
 (** {!Pervasives.result} value combinators. *)
@@ -2924,7 +2931,9 @@ end
 
 (** Build cache.
 
-    Build cache handle build operation caching internally. *)
+    A build cache handles build operation caching. It takes care to
+    hard link build operation file artefacts to/from a cache directory.
+    Without a cache a build always restarts from scratch. *)
 module Cache : sig
 
   (** {1:cache Cache} *)
@@ -2933,12 +2942,57 @@ module Cache : sig
   (** The type for caches. *)
 
   val create : dir:Fpath.t -> t result
-  (** [create ~dir] is a build operation cache reading and
-      writing build artefacts to [dir] which is created by this function
-      call if it doesn't exist. *)
+  (** [create ~dir] is a build operation cache reading and writing
+      build artefacts to [dir]. [dir] is created by this function call
+      if it doesn't exist. *)
 
   val dir : t -> Fpath.t
   (** [dir c] is [c]'s directory. *)
+
+  val suspicious_files : t -> Fpath.t list result
+  (** [suspicious_files c] is a list of files in [c]'s directory that
+      are not expected to be there. *)
+
+  val delete_unused_files : t -> unit result
+  (** [delete_unused_files c] deletes the files in [c]'s directory
+      whose link count is [1]. *)
+
+  val delete_files : t -> pct:int -> dir_byte_size:int option -> unit result
+  (** [delete_files c n ~pct ~dir_byte_size] deletes files in [c]'s
+      directory until it either weights at most [dir_byte_size] (if
+      specified) or is [pct] of the current size; whichever is the
+      smaller. The deletion policy is, in order as follows:
+      {ol
+      {- Files whose link count is [1], starting with the largest file size.}
+      {- Remaining files, starting with the oldest file access time.}} *)
+
+  (** {1:dir_stats Cache directory statistics} *)
+
+  (** Cache directory statistics. *)
+  module Dir_stats : sig
+    type t
+    (** The type for cache directory statistics. *)
+
+    val file_count : t -> int
+    (** [file_count s] is the number of files in the cache. *)
+
+    val files_byte_size : t -> int
+    (** [files_byte_size s] is the byte size of files in the cache. *)
+
+    val unused_file_count : t -> int
+    (** [unused_file_count s] are the number of unused files in the cache. *)
+
+    val unused_files_byte_size : t -> int
+    (** [unused_files_byte_size s] is the byte size of unused files in the
+        cache. *)
+
+    val pp : t Fmt.t
+    (** [pp] formats an unspecified representation of cache directory
+        statistics.  *)
+  end
+
+  val dir_stats : t -> Dir_stats.t result
+  (** [byte_size c] are the statistics of [c]'s directory. *)
 end
 
 (** Builds
