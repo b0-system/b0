@@ -10,8 +10,7 @@ open B0_driver
 let get_cache variant ~b0_dir ~cache_dir =
   let b0_dir = B0_dir.dir b0_dir in
   let dir = B0b_cli.get_cache_dir ~b0_dir ~cache_dir in
-  let index_file = Variant.cache_index_path variant  in
-  Cache.load ~index_file ~dir
+  Cache.create ~dir
 
 let need_variant_creation ~b0_dir create =
   let dir = B0_dir.variant_dir b0_dir in
@@ -91,7 +90,6 @@ let build_variant setup v cache ctrl units =
       Log.time (fun _ m -> m "Writing build metadata")
         (fun () ->
            Outcome.write outcome (Outcome.of_build ?prev:prev_outcome b)
-           >>= fun () -> Cache.save (Build.cache b)
            >>= fun () ->
            Ok (B0b_cli.variant_save_conf ~log v (Build.stored_conf b))) ()
 

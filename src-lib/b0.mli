@@ -2922,136 +2922,23 @@ module Tool : sig
       opt_key that doesn't error. *)
 end
 
-(** Build cache. *)
+(** Build cache.
+
+    Build cache handle build operation caching internally. *)
 module Cache : sig
-
-(**/**)
-
-  (* TODO remove *)
-
-  (** {1:keys Cache keys} *)
-
-  type key = Hash.t
-  (** The type for cache keys, stamp of the build operation that writes the
-      file. *)
-
-  val key_of_string : string -> key result
-  (** [key_of_string s] parses a key from [s]. *)
-
-  val key_to_string : key -> string
-  (** [key_to_string k] is [k] in human readable from and parseable
-      by {!key_of_string}. *)
-
-  val pp_key : key Fmt.t
-  (** [pp_key ppf k] prints an unspecified representation of [k] on ppf. *)
-
-  (** {1:elts Cache elements} *)
-
-  type elt
-  (** The type for information about files stored in the cache index. *)
-
-  val elt :
-    variant:string -> age:int -> op:Cmd.t -> key:Hash.t ->
-    Fpath.t -> file_stamp:Stamp.t -> elt
-
-  val elt_variant : elt -> string
-  val elt_age : elt -> int
-  val elt_op : elt -> Cmd.t
-  val elt_key : elt -> key
-  val elt_file_path : elt -> Fpath.t
-  val elt_file_stamp : elt -> Stamp.t
-(**/**)
 
   (** {1:cache Cache} *)
 
   type t
   (** The type for caches. *)
 
-  val empty : index_file:Fpath.t -> dir:Fpath.t -> t
-  (** [empty ~index_file ~dir] is an empty cache with index [index] and
-      directory [dir]. The file system is left untouched, in particular [dir]
-      is not created, see also {!load}. *)
-
-  val is_empty : t -> bool
-  (** [is_empty c] is [true] iff [c] is empty. *)
+  val create : dir:Fpath.t -> t result
+  (** [create ~dir] is a build operation cache reading and
+      writing build artefacts to [dir] which is created by this function
+      call if it doesn't exist. *)
 
   val dir : t -> Fpath.t
   (** [dir c] is [c]'s directory. *)
-
-  val index_file : t -> Fpath.t
-  (** [index_file c] is [c]'s index file. *)
-
-  (** {1:persist Persist} *)
-
-  val exists : index_file:Fpath.t -> bool result
-  (** [exists ~index_file ~dir] is [true] if [index_file] exists. *)
-
-  val load : index_file:Fpath.t -> dir:Fpath.t -> t result
-  (** [load ~index_file ~dir] loads a cache from [index_file] and
-      [dir]. If [index_file] doesn't exist an {!empty} index is
-      created (but [index_file] is not written yet). If [dir] doesn't
-      exist it is created. *)
-
-  val save : t -> unit result
-  (** [save t] saves the cache. *)
-
-(**/**)
-
-  (* TODO remove *)
-
-  (** {1:ops Operations} *)
-
-  val mem : t -> key -> bool
-  (** [mem c k] is [true] iff an element keyed by [k] exists in [c]'s index. *)
-
-  val add : t -> elt -> unit result
-  (** [add c elt] adds element [elt] to [c]. {!elt_file_path}[ elt] must
-      exist on disk and is hard linked to a file in the cache named
-      after {!elt_key}[ elt]. *)
-
-  val rem : t -> key -> unit result
-  (** [rem c k] removes the element keyed by [k] and its associated file
-      from the cache. Does nothing if [k] is not in [c]'s index. *)
-
-  val find : t -> key -> elt option
-  (** [find c k] is the element keyed by [k] in [c]'s index. *)
-
-  val use : t -> key -> bool result
-  (** [use c k] uses the element keyed by [k]. If [k] is in the cache index
-      this hard links the cache file to the element's path and returns
-      [true] if [k] is not in the cache index nothing happens and [false] is
-      returned. *)
-
-  val verify :
-    repair:bool -> t -> key ->
-    [ `Ok | `Miss_index | `Miss_file | `Stamp_mismatch | `Unknown ] result
-  (** [verify ~repair c k] checks [k] is in the cache index and directory
-      and that the file stamp matches. [`Unknown] is returned if [key] is
-      neither in the index nor in the directory. If [repair] is [true]
-      the cache is changed as follows before the call returns:
-      {ul
-      {- [`Miss_file], [k]'s index entry was dropped from the cache.}
-      {- [`Stamp_mismatch], [k]'s index entry stamp was udpated to match
-         the cached filed stamp.}
-      {- Otherwise the cache is left unchanged.}} *)
-
-  val foreign : ignore_keys:bool -> t -> ([`Key | `Other] * Fpath.t) list result
-  (** [unknown ~ignore_keys c] looks for files in [c]'s cache directory that are
-      unknown to the cache. If [ignore_keys] is [true] files unknown to the
-      cache but whose filename are keys are not listed as foreign. *)
-
-  (** {1:traverse Traverse} *)
-
-  val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a
-  (** [fold f c acc] starting with [acc] folds [f] over the elements of [c]. *)
-
-  val iter : (elt -> unit) -> t -> unit
-  (** [iter f c] iters [f] on the elements of [c]. *)
-
-  val path_map : t -> elt Fpath.Map.t
-  (** [path_map t] indexes the file paths of elements. *)
-
-(**/**)
 end
 
 (** Builds

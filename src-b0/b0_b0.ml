@@ -42,7 +42,6 @@ let main =
 let cmds =
   [ main;
     B0b_build.cmd;
-    B0b_cache.cmd;
     B0b_group.cmd;
     B0b_key.cmd;
     B0b_outcome.cmd;
