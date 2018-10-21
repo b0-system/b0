@@ -242,6 +242,7 @@ let basename_equal p0 p1 = (* Could be improved along filename_equal *)
 let parent p =
   let plen = B0_string.length p in
   let seg_start = last_non_empty_seg_start p in
+  if seg_start = 0 then "./" else
   let seg_stop = match last_is_dir_sep p with
   | true -> plen - 2
   | false -> plen - 1
