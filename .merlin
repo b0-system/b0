@@ -1,11 +1,7 @@
 PKG unix cmdliner
+S src-b00
 S src-std
-S src-lib
-S src-driver
-S src-cli
+S src-ui
 S src-care
-S src-d0
-S src-b0
-S test/*
 S examples/*
-B _boot_b0/**
+B _build/**

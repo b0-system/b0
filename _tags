@@ -2,30 +2,22 @@ true : bin_annot, safe_string, keep_locs
 true : package(unix)
 # true : package(landmarks.ppx,landmarks)
 
-<B0d> : -traverse
-
-<_b0> : not_hygienic
-<_boot_b0> : not_hygienic
-<_boot> : not_hygienic
+<src-b00> : include
+<examples> : include
+<test> : include
+<tools> : include
 <src-std> : include
 <src-std/b0_std.{cma,cmxa}> : record_b0_stubs
 <src-std/b0_std.cmxs> : link_b0_stubs
 
-<src-lib> : include
-<src-driver> : include
-<src-driver/**> : package(cmdliner)
+<src-ui> : include
+<src-ui/b0_ui*> : package(cmdliner)
+
 <src-care> : include
-<src-b0> : include
-<src-b0/**> : package(cmdliner)
-<src-d0> : include
-<src-d0/**> : package(cmdliner)
-<src-exe> : include
-<src-exe/**> : package(cmdliner)
-<src-exe/bzero*> : use_b0_stubs
-<src-exe/dzero*> : use_b0_stubs
-<src-exe/bzsize*> : use_b0_stubs
-<test> : include
-<test/**> : not_hygienic, use_b0_stubs
-<perf> : -traverse
-<examples> : -traverse
-<examples/**> : not_hygienic
+<src-care/**> : package(cmdliner)
+
+<test/**> : use_b0_stubs, package(cmdliner)
+<examples/**> : use_b0_stubs, not_hygienic
+<tools/**> : use_b0_stubs
+<tools/b00_cache*> : package(cmdliner)
+<tools/show_uri*> : package(cmdliner)

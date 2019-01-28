@@ -1,6 +1,0 @@
-(jbuild_version 1)
-(library
- ((name b0_care)
-  (public_name b0.care)
-  (wrapped false)
-  (libraries (b0))))

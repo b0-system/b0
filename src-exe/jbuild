@@ -1,6 +1,0 @@
-(executable
-  ((name bzero)
-   (public_name bzero)
-   (modules bzero)
-   (flags -linkall)
-   (libraries (b0.driver b0.b0))))

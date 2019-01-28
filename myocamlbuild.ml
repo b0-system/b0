@@ -16,9 +16,9 @@ let () =
   | After_rules ->
 
       dep ["compile";"c"]
-          ["src-std/b0.h";
-           "src-std/xxhash.h";
-           "src-std/MurmurHash3.h"];
+          ["src-std/b0_stubs.h";
+           "src-std/vendor/xxhash.h";
+           "src-std/vendor/MurmurHash3.h"];
 
       dep ["record_b0_stubs"] [lib "src-std/libb0_stubs"];
 

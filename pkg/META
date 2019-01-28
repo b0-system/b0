@@ -1,13 +1,9 @@
-description = "Describe and run build procedures"
+description = "Software construction care"
 version = "%%VERSION_NUM%%"
-requires = "b0.std"
-archive(byte) = "b0.cma"
-archive(native) = "b0.cmxa"
-plugin(byte) = "b0.cma"
-plugin(native) = "b0.cmxs"
+requires = ""
 
 package "std" (
-  description = "Private B0 library"
+  description = "B0's std library"
   version = "%%VERSION_NUM%%"
   requires = "unix"
   archive(byte) = "b0_std.cma"
@@ -16,32 +12,22 @@ package "std" (
   plugin(native) = "b0_std.cmxs"
 )
 
+package "b00" (
+ description = "B0's build kernel"
+ version = "%%VERSION_NUM%%"
+ requires = "b0.std"
+ archive(byte) = "b00.cma"
+ archive(native) = "b00.cmxa"
+ plugin(byte) = "b00.cma"
+ plugin(native) = "b00.cmxs"
+)
+
 package "care" (
-  description = "B0 default care"
+  description = "B0's system library"
   version = "%%VERSION_NUM%%"
-  requires = "b0"
+  requires = "unix cmdliner b0.std b0.b00"
   archive(byte) = "b0_care.cma"
   archive(native) = "b0_care.cmxa"
   plugin(byte) = "b0_care.cma"
   plugin(native) = "b0_care.cmxs"
-)
-
-package "driver" (
-  description = "Driver library"
-  version = "%%VERSION_NUM%%"
-  requires = "result cmdliner b0"
-  archive(byte) = "b0_care.cma"
-  archive(native) = "b0_care.cmxa"
-  plugin(byte) = "b0_care.cma"
-  plugin(native) = "b0_care.cmxs"
-)
-
-package "b0" (
-  description = "B0 tool driver library"
-  version = "%%VERSION_NUM%%"
-  requires = "result cmdliner b0 b0.care b0.driver"
-  archive(byte) = "b0_b0.cma"
-  archive(native) = "b0_b0.cmxa"
-  plugin(byte) = "b0_b0.cma"
-  plugin(native) = "b0_b0.cmxs"
 )
