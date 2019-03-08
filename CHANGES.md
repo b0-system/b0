@@ -1,4 +1,4 @@
-vX.Y.Z YYYY-MM-DD Location
---------------------------
+v0.0.0 2019-03-08 La Forclaz (VS)
+---------------------------------
 
-First release. 
+First release to support `odig`.

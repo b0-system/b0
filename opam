@@ -1,10 +1,10 @@
 opam-version: "2.0"
 maintainer: "Daniel Bünzli <daniel.buenzl i@erratique.ch>"
-authors: ["Daniel Bünzli <daniel.buenzl i@erratique.ch>"]
-homepage: "http://erratique.ch/software/b0"
-doc: "http://erratique.ch/software/b0/doc"
+authors: ["The b0 programmers"]
+homepage: "https://erratique.ch/software/b0"
+doc: "https://erratique.ch/software/b0/doc"
 license: "ISC"
-dev-repo: "git+http://erratique.ch/repos/b0.git"
+dev-repo: "git+https://erratique.ch/repos/b0.git"
 bug-reports: "https://github.com/b0-system/b0/issues"
 tags: ["dev" "org:erratique" "org:b0-system" "build" ]
 depends:
@@ -18,6 +18,5 @@ depends:
 depopts: []
 build:
 [[
-  "ocaml" "pkg/pkg.ml" "build"
-          "--dev-pkg" "%{dev}%"
+  "ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"
 ]]
