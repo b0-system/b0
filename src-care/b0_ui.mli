@@ -203,17 +203,20 @@ module Browser : sig
 
   (** {1:cli Cli arguments} *)
 
-  val browser : Cmd.t option Term.t
-  (** [browser] is a [--browser] option and [BROWSER] environment variable
-      to use with the [browser] argument of {!find}. *)
+  val browser : ?docs:string -> ?opts:string list -> unit -> Cmd.t option Term.t
+  (** [browser] is an option and [BROWSER] environment variable to use
+      with the [browser] argument of {!find}. [opts] are the cli
+      options and default to [["b"; "browser"]]. *)
 
-  val prefix : bool Term.t
-  (** [prefix] is [--prefix] option to use the [prefix] argument of
-      {!show}. *)
+  val prefix :  ?docs:string -> ?opts:string list -> unit -> bool Term.t
+  (** [prefix] is  option to use the with [prefix] argument of
+      {!show}. [opts] are the cli options and default to
+      [["p"; "prefix"]]. *)
 
-  val background : bool Term.t
-  (** [background] is a [--background] option to use the [background]
-      argument of [!show]. *)
+  val background : ?docs:string -> ?opts:string list -> unit -> bool Term.t
+  (** [background] is an option to use with the [background] argument
+      of [!show]. [opts] are the cli options and default to [["g";
+      "background"]] *)
 
   (** {1:show Show URIs} *)
 

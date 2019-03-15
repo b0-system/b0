@@ -349,7 +349,7 @@ module Browser = struct
   (* Cli *)
 
   let browser_var = "BROWSER"
-  let browser =
+  let browser ?docs ?(opts = ["b"; "browser"]) () =
     let env = Arg.env_var browser_var in
     let doc =
       "The WWW browser command $(docv) to use. The value may be interpreted \
@@ -360,20 +360,20 @@ module Browser = struct
        xdg-open(1) is found in $(b,PATH) this the program used by default."
     in
     let cmd = Arg.some ~none:"OS dependent fallback" Cli.Arg.cmd in
-    Arg.(value & opt cmd None & info ["b"; "browser"] ~env ~doc ~docv:"CMD")
+    Arg.(value & opt cmd None & info opts ~env ~doc ~docv:"CMD")
 
-  let prefix =
+  let prefix ?docs ?(opts = ["p"; "prefix"]) () =
     let doc = "Rather than the exact URI, reload if possible, the first \
                browser tab which has the URI as a prefix. Platform and browser \
                support for this feature is severly limited."
     in
-    Arg.(value & flag & info ["p"; "prefix"] ~doc)
+    Arg.(value & flag & info opts ~doc ?docs)
 
-  let background =
+  let background ?docs ?(opts = ["g"; "background"]) () =
     let doc = "Show URI but keep the browser application in the background. \
                Platform and browser support for this feature is limited."
     in
-    Arg.(value & flag & info ["g"; "background"] ~doc)
+    Arg.(value & flag & info opts ~doc ?docs)
 
   (* macOS JavaScript automation *)
 
