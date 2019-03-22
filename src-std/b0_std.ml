@@ -2020,6 +2020,27 @@ module Fpath = struct
   let err_null s = Fmt.error "%a: Not a path: has null bytes" String.dump s
   let err_empty s = Fmt.error "%a: Not a path: is empty" String.dump s
 
+  (* Pct encoding *)
+
+  let pct_esc_len ~escape_space = function
+  | '%' | '#' | '?' -> 3
+  | ' ' when escape_space -> 3
+  | c when Char.Ascii.is_control c -> 3
+  | _ -> 1
+
+  let set_pct_encoded b i c =
+    let c = Char.code c in
+    let hi = Char.Ascii.upper_hex_digit ((c lsr 4) land 0xF) in
+    let lo = Char.Ascii.upper_hex_digit (c land 0xF) in
+    Bytes.set b i '%'; Bytes.set b (i + 1) hi; Bytes.set b (i + 2) lo;
+    i + 3
+
+  let pct_esc_set_char ~escape_space b i = function
+  | '%' | '#' | '?' as c -> set_pct_encoded b i c
+  | ' ' as c when escape_space -> set_pct_encoded b i c
+  | c when Char.Ascii.is_control c -> set_pct_encoded b i c
+  | c -> Bytes.set b i c; i + 1
+
   (* Platform specifics. *)
 
   module Windows = struct
@@ -2114,6 +2135,13 @@ module Fpath = struct
     | false -> p.[non_unc_path_start p] <> dir_sep_char
 
     let is_root p = p.[path_start p] = dir_sep_char
+
+    let to_uri_path ?(escape_space = true) p =
+      let set_char b i = function
+      | '\\' -> Bytes.set b i '/'; i + 1
+      | c -> pct_esc_set_char ~escape_space b i c
+      in
+      String.escaper (pct_esc_len ~escape_space) set_char p
   end
 
   module Posix = struct
@@ -2161,6 +2189,10 @@ module Fpath = struct
 
     let is_rel p = p.[0] <> dir_sep_char
     let is_root p = String.equal p dir_sep || String.equal p "//"
+
+    let to_uri_path ?(escape_space = true) p =
+      String.escaper (pct_esc_len ~escape_space)
+        (pct_esc_set_char ~escape_space) p
   end
 
   let chop_volume = if Sys.win32 then Windows.chop_volume else Posix.chop_volume
@@ -2257,15 +2289,38 @@ module Fpath = struct
     | _ when seg_start = 0 -> "./"
     | _ -> add_seg (String.with_index_range ~last:(seg_start - 1) p) ""
 
+  (* Strict prefixes *)
+
+  let is_prefix pre p = match String.is_prefix pre p with
+  | false -> false
+  | true ->
+      let suff_start = String.length pre in
+      let p_len = String.length p in
+      (* Check [prefix] and [p] are not equal modulo directoryness. *)
+      if suff_start = p_len then false else
+      if suff_start = p_len - 1 && p.[suff_start] = dir_sep_char then false else
+      (* Check the prefix is segment based *)
+      (pre.[suff_start - 1] = dir_sep_char || p.[suff_start] = dir_sep_char)
+
+  let rem_prefix pre p = match is_prefix pre p with
+  | false -> None
+  | true ->
+      let len = String.length pre in
+      let first = if p.[len] = dir_sep_char then len + 1 else len in
+      Some (String.with_index_range p ~first)
+
   (* Predicates and comparisons *)
 
   let is_rel = if Sys.win32 then Windows.is_rel else Posix.is_rel
   let is_abs p = not (is_rel p)
   let is_root = if Sys.win32 then Windows.is_root else Posix.is_root
+
+  (* FIXME this is wrong on windows. *)
   let current_dir_dir = "." ^ dir_sep
   let is_current_dir p = String.equal p "." || String.equal p current_dir_dir
   let parent_dir_dir = ".." ^ dir_sep
   let is_parent_dir p = String.equal p ".." || String.equal p parent_dir_dir
+
   let equal = String.equal
   let compare = String.compare
   let equal_basename p0 p1 = (* XXX could avoid alloc *)
@@ -2368,6 +2423,8 @@ module Fpath = struct
   let ( -+ ) p e = set_ext e p
 
   (* Converting *)
+
+  let to_uri_path = if Sys.win32 then Windows.to_uri_path else Posix.to_uri_path
 
   let conv =
     let kind = "path" in

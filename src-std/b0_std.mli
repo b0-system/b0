@@ -1678,6 +1678,34 @@ module Fpath : sig
       [p]. If [p] is a {{!is_root}root path} this is [p] itself.
       If [p] is in the current directory this is [./]. *)
 
+  (** {1:prefix Strict prefixes} *)
+
+  val is_prefix : t -> t -> bool
+  (** [is_prefix prefix p] is [true] iff [prefix] is a strict prefix
+      of [p] that respects path segments. More formally iff the following
+      two conditions hold:
+      {ol
+      {- [not Fpath.(equal (to_dir_path prefix) (to_dir_path p))]}
+      {- [Fpath.(String.is_prefix (to_string (to_dir_path prefix)
+         (to_string p)))] is [true]}}
+
+      {b Warning.} By definition [is_prefix p p] is [false]. Note
+      also that the prefix relation does not entail directory
+      containement; for example [is_prefix (v "..")  (v "../..")]  holds. *)
+
+  val rem_prefix : t -> t -> t option
+  (** [rem_prefix prefix p] is:
+      {ul
+      {- [None] if {!is_prefix}[ prefix p] is [false].}
+      {- [Some q] otherwise where [q] is [p] without the string prefix
+         [Fpath.to_dir_path prefix]. This means that [q] is always
+         relative, that it preserves [p]'s
+         {{!is_dir_path}directoryness} and that [Fpath.(equal (prefix
+         // q) p)] holds.}}
+
+      {b Warning.} By definition [rem_prefix p p] is [None]. *)
+
+
   (** {1:preds Predicates and comparison} *)
 
   val is_rel : t -> bool
@@ -1766,6 +1794,21 @@ module Fpath : sig
   val to_string : t -> string
   (** [to_string p] is the path [p] as a string. The result can
       be safely converted back with {!v}. *)
+
+  val to_uri_path : ?escape_space:bool -> t -> string
+  (** [to_uri_path p] is the path [p] as an URI path. This is [p] with
+      the system specific {!dir_sep_char} directory separator replaced
+      by ['/'] and with the following characters percent encoded:
+      ['%'], ['?'], ['#'], [' '] (unless [escape_space] is [false],
+      defaults to [true]), and the US-ASCII
+      {{!Char.Ascii.is_control}control characters}.
+
+      {b Note.} In 2019, the standard definition of URIs is in a sorry
+      state. Assuming the original file path was UTF-8 encoded. It is
+      {e believed} the above function should lead to an URI path
+      component that can be parsed by HTML5's
+      {{:https://dev.w3.org/html5/spec-LC/urls.html#parsing-urls}
+      definition} of URI parsing. *)
 
   val conv : t Conv.t
   (** [conv] converts file paths. The textual representation

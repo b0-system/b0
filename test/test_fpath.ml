@@ -6,6 +6,47 @@
 
 open B0_std
 
+let test_is_prefix_rem_prefix () =
+  let test p q r =
+    let p = Fpath.v p and q = Fpath.v q in
+    match r with
+    | None ->
+        assert (not (Fpath.is_prefix p q));
+        assert (Fpath.rem_prefix p q = None);
+    | Some r ->
+        let r = Fpath.v r in
+        assert (Fpath.is_prefix p q);
+        match Fpath.rem_prefix p q with
+        | None -> assert false
+        | Some r' ->
+            assert (Fpath.equal r r');
+            assert (Fpath.equal (Fpath.( p // r')) q);
+  in
+  test "a/b/" "a/b" None;
+  test "a/b/" "a/b/" None;
+  test "a/b" "a/b" None;
+  test "a/b" "a/b/" None;
+  test "a/b" "a/b/c" (Some "c");
+  test "a/b" "a/b/c/" (Some "c/");
+  test "a/b/" "a/b/c" (Some "c");
+  test "a/b/" "a/b/c/" (Some "c/");
+  test "a/b" "a/b" None;
+  test "/a/b/" "/a/b" None;
+  test "/a/b/" "/a/b/" None;
+  test "/a/b" "/a/bc" None;
+  test "/a/b" "/a/b" None;
+  test "/a/b/" "/a/b" None;
+  test "/a/b" "/a/b/" None;
+  test "/a/b/" "/a/b/" None;
+  test "/a/b" "/a/b/c" (Some "c");
+  test "/a/b/" "/a/b/c" (Some "c");
+  test "a" "a/b/c" (Some "b/c");
+  if Sys.win32 then begin
+    test "C:\\a" "C:\\a\\b" (Some "b");
+  end;
+  ()
+
+
 let test_parent () =
   let test p pp =
     assert (Fpath.equal (Fpath.parent (Fpath.v p)) (Fpath.v pp))
@@ -35,6 +76,7 @@ let test_parent () =
   ()
 
 let test () =
+  test_is_prefix_rem_prefix ();
   test_parent ();
   ()
 
