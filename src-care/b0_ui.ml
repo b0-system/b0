@@ -178,7 +178,7 @@ module Memo = struct
       let rec loop sc st sd wc wt wd ot od = function
       | [] -> sc, st, sd, wc, wt, wd, ot, od
       | o :: os ->
-          let cached = Op.status o = Op.Cached in
+          let cached = Op.exec_revived o in
           let d = Op.exec_duration o in
           let ot = ot + 1 in
           let od = od ++ d in

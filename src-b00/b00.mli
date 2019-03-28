@@ -437,9 +437,8 @@ module Op : sig
   type status =
   | Waiting  (** Waiting for execution. *)
   | Executed (** Executed successfully. *)
-  | Cached   (** Revived from the cache. *)
   | Failed   (** Executed unsucessfully. *)
-  | Aborted  (** A prerequisite operation failed. *)
+  | Aborted  (** Aborted due to prerequisite failure. *)
   (** The type for operation statuses. *)
 
   val pp_status : status Fmt.t
@@ -472,6 +471,9 @@ module Op : sig
   val exec_duration : t -> Time.span
   (** [exec_duration] is the difference between {!exec_end_time} and
       {!exec_start_time}. *)
+
+  val exec_revived : t -> bool
+  (** [exec_revived o] is [true] iff [o] was revived from a cache. *)
 
   val status : t -> status
   (** [status o] is [o] execution status. *)
@@ -539,6 +541,9 @@ module Op : sig
 
   val set_exec_end_time : t -> Time.span -> unit
   (** [set_exec_end_time o t] sets [o]'s execution end time to [s]. *)
+
+  val set_exec_revived : t -> bool -> unit
+  (** [set_exec_revived o b] sets [o]'s cache revival status to [b]. *)
 
   val set_status : t -> status -> unit
   (** [set_status o s] sets the execution status to [s]. *)
@@ -623,7 +628,7 @@ module Op_cache : sig
 
   val revive : t -> Op.t -> (Fpath.t list option, string) result
   (** [revive c o] tries to revive operation [o] from the file cache
-      using the key [Op.hash o]. In particular this:
+      using the key [Op.hash o]. In particular:
       {ol
       {- Recreates the files [Op.writes o]}
       {- Sets [o]'s execution information using the metadata hunk
@@ -636,7 +641,7 @@ module Op_cache : sig
       nothing was revived.
 
       {b Warning.} In any case the fields {!Op.exec_start_time},
-      {!Op.exec_end_time} and {!Op.exec_status} of [o] get set. *)
+      {!Op.exec_end_time} of [o] get set. *)
 
   val add : t -> Op.t -> (bool, string) result
   (** [add c o] adds operation [o] to the cache. This associates the

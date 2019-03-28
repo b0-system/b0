@@ -631,10 +631,10 @@ module Op = struct
   | Mkdir m -> Fpath.pp_quoted ppf (Mkdir.dir m)
   | Wait_files -> ()
 
-  type status = Waiting | Executed | Cached | Failed | Aborted
+  type status = Waiting | Executed | Failed | Aborted
 
   let pp_status ppf v = Fmt.string ppf @@ match v with
-  | Waiting -> "waiting" | Executed -> "executed" | Cached -> "cached"
+  | Waiting -> "waiting" | Executed -> "executed"
   | Failed -> "failed" | Aborted -> "aborted"
 
   type id = int
@@ -643,6 +643,7 @@ module Op = struct
       creation_time : Time.span;
       mutable exec_start_time : Time.span;
       mutable exec_end_time : Time.span;
+      mutable exec_revived : bool;
       mutable status : status;
       mutable reads : Fpath.t list;
       mutable writes : Fpath.t list;
@@ -652,15 +653,17 @@ module Op = struct
   let v ~id creation_time ~reads ~writes kind =
     let exec_start_time = Time.Span.zero in
     let exec_end_time = Time.Span.zero in
+    let exec_revived = false in
     let status = Waiting in
     let hash = Hash.nil in
-    { id; creation_time; exec_start_time; exec_end_time; status;
+    { id; creation_time; exec_start_time; exec_end_time; exec_revived; status;
       reads; writes; hash; kind; }
 
   let id o = o.id
   let creation_time o = o.creation_time
   let exec_start_time o = o.exec_start_time
   let exec_end_time o = o.exec_end_time
+  let exec_revived o = o.exec_revived
   let exec_duration o = Time.Span.abs_diff o.exec_end_time o.exec_start_time
   let status o = o.status
   let reads o = o.reads
@@ -680,6 +683,7 @@ module Op = struct
   let compare o0 o1 = (Pervasives.compare : int -> int -> int) o0.id o1.id
   let set_exec_start_time o t = o.exec_start_time <- t
   let set_exec_end_time o t = o.exec_end_time <- t
+  let set_exec_revived o b = o.exec_revived <- b
   let set_status o s = o.status <- s
   let set_reads o fs = o.hash <- Hash.nil; o.reads <- fs
   let set_writes o fs = o.writes <- fs
@@ -723,8 +727,9 @@ module Op = struct
   let pp_synopsis ppf o =
     let pp_kind ppf k = Fmt.tty_string [`Fg `Green] ppf k in
     let pp_status ppf = function
-    | Executed -> ()
-    | Cached -> Fmt.pf ppf "[%a]" (Fmt.tty_string [`Fg `Green]) "CACHED"
+    | Executed ->
+        if not o.exec_revived then () else
+        Fmt.pf ppf "[%a]" (Fmt.tty_string [`Fg `Green]) "CACHED"
     | Failed -> Fmt.pf ppf "[%a]" (Fmt.tty_string [`Fg `Red]) "FAILED"
     | Aborted -> Fmt.pf ppf "[%a]" (Fmt.tty_string [`Fg `Red]) "ABORTED"
     | Waiting -> Fmt.pf ppf "[waiting]"
@@ -929,6 +934,8 @@ module Op_cache = struct
     | Some (m, existed) ->
         Result.bind (Conv.of_bin spawn_meta_conv m) @@
         fun (stdo_ui, result) ->
+        Op.set_exec_revived o true;
+        Op.set_status o Op.Executed;
         Op.Spawn.set_stdo_ui s stdo_ui;
         Op.Spawn.set_result s result;
         Ok (Some existed)
@@ -938,7 +945,10 @@ module Op_cache = struct
     let key = op_cache_key o in
     Result.bind (File_cache.revive c.cache key writes) @@ function
     | None -> Ok None
-    | Some (_, existed) -> Ok (Some existed)
+    | Some (_, existed) ->
+        Op.set_exec_revived o true;
+        Op.set_status o Op.Executed;
+        Ok (Some existed)
 
   let revive c o =
     Op.set_exec_start_time o (timestamp c);
@@ -947,7 +957,6 @@ module Op_cache = struct
     | Op.Write w -> revive_write c o w
     | Op.Read _ | Op.Mkdir _ | Op.Wait_files -> Ok None
     in
-    Op.set_status o Op.Cached; (* N.B. set even if the revive fails *)
     Op.set_exec_end_time o (timestamp c);
     r
 
@@ -1597,8 +1606,8 @@ module Memo = struct
     rem_op_kont m o; m.feedback (`Op_complete (o, `Did_not_write did_not_write))
 
   let finish_op m o = match Op.status o with
-  | Op.Cached -> continue_op m o
   | Op.Executed ->
+      if Op.exec_revived o then continue_op m o else
       begin match Hash.equal (Op.hash o) Hash.nil with
       | true ->
           begin match Op.did_not_write o with
@@ -1638,7 +1647,7 @@ module Memo = struct
           | Error e -> m.feedback (`Op_cache_error (o, e)); Exec.submit m.exec o
           end
       end
-  | Op.Executed | Op.Cached | Op.Failed -> assert false
+  | Op.Executed | Op.Failed -> assert false
 
   (* XXX we may blow stack continuations can add which stirs.
      XXX futures make it even worse. *)
