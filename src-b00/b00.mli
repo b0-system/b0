@@ -631,7 +631,7 @@ module Reviver : sig
   val file_cache : t -> File_cache.t
   (** [file_cache r] is [r]'s file cache. *)
 
-  (** {1:record_and_revive Recoding and reviving operations.} *)
+  (** {1:record_and_revive Recording and reviving operations.} *)
 
   val set_op_hash : t -> Op.t -> (unit, string) result
   (** [set_op_hash r o] hashes the operation [o] and stores the result
@@ -640,16 +640,18 @@ module Reviver : sig
 
   val record : t -> Op.t -> (bool, string) result
   (** [record r o] records operation [o] in the reviver [r]. This
-      associates the [Op.writes o] of [o] to the key [Op.hash o] and
-      stores operation output information of [o] in the key's metadata
-      hunk. The semantics of the result is like {!File_cache.add}; in
-      particular in case of [Ok false] it means some file in the set
-      of writes do not exist and is likely an error. *)
+      associates the [Op.writes o] of [o] to the key [Op.hash o]
+      (i.e. this function assume [o] has gone through {!set_op_hash}
+      before) and stores operation output information of [o] in the
+      key's metadata hunk. The semantics of the result is like
+      {!File_cache.add}; in particular in case of [Ok false] it means
+      some file in the set of writes do not exist and is likely an
+      error. *)
 
   val revive : t -> Op.t -> (Fpath.t list option, string) result
   (** [revive r o] tries to revive operation [o] from [r] using the key
       [Op.hash o] (i.e. this function assume [o] has gone through
-      {!set_op_hash} before. In particular:
+      {!set_op_hash} before). In particular:
       {ol
       {- Recreates the files [Op.writes o]}
       {- Sets [o]'s execution information using the metadata hunk
