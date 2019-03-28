@@ -19,9 +19,9 @@ module Cli : sig
   (** Miscellaneous {!Cmdliner} argument converters. *)
   module Arg : sig
 
-    val path : Fpath.t Arg.conv
-    (** [path] is a converter for file paths. No existence checks
-        are performed on the path. *)
+    val fpath : Fpath.t Arg.conv
+    (** [fpath] is a converter for file paths. No existence checks are
+        performed on the path. *)
 
     val cmd : Cmd.t Arg.conv
     (** [cmd] is a converter for commands. *)

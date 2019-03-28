@@ -92,7 +92,7 @@ module Cli = struct
   end
   module Arg = struct
     let err_msg of_string s = Result.map_error (fun e -> `Msg e) (of_string s)
-    let path = Arg.conv ~docv:"PATH" (err_msg Fpath.of_string, Fpath.pp)
+    let fpath = Arg.conv ~docv:"PATH" (err_msg Fpath.of_string, Fpath.pp)
     let cmd = Arg.conv ~docv:"CMD" (err_msg Cmd.of_string, Cmd.dump)
   end
 end

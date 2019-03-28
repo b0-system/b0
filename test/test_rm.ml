@@ -21,7 +21,7 @@ let () =
     in
     let path =
       let doc = "$(docv) is file path to delete" in
-      Arg.(required & pos 0 (some B0_ui.Cli.Arg.path) None &
+      Arg.(required & pos 0 (some B0_ui.Cli.Arg.fpath) None &
            info [] ~doc ~docv:"PATH")
     in
     Term.(const rm_cmd $ B0_ui.Cli.B0_std.setup () $ recurse $ path),

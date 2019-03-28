@@ -697,8 +697,8 @@ module Jsong : sig
   val json : Json.t -> t
   (** [of_json v] is the JSON value [v] as a generated value. *)
 
-  val path : Fpath.t -> t
-  (** [path p] is [p] as a generated JSON string value. *)
+  val fpath : Fpath.t -> t
+  (** [fpath p] is [p] as a generated JSON string value. *)
 
   val cmd : Cmd.t -> t
   (** [cmd c] is [c] as a generated JSON string array value. *)

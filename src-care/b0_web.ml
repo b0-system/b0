@@ -634,7 +634,7 @@ module Json = struct
     | `O o -> obj_end @@ List.fold_left (fun o (m, v) -> mem m (json v) o) obj o
 
     let list elv l = arr_end (List.fold_left (fun a v -> el (elv v) a) arr l)
-    let path p = string (Fpath.to_string p)
+    let fpath p = string (Fpath.to_string p)
     let cmd c = list string (Cmd.to_list c)
     let strf fmt = Fmt.kstr string fmt
 

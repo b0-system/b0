@@ -33,12 +33,12 @@ let () =
     in
     let src =
       let doc = "$(docv) is the source file or directory" in
-      Arg.(required & pos 0 (some B0_ui.Cli.Arg.path) None &
+      Arg.(required & pos 0 (some B0_ui.Cli.Arg.fpath) None &
            info [] ~doc ~docv:"SRC")
     in
     let dst =
       let doc = "$(docv) is the destination path; which must not exist." in
-      Arg.(required & pos 1 (some B0_ui.Cli.Arg.path) None &
+      Arg.(required & pos 1 (some B0_ui.Cli.Arg.fpath) None &
            info [] ~doc ~docv:"DST")
     in
     Term.(const cp_cmd $ B0_ui.Cli.B0_std.setup () $ allow_hardlinks $
