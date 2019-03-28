@@ -152,19 +152,19 @@ let test_string_only () =
   ()
 
 let test_fpath_conv () =
-  trip_conv Fpath.conv (Fpath.v "bla");
-  trip_conv Fpath.conv (Fpath.v "/bla(/bla");
-  trip_conv Fpath.conv (Fpath.v "./");
-  trip_conv Fpath.conv (Fpath.v "/");
-  txt_dec Fpath.conv (Fpath.v "/") (" \"/\" ");
+  trip_conv Conv.fpath (Fpath.v "bla");
+  trip_conv Conv.fpath (Fpath.v "/bla(/bla");
+  trip_conv Conv.fpath (Fpath.v "./");
+  trip_conv Conv.fpath (Fpath.v "/");
+  txt_dec Conv.fpath (Fpath.v "/") (" \"/\" ");
   ()
 
 let test_fpath_conv_only () =
-  trip_conv Fpath.conv_only (Fpath.v "bla");
-  trip_conv Fpath.conv_only (Fpath.v "/bla(/bla");
-  trip_conv Fpath.conv_only (Fpath.v "./");
-  trip_conv Fpath.conv_only (Fpath.v "/");
-  txt_dec Fpath.conv_only (Fpath.v "(())") "(())";
+  trip_conv Conv.fpath_only (Fpath.v "bla");
+  trip_conv Conv.fpath_only (Fpath.v "/bla(/bla");
+  trip_conv Conv.fpath_only (Fpath.v "./");
+  trip_conv Conv.fpath_only (Fpath.v "/");
+  txt_dec Conv.fpath_only (Fpath.v "(())") "(())";
   ()
 
 let test () =

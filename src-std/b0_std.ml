@@ -1193,822 +1193,6 @@ module List = struct
     List.rev (M.fold (fun c els acc -> (c, S.elements els) :: acc) classes [])
 end
 
-(* Value converters *)
-
-module Conv = struct
-
-  (* Encoders and decoders *)
-
-  exception Error of int * int * string
-  let err i fmt = Fmt.kstr (fun e -> raise_notrace @@ Error (i, i, e)) fmt
-
-  module Bin = struct
-
-    (* Encoding *)
-
-    type 'a enc = Buffer.t -> 'a -> unit
-
-    let enc_err ~kind msg = err 0 ("encoding %s: " ^^ msg) kind
-    let enc_check_int ~kind (min : int) (max : int) (v : int) =
-      if min <= v && v <= max then () else
-      enc_err ~kind "%d: not in range [%d;%d]" v min max
-
-    let enc_byte b byte = Buffer.add_char b (Char.unsafe_chr byte)
-    let enc_int32 b i =
-      (* XXX From 4.08 use Buffer.add_int32_le *)
-      let i0 = Int32.to_int i in
-      let i1 = Int32.to_int (Int32.shift_right_logical i 16) in
-      let b0 = i0 land 0xFF and b1 = (i0 lsr 8) land 0xFF
-      and b2 = i1 land 0xFF and b3 = (i1 lsr 8) land 0xFF in
-      enc_byte b b0; enc_byte b b1; enc_byte b b2; enc_byte b b3
-
-    let enc_int64 b i =
-      (* XXX From 4.08 one use Buffer.add_int64_le *)
-      let i0 = Int64.to_int i in
-      let i1 = Int64.to_int (Int64.shift_right_logical i 16) in
-      let i2 = Int64.to_int (Int64.shift_right_logical i 32) in
-      let i3 = Int64.to_int (Int64.shift_right_logical i 48) in
-      let b0 = i0 land 0xFF and b1 = (i0 lsr 8) land 0xFF
-      and b2 = i1 land 0xFF and b3 = (i1 lsr 8) land 0xFF
-      and b4 = i2 land 0xFF and b5 = (i2 lsr 8) land 0xFF
-      and b6 = i3 land 0xFF and b7 = (i3 lsr 8) land 0xFF in
-      enc_byte b b0; enc_byte b b1; enc_byte b b2; enc_byte b b3;
-      enc_byte b b4; enc_byte b b5; enc_byte b b6; enc_byte b b7
-
-    let enc_int b v = enc_int64 b (Int64.of_int v)
-    let enc_len b v = enc_int64 b (Int64.of_int v)
-
-    let enc_bytes b v =
-      enc_len b (String.length v); Buffer.add_string b v
-
-    let enc_list enc_v b vs =
-      let rec loop len acc = function
-      | [] -> len, acc | v :: vs -> loop (len + 1) (v :: acc) vs
-      in
-      let len, rvs = loop 0 [] vs in
-      enc_len b len; List.iter (enc_v b) rvs
-
-    (* Decoding *)
-
-    type 'a dec = string -> start:int -> int * 'a
-
-    let dec_err ~kind i msg = err i ("decoding %s: " ^^ msg) kind
-    let dec_err_eoi ~kind i = dec_err ~kind i "unexpected end of input"
-    let dec_err_exceed ~kind i v ~max =
-      dec_err ~kind i "%d: not in range [0;%d]" v max
-
-    let dec_need ~kind s ~start ~len =
-      match start + (len - 1) < String.length s with
-      | true -> () | false -> dec_err_eoi ~kind start
-
-    let dec_byte ~kind s ~start =
-      dec_need ~kind s ~start ~len:1; start + 1, Char.code (s.[start])
-
-    external swap32 : int32 -> int32 = "%bswap_int32"
-    external unsafe_get_int32_ne : string -> int -> int32 =
-      "%caml_string_get32u"
-
-    let unsafe_get_int32_le s i = match Sys.big_endian with
-    | true -> swap32 (unsafe_get_int32_ne s i)
-    | false -> unsafe_get_int32_ne s i
-
-    let dec_int32 ~kind s ~start =
-      let len = 4 in
-      dec_need ~kind s ~start ~len; start + len, unsafe_get_int32_le s start
-
-    external swap64 : int64 -> int64 = "%bswap_int64"
-    external unsafe_get_int64_ne : string -> int -> int64 =
-      "%caml_string_get64u"
-
-    let unsafe_get_int64_le b i = match Sys.big_endian with
-    | true -> swap64 (unsafe_get_int64_ne b i)
-    | false -> unsafe_get_int64_ne b i
-
-    let dec_int64 ~kind s ~start =
-      let len = 8 in
-      dec_need ~kind s ~start ~len; start + len, unsafe_get_int64_le s start
-
-    let int_min = Int64.of_int min_int
-    let int_max = Int64.of_int max_int
-    let int_len = 8
-    let dec_int ~kind s ~start =
-      let i, v = dec_int64 ~kind s ~start in
-      if (Int64.compare int_min v <= 0 && Int64.compare v int_max <= 0)
-      then i, Int64.to_int v
-      else dec_err ~kind start "%Ld: not in range [%Ld;%Ld]" v int_min int_max
-
-    let len_max = Int64.of_int max_int
-    let len_len = 8
-    let dec_len ~kind s ~start =
-      let i, l = dec_int64 ~kind s ~start in
-      if (Int64.compare 0L l <= 0 && Int64.compare l len_max <= 0)
-      then i, Int64.to_int l
-      else dec_err ~kind start "%Ld: not in range [0;%Ld]" l len_max
-
-    let dec_bytes ~kind s ~start =
-      let start, len = dec_len ~kind s ~start in
-      let last = start + len - 1 in
-      dec_need ~kind s ~start ~len;
-      start + len, String.with_index_range ~first:start ~last s
-
-    let dec_list dec_v ~kind s ~start =
-      let start, len = dec_len ~kind s ~start in
-      let rec loop acc count start = match count < 1 with
-      | true -> start, acc
-      | false ->
-          let start, v = dec_v s ~start in
-          loop (v :: acc) (count - 1) start
-      in
-      loop [] len start
-  end
-
-  module Txt = struct
-
-    let is_atom_sep = function
-    | '(' | ')' | ';' | '"' -> true
-    | c when Char.Ascii.is_white c -> true
-    | c -> false
-
-    (* Encoding *)
-
-    type 'a enc = Format.formatter -> 'a -> unit
-
-    let enc_err ~kind msg = err 0 ("encoding %s: " ^^ msg) kind
-    let enc_list enc_v ppf vs =
-      Fmt.pf ppf "@[<1>(%a)@]" Fmt.(list ~sep:sp enc_v) vs
-
-    let enc_atom ppf a =
-      let atom_must_quote a =
-        let rec loop max i s = match i < max with
-        | false -> if max < 0 then true (* empty string *) else false
-        | true ->
-            match a.[i] with
-            | '^' -> true
-            | c when is_atom_sep c -> true
-            | c when Char.Ascii.is_control c -> true
-            | c -> loop max (i + 1) s
-        in
-        loop (String.length a - 1) 0 a
-      in
-      match atom_must_quote a with
-      | false -> Fmt.string ppf a
-      | true ->
-          let len = String.length a in
-          let flush ppf start i =
-            if start < len then Fmt.string ppf (String.sub a start (i - start))
-          in
-          let rec loop start i = match i < len with
-          | false -> flush ppf start i
-          | true ->
-              let next = i + 1 in
-              match a.[i] with
-              | '"' -> flush ppf start i; Fmt.string ppf "^\""; loop next next
-              | '^' -> flush ppf start i; Fmt.string ppf "^^"; loop next next
-              | '\n' -> flush ppf start i; Fmt.string ppf "^n"; loop next next
-              | '\r' -> flush ppf start i; Fmt.string ppf "^r"; loop next next
-              | c when Char.Ascii.is_control c ->
-                  flush ppf start i; Fmt.pf ppf "^u{%04X}" (Char.code c);
-                  loop next next
-              | c -> loop start next
-          in
-          Fmt.char ppf '\"'; loop 0 0; Fmt.char ppf '\"'
-
-    let enc_check_int ~kind (min : int) (max : int) (v : int) =
-      if min <= v && v <= max then () else
-      enc_err ~kind "%d: not in range [%d;%d]" v min max
-
-    (* Decoding *)
-
-    type 'a dec = string -> start:int -> int * 'a
-
-    let err_char c = String.Ascii.escape (String.of_char c)
-    let dec_err ~kind i msg = err i ("parsing %s: " ^^ msg) kind
-    let dec_err_eoi ~kind i = dec_err ~kind i "unexpected end of input"
-    let dec_err_char ~kind i c =
-      dec_err ~kind i "%s: illegal character" (err_char c)
-
-    type lexeme = [ `Ls |  `Le | `Atom of string ]
-    let pp_lexeme ppf = function
-    | `Ls -> Fmt.string ppf "\"(\""
-    | `Le -> Fmt.string ppf "\")\""
-    | `Atom s -> Fmt.pf ppf "\"%s\"" s
-
-    let dec_err_lexeme ~kind i l ~exp =
-      dec_err ~kind i "%a: expected %a" pp_lexeme l
-        Fmt.(list ~sep:(unit " or ") pp_lexeme) exp
-
-    let dec_err_atom ~kind i a ~exp =
-      let exp = List.map (fun s -> Fmt.str "\"%s\"" s) exp in
-      dec_err ~kind i "%s: expected %a"
-        a Fmt.(list ~sep:(unit " or ") string) exp
-
-    let dec_err_unclosed ~kind i = dec_err ~kind i "unclosed list"
-    let dec_err_esc_truncated ~kind i = dec_err ~kind i "truncated escape"
-
-    let char_is_illegal = function
-    | '\x00' .. '\x08' | '\x0E' .. '\x1F' | '\x7F' -> true
-    | _ -> false
-
-    let dec_skip ~kind s ~start =
-      let rec skip len i =
-        if i >= len then len else
-        match s.[i] with
-        | ';' -> skip_comment len (i + 1)
-        | c when Char.Ascii.is_white s.[i] -> skip len (i + 1)
-        | c when char_is_illegal c -> dec_err_char ~kind i c
-        | c -> i
-      and skip_comment len i =
-        if i >= len then len else
-        match s.[i] with
-        | '\n' | '\r' -> skip len (i + 1)
-        | c when char_is_illegal c -> dec_err_char ~kind i c
-        | c -> skip_comment len (i + 1)
-      in
-      skip (String.length s) start
-
-    (* XXX From 4.06 use Buffer.add_utf_8_uchar *)
-    let buffer_add_utf_8_uchar b u = match Uchar.to_int u with
-    | u when u < 0 -> assert false
-    | u when u <= 0x007F ->
-        Buffer.add_char b (Char.unsafe_chr u)
-    | u when u <= 0x07FF ->
-        Buffer.add_char b (Char.unsafe_chr (0xC0 lor (u lsr 6)));
-        Buffer.add_char b (Char.unsafe_chr (0x80 lor (u land 0x3F)));
-    | u when u <= 0xFFFF ->
-        Buffer.add_char b (Char.unsafe_chr (0xE0 lor (u lsr 12)));
-        Buffer.add_char b (Char.unsafe_chr (0x80 lor ((u lsr 6) land 0x3F)));
-        Buffer.add_char b (Char.unsafe_chr (0x80 lor (u land 0x3F)));
-    | u when u <= 0x10FFFF ->
-        Buffer.add_char b (Char.unsafe_chr (0xF0 lor (u lsr 18)));
-        Buffer.add_char b (Char.unsafe_chr (0x80 lor ((u lsr 12) land 0x3F)));
-        Buffer.add_char b (Char.unsafe_chr (0x80 lor ((u lsr 6) land 0x3F)));
-        Buffer.add_char b (Char.unsafe_chr (0x80 lor (u land 0x3F)))
-    | _ -> assert false
-
-    let dec_uchar_esc ~kind s ~start i =
-      let max = String.length s - 1 in
-      if i > max then dec_err_esc_truncated ~kind start else
-      match s.[i] <> '{' with
-      | true ->
-          dec_err ~kind i "^u%s: illegal escape sequence" (err_char s.[i])
-      | false ->
-          let i = i + 1 in
-          let rec loop acc count = match i + count with
-          | k when k > max -> dec_err_esc_truncated ~kind start
-          | k ->
-              match s.[k] with
-              | c when Char.Ascii.is_hex_digit c ->
-                  let count = count + 1 in
-                  if count > 6
-                  then dec_err ~kind k "%c: expected \"}\"" c else
-                  let acc = acc * 16 + Char.Ascii.hex_digit_value c in
-                  loop acc count
-              | '}' ->
-                  if count = 0
-                  then dec_err ~kind k "}: expected hex digit"
-                  else if not (Uchar.is_valid acc)
-                  then dec_err ~kind start
-                      "%04X: Unicode escape is not a Unicode scalar value" acc
-                  else (k + 1, Uchar.of_int acc)
-              | c ->
-                  dec_err ~kind k
-                    "%s: expected hex digit" (err_char c)
-          in
-          loop 0 0
-
-    let dec_qatom ~kind s ~start:astart = (* '\"' at [astart] was parsed *)
-      let len = String.length s in
-      let b = Buffer.create 255 in
-      let flush start i =
-        if start < len then Buffer.add_substring b s start (i - start)
-      in
-      let rec loop start i = match i < len with
-      | false -> dec_err ~kind astart "unclosed quoted atom"
-      | true ->
-          match s.[i] with
-          | '\"' -> flush start i; i + 1, Buffer.contents b
-          | '^' -> (* totally evil escape sequence *)
-              flush start i;
-              let esc = i + 1 in
-              let next = i + 2 in
-              if esc < len then () else dec_err_esc_truncated ~kind i;
-              begin match s.[esc] with
-              | '\"' -> Buffer.add_char b '\"'; loop next next
-              | '^' -> Buffer.add_char b '^'; loop next next
-              | 'n' -> Buffer.add_char b '\n'; loop next next
-              | 'r' -> Buffer.add_char b '\r'; loop next next
-              | ' ' -> Buffer.add_char b ' '; loop next next
-              | 'u' ->
-                  let i, u = dec_uchar_esc ~kind s ~start:i next in
-                  buffer_add_utf_8_uchar b u; loop i i
-              | '\n' | '\r' -> (* continuation line *)
-                  let rec skip_white s i = match i < len with
-                  | false -> i
-                  | true when char_is_illegal s.[i] ->
-                      dec_err_char ~kind i s.[i]
-                  | true when Char.Ascii.is_white s.[i] -> skip_white s (i + 1)
-                  | true -> i
-                  in
-                  let start = skip_white s next in
-                  loop start start
-              | c ->
-                  dec_err ~kind i "^%s: illegal escape sequence" (err_char c)
-              end
-          | c when char_is_illegal c -> dec_err_char ~kind i c
-          | c -> loop start (i + 1)
-      in
-      let start = astart + 1 in
-      loop start start
-
-    let dec_atom ~kind s ~start =
-      let i = dec_skip ~kind s ~start in
-      match i < String.length s with
-      | false -> dec_err ~kind i "end of input, expected atom"
-      | true ->
-          if s.[i] = '\"' then dec_qatom ~kind s ~start:i else
-          let rec loop max i s = match i > max with
-          | true -> i - 1
-          | false ->
-              match s.[i] with
-              | c when char_is_illegal c -> dec_err_char ~kind i c
-              | c when is_atom_sep c -> i - 1
-              | c -> loop max (i + 1) s
-          in
-          let last = loop (String.length s - 1) (i + 1) s in
-          let atom = String.with_index_range ~first:i ~last s in
-          last + 1, atom
-
-    let dec_lx par ~kind s ~start =
-      let i = dec_skip ~kind s ~start in
-      match i < String.length s with
-      | false -> dec_err ~kind i "end of input, expected \"%c\" " par
-      | true when Char.equal s.[i] par -> i + 1
-      | true ->
-          dec_err ~kind start "%s: expected \"%c\"" (err_char s.[i]) par
-
-    let dec_ls ~kind s ~start = dec_lx '(' ~kind s ~start
-    let dec_le ~kind s ~start = dec_lx ')' ~kind s ~start
-    let dec_lexeme ~kind s ~start =
-      let i = dec_skip ~kind s ~start in
-      match i < String.length s with
-      | false -> dec_err_eoi ~kind i
-      | true ->
-          match s.[i] with
-          | '(' -> i + 1, (i, `Ls)
-          | ')' -> i + 1, (i, `Le)
-          | _ -> let j, a = dec_atom ~kind s ~start:i in j, (i, `Atom a)
-
-    let dec_t_of_atom f ~kind s ~start:astart =
-      let i, a = dec_atom ~kind s ~start:astart in
-      match f a with
-      | v -> i, v
-      | exception Failure _ -> dec_err ~kind astart "%s: not a literal" a
-
-    let dec_list dec_v ~kind s ~start =
-      let lstart = dec_ls ~kind s ~start in
-      let rec loop acc start =
-        let i = dec_skip ~kind s ~start in
-        match i < String.length s with
-        | false -> dec_err_unclosed ~kind lstart
-        | true ->
-            if s.[i] = ')' then dec_le ~kind s ~start:i, List.rev acc else
-            let start, v = dec_v s ~start:i in
-            loop (v :: acc) start
-      in
-      loop [] lstart
-
-    let dec_list_head ~kind s ~start =
-      let start = dec_ls ~kind s ~start in
-      dec_atom ~kind s ~start
-
-    let dec_list_tail dec_v ~kind ~ls s ~start =
-      let rec loop acc i =
-        let i = dec_skip ~kind s ~start:i in
-        match i < String.length s with
-        | false -> dec_err_unclosed ~kind ls
-        | true ->
-            if s.[i] = ')' then dec_le ~kind s ~start:i, List.rev acc else
-            let i, v = dec_v s ~start:i in
-            loop (v :: acc) start
-      in
-      loop [] start
-
-    let dec_check_int ~kind i (min : int) (max : int) (v : int) =
-      if min <= v && v <= max then () else
-      dec_err ~kind i "%d: not in range [%d;%d]" v min max
-  end
-
-  (* Converters *)
-
-  type 'a t =
-    { kind : string; docvar : string;
-      bin_enc : 'a Bin.enc; bin_dec : 'a Bin.dec;
-      txt_enc : 'a Txt.enc; txt_dec : 'a Txt.dec }
-
-  let v ~kind ~docvar bin_enc bin_dec txt_enc txt_dec =
-    { kind; docvar; bin_enc; bin_dec; txt_enc; txt_dec }
-
-  let kind c = c.kind
-  let docvar c = c.docvar
-  let bin_enc c = c.bin_enc
-  let bin_dec c = c.bin_dec
-  let txt_enc c = c.txt_enc
-  let txt_dec c = c.txt_dec
-  let with_kind ?docvar kind c =
-    let docvar = match docvar with None -> c.docvar | Some v -> v in
-    { c with kind; docvar }
-
-  let with_docvar docvar c = { c with docvar }
-  let with_conv ~kind ~docvar to_t of_t conv_t =
-    let bin_enc b v = conv_t.bin_enc b (to_t v) in
-    let bin_dec s ~start = let i, v = conv_t.bin_dec s ~start in i, of_t v in
-    let txt_enc ppf v = conv_t.txt_enc ppf (to_t v) in
-    let txt_dec s ~start = let i, v = conv_t.bin_dec s ~start in i, of_t v in
-    { kind; docvar; bin_enc; bin_dec; txt_enc; txt_dec }
-
-  (* Converting *)
-
-  let get_buf = function None -> Buffer.create 256 | Some b -> Buffer.clear b; b
-
-  let to_bin ?buf c v =
-    let b = get_buf buf in
-    try Ok (c.bin_enc b v; Buffer.contents b)
-    with Error (_, _, e) -> Result.Error e
-
-  let of_bin c s =
-    try
-      let i, v = c.bin_dec s 0 in
-      match i = String.length s with
-      | true -> Ok v
-      | false -> Bin.dec_err ~kind:c.kind i "unexpected leftover bytes"
-    with Error (i, _, e) -> Fmt.error "%d: %s" i e
-
-  let to_txt ?buf c v =
-    let b = get_buf buf in
-    let ppf = Format.formatter_of_buffer b in
-    try Ok (c.txt_enc ppf v; Format.pp_print_flush ppf (); Buffer.contents b)
-    with Error (_, _, e) -> Result.Error e
-
-  let of_txt c s =
-    try
-      let i, v = c.txt_dec s ~start:0 in
-      match i = String.length s with
-      | true -> Ok v
-      | false ->
-          match Txt.dec_skip ~kind:c.kind s ~start:i = String.length s with
-          | true -> Ok v
-          | false -> Txt.dec_err ~kind:c.kind i "unexpected leftover text"
-    with Error (i, _, e) -> Fmt.error "%d: %s" i e
-
-  let to_pp c ppf v = try c.txt_enc ppf v with
-  | Error (_, _, e) ->
-      Fmt.pf ppf "@[<1>(conv-error %a %a)@]" Txt.enc_atom c.kind Txt.enc_atom e
-
-  (* Predefined converters *)
-
-  let bool =
-    let kind = "bool" in
-    let bin_enc b v = Bin.enc_byte b (if v then 1 else 0) in
-    let bin_dec s ~start = match Bin.dec_byte ~kind s ~start with
-    | i, 0 -> i, false
-    | i, 1 -> i, true
-    | _, byte -> Bin.dec_err_exceed ~kind start byte ~max:1
-    in
-    let txt_enc ppf v = Fmt.string ppf (if v then "true" else "false") in
-    let txt_dec s ~start =
-      let i, a = Txt.dec_atom ~kind s ~start in
-      let v = match a with
-      | "true" -> true | "false" -> false
-      | a -> Txt.dec_err_atom ~kind start a ~exp:["true"; "false"]
-      in
-      i, v
-    in
-    v ~kind ~docvar:"BOOL" bin_enc bin_dec txt_enc txt_dec
-
-  let byte =
-    let kind = "byte" in
-    let min = 0 and max = 255 in
-    let bin_enc b v = Bin.enc_check_int ~kind min max v; Bin.enc_byte b v in
-    let bin_dec = Bin.dec_byte ~kind in
-    let txt_enc ppf v = Txt.enc_check_int ~kind min max v; Fmt.int ppf v in
-    let txt_dec s ~start =
-      let i, v as r = Txt.dec_t_of_atom int_of_string ~kind s ~start in
-      Txt.dec_check_int ~kind start min max v; r
-    in
-    v ~kind ~docvar:"BYTE" bin_enc bin_dec txt_enc txt_dec
-
-  let int =
-    let kind = "int" in
-    let bin_enc = Bin.enc_int in
-    let bin_dec = Bin.dec_int ~kind in
-    let txt_enc = Fmt.int in
-    let txt_dec s ~start = Txt.dec_t_of_atom int_of_string ~kind s ~start in
-    v ~kind ~docvar:"INT" bin_enc bin_dec txt_enc txt_dec
-
-  let int31 =
-    let kind = "int31" in
-    let min = - (1 lsl 30) and max = 1 lsl 30 - 1 in
-    let bin_enc b v =
-      Bin.enc_check_int ~kind min max v;
-      let b0 = v land 0xFF          and b1 = (v lsr 8) land 0xFF
-      and b2 = (v lsr 16) land 0xFF and b3 = (v lsr 24) land 0xFF in
-      Bin.enc_byte b b0; Bin.enc_byte b b1; Bin.enc_byte b b2; Bin.enc_byte b b3
-    in
-    let bin_dec s ~start =
-      let len = 4 in
-      Bin.dec_need ~kind s ~start ~len;
-      let b0 = Char.code s.[start]     and b1 = Char.code s.[start + 1]
-      and b2 = Char.code s.[start + 2] and b3 = Char.code s.[start + 3] in
-      let max_bit = Sys.int_size in
-      let i =
-        (b3 lsl (max_bit - 7))  lor (b2 lsl (max_bit - 15)) lor
-        (b1 lsl (max_bit - 23)) lor (b0 lsl (max_bit - 31))
-      in
-      let i = i asr (max_bit - 31) in
-      start + len, i
-    in
-    let txt_enc ppf v = Txt.enc_check_int ~kind min max v; Fmt.int ppf v in
-    let txt_dec s ~start =
-      let (i, v as r) = Txt.dec_t_of_atom  int_of_string ~kind s ~start in
-      Txt.dec_check_int ~kind start min max v; r
-    in
-    v ~kind ~docvar:"INT31" bin_enc bin_dec txt_enc txt_dec
-
-  let int32 =
-    let kind = "int32" in
-    let bin_enc = Bin.enc_int32 in
-    let bin_dec = Bin.dec_int32 ~kind in
-    let txt_enc = Fmt.int32 in
-    let txt_dec s ~start = Txt.dec_t_of_atom Int32.of_string ~kind s ~start in
-    v ~kind ~docvar:"INT32" bin_enc bin_dec txt_enc txt_dec
-
-  let int64 =
-    let kind = "int64" in
-    let bin_enc = Bin.enc_int64 in
-    let bin_dec = Bin.dec_int64 ~kind in
-    let txt_enc = Fmt.int64 in
-    let txt_dec s ~start = Txt.dec_t_of_atom Int64.of_string ~kind s ~start in
-    v ~kind ~docvar:"INT64" bin_enc bin_dec txt_enc txt_dec
-
-  let float =
-    let kind = "float" in
-    let bin_enc b v = Bin.enc_int64 b (Int64.bits_of_float v) in
-    let bin_dec s ~start =
-      let i, v = Bin.dec_int64 ~kind s ~start in i, Int64.float_of_bits v
-    in
-    let txt_enc = Fmt.float in
-    let txt_dec s ~start = Txt.dec_t_of_atom float_of_string ~kind s ~start in
-    v ~kind ~docvar:"FLOAT" bin_enc bin_dec txt_enc txt_dec
-
-  let string_bytes =
-    let kind = "string" in
-    let bin_enc = Bin.enc_bytes in
-    let bin_dec = Bin.dec_bytes ~kind in
-    let txt_enc ppf = function
-    | "" -> Fmt.pf ppf "@[<1>(hex@ \"\")@]"
-    | v -> Fmt.pf ppf "@[<1>(hex@ %s)@]" (String.Ascii.to_hex v)
-    in
-    let txt_dec s ~start =
-      let astart = Txt.dec_ls ~kind s ~start in
-      let start, a = Txt.dec_atom ~kind s ~start:astart in
-      if a <> "hex" then Txt.dec_err ~kind astart "%s: expected \"hex\"" a else
-      let start, h = Txt.dec_atom ~kind s ~start in
-      match String.Ascii.of_hex h with
-      | Ok v -> Txt.dec_le ~kind s ~start, v
-      | Error i when i = String.length s ->
-          Txt.dec_err ~kind (start + i) "missing hex digit"
-      | Error i ->
-          Txt.dec_err ~kind (start + i) "not a hex digit"
-    in
-    v ~kind ~docvar:"HEX" bin_enc bin_dec txt_enc txt_dec
-
-  let atom =
-    let kind = "atom" in
-    let bin_enc = Bin.enc_bytes in
-    let bin_dec = Bin.dec_bytes ~kind in
-    let txt_enc = Txt.enc_atom in
-    let txt_dec = Txt.dec_atom ~kind in
-    v ~kind ~docvar:"VALUE" bin_enc bin_dec txt_enc txt_dec
-
-  let atom_non_empty =
-    let kind = "atom" in
-    let bin_enc b = function
-    | "" -> Bin.enc_err ~kind "empty atom" | v -> Bin.enc_bytes b v
-    in
-    let bin_dec s ~start =
-      let (i, v as r) = Bin.dec_bytes ~kind s ~start in
-      if v = "" then Bin.dec_err ~kind start "empty atom" else r
-    in
-    let txt_enc ppf = function
-    | "" -> Txt.enc_err ~kind "empty atom" | v -> Txt.enc_atom ppf v
-    in
-    let txt_dec s ~start =
-      let (i, v as r) = Txt.dec_atom ~kind s ~start in
-      if v = "" then Txt.dec_err ~kind start "empty atom" else r
-    in
-    v ~kind ~docvar:"VALUE" bin_enc bin_dec txt_enc txt_dec
-
-  let option ?kind:k ?docvar:d c =
-    let kind = match k with Some k -> k | None -> Fmt.str "%s option" c.kind in
-    let docvar = match d with Some v -> v | None -> Fmt.str "[%s]" c.docvar in
-    let bin_enc b = function
-    | None -> Bin.enc_byte b 0x0
-    | Some v -> Bin.enc_byte b 0x1; c.bin_enc b v
-    in
-    let bin_dec s ~start = match Bin.dec_byte ~kind s ~start with
-    | start, 0x0 -> start, None
-    | start, 0x1 -> let i, v = c.bin_dec s ~start in i, Some v
-    | _, byte -> Bin.dec_err_exceed ~kind start byte ~max:0x1
-    in
-    let txt_enc ppf = function
-    | None -> Fmt.pf ppf "none"
-    | Some v -> Fmt.pf ppf "@[<1>(some@ @[%a@])@]" c.txt_enc v
-    in
-    let txt_dec s ~start = match Txt.dec_lexeme ~kind s ~start with
-    | i, (j, `Ls) ->
-        let start, a = Txt.dec_atom ~kind s ~start:i in
-        if String.equal a "some" then
-          let start, v = c.txt_dec s ~start in
-          Txt.dec_le ~kind s ~start, Some v
-        else
-          Txt.dec_err_atom ~kind j a ~exp:["some"]
-    | i, (_, `Atom "none") -> i, None
-    | _, (j, l) -> Txt.dec_err_lexeme ~kind j l ~exp:[`Ls; `Atom "none"]
-    in
-    v ~kind ~docvar bin_enc bin_dec txt_enc txt_dec
-
-  let some c =
-    let err_none = format_of_string "cannot encode None" in
-    let bin_enc b = function
-    | None -> Bin.enc_err ~kind:c.kind err_none
-    | Some v -> c.bin_enc b v
-    in
-    let bin_dec s ~start = let i, v = c.bin_dec s ~start in i, Some v in
-    let txt_enc ppf = function
-    | None -> Txt.enc_err ~kind:c.kind err_none
-    | Some v -> c.txt_enc ppf v
-    in
-    let txt_dec s ~start = let i, v = c.txt_dec s ~start in i, Some v in
-    { c with bin_enc; bin_dec; txt_enc; txt_dec }
-
-  let result ?kind:k ?docvar:d ok error =
-    let kind = match k with
-    | Some k -> k | None -> Fmt.str "(%s, %s) result" ok.kind error.kind
-    in
-    let docvar = match d with Some v -> v | None -> "RESULT" in
-    let bin_enc b = function
-    | Ok v -> Bin.enc_byte b 0x0; ok.bin_enc b v
-    | Error e -> Bin.enc_byte b 0x1; error.bin_enc b e
-    in
-    let bin_dec s ~start = match Bin.dec_byte ~kind s ~start with
-    | start, 0x0 -> let i, v = ok.bin_dec s ~start in i, Ok v
-    | start, 0x1 -> let i, e = error.bin_dec s ~start in i, Error e
-    | _, byte -> Bin.dec_err_exceed ~kind start byte ~max:0x1
-    in
-    let txt_enc ppf = function
-    | Ok v -> Fmt.pf ppf "@[<1>(ok@ @[%a@])@]" ok.txt_enc v
-    | Error e -> Fmt.pf ppf "@[<1>(error@ @[%a@])@]" error.txt_enc e
-    in
-    let txt_dec s ~start =
-      let astart = Txt.dec_ls ~kind s ~start in
-      let start, a = Txt.dec_atom ~kind s ~start:astart in
-      match a with
-      | "ok" ->
-          let start, v = ok.txt_dec s ~start in
-          Txt.dec_le ~kind s ~start, Ok v
-      | "error" ->
-          let start, e = error.txt_dec s ~start in
-          Txt.dec_le ~kind s ~start, Error e
-      | a ->
-          Txt.dec_err ~kind astart "%s: expected \"ok\" or \"error\"" a
-    in
-    v ~kind ~docvar bin_enc bin_dec txt_enc txt_dec
-
-  let list ?kind:k ?docvar:d c =
-    let kind = match k with Some k -> k | None -> Fmt.str "%s list" c.kind in
-    let docvar = match d with Some v -> v | None -> Fmt.str "%s..." c.docvar in
-    let bin_enc = Bin.enc_list c.bin_enc in
-    let bin_dec = Bin.dec_list c.bin_dec ~kind in
-    let txt_enc = Txt.enc_list c.txt_enc in
-    let txt_dec = Txt.dec_list ~kind c.txt_dec in
-    v ~kind ~docvar bin_enc bin_dec txt_enc txt_dec
-
-  let array ?kind:k ?docvar:d c =
-    let kind = match k with Some k -> k | None -> Fmt.str "%s array" c.kind in
-    let docvar = match d with Some v -> v | None -> Fmt.str "%s..." c.docvar in
-    let bin_enc b vs =
-      Bin.enc_len b (Array.length vs); Array.iter (c.bin_enc b) vs
-    in
-    let bin_dec s ~start =
-      let start, len = Bin.dec_len ~kind s ~start in
-      match len = 0 with
-      | true -> start, [||]
-      | false ->
-          let start, v0 = c.bin_dec s ~start in
-          let a = Array.make len v0 in
-          let rec loop a i start = match i < len with
-          | false -> start, a
-          | true ->
-              let start, v = c.bin_dec s ~start in
-              a.(i) <- v; loop a (i + 1) start
-          in
-          loop a 1 start
-    in
-    let txt_enc ppf vs =
-      Fmt.pf ppf "@[<1>(%a)@]" Fmt.(array ~sep:sp c.txt_enc) vs
-    in
-    let txt_dec s ~start =
-      let i, vs = Txt.dec_list ~kind c.txt_dec s ~start in
-      i, Array.of_list vs
-    in
-    v ~kind ~docvar bin_enc bin_dec txt_enc txt_dec
-
-  let pair ?kind:k ?docvar:d c0 c1 =
-    let kind = match k with
-    | Some k -> k | None -> Fmt.str "%s * %s" c0.kind c1.kind
-    in
-    let docvar = match d with
-    | Some v -> v | None -> Fmt.str "%s %s" c0.docvar c1.docvar
-    in
-    let bin_enc b (v0, v1) = c0.bin_enc b v0; c1.bin_enc b v1 in
-    let bin_dec s ~start =
-      let start, v0 = c0.bin_dec s ~start in
-      let i, v1 = c1.bin_dec s ~start in
-      i, (v0, v1)
-    in
-    let txt_enc ppf (v0, v1) =
-      Fmt.pf ppf "@[<1>(%a %a)@]" c0.txt_enc v0 c1.txt_enc v1
-    in
-    let txt_dec s ~start =
-      let start = Txt.dec_ls ~kind s ~start in
-      let start, v0 = c0.txt_dec s start in
-      let start, v1 = c1.txt_dec s start in
-      let i = Txt.dec_le ~kind s ~start in
-      i, (v0, v1)
-    in
-    v ~kind ~docvar bin_enc bin_dec txt_enc txt_dec
-
-  let enum ~kind ~docvar ?(eq = ( = )) vs =
-    let bin_enc b v =
-      let rec loop v i = function
-      | (_, v') :: _ when eq v v' -> Bin.enc_byte b i
-      | _ :: vs -> loop v (i + 1) vs
-      | [] -> Bin.enc_err ~kind "unknown enum value"
-      in
-      loop v 0 vs
-    in
-    let bin_dec s ~start =
-      Bin.dec_need ~kind s ~start ~len:1;
-      let rec loop k i = function
-      | (_, v) :: _ when k = i -> start + 1, v
-      | _ :: vs -> loop k (i + 1) vs
-      | [] -> Bin.dec_err ~kind start "%d: unknown enum value index" k
-      in
-      loop (Char.code s.[start]) 0 vs
-    in
-    let txt_enc ppf v =
-      let rec loop v = function
-      | (key, v') :: _  when eq v v' -> Txt.enc_atom ppf key
-      | _ :: vs -> loop v vs
-      | [] -> Txt.enc_err ~kind "unkown enum value"
-      in
-      loop v vs
-    in
-    let txt_dec s ~start =
-      let i, key = Txt.dec_atom ~kind s ~start in
-      let rec loop key = function
-      | (key', v) :: _ when String.equal key key' -> i, v
-      | _ :: vs -> loop key vs
-      | [] ->
-          let ks = List.map fst vs in
-          match String.suggest ks key with
-          | [] ->
-              Txt.dec_err ~kind start
-                "%s: unknown enum value, expected one of %a" key
-                Fmt.(list ~sep:comma string) ks
-          | [k] ->
-              Txt.dec_err ~kind start
-                "%s: unknown enum value, did you mean %s ?" key k
-          | ks ->
-              Txt.dec_err ~kind start
-                "%s: unknown enum value, did you mean one of %a ?" key
-                Fmt.(list ~sep:comma string) ks
-      in
-      loop key vs
-    in
-    v ~kind ~docvar bin_enc bin_dec txt_enc txt_dec
-
-  (* Non-composable predefined converters *)
-
-  let string_only =
-    let kind = "string" in
-    let bin_enc = Bin.enc_bytes in
-    let bin_dec = Bin.dec_bytes ~kind in
-    let txt_enc = Fmt.string in
-    let txt_dec s ~start = String.length s, s in
-    v ~kind ~docvar:"VALUE" bin_enc bin_dec txt_enc txt_dec
-end
-
 (* File paths *)
 
 module Fpath = struct
@@ -2425,41 +1609,6 @@ module Fpath = struct
   (* Converting *)
 
   let to_uri_path = if Sys.win32 then Windows.to_uri_path else Posix.to_uri_path
-
-  let conv =
-    let kind = "path" in
-    let bin_enc b v = Conv.Bin.enc_bytes b (to_string v) in
-    let bin_dec s ~start =
-      let i, v = Conv.Bin.dec_bytes ~kind s ~start in
-      match of_string v with
-      | Error e -> Conv.Bin.dec_err ~kind start "%s" e
-      | Ok v -> i, v
-    in
-    let txt_enc ppf v = Conv.Txt.enc_atom ppf (to_string v) in
-    let txt_dec s ~start =
-      let i, v = Conv.Txt.dec_atom ~kind s ~start in
-      match of_string v with
-      | Error e -> Conv.Txt.dec_err ~kind start "%s" e
-      | Ok v -> i, v
-    in
-    Conv.v ~kind ~docvar:"PATH" bin_enc bin_dec txt_enc txt_dec
-
-  let conv_only =
-    let kind = "path" in
-    let bin_enc b v = Conv.Bin.enc_bytes b (to_string v) in
-    let bin_dec s ~start =
-      let i, v = Conv.Bin.dec_bytes ~kind s ~start in
-      match of_string v with
-      | Error e -> Conv.Bin.dec_err ~kind start "%s" e
-      | Ok v -> i, v
-    in
-    let txt_enc ppf v = Fmt.string ppf (to_string v) in
-    let txt_dec s ~start = match of_string s with
-    | Error e -> Conv.Txt.dec_err ~kind start "%s" e
-    | Ok v -> (String.length s), v
-    in
-    Conv.v ~kind ~docvar:"PATH" bin_enc bin_dec txt_enc txt_dec
-
   let pp = String.pp
   let pp_quoted ppf p = String.pp ppf (Filename.quote p)
   let dump = String.dump
@@ -2515,7 +1664,6 @@ module Hash = struct
   let of_bytes h = h
   let to_hex = String.Ascii.to_hex
   let of_hex = String.Ascii.of_hex
-  let conv = Conv.with_kind "hash" ~docvar:"HASH" Conv.string_bytes
   let pp ppf h = Fmt.string ppf (if is_nil h then "nil" else to_hex h)
 
   (* Hash functions *)
@@ -2618,14 +1766,6 @@ module Time = struct
 
     let to_uint64_ns s = s
     let of_uint64_ns ns = ns
-    let conv =
-      let kind = "time span" in
-      let bin_enc = Conv.Bin.enc_int64 in
-      let bin_dec = Conv.Bin.dec_int64 ~kind in
-      let txt_enc ppf v = Fmt.pf ppf "0u%Lu" v in
-      let txt_dec = Conv.Txt.dec_t_of_atom Int64.of_string ~kind in
-      Conv.v ~kind ~docvar:"TIMESPAN" bin_enc bin_dec txt_enc txt_dec
-
     let pp = Fmt.uint64_ns_span
     let pp_ns ppf s = Fmt.pf ppf "%Lu" s
   end
@@ -2648,27 +1788,6 @@ module Time = struct
   let cpu_stime c = sec_to_span c.Unix.tms_stime
   let cpu_children_utime c = sec_to_span c.Unix.tms_cutime
   let cpu_children_stime c = sec_to_span c.Unix.tms_cstime
-  let cpu_span_conv =
-    let kind = "cpu span" in
-    let bin_enc b v =
-      Conv.Bin.enc_int64 b (Int64.bits_of_float v.Unix.tms_utime);
-      Conv.Bin.enc_int64 b (Int64.bits_of_float v.Unix.tms_stime);
-      Conv.Bin.enc_int64 b (Int64.bits_of_float v.Unix.tms_cutime);
-      Conv.Bin.enc_int64 b (Int64.bits_of_float v.Unix.tms_cstime);
-    in
-    let bin_dec s ~start =
-      Conv.Bin.dec_need ~kind s ~start ~len:32;
-      let start, ut = Conv.Bin.dec_int64 ~kind s ~start in
-      let start, st = Conv.Bin.dec_int64 ~kind s ~start in
-      let start, cut = Conv.Bin.dec_int64 ~kind s ~start in
-      let start, cst = Conv.Bin.dec_int64 ~kind s ~start in
-      let f i = Int64.float_of_bits i in
-      start, Unix.{ tms_utime = f ut; tms_stime = f st; tms_cutime = f cut;
-                    tms_cstime = f cst }
-    in
-    let txt_enc ppf = Conv.Txt.enc_err ~kind "Unsupported" in
-    let txt_dec s ~start = Conv.Txt.dec_err ~kind start "Unsupported" in
-    Conv.v ~kind ~docvar:"CPU-SPAN" bin_enc bin_dec txt_enc txt_dec
 
   (* CPU counters *)
 
@@ -2848,46 +1967,6 @@ module Cmd = struct
     with Failure err -> Fmt.error "command line %a: %s" String.dump s err
 
   let to_string l = String.concat " " (List.map Filename.quote @@ to_list l)
-
-  let conv = (* XXX not tail recursive *)
-    let kind = "cmd" in
-    let rec bin_enc b = function
-    | A a -> Conv.Bin.enc_byte b 0x0; Conv.Bin.enc_bytes b a
-    | Rseq l -> Conv.Bin.enc_byte b 0x1; Conv.Bin.enc_list bin_enc b l
-    | Shield c -> Conv.Bin.enc_byte b 0x2; bin_enc b c
-    in
-    let rec bin_dec s ~start = match Conv.Bin.dec_byte ~kind s ~start with
-    | start, 0x0 -> let i, a = Conv.Bin.dec_bytes ~kind s ~start in i, A a
-    | start, 0x1 ->
-        let i, l = Conv.Bin.dec_list bin_dec ~kind s ~start in i, Rseq l
-    | start, 0x2 -> let i, c = bin_dec s ~start in i, Shield c
-    | _, byte -> Conv.Bin.dec_err_exceed ~kind start byte ~max:0x2
-    in
-    let rec txt_enc ppf = function
-    | A a -> Conv.Txt.enc_atom ppf a
-    | Rseq l -> Conv.Txt.enc_list txt_enc ppf (A "rseq" :: l)
-    | Shield c -> Conv.Txt.enc_list txt_enc ppf (A "shield" :: c :: [])
-    in
-    let rec txt_dec s ~start = match Conv.Txt.dec_lexeme ~kind s ~start with
-    | i, (_, `Atom a) -> i, A a
-    | i, (ls, `Ls) ->
-        let i, a = Conv.Txt.dec_atom ~kind s ~start:i in
-        begin match a with
-        | "rseq" ->
-            let i, l = Conv.Txt.dec_list_tail txt_dec ~kind ~ls s ~start:i in
-            start, Rseq l
-        | "shield" ->
-            let i, c = txt_dec s ~start:i in
-            let i = Conv.Txt.dec_le ~kind s ~start:i in
-            i, Shield c
-        | a ->
-            Conv.Txt.dec_err_atom ~kind i a ~exp:["rseq"; "shield"]
-        end
-    | _, (j, l) ->
-        Conv.Txt.dec_err_lexeme ~kind j l ~exp:[`Ls; `Atom "atom" (* bof *)]
-    in
-    Conv.v ~kind ~docvar:"CMD" bin_enc bin_dec txt_enc txt_dec
-
   let pp ppf l = Fmt.pf ppf "@[%a@]" Fmt.(list ~sep:sp string) (to_list l)
   let dump ppf l =
     let pp_arg ppf a = Fmt.string ppf (Filename.quote a) in
@@ -4560,6 +3639,946 @@ module Log = struct
       (fun w ->
          let header = Format.asprintf "%a" Time.Span.pp span in
          m r (w ~header))
+end
+
+(* Value converters *)
+
+module Conv = struct
+
+  (* Encoders and decoders *)
+
+  exception Error of int * int * string
+  let err i fmt = Fmt.kstr (fun e -> raise_notrace @@ Error (i, i, e)) fmt
+
+  module Bin = struct
+
+    (* Encoding *)
+
+    type 'a enc = Buffer.t -> 'a -> unit
+
+    let enc_err ~kind msg = err 0 ("encoding %s: " ^^ msg) kind
+    let enc_check_int ~kind (min : int) (max : int) (v : int) =
+      if min <= v && v <= max then () else
+      enc_err ~kind "%d: not in range [%d;%d]" v min max
+
+    let enc_byte b byte = Buffer.add_char b (Char.unsafe_chr byte)
+    let enc_int32 b i =
+      (* XXX From 4.08 use Buffer.add_int32_le *)
+      let i0 = Int32.to_int i in
+      let i1 = Int32.to_int (Int32.shift_right_logical i 16) in
+      let b0 = i0 land 0xFF and b1 = (i0 lsr 8) land 0xFF
+      and b2 = i1 land 0xFF and b3 = (i1 lsr 8) land 0xFF in
+      enc_byte b b0; enc_byte b b1; enc_byte b b2; enc_byte b b3
+
+    let enc_int64 b i =
+      (* XXX From 4.08 one use Buffer.add_int64_le *)
+      let i0 = Int64.to_int i in
+      let i1 = Int64.to_int (Int64.shift_right_logical i 16) in
+      let i2 = Int64.to_int (Int64.shift_right_logical i 32) in
+      let i3 = Int64.to_int (Int64.shift_right_logical i 48) in
+      let b0 = i0 land 0xFF and b1 = (i0 lsr 8) land 0xFF
+      and b2 = i1 land 0xFF and b3 = (i1 lsr 8) land 0xFF
+      and b4 = i2 land 0xFF and b5 = (i2 lsr 8) land 0xFF
+      and b6 = i3 land 0xFF and b7 = (i3 lsr 8) land 0xFF in
+      enc_byte b b0; enc_byte b b1; enc_byte b b2; enc_byte b b3;
+      enc_byte b b4; enc_byte b b5; enc_byte b b6; enc_byte b b7
+
+    let enc_int b v = enc_int64 b (Int64.of_int v)
+    let enc_len b v = enc_int64 b (Int64.of_int v)
+
+    let enc_bytes b v =
+      enc_len b (String.length v); Buffer.add_string b v
+
+    let enc_list enc_v b vs =
+      let rec loop len acc = function
+      | [] -> len, acc | v :: vs -> loop (len + 1) (v :: acc) vs
+      in
+      let len, rvs = loop 0 [] vs in
+      enc_len b len; List.iter (enc_v b) rvs
+
+    (* Decoding *)
+
+    type 'a dec = string -> start:int -> int * 'a
+
+    let dec_err ~kind i msg = err i ("decoding %s: " ^^ msg) kind
+    let dec_err_eoi ~kind i = dec_err ~kind i "unexpected end of input"
+    let dec_err_exceed ~kind i v ~max =
+      dec_err ~kind i "%d: not in range [0;%d]" v max
+
+    let dec_need ~kind s ~start ~len =
+      match start + (len - 1) < String.length s with
+      | true -> () | false -> dec_err_eoi ~kind start
+
+    let dec_byte ~kind s ~start =
+      dec_need ~kind s ~start ~len:1; start + 1, Char.code (s.[start])
+
+    external swap32 : int32 -> int32 = "%bswap_int32"
+    external unsafe_get_int32_ne : string -> int -> int32 =
+      "%caml_string_get32u"
+
+    let unsafe_get_int32_le s i = match Sys.big_endian with
+    | true -> swap32 (unsafe_get_int32_ne s i)
+    | false -> unsafe_get_int32_ne s i
+
+    let dec_int32 ~kind s ~start =
+      let len = 4 in
+      dec_need ~kind s ~start ~len; start + len, unsafe_get_int32_le s start
+
+    external swap64 : int64 -> int64 = "%bswap_int64"
+    external unsafe_get_int64_ne : string -> int -> int64 =
+      "%caml_string_get64u"
+
+    let unsafe_get_int64_le b i = match Sys.big_endian with
+    | true -> swap64 (unsafe_get_int64_ne b i)
+    | false -> unsafe_get_int64_ne b i
+
+    let dec_int64 ~kind s ~start =
+      let len = 8 in
+      dec_need ~kind s ~start ~len; start + len, unsafe_get_int64_le s start
+
+    let int_min = Int64.of_int min_int
+    let int_max = Int64.of_int max_int
+    let int_len = 8
+    let dec_int ~kind s ~start =
+      let i, v = dec_int64 ~kind s ~start in
+      if (Int64.compare int_min v <= 0 && Int64.compare v int_max <= 0)
+      then i, Int64.to_int v
+      else dec_err ~kind start "%Ld: not in range [%Ld;%Ld]" v int_min int_max
+
+    let len_max = Int64.of_int max_int
+    let len_len = 8
+    let dec_len ~kind s ~start =
+      let i, l = dec_int64 ~kind s ~start in
+      if (Int64.compare 0L l <= 0 && Int64.compare l len_max <= 0)
+      then i, Int64.to_int l
+      else dec_err ~kind start "%Ld: not in range [0;%Ld]" l len_max
+
+    let dec_bytes ~kind s ~start =
+      let start, len = dec_len ~kind s ~start in
+      let last = start + len - 1 in
+      dec_need ~kind s ~start ~len;
+      start + len, String.with_index_range ~first:start ~last s
+
+    let dec_list dec_v ~kind s ~start =
+      let start, len = dec_len ~kind s ~start in
+      let rec loop acc count start = match count < 1 with
+      | true -> start, acc
+      | false ->
+          let start, v = dec_v s ~start in
+          loop (v :: acc) (count - 1) start
+      in
+      loop [] len start
+  end
+
+  module Txt = struct
+
+    let is_atom_sep = function
+    | '(' | ')' | ';' | '"' -> true
+    | c when Char.Ascii.is_white c -> true
+    | c -> false
+
+    (* Encoding *)
+
+    type 'a enc = Format.formatter -> 'a -> unit
+
+    let enc_err ~kind msg = err 0 ("encoding %s: " ^^ msg) kind
+    let enc_list enc_v ppf vs =
+      Fmt.pf ppf "@[<1>(%a)@]" Fmt.(list ~sep:sp enc_v) vs
+
+    let enc_atom ppf a =
+      let atom_must_quote a =
+        let rec loop max i s = match i < max with
+        | false -> if max < 0 then true (* empty string *) else false
+        | true ->
+            match a.[i] with
+            | '^' -> true
+            | c when is_atom_sep c -> true
+            | c when Char.Ascii.is_control c -> true
+            | c -> loop max (i + 1) s
+        in
+        loop (String.length a - 1) 0 a
+      in
+      match atom_must_quote a with
+      | false -> Fmt.string ppf a
+      | true ->
+          let len = String.length a in
+          let flush ppf start i =
+            if start < len then Fmt.string ppf (String.sub a start (i - start))
+          in
+          let rec loop start i = match i < len with
+          | false -> flush ppf start i
+          | true ->
+              let next = i + 1 in
+              match a.[i] with
+              | '"' -> flush ppf start i; Fmt.string ppf "^\""; loop next next
+              | '^' -> flush ppf start i; Fmt.string ppf "^^"; loop next next
+              | '\n' -> flush ppf start i; Fmt.string ppf "^n"; loop next next
+              | '\r' -> flush ppf start i; Fmt.string ppf "^r"; loop next next
+              | c when Char.Ascii.is_control c ->
+                  flush ppf start i; Fmt.pf ppf "^u{%04X}" (Char.code c);
+                  loop next next
+              | c -> loop start next
+          in
+          Fmt.char ppf '\"'; loop 0 0; Fmt.char ppf '\"'
+
+    let enc_check_int ~kind (min : int) (max : int) (v : int) =
+      if min <= v && v <= max then () else
+      enc_err ~kind "%d: not in range [%d;%d]" v min max
+
+    (* Decoding *)
+
+    type 'a dec = string -> start:int -> int * 'a
+
+    let err_char c = String.Ascii.escape (String.of_char c)
+    let dec_err ~kind i msg = err i ("parsing %s: " ^^ msg) kind
+    let dec_err_eoi ~kind i = dec_err ~kind i "unexpected end of input"
+    let dec_err_char ~kind i c =
+      dec_err ~kind i "%s: illegal character" (err_char c)
+
+    type lexeme = [ `Ls |  `Le | `Atom of string ]
+    let pp_lexeme ppf = function
+    | `Ls -> Fmt.string ppf "\"(\""
+    | `Le -> Fmt.string ppf "\")\""
+    | `Atom s -> Fmt.pf ppf "\"%s\"" s
+
+    let dec_err_lexeme ~kind i l ~exp =
+      dec_err ~kind i "%a: expected %a" pp_lexeme l
+        Fmt.(list ~sep:(unit " or ") pp_lexeme) exp
+
+    let dec_err_atom ~kind i a ~exp =
+      let exp = List.map (fun s -> Fmt.str "\"%s\"" s) exp in
+      dec_err ~kind i "%s: expected %a"
+        a Fmt.(list ~sep:(unit " or ") string) exp
+
+    let dec_err_unclosed ~kind i = dec_err ~kind i "unclosed list"
+    let dec_err_esc_truncated ~kind i = dec_err ~kind i "truncated escape"
+
+    let char_is_illegal = function
+    | '\x00' .. '\x08' | '\x0E' .. '\x1F' | '\x7F' -> true
+    | _ -> false
+
+    let dec_skip ~kind s ~start =
+      let rec skip len i =
+        if i >= len then len else
+        match s.[i] with
+        | ';' -> skip_comment len (i + 1)
+        | c when Char.Ascii.is_white s.[i] -> skip len (i + 1)
+        | c when char_is_illegal c -> dec_err_char ~kind i c
+        | c -> i
+      and skip_comment len i =
+        if i >= len then len else
+        match s.[i] with
+        | '\n' | '\r' -> skip len (i + 1)
+        | c when char_is_illegal c -> dec_err_char ~kind i c
+        | c -> skip_comment len (i + 1)
+      in
+      skip (String.length s) start
+
+    (* XXX From 4.06 use Buffer.add_utf_8_uchar *)
+    let buffer_add_utf_8_uchar b u = match Uchar.to_int u with
+    | u when u < 0 -> assert false
+    | u when u <= 0x007F ->
+        Buffer.add_char b (Char.unsafe_chr u)
+    | u when u <= 0x07FF ->
+        Buffer.add_char b (Char.unsafe_chr (0xC0 lor (u lsr 6)));
+        Buffer.add_char b (Char.unsafe_chr (0x80 lor (u land 0x3F)));
+    | u when u <= 0xFFFF ->
+        Buffer.add_char b (Char.unsafe_chr (0xE0 lor (u lsr 12)));
+        Buffer.add_char b (Char.unsafe_chr (0x80 lor ((u lsr 6) land 0x3F)));
+        Buffer.add_char b (Char.unsafe_chr (0x80 lor (u land 0x3F)));
+    | u when u <= 0x10FFFF ->
+        Buffer.add_char b (Char.unsafe_chr (0xF0 lor (u lsr 18)));
+        Buffer.add_char b (Char.unsafe_chr (0x80 lor ((u lsr 12) land 0x3F)));
+        Buffer.add_char b (Char.unsafe_chr (0x80 lor ((u lsr 6) land 0x3F)));
+        Buffer.add_char b (Char.unsafe_chr (0x80 lor (u land 0x3F)))
+    | _ -> assert false
+
+    let dec_uchar_esc ~kind s ~start i =
+      let max = String.length s - 1 in
+      if i > max then dec_err_esc_truncated ~kind start else
+      match s.[i] <> '{' with
+      | true ->
+          dec_err ~kind i "^u%s: illegal escape sequence" (err_char s.[i])
+      | false ->
+          let i = i + 1 in
+          let rec loop acc count = match i + count with
+          | k when k > max -> dec_err_esc_truncated ~kind start
+          | k ->
+              match s.[k] with
+              | c when Char.Ascii.is_hex_digit c ->
+                  let count = count + 1 in
+                  if count > 6
+                  then dec_err ~kind k "%c: expected \"}\"" c else
+                  let acc = acc * 16 + Char.Ascii.hex_digit_value c in
+                  loop acc count
+              | '}' ->
+                  if count = 0
+                  then dec_err ~kind k "}: expected hex digit"
+                  else if not (Uchar.is_valid acc)
+                  then dec_err ~kind start
+                      "%04X: Unicode escape is not a Unicode scalar value" acc
+                  else (k + 1, Uchar.of_int acc)
+              | c ->
+                  dec_err ~kind k
+                    "%s: expected hex digit" (err_char c)
+          in
+          loop 0 0
+
+    let dec_qatom ~kind s ~start:astart = (* '\"' at [astart] was parsed *)
+      let len = String.length s in
+      let b = Buffer.create 255 in
+      let flush start i =
+        if start < len then Buffer.add_substring b s start (i - start)
+      in
+      let rec loop start i = match i < len with
+      | false -> dec_err ~kind astart "unclosed quoted atom"
+      | true ->
+          match s.[i] with
+          | '\"' -> flush start i; i + 1, Buffer.contents b
+          | '^' -> (* totally evil escape sequence *)
+              flush start i;
+              let esc = i + 1 in
+              let next = i + 2 in
+              if esc < len then () else dec_err_esc_truncated ~kind i;
+              begin match s.[esc] with
+              | '\"' -> Buffer.add_char b '\"'; loop next next
+              | '^' -> Buffer.add_char b '^'; loop next next
+              | 'n' -> Buffer.add_char b '\n'; loop next next
+              | 'r' -> Buffer.add_char b '\r'; loop next next
+              | ' ' -> Buffer.add_char b ' '; loop next next
+              | 'u' ->
+                  let i, u = dec_uchar_esc ~kind s ~start:i next in
+                  buffer_add_utf_8_uchar b u; loop i i
+              | '\n' | '\r' -> (* continuation line *)
+                  let rec skip_white s i = match i < len with
+                  | false -> i
+                  | true when char_is_illegal s.[i] ->
+                      dec_err_char ~kind i s.[i]
+                  | true when Char.Ascii.is_white s.[i] -> skip_white s (i + 1)
+                  | true -> i
+                  in
+                  let start = skip_white s next in
+                  loop start start
+              | c ->
+                  dec_err ~kind i "^%s: illegal escape sequence" (err_char c)
+              end
+          | c when char_is_illegal c -> dec_err_char ~kind i c
+          | c -> loop start (i + 1)
+      in
+      let start = astart + 1 in
+      loop start start
+
+    let dec_atom ~kind s ~start =
+      let i = dec_skip ~kind s ~start in
+      match i < String.length s with
+      | false -> dec_err ~kind i "end of input, expected atom"
+      | true ->
+          if s.[i] = '\"' then dec_qatom ~kind s ~start:i else
+          let rec loop max i s = match i > max with
+          | true -> i - 1
+          | false ->
+              match s.[i] with
+              | c when char_is_illegal c -> dec_err_char ~kind i c
+              | c when is_atom_sep c -> i - 1
+              | c -> loop max (i + 1) s
+          in
+          let last = loop (String.length s - 1) (i + 1) s in
+          let atom = String.with_index_range ~first:i ~last s in
+          last + 1, atom
+
+    let dec_lx par ~kind s ~start =
+      let i = dec_skip ~kind s ~start in
+      match i < String.length s with
+      | false -> dec_err ~kind i "end of input, expected \"%c\" " par
+      | true when Char.equal s.[i] par -> i + 1
+      | true ->
+          dec_err ~kind start "%s: expected \"%c\"" (err_char s.[i]) par
+
+    let dec_ls ~kind s ~start = dec_lx '(' ~kind s ~start
+    let dec_le ~kind s ~start = dec_lx ')' ~kind s ~start
+    let dec_lexeme ~kind s ~start =
+      let i = dec_skip ~kind s ~start in
+      match i < String.length s with
+      | false -> dec_err_eoi ~kind i
+      | true ->
+          match s.[i] with
+          | '(' -> i + 1, (i, `Ls)
+          | ')' -> i + 1, (i, `Le)
+          | _ -> let j, a = dec_atom ~kind s ~start:i in j, (i, `Atom a)
+
+    let dec_t_of_atom f ~kind s ~start:astart =
+      let i, a = dec_atom ~kind s ~start:astart in
+      match f a with
+      | v -> i, v
+      | exception Failure _ -> dec_err ~kind astart "%s: not a literal" a
+
+    let dec_list dec_v ~kind s ~start =
+      let lstart = dec_ls ~kind s ~start in
+      let rec loop acc start =
+        let i = dec_skip ~kind s ~start in
+        match i < String.length s with
+        | false -> dec_err_unclosed ~kind lstart
+        | true ->
+            if s.[i] = ')' then dec_le ~kind s ~start:i, List.rev acc else
+            let start, v = dec_v s ~start:i in
+            loop (v :: acc) start
+      in
+      loop [] lstart
+
+    let dec_list_head ~kind s ~start =
+      let start = dec_ls ~kind s ~start in
+      dec_atom ~kind s ~start
+
+    let dec_list_tail dec_v ~kind ~ls s ~start =
+      let rec loop acc i =
+        let i = dec_skip ~kind s ~start:i in
+        match i < String.length s with
+        | false -> dec_err_unclosed ~kind ls
+        | true ->
+            if s.[i] = ')' then dec_le ~kind s ~start:i, List.rev acc else
+            let i, v = dec_v s ~start:i in
+            loop (v :: acc) start
+      in
+      loop [] start
+
+    let dec_check_int ~kind i (min : int) (max : int) (v : int) =
+      if min <= v && v <= max then () else
+      dec_err ~kind i "%d: not in range [%d;%d]" v min max
+  end
+
+  (* Converters *)
+
+  type 'a t =
+    { kind : string; docvar : string;
+      bin_enc : 'a Bin.enc; bin_dec : 'a Bin.dec;
+      txt_enc : 'a Txt.enc; txt_dec : 'a Txt.dec }
+
+  let v ~kind ~docvar bin_enc bin_dec txt_enc txt_dec =
+    { kind; docvar; bin_enc; bin_dec; txt_enc; txt_dec }
+
+  let kind c = c.kind
+  let docvar c = c.docvar
+  let bin_enc c = c.bin_enc
+  let bin_dec c = c.bin_dec
+  let txt_enc c = c.txt_enc
+  let txt_dec c = c.txt_dec
+  let with_kind ?docvar kind c =
+    let docvar = match docvar with None -> c.docvar | Some v -> v in
+    { c with kind; docvar }
+
+  let with_docvar docvar c = { c with docvar }
+  let with_conv ~kind ~docvar to_t of_t conv_t =
+    let bin_enc b v = conv_t.bin_enc b (to_t v) in
+    let bin_dec s ~start = let i, v = conv_t.bin_dec s ~start in i, of_t v in
+    let txt_enc ppf v = conv_t.txt_enc ppf (to_t v) in
+    let txt_dec s ~start = let i, v = conv_t.bin_dec s ~start in i, of_t v in
+    { kind; docvar; bin_enc; bin_dec; txt_enc; txt_dec }
+
+  (* Converting *)
+
+  let get_buf = function None -> Buffer.create 256 | Some b -> Buffer.clear b; b
+
+  let to_bin ?buf c v =
+    let b = get_buf buf in
+    try Ok (c.bin_enc b v; Buffer.contents b)
+    with Error (_, _, e) -> Result.Error e
+
+  let of_bin c s =
+    try
+      let i, v = c.bin_dec s 0 in
+      match i = String.length s with
+      | true -> Ok v
+      | false -> Bin.dec_err ~kind:c.kind i "unexpected leftover bytes"
+    with Error (i, _, e) -> Fmt.error "%d: %s" i e
+
+  let to_txt ?buf c v =
+    let b = get_buf buf in
+    let ppf = Format.formatter_of_buffer b in
+    try Ok (c.txt_enc ppf v; Format.pp_print_flush ppf (); Buffer.contents b)
+    with Error (_, _, e) -> Result.Error e
+
+  let of_txt c s =
+    try
+      let i, v = c.txt_dec s ~start:0 in
+      match i = String.length s with
+      | true -> Ok v
+      | false ->
+          match Txt.dec_skip ~kind:c.kind s ~start:i = String.length s with
+          | true -> Ok v
+          | false -> Txt.dec_err ~kind:c.kind i "unexpected leftover text"
+    with Error (i, _, e) -> Fmt.error "%d: %s" i e
+
+  let to_pp c ppf v = try c.txt_enc ppf v with
+  | Error (_, _, e) ->
+      Fmt.pf ppf "@[<1>(conv-error %a %a)@]" Txt.enc_atom c.kind Txt.enc_atom e
+
+  (* Predefined converters *)
+
+  let bool =
+    let kind = "bool" in
+    let bin_enc b v = Bin.enc_byte b (if v then 1 else 0) in
+    let bin_dec s ~start = match Bin.dec_byte ~kind s ~start with
+    | i, 0 -> i, false
+    | i, 1 -> i, true
+    | _, byte -> Bin.dec_err_exceed ~kind start byte ~max:1
+    in
+    let txt_enc ppf v = Fmt.string ppf (if v then "true" else "false") in
+    let txt_dec s ~start =
+      let i, a = Txt.dec_atom ~kind s ~start in
+      let v = match a with
+      | "true" -> true | "false" -> false
+      | a -> Txt.dec_err_atom ~kind start a ~exp:["true"; "false"]
+      in
+      i, v
+    in
+    v ~kind ~docvar:"BOOL" bin_enc bin_dec txt_enc txt_dec
+
+  let byte =
+    let kind = "byte" in
+    let min = 0 and max = 255 in
+    let bin_enc b v = Bin.enc_check_int ~kind min max v; Bin.enc_byte b v in
+    let bin_dec = Bin.dec_byte ~kind in
+    let txt_enc ppf v = Txt.enc_check_int ~kind min max v; Fmt.int ppf v in
+    let txt_dec s ~start =
+      let i, v as r = Txt.dec_t_of_atom int_of_string ~kind s ~start in
+      Txt.dec_check_int ~kind start min max v; r
+    in
+    v ~kind ~docvar:"BYTE" bin_enc bin_dec txt_enc txt_dec
+
+  let int =
+    let kind = "int" in
+    let bin_enc = Bin.enc_int in
+    let bin_dec = Bin.dec_int ~kind in
+    let txt_enc = Fmt.int in
+    let txt_dec s ~start = Txt.dec_t_of_atom int_of_string ~kind s ~start in
+    v ~kind ~docvar:"INT" bin_enc bin_dec txt_enc txt_dec
+
+  let int31 =
+    let kind = "int31" in
+    let min = - (1 lsl 30) and max = 1 lsl 30 - 1 in
+    let bin_enc b v =
+      Bin.enc_check_int ~kind min max v;
+      let b0 = v land 0xFF          and b1 = (v lsr 8) land 0xFF
+      and b2 = (v lsr 16) land 0xFF and b3 = (v lsr 24) land 0xFF in
+      Bin.enc_byte b b0; Bin.enc_byte b b1; Bin.enc_byte b b2; Bin.enc_byte b b3
+    in
+    let bin_dec s ~start =
+      let len = 4 in
+      Bin.dec_need ~kind s ~start ~len;
+      let b0 = Char.code s.[start]     and b1 = Char.code s.[start + 1]
+      and b2 = Char.code s.[start + 2] and b3 = Char.code s.[start + 3] in
+      let max_bit = Sys.int_size in
+      let i =
+        (b3 lsl (max_bit - 7))  lor (b2 lsl (max_bit - 15)) lor
+        (b1 lsl (max_bit - 23)) lor (b0 lsl (max_bit - 31))
+      in
+      let i = i asr (max_bit - 31) in
+      start + len, i
+    in
+    let txt_enc ppf v = Txt.enc_check_int ~kind min max v; Fmt.int ppf v in
+    let txt_dec s ~start =
+      let (i, v as r) = Txt.dec_t_of_atom  int_of_string ~kind s ~start in
+      Txt.dec_check_int ~kind start min max v; r
+    in
+    v ~kind ~docvar:"INT31" bin_enc bin_dec txt_enc txt_dec
+
+  let int32 =
+    let kind = "int32" in
+    let bin_enc = Bin.enc_int32 in
+    let bin_dec = Bin.dec_int32 ~kind in
+    let txt_enc = Fmt.int32 in
+    let txt_dec s ~start = Txt.dec_t_of_atom Int32.of_string ~kind s ~start in
+    v ~kind ~docvar:"INT32" bin_enc bin_dec txt_enc txt_dec
+
+  let int64 =
+    let kind = "int64" in
+    let bin_enc = Bin.enc_int64 in
+    let bin_dec = Bin.dec_int64 ~kind in
+    let txt_enc = Fmt.int64 in
+    let txt_dec s ~start = Txt.dec_t_of_atom Int64.of_string ~kind s ~start in
+    v ~kind ~docvar:"INT64" bin_enc bin_dec txt_enc txt_dec
+
+  let float =
+    let kind = "float" in
+    let bin_enc b v = Bin.enc_int64 b (Int64.bits_of_float v) in
+    let bin_dec s ~start =
+      let i, v = Bin.dec_int64 ~kind s ~start in i, Int64.float_of_bits v
+    in
+    let txt_enc = Fmt.float in
+    let txt_dec s ~start = Txt.dec_t_of_atom float_of_string ~kind s ~start in
+    v ~kind ~docvar:"FLOAT" bin_enc bin_dec txt_enc txt_dec
+
+  let string_bytes =
+    let kind = "string" in
+    let bin_enc = Bin.enc_bytes in
+    let bin_dec = Bin.dec_bytes ~kind in
+    let txt_enc ppf = function
+    | "" -> Fmt.pf ppf "@[<1>(hex@ \"\")@]"
+    | v -> Fmt.pf ppf "@[<1>(hex@ %s)@]" (String.Ascii.to_hex v)
+    in
+    let txt_dec s ~start =
+      let astart = Txt.dec_ls ~kind s ~start in
+      let start, a = Txt.dec_atom ~kind s ~start:astart in
+      if a <> "hex" then Txt.dec_err ~kind astart "%s: expected \"hex\"" a else
+      let start, h = Txt.dec_atom ~kind s ~start in
+      match String.Ascii.of_hex h with
+      | Ok v -> Txt.dec_le ~kind s ~start, v
+      | Error i when i = String.length s ->
+          Txt.dec_err ~kind (start + i) "missing hex digit"
+      | Error i ->
+          Txt.dec_err ~kind (start + i) "not a hex digit"
+    in
+    v ~kind ~docvar:"HEX" bin_enc bin_dec txt_enc txt_dec
+
+  let atom =
+    let kind = "atom" in
+    let bin_enc = Bin.enc_bytes in
+    let bin_dec = Bin.dec_bytes ~kind in
+    let txt_enc = Txt.enc_atom in
+    let txt_dec = Txt.dec_atom ~kind in
+    v ~kind ~docvar:"VALUE" bin_enc bin_dec txt_enc txt_dec
+
+  let atom_non_empty =
+    let kind = "atom" in
+    let bin_enc b = function
+    | "" -> Bin.enc_err ~kind "empty atom" | v -> Bin.enc_bytes b v
+    in
+    let bin_dec s ~start =
+      let (i, v as r) = Bin.dec_bytes ~kind s ~start in
+      if v = "" then Bin.dec_err ~kind start "empty atom" else r
+    in
+    let txt_enc ppf = function
+    | "" -> Txt.enc_err ~kind "empty atom" | v -> Txt.enc_atom ppf v
+    in
+    let txt_dec s ~start =
+      let (i, v as r) = Txt.dec_atom ~kind s ~start in
+      if v = "" then Txt.dec_err ~kind start "empty atom" else r
+    in
+    v ~kind ~docvar:"VALUE" bin_enc bin_dec txt_enc txt_dec
+
+  let fpath =
+    let kind = "path" in
+    let bin_enc b v = Bin.enc_bytes b (Fpath.to_string v) in
+    let bin_dec s ~start =
+      let i, v = Bin.dec_bytes ~kind s ~start in
+      match Fpath.of_string v with
+      | Error e -> Bin.dec_err ~kind start "%s" e
+      | Ok v -> i, v
+    in
+    let txt_enc ppf v = Txt.enc_atom ppf (Fpath.to_string v) in
+    let txt_dec s ~start =
+      let i, v = Txt.dec_atom ~kind s ~start in
+      match Fpath.of_string v with
+      | Error e -> Txt.dec_err ~kind start "%s" e
+      | Ok v -> i, v
+    in
+    v ~kind ~docvar:"PATH" bin_enc bin_dec txt_enc txt_dec
+
+  let hash = with_kind "hash" ~docvar:"HASH" string_bytes
+  let time_span =
+    let kind = "time span" in
+    let bin_enc = Bin.enc_int64 in
+    let bin_dec = Bin.dec_int64 ~kind in
+    let txt_enc ppf v = Fmt.pf ppf "0u%Lu" v in
+    let txt_dec = Txt.dec_t_of_atom Int64.of_string ~kind in
+    v ~kind ~docvar:"TIMESPAN" bin_enc bin_dec txt_enc txt_dec
+
+  let time_cpu_span =
+    let kind = "cpu span" in
+    let bin_enc b v =
+      Bin.enc_int64 b (Int64.bits_of_float v.Unix.tms_utime);
+      Bin.enc_int64 b (Int64.bits_of_float v.Unix.tms_stime);
+      Bin.enc_int64 b (Int64.bits_of_float v.Unix.tms_cutime);
+      Bin.enc_int64 b (Int64.bits_of_float v.Unix.tms_cstime);
+    in
+    let bin_dec s ~start =
+      Bin.dec_need ~kind s ~start ~len:32;
+      let start, ut = Bin.dec_int64 ~kind s ~start in
+      let start, st = Bin.dec_int64 ~kind s ~start in
+      let start, cut = Bin.dec_int64 ~kind s ~start in
+      let start, cst = Bin.dec_int64 ~kind s ~start in
+      let f i = Int64.float_of_bits i in
+      start, Unix.{ tms_utime = f ut; tms_stime = f st; tms_cutime = f cut;
+                    tms_cstime = f cst }
+    in
+    let txt_enc ppf = Txt.enc_err ~kind "Unsupported" in
+    let txt_dec s ~start = Txt.dec_err ~kind start "Unsupported" in
+    v ~kind ~docvar:"CPU-SPAN" bin_enc bin_dec txt_enc txt_dec
+
+  let cmd = (* XXX not tail recursive *)
+    let kind = "cmd" in
+    let rec bin_enc b = function
+    | Cmd.A a -> Bin.enc_byte b 0x0; Bin.enc_bytes b a
+    | Cmd.Rseq l -> Bin.enc_byte b 0x1; Bin.enc_list bin_enc b l
+    | Cmd.Shield c -> Bin.enc_byte b 0x2; bin_enc b c
+    in
+    let rec bin_dec s ~start = match Bin.dec_byte ~kind s ~start with
+    | start, 0x0 -> let i, a = Bin.dec_bytes ~kind s ~start in i, Cmd.A a
+    | start, 0x1 ->
+        let i, l = Bin.dec_list bin_dec ~kind s ~start in i, Cmd.Rseq l
+    | start, 0x2 -> let i, c = bin_dec s ~start in i, Cmd.Shield c
+    | _, byte -> Bin.dec_err_exceed ~kind start byte ~max:0x2
+    in
+    let rec txt_enc ppf = function
+    | Cmd.A a -> Txt.enc_atom ppf a
+    | Cmd.Rseq l -> Txt.enc_list txt_enc ppf (Cmd.A "rseq" :: l)
+    | Cmd.Shield c -> Txt.enc_list txt_enc ppf (Cmd.A "shield" :: c :: [])
+    in
+    let rec txt_dec s ~start = match Txt.dec_lexeme ~kind s ~start with
+    | i, (_, `Atom a) -> i, Cmd.A a
+    | i, (ls, `Ls) ->
+        let i, a = Txt.dec_atom ~kind s ~start:i in
+        begin match a with
+        | "rseq" ->
+            let i, l = Txt.dec_list_tail txt_dec ~kind ~ls s ~start:i in
+            start, Cmd.Rseq l
+        | "shield" ->
+            let i, c = txt_dec s ~start:i in
+            let i = Txt.dec_le ~kind s ~start:i in
+            i, Cmd.Shield c
+        | a ->
+            Txt.dec_err_atom ~kind i a ~exp:["rseq"; "shield"]
+        end
+    | _, (j, l) ->
+        Txt.dec_err_lexeme ~kind j l ~exp:[`Ls; `Atom "atom" (* bof *)]
+    in
+    v ~kind ~docvar:"CMD" bin_enc bin_dec txt_enc txt_dec
+
+  let os_cmd_status : Os.Cmd.status t =
+    let kind = "cmd-status" in
+    let bin_enc b = function
+    | `Exited e -> Bin.enc_byte b 0x0; Bin.enc_byte b e
+    | `Signaled s -> Bin.enc_byte b 0x1; Bin.enc_byte b (- s)
+    in
+    let bin_dec s ~start = match Bin.dec_byte ~kind s ~start with
+    | start, 0x0 ->
+        let i, v = Bin.dec_byte s ~kind ~start in i, `Exited v
+    | start, 0x1 ->
+        let i, v = Bin.dec_byte s ~kind ~start in i, `Signaled (- v)
+    | _, byte ->
+        Bin.dec_err_exceed ~kind start byte ~max:0x1
+    in
+    let txt_enc ppf = raise (Error (0, 0, "TODO Not implemented")) in
+    let txt_dec s ~start = raise (Error (0, 0, "TODO Not implemented")) in
+    v ~kind ~docvar:"STATUS" bin_enc bin_dec txt_enc txt_dec
+
+  (* Higher-order converters *)
+
+  let option ?kind:k ?docvar:d c =
+    let kind = match k with Some k -> k | None -> Fmt.str "%s option" c.kind in
+    let docvar = match d with Some v -> v | None -> Fmt.str "[%s]" c.docvar in
+    let bin_enc b = function
+    | None -> Bin.enc_byte b 0x0
+    | Some v -> Bin.enc_byte b 0x1; c.bin_enc b v
+    in
+    let bin_dec s ~start = match Bin.dec_byte ~kind s ~start with
+    | start, 0x0 -> start, None
+    | start, 0x1 -> let i, v = c.bin_dec s ~start in i, Some v
+    | _, byte -> Bin.dec_err_exceed ~kind start byte ~max:0x1
+    in
+    let txt_enc ppf = function
+    | None -> Fmt.pf ppf "none"
+    | Some v -> Fmt.pf ppf "@[<1>(some@ @[%a@])@]" c.txt_enc v
+    in
+    let txt_dec s ~start = match Txt.dec_lexeme ~kind s ~start with
+    | i, (j, `Ls) ->
+        let start, a = Txt.dec_atom ~kind s ~start:i in
+        if String.equal a "some" then
+          let start, v = c.txt_dec s ~start in
+          Txt.dec_le ~kind s ~start, Some v
+        else
+          Txt.dec_err_atom ~kind j a ~exp:["some"]
+    | i, (_, `Atom "none") -> i, None
+    | _, (j, l) -> Txt.dec_err_lexeme ~kind j l ~exp:[`Ls; `Atom "none"]
+    in
+    v ~kind ~docvar bin_enc bin_dec txt_enc txt_dec
+
+  let some c =
+    let err_none = format_of_string "cannot encode None" in
+    let bin_enc b = function
+    | None -> Bin.enc_err ~kind:c.kind err_none
+    | Some v -> c.bin_enc b v
+    in
+    let bin_dec s ~start = let i, v = c.bin_dec s ~start in i, Some v in
+    let txt_enc ppf = function
+    | None -> Txt.enc_err ~kind:c.kind err_none
+    | Some v -> c.txt_enc ppf v
+    in
+    let txt_dec s ~start = let i, v = c.txt_dec s ~start in i, Some v in
+    { c with bin_enc; bin_dec; txt_enc; txt_dec }
+
+  let result ?kind:k ?docvar:d ok error =
+    let kind = match k with
+    | Some k -> k | None -> Fmt.str "(%s, %s) result" ok.kind error.kind
+    in
+    let docvar = match d with Some v -> v | None -> "RESULT" in
+    let bin_enc b = function
+    | Ok v -> Bin.enc_byte b 0x0; ok.bin_enc b v
+    | Error e -> Bin.enc_byte b 0x1; error.bin_enc b e
+    in
+    let bin_dec s ~start = match Bin.dec_byte ~kind s ~start with
+    | start, 0x0 -> let i, v = ok.bin_dec s ~start in i, Ok v
+    | start, 0x1 -> let i, e = error.bin_dec s ~start in i, Error e
+    | _, byte -> Bin.dec_err_exceed ~kind start byte ~max:0x1
+    in
+    let txt_enc ppf = function
+    | Ok v -> Fmt.pf ppf "@[<1>(ok@ @[%a@])@]" ok.txt_enc v
+    | Error e -> Fmt.pf ppf "@[<1>(error@ @[%a@])@]" error.txt_enc e
+    in
+    let txt_dec s ~start =
+      let astart = Txt.dec_ls ~kind s ~start in
+      let start, a = Txt.dec_atom ~kind s ~start:astart in
+      match a with
+      | "ok" ->
+          let start, v = ok.txt_dec s ~start in
+          Txt.dec_le ~kind s ~start, Ok v
+      | "error" ->
+          let start, e = error.txt_dec s ~start in
+          Txt.dec_le ~kind s ~start, Error e
+      | a ->
+          Txt.dec_err ~kind astart "%s: expected \"ok\" or \"error\"" a
+    in
+    v ~kind ~docvar bin_enc bin_dec txt_enc txt_dec
+
+  let list ?kind:k ?docvar:d c =
+    let kind = match k with Some k -> k | None -> Fmt.str "%s list" c.kind in
+    let docvar = match d with Some v -> v | None -> Fmt.str "%s..." c.docvar in
+    let bin_enc = Bin.enc_list c.bin_enc in
+    let bin_dec = Bin.dec_list c.bin_dec ~kind in
+    let txt_enc = Txt.enc_list c.txt_enc in
+    let txt_dec = Txt.dec_list ~kind c.txt_dec in
+    v ~kind ~docvar bin_enc bin_dec txt_enc txt_dec
+
+  let array ?kind:k ?docvar:d c =
+    let kind = match k with Some k -> k | None -> Fmt.str "%s array" c.kind in
+    let docvar = match d with Some v -> v | None -> Fmt.str "%s..." c.docvar in
+    let bin_enc b vs =
+      Bin.enc_len b (Array.length vs); Array.iter (c.bin_enc b) vs
+    in
+    let bin_dec s ~start =
+      let start, len = Bin.dec_len ~kind s ~start in
+      match len = 0 with
+      | true -> start, [||]
+      | false ->
+          let start, v0 = c.bin_dec s ~start in
+          let a = Array.make len v0 in
+          let rec loop a i start = match i < len with
+          | false -> start, a
+          | true ->
+              let start, v = c.bin_dec s ~start in
+              a.(i) <- v; loop a (i + 1) start
+          in
+          loop a 1 start
+    in
+    let txt_enc ppf vs =
+      Fmt.pf ppf "@[<1>(%a)@]" Fmt.(array ~sep:sp c.txt_enc) vs
+    in
+    let txt_dec s ~start =
+      let i, vs = Txt.dec_list ~kind c.txt_dec s ~start in
+      i, Array.of_list vs
+    in
+    v ~kind ~docvar bin_enc bin_dec txt_enc txt_dec
+
+  let pair ?kind:k ?docvar:d c0 c1 =
+    let kind = match k with
+    | Some k -> k | None -> Fmt.str "%s * %s" c0.kind c1.kind
+    in
+    let docvar = match d with
+    | Some v -> v | None -> Fmt.str "%s %s" c0.docvar c1.docvar
+    in
+    let bin_enc b (v0, v1) = c0.bin_enc b v0; c1.bin_enc b v1 in
+    let bin_dec s ~start =
+      let start, v0 = c0.bin_dec s ~start in
+      let i, v1 = c1.bin_dec s ~start in
+      i, (v0, v1)
+    in
+    let txt_enc ppf (v0, v1) =
+      Fmt.pf ppf "@[<1>(%a %a)@]" c0.txt_enc v0 c1.txt_enc v1
+    in
+    let txt_dec s ~start =
+      let start = Txt.dec_ls ~kind s ~start in
+      let start, v0 = c0.txt_dec s start in
+      let start, v1 = c1.txt_dec s start in
+      let i = Txt.dec_le ~kind s ~start in
+      i, (v0, v1)
+    in
+    v ~kind ~docvar bin_enc bin_dec txt_enc txt_dec
+
+  let enum ~kind ~docvar ?(eq = ( = )) vs =
+    let bin_enc b v =
+      let rec loop v i = function
+      | (_, v') :: _ when eq v v' -> Bin.enc_byte b i
+      | _ :: vs -> loop v (i + 1) vs
+      | [] -> Bin.enc_err ~kind "unknown enum value"
+      in
+      loop v 0 vs
+    in
+    let bin_dec s ~start =
+      Bin.dec_need ~kind s ~start ~len:1;
+      let rec loop k i = function
+      | (_, v) :: _ when k = i -> start + 1, v
+      | _ :: vs -> loop k (i + 1) vs
+      | [] -> Bin.dec_err ~kind start "%d: unknown enum value index" k
+      in
+      loop (Char.code s.[start]) 0 vs
+    in
+    let txt_enc ppf v =
+      let rec loop v = function
+      | (key, v') :: _  when eq v v' -> Txt.enc_atom ppf key
+      | _ :: vs -> loop v vs
+      | [] -> Txt.enc_err ~kind "unkown enum value"
+      in
+      loop v vs
+    in
+    let txt_dec s ~start =
+      let i, key = Txt.dec_atom ~kind s ~start in
+      let rec loop key = function
+      | (key', v) :: _ when String.equal key key' -> i, v
+      | _ :: vs -> loop key vs
+      | [] ->
+          let ks = List.map fst vs in
+          match String.suggest ks key with
+          | [] ->
+              Txt.dec_err ~kind start
+                "%s: unknown enum value, expected one of %a" key
+                Fmt.(list ~sep:comma string) ks
+          | [k] ->
+              Txt.dec_err ~kind start
+                "%s: unknown enum value, did you mean %s ?" key k
+          | ks ->
+              Txt.dec_err ~kind start
+                "%s: unknown enum value, did you mean one of %a ?" key
+                Fmt.(list ~sep:comma string) ks
+      in
+      loop key vs
+    in
+    v ~kind ~docvar bin_enc bin_dec txt_enc txt_dec
+
+  (* Non-composable predefined converters *)
+
+  let string_only =
+    let kind = "string" in
+    let bin_enc = Bin.enc_bytes in
+    let bin_dec = Bin.dec_bytes ~kind in
+    let txt_enc = Fmt.string in
+    let txt_dec s ~start = String.length s, s in
+    v ~kind ~docvar:"VALUE" bin_enc bin_dec txt_enc txt_dec
+
+  let fpath_only =
+    let kind = "path" in
+    let bin_enc b v = Bin.enc_bytes b (Fpath.to_string v) in
+    let bin_dec s ~start =
+      let i, v = Bin.dec_bytes ~kind s ~start in
+      match Fpath.of_string v with
+      | Error e -> Bin.dec_err ~kind start "%s" e
+      | Ok v -> i, v
+    in
+    let txt_enc ppf v = Fmt.string ppf (Fpath.to_string v) in
+    let txt_dec s ~start = match Fpath.of_string s with
+    | Error e -> Txt.dec_err ~kind start "%s" e
+    | Ok v -> (String.length s), v
+    in
+    v ~kind ~docvar:"PATH" bin_enc bin_dec txt_enc txt_dec
 end
 
 (*---------------------------------------------------------------------------

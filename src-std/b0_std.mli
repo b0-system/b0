@@ -1010,569 +1010,6 @@ module List : sig
       default to {!Pervasives.compare}. *)
 end
 
-(** Value converters.
-
-    A value converter describes how to encode and decode OCaml values
-    to a binary presentation and a textual, human specifiable,
-    {{!sexp_syntax}s-expression based}, representation.
-
-    {b Notation.} Given a value [v] and a converter [c] we write
-    \[[v]\]{_c} the textual encoding of [v] according to [c]. *)
-module Conv : sig
-
-  (** {1:low_codec Low-level encoders and decoders} *)
-
-  exception Error of int * int * string
-  (** The exception for conversion errors. This exception is raised
-      both by encoders and decoders with {!raise_notrace}. The
-      integers indicates a byte index range in the input on decoding
-      errors, it is meaningless on encoding ones.
-
-      {b Note.} This exception is used for defining
-      converters. High-level {{!convert}converting functions} do not
-      raise but use result values to report errors. *)
-
-  (** Binary codecs. *)
-  module Bin : sig
-
-    (** {1:enc Encoding} *)
-
-    type 'a enc = Buffer.t -> 'a -> unit
-    (** The type for binary encoders. [enc b v] binary encodes the
-        value [v] in [b]. Raises {!Error} in case of error. *)
-
-    val enc_err :
-      kind:string -> ('a, Format.formatter, unit, 'b) format4 -> 'a
-    (** [enc_err ~kind fmt] raises a binary encoding error message for kind
-        [kind] formatted according to [fmt]. *)
-
-    val enc_byte : int enc
-    (** [enc_byte] encodes an integer in range \[0;255\]. *)
-
-    val enc_bytes : string enc
-    (** [enc_bytes] encodes the given bytes. *)
-
-    val enc_list : 'a enc -> 'a list enc
-    (** [enc_list enc_v] encodes a list of values encoded with [enc_v]. *)
-
-    (** {1:dec Decoding} *)
-
-    type 'a dec = string -> start:int -> int * 'a
-    (** The type for binary decoders. [dec s ~start] binary decodes
-        a value at [start] in [s]. [start] is either the index of a byte
-        in [s] or the length of [s].  The function returns [(i, v)] with
-        [v] the decoded value and [i] the first index in [s] after the
-        decoded value or the length of [s] if there is no such
-        index. Raises {!Error} in case of error. *)
-
-    val dec_err :
-      kind:string -> int -> ('a, Format.formatter, unit, 'b) format4 -> 'a
-    (** [dec_err ~kind i fmt] raises a binary decoding error message
-        for kind [kind] at input byte index [i] formatted according to [fmt]. *)
-
-    val dec_err_eoi : kind:string -> int -> 'a
-    (** [dec_err_eoi ~kind i] raises a decoding error message for kind
-        [kind] at input byte index [i] indicating an unexpected end of input. *)
-
-    val dec_err_exceed : kind:string -> int -> int -> max:int -> 'a
-    (** [dec_err_exceed ~kind i v ~max] raises a decoding error message
-        for kind [kind] at input byte index [i] indicating [v] is not
-        in the range [0;max]. *)
-
-    val dec_need : kind:string -> string -> start:int -> len:int -> unit
-    (** [dec_need ~kind s ~start ~len] checks that [len] bytes are
-        available starting at [start] (which can be out of bounds) in
-        [s] and calls {!err_eoi} if that is not the case. *)
-
-    val dec_byte : kind:string -> int dec
-    (** [dec_byte] decodes an integer in range \[0;255\] for the
-        given [kind]. *)
-
-    val dec_bytes : kind:string -> string dec
-    (** [dec_bytes ~kind] decodes the given bytes for the given
-        [kind]. *)
-
-    val dec_list : 'a dec -> kind:string -> 'a list dec
-    (** [bin_dec_list dec_v ~kind] decodes a list of values decoded with
-        [dec_v] for the given [kind]. *)
-  end
-
-  (** Textual codecs *)
-  module Txt : sig
-
-    (** {1:codec Textual encoders and decoders} *)
-
-    type 'a enc = Format.formatter -> 'a -> unit
-    (** The type for textual encoders. [enc ppf v] textually encodes
-        the value [v] on [ppf]. Raises {!Error} in case of error. *)
-
-    type 'a dec = string -> start:int -> int * 'a
-    (** The type for textual decoders. [dec s ~start] textually
-        decodes a value at [start] in [s]. [start] is either the first
-        textual input bytes to consider (which may be whitespace or a
-        commenet) or the length of [s]. The function returns [(i, v)]
-        with [v] the decoded value and [i] the first index after the
-        decoded value or the lenght of [s] if there is no such
-        index. Raises {!Error} in case of error.
-
-        {b XXX.} In the end this signature is showing its limits for
-        error reporting.  Maybe we should have an abstraction here. *)
-
-    (** {1:enc Encoding} *)
-
-    val enc_err :
-      kind:string -> ('a, Format.formatter, unit, 'b) format4 -> 'a
-    (** [enc_err ~kind fmt] raises a textual encoding error message for kind
-        [kind] formatted according to [fmt]. *)
-
-    val enc_atom : string enc
-    (** [enc_atom ppf s] encodes [s] as an {{!atom}atom} on [ppf] quoting
-        it as needed. *)
-
-    val enc_list : 'a enc -> 'a list enc
-    (** [enc_list enc_v] encodes a list of values encoded with [enc_v]. *)
-
-    (** {1:dec Decoding} *)
-
-    type lexeme = [`Ls | `Le | `Atom of string]
-    (** The type for s-expressions lexemes. *)
-
-    val dec_err :
-      kind:string -> int -> ('a, Format.formatter, unit, 'b) format4 -> 'a
-    (** [dec_err ~kind i fmt] raises a textual decoding error message for
-        kind [kind] at input byte index [i] formatted according to [fmt]. *)
-
-    val dec_err_eoi : kind:string -> int -> 'a
-    (** [dec_err_eoi ~kind i] raises a textual error message for kind [kind]
-        at input byte index [i] indicating an unexpected end of input. *)
-
-    val dec_err_lexeme :
-      kind:string -> int -> lexeme -> exp:lexeme list -> 'a
-    (** [dec_err_case ~kind i] raises a textual error message for kind
-        [kind] at input byte index [i] indicating one of [exp] was
-        expected. *)
-
-    val dec_err_atom : kind:string -> int -> string -> exp:string list -> 'a
-    (** [dec_err_atom ~kind i a exp] raises a textual error message for kind
-        [kind] at input byte index [i] and atom [a] indicating one of [exp]
-        atoms was expected. *)
-
-    val dec_skip : kind:string -> string -> start:int -> int
-    (** [dec_skip ~kind s ~start] starting at [start] (which can be
-        out of bounds) is the first non-white, non-comment, byte index
-        or the length of [s] if there is no such index. *)
-
-    val dec_lexeme : kind:string -> (int * lexeme) dec
-    (** [dec_case ~kind s ~start] starting at [start] (which can be
-        out of bounds), skips whitespace and comment, looks for either
-        a left parenthesis, right parenthesis or an atom and returns
-        the index of their first position. Errors if end of input is
-        is found. *)
-
-    val dec_ls : kind:string -> string -> start:int -> int
-    (** [dec_ls ~kind s ~start] starting at [start] (which can
-        be out of bounds), skips whitespace and comments,
-        parses a list start and returns the index after it
-        or the length of [s]. *)
-
-    val dec_le : kind:string -> string -> start:int -> int
-    (** [dec_le ~kind s ~start] starting at [start] (which can be
-        out of bounds), skips whitespace and comments, parses a list end
-        and returns the index after it or the length of [s]. *)
-
-    val dec_atom : kind:string -> string dec
-    (** [dec_atom ~kind s ~start] starting at [start] (which can
-        be out of bounds), skips whitespace and comments, parses
-        an atom and returns the index after it or the length of
-        [s]. *)
-
-    val dec_list : 'a dec -> kind:string -> 'a list dec
-    (** [dec_list dec_v ~kind] decodes a list of values decoded with
-        [dec_v] for the given [kind]. *)
-
-    val dec_list_tail : 'a dec -> kind:string -> ls:int -> 'a list dec
-    (** [dec_list_tail dec_v ~kind ~lstart] decodes list elements
-        decoded with [dec_v] and an the end of list for the given
-        [kind], [ls] is the position of the list start. *)
-  end
-
-  (** {1:converters Converters} *)
-
-  type 'a t
-  (** The type for converters. *)
-
-  val v :
-    kind:string -> docvar:string -> 'a Bin.enc -> 'a Bin.dec -> 'a Txt.enc ->
-    'a Txt.dec -> 'a t
-  (** [v ~kind ~docvar bin_enc bin_dec txt_enc txt_dec] is a value
-      converter using [bin_enc], [bin_dec], [txt_enc], [txt_dec] for
-      binary and textual conversions. [kind] documents the kind of
-      converted value and [docvar] a meta-variable used in
-      documentation to stand for these values (use uppercase
-      e.g. [INT] for integers). *)
-
-  val kind : 'a t -> string
-  (** [kind c] is the documented kind of value converted by [c]. *)
-
-  val docvar  : 'a t -> string
-  (** [docvar c] is the documentation meta-variable for values converted
-      by [c]. *)
-
-  val bin_enc : 'a t -> 'a Bin.enc
-  (** [bin_enc c] is the binary encoder of [c]. *)
-
-  val bin_dec : 'a t -> 'a Bin.dec
-  (** [bin_dec c] is the binary decoder of [c]. *)
-
-  val txt_enc : 'a t -> 'a Txt.enc
-  (** [txt_enc c] is the textual encoder of [c]. *)
-
-  val txt_dec : 'a t -> 'a Txt.dec
-  (** [txt_dec c] is the textual decoder of [c]. *)
-
-  val with_kind : ?docvar:string -> string -> 'a t -> 'a t
-  (** [with_kind ~docvar k c] is [c] with kind [k] and documentation
-      meta-variable [docvar] (defaults to [docvar c]). *)
-
-  val with_docvar : string -> 'a t -> 'a t
-  (** [with_docvar docvar c] is [c] with documentation meta-variable
-      [docvar]. *)
-
-  val with_conv :
-    kind:string -> docvar:string -> ('b -> 'a) -> ('a -> 'b) -> 'a t -> 'b t
-  (** [with_conv ~kind ~docvar to_t of_t t_conv] is a converter for type
-      ['b] given a converter [t_conv] for type ['a] and conversion
-      functions from and to type ['b]. The conversion functions should
-      raise {!Error} if they are not total. *)
-
-  (** {1:converting Converting} *)
-
-  val to_bin : ?buf:Buffer.t -> 'a t -> 'a -> (string, string) result
-  (** [to_bin c v] binary encodes [v] using [c]. [buf] is used as
-      the internal buffer if specified (it is {!Buffer.clear}ed before
-      usage). *)
-
-  val of_bin : 'a t -> string -> ('a, string) result
-  (** [of_bin c s] binary decodes a value from [s] using [c]. *)
-
-  val to_txt : ?buf:Buffer.t -> 'a t -> 'a -> (string, string) result
-  (** [to_txt c v] textually encodes [v] using [c]. [buf] is used as
-      the internal buffer if specified (it is {!Buffer.clear}ed before
-      usage). *)
-
-  val of_txt : 'a t -> string -> ('a, string) result
-  (** [of_txt c s] textually decodes a value from [s] using [c]. *)
-
-  val to_pp : 'a t -> 'a Fmt.t
-  (** [to_pp c] is a formatter using {!to_txt} to format values. Any
-      error that might occur is printed in the output using
-      the s-expression ({e conv-error} \[[c]\]{_kind} \[[e]\]) with
-      \[[c]\]{_kind} the atom for the value [kind c] and \[[e]\]
-      the atom for the error message. *)
-
-  (** {1:predef Predefined converters} *)
-
-  val bool : bool t
-  (** [bool] converts booleans. Textual conversions represent booleans
-      with the {{!atoms}atoms} {e true} and {e false}. *)
-
-  val byte : int t
-  (** [byte] converts a byte. Textual decoding parses an {{!atoms}atom}
-      according to the syntax of {!int_of_string}. Conversions fail if
-      the integer is not in the range \[0;255\].  *)
-
-  val int : int t
-  (** [int] converts signed OCaml integers. Textual decoding parses an
-      {{!atoms}atom} according to the syntax of
-      {!int_of_string}. Conversions fail if the integer is not in the
-      range \[-2{^{!Sys.int_size}-1};2{^{!Sys.int_size}-1}-1\].
-
-      {b Warning.} A large integer encoded on a 64-bit platform may
-      fail to decode on a 32-bit platform, use {!int31} or {!int64} if
-      this is a problem. *)
-
-  val int31 : int t
-  (** [int31] converts signed 31-bit integers. Textual decoding parses
-      an {{!atoms}atom} according to the syntax of
-      {!int_of_string}. Conversions fail if the integer is not in the
-      range \[-2{^30};2{^30}-1\]. *)
-
-  val int32 : int32 t
-  (** [int32] converts signed 32-bit integers. Textual decoding parses
-      an {{!atoms}atom} according to the syntax of
-      {!Int32.of_string}. Conversions fail if the integer is not in
-      the range \[-2{^31};2{^31}-1\]. *)
-
-  val int64 : int64 t
-  (** [int64] converts signed 64-bit integers. Textual decoding parses
-      an {{!atoms}atom} according to the syntax of
-      {!Int64.of_string}. Conversions fail if the integer is not in
-      the range \[-2{^63};2{^63}-1\]. *)
-
-  val float : float t
-  (** [float] converts floating point numbers. Textual decoding parses
-      an {{!atoms}atom} using {!float_of_string}. *)
-
-  val string_bytes : string t
-  (** [string_bytes] converts OCaml strings as byte sequences.
-      Textual conversion represents the bytes of [s] with the
-      s-expression ({e hex} \[[s]\]{_hex}) with \[[s]\]{_hex} the
-      {{!atoms}atom} resulting from {!String.Ascii.to_hex}[ s].
-      See also {!atom} and {!only_string}.
-
-      {b Warning.} A large string encoded on a 64-bit platform may
-      fail to decode on a 32-bit platform. *)
-
-  val atom : string t
-  (** [atom] converts strings assumed to represent UTF-8 encoded
-      Unicode text; but the encoding is not checked. Textual
-      conversions represent strings as {{!atoms}atoms}. See also
-      {!string_bytes} and {!only_string}.
-
-      {b Warning.} A large atom encoded on a 64-bit platform may fail
-      to decode on a 32-bit platform. *)
-
-  val atom_non_empty : string t
-  (** [atom_non_empty] is like {!atom} but ensures the atom is
-      not empty. *)
-
-  val option : ?kind:string -> ?docvar:string -> 'a t -> 'a option t
-  (** [option c] converts optional values converted with [c]. Textual
-      conversions represent [None] with the {{!atoms}atom} {e none}
-      and [Some v] with the s-expression ({e some} \[[v]\]{_c}). *)
-
-  val some : 'a t -> 'a option t
-  (** [some c] wraps decodes of [c] with {!Option.some}. {b Warning.}
-      [None] can't be converted in either direction, use {!option} for
-      this. *)
-
-  val result : ?kind:string -> ?docvar:string -> 'a t -> 'b t ->
-    ('a, 'b) result t
-  (** [result ok error] converts result values with [ok] and [error].
-      Textual conversions represent [Ok v] with the s-expression
-      ({e ok} \[[v]\]{_ok}) and [Error e] with
-      ({e error} \[[e]\]{_error}). *)
-
-  val list : ?kind:string -> ?docvar:string -> 'a t -> 'a list t
-  (** [array c] converts a list of values converted with [c]. Textual
-      conversions represent a list [[v0; ... vn]] by the s-expression
-      (\[[v0]\]{_c} ... \[[vn]\]{_c}).
-
-      {b Warning.} A large list encoded on a 64-bit platform may fail
-      to decode on a 32-bit platform. *)
-
-  val array : ?kind:string -> ?docvar:string -> 'a t -> 'a array t
-  (** [array c] is like {!list} but converts arrays.
-
-      {b Warning.} A large array encoded on a 64-bit platform may fail
-      to decode on a 32-bit platform. *)
-
-  val pair : ?kind:string -> ?docvar:string -> 'a t -> 'b t -> ('a * 'b) t
-  (** [pair c0 c1] converts pairs of values converted with [c0] and [c1].
-      Textual conversion represent a pair [(v0, v1)] by the
-      s-expression (\[[v0]\]{_c0} \[[v1]\]{_c1}). *)
-
-  val enum :
-    kind:string -> docvar:string -> ?eq:('a -> 'a -> bool) ->
-    (string * 'a) list -> 'a t
-  (** [enum ~kind ~docvar ~eq vs] converts values present in [vs].
-      {!eq} is used to test equality among values (defaults to {!( =
-      )}). The list length should not exceed 256. Textual conversions
-      use the strings of the pairs in [vs] as {{!atoms}atoms} to
-      encode the corresponding value. *)
-
-  (** {1:non_composable Non-composable predefined converters}
-
-      Textual conversions performed by the following converters cannot
-      be composed; they do not respect the syntax of s-expression
-      {{!atom}atoms}. They can be used for direct conversions when one
-      does not want to be subject to the syntactic constraints of
-      s-expressions. For example when parsing command line interface
-      arguments or environment variables. *)
-
-  val string_only : string t
-  (** [string_only] converts OCaml strings. Textual conversion is
-      {b not composable}, use {!string_bytes} or {!atom}
-      instead. Textual encoding passes the string as is and decoding
-      ignores the initial starting point and returns the whole input
-      string.
-
-      {b Warning.} A large string encoded on a 64-bit platform may
-      fail to decode on a 32-bit platform. *)
-
-  (** {1:sexp_syntax S-expressions syntax}
-
-      S-expressions are a general way of describing data via atoms
-      (sequences of characters) and lists delimited by parentheses.
-      Here are a few examples of s-expressions and their syntax:
-{v
-
-this-is-an-atom
-(this is a list of seven atoms)
-(this list contains (a nested) list)
-
-; This is a comment
-; Anything that follows a semi-colon is ignored until the next line
-
-(this list ; has three atoms and an embededded ()
- comment)
-
-"this is a quoted atom, it can contain spaces ; and ()"
-
-"quoted atoms can be split ^
- across lines or contain Unicode esc^u\{0061\}pes"
-v}
-
-      We define the syntax of s-expressions over a sequence of
-      {{:http://unicode.org/glossary/#unicode_scalar_value}Unicode
-      characters} in which all US-ASCII {{!Char.Ascii.is_control}control
-      characters} except {{!whitespace}whitespace} are forbidden in
-      unescaped form.
-
-      {b Note.} This module assumes the sequence of Unicode characters
-      is encoded as UTF-8 although it doesn't check this for now.
-
-      {2:sexp S-expressions and sequences thereof}
-
-      An {e s-expression} is either an {{!atoms}{e atom}} or a
-      {{!lists}{e list}} of s-expressions interspaced with
-      {{!whitespace}{e whitespace}} and {{!comments}{e comments}}. A {e
-      sequence of s-expressions} is a succession of s-expressions
-      interspaced with whitespace and comments.
-
-      These elements are informally described below and finally made
-      precise via an ABNF {{!grammar}grammar}.
-
-      {2:whitespace Whitespace}
-
-      Whitespace is a sequence of whitespace characters, namely, space
-      [' '] (U+0020), tab ['\t'] (U+0009), line feed ['\n'] (U+000A),
-      vertical tab ['\t'] (U+000B), form feed (U+000C) and carriage return
-      ['\r'] (U+000D).
-
-      {2:comments Comments}
-
-      Unless it occurs inside an atom in quoted form (see below)
-      anything that follows a semicolon [';'] (U+003B) is ignored until
-      the next {e end of line}, that is either a line feed ['\n'] (U+000A), a
-      carriage return ['\r']  (U+000D) or a carriage return and a line feed
-      ["\r\n"] (<U+000D,U+000A>).
-{v
-(this is not a comment) ; This is a comment
-(this is not a comment)
-v}
-
-      {2:atoms Atoms}
-
-      An atom represents ground data as a string of Unicode characters.
-      It can, via escapes, represent any sequence of Unicode characters,
-      including control characters and U+0000. It cannot represent an
-      arbitrary byte sequence except via a client-defined encoding
-      convention (e.g. Base64 or {{!string_bytes}hex encoding}).
-
-      Atoms can be specified either via an unquoted or a quoted form. In
-      unquoted form the atom is written without delimiters. In quoted
-      form the atom is delimited by double quote ['\"'] (U+0022) characters,
-      it is mandatory for atoms that contain {{!whitespace}whitespace},
-      parentheses ['('] [')'], semicolons [';'], quotes ['\"'], carets ['^']
-      or characters that need to be escaped.
-{v
-abc        ; a token for the atom "abc"
-"abc"      ; a quoted token for the atom "abc"
-"abc; (d"  ; a quoted token for the atom "abc; (d"
-""         ; the quoted token for the atom ""
-v}
-      For atoms that do not need to be quoted, both their unquoted and
-      quoted form represent the same string; e.g. the string ["true"]
-      can be represented both by the atoms {e true} and {e
-      "true"}. The empty string can only be represented in quoted form
-      by {e ""}.
-
-      In quoted form escapes are introduced by a caret ['^']. Double
-      quotes ['\"'] and carets ['^'] must always be escaped.
-{v
-"^^"             ; atom for ^
-"^n"             ; atom for line feed U+000A
-"^u\{0000\}"       ; atom for U+0000
-"^"^u\{1F42B\}^""  ; atom with a quote, U+1F42B and a quote
-v}
-      The following escape sequences are recognized:
-      {ul
-      {- ["^ "] (<U+005E,U+0020>) for space [' '] (U+0020)}
-      {- ["^\""] (<U+005E,U+0022>) for double quote ['\"'] (U+0022)
-         {b mandatory}}
-      {- ["^^"] (<U+005E,U+005E>) for caret ['^'] (U+005E) {b mandatory}}
-      {- ["^n"] (<U+005E,U+006E>) for line feed ['\n'] (U+000A)}
-      {- ["^r"] (<U+005E,U+0072>) for carriage return ['\r'] (U+000D)}
-      {- ["^u{X}"] with [X] is from 1 to at most 6 upper or lower case
-         hexadecimal digits standing for the corresponding
-         {{:http://unicode.org/glossary/#unicode_scalar_value}Unicode character}
-         U+X.}
-      {- Any other character except line feed ['\n'] (U+000A) or
-         carriage return ['\r'] (U+000D), following a caret is an
-         illegal sequence of characters. In the two former cases the
-         atom continues on the next line and white space is ignored.}}
-      An atom in quoted form can be split across lines by using a caret
-      ['^'] (U+005E) followed by a line feed ['\n'] (U+000A) or a
-      carriage return ['\r'] (U+000D); any subsequent
-      {{!whitespace}whitespace} is ignored.
-{v
-"^
-  a^
-  ^ " ; the atom "a "
-v}
-      The character ['^'] (U+005E) is used as an escape character rather
-      than the usual ['\\'] (U+005C) in order to make quoted Windows®
-      file paths decently readable and, not the least, utterly please DKM.
-
-      {2:lists Lists}
-
-      Lists are delimited by left ['('] (U+0028) and right
-      [')'] (U+0029) parentheses. Their elements are s-expressions separated by
-      optional {{!whitespace}whitespace} and {{!comments}comments}. For example:
-{v
-(a list (of four) expressions)
-(a list(of four)expressions)
-("a"list("of"four)expressions)
-(a list (of ; This is a comment
-four) expressions)
-() ; the empty list
-v}
-
-      {2:grammar S-expression grammar}
-
-      The following {{:https://tools.ietf.org/html/rfc5234}RFC 5234}
-      ABNF grammar is defined on a sequence of
-      {{:http://unicode.org/glossary/#unicode_scalar_value}Unicode characters}.
-{v
- sexp-seq = *(ws / comment / sexp)
-     sexp = atom / list
-     list = %x0028 sexp-seq %x0029
-     atom = token / qtoken
-    token = t-char *(t-char)
-   qtoken = %x0022 *(q-char / escape / cont) %x0022
-   escape = %x005E (%x0020 / %x0022 / %x005E / %x006E / %x0072 /
-                    %x0075 %x007B unum %x007D)
-     unum = 1*6(HEXDIG)
-     cont = %x005E nl ws
-       ws = *(ws-char)
-  comment = %x003B *(c-char) nl
-       nl = %x000A / %x000D / %x000D %x000A
-   t-char = %x0021 / %x0023-0027 / %x002A-%x003A / %x003C-%x005D /
-            %x005F-%x007E / %x0080-D7FF / %xE000-10FFFF
-   q-char = t-char / ws-char / %x0028 / %x0029 / %x003B
-  ws-char = %x0020 / %x0009 / %x000A / %x000B / %x000C / %x000D
-   c-char = %x0009 / %x000B / %x000C / %x0020-D7FF / %xE000-10FFFF
-v}
-      A few additional constraints not expressed by the grammar:
-      {ul
-      {- [unum] once interpreted as an hexadecimal number must be a
-       {{:http://unicode.org/glossary/#unicode_scalar_value}Unicode scalar
-       value.}}
-      {- A comment can be ended by the end of the character sequence rather
-       than [nl]. }} *)
-end
-
 (** File paths.
 
     A file system {e path} specifies a file or a directory in a file
@@ -1805,19 +1242,9 @@ module Fpath : sig
       {b Note.} In 2019, the standard definition of URIs is in a sorry
       state. Assuming the original file path was UTF-8 encoded. It is
       {e believed} the above function should lead to an URI path
-      component that can be parsed by HTML5's
+      comp§onent that can be parsed by HTML5's
       {{:https://dev.w3.org/html5/spec-LC/urls.html#parsing-urls}
       definition} of URI parsing. *)
-
-  val conv : t Conv.t
-  (** [conv] converts file paths. The textual representation
-      uses non-empty {{!Conv.atoms}atoms}. See also {!conv_only}. *)
-
-  val conv_only : t Conv.t
-  (** [conv_only] converts file paths. Textual conversion is {b not
-      composable}, use {!conv} instead. Textual encoding pass the
-      string as is and decoding ignores the initial starting point and
-      parses the whole input string into a file path. *)
 
   val pp : t Fmt.t
   (** [pp ppf p] prints path [p] on [ppf] using {!to_string}. *)
@@ -1945,9 +1372,6 @@ module Hash : sig
   val of_hex : string -> (t, int) result
   (** [of_hex s] is [Result.map of_bytes (]{!String.Ascii.of_hex}[ s)]. *)
 
-  val conv : t Conv.t
-  (** [conv] converts using {!Conv.string_bytes}. *)
-
   val pp : t Fmt.t
   (** [pp] formats using {!to_hex} or, if the hash is {!nil},
       formats ["nil"]. *)
@@ -2042,10 +1466,6 @@ module Time : sig
     (** [of_uint64_ns u] is the {e unsigned} 64-bit integer nanosecond span [u]
         as a span. *)
 
-    val conv : span Conv.t
-    (** [conv] is a converter for timespans. Texual conversion parses
-        an {{!atoms}atom} using {!Int64.of_string}. *)
-
     val pp : span Fmt.t
     (** [pp] formats with {!Fmt.uint64_ns_span}. *)
 
@@ -2086,9 +1506,6 @@ module Time : sig
   val cpu_children_stime : cpu_span -> span
   (** [cpu_utime_s cpu] is [cpu]'s system time in seconds for children
       processes. *)
-
-  val cpu_span_conv : cpu_span Conv.t
-  (** [cpu_span_conv] is a converter for cpu spans. *)
 
   (** {1:cpu_counter CPU time counters} *)
 
@@ -2251,9 +1668,6 @@ v}
       [qchar] are substitued by the byte they escape except for ['\n']
       which removes the backslash and newline from the byte stream.
       [squoted] and [dquoted] represent the bytes they enclose. *)
-
-  val conv : t Conv.t
-  (** [conv] converts command lines. *)
 
   val pp : t Fmt.t
   (** [pp ppf l] formats an unspecified representation of [l] on
@@ -3292,6 +2706,599 @@ module Log : sig
 
   val set_kmsg : kmsg -> unit
   (** [set_kmsg kmsg] sets the logging function to [kmsg]. *)
+end
+
+(** Value converters.
+
+    A value converter describes how to encode and decode OCaml values
+    to a binary presentation and a textual, human specifiable,
+    {{!sexp_syntax}s-expression based}, representation.
+
+    {b Notation.} Given a value [v] and a converter [c] we write
+    \[[v]\]{_c} the textual encoding of [v] according to [c]. *)
+module Conv : sig
+
+  (** {1:low_codec Low-level encoders and decoders} *)
+
+  exception Error of int * int * string
+  (** The exception for conversion errors. This exception is raised
+      both by encoders and decoders with {!raise_notrace}. The
+      integers indicates a byte index range in the input on decoding
+      errors, it is meaningless on encoding ones.
+
+      {b Note.} This exception is used for defining
+      converters. High-level {{!convert}converting functions} do not
+      raise but use result values to report errors. *)
+
+  (** Binary codecs. *)
+  module Bin : sig
+
+    (** {1:enc Encoding} *)
+
+    type 'a enc = Buffer.t -> 'a -> unit
+    (** The type for binary encoders. [enc b v] binary encodes the
+        value [v] in [b]. Raises {!Error} in case of error. *)
+
+    val enc_err :
+      kind:string -> ('a, Format.formatter, unit, 'b) format4 -> 'a
+    (** [enc_err ~kind fmt] raises a binary encoding error message for kind
+        [kind] formatted according to [fmt]. *)
+
+    val enc_byte : int enc
+    (** [enc_byte] encodes an integer in range \[0;255\]. *)
+
+    val enc_bytes : string enc
+    (** [enc_bytes] encodes the given bytes. *)
+
+    val enc_list : 'a enc -> 'a list enc
+    (** [enc_list enc_v] encodes a list of values encoded with [enc_v]. *)
+
+    (** {1:dec Decoding} *)
+
+    type 'a dec = string -> start:int -> int * 'a
+    (** The type for binary decoders. [dec s ~start] binary decodes
+        a value at [start] in [s]. [start] is either the index of a byte
+        in [s] or the length of [s].  The function returns [(i, v)] with
+        [v] the decoded value and [i] the first index in [s] after the
+        decoded value or the length of [s] if there is no such
+        index. Raises {!Error} in case of error. *)
+
+    val dec_err :
+      kind:string -> int -> ('a, Format.formatter, unit, 'b) format4 -> 'a
+    (** [dec_err ~kind i fmt] raises a binary decoding error message
+        for kind [kind] at input byte index [i] formatted according to [fmt]. *)
+
+    val dec_err_eoi : kind:string -> int -> 'a
+    (** [dec_err_eoi ~kind i] raises a decoding error message for kind
+        [kind] at input byte index [i] indicating an unexpected end of input. *)
+
+    val dec_err_exceed : kind:string -> int -> int -> max:int -> 'a
+    (** [dec_err_exceed ~kind i v ~max] raises a decoding error message
+        for kind [kind] at input byte index [i] indicating [v] is not
+        in the range [0;max]. *)
+
+    val dec_need : kind:string -> string -> start:int -> len:int -> unit
+    (** [dec_need ~kind s ~start ~len] checks that [len] bytes are
+        available starting at [start] (which can be out of bounds) in
+        [s] and calls {!err_eoi} if that is not the case. *)
+
+    val dec_byte : kind:string -> int dec
+    (** [dec_byte] decodes an integer in range \[0;255\] for the
+        given [kind]. *)
+
+    val dec_bytes : kind:string -> string dec
+    (** [dec_bytes ~kind] decodes the given bytes for the given
+        [kind]. *)
+
+    val dec_list : 'a dec -> kind:string -> 'a list dec
+    (** [bin_dec_list dec_v ~kind] decodes a list of values decoded with
+        [dec_v] for the given [kind]. *)
+  end
+
+  (** Textual codecs *)
+  module Txt : sig
+
+    (** {1:codec Textual encoders and decoders} *)
+
+    type 'a enc = Format.formatter -> 'a -> unit
+    (** The type for textual encoders. [enc ppf v] textually encodes
+        the value [v] on [ppf]. Raises {!Error} in case of error. *)
+
+    type 'a dec = string -> start:int -> int * 'a
+    (** The type for textual decoders. [dec s ~start] textually
+        decodes a value at [start] in [s]. [start] is either the first
+        textual input bytes to consider (which may be whitespace or a
+        commenet) or the length of [s]. The function returns [(i, v)]
+        with [v] the decoded value and [i] the first index after the
+        decoded value or the lenght of [s] if there is no such
+        index. Raises {!Error} in case of error.
+
+        {b XXX.} In the end this signature is showing its limits for
+        error reporting.  Maybe we should have an abstraction here. *)
+
+    (** {1:enc Encoding} *)
+
+    val enc_err :
+      kind:string -> ('a, Format.formatter, unit, 'b) format4 -> 'a
+    (** [enc_err ~kind fmt] raises a textual encoding error message for kind
+        [kind] formatted according to [fmt]. *)
+
+    val enc_atom : string enc
+    (** [enc_atom ppf s] encodes [s] as an {{!atom}atom} on [ppf] quoting
+        it as needed. *)
+
+    val enc_list : 'a enc -> 'a list enc
+    (** [enc_list enc_v] encodes a list of values encoded with [enc_v]. *)
+
+    (** {1:dec Decoding} *)
+
+    type lexeme = [`Ls | `Le | `Atom of string]
+    (** The type for s-expressions lexemes. *)
+
+    val dec_err :
+      kind:string -> int -> ('a, Format.formatter, unit, 'b) format4 -> 'a
+    (** [dec_err ~kind i fmt] raises a textual decoding error message for
+        kind [kind] at input byte index [i] formatted according to [fmt]. *)
+
+    val dec_err_eoi : kind:string -> int -> 'a
+    (** [dec_err_eoi ~kind i] raises a textual error message for kind [kind]
+        at input byte index [i] indicating an unexpected end of input. *)
+
+    val dec_err_lexeme :
+      kind:string -> int -> lexeme -> exp:lexeme list -> 'a
+    (** [dec_err_case ~kind i] raises a textual error message for kind
+        [kind] at input byte index [i] indicating one of [exp] was
+        expected. *)
+
+    val dec_err_atom : kind:string -> int -> string -> exp:string list -> 'a
+    (** [dec_err_atom ~kind i a exp] raises a textual error message for kind
+        [kind] at input byte index [i] and atom [a] indicating one of [exp]
+        atoms was expected. *)
+
+    val dec_skip : kind:string -> string -> start:int -> int
+    (** [dec_skip ~kind s ~start] starting at [start] (which can be
+        out of bounds) is the first non-white, non-comment, byte index
+        or the length of [s] if there is no such index. *)
+
+    val dec_lexeme : kind:string -> (int * lexeme) dec
+    (** [dec_case ~kind s ~start] starting at [start] (which can be
+        out of bounds), skips whitespace and comment, looks for either
+        a left parenthesis, right parenthesis or an atom and returns
+        the index of their first position. Errors if end of input is
+        is found. *)
+
+    val dec_ls : kind:string -> string -> start:int -> int
+    (** [dec_ls ~kind s ~start] starting at [start] (which can
+        be out of bounds), skips whitespace and comments,
+        parses a list start and returns the index after it
+        or the length of [s]. *)
+
+    val dec_le : kind:string -> string -> start:int -> int
+    (** [dec_le ~kind s ~start] starting at [start] (which can be
+        out of bounds), skips whitespace and comments, parses a list end
+        and returns the index after it or the length of [s]. *)
+
+    val dec_atom : kind:string -> string dec
+    (** [dec_atom ~kind s ~start] starting at [start] (which can
+        be out of bounds), skips whitespace and comments, parses
+        an atom and returns the index after it or the length of
+        [s]. *)
+
+    val dec_list : 'a dec -> kind:string -> 'a list dec
+    (** [dec_list dec_v ~kind] decodes a list of values decoded with
+        [dec_v] for the given [kind]. *)
+
+    val dec_list_tail : 'a dec -> kind:string -> ls:int -> 'a list dec
+    (** [dec_list_tail dec_v ~kind ~lstart] decodes list elements
+        decoded with [dec_v] and an the end of list for the given
+        [kind], [ls] is the position of the list start. *)
+  end
+
+  (** {1:converters Converters} *)
+
+  type 'a t
+  (** The type for converters. *)
+
+  val v :
+    kind:string -> docvar:string -> 'a Bin.enc -> 'a Bin.dec -> 'a Txt.enc ->
+    'a Txt.dec -> 'a t
+  (** [v ~kind ~docvar bin_enc bin_dec txt_enc txt_dec] is a value
+      converter using [bin_enc], [bin_dec], [txt_enc], [txt_dec] for
+      binary and textual conversions. [kind] documents the kind of
+      converted value and [docvar] a meta-variable used in
+      documentation to stand for these values (use uppercase
+      e.g. [INT] for integers). *)
+
+  val kind : 'a t -> string
+  (** [kind c] is the documented kind of value converted by [c]. *)
+
+  val docvar  : 'a t -> string
+  (** [docvar c] is the documentation meta-variable for values converted
+      by [c]. *)
+
+  val bin_enc : 'a t -> 'a Bin.enc
+  (** [bin_enc c] is the binary encoder of [c]. *)
+
+  val bin_dec : 'a t -> 'a Bin.dec
+  (** [bin_dec c] is the binary decoder of [c]. *)
+
+  val txt_enc : 'a t -> 'a Txt.enc
+  (** [txt_enc c] is the textual encoder of [c]. *)
+
+  val txt_dec : 'a t -> 'a Txt.dec
+  (** [txt_dec c] is the textual decoder of [c]. *)
+
+  val with_kind : ?docvar:string -> string -> 'a t -> 'a t
+  (** [with_kind ~docvar k c] is [c] with kind [k] and documentation
+      meta-variable [docvar] (defaults to [docvar c]). *)
+
+  val with_docvar : string -> 'a t -> 'a t
+  (** [with_docvar docvar c] is [c] with documentation meta-variable
+      [docvar]. *)
+
+  val with_conv :
+    kind:string -> docvar:string -> ('b -> 'a) -> ('a -> 'b) -> 'a t -> 'b t
+  (** [with_conv ~kind ~docvar to_t of_t t_conv] is a converter for type
+      ['b] given a converter [t_conv] for type ['a] and conversion
+      functions from and to type ['b]. The conversion functions should
+      raise {!Error} if they are not total. *)
+
+  (** {1:converting Converting} *)
+
+  val to_bin : ?buf:Buffer.t -> 'a t -> 'a -> (string, string) result
+  (** [to_bin c v] binary encodes [v] using [c]. [buf] is used as
+      the internal buffer if specified (it is {!Buffer.clear}ed before
+      usage). *)
+
+  val of_bin : 'a t -> string -> ('a, string) result
+  (** [of_bin c s] binary decodes a value from [s] using [c]. *)
+
+  val to_txt : ?buf:Buffer.t -> 'a t -> 'a -> (string, string) result
+  (** [to_txt c v] textually encodes [v] using [c]. [buf] is used as
+      the internal buffer if specified (it is {!Buffer.clear}ed before
+      usage). *)
+
+  val of_txt : 'a t -> string -> ('a, string) result
+  (** [of_txt c s] textually decodes a value from [s] using [c]. *)
+
+  val to_pp : 'a t -> 'a Fmt.t
+  (** [to_pp c] is a formatter using {!to_txt} to format values. Any
+      error that might occur is printed in the output using
+      the s-expression ({e conv-error} \[[c]\]{_kind} \[[e]\]) with
+      \[[c]\]{_kind} the atom for the value [kind c] and \[[e]\]
+      the atom for the error message. *)
+
+  (** {1:predef Predefined converters} *)
+
+  (** {2:base Base types} *)
+
+  val bool : bool t
+  (** [bool] converts booleans. Textual conversions represent booleans
+      with the {{!atoms}atoms} {e true} and {e false}. *)
+
+  val byte : int t
+  (** [byte] converts a byte. Textual decoding parses an {{!atoms}atom}
+      according to the syntax of {!int_of_string}. Conversions fail if
+      the integer is not in the range \[0;255\].  *)
+
+  val int : int t
+  (** [int] converts signed OCaml integers. Textual decoding parses an
+      {{!atoms}atom} according to the syntax of
+      {!int_of_string}. Conversions fail if the integer is not in the
+      range \[-2{^{!Sys.int_size}-1};2{^{!Sys.int_size}-1}-1\].
+
+      {b Warning.} A large integer encoded on a 64-bit platform may
+      fail to decode on a 32-bit platform, use {!int31} or {!int64} if
+      this is a problem. *)
+
+  val int31 : int t
+  (** [int31] converts signed 31-bit integers. Textual decoding parses
+      an {{!atoms}atom} according to the syntax of
+      {!int_of_string}. Conversions fail if the integer is not in the
+      range \[-2{^30};2{^30}-1\]. *)
+
+  val int32 : int32 t
+  (** [int32] converts signed 32-bit integers. Textual decoding parses
+      an {{!atoms}atom} according to the syntax of
+      {!Int32.of_string}. Conversions fail if the integer is not in
+      the range \[-2{^31};2{^31}-1\]. *)
+
+  val int64 : int64 t
+  (** [int64] converts signed 64-bit integers. Textual decoding parses
+      an {{!atoms}atom} according to the syntax of
+      {!Int64.of_string}. Conversions fail if the integer is not in
+      the range \[-2{^63};2{^63}-1\]. *)
+
+  val float : float t
+  (** [float] converts floating point numbers. Textual decoding parses
+      an {{!atoms}atom} using {!float_of_string}. *)
+
+  val string_bytes : string t
+  (** [string_bytes] converts OCaml strings as byte sequences.
+      Textual conversion represents the bytes of [s] with the
+      s-expression ({e hex} \[[s]\]{_hex}) with \[[s]\]{_hex} the
+      {{!atoms}atom} resulting from {!String.Ascii.to_hex}[ s].
+      See also {!atom} and {!only_string}.
+
+      {b Warning.} A large string encoded on a 64-bit platform may
+      fail to decode on a 32-bit platform. *)
+
+  val atom : string t
+  (** [atom] converts strings assumed to represent UTF-8 encoded
+      Unicode text; but the encoding is not checked. Textual
+      conversions represent strings as {{!atoms}atoms}. See also
+      {!string_bytes} and {!only_string}.
+
+      {b Warning.} A large atom encoded on a 64-bit platform may fail
+      to decode on a 32-bit platform. *)
+
+  val atom_non_empty : string t
+  (** [atom_non_empty] is like {!atom} but ensures the atom is
+      not empty. *)
+
+  val fpath : Fpath.t t
+  (** [fpath] converts file paths. The textual representation
+      uses non-empty {{!atom}atoms}. See also {!fpath_only}. *)
+
+  val hash : Hash.t t
+  (** [hash] converts using {!string_bytes}. *)
+
+  val time_span : Time.span t
+  (** [time_span] is a converter for time spans. Texual conversion
+      parses an {{!atoms}atom} using {!Int64.of_string}. *)
+
+  val time_cpu_span : Time.cpu_span t
+  (** [time_cpu_span] is a converter for CPU spans. *)
+
+  val cmd : Cmd.t t
+  (** [cmd] converts command lines. *)
+
+  val os_cmd_status : Os.Cmd.status t
+  (** [os_cmd_status] converts tool spawn statuses. *)
+
+  (** {2:higher Higher-order converters} *)
+
+  val option : ?kind:string -> ?docvar:string -> 'a t -> 'a option t
+  (** [option c] converts optional values converted with [c]. Textual
+      conversions represent [None] with the {{!atoms}atom} {e none}
+      and [Some v] with the s-expression ({e some} \[[v]\]{_c}). *)
+
+  val some : 'a t -> 'a option t
+  (** [some c] wraps decodes of [c] with {!Option.some}. {b Warning.}
+      [None] can't be converted in either direction, use {!option} for
+      this. *)
+
+  val result : ?kind:string -> ?docvar:string -> 'a t -> 'b t ->
+    ('a, 'b) result t
+  (** [result ok error] converts result values with [ok] and [error].
+      Textual conversions represent [Ok v] with the s-expression
+      ({e ok} \[[v]\]{_ok}) and [Error e] with
+      ({e error} \[[e]\]{_error}). *)
+
+  val list : ?kind:string -> ?docvar:string -> 'a t -> 'a list t
+  (** [array c] converts a list of values converted with [c]. Textual
+      conversions represent a list [[v0; ... vn]] by the s-expression
+      (\[[v0]\]{_c} ... \[[vn]\]{_c}).
+
+      {b Warning.} A large list encoded on a 64-bit platform may fail
+      to decode on a 32-bit platform. *)
+
+  val array : ?kind:string -> ?docvar:string -> 'a t -> 'a array t
+  (** [array c] is like {!list} but converts arrays.
+
+      {b Warning.} A large array encoded on a 64-bit platform may fail
+      to decode on a 32-bit platform. *)
+
+  val pair : ?kind:string -> ?docvar:string -> 'a t -> 'b t -> ('a * 'b) t
+  (** [pair c0 c1] converts pairs of values converted with [c0] and [c1].
+      Textual conversion represent a pair [(v0, v1)] by the
+      s-expression (\[[v0]\]{_c0} \[[v1]\]{_c1}). *)
+
+  val enum :
+    kind:string -> docvar:string -> ?eq:('a -> 'a -> bool) ->
+    (string * 'a) list -> 'a t
+  (** [enum ~kind ~docvar ~eq vs] converts values present in [vs].
+      {!eq} is used to test equality among values (defaults to {!( =
+      )}). The list length should not exceed 256. Textual conversions
+      use the strings of the pairs in [vs] as {{!atoms}atoms} to
+      encode the corresponding value. *)
+
+  (** {2:non_composable Non-composable predefined converters}
+
+      Textual conversions performed by the following converters cannot
+      be composed; they do not respect the syntax of s-expression
+      {{!atom}atoms}. They can be used for direct conversions when one
+      does not want to be subject to the syntactic constraints of
+      s-expressions. For example when parsing command line interface
+      arguments or environment variables. *)
+
+  val string_only : string t
+  (** [string_only] converts OCaml strings. Textual conversion is
+      {b not composable}, use {!string_bytes} or {!atom}
+      instead. Textual encoding passes the string as is and decoding
+      ignores the initial starting point and returns the whole input
+      string.
+
+      {b Warning.} A large string encoded on a 64-bit platform may
+      fail to decode on a 32-bit platform. *)
+
+  val fpath_only : Fpath.t t
+  (** [fpath_only] converts file paths. Textual conversion is {b not
+      composable}, use {!path} instead. Textual encoding pass the
+      string as is and decoding ignores the initial starting point and
+      parses the whole input string into a file path. *)
+
+  (** {1:sexp_syntax S-expressions syntax}
+
+      S-expressions are a general way of describing data via atoms
+      (sequences of characters) and lists delimited by parentheses.
+      Here are a few examples of s-expressions and their syntax:
+{v
+
+this-is-an-atom
+(this is a list of seven atoms)
+(this list contains (a nested) list)
+
+; This is a comment
+; Anything that follows a semi-colon is ignored until the next line
+
+(this list ; has three atoms and an embededded ()
+ comment)
+
+"this is a quoted atom, it can contain spaces ; and ()"
+
+"quoted atoms can be split ^
+ across lines or contain Unicode esc^u\{0061\}pes"
+v}
+
+      We define the syntax of s-expressions over a sequence of
+      {{:http://unicode.org/glossary/#unicode_scalar_value}Unicode
+      characters} in which all US-ASCII {{!Char.Ascii.is_control}control
+      characters} except {{!whitespace}whitespace} are forbidden in
+      unescaped form.
+
+      {b Note.} This module assumes the sequence of Unicode characters
+      is encoded as UTF-8 although it doesn't check this for now.
+
+      {2:sexp S-expressions and sequences thereof}
+
+      An {e s-expression} is either an {{!atoms}{e atom}} or a
+      {{!lists}{e list}} of s-expressions interspaced with
+      {{!whitespace}{e whitespace}} and {{!comments}{e comments}}. A {e
+      sequence of s-expressions} is a succession of s-expressions
+      interspaced with whitespace and comments.
+
+      These elements are informally described below and finally made
+      precise via an ABNF {{!grammar}grammar}.
+
+      {2:whitespace Whitespace}
+
+      Whitespace is a sequence of whitespace characters, namely, space
+      [' '] (U+0020), tab ['\t'] (U+0009), line feed ['\n'] (U+000A),
+      vertical tab ['\t'] (U+000B), form feed (U+000C) and carriage return
+      ['\r'] (U+000D).
+
+      {2:comments Comments}
+
+      Unless it occurs inside an atom in quoted form (see below)
+      anything that follows a semicolon [';'] (U+003B) is ignored until
+      the next {e end of line}, that is either a line feed ['\n'] (U+000A), a
+      carriage return ['\r']  (U+000D) or a carriage return and a line feed
+      ["\r\n"] (<U+000D,U+000A>).
+{v
+(this is not a comment) ; This is a comment
+(this is not a comment)
+v}
+
+      {2:atoms Atoms}
+
+      An atom represents ground data as a string of Unicode characters.
+      It can, via escapes, represent any sequence of Unicode characters,
+      including control characters and U+0000. It cannot represent an
+      arbitrary byte sequence except via a client-defined encoding
+      convention (e.g. Base64 or {{!string_bytes}hex encoding}).
+
+      Atoms can be specified either via an unquoted or a quoted form. In
+      unquoted form the atom is written without delimiters. In quoted
+      form the atom is delimited by double quote ['\"'] (U+0022) characters,
+      it is mandatory for atoms that contain {{!whitespace}whitespace},
+      parentheses ['('] [')'], semicolons [';'], quotes ['\"'], carets ['^']
+      or characters that need to be escaped.
+{v
+abc        ; a token for the atom "abc"
+"abc"      ; a quoted token for the atom "abc"
+"abc; (d"  ; a quoted token for the atom "abc; (d"
+""         ; the quoted token for the atom ""
+v}
+      For atoms that do not need to be quoted, both their unquoted and
+      quoted form represent the same string; e.g. the string ["true"]
+      can be represented both by the atoms {e true} and {e
+      "true"}. The empty string can only be represented in quoted form
+      by {e ""}.
+
+      In quoted form escapes are introduced by a caret ['^']. Double
+      quotes ['\"'] and carets ['^'] must always be escaped.
+{v
+"^^"             ; atom for ^
+"^n"             ; atom for line feed U+000A
+"^u\{0000\}"       ; atom for U+0000
+"^"^u\{1F42B\}^""  ; atom with a quote, U+1F42B and a quote
+v}
+      The following escape sequences are recognized:
+      {ul
+      {- ["^ "] (<U+005E,U+0020>) for space [' '] (U+0020)}
+      {- ["^\""] (<U+005E,U+0022>) for double quote ['\"'] (U+0022)
+         {b mandatory}}
+      {- ["^^"] (<U+005E,U+005E>) for caret ['^'] (U+005E) {b mandatory}}
+      {- ["^n"] (<U+005E,U+006E>) for line feed ['\n'] (U+000A)}
+      {- ["^r"] (<U+005E,U+0072>) for carriage return ['\r'] (U+000D)}
+      {- ["^u{X}"] with [X] is from 1 to at most 6 upper or lower case
+         hexadecimal digits standing for the corresponding
+         {{:http://unicode.org/glossary/#unicode_scalar_value}Unicode character}
+         U+X.}
+      {- Any other character except line feed ['\n'] (U+000A) or
+         carriage return ['\r'] (U+000D), following a caret is an
+         illegal sequence of characters. In the two former cases the
+         atom continues on the next line and white space is ignored.}}
+      An atom in quoted form can be split across lines by using a caret
+      ['^'] (U+005E) followed by a line feed ['\n'] (U+000A) or a
+      carriage return ['\r'] (U+000D); any subsequent
+      {{!whitespace}whitespace} is ignored.
+{v
+"^
+  a^
+  ^ " ; the atom "a "
+v}
+      The character ['^'] (U+005E) is used as an escape character rather
+      than the usual ['\\'] (U+005C) in order to make quoted Windows®
+      file paths decently readable and, not the least, utterly please DKM.
+
+      {2:lists Lists}
+
+      Lists are delimited by left ['('] (U+0028) and right
+      [')'] (U+0029) parentheses. Their elements are s-expressions separated by
+      optional {{!whitespace}whitespace} and {{!comments}comments}. For example:
+{v
+(a list (of four) expressions)
+(a list(of four)expressions)
+("a"list("of"four)expressions)
+(a list (of ; This is a comment
+four) expressions)
+() ; the empty list
+v}
+
+      {2:grammar S-expression grammar}
+
+      The following {{:https://tools.ietf.org/html/rfc5234}RFC 5234}
+      ABNF grammar is defined on a sequence of
+      {{:http://unicode.org/glossary/#unicode_scalar_value}Unicode characters}.
+{v
+ sexp-seq = *(ws / comment / sexp)
+     sexp = atom / list
+     list = %x0028 sexp-seq %x0029
+     atom = token / qtoken
+    token = t-char *(t-char)
+   qtoken = %x0022 *(q-char / escape / cont) %x0022
+   escape = %x005E (%x0020 / %x0022 / %x005E / %x006E / %x0072 /
+                    %x0075 %x007B unum %x007D)
+     unum = 1*6(HEXDIG)
+     cont = %x005E nl ws
+       ws = *(ws-char)
+  comment = %x003B *(c-char) nl
+       nl = %x000A / %x000D / %x000D %x000A
+   t-char = %x0021 / %x0023-0027 / %x002A-%x003A / %x003C-%x005D /
+            %x005F-%x007E / %x0080-D7FF / %xE000-10FFFF
+   q-char = t-char / ws-char / %x0028 / %x0029 / %x003B
+  ws-char = %x0020 / %x0009 / %x000A / %x000B / %x000C / %x000D
+   c-char = %x0009 / %x000B / %x000C / %x0020-D7FF / %xE000-10FFFF
+v}
+      A few additional constraints not expressed by the grammar:
+      {ul
+      {- [unum] once interpreted as an hexadecimal number must be a
+       {{:http://unicode.org/glossary/#unicode_scalar_value}Unicode scalar
+       value.}}
+      {- A comment can be ended by the end of the character sequence rather
+       than [nl]. }} *)
 end
 
 (*---------------------------------------------------------------------------

@@ -834,30 +834,12 @@ module Reviver = struct
 
   (* Operation metadata converters *)
 
-  let cmd_status_conv : Os.Cmd.status Conv.t =
-    let kind = "cmd-status" in
-    let bin_enc b = function
-    | `Exited e -> Conv.Bin.enc_byte b 0x0; Conv.Bin.enc_byte b e
-    | `Signaled s -> Conv.Bin.enc_byte b 0x1; Conv.Bin.enc_byte b (- s)
-    in
-    let bin_dec s ~start = match Conv.Bin.dec_byte ~kind s ~start with
-    | start, 0x0 ->
-        let i, v = Conv.Bin.dec_byte s ~kind ~start in i, `Exited v
-    | start, 0x1 ->
-        let i, v = Conv.Bin.dec_byte s ~kind ~start in i, `Signaled (- v)
-    | _, byte ->
-        Conv.Bin.dec_err_exceed ~kind start byte ~max:0x1
-    in
-    let txt_enc ppf = raise (Conv.Error (0, 0, "Not implemented")) in
-    let txt_dec s ~start = raise (Conv.Error (0, 0, "Not implemented")) in
-    Conv.v ~kind ~docvar:"STATUS" bin_enc bin_dec txt_enc txt_dec
-
   let spawn_meta_conv :
     ((string, string) result option * (Os.Cmd.status, string) result) Conv.t
     =
     Conv.(pair ~kind:"spawn-result" ~docvar:"SPAWN"
             (option (result string_bytes string_bytes))
-            (result cmd_status_conv string_bytes))
+            (result os_cmd_status string_bytes))
 
   (* Operation reviver *)
 
