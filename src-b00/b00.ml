@@ -375,7 +375,7 @@ module File_cache = struct
       in
       loop 0 [] fs
     with
-    | Failure e -> Result.error (err_key "revive" k e)
+    | Failure e -> Error (err_key "revive" k e)
 
   (* Functions on cache directories *)
 
@@ -393,16 +393,16 @@ module File_cache = struct
       | Some (meta, fs) -> f key meta fs acc
     in
     try Ok (cache_fold_key_dir_names c (fold_key f) acc)
-    with Failure e -> Result.error (err "fold" e)
+    with Failure e -> Error (err "fold" e)
 
   let keys c =
     let add_name acc fname = key_of_filename fname :: acc in
     try Ok (cache_fold_key_dir_names c add_name [])
-    with Failure e -> Result.error (err "keys" e)
+    with Failure e -> Error (err "keys" e)
 
   let is_unused c k = try key_dir_exit_if_used (key_dir c k); Ok true with
   | Exit -> Ok false
-  | Failure e -> Result.error (err_key "unused check" k e)
+  | Failure e -> Error (err_key "unused check" k e)
 
   let delete_unused c =
     let delete_unused_key () fname =
@@ -411,7 +411,7 @@ module File_cache = struct
       | Exit -> ()
     in
     try Ok (cache_fold_key_dir_names c delete_unused_key ())
-    with Failure e -> Result.error (err "delete unused" e)
+    with Failure e -> Error (err "delete unused" e)
 
   let trim_size c ~max_byte_size ~pct =
     try
@@ -439,7 +439,7 @@ module File_cache = struct
           delete_keys (current - size) budget kdirs
       in
       Ok (delete_keys total_size budget @@ List.sort order ks)
-    with Failure e -> Result.error (err "trim size" e)
+    with Failure e -> Error (err "trim size" e)
 
   module Stats = struct
     type keys = {keys_count : int; keys_file_count : int; keys_byte_size : int}
@@ -464,7 +464,7 @@ module File_cache = struct
           loop (k + 1) (f + kf) (b + kb) ns
       in
       try Ok (loop 0 0 0 ns) with
-      | Failure e -> Result.error (err "keys stats" e)
+      | Failure e -> Error (err "keys stats" e)
 
     type cache = { all_keys : keys; unused_keys : keys }
     let all_keys s = s.all_keys
@@ -492,7 +492,7 @@ module File_cache = struct
         let names = cache_fold_key_dir_names c (fun acc n -> n :: acc) [] in
         Ok (loop 0 0 0 0 0 0 names)
       with
-      | Failure e -> Result.error (err "stats" e)
+      | Failure e -> Error (err "stats" e)
   end
 end
 
@@ -859,7 +859,7 @@ module Reviver = struct
             (option (result string_bytes string_bytes))
             (result cmd_status_conv string_bytes))
 
-  (* Operation cache *)
+  (* Operation reviver *)
 
   type t =
     { clock : Time.counter;
@@ -867,10 +867,9 @@ module Reviver = struct
       cache : File_cache.t;
       buffer : Buffer.t; (* buffer to encode metadata *)
       mutable file_hashes : Hash.t Fpath.Map.t; (* file hash cache *)
-      mutable file_hash_dur : Time.span; (* file hash duration *) }
+      mutable file_hash_dur : Time.span; (* total file hash duration *) }
 
-  let create ?clock ?(hash_fun = (module Hash.Xxh_64 : Hash.T)) cache =
-    let clock = match clock with None -> Time.counter () | Some c -> c in
+  let create clock hash_fun cache =
     let buffer = Buffer.create 1024 in
     let file_hashes = Fpath.Map.empty in
     let file_hash_dur = Time.Span.zero in
@@ -879,30 +878,33 @@ module Reviver = struct
   let clock r = r.clock
   let hash_fun r = r.hash_fun
   let file_cache r = r.cache
-
-
   let timestamp r = Time.count r.clock
 
-  let hash_file r f = match Fpath.Map.find f r.file_hashes with
+  (* Hashing *)
+
+  let _hash_file r f = match Fpath.Map.find f r.file_hashes with
   | h -> h
   | exception Not_found ->
       let module H = (val r.hash_fun : Hash.T) in
       let t = timestamp r in
-      let h = Result.to_failure (H.file f) in
+      let h = H.file f in
       let dur = Time.Span.abs_diff (timestamp r) t in
       r.file_hash_dur <- Time.Span.add r.file_hash_dur dur;
-      r.file_hashes <- Fpath.Map.add f h r.file_hashes;
-      h
+      match h with
+      | Ok h -> r.file_hashes <- Fpath.Map.add f h r.file_hashes; h
+      | Error e -> failwith e
+
+  let hash_file r f = try Ok (_hash_file r f) with Failure e -> Error e
 
   let hash_op_reads r o acc =
-    let add_file_hash acc f = Hash.to_bytes (hash_file r f) :: acc in
+    let add_file_hash acc f = Hash.to_bytes (_hash_file r f) :: acc in
     List.fold_left add_file_hash acc (Op.reads o)
 
   let hash_spawn r o s =
     let stdin_sig = function None -> "0" | Some _ -> "1" in
     let stdo_sig = function `File _ -> "0" | `Tee _ -> "1" | `Ui -> "2" in
     let module H = (val r.hash_fun : Hash.T) in
-    let acc = [Hash.to_bytes (hash_file r (Op.Spawn.tool s))] in
+    let acc = [Hash.to_bytes (_hash_file r (Op.Spawn.tool s))] in
     let acc = hash_op_reads r o acc in
     let acc = stdin_sig (Op.Spawn.stdin s) :: acc in
     let acc = stdo_sig (Op.Spawn.stdout s) :: acc in
@@ -921,13 +923,20 @@ module Reviver = struct
     let sg = String.concat "" acc in
     H.string sg
 
-  let hash_op r o = match Op.kind o with
-  | Op.Spawn s -> hash_spawn r o s
-  | Op.Write w -> hash_write r o w
-  | Op.Read _ | Op.Mkdir _ | Op.Wait_files -> Hash.nil
+  let hash_op r o =
+    try
+      Ok begin match Op.kind o with
+      | Op.Spawn s -> hash_spawn r o s
+      | Op.Write w -> hash_write r o w
+      | Op.Read _ | Op.Mkdir _ | Op.Wait_files -> Hash.nil
+      end
+    with Failure e -> Error e
 
-  let set_op_hash r o = try Ok (Op.set_hash o (hash_op r o)) with
-  | Failure e -> Result.error e
+  let file_hashes r = r.file_hashes
+  let file_hash_dur r = r.file_hash_dur
+
+
+  (* Recording and reviving operations *)
 
   let op_cache_key o = Hash.to_hex (Op.hash o)
 
@@ -978,9 +987,6 @@ module Reviver = struct
   | Op.Spawn s -> record_spawn r o s
   | Op.Write w -> record_write r o w
   | Op.Read _ | Op.Mkdir _ | Op.Wait_files -> Ok true
-
-  let file_hashes r = r.file_hashes
-  let file_hash_dur r = r.file_hash_dur
 end
 
 module Guard = struct
@@ -1159,13 +1165,16 @@ module Exec = struct
     { clock; tmp_dir; feedback; todo; collectable; to_spawn; max_spawn;
       spawn_count = 0; spawns = [] }
 
+  let clock c = c.clock
+  let tmp_dir c = c.tmp_dir
+  let max_spawn c = c.max_spawn
   let incr_spawn_count e = e.spawn_count <- e.spawn_count + 1
   let decr_spawn_count e = e.spawn_count <- e.spawn_count - 1
   let timestamp e = Time.count e.clock
 
   (* Operation execution *)
 
-  let complete_spawn e o ui result =
+  let finish_exec_spawn e o ui result =
     let read_stdo_ui s ui =
       let append f0 f1 =
         Result.bind (Os.File.read f0) @@ fun f0 ->
@@ -1197,7 +1206,7 @@ module Exec = struct
     decr_spawn_count e;
     Queue.add o e.collectable
 
-  let submit_spawn e o =
+  let start_exec_spawn e o =
     let spawn s =
       let get_stdo_ui_file e = match Os.File.open_tmp_fd ~dir:e.tmp_dir () with
       | Ok (file, fd) -> Os.Cmd.out_fd ~close:true fd, Some file
@@ -1227,7 +1236,7 @@ module Exec = struct
         | Ok pid ->
             e.spawns <- (pid, ui, o) :: e.spawns;
             e.feedback (`Exec_submit (Some pid, o))
-      with Failure err -> complete_spawn e o None (Error err)
+      with Failure err -> finish_exec_spawn e o None (Error err)
     in
     incr_spawn_count e;
     Op.set_exec_start_time o (timestamp e);
@@ -1299,7 +1308,7 @@ module Exec = struct
     | n ->
         match Queue.take e.to_spawn with
         | exception Queue.Empty -> ()
-        | o -> submit_spawn e o; loop e (n - 1)
+        | o -> start_exec_spawn e o; loop e (n - 1)
     in
     loop e spawn_limit
 
@@ -1319,9 +1328,9 @@ module Exec = struct
         let old_spawn_count = e.spawn_count in
         let collect spawns (pid, ui, o as p) =
           match Os.Cmd.spawn_poll_status pid with
-          | Error _ as err -> complete_spawn e o ui err; spawns
+          | Error _ as err -> finish_exec_spawn e o ui err; spawns
           | Ok None -> p :: spawns
-          | Ok (Some st) -> complete_spawn e o ui (Ok st); spawns
+          | Ok (Some st) -> finish_exec_spawn e o ui (Ok st); spawns
         in
         e.spawns <- List.fold_left collect [] e.spawns;
         match block && old_spawn_count = e.spawn_count with
@@ -1548,7 +1557,10 @@ module Memo = struct
     { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec; futs;
       op_id; konts; ops; }
 
-  let memo ?hash_fun ?env ?cwd ?cachedir ?(max_spawn = 4) ?feedback () =
+  let memo
+      ?(hash_fun = (module Hash.Xxh_64 : Hash.T)) ?env ?cwd ?cachedir
+      ?(max_spawn = 4) ?feedback ()
+    =
     let feedback = match feedback with
     | Some f -> f
     | None ->
@@ -1571,10 +1583,10 @@ module Memo = struct
     | None -> Fpath.(cwd / "_b0" / "cache")
     | Some c -> c
     in
-    Result.bind (File_cache.create ~feedback:fb_cache cachedir) @@ fun c ->
+    Result.bind (File_cache.create ~feedback:fb_cache cachedir) @@ fun cache ->
     let env = Env.v env in
     let guard = Guard.create () in
-    let reviver = Reviver.create ~clock ?hash_fun c in
+    let reviver = Reviver.create clock hash_fun cache in
     let exec = Exec.create ~clock ~feedback:fb_exec ~max_spawn () in
     Ok (create ~clock ~feedback:fb_memo ~cwd env guard reviver exec)
 
@@ -1637,14 +1649,15 @@ module Memo = struct
   let submit_op m o = match Op.status o with
   | Op.Aborted -> finish_op m o
   | Op.Waiting ->
-      begin match Reviver.set_op_hash m.reviver o with
+      begin match Reviver.hash_op m.reviver o with
       | Error e ->
           (* FIXME Does this report errors cleanly ? We really want to
              be able to say which reads were supposed to be there and are not *)
           m.feedback (`Op_cache_error (o, e));
           Op.set_status o Op.Aborted;
           finish_op m o
-      | Ok () ->
+      | Ok hash ->
+          Op.set_hash o hash;
           begin match Reviver.revive m.reviver o with
           | Ok None -> Exec.submit m.exec o
           | Ok (Some _) -> finish_op m o

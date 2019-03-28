@@ -599,10 +599,10 @@ end
 (** Build operation revivers.
 
     An operation reviver combines a {{!File_cache}file cache} and a
-    {{!B0_std.Hash.T}hash function} to record the effect of
+    {{!B0_std.Hash.T}hash function} to record and revive the effect of
     {{!Op}build operations}.
 
-    {b Note.} File hashes performed by this module are
+    {b Note.} Hashes performed on files by this module are
     {{!file_hashes}cached}. *)
 module Reviver : sig
 
@@ -611,16 +611,13 @@ module Reviver : sig
   type t
   (** The type for build operation revivers. *)
 
-  val create :
-    ?clock:Time.counter -> ?hash_fun:(module Hash.T) -> File_cache.t -> t
-  (** [create ~clock ~hash_fun c] is a reviver with
+  val create : Time.counter -> (module Hash.T) -> File_cache.t -> t
+  (** [create clock hash_fun cache] is a reviver with
       {ul
-      {- [c] the file cache used to record build operations}
-      {- [hash_fun] the hash function used to hash files and
-         build operations; defaults to {!B0_std.Hash.Xxh_64}}
       {- [clock] the clock used to {{!file_hash_dur}measure} file hashing
-         time and {{!Op.set_exec_start_time}timestamp} revived operations
-         defaults to {!B0_std.Time.counter}[ ()].}} *)
+         time and {{!Op.set_exec_start_time}timestamp} revived operations.}
+      {- [hash_fun] the hash function used to hash files and build operations.}
+      {- [cache] the file cache used to record build operations.}} *)
 
   val clock : t -> Time.counter
   (** [clock r] is [r]'s clock. *)
@@ -631,12 +628,23 @@ module Reviver : sig
   val file_cache : t -> File_cache.t
   (** [file_cache r] is [r]'s file cache. *)
 
-  (** {1:record_and_revive Recording and reviving operations.} *)
+  (** {1:hashing Hashing} *)
 
-  val set_op_hash : t -> Op.t -> (unit, string) result
-  (** [set_op_hash r o] hashes the operation [o] and stores the result
-      in [o] with {!Op.set_hash}. Errors if an input file of the
-      operation can't be hashed. *)
+  val hash_op : t -> Op.t -> (Hash.t, string) result
+  (** [hash_op r o] hashes the operation [o]. Errors if an input
+      file of the build operation can't be hashed. *)
+
+  val hash_file : t -> Fpath.t -> (Hash.t, string) result
+  (** [hash_file r f] hashes file [f]. Note that file hashes
+      are {{!file_hashes}cached} by [r]. *)
+
+  val file_hashes : t -> Hash.t Fpath.Map.t
+  (** [file_hashes r] is a map of the files that were hashed. *)
+
+  val file_hash_dur : t -> Time.span
+  (** [file_hash_dur r] is the time spent hashing files. *)
+
+  (** {1:record_and_revive Recording and reviving operations} *)
 
   val record : t -> Op.t -> (bool, string) result
   (** [record r o] records operation [o] in the reviver [r]. This
@@ -665,17 +673,9 @@ module Reviver : sig
 
       {b Warning.} In any case the fields {!Op.exec_start_time},
       {!Op.exec_end_time} of [o] get set. *)
-
-  (** {1:file_hash File hash statistics} *)
-
-  val file_hashes : t -> Hash.t Fpath.Map.t
-  (** [file_hashes c] is a map of the files that were hashed. *)
-
-  val file_hash_dur : t -> Time.span
-  (** [file_hash_dur c] is the time spent hashing files. *)
 end
 
-(** Build operations guards.
+(** Build operation guards.
 
     A guard ensure that a build operation is allowed to proceed.
     This means either that:
@@ -779,6 +779,17 @@ module Exec : sig
          {!Random.State.make_self_init}.}
       {- [clock], the clock used to {{!Op.set_exec_start_time}timestamp}
          the operations; defaults to {!B0_std.Time.counter}[ ()].}} *)
+
+  val clock : t -> Time.counter
+  (** [clock e] is [e]'s clock. *)
+
+  val tmp_dir : t -> Fpath.t
+  (** [tmp_dir e] is [e]'s temporary directory. *)
+
+  val max_spawn : t -> int
+  (** [max_spawn e] is [e]'s maximal number of simultaneous process spawns. *)
+
+  (** {1:schedcollect Scheduling and collecting operations} *)
 
   val schedule : t -> Op.t -> unit
   (** [schedule e o] schedules [o] for execution in [e]. Just before
