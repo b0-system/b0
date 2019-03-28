@@ -277,13 +277,13 @@ module File_cache = struct
       then (write_file (kdir ^ key_meta_filename) meta; Ok true)
       else Ok false
     with
-    | Failure e -> Result.error (err_key "add" k e)
+    | Failure e -> Error (err_key "add" k e)
 
   let rem c k = try Ok (key_dir_delete (key_dir c k)) with
-  | Failure e -> Result.error (err_key "delete" k e)
+  | Failure e -> Error (err_key "delete" k e)
 
   let find c k = try Ok (key_dir_files (key_dir c k)) with
-  | Failure e -> Result.error (err_key "find" k e)
+  | Failure e -> Error (err_key "find" k e)
 
   let revive c k fs =
     let rec exists f = try Unix.access f [Unix.F_OK]; true with

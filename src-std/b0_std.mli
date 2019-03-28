@@ -1705,7 +1705,6 @@ module Fpath : sig
 
       {b Warning.} By definition [rem_prefix p p] is [None]. *)
 
-
   (** {1:preds Predicates and comparison} *)
 
   val is_rel : t -> bool

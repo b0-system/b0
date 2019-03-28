@@ -462,12 +462,12 @@ module Op : sig
   val exec_start_time : t -> Time.span
   (** [exec_start_time o] is [o]'s execution start time. This is
       different from {!B0_std.Time.Span.zero} once the operation has
-      been submitted to the OS for execution. *)
+      been submitted for execution. *)
 
   val exec_end_time : t -> Time.span
   (** [exec_end_time o] is [o]'s execution end time. This is different
       from {!B0_std.Time.Span.zero} once the operation has been completed
-      by the OS and collected. *)
+      and collected. *)
 
   val exec_duration : t -> Time.span
   (** [exec_duration] is the difference between {!exec_end_time} and
@@ -483,8 +483,8 @@ module Op : sig
   (** [writes o] are the file paths written by [o]. *)
 
   val did_not_write : t -> Fpath.t list
-  (** [did_not_write o] are the file of {!writes} that do
-      not exist or are not readable. *)
+  (** [did_not_write o] compares {!writes} with the current state
+      of the file system and reports those files that do not exist on it.  *)
 
   val hash : t -> Hash.t
   (** [hash o] is the operation's hash. This is {!Hash.nil} before the
