@@ -194,9 +194,9 @@ module Memo = struct
       loop 0 0 Time.Span.zero 0 0 Time.Span.zero 0 Time.Span.zero os
     in
     let ht, hd =
-      let c = Memo.op_cache m in
-      Fpath.Map.cardinal (Op_cache.file_hashes c),
-      Op_cache.file_hash_dur c
+      let c = Memo.reviver m in
+      Fpath.Map.cardinal (Reviver.file_hashes c),
+      Reviver.file_hash_dur c
     in
     let pp_op_kind ppf (sc, st, sd) =
       Fmt.pf ppf "%a %d (%d cached)" Time.Span.pp sd st sc

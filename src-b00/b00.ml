@@ -830,7 +830,7 @@ end = struct
   let length q = q.length
 end
 
-module Op_cache = struct
+module Reviver = struct
 
   (* Operation metadata converters *)
 
@@ -876,29 +876,34 @@ module Op_cache = struct
     let file_hash_dur = Time.Span.zero in
     { clock; hash_fun; buffer; cache; file_hashes; file_hash_dur }
 
-  let timestamp c = Time.count c.clock
+  let clock r = r.clock
+  let hash_fun r = r.hash_fun
+  let file_cache r = r.cache
 
-  let hash_file c f = match Fpath.Map.find f c.file_hashes with
+
+  let timestamp r = Time.count r.clock
+
+  let hash_file r f = match Fpath.Map.find f r.file_hashes with
   | h -> h
   | exception Not_found ->
-      let module H = (val c.hash_fun : Hash.T) in
-      let t = timestamp c in
+      let module H = (val r.hash_fun : Hash.T) in
+      let t = timestamp r in
       let h = Result.to_failure (H.file f) in
-      let dur = Time.Span.abs_diff (timestamp c) t in
-      c.file_hash_dur <- Time.Span.add c.file_hash_dur dur;
-      c.file_hashes <- Fpath.Map.add f h c.file_hashes;
+      let dur = Time.Span.abs_diff (timestamp r) t in
+      r.file_hash_dur <- Time.Span.add r.file_hash_dur dur;
+      r.file_hashes <- Fpath.Map.add f h r.file_hashes;
       h
 
-  let hash_op_reads c o acc =
-    let add_file_hash acc f = Hash.to_bytes (hash_file c f) :: acc in
+  let hash_op_reads r o acc =
+    let add_file_hash acc f = Hash.to_bytes (hash_file r f) :: acc in
     List.fold_left add_file_hash acc (Op.reads o)
 
-  let hash_spawn c o s =
+  let hash_spawn r o s =
     let stdin_sig = function None -> "0" | Some _ -> "1" in
     let stdo_sig = function `File _ -> "0" | `Tee _ -> "1" | `Ui -> "2" in
-    let module H = (val c.hash_fun : Hash.T) in
-    let acc = [Hash.to_bytes (hash_file c (Op.Spawn.tool s))] in
-    let acc = hash_op_reads c o acc in
+    let module H = (val r.hash_fun : Hash.T) in
+    let acc = [Hash.to_bytes (hash_file r (Op.Spawn.tool s))] in
+    let acc = hash_op_reads r o acc in
     let acc = stdin_sig (Op.Spawn.stdin s) :: acc in
     let acc = stdo_sig (Op.Spawn.stdout s) :: acc in
     let acc = stdo_sig (Op.Spawn.stderr s) :: acc in
@@ -908,28 +913,28 @@ module Op_cache = struct
     let sg = String.concat "" acc in
     H.string sg
 
-  let hash_write c o w =
-    let module H = (val c.hash_fun : Hash.T) in
+  let hash_write r o w =
+    let module H = (val r.hash_fun : Hash.T) in
     let acc = string_of_int (Op.Write.mode w) :: [Op.Write.salt w] in
-    let acc = hash_op_reads c o acc in
+    let acc = hash_op_reads r o acc in
     let acc = Fpath.to_string (Op.Write.file w) :: acc in (* FIXME *)
     let sg = String.concat "" acc in
     H.string sg
 
-  let hash_op c o = match Op.kind o with
-  | Op.Spawn s -> hash_spawn c o s
-  | Op.Write w -> hash_write c o w
+  let hash_op r o = match Op.kind o with
+  | Op.Spawn s -> hash_spawn r o s
+  | Op.Write w -> hash_write r o w
   | Op.Read _ | Op.Mkdir _ | Op.Wait_files -> Hash.nil
 
-  let set_op_hash c o = try Ok (Op.set_hash o (hash_op c o)) with
+  let set_op_hash r o = try Ok (Op.set_hash o (hash_op r o)) with
   | Failure e -> Result.error e
 
   let op_cache_key o = Hash.to_hex (Op.hash o)
 
-  let revive_spawn c o s =
+  let revive_spawn r o s =
     let writes = Op.writes o in
     let key = op_cache_key o in
-    Result.bind (File_cache.revive c.cache key writes) @@ function
+    Result.bind (File_cache.revive r.cache key writes) @@ function
     | None -> Ok None
     | Some (m, existed) ->
         Result.bind (Conv.of_bin spawn_meta_conv m) @@
@@ -940,43 +945,42 @@ module Op_cache = struct
         Op.Spawn.set_result s result;
         Ok (Some existed)
 
-  let revive_write c o w =
+  let revive_write r o w =
     let writes = Op.writes o in
     let key = op_cache_key o in
-    Result.bind (File_cache.revive c.cache key writes) @@ function
+    Result.bind (File_cache.revive r.cache key writes) @@ function
     | None -> Ok None
     | Some (_, existed) ->
         Op.set_exec_revived o true;
         Op.set_status o Op.Executed;
         Ok (Some existed)
 
-  let revive c o =
-    Op.set_exec_start_time o (timestamp c);
-    let r = match Op.kind o with
-    | Op.Spawn s -> revive_spawn c o s
-    | Op.Write w -> revive_write c o w
+  let revive r o =
+    Op.set_exec_start_time o (timestamp r);
+    let ret = match Op.kind o with
+    | Op.Spawn s -> revive_spawn r o s
+    | Op.Write w -> revive_write r o w
     | Op.Read _ | Op.Mkdir _ | Op.Wait_files -> Ok None
     in
-    Op.set_exec_end_time o (timestamp c);
-    r
+    Op.set_exec_end_time o (timestamp r);
+    ret
 
-  let add_spawn c o s =
+  let record_spawn r o s =
     let spawn_meta = Op.Spawn.stdo_ui s, Op.Spawn.result s in
-    match Conv.to_bin ~buf:c.buffer spawn_meta_conv spawn_meta with
+    match Conv.to_bin ~buf:r.buffer spawn_meta_conv spawn_meta with
     | Error _ as e -> e
-    | Ok m -> File_cache.add c.cache (op_cache_key o) m (Op.writes o)
+    | Ok m -> File_cache.add r.cache (op_cache_key o) m (Op.writes o)
 
-  let add_write c o w =
-    File_cache.add c.cache (op_cache_key o) "" (Op.writes o)
+  let record_write r o w =
+    File_cache.add r.cache (op_cache_key o) "" (Op.writes o)
 
-  let add c o = match Op.kind o with
-  | Op.Spawn s -> add_spawn c o s
-  | Op.Write w -> add_write c o w
+  let record r o = match Op.kind o with
+  | Op.Spawn s -> record_spawn r o s
+  | Op.Write w -> record_write r o w
   | Op.Read _ | Op.Mkdir _ | Op.Wait_files -> Ok true
 
-  let hash_fun c = c.hash_fun
-  let file_hashes c = c.file_hashes
-  let file_hash_dur c = c.file_hash_dur
+  let file_hashes r = r.file_hashes
+  let file_hash_dur r = r.file_hash_dur
 end
 
 module Guard = struct
@@ -1523,7 +1527,7 @@ module Memo = struct
       cwd : Fpath.t;
       env : Env.t ;
       guard : Guard.t;
-      cache : Op_cache.t;
+      reviver : Reviver.t;
       exec : Exec.t;
       futs : Futs.t;
       mutable op_id : int;
@@ -1534,14 +1538,14 @@ module Memo = struct
       mutable konts : (t -> Op.t -> unit) Op.Map.t;
       mutable ops : Op.t list; }
 
-  let create ?clock ?cpu_clock:cc ~feedback ~cwd env guard cache exec =
+  let create ?clock ?cpu_clock:cc ~feedback ~cwd env guard reviver exec =
     let clock = match clock with None -> Time.counter () | Some c -> c in
     let cpu_clock = match cc with None -> Time.cpu_counter () | Some c -> c in
     let futs = Futs.create () in
     let op_id = 0 in
     let konts = Op.Map.empty in
     let ops = [] in
-    { clock; cpu_clock; feedback; cwd; env; guard; cache; exec; futs;
+    { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec; futs;
       op_id; konts; ops; }
 
   let memo ?hash_fun ?env ?cwd ?cachedir ?(max_spawn = 4) ?feedback () =
@@ -1570,17 +1574,17 @@ module Memo = struct
     Result.bind (File_cache.create ~feedback:fb_cache cachedir) @@ fun c ->
     let env = Env.v env in
     let guard = Guard.create () in
-    let cache = Op_cache.create ~clock ?hash_fun c in
+    let reviver = Reviver.create ~clock ?hash_fun c in
     let exec = Exec.create ~clock ~feedback:fb_exec ~max_spawn () in
-    Ok (create ~clock ~feedback:fb_memo ~cwd env guard cache exec)
+    Ok (create ~clock ~feedback:fb_memo ~cwd env guard reviver exec)
 
   let clock m = m.clock
   let cpu_clock m = m.cpu_clock
   let env m = m.env
-  let op_cache m = m.cache
+  let reviver m = m.reviver
   let guard m = m.guard
   let exec m = m.exec
-  let hash_fun m = Op_cache.hash_fun m.cache
+  let hash_fun m = Reviver.hash_fun m.reviver
   let ops m = m.ops
   let timestamp m = Time.count m.clock
   let new_op_id m = let id = m.op_id in m.op_id <- id + 1; id
@@ -1615,7 +1619,7 @@ module Memo = struct
           | fs -> Op.set_status o Op.Failed; discontinue_op m o fs
           end
       | false ->
-          match Op_cache.add m.cache o with
+          match Reviver.record m.reviver o with
           | Ok true -> continue_op m o
           | Ok false ->
               Op.set_status o Op.Failed;
@@ -1633,7 +1637,7 @@ module Memo = struct
   let submit_op m o = match Op.status o with
   | Op.Aborted -> finish_op m o
   | Op.Waiting ->
-      begin match Op_cache.set_op_hash m.cache o with
+      begin match Reviver.set_op_hash m.reviver o with
       | Error e ->
           (* FIXME Does this report errors cleanly ? We really want to
              be able to say which reads were supposed to be there and are not *)
@@ -1641,7 +1645,7 @@ module Memo = struct
           Op.set_status o Op.Aborted;
           finish_op m o
       | Ok () ->
-          begin match Op_cache.revive m.cache o with
+          begin match Reviver.revive m.reviver o with
           | Ok None -> Exec.submit m.exec o
           | Ok (Some _) -> finish_op m o
           | Error e -> m.feedback (`Op_cache_error (o, e)); Exec.submit m.exec o

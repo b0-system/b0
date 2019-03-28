@@ -52,9 +52,9 @@ open B0_std
     file {e contents} (filenames are irrelevant).
 
     [B0] uses file caches to capture the contents of files written by
-    build operations, it also stores their exit code and standard
-    outputs in the metadata. This allows to recreate the effect of a
-    build operation without having to rerun it.
+    build operations and stores additional build operation output in
+    the metadata. This allows to recreate the effect of a build
+    operation without having to rerun it.
 
     {b FIXME.} The following notions use the file system information
     and can be inaccurate. It's a bit unclear whether it's a good idea
@@ -596,39 +596,60 @@ module Op : sig
   module Map : Map.S with type key := t
 end
 
-(** Operation cache.
+(** Build operation revivers.
 
-    An operation cache combines a {{!File_cache}file cache} and a
-    {{!B0_std.Hash.T}hash function} to memoize {{!Op}build operations}.
+    An operation reviver combines a {{!File_cache}file cache} and a
+    {{!B0_std.Hash.T}hash function} to record the effect of
+    {{!Op}build operations}.
 
     {b Note.} File hashes performed by this module are
     {{!file_hashes}cached}. *)
-module Op_cache : sig
+module Reviver : sig
 
-  (** {1:cache Build operation cache} *)
+  (** {1:reviver Operation reviver} *)
 
   type t
-  (** The type for build operation caches. *)
+  (** The type for build operation revivers. *)
 
   val create :
     ?clock:Time.counter -> ?hash_fun:(module Hash.T) -> File_cache.t -> t
-  (** [create ~clock ~hash_fun c] is an operation cache with
+  (** [create ~clock ~hash_fun c] is a reviver with
       {ul
-      {- [c] the file cache used to memoize build operations}
+      {- [c] the file cache used to record build operations}
       {- [hash_fun] the hash function used to hash files and
          build operations; defaults to {!B0_std.Hash.Xxh_64}}
       {- [clock] the clock used to {{!file_hash_dur}measure} file hashing
          time and {{!Op.set_exec_start_time}timestamp} revived operations
          defaults to {!B0_std.Time.counter}[ ()].}} *)
 
+  val clock : t -> Time.counter
+  (** [clock r] is [r]'s clock. *)
+
+  val hash_fun : t -> (module Hash.T)
+  (** [hash_fun r] is [r]'s hash function. *)
+
+  val file_cache : t -> File_cache.t
+  (** [file_cache r] is [r]'s file cache. *)
+
+  (** {1:record_and_revive Recoding and reviving operations.} *)
+
   val set_op_hash : t -> Op.t -> (unit, string) result
-  (** [set_op_hash t o] hashes the operation [o] and stores the result
+  (** [set_op_hash r o] hashes the operation [o] and stores the result
       in [o] with {!Op.set_hash}. Errors if an input file of the
       operation can't be hashed. *)
 
+  val record : t -> Op.t -> (bool, string) result
+  (** [record r o] records operation [o] in the reviver [r]. This
+      associates the [Op.writes o] of [o] to the key [Op.hash o] and
+      stores operation output information of [o] in the key's metadata
+      hunk. The semantics of the result is like {!File_cache.add}; in
+      particular in case of [Ok false] it means some file in the set
+      of writes do not exist and is likely an error. *)
+
   val revive : t -> Op.t -> (Fpath.t list option, string) result
-  (** [revive c o] tries to revive operation [o] from the file cache
-      using the key [Op.hash o]. In particular:
+  (** [revive r o] tries to revive operation [o] from [r] using the key
+      [Op.hash o] (i.e. this function assume [o] has gone through
+      {!set_op_hash} before. In particular:
       {ol
       {- Recreates the files [Op.writes o]}
       {- Sets [o]'s execution information using the metadata hunk
@@ -643,16 +664,7 @@ module Op_cache : sig
       {b Warning.} In any case the fields {!Op.exec_start_time},
       {!Op.exec_end_time} of [o] get set. *)
 
-  val add : t -> Op.t -> (bool, string) result
-  (** [add c o] adds operation [o] to the cache. This associates the
-      [Op.writes o] of [o] to the key [Op.hash o] and stores execution
-      information of [o] in the key's metadata hunk. The semantics of
-      the result is like {!File_cache.add}; in particular in case of
-      [Ok false] it means some file in the set of writes do not exist
-      and is likely an error. *)
-
-  val hash_fun : t -> (module Hash.T)
-  (** [hash_fun c] is the hash function used by the operation cache. *)
+  (** {1:file_hash File hash statistics} *)
 
   val file_hashes : t -> Hash.t Fpath.Map.t
   (** [file_hashes c] is a map of the files that were hashed. *)
@@ -683,7 +695,7 @@ module Guard : sig
       {- [`File_status_repeat f] indicates that the file status of [f]
          was set more than once.}
       {- [`File_status_unstable f] indicates that the file status of [f]
-         was set more than once and in an inconsistent manner}} *)
+         was set more than once and in an inconsistent manner.}} *)
 
   type t
   (** The type for build operations guards. *)
@@ -950,7 +962,7 @@ module Memo : sig
     ?cpu_clock:Time.cpu_counter ->
     feedback:(feedback -> unit) ->
     cwd:Fpath.t ->
-    Env.t -> Guard.t -> Op_cache.t -> Exec.t -> t
+    Env.t -> Guard.t -> Reviver.t -> Exec.t -> t
 
   val memo :
     ?hash_fun:(module B0_std.Hash.T) ->
@@ -978,8 +990,8 @@ module Memo : sig
   val env : t -> Env.t
   (** [env m] is [m]'s environment. *)
 
-  val op_cache : t -> Op_cache.t
-  (** [op_cache m] is [m]'s operation cache. *)
+  val reviver : t -> Reviver.t
+  (** [reviver m] is [m]'s reviver. *)
 
   val guard : t -> Guard.t
   (** [guard m] is [m]'s guard. *)
