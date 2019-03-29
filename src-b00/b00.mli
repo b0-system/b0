@@ -51,10 +51,10 @@ open B0_std
     A file cache maps a key to a metadata hunk and an ordered list of
     file {e contents} (filenames are irrelevant).
 
-    [B0] uses file caches to capture the contents of files written by
-    build operations and stores additional build operation output in
-    the metadata. This allows to recreate the effect of a build
-    operation without having to rerun it.
+    File caches are used to capture the contents of files written by
+    build operations and store their additional output in the
+    metadata. This allows to recreate the effect of a build operation
+    without having to rerun it.
 
     {b FIXME.} The following notions use the file system information
     and can be inaccurate. It's a bit unclear whether it's a good idea
@@ -77,7 +77,7 @@ module File_cache : sig
   (** The type for file cache feedback. See {!create}. *)
 
   val pp_feedback : feedback Fmt.t
-  (** [pp_feedback] formats file caches feedback. *)
+  (** [pp_feedback] formats file cache feedback. *)
 
   type key = string
   (** The type for keys. A key maps to a metadata hunk and an ordered
@@ -246,6 +246,70 @@ end
     result of their execution. No execution or caching logic lives here. *)
 module Op : sig
 
+  (** {1:op_status Operation status} *)
+
+  type status =
+  | Waiting  (** Waiting for execution. *)
+  | Executed (** Executed successfully. *)
+  | Failed   (** Executed unsuccessfully. *)
+  | Aborted  (** Aborted due to prerequisite failure. *)
+  (** The type for operation statuses. *)
+
+  val pp_status : status Fmt.t
+  (** [pp_status] formats execution status. *)
+
+  (** {1:op Operations} *)
+
+  type id = int
+  (** The type for build operation identifiers. *)
+
+  type t
+  (** The type for build operations. *)
+
+  type op = t
+  (** Again. *)
+
+  val id : t -> id
+  (** [id o] is the identifier of operation [o]. *)
+
+  val creation_time : t -> Time.span
+  (** [creation_time o] is [o]'s creation time. *)
+
+  val exec_start_time : t -> Time.span
+  (** [exec_start_time o] is [o]'s execution start time. This is
+      different from {!B0_std.Time.Span.zero} once the operation has
+      been submitted for execution. *)
+
+  val exec_end_time : t -> Time.span
+  (** [exec_end_time o] is [o]'s execution end time. This is different
+      from {!B0_std.Time.Span.zero} once the operation has been completed
+      and collected. *)
+
+  val exec_duration : t -> Time.span
+  (** [exec_duration] is the difference between {!exec_end_time} and
+      {!exec_start_time}. *)
+
+  val exec_revived : t -> bool
+  (** [exec_revived o] is [true] iff [o] was revived from a cache. *)
+
+  val status : t -> status
+  (** [status o] is [o] execution status. *)
+
+  val reads : t -> Fpath.t list
+  (** [reads o] are the file paths read by the operation. *)
+
+  val writes : t -> Fpath.t list
+  (** [writes o] are the file paths written by [o]. *)
+
+  val did_not_write : t -> Fpath.t list
+  (** [did_not_write o] compares {!writes} with the current state
+      of the file system and reports those files that do not exist on it.  *)
+
+  val hash : t -> Hash.t
+  (** [hash o] is the operation's hash. This is {!Hash.nil} before the
+      operation hash has been effectively computed and set via
+      {!set_hash}. *)
+
   (** {1:op_kind Operations kinds} *)
 
   (** Tool spawns. *)
@@ -270,6 +334,19 @@ module Op : sig
 
     type t
     (** The type for process spawn operations. *)
+
+    val v :
+      id:id -> Time.span -> reads:Fpath.t list -> writes:Fpath.t list ->
+      env:Os.Env.assignments -> relevant_env:Os.Env.assignments ->
+      cwd:Fpath.t -> stdin:Fpath.t option -> stdout:stdo ->
+      stderr:stdo -> success_exits:success_exits ->
+      Cmd.tool -> Cmd.t -> op
+    (** [spawn] declares a spawn build operation, see the corresponding
+        accessors in {!Spawn} for the semantics of the various fields. *)
+
+    val get : op -> t
+    (** [get o] is the spawn [o]. @raise Invalid_argument if [o] is
+        not a spawn. *)
 
     val env : t -> Os.Env.assignments
     (** [env s] is the environment in which [s] runs. *)
@@ -342,6 +419,14 @@ module Op : sig
     type t
     (** The type for file read operations. *)
 
+    val v : id:id -> Time.span -> Fpath.t -> op
+    (** [v] declares a file read operation, see the corresponding
+        accessors in {!Read} for the semantics of the various fields. *)
+
+    val get : op -> t
+    (** [get_read o] is the read [o]. @raise Invalid_argument if [o]
+        is not a read. *)
+
     val file : t -> Fpath.t
     (** [file r] is the file read by [r]. *)
 
@@ -367,6 +452,16 @@ module Op : sig
 
     type t
     (** The type for file write operations. *)
+
+    val v :
+      id:id -> Time.span -> salt:string -> reads:Fpath.t list ->
+      mode:int -> write:Fpath.t -> (unit -> (string, string) result) -> op
+    (** [write] declares a file write operations, see the corresponding
+        accessors in {!Write} for the semantics of the various fields. *)
+
+    val get : op -> t
+    (** [geo o] is the write [o]. @raise Invalid_argument if [o] is
+        not a write. *)
 
     val salt : t -> string
     (** [salt w] is the file write salt used for caching. *)
@@ -403,6 +498,15 @@ module Op : sig
     type t
     (** The type for directory creation operations. *)
 
+    val v : id:id -> Time.span -> Fpath.t -> op
+    (** [v] declares a directory creation operation, see the
+        corresponding accessors for the semantics of the various
+        fields. *)
+
+    val get : op -> t
+    (** [get o] is the mkdir [o]. @raise Invalid_argument if [o] is not
+        a mkdir. *)
+
     val dir : t -> Fpath.t
     (** [dir mk] is the directory created by [mk]. *)
 
@@ -421,6 +525,12 @@ module Op : sig
     (** [pp] formats directory creations. *)
   end
 
+  module Wait_files : sig
+    val v : id:id -> Time.span -> Fpath.t list -> t
+    (** [v] declares a wait files operation, these are stored in
+        {!reads}. *)
+  end
+
   type kind =
   | Spawn of Spawn.t
   | Read of Read.t
@@ -432,85 +542,8 @@ module Op : sig
   val kind_name : kind -> string
   (** [kind_name k] is a end user name for kind [k]. *)
 
-  (** {1:op_status Operation status} *)
-
-  type status =
-  | Waiting  (** Waiting for execution. *)
-  | Executed (** Executed successfully. *)
-  | Failed   (** Executed unsucessfully. *)
-  | Aborted  (** Aborted due to prerequisite failure. *)
-  (** The type for operation statuses. *)
-
-  val pp_status : status Fmt.t
-  (** [pp_status] formats execution status. *)
-
-  (** {1:op Operations} *)
-
-  type id = int
-  (** The type for build operation identifiers. *)
-
-  type t
-  (** The type for build operations. *)
-
-  val id : t -> id
-  (** [id o] is the identifier of operation [o]. *)
-
-  val creation_time : t -> Time.span
-  (** [creation_time o] is [o]'s creation time. *)
-
-  val exec_start_time : t -> Time.span
-  (** [exec_start_time o] is [o]'s execution start time. This is
-      different from {!B0_std.Time.Span.zero} once the operation has
-      been submitted for execution. *)
-
-  val exec_end_time : t -> Time.span
-  (** [exec_end_time o] is [o]'s execution end time. This is different
-      from {!B0_std.Time.Span.zero} once the operation has been completed
-      and collected. *)
-
-  val exec_duration : t -> Time.span
-  (** [exec_duration] is the difference between {!exec_end_time} and
-      {!exec_start_time}. *)
-
-  val exec_revived : t -> bool
-  (** [exec_revived o] is [true] iff [o] was revived from a cache. *)
-
-  val status : t -> status
-  (** [status o] is [o] execution status. *)
-
-  val reads : t -> Fpath.t list
-  (** [reads o] are the file paths read by the operation. *)
-
-  val writes : t -> Fpath.t list
-  (** [writes o] are the file paths written by [o]. *)
-
-  val did_not_write : t -> Fpath.t list
-  (** [did_not_write o] compares {!writes} with the current state
-      of the file system and reports those files that do not exist on it.  *)
-
-  val hash : t -> Hash.t
-  (** [hash o] is the operation's hash. This is {!Hash.nil} before the
-      operation hash has been effectively computed and set via
-      {!set_hash}. *)
-
   val kind : t -> kind
   (** [kind o] is [o]'s kind. *)
-
-  val get_spawn : t -> Spawn.t
-  (** [get_spawn o] is the spawn [o]. @raise Invalid_argument if [o]
-      is not a spawn. *)
-
-  val get_read : t -> Read.t
-  (** [get_read o] is the read [o]. @raise Invalid_argument if [o]
-      is not a read. *)
-
-  val get_write : t -> Write.t
-  (** [get_write o] is the write [o]. @raise Invalid_argument if [o]
-      is not a write. *)
-
-  val get_mkdir : t -> Mkdir.t
-  (** [get_mkdir o] is the mkdir [o]. @raise Invalid_argument if [o]
-      is not a mkdir. *)
 
   val equal : t -> t -> bool
   (** [equal o0 o1] is [id o0 = id o1]. *)
@@ -557,35 +590,6 @@ module Op : sig
 
   val set_hash : t -> Hash.t -> unit
   (** [set_hash o h] sets the operation hash to [h]. *)
-
-  (** {1:op_constr Operation contructors} *)
-
-  val spawn :
-    id:id -> Time.span -> reads:Fpath.t list -> writes:Fpath.t list ->
-    env:Os.Env.assignments -> relevant_env:Os.Env.assignments ->
-    cwd:Fpath.t -> stdin:Fpath.t option -> stdout:Spawn.stdo ->
-    stderr:Spawn.stdo -> success_exits:Spawn.success_exits ->
-    Cmd.tool -> Cmd.t -> t
-  (** [spawn] declares a spawn build operation, see the corresponding
-      accessors in {!Spawn} for the semantics of the various fields. *)
-
-  val read : id:id -> Time.span -> Fpath.t -> t
-  (** [read] declares a file read operation, see the corresponding
-        accessors in {!Read} for the semantics of the various fields. *)
-
-  val write :
-    id:id -> Time.span -> salt:string -> reads:Fpath.t list ->
-    mode:int -> write:Fpath.t -> (unit -> (string, string) result) -> t
-  (** [write] declares a file write operations, see the corresponding
-      accessors in {!Write} for the semantics of the various fields. *)
-
-  val mkdir : id:id -> Time.span -> Fpath.t -> t
-  (** [mkdir] declares a directory creation operation, see the corresponding
-      accessors for the semantics of the various fields. *)
-
-  val wait_files : id:id -> Time.span -> Fpath.t list -> t
-  (** [wait_files] declares a wait files operation, these are stored
-      in {!reads}. *)
 
   (** {1:set_map Operation sets and map} *)
 

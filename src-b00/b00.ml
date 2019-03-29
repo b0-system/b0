@@ -500,21 +500,129 @@ module Op = struct
   let pp_file_contents = Fmt.elided_string ~max:150
   let pp_error_msg ppf e = Fmt.pf ppf "@[error: %s@]" e
 
+  type spawn_stdo = [ `Ui | `File of Fpath.t | `Tee of Fpath.t ]
+  type spawn_success_exits = int list
+  type spawn =
+    { env : Os.Env.assignments;
+      relevant_env : Os.Env.assignments;
+      cwd : Fpath.t;
+      stdin : Fpath.t option;
+      stdout : spawn_stdo;
+      stderr : spawn_stdo;
+      success_exits : spawn_success_exits;
+      tool : Cmd.tool;
+      args : Cmd.t;
+      mutable stdo_ui : (string, string) result option;
+      mutable spawn_result  : (Os.Cmd.status, string) result; }
+
+  type read =
+    { read_file : Fpath.t;
+      mutable read_result : (string, string) result; }
+
+  type write =
+    { write_salt : string;
+      write_mode : int;
+      write_file : Fpath.t;
+      write_data : unit -> (string, string) result;
+      mutable write_result : (unit, string) result; }
+
+  type mkdir =
+    { mkdir_dir : Fpath.t;
+      mutable mkdir_result : (unit, string) result; }
+
+  (* Operations *)
+
+  type kind =
+  | Spawn of spawn
+  | Read of read
+  | Write of write
+  | Mkdir of mkdir
+  | Wait_files
+
+  let kind_name = function
+  | Spawn _ -> "spawn"
+  | Read  _ -> "read"
+  | Write _ -> "write"
+  | Mkdir _ -> "mkdir"
+  | Wait_files -> "wait-files"
+
+  type status = Waiting | Executed | Failed | Aborted
+
+  let pp_status ppf v = Fmt.string ppf @@ match v with
+  | Waiting -> "waiting" | Executed -> "executed"
+  | Failed -> "failed" | Aborted -> "aborted"
+
+  type id = int
+  type t =
+    { id : id;
+      creation_time : Time.span;
+      mutable exec_start_time : Time.span;
+      mutable exec_end_time : Time.span;
+      mutable exec_revived : bool;
+      mutable status : status;
+      mutable reads : Fpath.t list;
+      mutable writes : Fpath.t list;
+      mutable hash : Hash.t;
+      kind : kind }
+
+  type op = t
+
+  let v ~id creation_time ~reads ~writes kind =
+    let exec_start_time = Time.Span.zero in
+    let exec_end_time = Time.Span.zero in
+    let exec_revived = false in
+    let status = Waiting in
+    let hash = Hash.nil in
+    { id; creation_time; exec_start_time; exec_end_time; exec_revived; status;
+      reads; writes; hash; kind; }
+
+  let id o = o.id
+  let creation_time o = o.creation_time
+  let exec_start_time o = o.exec_start_time
+  let exec_end_time o = o.exec_end_time
+  let exec_revived o = o.exec_revived
+  let exec_duration o = Time.Span.abs_diff o.exec_end_time o.exec_start_time
+  let status o = o.status
+  let reads o = o.reads
+  let writes o = o.writes
+  let did_not_write o =
+    let rec loop acc = function
+    | [] -> List.sort Fpath.compare acc
+    | f :: fs ->
+        match Unix.access (Fpath.to_string f) [Unix.F_OK] with
+        | exception Unix.Unix_error _ -> loop (f :: acc) fs
+        | () -> loop acc fs
+    in
+    loop [] o.writes
+
+  let hash o = o.hash
+  let equal o0 o1 = o0.id = o1.id
+  let compare o0 o1 = (Pervasives.compare : int -> int -> int) o0.id o1.id
+  let set_exec_start_time o t = o.exec_start_time <- t
+  let set_exec_end_time o t = o.exec_end_time <- t
+  let set_exec_revived o b = o.exec_revived <- b
+  let set_status o s = o.status <- s
+  let set_reads o fs = o.hash <- Hash.nil; o.reads <- fs
+  let set_writes o fs = o.writes <- fs
+  let set_hash o h = o.hash <- h
+  let kind o = o.kind
+
   module Spawn = struct
-    type stdo = [ `Ui | `File of Fpath.t | `Tee of Fpath.t ]
-    type success_exits = int list
-    type t =
-      { env : Os.Env.assignments;
-        relevant_env : Os.Env.assignments;
-        cwd : Fpath.t;
-        stdin : Fpath.t option;
-        stdout : stdo;
-        stderr : stdo;
-        success_exits : success_exits;
-        tool : Cmd.tool;
-        args : Cmd.t;
-        mutable stdo_ui : (string, string) result option;
-        mutable result  : (Os.Cmd.status, string) result; }
+    type stdo = spawn_stdo
+    type success_exits = spawn_success_exits
+    type t = spawn
+
+    let v
+        ~id creation_time ~reads ~writes ~env ~relevant_env ~cwd ~stdin ~stdout
+        ~stderr ~success_exits tool args
+      =
+      let spawn =
+        { env; relevant_env; cwd; stdin; stdout; stderr; success_exits;
+          tool; args; stdo_ui = None; spawn_result = Error "not spawned" }
+      in
+      v ~id creation_time ~reads ~writes (Spawn spawn)
+
+    let get o = match o.kind with Spawn s -> s | _ -> assert false
 
     let env s = s.env
     let relevant_env s = s.relevant_env
@@ -527,8 +635,8 @@ module Op = struct
     let args s = s.args
     let stdo_ui s = s.stdo_ui
     let set_stdo_ui s ui = s.stdo_ui <- ui
-    let result s = s.result
-    let set_result s e = s.result <- e
+    let result s = s.spawn_result
+    let set_result s e = s.spawn_result <- e
 
     (* Formatting *)
 
@@ -583,89 +691,95 @@ module Op = struct
       Fmt.field "stdout" pp_stdo ppf s.stdout; Fmt.cut ppf ();
       Fmt.field "stderr" pp_stdo ppf s.stderr; Fmt.cut ppf ();
       Fmt.field "stdo-ui" (pp_stdo_ui ~elide:false) ppf s; Fmt.cut ppf ();
-      Fmt.field "result" pp_result ppf s.result;
+      Fmt.field "result" pp_result ppf s.spawn_result;
       ()
   end
 
   module Read = struct
-    type t =
-      { file : Fpath.t;
-        mutable result : (string, string) result; }
+    type t = read
 
-    let file r = r.file
-    let result r = r.result
-    let set_result r res = r.result <- res
+    let v ~id creation_time file =
+      let read = { read_file = file; read_result = Error "not read" } in
+      v ~id creation_time ~reads:[file] ~writes:[] (Read read)
+
+    let get o = match o.kind with Read r -> r | _ -> assert false
+    let file r = r.read_file
+    let result r = r.read_result
+    let set_result r res = r.read_result <- res
 
     let pp_result ppf = function
     | Error e -> pp_error_msg ppf e
     | Ok d -> pp_file_contents ppf d
 
     let pp ppf r =
-      Fmt.field "file" Fpath.pp_quoted ppf r.file; Fmt.cut ppf ();
-      Fmt.field "result" pp_result ppf r.result; Fmt.cut ppf ();
+      Fmt.field "file" Fpath.pp_quoted ppf r.read_file; Fmt.cut ppf ();
+      Fmt.field "result" pp_result ppf r.read_result; Fmt.cut ppf ();
       ()
   end
 
   module Write = struct
-    type t =
-      { salt : string;
-        mode : int;
-        file : Fpath.t;
-        data : unit -> (string, string) result;
-        mutable result : (unit, string) result; }
+    type t = write
 
-    let salt w = w.salt
-    let mode w = w.mode
-    let file w = w.file
-    let data w = w.data
-    let result w = w.result
-    let set_result w res = w.result <- res
+    let v
+        ~id creation_time ~salt:write_salt ~reads ~mode:write_mode
+        ~write:write_file write_data
+      =
+      let write_result = Error "not written" in
+      let w = {write_salt; write_mode; write_file; write_data; write_result} in
+      v ~id creation_time ~reads ~writes:[write_file] (Write w)
+
+    let get o = match o.kind with Write r -> r | _ -> assert false
+
+    let salt w = w.write_salt
+    let mode w = w.write_mode
+    let file w = w.write_file
+    let data w = w.write_data
+    let result w = w.write_result
+    let set_result w res = w.write_result <- res
 
     let pp_result ppf = function
     | Error e -> pp_error_msg ppf e
     | Ok () -> Fmt.string ppf "written"
 
     let pp ppf w =
-      Fmt.field "file" Fpath.pp_quoted ppf w.file; Fmt.cut ppf ();
-      Fmt.field "mode" Fmt.int ppf w.mode; Fmt.cut ppf ();
-      Fmt.field "result" pp_result ppf w.result;
+      Fmt.field "file" Fpath.pp_quoted ppf w.write_file; Fmt.cut ppf ();
+      Fmt.field "mode" Fmt.int ppf w.write_mode; Fmt.cut ppf ();
+      Fmt.field "result" pp_result ppf w.write_result;
       ()
   end
 
   module Mkdir = struct
-    type t =
-      { dir : Fpath.t;
-        mutable result : (unit, string) result; }
+    type t = mkdir
 
-    let dir mk = mk.dir
-    let result mk = mk.result
-    let set_result mk res = mk.result <- res
+    let get o = match o.kind with Mkdir mk -> mk | _ -> assert false
+    let v ~id creation_time dir =
+      let mkdir = { mkdir_dir = dir; mkdir_result = Error "not created" } in
+      v ~id creation_time ~reads:[] ~writes:[dir] (Mkdir mkdir)
+
+    let dir mk = mk.mkdir_dir
+    let result mk = mk.mkdir_result
+    let set_result mk res = mk.mkdir_result <- res
 
     let pp_result ppf = function
     | Error e -> pp_error_msg ppf e
     | Ok () -> Fmt.string ppf "created"
 
     let pp ppf m =
-      Fmt.field "dir" Fpath.pp_quoted ppf m.dir; Fmt.cut ppf ();
-      Fmt.field "result" pp_result ppf m.result;
+      Fmt.field "dir" Fpath.pp_quoted ppf m.mkdir_dir; Fmt.cut ppf ();
+      Fmt.field "result" pp_result ppf m.mkdir_result;
       ()
   end
 
-  (* Operations *)
+  module Wait_files = struct
+    let v ~id creation_time reads =
+      v ~id creation_time ~reads ~writes:[] Wait_files
+  end
 
-  type kind =
-  | Spawn of Spawn.t
-  | Read of Read.t
-  | Write of Write.t
-  | Mkdir of Mkdir.t
-  | Wait_files
+  module T = struct type nonrec t = t let compare = compare end
+  module Set = Set.Make (T)
+  module Map = Map.Make (T)
 
-  let kind_name = function
-  | Spawn _ -> "spawn"
-  | Read  _ -> "read"
-  | Write _ -> "write"
-  | Mkdir _ -> "mkdir"
-  | Wait_files -> "wait-files"
+  (* Formatting *)
 
   let pp_kind ppf = function
   | Spawn s -> Spawn.pp ppf s
@@ -680,99 +794,6 @@ module Op = struct
   | Write w -> Fpath.pp_quoted ppf (Write.file w)
   | Mkdir m -> Fpath.pp_quoted ppf (Mkdir.dir m)
   | Wait_files -> ()
-
-  type status = Waiting | Executed | Failed | Aborted
-
-  let pp_status ppf v = Fmt.string ppf @@ match v with
-  | Waiting -> "waiting" | Executed -> "executed"
-  | Failed -> "failed" | Aborted -> "aborted"
-
-  type id = int
-  type t =
-    { id : id;
-      creation_time : Time.span;
-      mutable exec_start_time : Time.span;
-      mutable exec_end_time : Time.span;
-      mutable exec_revived : bool;
-      mutable status : status;
-      mutable reads : Fpath.t list;
-      mutable writes : Fpath.t list;
-      mutable hash : Hash.t;
-      kind : kind }
-
-  let v ~id creation_time ~reads ~writes kind =
-    let exec_start_time = Time.Span.zero in
-    let exec_end_time = Time.Span.zero in
-    let exec_revived = false in
-    let status = Waiting in
-    let hash = Hash.nil in
-    { id; creation_time; exec_start_time; exec_end_time; exec_revived; status;
-      reads; writes; hash; kind; }
-
-  let id o = o.id
-  let creation_time o = o.creation_time
-  let exec_start_time o = o.exec_start_time
-  let exec_end_time o = o.exec_end_time
-  let exec_revived o = o.exec_revived
-  let exec_duration o = Time.Span.abs_diff o.exec_end_time o.exec_start_time
-  let status o = o.status
-  let reads o = o.reads
-  let writes o = o.writes
-  let did_not_write o =
-    let rec loop acc = function
-    | [] -> List.sort Fpath.compare acc
-    | f :: fs ->
-        match Unix.access (Fpath.to_string f) [Unix.F_OK] with
-        | exception Unix.Unix_error _ -> loop (f :: acc) fs
-        | () -> loop acc fs
-    in
-    loop [] o.writes
-
-  let hash o = o.hash
-  let equal o0 o1 = o0.id = o1.id
-  let compare o0 o1 = (Pervasives.compare : int -> int -> int) o0.id o1.id
-  let set_exec_start_time o t = o.exec_start_time <- t
-  let set_exec_end_time o t = o.exec_end_time <- t
-  let set_exec_revived o b = o.exec_revived <- b
-  let set_status o s = o.status <- s
-  let set_reads o fs = o.hash <- Hash.nil; o.reads <- fs
-  let set_writes o fs = o.writes <- fs
-  let set_hash o h = o.hash <- h
-  let kind o = o.kind
-  let get_spawn o = match o.kind with Spawn s -> s | _ -> assert false
-  let get_read o = match o.kind with Read r -> r | _ -> assert false
-  let get_write o = match o.kind with Write r -> r | _ -> assert false
-  let get_mkdir o = match o.kind with Mkdir mk -> mk | _ -> assert false
-  let spawn
-      ~id creation_time ~reads ~writes ~env ~relevant_env ~cwd ~stdin ~stdout
-      ~stderr ~success_exits tool args
-    =
-    let spawn =
-      { Spawn.env; relevant_env; cwd; stdin; stdout; stderr; success_exits;
-        tool; args; stdo_ui = None; result = Error "not spawned" }
-    in
-    v ~id creation_time ~reads ~writes (Spawn spawn)
-
-  let read ~id creation_time file =
-    let read = { Read.file = file; result = Error "not read" } in
-    v ~id creation_time ~reads:[file] ~writes:[] (Read read)
-
-  let write ~id creation_time ~salt ~reads ~mode ~write:file data =
-    let write = { Write.salt; mode; file; data; result = Error "not written"} in
-    v ~id creation_time ~reads ~writes:[file] (Write write)
-
-  let mkdir ~id creation_time dir =
-    let mkdir = { Mkdir.dir = dir; result = Error "not created" } in
-    v ~id creation_time ~reads:[] ~writes:[dir] (Mkdir mkdir)
-
-  let wait_files ~id creation_time reads =
-    v ~id creation_time ~reads ~writes:[] Wait_files
-
-  module T = struct type nonrec t = t let compare = compare end
-  module Set = Set.Make (T)
-  module Map = Map.Make (T)
-
-  (* Formatting *)
 
   let pp_synopsis ppf o =
     let pp_kind ppf k = Fmt.tty_string [`Fg `Green] ppf k in
@@ -819,7 +840,7 @@ module Op = struct
       pp_kind o.kind pp_op o
 
   let pp_spawn_status_fail ppf o =
-    let s = get_spawn o in
+    let s = Spawn.get o in
     Fmt.pf ppf "@[<v>%a@, Illegal exit status: %a expected: %a@, @[<v>%a@]\
                 @, @[<v>%a@]@]"
       pp_synopsis o
@@ -917,14 +938,13 @@ module Reviver = struct
   let file_hashes r = r.file_hashes
   let file_hash_dur r = r.file_hash_dur
 
-
   (* Recording and reviving operations *)
 
-  let op_cache_key o = Hash.to_hex (Op.hash o)
+  let file_cache_key o = Hash.to_hex (Op.hash o)
 
   let revive_spawn r o s =
     let writes = Op.writes o in
-    let key = op_cache_key o in
+    let key = file_cache_key o in
     Result.bind (File_cache.revive r.cache key writes) @@ function
     | None -> Ok None
     | Some (m, existed) ->
@@ -938,7 +958,7 @@ module Reviver = struct
 
   let revive_write r o w =
     let writes = Op.writes o in
-    let key = op_cache_key o in
+    let key = file_cache_key o in
     Result.bind (File_cache.revive r.cache key writes) @@ function
     | None -> Ok None
     | Some (_, existed) ->
@@ -960,10 +980,10 @@ module Reviver = struct
     let spawn_meta = Op.Spawn.stdo_ui s, Op.Spawn.result s in
     match Conv.to_bin ~buf:r.buffer spawn_meta_conv spawn_meta with
     | Error _ as e -> e
-    | Ok m -> File_cache.add r.cache (op_cache_key o) m (Op.writes o)
+    | Ok m -> File_cache.add r.cache (file_cache_key o) m (Op.writes o)
 
   let record_write r o w =
-    File_cache.add r.cache (op_cache_key o) "" (Op.writes o)
+    File_cache.add r.cache (file_cache_key o) "" (Op.writes o)
 
   let record r o = match Op.kind o with
   | Op.Spawn s -> record_spawn r o s
@@ -1172,7 +1192,7 @@ module Exec = struct
       | `Tee f0, `Tee f1 -> ret @@ append f0 f1
       | `Tee f, `File _ | `File _, `Tee f -> ret @@ Os.File.read f
     in
-    let s = Op.get_spawn o in
+    let s = Op.Spawn.get o in
     let status = match result with
     | Error _ | Ok (`Signaled _) -> Op.Failed
     | Ok (`Exited c) ->
@@ -1222,7 +1242,7 @@ module Exec = struct
     in
     incr_spawn_count e;
     Op.set_exec_start_time o (timestamp e);
-    spawn (Op.get_spawn o)
+    spawn (Op.Spawn.get o)
 
   let exec_read e o r =
     Op.set_exec_start_time o (timestamp e);
@@ -1691,23 +1711,23 @@ module Memo = struct
     Guard.set_file_ready m.guard p
 
   let read m file k =
-    let o = Op.read ~id:(new_op_id m) (timestamp m) file in
-    let k m o = k (Result.get_ok @@ Op.Read.result (Op.get_read o)) in
+    let o = Op.Read.v ~id:(new_op_id m) (timestamp m) file in
+    let k m o = k (Result.get_ok @@ Op.Read.result (Op.Read.get o)) in
     add_op_kont m o k; add_op m o
 
   let wait_files m files k =
-    let o = Op.wait_files ~id:(new_op_id m) (timestamp m) files in
+    let o = Op.Wait_files.v ~id:(new_op_id m) (timestamp m) files in
     let k m o = k () in
     add_op_kont m o k; add_op m o
 
   let write m ?(salt = "") ?(reads = []) ?(mode = 0o644) write write_data =
     let id = new_op_id m in
-    let o = Op.write ~id (timestamp m) ~salt ~reads ~mode ~write write_data in
+    let o = Op.Write.v ~id (timestamp m) ~salt ~reads ~mode ~write write_data in
     add_op m o
 
   let mkdir m dir k =
-    let o = Op.mkdir ~id:(new_op_id m) (timestamp m) dir in
-    let k m o = k (Result.get_ok @@ Op.Mkdir.result (Op.get_mkdir o)) in
+    let o = Op.Mkdir.v ~id:(new_op_id m) (timestamp m) dir in
+    let k m o = k (Result.get_ok @@ Op.Mkdir.result (Op.Mkdir.get o)) in
     add_op_kont m o k; add_op m o
 
   (* FIXME better strategy to deal with builded tools. If the tool is a
@@ -1771,14 +1791,14 @@ module Memo = struct
         let env, relevant_env = spawn_env m tool env in
         let cwd = match cwd with None -> m.cwd | Some d -> d in
         let o =
-          Op.spawn ~id stamp ~reads ~writes ~env ~relevant_env ~cwd
+          Op.Spawn.v ~id stamp ~reads ~writes ~env ~relevant_env ~cwd
             ~stdin ~stdout ~stderr ~success_exits tool.tool_file
             cmd.cmd_args
         in
         begin match k with
         | None -> ()
         | Some k ->
-            let k m o = match Op.Spawn.result (Op.get_spawn o) with
+            let k m o = match Op.Spawn.result (Op.Spawn.get o) with
             | Ok (`Exited code) -> k code
             | _ -> assert false
             in
