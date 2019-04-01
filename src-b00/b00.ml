@@ -903,6 +903,10 @@ module Reviver = struct
 
   (* Hashing *)
 
+  let hash_string r s =
+    let module H = (val r.hash_fun : Hash.T) in
+    H.string s
+
   let _hash_file r f = match Fpath.Map.find f r.file_hashes with
   | h -> h
   | exception Not_found ->
@@ -1594,7 +1598,8 @@ module Memo = struct
   let reviver m = m.reviver
   let guard m = m.guard
   let exec m = m.exec
-  let hash_fun m = Reviver.hash_fun m.reviver
+  let hash_string m s = Reviver.hash_string m.reviver s
+  let hash_file m f = Reviver.hash_file m.reviver f
   let ops m = m.ops
   let timestamp m = Time.count m.clock
   let new_op_id m = let id = m.op_id in m.op_id <- id + 1; id

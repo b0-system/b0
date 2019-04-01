@@ -664,9 +664,12 @@ module Reviver : sig
   (** [hash_op r o] hashes the operation [o]. Errors if an input
       file of the build operation can't be hashed. *)
 
+  val hash_string : t -> string -> Hash.t
+  (** [hash_string r s] hashes [s] using [r]'s {!hash_fun}. *)
+
   val hash_file : t -> Fpath.t -> (Hash.t, string) result
-  (** [hash_file r f] hashes file [f]. Note that file hashes
-      are {{!file_hashes}cached} by [r]. *)
+  (** [hash_file r f] hashes file [f] using [r]'s {!hash_fun}. Note
+      that file hashes are {{!file_hashes}cached} by [r]. *)
 
   val file_hashes : t -> Hash.t Fpath.Map.t
   (** [file_hashes r] is a map of the files that were hashed. *)
@@ -1042,8 +1045,12 @@ module Memo : sig
   val exec : t -> Exec.t
   (** [exec m] is [m]'s executors. *)
 
-  val hash_fun : t -> (module B0_std.Hash.T)
-  (** [hash_fun m] is [m]'s hash function. *)
+  val hash_string : t -> string -> Hash.t
+  (** [hash_string m s] is {!Reviver.hash_string}[ (reviver m) s]. *)
+
+  val hash_file : t -> Fpath.t -> (Hash.t, string) result
+  (** [hash_file m f] is {!Reviver.hash_file}[ (reviver m) f].
+      Note that these file hashes operations are memoized. *)
 
   val stir : block:bool -> t -> unit
   (** [stir ~block m] runs the memoizer a bit. If [block] is [true]
