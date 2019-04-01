@@ -520,7 +520,7 @@ module Op = struct
       mutable read_result : (string, string) result; }
 
   type write =
-    { write_salt : string;
+    { write_stamp : string;
       write_mode : int;
       write_file : Fpath.t;
       write_data : unit -> (string, string) result;
@@ -732,16 +732,16 @@ module Op = struct
     type t = write
 
     let v
-        ~id creation_time ~salt:write_salt ~reads ~mode:write_mode
+        ~id creation_time ~stamp:write_stamp ~reads ~mode:write_mode
         ~write:write_file write_data
       =
       let write_result = Error "not written" in
-      let w = {write_salt; write_mode; write_file; write_data; write_result} in
+      let w = {write_stamp; write_mode; write_file; write_data; write_result} in
       v ~id creation_time ~reads ~writes:[write_file] (Write w)
 
     let get o = match o.kind with Write r -> r | _ -> assert false
 
-    let salt w = w.write_salt
+    let stamp w = w.write_stamp
     let mode w = w.write_mode
     let file w = w.write_file
     let data w = w.write_data
@@ -938,9 +938,8 @@ module Reviver = struct
 
   let hash_write r o w =
     let module H = (val r.hash_fun : Hash.T) in
-    let acc = string_of_int (Op.Write.mode w) :: [Op.Write.salt w] in
+    let acc = string_of_int (Op.Write.mode w) :: [Op.Write.stamp w] in
     let acc = hash_op_reads r o acc in
-    let acc = Fpath.to_string (Op.Write.file w) :: acc in (* FIXME *)
     let sg = String.concat "" acc in
     H.string sg
 
@@ -1717,9 +1716,10 @@ module Memo = struct
     let k m o = k () in
     add_op_kont m o k; add_op m o
 
-  let write m ?(salt = "") ?(reads = []) ?(mode = 0o644) write write_data =
+  let write m ?(stamp = "") ?(reads = []) ?(mode = 0o644) write write_data =
     let id = new_op_id m in
-    let o = Op.Write.v ~id (timestamp m) ~salt ~reads ~mode ~write write_data in
+    let start_time = timestamp m in
+    let o = Op.Write.v ~id start_time ~stamp ~reads ~mode ~write write_data in
     add_op m o
 
   let mkdir m dir k =

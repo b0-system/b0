@@ -468,7 +468,7 @@ module Op : sig
     (** The type for file write operations. *)
 
     val v :
-      id:id -> Time.span -> salt:string -> reads:Fpath.t list ->
+      id:id -> Time.span -> stamp:string -> reads:Fpath.t list ->
       mode:int -> write:Fpath.t -> (unit -> (string, string) result) -> op
     (** [write] declares a file write operations, see the corresponding
         accessors in {!Write} for the semantics of the various fields. *)
@@ -477,8 +477,8 @@ module Op : sig
     (** [geo o] is the write [o]. @raise Invalid_argument if [o] is
         not a write. *)
 
-    val salt : t -> string
-    (** [salt w] is the file write salt used for caching. *)
+    val stamp : t -> string
+    (** [stamp w] is the file write stamp used for caching. *)
 
     val mode : t -> int
     (** [int w] is the mode of the file written by [w]. *)
@@ -1091,11 +1091,11 @@ module Memo : sig
       becomes ready and continues with [k s]. *)
 
   val write :
-    t -> ?salt:string -> ?reads:Fpath.t list -> ?mode:int -> Fpath.t ->
+    t -> ?stamp:string -> ?reads:Fpath.t list -> ?mode:int -> Fpath.t ->
     (unit -> (string, string) result) -> unit
   (** [write m ~reads file w] writes [file] with data [w ()] and mode
       [mode] (defaults to [0o644]) when [reads] are ready. [w]'s
-      result must only depend on [reads] and [salt] (defaults to
+      result must only depend on [reads] and [stamp] (defaults to
       [""]). *)
 
   val mkdir : t -> Fpath.t -> bool fiber
