@@ -26,7 +26,7 @@ let hello m =
   Memo.spawn m ~reads:[src] ~writes:[cmi; cmo] @@
   ocamlc Cmd.(arg "-c" % "-o" %% path exe %% path src);
   let dir = Fpath.(bdir / "bla") in
-  Memo.mkdir m dir begin fun () ->
+  Memo.mkdir m dir begin fun _ ->
     Memo.Fut.set set_did_mkdir dir;
     Memo.read m src begin fun src ->
       let gen = Fpath.(exe + ".gen") in

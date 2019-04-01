@@ -243,7 +243,8 @@ end
 (** Build operations.
 
     This module only provides a type for specifying operations and the
-    result of their execution. No execution or caching logic lives here. *)
+    result of their execution. Execution and caching is respectively handled
+    by the modules {!Exec} and {!Reviver}. *)
 module Op : sig
 
   (** {1:op_status Operation status} *)
@@ -392,6 +393,13 @@ module Op : sig
     val set_result : t -> (Os.Cmd.status, string) result -> unit
     (** [set_result s e] the spawn result of [s] to [e]. *)
 
+    val set_exec_status :
+      op -> t -> Time.span -> (string, string) result option ->
+      (Os.Cmd.status, string) result -> unit
+    (** [set_exec_status o (get o) end_time stdo_ui result] sets the
+        result of operation [o]. In particular this set the operation
+        status according to [result]. *)
+
     (** {1:fmt Formatters} *)
 
     val pp_success_exits : int list Fmt.t
@@ -435,6 +443,12 @@ module Op : sig
 
     val set_result : t -> (string, string) result -> unit
     (** [set_result r res] sets the file read result of [r] to [res]. *)
+
+    val set_exec_status :
+      op -> t -> Time.span ->  (string, string) result -> unit
+    (** [set_exec_status o (get o) end_time result] sets the result of
+        operation [o]. In particular this set the operation status
+        according to [result]. *)
 
     (** {1:formatting Formatters} *)
 
@@ -481,6 +495,12 @@ module Op : sig
     val set_result : t -> (unit, string) result -> unit
     (** [set_result w res] sets the write results of [w] to [res]. *)
 
+    val set_exec_status :
+      op -> t -> Time.span -> (unit, string) result -> unit
+    (** [set_exec_status o (get o) end_time result] sets the result of
+        operation [o]. In particular this set the operation status
+        according to [result]. *)
+
     (** {1:fmt Formatters} *)
 
     val pp_result : (unit, string) result Fmt.t
@@ -510,15 +530,21 @@ module Op : sig
     val dir : t -> Fpath.t
     (** [dir mk] is the directory created by [mk]. *)
 
-    val result : t -> (unit, string) result
-    (** [result mk] is unit or an error. *)
+    val result : t -> (bool, string) result
+    (** [result mk] is the result of the directory creation. *)
 
-    val set_result : t -> (unit, string) result -> unit
+    val set_result : t -> (bool, string) result -> unit
     (** [set_result r res] sets the mkdir result of [r] to [res]. *)
+
+    val set_exec_status :
+      op -> t -> Time.span ->  (bool, string) result -> unit
+    (** [set_exec_status o (get o) end_time result] sets the operation
+        result of [o]. In particular this set the operation status
+        according to [result]. *)
 
     (** {1:fmt Formatters} *)
 
-    val pp_result : (unit, string) result Fmt.t
+    val pp_result : (bool, string) result Fmt.t
     (** [pp_result] formats directory creation results. *)
 
     val pp : t Fmt.t
@@ -1072,9 +1098,10 @@ module Memo : sig
       result must only depend on [reads] and [salt] (defaults to
       [""]). *)
 
-  val mkdir : t -> Fpath.t -> unit fiber
-  (** [mkdir m dir k] creates directory [dir] and continues with [k ()] at
-      which point file [dir] is ready. *)
+  val mkdir : t -> Fpath.t -> bool fiber
+  (** [mkdir m dir k] creates directory [dir] and continues with [k created] at
+      which point file [dir] is ready and [created] indicates if the
+      directory was created by the operation. *)
 
   (** {1:spawn Memoizing tool spawns} *)
 

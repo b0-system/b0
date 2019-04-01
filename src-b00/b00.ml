@@ -528,7 +528,7 @@ module Op = struct
 
   type mkdir =
     { mkdir_dir : Fpath.t;
-      mutable mkdir_result : (unit, string) result; }
+      mutable mkdir_result : (bool, string) result; }
 
   (* Operations *)
 
@@ -637,6 +637,16 @@ module Op = struct
     let set_stdo_ui s ui = s.stdo_ui <- ui
     let result s = s.spawn_result
     let set_result s e = s.spawn_result <- e
+    let set_exec_status o s end_time stdo_ui result =
+      let status = match result with
+      | Error _ | Ok (`Signaled _) -> Failed
+      | Ok (`Exited c) ->
+          match success_exits s with
+          | [] -> Executed
+          | cs -> if (List.mem c cs) then Executed else Failed
+      in
+      set_stdo_ui s stdo_ui; set_result s result; set_status o status;
+      set_exec_end_time o end_time
 
     (* Formatting *)
 
@@ -662,7 +672,7 @@ module Op = struct
       in
       Fmt.pf ppf "@[<h>"; pp_brack ppf "[";
       pp_tool ppf tool; pp_args false ppf args;
-      pp_brack ppf "]"; Fmt.pf ppf "@]"; ()
+      pp_brack ppf "]"; Fmt.pf ppf "@]"
 
     let pp_stdo ppf = function
     | `Ui -> Fmt.pf ppf "<ui>"
@@ -691,8 +701,7 @@ module Op = struct
       Fmt.field "stdout" pp_stdo ppf s.stdout; Fmt.cut ppf ();
       Fmt.field "stderr" pp_stdo ppf s.stderr; Fmt.cut ppf ();
       Fmt.field "stdo-ui" (pp_stdo_ui ~elide:false) ppf s; Fmt.cut ppf ();
-      Fmt.field "result" pp_result ppf s.spawn_result;
-      ()
+      Fmt.field "result" pp_result ppf s.spawn_result
   end
 
   module Read = struct
@@ -706,6 +715,9 @@ module Op = struct
     let file r = r.read_file
     let result r = r.read_result
     let set_result r res = r.read_result <- res
+    let set_exec_status o r end_time res =
+      let status = match res with Ok _ -> Executed | Error _ -> Failed in
+      set_result r res; set_status o status; set_exec_end_time o end_time
 
     let pp_result ppf = function
     | Error e -> pp_error_msg ppf e
@@ -713,8 +725,7 @@ module Op = struct
 
     let pp ppf r =
       Fmt.field "file" Fpath.pp_quoted ppf r.read_file; Fmt.cut ppf ();
-      Fmt.field "result" pp_result ppf r.read_result; Fmt.cut ppf ();
-      ()
+      Fmt.field "result" pp_result ppf r.read_result; Fmt.cut ppf ()
   end
 
   module Write = struct
@@ -736,6 +747,10 @@ module Op = struct
     let data w = w.write_data
     let result w = w.write_result
     let set_result w res = w.write_result <- res
+    let set_exec_status o w end_time res =
+      let status = match res with Ok _ -> Executed | Error _ -> Failed in
+      set_result w res; set_status o status; set_exec_end_time o end_time
+
 
     let pp_result ppf = function
     | Error e -> pp_error_msg ppf e
@@ -744,8 +759,7 @@ module Op = struct
     let pp ppf w =
       Fmt.field "file" Fpath.pp_quoted ppf w.write_file; Fmt.cut ppf ();
       Fmt.field "mode" Fmt.int ppf w.write_mode; Fmt.cut ppf ();
-      Fmt.field "result" pp_result ppf w.write_result;
-      ()
+      Fmt.field "result" pp_result ppf w.write_result
   end
 
   module Mkdir = struct
@@ -759,15 +773,19 @@ module Op = struct
     let dir mk = mk.mkdir_dir
     let result mk = mk.mkdir_result
     let set_result mk res = mk.mkdir_result <- res
+    let set_exec_status o mk end_time res =
+      let status = match res with
+      | Ok _ -> Executed | Error _ -> Failed
+      in
+      set_result mk res; set_status o status; set_exec_end_time o end_time
 
     let pp_result ppf = function
     | Error e -> pp_error_msg ppf e
-    | Ok () -> Fmt.string ppf "created"
+    | Ok created -> Fmt.string ppf (if created then "created" else "existed")
 
     let pp ppf m =
       Fmt.field "dir" Fpath.pp_quoted ppf m.mkdir_dir; Fmt.cut ppf ();
-      Fmt.field "result" pp_result ppf m.mkdir_result;
-      ()
+      Fmt.field "result" pp_result ppf m.mkdir_result
   end
 
   module Wait_files = struct
@@ -1193,18 +1211,8 @@ module Exec = struct
       | `Tee f, `File _ | `File _, `Tee f -> ret @@ Os.File.read f
     in
     let s = Op.Spawn.get o in
-    let status = match result with
-    | Error _ | Ok (`Signaled _) -> Op.Failed
-    | Ok (`Exited c) ->
-        match Op.Spawn.success_exits s with
-        | [] -> Op.Executed
-        | cs -> if (List.mem c cs) then Op.Executed else Op.Failed
-    in
     let stdo_ui = match ui with None -> None | Some ui -> (read_stdo_ui s ui) in
-    Op.Spawn.set_stdo_ui s stdo_ui;
-    Op.Spawn.set_result s result;
-    Op.set_status o status;
-    Op.set_exec_end_time o (timestamp e);
+    Op.Spawn.set_exec_status o s (timestamp e) stdo_ui result;
     decr_spawn_count e;
     Queue.add o e.collectable
 
@@ -1248,10 +1256,7 @@ module Exec = struct
     Op.set_exec_start_time o (timestamp e);
     e.feedback (`Exec_submit (None, o));
     let res = Os.File.read (Op.Read.file r) in
-    let status = match res with Ok _ -> Op.Executed | Error _ -> Op.Failed in
-    Op.Read.set_result r res;
-    Op.set_status o status;
-    Op.set_exec_end_time o (timestamp e);
+    Op.Read.set_exec_status o r (timestamp e) res;
     Queue.add o e.collectable
 
   let exec_write e o w =
@@ -1263,22 +1268,14 @@ module Exec = struct
         let mode = Op.Write.mode w in
         Os.File.write ~force:true ~make_path:true ~mode (Op.Write.file w) data
     in
-    let status = match res with Ok _ -> Op.Executed | Error _ -> Op.Failed in
-    Op.Write.set_result w res;
-    Op.set_status o status;
-    Op.set_exec_end_time o (timestamp e);
+    Op.Write.set_exec_status o w (timestamp e) res;
     Queue.add o e.collectable
 
   let exec_mkdir e o mk =
     Op.set_exec_start_time o (timestamp e);
     e.feedback (`Exec_submit (None, o));
     let res = Os.Dir.create ~make_path:true (Op.Mkdir.dir mk) in
-    let status, res = match res with
-    | Ok _ -> Op.Executed, Ok () | Error _ as e -> Op.Failed, e
-    in
-    Op.Mkdir.set_result mk res;
-    Op.set_status o status;
-    Op.set_exec_end_time o (timestamp e);
+    Op.Mkdir.set_exec_status o mk (timestamp e) res;
     Queue.add o e.collectable
 
   let exec_wait_files e o =
