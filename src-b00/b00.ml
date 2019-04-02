@@ -553,8 +553,10 @@ module Op = struct
   | Failed -> "failed" | Aborted -> "aborted"
 
   type id = int
+  type group = string
   type t =
     { id : id;
+      group : group;
       creation_time : Time.span;
       mutable exec_start_time : Time.span;
       mutable exec_end_time : Time.span;
@@ -567,16 +569,17 @@ module Op = struct
 
   type op = t
 
-  let v ~id creation_time ~reads ~writes kind =
+  let v ~id ~group creation_time ~reads ~writes kind =
     let exec_start_time = Time.Span.zero in
     let exec_end_time = Time.Span.zero in
     let exec_revived = false in
     let status = Waiting in
     let hash = Hash.nil in
-    { id; creation_time; exec_start_time; exec_end_time; exec_revived; status;
-      reads; writes; hash; kind; }
+    { id; group; creation_time; exec_start_time; exec_end_time; exec_revived;
+      status; reads; writes; hash; kind; }
 
   let id o = o.id
+  let group o = o.group
   let creation_time o = o.creation_time
   let exec_start_time o = o.exec_start_time
   let exec_end_time o = o.exec_end_time
@@ -613,14 +616,14 @@ module Op = struct
     type t = spawn
 
     let v
-        ~id creation_time ~reads ~writes ~env ~relevant_env ~cwd ~stdin ~stdout
-        ~stderr ~success_exits tool args
+        ~id ~group creation_time ~reads ~writes ~env ~relevant_env ~cwd
+        ~stdin ~stdout ~stderr ~success_exits tool args
       =
       let spawn =
         { env; relevant_env; cwd; stdin; stdout; stderr; success_exits;
           tool; args; stdo_ui = None; spawn_result = Error "not spawned" }
       in
-      v ~id creation_time ~reads ~writes (Spawn spawn)
+      v ~id ~group creation_time ~reads ~writes (Spawn spawn)
 
     let get o = match o.kind with Spawn s -> s | _ -> assert false
 
@@ -707,9 +710,9 @@ module Op = struct
   module Read = struct
     type t = read
 
-    let v ~id creation_time file =
+    let v ~id ~group creation_time file =
       let read = { read_file = file; read_result = Error "not read" } in
-      v ~id creation_time ~reads:[file] ~writes:[] (Read read)
+      v ~id ~group creation_time ~reads:[file] ~writes:[] (Read read)
 
     let get o = match o.kind with Read r -> r | _ -> assert false
     let file r = r.read_file
@@ -732,12 +735,12 @@ module Op = struct
     type t = write
 
     let v
-        ~id creation_time ~stamp:write_stamp ~reads ~mode:write_mode
+        ~id ~group creation_time ~stamp:write_stamp ~reads ~mode:write_mode
         ~write:write_file write_data
       =
       let write_result = Error "not written" in
       let w = {write_stamp; write_mode; write_file; write_data; write_result} in
-      v ~id creation_time ~reads ~writes:[write_file] (Write w)
+      v ~id ~group creation_time ~reads ~writes:[write_file] (Write w)
 
     let get o = match o.kind with Write r -> r | _ -> assert false
 
@@ -766,9 +769,9 @@ module Op = struct
     type t = mkdir
 
     let get o = match o.kind with Mkdir mk -> mk | _ -> assert false
-    let v ~id creation_time dir =
+    let v ~id ~group creation_time dir =
       let mkdir = { mkdir_dir = dir; mkdir_result = Error "not created" } in
-      v ~id creation_time ~reads:[] ~writes:[dir] (Mkdir mkdir)
+      v ~id ~group creation_time ~reads:[] ~writes:[dir] (Mkdir mkdir)
 
     let dir mk = mk.mkdir_dir
     let result mk = mk.mkdir_result
@@ -789,8 +792,8 @@ module Op = struct
   end
 
   module Wait_files = struct
-    let v ~id creation_time reads =
-      v ~id creation_time ~reads ~writes:[] Wait_files
+    let v ~id ~group creation_time reads =
+      v ~id ~group creation_time ~reads ~writes:[] Wait_files
   end
 
   module T = struct type nonrec t = t let compare = compare end
@@ -839,6 +842,7 @@ module Op = struct
     in
     let pp_reads = Fmt.braces @@ Fmt.list Fpath.pp_quoted in
     let dur = Time.Span.abs_diff o.exec_end_time o.exec_start_time in
+    Fmt.field "group" Fmt.string ppf (o.group); Fmt.cut ppf ();
     Fmt.field "writes" pp_writes ppf o.writes; Fmt.cut ppf ();
     Fmt.field "reads" pp_reads ppf o.reads; Fmt.cut ppf ();
     Fmt.field "created" pp_span ppf o.creation_time; Fmt.cut ppf ();
@@ -1530,7 +1534,9 @@ module Memo = struct
           | _ -> Fmt.pf ppf "@[<h>[DONE]%a@]" Op.pp_short op
 
   exception Fail of string
-  type t =
+
+  type ctx = { group : Op.group }
+  and memo =
     { clock : Time.counter;
       cpu_clock : Time.cpu_counter;
       feedback : feedback -> unit;
@@ -1544,19 +1550,24 @@ module Memo = struct
       (* XXX The fact that continuations are not part of operations
          is an artefact of using marshall on op values in B0. Since we
          won't do this  maybe we could have a field for it in Op.t though
-         it may still be a good idea to not carray these closures around.  *)
+         it may still be a good idea to not carry these closures around.  *)
       mutable konts : (t -> Op.t -> unit) Op.Map.t;
       mutable ops : Op.t list; }
 
+  and t = { c : ctx; m : memo }
+
   let create ?clock ?cpu_clock:cc ~feedback ~cwd env guard reviver exec =
+    let c = { group = "" } in
     let clock = match clock with None -> Time.counter () | Some c -> c in
     let cpu_clock = match cc with None -> Time.cpu_counter () | Some c -> c in
     let futs = Futs.create () in
     let op_id = 0 in
     let konts = Op.Map.empty in
     let ops = [] in
-    { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec; futs;
-      op_id; konts; ops; }
+    let m = { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec; futs;
+              op_id; konts; ops; }
+    in
+    { c; m }
 
   let memo
       ?(hash_fun = (module Hash.Xxh_64 : Hash.T)) ?env ?cwd ?cachedir
@@ -1591,37 +1602,40 @@ module Memo = struct
     let exec = Exec.create ~clock ~feedback:fb_exec ~max_spawn () in
     Ok (create ~clock ~feedback:fb_memo ~cwd env guard reviver exec)
 
-  let clock m = m.clock
-  let cpu_clock m = m.cpu_clock
-  let env m = m.env
-  let reviver m = m.reviver
-  let guard m = m.guard
-  let exec m = m.exec
-  let hash_string m s = Reviver.hash_string m.reviver s
-  let hash_file m f = Reviver.hash_file m.reviver f
-  let ops m = m.ops
-  let timestamp m = Time.count m.clock
-  let new_op_id m = let id = m.op_id in m.op_id <- id + 1; id
+  let clock m = m.m.clock
+  let cpu_clock m = m.m.cpu_clock
+  let env m = m.m.env
+  let reviver m = m.m.reviver
+  let guard m = m.m.guard
+  let exec m = m.m.exec
+  let hash_string m s = Reviver.hash_string m.m.reviver s
+  let hash_file m f = Reviver.hash_file m.m.reviver f
+  let ops m = m.m.ops
+  let timestamp m = Time.count m.m.clock
+  let new_op_id m = let id = m.m.op_id in m.m.op_id <- id + 1; id
+  let group m = m.c.group
+  let with_group m group = { c = { group }; m = m.m }
 
   let trap_kont_exn k m o = try k m o with
-  | Fail e -> m.feedback (`Fiber_fail e)
+  | Fail e -> m.m.feedback (`Fiber_fail e)
   | Stack_overflow as e -> raise e
   | Out_of_memory as e -> raise e
   | Sys.Break as e -> raise e
-  | e -> m.feedback (`Fiber_exn (e, Printexc.get_raw_backtrace ()))
+  | e -> m.m.feedback (`Fiber_exn (e, Printexc.get_raw_backtrace ()))
 
-  let add_op_kont m o k = m.konts <- Op.Map.add o (trap_kont_exn k) m.konts
-  let rem_op_kont m o = m.konts <- Op.Map.remove o m.konts
+  let add_op_kont m o k = m.m.konts <- Op.Map.add o (trap_kont_exn k) m.m.konts
+  let rem_op_kont m o = m.m.konts <- Op.Map.remove o m.m.konts
 
   let continue_op m o =
-    List.iter (fun f -> Guard.set_file_ready m.guard f) (Op.writes o);
-    m.feedback (`Op_complete (o, `Did_not_write []));
-    match Op.Map.find o m.konts with
+    List.iter (fun f -> Guard.set_file_ready m.m.guard f) (Op.writes o);
+    m.m.feedback (`Op_complete (o, `Did_not_write []));
+    match Op.Map.find o m.m.konts with
     | k -> rem_op_kont m o; k m o | exception Not_found -> ()
 
   let discontinue_op m o did_not_write =
-    List.iter (fun f -> Guard.set_file_never m.guard f) (Op.writes o);
-    rem_op_kont m o; m.feedback (`Op_complete (o, `Did_not_write did_not_write))
+    List.iter (fun f -> Guard.set_file_never m.m.guard f) (Op.writes o);
+    rem_op_kont m o;
+    m.m.feedback (`Op_complete (o, `Did_not_write did_not_write))
 
   let finish_op m o = match Op.status o with
   | Op.Executed ->
@@ -1633,13 +1647,13 @@ module Memo = struct
           | fs -> Op.set_status o Op.Failed; discontinue_op m o fs
           end
       | false ->
-          match Reviver.record m.reviver o with
+          match Reviver.record m.m.reviver o with
           | Ok true -> continue_op m o
           | Ok false ->
               Op.set_status o Op.Failed;
               discontinue_op m o (Op.did_not_write o)
           | Error e ->
-              m.feedback (`Op_cache_error (o, e));
+              m.m.feedback (`Op_cache_error (o, e));
               begin match Op.did_not_write o with
               | [] -> continue_op m o
               | fs -> Op.set_status o Op.Failed; discontinue_op m o fs
@@ -1651,19 +1665,21 @@ module Memo = struct
   let submit_op m o = match Op.status o with
   | Op.Aborted -> finish_op m o
   | Op.Waiting ->
-      begin match Reviver.hash_op m.reviver o with
+      begin match Reviver.hash_op m.m.reviver o with
       | Error e ->
           (* FIXME Does this report errors cleanly ? We really want to
              be able to say which reads were supposed to be there and are not *)
-          m.feedback (`Op_cache_error (o, e));
+          m.m.feedback (`Op_cache_error (o, e));
           Op.set_status o Op.Aborted;
           finish_op m o
       | Ok hash ->
           Op.set_hash o hash;
-          begin match Reviver.revive m.reviver o with
-          | Ok None -> Exec.submit m.exec o
+          begin match Reviver.revive m.m.reviver o with
+          | Ok None -> Exec.submit m.m.exec o
           | Ok (Some _) -> finish_op m o
-          | Error e -> m.feedback (`Op_cache_error (o, e)); Exec.submit m.exec o
+          | Error e ->
+              m.m.feedback (`Op_cache_error (o, e));
+              Exec.submit m.m.exec o
           end
       end
   | Op.Executed | Op.Failed -> assert false
@@ -1671,31 +1687,32 @@ module Memo = struct
   (* XXX we may blow stack continuations can add which stirs.
      XXX futures make it even worse. *)
 
-  let rec stir ~block m = match Guard.allowed m.guard with
+  let rec stir ~block m = match Guard.allowed m.m.guard with
   | Some o -> submit_op m o; stir ~block m
   | None ->
-      match Exec.collect m.exec ~block with
+      match Exec.collect m.m.exec ~block with
       | Some o -> finish_op m o; stir ~block m
       | None ->
-          match Futs.stir m.futs with
+          match Futs.stir m.m.futs with
           | Some k -> k (); stir ~block m
           | None -> ()
 
-  let add_op m o = m.ops <- o :: m.ops; Guard.add m.guard o; stir ~block:false m
+  let add_op m o =
+    m.m.ops <- o :: m.m.ops; Guard.add m.m.guard o; stir ~block:false m
 
   let rec finish m =
     stir ~block:true m;
-    match List.exists (fun o -> Op.status o = Op.Waiting) m.ops with
+    match List.exists (fun o -> Op.status o = Op.Waiting) m.m.ops with
     | false ->
-        assert (Futs.stir m.futs = None);
+        assert (Futs.stir m.m.futs = None);
         Ok ()
     | true ->
-        let undecided = Guard.root_undecided_files m.guard in
-        Fpath.Set.iter (Guard.set_file_never m.guard) undecided;
+        let undecided = Guard.root_undecided_files m.m.guard in
+        Fpath.Set.iter (Guard.set_file_never m.m.guard) undecided;
         stir ~block:true m;
         (* TODO a cycle dep between ops will break this assertion. *)
-        assert (not (List.exists (fun o -> Op.status o = Op.Waiting) m.ops));
-        assert (Futs.stir m.futs = None);
+        assert (not (List.exists (fun o -> Op.status o = Op.Waiting) m.m.ops));
+        assert (Futs.stir m.m.futs = None);
         Error undecided
 
   (* Fibers *)
@@ -1708,26 +1725,30 @@ module Memo = struct
   (* Files *)
 
   let file_ready m p =
-    Guard.set_file_ready m.guard p
+    Guard.set_file_ready m.m.guard p
 
   let read m file k =
-    let o = Op.Read.v ~id:(new_op_id m) (timestamp m) file in
+    let o = Op.Read.v ~id:(new_op_id m) ~group:m.c.group (timestamp m) file in
     let k m o = k (Result.get_ok @@ Op.Read.result (Op.Read.get o)) in
     add_op_kont m o k; add_op m o
 
   let wait_files m files k =
-    let o = Op.Wait_files.v ~id:(new_op_id m) (timestamp m) files in
+    let id = new_op_id m in
+    let o = Op.Wait_files.v ~id ~group:m.c.group (timestamp m) files in
     let k m o = k () in
     add_op_kont m o k; add_op m o
 
   let write m ?(stamp = "") ?(reads = []) ?(mode = 0o644) write write_data =
     let id = new_op_id m in
+    let group = m.c.group in
     let start_time = timestamp m in
-    let o = Op.Write.v ~id start_time ~stamp ~reads ~mode ~write write_data in
+    let o =
+      Op.Write.v ~id start_time ~group ~stamp ~reads ~mode ~write write_data
+    in
     add_op m o
 
   let mkdir m dir k =
-    let o = Op.Mkdir.v ~id:(new_op_id m) (timestamp m) dir in
+    let o = Op.Mkdir.v ~id:(new_op_id m) ~group:m.c.group (timestamp m) dir in
     let k m o = k (Result.get_ok @@ Op.Mkdir.result (Op.Mkdir.get o)) in
     add_op_kont m o k; add_op m o
 
@@ -1750,9 +1771,9 @@ module Memo = struct
   type cmd = { cmd_tool : tool; cmd_args : Cmd.t }
 
   let tool_env m t =
-    let env = Env.env m.env in
+    let env = Env.env m.m.env in
     let tool_env, relevant = Tool.read_env t env in
-    let forced_env = Env.forced_env m.env in
+    let forced_env = Env.forced_env m.m.env in
     let tool_env = Os.Env.override tool_env ~by:forced_env in
     let relevant = Os.Env.override relevant ~by:forced_env in
     tool_env, relevant
@@ -1760,9 +1781,9 @@ module Memo = struct
   let spawn_env m cmd_tool = function
   | None -> cmd_tool.tool_env, cmd_tool.tool_relevant_env
   | Some spawn_env ->
-      let env = Env.env m.env in
+      let env = Env.env m.m.env in
       let tool_env, relevant = Tool.read_env cmd_tool.tool env in
-      let forced_env = Env.forced_env m.env in
+      let forced_env = Env.forced_env m.m.env in
       let tool_env = Os.Env.override tool_env ~by:spawn_env in
       let tool_env = Os.Env.override tool_env ~by:forced_env in
       let relevant = Os.Env.override relevant ~by:spawn_env in
@@ -1770,7 +1791,7 @@ module Memo = struct
       Os.Env.to_assignments tool_env, Os.Env.to_assignments relevant
 
   let tool m tool =
-    let cmd_tool = match Env.tool m.env (Tool.name tool) with
+    let cmd_tool = match Env.tool m.m.env (Tool.name tool) with
     | Error e -> Miss (tool, e)
     | Ok tool_file ->
         let tool_env, tool_relevant_env = tool_env m tool in
@@ -1785,16 +1806,16 @@ module Memo = struct
       ?(stderr = `Ui) ?(success_exits = [0]) ?k cmd
     =
     match cmd.cmd_tool with
-    | Miss (tool, e) -> m.feedback (`Miss_tool (tool, e))
+    | Miss (tool, e) -> m.m.feedback (`Miss_tool (tool, e))
     | Tool tool ->
         let id = new_op_id m in
         let stamp = timestamp m in
         let env, relevant_env = spawn_env m tool env in
-        let cwd = match cwd with None -> m.cwd | Some d -> d in
+        let cwd = match cwd with None -> m.m.cwd | Some d -> d in
         let o =
-          Op.Spawn.v ~id stamp ~reads ~writes ~env ~relevant_env ~cwd
-            ~stdin ~stdout ~stderr ~success_exits tool.tool_file
-            cmd.cmd_args
+          Op.Spawn.v ~id ~group:m.c.group stamp ~reads ~writes ~env
+            ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits
+            tool.tool_file cmd.cmd_args
         in
         begin match k with
         | None -> ()
@@ -1811,15 +1832,15 @@ module Memo = struct
     type memo = t
     type 'a t = 'a Futs.fut * memo
     type 'a set = 'a Futs.fut_set
-    let create m = let f, s = Futs.fut m.futs in (f, m), s
+    let create m = let f, s = Futs.fut m.m.futs in (f, m), s
     let value (f, _) = Futs.fut_value f
     let wait (f, m) k =
       let trap_kont_exn v = try k v with
-      | Fail e -> m.feedback (`Fiber_fail e)
+      | Fail e -> m.m.feedback (`Fiber_fail e)
       | Stack_overflow as e -> raise e
       | Out_of_memory as e -> raise e
       | Sys.Break as e -> raise e
-      | e -> m.feedback (`Fiber_exn (e, Printexc.get_raw_backtrace ()))
+      | e -> m.m.feedback (`Fiber_exn (e, Printexc.get_raw_backtrace ()))
       in
       Futs.fut_wait f trap_kont_exn
 

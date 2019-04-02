@@ -264,6 +264,9 @@ module Op : sig
   type id = int
   (** The type for build operation identifiers. *)
 
+  type group = string
+  (** The type for build operation groups. *)
+
   type t
   (** The type for build operations. *)
 
@@ -272,6 +275,9 @@ module Op : sig
 
   val id : t -> id
   (** [id o] is the identifier of operation [o]. *)
+
+  val group : t -> string
+  (** [group o] is the group of [o]. *)
 
   val creation_time : t -> Time.span
   (** [creation_time o] is [o]'s creation time. *)
@@ -337,11 +343,12 @@ module Op : sig
     (** The type for process spawn operations. *)
 
     val v :
-      id:id -> Time.span -> reads:Fpath.t list -> writes:Fpath.t list ->
-      env:Os.Env.assignments -> relevant_env:Os.Env.assignments ->
-      cwd:Fpath.t -> stdin:Fpath.t option -> stdout:stdo ->
-      stderr:stdo -> success_exits:success_exits ->
-      Cmd.tool -> Cmd.t -> op
+      id:id -> group:group -> Time.span -> reads:Fpath.t list ->
+      writes:Fpath.t list -> env:Os.Env.assignments ->
+      relevant_env:Os.Env.assignments -> cwd:Fpath.t ->
+      stdin:Fpath.t option -> stdout:stdo -> stderr:stdo ->
+      success_exits:success_exits -> Cmd.tool -> Cmd.t -> op
+
     (** [spawn] declares a spawn build operation, see the corresponding
         accessors in {!Spawn} for the semantics of the various fields. *)
 
@@ -427,7 +434,7 @@ module Op : sig
     type t
     (** The type for file read operations. *)
 
-    val v : id:id -> Time.span -> Fpath.t -> op
+    val v : id:id -> group:group -> Time.span -> Fpath.t -> op
     (** [v] declares a file read operation, see the corresponding
         accessors in {!Read} for the semantics of the various fields. *)
 
@@ -468,8 +475,9 @@ module Op : sig
     (** The type for file write operations. *)
 
     val v :
-      id:id -> Time.span -> stamp:string -> reads:Fpath.t list ->
-      mode:int -> write:Fpath.t -> (unit -> (string, string) result) -> op
+      id:id -> group:group -> Time.span -> stamp:string ->
+      reads:Fpath.t list -> mode:int -> write:Fpath.t ->
+      (unit -> (string, string) result) -> op
     (** [write] declares a file write operations, see the corresponding
         accessors in {!Write} for the semantics of the various fields. *)
 
@@ -518,7 +526,7 @@ module Op : sig
     type t
     (** The type for directory creation operations. *)
 
-    val v : id:id -> Time.span -> Fpath.t -> op
+    val v : id:id -> group:group -> Time.span -> Fpath.t -> op
     (** [v] declares a directory creation operation, see the
         corresponding accessors for the semantics of the various
         fields. *)
@@ -552,7 +560,7 @@ module Op : sig
   end
 
   module Wait_files : sig
-    val v : id:id -> Time.span -> Fpath.t list -> t
+    val v : id:id -> group:group -> Time.span -> Fpath.t list -> t
     (** [v] declares a wait files operation, these are stored in
         {!reads}. *)
   end
@@ -1064,6 +1072,14 @@ module Memo : sig
   (** [ops m] is the list of operations that were submitted to the
       memoizer *)
 
+  (** {1:group Operation groups} *)
+
+  val group : t -> string
+  (** [group m] is [m]'s group. *)
+
+  val with_group : t -> string -> t
+  (** [group m g] is [m] but operations performed on [m] have group [g]. *)
+
   (** {1:fibers Fibers} *)
 
   type 'a fiber = ('a -> unit) -> unit
@@ -1093,8 +1109,8 @@ module Memo : sig
       becomes ready and continues with [k s]. *)
 
   val write :
-    t -> ?stamp:string -> ?reads:Fpath.t list -> ?mode:int -> Fpath.t ->
-    (unit -> (string, string) result) -> unit
+    t -> ?stamp:string -> ?reads:Fpath.t list -> ?mode:int ->
+    Fpath.t -> (unit -> (string, string) result) -> unit
   (** [write m ~reads file w] writes [file] with data [w ()] and mode
       [mode] (defaults to [0o644]) when [reads] are ready. [w]'s
       result must only depend on [reads] and [stamp] (defaults to
