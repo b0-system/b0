@@ -1535,7 +1535,7 @@ end
     concerned they simply indicate that the argument value itself does
     not influence the file outputs of the tool. As such shielded
     arguments do not appear in the command line
-    {{!to_list_and_sig}signature} which is used to memoize tool
+    {{!to_list_and_stamp}stamp} which is used to memoize tool
     spawns. A typical example of shielded argument are file paths to
     inputs: it's often the file contents not the actual file path that
     determines the tool output; beware though that some tool use both
@@ -1636,12 +1636,12 @@ module Cmd : sig
   val to_list : t -> string list
   (** [to_list l] converts [l] to a list of strings. *)
 
-  val to_sig : t -> string list
-  (** [to_sig l] is the sequence of unshielded arguments. *)
+  val to_stamp : t -> string list
+  (** [to_stamp l] is the sequence of unshielded arguments. *)
 
-  val to_list_and_sig : t -> string list * string list
-  (** [to_list_and_sig l] is a [l] as a list of strings tuppled with
-      its signature: the sequence of unshielded arguments. *)
+  val to_list_and_stamp : t -> string list * string list
+  (** [to_list_and_stamp l] is a [l] as a list of strings tuppled with
+      its stamp: the sequence of unshielded arguments. *)
 
   val to_string : t -> string
   (** [to_string l] converts [l] to a string that can be passed

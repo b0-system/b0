@@ -1871,7 +1871,7 @@ module Cmd = struct
     in
     loop [] l
 
-  let to_list_and_sig l =
+  let to_list_and_stamp l =
     let rec loop shielded acc sg = function
     | A a -> (a :: acc), (if shielded then sg else a :: sg)
     | Rseq ls ->
@@ -1886,7 +1886,7 @@ module Cmd = struct
     in
     loop false [] [] l
 
-  let to_sig l =
+  let to_stamp l =
     let rec loop acc = function
     | A a -> (a :: acc)
     | Rseq ls ->  List.fold_left loop acc ls

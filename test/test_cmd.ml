@@ -21,9 +21,9 @@ let ocamlopt ?(profile = false) ?(debug = false) incs file =
   let incs = Cmd.(shield (paths ~slip:"-I" incs)) in
   Cmd.(arg "ocamlopt" % "-c" %% debug %% profile %% incs %% (path file))
 
-let test_sig () =
+let test_stamp () =
   let test cl cmd wit =
-    assert ((cmd, wit) = Cmd.to_list_and_sig cl)
+    assert ((cmd, wit) = Cmd.to_list_and_stamp cl)
   in
   test (ls (Fpath.v "/tmp/hey ha"))
     [ "ls"; "-a"; "/tmp/hey ha" ]
@@ -45,7 +45,7 @@ let test_sig () =
 
 
 let test () =
-  test_sig ();
+  test_stamp ();
   ()
 
 (*---------------------------------------------------------------------------

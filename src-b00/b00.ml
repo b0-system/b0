@@ -926,26 +926,26 @@ module Reviver = struct
     List.fold_left add_file_hash acc (Op.reads o)
 
   let hash_spawn r o s =
-    let stdin_sig = function None -> "0" | Some _ -> "1" in
-    let stdo_sig = function `File _ -> "0" | `Tee _ -> "1" | `Ui -> "2" in
+    let stdin_stamp = function None -> "0" | Some _ -> "1" in
+    let stdo_stamp = function `File _ -> "0" | `Tee _ -> "1" | `Ui -> "2" in
     let module H = (val r.hash_fun : Hash.T) in
     let acc = [Hash.to_bytes (_hash_file r (Op.Spawn.tool s))] in
     let acc = hash_op_reads r o acc in
-    let acc = stdin_sig (Op.Spawn.stdin s) :: acc in
-    let acc = stdo_sig (Op.Spawn.stdout s) :: acc in
-    let acc = stdo_sig (Op.Spawn.stderr s) :: acc in
+    let acc = stdin_stamp (Op.Spawn.stdin s) :: acc in
+    let acc = stdo_stamp (Op.Spawn.stdout s) :: acc in
+    let acc = stdo_stamp (Op.Spawn.stderr s) :: acc in
     let env = Op.Spawn.relevant_env s in
     let acc = List.fold_left (fun acc v -> v :: acc) acc env in
-    let acc = List.rev_append (Cmd.to_sig @@ Op.Spawn.args s) acc in
-    let sg = String.concat "" acc in
-    H.string sg
+    let acc = List.rev_append (Cmd.to_stamp @@ Op.Spawn.args s) acc in
+    let stamp = String.concat "" acc in
+    H.string stamp
 
   let hash_write r o w =
     let module H = (val r.hash_fun : Hash.T) in
     let acc = string_of_int (Op.Write.mode w) :: [Op.Write.stamp w] in
     let acc = hash_op_reads r o acc in
-    let sg = String.concat "" acc in
-    H.string sg
+    let stamp = String.concat "" acc in
+    H.string stamp
 
   let hash_op r o =
     try

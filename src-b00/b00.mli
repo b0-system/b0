@@ -353,8 +353,8 @@ module Op : sig
     (** [env s] is the environment in which [s] runs. *)
 
     val relevant_env : t -> Os.Env.assignments
-    (** [relevant_env s] are the assignements of [env s]
-        that should be taken into account for caching. *)
+    (** [relevant_env s] are the assignements of [env s] that may
+        influence the tool outputs. *)
 
     val cwd : t -> Fpath.t
     (** [cwd s] is the cwd with which [s] runs. *)
@@ -896,13 +896,13 @@ end
     environment and whether and how it supports response files.
 
     Declared environment variables are split into relevant and
-    shielded variables. A relevant variable is a variable whose
-    value influences the tool's output. A shielded variable is a
-    variable whose value does not influence the tool's output but is
+    shielded variables. A relevant variable is a variable whose value
+    influences the tool's output. A shielded variable is a variable
+    whose value does not influence the tool's output but is
     nonetheless essential to its operation. Shielded environment
-    variables do not appear in the spawn environment signature which
-    is used to memoize tool spawns. Variables specifying the location
-    of {{!tmp_vars}temporary file directories} are good examples of
+    variables do not appear are not part of the stamp used to memoize
+    tool spawns. Variables specifying the location of
+    {{!tmp_vars}temporary file directories} are good examples of
     shielded variables.
 
     {b Portability.} In order to maximize portability no [.exe]
@@ -1004,18 +1004,13 @@ module Memo : sig
       aguard, an operation cache and an executor. *)
 
   val create :
-    ?clock:Time.counter ->
-    ?cpu_clock:Time.cpu_counter ->
-    feedback:(feedback -> unit) ->
-    cwd:Fpath.t ->
-    Env.t -> Guard.t -> Reviver.t -> Exec.t -> t
+    ?clock:Time.counter -> ?cpu_clock:Time.cpu_counter ->
+    feedback:(feedback -> unit) -> cwd:Fpath.t -> Env.t -> Guard.t ->
+    Reviver.t -> Exec.t -> t
 
   val memo :
-    ?hash_fun:(module B0_std.Hash.T) ->
-    ?env:B0_std.Os.Env.t ->
-    ?cwd:B0_std.Fpath.t ->
-    ?cachedir:B0_std.Fpath.t ->
-    ?max_spawn:int ->
+    ?hash_fun:(module B0_std.Hash.T) -> ?env:B0_std.Os.Env.t ->
+    ?cwd:B0_std.Fpath.t -> ?cachedir:B0_std.Fpath.t -> ?max_spawn:int ->
     ?feedback:([feedback | File_cache.feedback | Exec.feedback] -> unit) ->
     unit -> (t, string) result
   (** [memo] is a simpler {!create}
