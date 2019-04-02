@@ -871,15 +871,6 @@ end
 
 module Reviver = struct
 
-  (* Operation metadata converters *)
-
-  let spawn_meta_conv :
-    ((string, string) result option * (Os.Cmd.status, string) result) Conv.t
-    =
-    Conv.(pair ~kind:"spawn-result" ~docvar:"SPAWN"
-            (option (result string_bytes string_bytes))
-            (result os_cmd_status string_bytes))
-
   (* Operation reviver *)
 
   type t =
@@ -961,41 +952,46 @@ module Reviver = struct
 
   (* Recording and reviving operations *)
 
+  let spawn_meta_conv :
+    ((string, string) result option * (Os.Cmd.status, string) result) Conv.t
+    =
+    Conv.(pair ~kind:"spawn-result" ~docvar:"SPAWN"
+            (option (result string_bytes string_bytes))
+            (result os_cmd_status string_bytes))
+
+  let write_meta_conv : (unit, string) result Conv.t =
+    Conv.(result unit string_bytes)
+
   let file_cache_key o = Hash.to_hex (Op.hash o)
 
   let revive_spawn r o s =
-    let writes = Op.writes o in
     let key = file_cache_key o in
+    let writes = Op.writes o in
     Result.bind (File_cache.revive r.cache key writes) @@ function
     | None -> Ok None
     | Some (m, existed) ->
-        Result.bind (Conv.of_bin spawn_meta_conv m) @@
-        fun (stdo_ui, result) ->
+        Result.bind (Conv.of_bin spawn_meta_conv m) @@ fun (stdo_ui, res) ->
         Op.set_exec_revived o true;
-        Op.set_status o Op.Executed;
-        Op.Spawn.set_stdo_ui s stdo_ui;
-        Op.Spawn.set_result s result;
+        Op.Spawn.set_exec_status o s (timestamp r) stdo_ui res;
         Ok (Some existed)
 
   let revive_write r o w =
-    let writes = Op.writes o in
     let key = file_cache_key o in
+    let writes = Op.writes o in
     Result.bind (File_cache.revive r.cache key writes) @@ function
     | None -> Ok None
-    | Some (_, existed) ->
+    | Some (m, existed) ->
+        Result.bind (Conv.of_bin write_meta_conv m) @@ fun res ->
         Op.set_exec_revived o true;
-        Op.set_status o Op.Executed;
+        Op.Write.set_exec_status o w (timestamp r) res;
         Ok (Some existed)
 
   let revive r o =
     Op.set_exec_start_time o (timestamp r);
-    let ret = match Op.kind o with
+    match Op.kind o with
     | Op.Spawn s -> revive_spawn r o s
     | Op.Write w -> revive_write r o w
     | Op.Read _ | Op.Mkdir _ | Op.Wait_files -> Ok None
-    in
-    Op.set_exec_end_time o (timestamp r);
-    ret
 
   let record_spawn r o s =
     let spawn_meta = Op.Spawn.stdo_ui s, Op.Spawn.result s in
@@ -1004,7 +1000,10 @@ module Reviver = struct
     | Ok m -> File_cache.add r.cache (file_cache_key o) m (Op.writes o)
 
   let record_write r o w =
-    File_cache.add r.cache (file_cache_key o) "" (Op.writes o)
+    let write_meta = Op.Write.result w in
+    match Conv.to_bin ~buf:r.buffer write_meta_conv write_meta with
+    | Error _ as e -> e
+    | Ok m -> File_cache.add r.cache (file_cache_key o) m (Op.writes o)
 
   let record r o = match Op.kind o with
   | Op.Spawn s -> record_spawn r o s

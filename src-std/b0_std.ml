@@ -4114,6 +4114,22 @@ module Conv = struct
 
   (* Predefined converters *)
 
+  let unit =
+    let kind = "unit" in
+    let bin_enc b v = Bin.enc_byte b 0 in
+    let bin_dec s ~start = match Bin.dec_byte ~kind s ~start with
+    | i, 0 -> i, ()
+    | i, byte -> Bin.dec_err ~kind i "expected 0"
+    in
+    let txt_enc ppf v = Fmt.string ppf "unit" in
+    let txt_dec s ~start =
+      let i, a = Txt.dec_atom ~kind s ~start in
+      match a with
+      | "unit" -> i, ()
+      | a -> Txt.dec_err_atom ~kind start a ~exp:["unit"]
+    in
+    v ~kind ~docvar:"UNIT" bin_enc bin_dec txt_enc txt_dec
+
   let bool =
     let kind = "bool" in
     let bin_enc b v = Bin.enc_byte b (if v then 1 else 0) in

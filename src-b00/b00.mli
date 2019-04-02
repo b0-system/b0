@@ -660,16 +660,16 @@ module Reviver : sig
 
   (** {1:hashing Hashing} *)
 
-  val hash_op : t -> Op.t -> (Hash.t, string) result
-  (** [hash_op r o] hashes the operation [o]. Errors if an input
-      file of the build operation can't be hashed. *)
-
   val hash_string : t -> string -> Hash.t
   (** [hash_string r s] hashes [s] using [r]'s {!hash_fun}. *)
 
   val hash_file : t -> Fpath.t -> (Hash.t, string) result
   (** [hash_file r f] hashes file [f] using [r]'s {!hash_fun}. Note
       that file hashes are {{!file_hashes}cached} by [r]. *)
+
+  val hash_op : t -> Op.t -> (Hash.t, string) result
+  (** [hash_op r o] hashes the operation [o]. Errors if an input
+      file of the build operation can't be hashed. *)
 
   val file_hashes : t -> Hash.t Fpath.Map.t
   (** [file_hashes r] is a map of the files that were hashed. *)

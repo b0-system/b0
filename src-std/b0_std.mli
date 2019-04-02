@@ -2972,6 +2972,10 @@ module Conv : sig
 
   (** {2:base Base types} *)
 
+  val unit : unit t
+  (** [unit] unit converts unit. Textual conversion represent
+      unit with "unit". *)
+
   val bool : bool t
   (** [bool] converts booleans. Textual conversions represent booleans
       with the {{!atoms}atoms} {e true} and {e false}. *)
