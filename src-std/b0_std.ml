@@ -3284,8 +3284,7 @@ module Os = struct
     | In_string s ->
         begin try
           (* We write the input string to a temporary file. *)
-          let flags = Unix.[O_RDWR; O_CREAT; O_EXCL; O_SHARE_DELETE; O_CLOEXEC]
-          in
+          let flags = Unix.[O_RDWR; O_CREAT; O_EXCL; O_SHARE_DELETE] in
           let f, fd = Result.to_failure (Tmp.open' ~flags ()) in
           Fd.Set.add fd fds;
           Tmp.rem_file f; (* We don't need the actual file. *)
