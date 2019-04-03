@@ -2420,8 +2420,19 @@ module Os : sig
     type stdo
     (** The type for representing the standard output of a process. *)
 
-    val out_file : Fpath.t -> stdo
-    (** [out_file f] is a standard output that writes to file [f]. *)
+    val out_file : ?mode:int -> force:bool -> make_path:bool -> Fpath.t -> stdo
+    (** [out_file ~force ~make_path file] is a standard output that writes
+        to file [file].
+        {ul
+        {- If [make_path] is [true] and the parent directory of [file]
+           does not exist the whole path to the parent is created as
+           needed with permission [0o755] (readable and traversable by
+           everyone, writable by the user).}
+        {- If [force] is [true] and [file] exists at call time as a
+           regular file it tries to overwrite it, in all other cases
+           the function errors if [file] exists.}
+        {- [mode] are the permissions of the written file; they default to
+           [0o644], readable by everyone, writable by the user.}} *)
 
     val out_fd : close:bool -> Unix.file_descr -> stdo
     (** [out_fd ~close fd] is a standard output that writes to file

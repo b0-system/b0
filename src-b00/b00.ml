@@ -1236,11 +1236,13 @@ module Exec = struct
         | Some f -> Os.Cmd.in_file f
         in
         let stdout, ui = match Op.Spawn.stdout s with
-        | `File f | `Tee f -> Os.Cmd.out_file f, None
-        | `Ui -> get_stdo_ui_file e
+        | `File f | `Tee f ->
+            Os.Cmd.out_file ~force:true ~make_path:true f, None
+        | `Ui ->
+            get_stdo_ui_file e
         in
         let stderr, ui = match Op.Spawn.stderr s with
-        | `File f | `Tee f -> Os.Cmd.out_file f, ui
+        | `File f | `Tee f -> Os.Cmd.out_file ~force:true ~make_path:true f, ui
         | `Ui ->
             match ui with
             | Some _ -> stdout, ui

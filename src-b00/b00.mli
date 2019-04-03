@@ -28,6 +28,8 @@
     {- Build metadata, unit and file level, packages.}}
     {b TODO.}
     {ul
+    {- Memo.spawn redirections, consider supporting all the options
+       of {!Os.Cmd.spawn}}
     {- The concept of response file in {!Tool} should likely appear at
        the {!Op.spawn} level aswell so that we can simply have the sequence
        of {!Op.t} value for a potential build log (otherwise {!Op.spawn_args}
@@ -36,9 +38,7 @@
        aswell. Copy can be expressed in terms of read/write but maybe
        better to have as a primitive for concurency. Delete doesn't
        fit well in the "file ready" model, but could be useful for
-       concurrency.}
-    {- Spawn redirection should maybe create the paths of the file
-       they write to.}}
+       concurrency.}}
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
 
@@ -1148,7 +1148,8 @@ module Memo : sig
          Warning.} The file is not automatically added to [reads],
          this allows for example to use {!Os.File.null}.}
       {- [stdout] and [stderr], the redirections for the standard
-         outputs of the command, see {!stdo}. {b Warning.} File redirections
+         outputs of the command, see {!stdo}. Path to files are
+         created if needed. {b Warning.} File redirections
          are not automatically added to [writes]; this allows for example
          to use {!Os.File.null}.}
       {- [success_exits] the exit codes that determine if the build operation

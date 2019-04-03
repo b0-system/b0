@@ -2306,20 +2306,22 @@ module Os = struct
       | Unix.Unix_error (e, _, _) ->
           ferr file (err_doing "Testing existence" (uerr e))
 
-    let rec handle_force_open_fdout ~force ~make_path ~mode file =
-      let fls = Unix.[O_WRONLY; O_CREAT; O_SHARE_DELETE; O_CLOEXEC; O_TRUNC] in
-      let fls = if force then fls else Unix.O_EXCL :: fls in
+    let rec handle_force_open_fdout
+      ?(flags = Unix.[O_WRONLY; O_CREAT; O_SHARE_DELETE; O_CLOEXEC; O_TRUNC])
+      ~force ~make_path ~mode file
+      =
+      let fls = if force then flags else Unix.O_EXCL :: flags in
       match Unix.openfile file fls mode with
       | fd -> Ok fd
       | exception Unix.Unix_error (Unix.EEXIST, _, _) -> err_force file
       | exception Unix.Unix_error (Unix.EINTR, _, _) ->
-          handle_force_open_fdout ~force ~make_path ~mode file
+          handle_force_open_fdout ~flags ~force ~make_path ~mode file
       | exception Unix.Unix_error (Unix.ENOENT as e, _, _) when make_path ->
           begin match dir_create ~make_path (Fpath.parent file) with
           | Error e -> ferr file e
           | Ok false (* existed *) -> ferr file (uerr e)
           | Ok true (* created *) ->
-              handle_force_open_fdout ~force ~make_path ~mode file
+              handle_force_open_fdout ~flags ~force ~make_path ~mode file
           end
       | exception Unix.Unix_error (e, _, _) -> ferr file (uerr e)
 
@@ -3306,23 +3308,27 @@ module Os = struct
     (* Process standard outputs *)
 
     type stdo =
-    | Out_file of Fpath.t
     | Out_fd of { fd : Unix.file_descr; close : bool }
+    | Out_file of
+        { mode : int; force : bool; make_path : bool; file : Fpath.t }
 
-    let out_file f = Out_file f
+    let out_file ?(mode = 0o644) ~force ~make_path file =
+      Out_file { mode; force; make_path; file }
+
     let out_fd ~close fd = Out_fd { fd; close }
     let out_stdout = Out_fd { fd = Unix.stdout; close = false }
     let out_stderr = Out_fd { fd = Unix.stderr; close = false }
-    let out_null = Out_file File.null
+    let out_null = out_file ~force:true ~make_path:false File.null
+
     let stdo_to_fd fds = function
     | Out_fd { fd; close } -> if close then Fd.Set.add fd fds; fd
-    | Out_file f ->
-        try
-          let f = Fpath.to_string f in
-          let fd = Fd.openfile f Unix.[O_WRONLY; O_CREAT; O_TRUNC] 0o644 in
-          Fd.Set.add fd fds; fd
-        with Unix.Unix_error (e, _, _) ->
-          Fmt.failwith_notrace "open file %a for stdout: %s" Fpath.pp f (uerr e)
+    | Out_file { mode; force; make_path; file } ->
+        let flags = Unix.[O_WRONLY; O_CREAT; O_TRUNC] in
+        match
+          Fs_base.handle_force_open_fdout ~flags ~force ~make_path ~mode file
+        with
+        | Error e -> Fmt.failwith_notrace "open for output: %s" e
+        | Ok fd -> Fd.Set.add fd fds; fd
 
     (* Low-level command spawn *)
 
