@@ -703,6 +703,10 @@ module Jsong : sig
   val cmd : Cmd.t -> t
   (** [cmd c] is [c] as a generated JSON string array value. *)
 
+  val option : ('a -> t) -> 'a option -> t
+  (** [option some o] is [o] as a generated JSON value which is
+      {!null} if [o] is [None] and [some v] if [o] is [some v]. *)
+
   val list : ('a -> t) -> 'a list -> t
   (** [list el l] is [l] as a generated JSON array whose elements
       are generated using [el]. *)

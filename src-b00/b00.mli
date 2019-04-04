@@ -34,11 +34,10 @@
        the {!Op.spawn} level aswell so that we can simply have the sequence
        of {!Op.t} value for a potential build log (otherwise {!Op.spawn_args}
        becomes the line with the response file which is not meanigfull)}
-    {- Operations, b0 also had file deletion and copy maybe add them
-       aswell. Copy can be expressed in terms of read/write but maybe
-       better to have as a primitive for concurency. Delete doesn't
-       fit well in the "file ready" model, but could be useful for
-       concurrency.}}
+    {- Operations, b0 also had file deletion maybe add them
+       aswell. Delete doesn't fit well in the "file ready" model, but
+       could be useful for concurrency.}
+    {- Input files. Should we consider their mode ? E.g. if we cache failure}}
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
 
@@ -350,7 +349,7 @@ module Op : sig
       success_exits:success_exits -> Cmd.tool -> Cmd.t -> op
 
     (** [spawn] declares a spawn build operation, see the corresponding
-        accessors in {!Spawn} for the semantics of the various fields. *)
+        accessors in {!Spawn} for the semantics of the various arguments. *)
 
     val get : op -> t
     (** [get o] is the spawn [o]. @raise Invalid_argument if [o] is
@@ -436,7 +435,8 @@ module Op : sig
 
     val v : id:id -> group:group -> Time.span -> Fpath.t -> op
     (** [v] declares a file read operation, see the corresponding
-        accessors in {!Read} for the semantics of the various fields. *)
+        accessors in {!Read} for the semantics of the various
+        arguments. *)
 
     val get : op -> t
     (** [get_read o] is the read [o]. @raise Invalid_argument if [o]
@@ -479,7 +479,7 @@ module Op : sig
       reads:Fpath.t list -> mode:int -> write:Fpath.t ->
       (unit -> (string, string) result) -> op
     (** [write] declares a file write operations, see the corresponding
-        accessors in {!Write} for the semantics of the various fields. *)
+        accessors in {!Write} for the semantics of the various arguments. *)
 
     val get : op -> t
     (** [geo o] is the write [o]. @raise Invalid_argument if [o] is
@@ -518,6 +518,58 @@ module Op : sig
     (** [pp] formats a write. *)
   end
 
+  (** File copy *)
+  module Copy : sig
+
+    (** {1:copy File copy} *)
+
+    type t
+    (** The type for file copies. *)
+
+    val v :
+      id:id -> group:group -> Time.span -> mode:int -> linenum:int option ->
+      src:Fpath.t -> Fpath.t -> op
+    (** [v] declares a file link operation, see the corresponding
+        accessors for the semantics of various arguments. *)
+
+    val get : op -> t
+    (** [get o] is the copy operation [o]. @raise Invalid_argument if [o]
+        is not a copy. *)
+
+    val src : t -> Fpath.t
+    (** [src c] is the file read for the copy. *)
+
+    val dst : t -> Fpath.t
+    (** [dst c] is the written by the copy. *)
+
+    val mode : t -> int
+    (** [mode c] is the mode of the file written by the copy. *)
+
+    val linenum : t -> int option
+    (** [linenum c] is the linumber directive to write at the begining
+        of the destination file (if any). *)
+
+    val result : t -> (unit, string) result
+    (** [result c] is the result of the file copy. *)
+
+    val set_result : t -> (unit, string) result -> unit
+    (** [set_result c res] sets the result of [c] to [res]. *)
+
+    val set_exec_status :
+      op -> t -> Time.span -> (unit, string) result -> unit
+    (** [set_exec_status o (get o) end_time result] sets the result of
+        operation [o]. In particular this set the operation status
+        according to [result]. *)
+
+    (** {1:fmt Formatters} *)
+
+    val pp_result : (unit, string) result Fmt.t
+    (** [pp_result] formats a write result. *)
+
+    val pp : t Fmt.t
+    (** [pp] formats a write. *)
+  end
+
   (** Directory creation. *)
   module Mkdir : sig
 
@@ -529,7 +581,7 @@ module Op : sig
     val v : id:id -> group:group -> Time.span -> Fpath.t -> op
     (** [v] declares a directory creation operation, see the
         corresponding accessors for the semantics of the various
-        fields. *)
+        arguments. *)
 
     val get : op -> t
     (** [get o] is the mkdir [o]. @raise Invalid_argument if [o] is not
@@ -569,6 +621,7 @@ module Op : sig
   | Spawn of Spawn.t
   | Read of Read.t
   | Write of Write.t
+  | Copy of Copy.t
   | Mkdir of Mkdir.t
   | Wait_files (** *)
   (** The type for operation kinds. *)
@@ -1115,6 +1168,16 @@ module Memo : sig
       [mode] (defaults to [0o644]) when [reads] are ready. [w]'s
       result must only depend on [reads] and [stamp] (defaults to
       [""]). *)
+
+  val copy :
+    t -> ?mode:int -> ?linenum:int -> src:Fpath.t -> Fpath.t -> unit
+  (** [copy m ~mode ?linenum ~src dst] copies file [src] to [dst] with
+      mode [mode] (defaults to [0o644]) when [src] is ready. If [linenum]
+      is specified, the following line number directive is prependend
+      in [dst] to the contents of [src]:
+{[
+#line $(linenum) "$(src)"
+]} *)
 
   val mkdir : t -> Fpath.t -> bool fiber
   (** [mkdir m dir k] creates directory [dir] and continues with [k created] at

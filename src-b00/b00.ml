@@ -526,6 +526,13 @@ module Op = struct
       write_data : unit -> (string, string) result;
       mutable write_result : (unit, string) result; }
 
+  type copy =
+    { copy_src : Fpath.t;
+      copy_dst : Fpath.t;
+      copy_mode : int;
+      copy_linenum : int option;
+      mutable copy_result : (unit, string) result; }
+
   type mkdir =
     { mkdir_dir : Fpath.t;
       mutable mkdir_result : (bool, string) result; }
@@ -536,6 +543,7 @@ module Op = struct
   | Spawn of spawn
   | Read of read
   | Write of write
+  | Copy of copy
   | Mkdir of mkdir
   | Wait_files
 
@@ -543,6 +551,7 @@ module Op = struct
   | Spawn _ -> "spawn"
   | Read  _ -> "read"
   | Write _ -> "write"
+  | Copy _ -> "copy"
   | Mkdir _ -> "mkdir"
   | Wait_files -> "wait-files"
 
@@ -614,7 +623,6 @@ module Op = struct
     type stdo = spawn_stdo
     type success_exits = spawn_success_exits
     type t = spawn
-
     let v
         ~id ~group creation_time ~reads ~writes ~env ~relevant_env ~cwd
         ~stdin ~stdout ~stderr ~success_exits tool args
@@ -626,7 +634,6 @@ module Op = struct
       v ~id ~group creation_time ~reads ~writes (Spawn spawn)
 
     let get o = match o.kind with Spawn s -> s | _ -> assert false
-
     let env s = s.env
     let relevant_env s = s.relevant_env
     let cwd s = s.cwd
@@ -709,7 +716,6 @@ module Op = struct
 
   module Read = struct
     type t = read
-
     let v ~id ~group creation_time file =
       let read = { read_file = file; read_result = Error "not read" } in
       v ~id ~group creation_time ~reads:[file] ~writes:[] (Read read)
@@ -733,7 +739,6 @@ module Op = struct
 
   module Write = struct
     type t = write
-
     let v
         ~id ~group creation_time ~stamp:write_stamp ~reads ~mode:write_mode
         ~write:write_file write_data
@@ -743,7 +748,6 @@ module Op = struct
       v ~id ~group creation_time ~reads ~writes:[write_file] (Write w)
 
     let get o = match o.kind with Write r -> r | _ -> assert false
-
     let stamp w = w.write_stamp
     let mode w = w.write_mode
     let file w = w.write_file
@@ -753,7 +757,6 @@ module Op = struct
     let set_exec_status o w end_time res =
       let status = match res with Ok _ -> Executed | Error _ -> Failed in
       set_result w res; set_status o status; set_exec_end_time o end_time
-
 
     let pp_result ppf = function
     | Error e -> pp_error_msg ppf e
@@ -765,21 +768,48 @@ module Op = struct
       Fmt.field "result" pp_result ppf w.write_result
   end
 
+  module Copy = struct
+    type t = copy
+    let v
+      ~id ~group creation_time ~mode:copy_mode ~linenum:copy_linenum
+      ~src:copy_src copy_dst
+      =
+      let copy_result = Error "not copied" in
+      let c = {copy_src; copy_dst; copy_mode; copy_linenum; copy_result} in
+      let reads = [copy_src] and writes = [copy_dst] in
+      v ~id ~group creation_time ~reads ~writes (Copy c)
+
+    let get o = match o.kind with Copy c -> c | _ -> assert false
+    let src c = c.copy_src
+    let dst c = c.copy_dst
+    let mode c = c.copy_mode
+    let linenum c = c.copy_linenum
+    let result c = c.copy_result
+    let set_result c res = c.copy_result <- res
+    let set_exec_status o c end_time res =
+      let status = match res with Ok _ -> Executed | Error _ -> Failed in
+      set_result c res; set_status o status; set_exec_end_time o end_time
+
+    let pp_result ppf = function
+    | Error e -> pp_error_msg ppf e
+    | Ok () -> Fmt.string ppf "copied"
+
+    let pp ppf m =
+      Fmt.field "result" pp_result ppf m.copy_result
+  end
+
   module Mkdir = struct
     type t = mkdir
-
-    let get o = match o.kind with Mkdir mk -> mk | _ -> assert false
     let v ~id ~group creation_time dir =
       let mkdir = { mkdir_dir = dir; mkdir_result = Error "not created" } in
       v ~id ~group creation_time ~reads:[] ~writes:[dir] (Mkdir mkdir)
 
+    let get o = match o.kind with Mkdir mk -> mk | _ -> assert false
     let dir mk = mk.mkdir_dir
     let result mk = mk.mkdir_result
     let set_result mk res = mk.mkdir_result <- res
     let set_exec_status o mk end_time res =
-      let status = match res with
-      | Ok _ -> Executed | Error _ -> Failed
-      in
+      let status = match res with Ok _ -> Executed | Error _ -> Failed in
       set_result mk res; set_status o status; set_exec_end_time o end_time
 
     let pp_result ppf = function
@@ -806,6 +836,7 @@ module Op = struct
   | Spawn s -> Spawn.pp ppf s
   | Read r -> Read.pp ppf r
   | Write w -> Write.pp ppf w
+  | Copy c -> Copy.pp ppf c
   | Mkdir m -> Mkdir.pp ppf m
   | Wait_files -> ()
 
@@ -814,6 +845,9 @@ module Op = struct
   | Read r -> Fpath.pp_quoted ppf (Read.file r)
   | Write w -> Fpath.pp_quoted ppf (Write.file w)
   | Mkdir m -> Fpath.pp_quoted ppf (Mkdir.dir m)
+  | Copy c ->
+      Fmt.pf ppf "%a to %a"
+        Fpath.pp_quoted (Copy.src c) Fpath.pp_quoted (Copy.dst c)
   | Wait_files -> ()
 
   let pp_synopsis ppf o =
@@ -821,7 +855,7 @@ module Op = struct
     let pp_status ppf = function
     | Executed ->
         if not o.exec_revived then () else
-        Fmt.pf ppf "[%a]" (Fmt.tty_string [`Fg `Green]) "CACHED"
+        Fmt.pf ppf "[%a]" (Fmt.tty_string [`Fg `Green]) "REVIVED"
     | Failed -> Fmt.pf ppf "[%a]" (Fmt.tty_string [`Fg `Red]) "FAILED"
     | Aborted -> Fmt.pf ppf "[%a]" (Fmt.tty_string [`Fg `Red]) "ABORTED"
     | Waiting -> Fmt.pf ppf "[waiting]"
@@ -932,21 +966,28 @@ module Reviver = struct
     let env = Op.Spawn.relevant_env s in
     let acc = List.fold_left (fun acc v -> v :: acc) acc env in
     let acc = List.rev_append (Cmd.to_stamp @@ Op.Spawn.args s) acc in
-    let stamp = String.concat "" acc in
-    H.string stamp
+    H.string (String.concat "" acc)
 
   let hash_write r o w =
     let module H = (val r.hash_fun : Hash.T) in
     let acc = string_of_int (Op.Write.mode w) :: [Op.Write.stamp w] in
     let acc = hash_op_reads r o acc in
-    let stamp = String.concat "" acc in
-    H.string stamp
+    H.string (String.concat "" acc)
+
+  let hash_copy r o c =
+    let module H = (val r.hash_fun : Hash.T) in
+    let linenum_stamp = function None -> "n" | Some i -> string_of_int i in
+    let acc = hash_op_reads r o [] in
+    let acc = string_of_int (Op.Copy.mode c) :: acc in
+    let acc = linenum_stamp (Op.Copy.linenum c) :: acc in
+    H.string (String.concat "" acc)
 
   let hash_op r o =
     try
       Ok begin match Op.kind o with
       | Op.Spawn s -> hash_spawn r o s
       | Op.Write w -> hash_write r o w
+      | Op.Copy c -> hash_copy r o c
       | Op.Read _ | Op.Mkdir _ | Op.Wait_files -> Hash.nil
       end
     with Failure e -> Error e
@@ -963,7 +1004,7 @@ module Reviver = struct
             (option (result string_bytes string_bytes))
             (result os_cmd_status string_bytes))
 
-  let write_meta_conv : (unit, string) result Conv.t =
+  let unit_result_meta_conv : (unit, string) result Conv.t =
     Conv.(result unit string_bytes)
 
   let file_cache_key o = Hash.to_hex (Op.hash o)
@@ -985,9 +1026,20 @@ module Reviver = struct
     Result.bind (File_cache.revive r.cache key writes) @@ function
     | None -> Ok None
     | Some (m, existed) ->
-        Result.bind (Conv.of_bin write_meta_conv m) @@ fun res ->
+        Result.bind (Conv.of_bin unit_result_meta_conv m) @@ fun res ->
         Op.set_exec_revived o true;
         Op.Write.set_exec_status o w (timestamp r) res;
+        Ok (Some existed)
+
+  let revive_copy r o c =
+    let key = file_cache_key o in
+    let writes = Op.writes o in
+    Result.bind (File_cache.revive r.cache key writes) @@ function
+    | None -> Ok None
+    | Some (m, existed) ->
+        Result.bind (Conv.of_bin unit_result_meta_conv m) @@ fun res ->
+        Op.set_exec_revived o true;
+        Op.Copy.set_exec_status o c (timestamp r) res;
         Ok (Some existed)
 
   let revive r o =
@@ -995,6 +1047,7 @@ module Reviver = struct
     match Op.kind o with
     | Op.Spawn s -> revive_spawn r o s
     | Op.Write w -> revive_write r o w
+    | Op.Copy c -> revive_copy r o c
     | Op.Read _ | Op.Mkdir _ | Op.Wait_files -> Ok None
 
   let record_spawn r o s =
@@ -1005,13 +1058,20 @@ module Reviver = struct
 
   let record_write r o w =
     let write_meta = Op.Write.result w in
-    match Conv.to_bin ~buf:r.buffer write_meta_conv write_meta with
+    match Conv.to_bin ~buf:r.buffer unit_result_meta_conv write_meta with
+    | Error _ as e -> e
+    | Ok m -> File_cache.add r.cache (file_cache_key o) m (Op.writes o)
+
+  let record_copy r o c =
+    let copy_meta = Op.Copy.result c in
+    match Conv.to_bin ~buf:r.buffer unit_result_meta_conv copy_meta with
     | Error _ as e -> e
     | Ok m -> File_cache.add r.cache (file_cache_key o) m (Op.writes o)
 
   let record r o = match Op.kind o with
   | Op.Spawn s -> record_spawn r o s
   | Op.Write w -> record_write r o w
+  | Op.Copy c -> record_copy r o c
   | Op.Read _ | Op.Mkdir _ | Op.Wait_files -> Ok true
 end
 
@@ -1279,6 +1339,21 @@ module Exec = struct
     Op.Write.set_exec_status o w (timestamp e) res;
     Queue.add o e.collectable
 
+  let exec_copy e o c =
+    Op.set_exec_start_time o (timestamp e);
+    e.feedback (`Exec_submit (None, o));
+    let atomic = true and force = true and make_path = true in
+    let mode = Op.Copy.mode c and src = Op.Copy.src c and dst = Op.Copy.dst c in
+    let res = match Op.Copy.linenum c with
+    | None -> Os.File.copy ~atomic ~force ~make_path ~mode ~src dst
+    | Some line ->
+        Result.bind (Os.File.read src) @@ fun data ->
+        let data = Fmt.str "#line %d \"%a\"\n%s" line Fpath.pp src data in
+        Os.File.write ~atomic ~force ~make_path ~mode dst data
+    in
+    Op.Copy.set_exec_status o c (timestamp e) res;
+    Queue.add o e.collectable
+
   let exec_mkdir e o mk =
     Op.set_exec_start_time o (timestamp e);
     e.feedback (`Exec_submit (None, o));
@@ -1303,6 +1378,7 @@ module Exec = struct
   | Op.Spawn _ -> Queue.add o e.to_spawn (* see submit_spawns *)
   | Op.Read r -> exec_read e o r
   | Op.Write w -> exec_write e o w
+  | Op.Copy c -> exec_copy e o c
   | Op.Mkdir mk -> exec_mkdir e o mk
   | Op.Wait_files -> exec_wait_files e o
 
@@ -1740,13 +1816,14 @@ module Memo = struct
     let k m o = k () in
     add_op_kont m o k; add_op m o
 
-  let write m ?(stamp = "") ?(reads = []) ?(mode = 0o644) write write_data =
-    let id = new_op_id m in
-    let group = m.c.group in
-    let start_time = timestamp m in
-    let o =
-      Op.Write.v ~id start_time ~group ~stamp ~reads ~mode ~write write_data
-    in
+  let write m ?(stamp = "") ?(reads = []) ?(mode = 0o644) write data =
+    let id = new_op_id m and group = m.c.group and start = timestamp m in
+    let o = Op.Write.v ~id start ~group ~stamp ~reads ~mode ~write data in
+    add_op m o
+
+  let copy m ?(mode = 0o644) ?linenum ~src dst =
+    let id = new_op_id m and group = m.c.group and start = timestamp m in
+    let o = Op.Copy.v ~id start ~group ~mode ~linenum ~src dst in
     add_op m o
 
   let mkdir m dir k =
