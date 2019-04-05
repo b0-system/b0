@@ -360,7 +360,7 @@ module Browser = struct
        xdg-open(1) is found in $(b,PATH) this the program used by default."
     in
     let cmd = Arg.some ~none:"OS dependent fallback" Cli.Arg.cmd in
-    Arg.(value & opt cmd None & info opts ~env ~doc ~docv:"CMD")
+    Arg.(value & opt cmd None & info opts ~env ~doc ?docs ~docv:"CMD")
 
   let prefix ?docs ?(opts = ["p"; "prefix"]) () =
     let doc = "Rather than the exact URI, reload if possible, the first \
