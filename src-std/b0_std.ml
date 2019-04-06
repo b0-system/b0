@@ -2454,7 +2454,11 @@ module Os = struct
 
     let rand_num () = Random.State.bits (Lazy.force rand_gen) land 0xFFFFFF
     let rand_str () = Printf.sprintf "%06x" (rand_num ())
-    let tmp_path dir name rand = Printf.sprintf ("%s" ^^ name) dir rand
+    let tmp_path dir name rand =
+      match dir.[String.length dir - 1] = Fpath.dir_sep_char with
+      | true -> Printf.sprintf ("%s" ^^ name) dir rand
+      | false -> Printf.sprintf ("%s%c" ^^ name) dir Fpath.dir_sep_char rand
+
     let err dir name rand e =
       Fmt.error "tmp file %s: %s" (tmp_path dir name rand) e
 
