@@ -90,9 +90,9 @@ module Memo : sig
   (** [log_feedback ~show_spawn_ui ppf] is memo feedback that logs on
       [ppf] depending on {!Log.level}. [show_spawn_ui] is the level at
       which spawn's ui outputs get logged if even if they are
-      successful. [show_success] is the level at which all succuss ful
-      operations are get logged. Other than that operations get logged
-      as follows:
+      successful. [show_success] is the level at which all successful
+      operations have their synopsis logged. Other than that operations
+      get logged as follows:
       {ul
       {- {!Log.Quiet} logs nothing.}
       {- {!Log.Error} and {!Log.Warning} only report failures.}

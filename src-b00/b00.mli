@@ -412,7 +412,8 @@ module Op : sig
     (** [pp_success_exits] formats the success exits. *)
 
     val pp_cmd : t Fmt.t
-    (** [pp_cmd] formats the command issued by the spawn. *)
+    (** [pp_cmd] formats the command issued by the spawn, including
+        redirections. *)
 
     val pp_stdo_ui : elide:bool -> t Fmt.t
     (** [pp_stdo_ui] formats the standard output ui of the spawn. If

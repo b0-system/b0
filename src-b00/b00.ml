@@ -497,6 +497,7 @@ module File_cache = struct
 end
 
 module Op = struct
+  let file_write_color = [`Faint; `Fg `Green]
   let pp_file_contents = Fmt.elided_string ~max:150
   let pp_error_msg ppf e = Fmt.pf ppf "@[error: %s@]" e
 
@@ -548,12 +549,12 @@ module Op = struct
   | Wait_files
 
   let kind_name = function
-  | Spawn _ -> "spawn"
-  | Read  _ -> "read"
-  | Write _ -> "write"
-  | Copy _ -> "copy"
-  | Mkdir _ -> "mkdir"
-  | Wait_files -> "wait-files"
+  | Spawn _ -> "spawn" | Read  _ -> "read" | Write _ -> "write"
+  | Copy _ -> "copy" | Mkdir _ -> "mkdir" | Wait_files -> "wait-files"
+
+  let kind_name_padded = function
+  | Spawn _ -> "spawn" | Read _ -> "read " | Write _ -> "write"
+  | Copy _ -> "copy " | Mkdir _ -> "mkdir" | Wait_files -> "wait "
 
   type status = Waiting | Executed | Failed | Aborted
 
@@ -665,14 +666,14 @@ module Op = struct
     | cs -> Fmt.(list ~sep:comma int) ppf cs
 
     let pp_cmd ppf s =
-      (* XXX this could maybe moved to B0_std.Cmd. *)
+      (* XXX part of this could maybe moved to B0_std.Cmd. *)
       let tool = Fpath.to_string s.tool in
       let args = Cmd.to_list s.args in
       let quote = Filename.quote in
       let pp_brack = Fmt.tty_string [`Fg `Yellow] in
       let pp_tool ppf e = Fmt.tty_string [`Fg `Blue; `Bold] ppf (quote e) in
       let pp_arg ppf a = Fmt.pf ppf "%s" (quote a) in
-      let pp_o_arg ppf a = Fmt.tty_string [`Faint; `Fg `Green] ppf (quote a) in
+      let pp_o_arg ppf a = Fmt.tty_string file_write_color ppf (quote a) in
       let rec pp_args last_was_o ppf = function
       | [] -> ()
       | a :: args ->
@@ -680,8 +681,18 @@ module Op = struct
           if last_was_o then pp_o_arg ppf a else pp_arg ppf a;
           pp_args (String.equal a "-o") ppf args
       in
+      let pp_stdin ppf = function
+      | None -> ()
+      | Some file -> Fmt.pf ppf "< %s" (quote (Fpath.to_string file))
+      in
+      let pp_stdo redir ppf = function
+      | `Ui -> ()
+      | `Tee f | `File f ->
+          Fmt.pf ppf " %s %a" redir pp_o_arg (Fpath.to_string f)
+      in
       Fmt.pf ppf "@[<h>"; pp_brack ppf "[";
       pp_tool ppf tool; pp_args false ppf args;
+      pp_stdin ppf s.stdin; pp_stdo ">" ppf s.stdout; pp_stdo "2>" ppf s.stderr;
       pp_brack ppf "]"; Fmt.pf ppf "@]"
 
     let pp_stdo ppf = function
@@ -843,31 +854,35 @@ module Op = struct
   let pp_kind_short ppf = function
   | Spawn s -> Spawn.pp_cmd ppf s
   | Read r -> Fpath.pp_quoted ppf (Read.file r)
-  | Write w -> Fpath.pp_quoted ppf (Write.file w)
+  | Write w -> (Fmt.tty file_write_color Fpath.pp_quoted) ppf (Write.file w)
   | Mkdir m -> Fpath.pp_quoted ppf (Mkdir.dir m)
   | Copy c ->
       Fmt.pf ppf "%a to %a"
-        Fpath.pp_quoted (Copy.src c) Fpath.pp_quoted (Copy.dst c)
+        Fpath.pp_quoted (Copy.src c)
+        (Fmt.tty file_write_color Fpath.pp_quoted) (Copy.dst c)
   | Wait_files -> ()
 
   let pp_synopsis ppf o =
     let pp_kind ppf k = Fmt.tty_string [`Fg `Green] ppf k in
     let pp_status ppf = function
-    | Executed ->
-        if not o.exec_revived then () else
-        Fmt.pf ppf "[%a]" (Fmt.tty_string [`Fg `Green]) "REVIVED"
+    | Executed -> ()
     | Failed -> Fmt.pf ppf "[%a]" (Fmt.tty_string [`Fg `Red]) "FAILED"
     | Aborted -> Fmt.pf ppf "[%a]" (Fmt.tty_string [`Fg `Red]) "ABORTED"
     | Waiting -> Fmt.pf ppf "[waiting]"
     in
-    Fmt.pf ppf "@[%a[%a:%d]@]"
-      pp_status o.status pp_kind (kind_name o.kind) o.id
+    let pp_revived ppf = function
+    | true -> Fmt.tty_string [`Fg `Magenta; `Faint] ppf "R"
+    | false -> Fmt.tty_string [`Fg `Magenta] ppf "E"
+    in
+    Fmt.pf ppf "@[%a[%a %a:%03d]@]"
+      pp_status o.status pp_kind (kind_name_padded o.kind)
+      pp_revived o.exec_revived o.id
 
   let pp_short ppf o =
     Fmt.pf ppf "@[<h>%a %a@]" pp_synopsis o pp_kind_short o.kind
 
   let pp_writes =
-    let pp_file_write = Fmt.tty [`Faint; `Fg `Green] Fpath.pp_quoted in
+    let pp_file_write = Fmt.tty file_write_color Fpath.pp_quoted in
     Fmt.braces @@ Fmt.list pp_file_write
 
   let pp_op ppf o =

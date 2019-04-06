@@ -170,37 +170,10 @@ module Memo = struct
 
   let pp_stats ppf m =
     let open B00 in
-    let ( ++ ) = Time.Span.add in
-    let os = Memo.ops m in
-    let dur = Time.count (Memo.clock m)in
-    let cpu = Time.cpu_count (Memo.cpu_clock m) in
-    let sc, st, sd, wc, wt, wd, ot, od =
-      let rec loop sc st sd wc wt wd ot od = function
-      | [] -> sc, st, sd, wc, wt, wd, ot, od
-      | o :: os ->
-          let cached = Op.exec_revived o in
-          let d = Op.exec_duration o in
-          let ot = ot + 1 in
-          let od = od ++ d in
-          match Op.kind o with
-          | Op.Spawn _ ->
-              let sc = if cached then sc + 1 else sc in
-              loop sc (st + 1) (sd ++ d) wc wt wd ot od os
-          | Op.Write _ ->
-              let wc = if cached then wc + 1 else wc in
-              loop sc st sd wc (wt + 1) (wd ++ d) ot od os
-          | _ -> loop sc st sd wc wt wd ot od os
-      in
-      loop 0 0 Time.Span.zero 0 0 Time.Span.zero 0 Time.Span.zero os
+    let pp_op ppf (oc, ot, od) =
+      Fmt.pf ppf "%a %d (%d revived)" Time.Span.pp od ot oc
     in
-    let ht, hd =
-      let c = Memo.reviver m in
-      Fpath.Map.cardinal (Reviver.file_hashes c),
-      Reviver.file_hash_dur c
-    in
-    let pp_op_kind ppf (sc, st, sd) =
-      Fmt.pf ppf "%a %d (%d cached)" Time.Span.pp sd st sc
-    in
+    let pp_op_no_cache ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
     let pp_totals ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
     let pp_xtime ppf (self, children) =
       Fmt.pf ppf "%a %a" Time.Span.pp self
@@ -213,9 +186,46 @@ module Memo = struct
     let pp_utime ppf cpu =
       pp_xtime ppf Time.(cpu_utime cpu, cpu_children_utime cpu)
     in
+    let sc, st, sd, wc, wt, wd, cc, ct, cd, rt, rd, ot, od =
+      let ( ++ ) = Time.Span.add in
+      let rec loop sc st sd wc wt wd cc ct cd rt rd ot od = function
+      | [] -> sc, st, sd, wc, wt, wd, cc, ct, cd, rt, rd, ot, od
+      | o :: os ->
+          let cached = Op.exec_revived o in
+          let d = Op.exec_duration o in
+          let ot = ot + 1 in
+          let od = od ++ d in
+          match Op.kind o with
+          | Op.Spawn _ ->
+              let sc = if cached then sc + 1 else sc in
+              loop sc (st + 1) (sd ++ d) wc wt wd cc ct cd rt rd ot od os
+          | Op.Write _ ->
+              let wc = if cached then wc + 1 else wc in
+              loop sc st sd wc (wt + 1) (wd ++ d) cc ct cd rt rd ot od os
+          | Op.Copy _ ->
+              let cc = if cached then cc + 1 else cc in
+              loop sc st sd wc wt wd cc (ct + 1) (cd ++ d) rt rd ot od os
+          | Op.Read _ ->
+              loop sc st sd wc wt wd cc ct cd (rt + 1) (rd ++ d) ot od os
+          | _ ->
+              loop sc st sd wc wt wd cc ct cd rt rd ot od os
+      in
+      loop
+        0 0 Time.Span.zero 0 0 Time.Span.zero 0 0 Time.Span.zero
+        0 Time.Span.zero 0 Time.Span.zero (Memo.ops m)
+    in
+    let ht, hd =
+      let c = Memo.reviver m in
+      Fpath.Map.cardinal (Reviver.file_hashes c),
+      Reviver.file_hash_dur c
+    in
+    let dur = Time.count (Memo.clock m)in
+    let cpu = Time.cpu_count (Memo.cpu_clock m) in
     Fmt.pf ppf "@[<v>";
-    Fmt.field "spawns" pp_op_kind ppf (sc, st, sd); Fmt.cut ppf ();
-    Fmt.field "writes" pp_op_kind ppf (wc, wt, wd); Fmt.cut ppf ();
+    Fmt.field "spawns" pp_op ppf (sc, st, sd); Fmt.cut ppf ();
+    Fmt.field "writes" pp_op ppf (wc, wt, wd); Fmt.cut ppf ();
+    Fmt.field "copies" pp_op ppf (cc, ct, cd); Fmt.cut ppf ();
+    Fmt.field "reads" pp_op_no_cache ppf (rt, rd); Fmt.cut ppf ();
     Fmt.field "all" pp_totals ppf (ot, od); Fmt.cut ppf ();
     Fmt.field "hashes" pp_totals ppf (ht, hd); Fmt.cut ppf ();
     Fmt.field "utime" pp_utime ppf cpu; Fmt.cut ppf ();
