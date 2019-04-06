@@ -49,8 +49,9 @@ let hello m =
 let () =
   Result.to_failure @@
   Result.bind (Os.Dir.cwd ()) @@ fun cwd ->
-  let cachedir = Fpath.(cwd / "examples" / "_cache") in
-  Result.bind (Memo.memo ~cwd ~cachedir ()) @@ fun m ->
+  let cache_dir = Fpath.(cwd / "examples" / "_cache") in
+  let trash_dir = Fpath.(cwd / "examples" / "_trash") in
+  Result.bind (Memo.memo ~cwd ~cache_dir ~trash_dir ()) @@ fun m ->
   hello m;
   Log.if_error_pp
     (fun ppf fs -> Fmt.pf ppf "[<v>Never became ready:@,%a@]" Fpath.Set.dump fs)

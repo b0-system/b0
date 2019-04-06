@@ -900,6 +900,34 @@ module Exec : sig
       is [true] and no operation exists in [e] [None] is returned. *)
 end
 
+(** Trash and delete file hierarchies. *)
+module Trash : sig
+
+  type t
+  (** The type for trashes. *)
+
+  val create : Fpath.t -> t
+  (** [create dir] is a trash using directory [dir] for data
+      storage. [dir] may not exist. *)
+
+  val dir : t -> Fpath.t
+  (** [dir t] is the trash's directory (may not exist) *)
+
+  val trash : t -> Fpath.t -> (unit, string) result
+  (** [trash t p] trashes path [p] in [dir t]. If [p] does not exist
+      this has no effect. Note that [p] needs to be on the same device
+      as [dir t] and that the latter is created if needed. *)
+
+  val delete : block:bool -> t -> (unit, string) result
+  (** [delete ~block t] deletes [t]'s trash directory and its
+      content. If [block] is [true] the operation is synchronous and
+      blocks until the trash is effectively deleted; if [false] the
+      operation is spawn as a separate process.
+
+      {b Note.} On Windows [block:false] relies on [cmd.exe] being
+      available. *)
+end
+
 (** {1:b01 B01} *)
 
 (** Build environment.
@@ -1068,12 +1096,14 @@ module Memo : sig
   val create :
     ?clock:Time.counter -> ?cpu_clock:Time.cpu_counter ->
     feedback:(feedback -> unit) -> cwd:Fpath.t -> Env.t -> Guard.t ->
-    Reviver.t -> Exec.t -> t
+    Reviver.t -> Exec.t -> Trash.t -> t
 
   val memo :
     ?hash_fun:(module B0_std.Hash.T) -> ?env:B0_std.Os.Env.t ->
-    ?cwd:B0_std.Fpath.t -> ?cachedir:B0_std.Fpath.t -> ?max_spawn:int ->
+    ?cwd:B0_std.Fpath.t -> ?cache_dir:B0_std.Fpath.t ->
+    ?trash_dir:B0_std.Fpath.t -> ?max_spawn:int ->
     ?feedback:([feedback | File_cache.feedback | Exec.feedback] -> unit) ->
+
     unit -> (t, string) result
   (** [memo] is a simpler {!create}
       {ul
@@ -1081,7 +1111,8 @@ module Memo : sig
       {- [max_spawn] defaults to {!Exec.create}'s default.}
       {- [env] defaults to {!Os.Env.current}}
       {- [cwd] defaults to {!Os.Dir.cwd}}
-      {- [cachedir] defaults to [Fpath.(cwd / "_b0" / "cache")]}
+      {- [cache_dir] defaults to [Fpath.(cwd / "_b0" / ".cache")]}
+      {- [trash_dir] defaults to [Fpath.(cwd / "_b0" / ".trash")]}
       {- [feedback] defaults formats feedback on stdout.}} *)
 
   val clock : t -> Time.counter
@@ -1102,6 +1133,9 @@ module Memo : sig
   val exec : t -> Exec.t
   (** [exec m] is [m]'s executors. *)
 
+  val trash : t -> Trash.t
+  (** [trash m] is [m]'s trash. *)
+
   val hash_string : t -> string -> Hash.t
   (** [hash_string m s] is {!Reviver.hash_string}[ (reviver m) s]. *)
 
@@ -1115,12 +1149,15 @@ module Memo : sig
       perform. *)
 
   val finish : t -> (unit, Fpath.Set.t) result
-  (** [finish m] finishes the memoizer. This blocks until there are no
-      operation to execute like {!stir} does. If no operations are
-      left waiting this returns [Ok ()]. If there are remaining
-      wiating operations it aborts them and returns [Error fs] with
-      [fs] the files that never became ready and where not supposed to
-      be written by the waiting operations. *)
+  (** [finish m] finishes the memoizer and deletes the trash.  This
+      blocks until there are no operation to execute like {!stir}
+      does. If no operations are left waiting this returns [Ok ()]. If
+      there are remaining waiting operations it aborts them and
+      returns [Error fs] with [fs] the files that never became ready
+      and where not supposed to be written by the waiting operations. *)
+
+  val delete_trash : block:bool -> t -> (unit, string) result
+  (** [delete_trash ~block m] is {!Trash.delete}[ trash m]. *)
 
   val ops : t -> Op.t list
   (** [ops m] is the list of operations that were submitted to the
@@ -1184,6 +1221,10 @@ module Memo : sig
   (** [mkdir m dir k] creates directory [dir] and continues with [k created] at
       which point file [dir] is ready and [created] indicates if the
       directory was created by the operation. *)
+
+  val trash : t -> Fpath.t -> unit
+  (** [trash m p] trashes path [p]. After the function returns path [p]
+      should be free to use. *)
 
   (** {1:spawn Memoizing tool spawns} *)
 
