@@ -1,0 +1,104 @@
+{0 B00 manual}
+
+{1:design Design considerations}
+
+{2:kernel_extract Kernel extraction from B0}
+
+Concepts kept:
+
+{ul
+{- Treat build operations as pure functions that affect the file system
+   and memoize their results.}
+{- Parallelize build operations by synchronizing on the files they
+   read and writes.}
+{- Tight control over tool lookup and build environment.}}
+
+Concepts dropped and to be seen how we can recover them at a higher level:
+
+{ul
+{- Build aims for cross compilation (build/host OS distinction). This
+   should be capturable as two separate {!B00.Memo}s.}
+{- Build units (named sets of build operation with metadata),
+   {!B00.Op.group} where now introduced though but they have
+   only have UI semantics.}
+{- Build operation synchronisation, only files for now, we had
+   unit-level. Did introduce {!B00.Memo.Fut} for odig.}
+{- Build configuration.}
+{- Build unit/config definition localisation (multiple B0.ml files)}
+{- Build directory structuring}
+{- Forced clean builds. The {!B00.Trash} has been reintroduced
+   now, but it can be used selectively. See also {!rems} discussion.}
+{- Build metadata, unit and file level, packages.}}
+
+{2:todo TODO and resolve}
+
+{ul
+{- Memo.spawn redirections, consider supporting all the options
+   of {!Os.Cmd.spawn}}
+{- The concept of response file in {!B00.Memo.Tool} should likely appear at
+   the {!B00.Op.spawn} level aswell so that we can simply have the sequence
+   of {!B00.Op.t} value for a potential build log
+   (otherwise {!Memo.Op.spawn_args}
+   becomes the line with the response file which is not meanigfull)}
+{- Operations, b0 also had file deletion maybe add them
+   aswell. Delete doesn't fit well in the "file ready" model, but
+   could be useful for concurrency.}
+{- Input files. Should we consider their mode ? E.g. if we cache failure}}
+
+{2:rems Handling removals}
+
+Knowing files before hand doesn't fit the build model, besides
+removals is under the responsability of `Memo` clients (e.g. for now
+`odig` doesn't deal with it). The approach currently taken is the
+first one below. The second one could be considered but hampers
+correctness.
+
+{ol
+{- Clean builds. Usually builds are performed in a dedicated
+   directory, always delete the previous directory at the beginning
+   of the build and restart from scratch. Deleting is slow and should not
+   impede the build, hence the {!B00.Memo.trash} that simply renames
+   to a trash directory and the asynchronous deletion at the end of the build.}
+{- Diffing. If we know which files were generated in the previous run
+   (easy to get from the build build log), we can remove stale artefacts
+   after the new run has been completed (and do a clean build if you lost
+   the info). This may however lead to incorrect builds (`-I` problems)
+   where tool may pickup stale artefacts}}
+
+A middle ground between the two could be the following. Currently we
+trash paths in a dedicated directory and delete it asynchronously at
+the end of the build as this may be slow. However we could track
+the renames to the path directory. When we revive from the cache
+to a given path one can check if the path exists in the trash with
+the same inode number, if it does we can rename it from there
+to the build rather than create a new link.
+
+The nice thing of this approach is that at the end of the build we get
+in the trash exactly the things that really need to be deleted, rather
+than delete all the build all of the time (note that this is still
+more than say a `make` based build system because those overwrites paths).
+
+{2:fail Reviving failures}
+
+Should build operations be cached or not ?
+
+On one hand it can be useful if one tries to build and there's a long
+build operation and nothing changed, you can respond immediately with
+the same error.
+
+On the other hand the failure may be due to a reason that is not
+captured by the operation hash.  An example would be a permission
+denied error e.g. on an output directory. If the operation failure is
+cached changing the permission would not affect the hash and thus the
+operation would not be retried. You'd need to reset the cache (either
+globally or for the operation).
+
+A bit unsure what is best for the end-user here. The first point is
+clearly useful in certain scenarios and/or for slow compilers. The
+second point entails you need to understand that things can be a bit
+subtle (speaking of which I wonder if the file modes of the files
+declared as read by a build operation shouldn't be part of the hash
+aswell).
+
+At least a low level toggle should be provided for this in the API.
+Whether to expose it to the user is another story.

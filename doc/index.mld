@@ -2,6 +2,9 @@
 
 This package is unstable, do not depend on it.
 
+{{!page-manual}Old manual fragments} and
+{{!page-b00_manual}b00 discussion}.
+
 {1:b0_std B0 std}
 
 A few modules that should be in the stdlib. A few others that

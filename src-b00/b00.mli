@@ -7,37 +7,8 @@
 (** Build kernel
 
     {b WARNING.} This is an unstable API use at your own risk.
-
-    Concepts kept:
-    {ul
-    {- Treat build operations as pure functions that affect the file system
-       and memoize their results.}
-    {- Parallelize build operations by synchronizing on the files they
-       read and writes.}
-    {- Tight control over tool lookup and build environment.}}
-    Concepts dropped and to be seen how we can recover them at a higher level:
-    {ul
-    {- Build aims for cross compilation (build/host OS distinction). This
-       should be capturable as two separate {!Memo}s.}
-    {- Build units (named sets of build operation with metadata)}
-    {- Build operation synchronisation, only files for now, we had
-       unit-level. Did introduce {!Memo.Fut} for odig.}
-    {- Build configuration.}
-    {- Build unit/config definition localisation (multiple B0.ml files)}
-    {- Build directory structuring and forced clean builds}
-    {- Build metadata, unit and file level, packages.}}
-    {b TODO.}
-    {ul
-    {- Memo.spawn redirections, consider supporting all the options
-       of {!Os.Cmd.spawn}}
-    {- The concept of response file in {!Tool} should likely appear at
-       the {!Op.spawn} level aswell so that we can simply have the sequence
-       of {!Op.t} value for a potential build log (otherwise {!Op.spawn_args}
-       becomes the line with the response file which is not meanigfull)}
-    {- Operations, b0 also had file deletion maybe add them
-       aswell. Delete doesn't fit well in the "file ready" model, but
-       could be useful for concurrency.}
-    {- Input files. Should we consider their mode ? E.g. if we cache failure}}
+    See the {{!page-b00_manual}b00 manual} for design issues
+    and discussions.
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
 
