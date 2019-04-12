@@ -27,6 +27,8 @@ B0_github
 B0_json
 B0_machine
 B0_odoc
+B0_sexp
+B0_tlex
 B0_trace
 B0_ui
 B0_vcs

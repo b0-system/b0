@@ -2625,7 +2625,11 @@ module Log : sig
   type ('a, 'b) msgf =
     (?header:string -> ('a, Format.formatter, unit, 'b) format4 -> 'a) -> 'b
   (** The type for client specified message formatting functions. See
-      {!Logs.msgf}. *)
+      {!Logs.msgf}.
+
+      [header] interpretation is up to the reported but [None] should
+      automatially output headers that depend on the level and [Some ""]
+      should not output any header leaving full control to the client. *)
 
   type 'a log = ('a, unit) msgf -> unit
   (** The type for log functions. See {!Logs.log}. *)
@@ -2723,7 +2727,7 @@ end
 
     A value converter describes how to encode and decode OCaml values
     to a binary presentation and a textual, human specifiable,
-    {{!sexp_syntax}s-expression based}, representation.
+    {{!B0_sexp.sexp_syntax}s-expression based}, representation.
 
     {b Notation.} Given a value [v] and a converter [c] we write
     \[[v]\]{_c} the textual encoding of [v] according to [c]. *)
@@ -3142,178 +3146,6 @@ module Conv : sig
       composable}, use {!path} instead. Textual encoding pass the
       string as is and decoding ignores the initial starting point and
       parses the whole input string into a file path. *)
-
-  (** {1:sexp_syntax S-expressions syntax}
-
-      S-expressions are a general way of describing data via atoms
-      (sequences of characters) and lists delimited by parentheses.
-      Here are a few examples of s-expressions and their syntax:
-{v
-
-this-is-an-atom
-(this is a list of seven atoms)
-(this list contains (a nested) list)
-
-; This is a comment
-; Anything that follows a semi-colon is ignored until the next line
-
-(this list ; has three atoms and an embededded ()
- comment)
-
-"this is a quoted atom, it can contain spaces ; and ()"
-
-"quoted atoms can be split ^
- across lines or contain Unicode esc^u\{0061\}pes"
-v}
-
-      We define the syntax of s-expressions over a sequence of
-      {{:http://unicode.org/glossary/#unicode_scalar_value}Unicode
-      characters} in which all US-ASCII {{!Char.Ascii.is_control}control
-      characters} except {{!whitespace}whitespace} are forbidden in
-      unescaped form.
-
-      {b Note.} This module assumes the sequence of Unicode characters
-      is encoded as UTF-8 although it doesn't check this for now.
-
-      {2:sexp S-expressions and sequences thereof}
-
-      An {e s-expression} is either an {{!atoms}{e atom}} or a
-      {{!lists}{e list}} of s-expressions interspaced with
-      {{!whitespace}{e whitespace}} and {{!comments}{e comments}}. A {e
-      sequence of s-expressions} is a succession of s-expressions
-      interspaced with whitespace and comments.
-
-      These elements are informally described below and finally made
-      precise via an ABNF {{!grammar}grammar}.
-
-      {2:whitespace Whitespace}
-
-      Whitespace is a sequence of whitespace characters, namely, space
-      [' '] (U+0020), tab ['\t'] (U+0009), line feed ['\n'] (U+000A),
-      vertical tab ['\t'] (U+000B), form feed (U+000C) and carriage return
-      ['\r'] (U+000D).
-
-      {2:comments Comments}
-
-      Unless it occurs inside an atom in quoted form (see below)
-      anything that follows a semicolon [';'] (U+003B) is ignored until
-      the next {e end of line}, that is either a line feed ['\n'] (U+000A), a
-      carriage return ['\r']  (U+000D) or a carriage return and a line feed
-      ["\r\n"] (<U+000D,U+000A>).
-{v
-(this is not a comment) ; This is a comment
-(this is not a comment)
-v}
-
-      {2:atoms Atoms}
-
-      An atom represents ground data as a string of Unicode characters.
-      It can, via escapes, represent any sequence of Unicode characters,
-      including control characters and U+0000. It cannot represent an
-      arbitrary byte sequence except via a client-defined encoding
-      convention (e.g. Base64 or {{!string_bytes}hex encoding}).
-
-      Atoms can be specified either via an unquoted or a quoted form. In
-      unquoted form the atom is written without delimiters. In quoted
-      form the atom is delimited by double quote ['\"'] (U+0022) characters,
-      it is mandatory for atoms that contain {{!whitespace}whitespace},
-      parentheses ['('] [')'], semicolons [';'], quotes ['\"'], carets ['^']
-      or characters that need to be escaped.
-{v
-abc        ; a token for the atom "abc"
-"abc"      ; a quoted token for the atom "abc"
-"abc; (d"  ; a quoted token for the atom "abc; (d"
-""         ; the quoted token for the atom ""
-v}
-      For atoms that do not need to be quoted, both their unquoted and
-      quoted form represent the same string; e.g. the string ["true"]
-      can be represented both by the atoms {e true} and {e
-      "true"}. The empty string can only be represented in quoted form
-      by {e ""}.
-
-      In quoted form escapes are introduced by a caret ['^']. Double
-      quotes ['\"'] and carets ['^'] must always be escaped.
-{v
-"^^"             ; atom for ^
-"^n"             ; atom for line feed U+000A
-"^u\{0000\}"       ; atom for U+0000
-"^"^u\{1F42B\}^""  ; atom with a quote, U+1F42B and a quote
-v}
-      The following escape sequences are recognized:
-      {ul
-      {- ["^ "] (<U+005E,U+0020>) for space [' '] (U+0020)}
-      {- ["^\""] (<U+005E,U+0022>) for double quote ['\"'] (U+0022)
-         {b mandatory}}
-      {- ["^^"] (<U+005E,U+005E>) for caret ['^'] (U+005E) {b mandatory}}
-      {- ["^n"] (<U+005E,U+006E>) for line feed ['\n'] (U+000A)}
-      {- ["^r"] (<U+005E,U+0072>) for carriage return ['\r'] (U+000D)}
-      {- ["^u{X}"] with [X] is from 1 to at most 6 upper or lower case
-         hexadecimal digits standing for the corresponding
-         {{:http://unicode.org/glossary/#unicode_scalar_value}Unicode character}
-         U+X.}
-      {- Any other character except line feed ['\n'] (U+000A) or
-         carriage return ['\r'] (U+000D), following a caret is an
-         illegal sequence of characters. In the two former cases the
-         atom continues on the next line and white space is ignored.}}
-      An atom in quoted form can be split across lines by using a caret
-      ['^'] (U+005E) followed by a line feed ['\n'] (U+000A) or a
-      carriage return ['\r'] (U+000D); any subsequent
-      {{!whitespace}whitespace} is ignored.
-{v
-"^
-  a^
-  ^ " ; the atom "a "
-v}
-      The character ['^'] (U+005E) is used as an escape character rather
-      than the usual ['\\'] (U+005C) in order to make quoted Windows®
-      file paths decently readable and, not the least, utterly please DKM.
-
-      {2:lists Lists}
-
-      Lists are delimited by left ['('] (U+0028) and right
-      [')'] (U+0029) parentheses. Their elements are s-expressions separated by
-      optional {{!whitespace}whitespace} and {{!comments}comments}. For example:
-{v
-(a list (of four) expressions)
-(a list(of four)expressions)
-("a"list("of"four)expressions)
-(a list (of ; This is a comment
-four) expressions)
-() ; the empty list
-v}
-
-      {2:grammar S-expression grammar}
-
-      The following {{:https://tools.ietf.org/html/rfc5234}RFC 5234}
-      ABNF grammar is defined on a sequence of
-      {{:http://unicode.org/glossary/#unicode_scalar_value}Unicode characters}.
-{v
- sexp-seq = *(ws / comment / sexp)
-     sexp = atom / list
-     list = %x0028 sexp-seq %x0029
-     atom = token / qtoken
-    token = t-char *(t-char)
-   qtoken = %x0022 *(q-char / escape / cont) %x0022
-   escape = %x005E (%x0020 / %x0022 / %x005E / %x006E / %x0072 /
-                    %x0075 %x007B unum %x007D)
-     unum = 1*6(HEXDIG)
-     cont = %x005E nl ws
-       ws = *(ws-char)
-  comment = %x003B *(c-char) nl
-       nl = %x000A / %x000D / %x000D %x000A
-   t-char = %x0021 / %x0023-0027 / %x002A-%x003A / %x003C-%x005D /
-            %x005F-%x007E / %x0080-D7FF / %xE000-10FFFF
-   q-char = t-char / ws-char / %x0028 / %x0029 / %x003B
-  ws-char = %x0020 / %x0009 / %x000A / %x000B / %x000C / %x000D
-   c-char = %x0009 / %x000B / %x000C / %x0020-D7FF / %xE000-10FFFF
-v}
-      A few additional constraints not expressed by the grammar:
-      {ul
-      {- [unum] once interpreted as an hexadecimal number must be a
-       {{:http://unicode.org/glossary/#unicode_scalar_value}Unicode scalar
-       value.}}
-      {- A comment can be ended by the end of the character sequence rather
-       than [nl]. }} *)
 end
 
 (*---------------------------------------------------------------------------

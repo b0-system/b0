@@ -21,6 +21,8 @@ module Json = struct
 
   (* Decode *)
 
+  (* FIXME add positions and reuse Tlex. *)
+
   type decoder = { t : Buffer.t; i : string; mutable pos : int; }
   let decoder s = { t = Buffer.create 255; i = s; pos = 0 }
   let accept d = d.pos <- d.pos + 1 [@@ ocaml.inline]
@@ -105,7 +107,7 @@ module Json = struct
       accept_tail d
   | L4_F0 ->
       taccept d;
-      if (byte d - 0x90 < 0x90 - 0xBF) then taccept d else err d;
+      if (byte d - 0x90 < 0xBF - 0x90) then taccept d else err d;
       accept_tail d; accept_tail d
   | L4_F1_F3 -> taccept d; accept_tail d; accept_tail d; accept_tail d;
   | L4_F4 ->

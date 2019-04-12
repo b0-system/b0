@@ -283,13 +283,13 @@ module Fmt = struct
   | [] -> empty ppf ()
   | [v] -> pp_v ppf v
   | [v0; v1] -> pf ppf "@[either %a or@ %a@]" pp_v v0 pp_v v1
-  | v :: vs ->
+  | _ :: _ as vs ->
       let rec loop ppf = function
       | [v] -> pf ppf "or@ %a" pp_v v
       | v :: vs -> pf ppf "%a,@ " pp_v v; loop ppf vs
       | [] -> assert false
       in
-      pf ppf "@[one@ of@ %a%a@]" pp_v v loop vs
+      pf ppf "@[one@ of@ %a@]" loop vs
 
   let did_you_mean
       ?(pre = unit "Unknown") ?(post = nop) ~kind pp_v ppf (v, hints)
@@ -3562,6 +3562,7 @@ module Log = struct
     in
     let pp_header ppf (l, h) = match h with
     | None -> if l = App then () else Fmt.pf ppf "%s: [%a] " x pp_level l
+    | Some "" -> ()
     | Some h -> Fmt.pf ppf "%s: [%a] " x (pp_level_str l) h
     in
     pp_header
@@ -3592,7 +3593,7 @@ module Log = struct
     let ppf =
       if level = App then Format.std_formatter else Format.err_formatter
     in
-    Format.kfprintf k ppf ("%a@[" ^^ fmt ^^ "@]@.") pp_header (level, header)
+    Format.kfprintf k ppf ("@[%a" ^^ fmt ^^ "@]@.") pp_header (level, header)
 
   let kmsg_nop = let kmsg k level msgf = k () in { kmsg }
   let kmsg_default =
