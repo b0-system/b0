@@ -8,6 +8,7 @@
 
 open B0_std
 open B0_web
+open B0_json
 
 (** {1 GitHub authentication} *)
 

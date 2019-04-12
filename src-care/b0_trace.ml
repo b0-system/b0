@@ -5,8 +5,9 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
+open B0_json
 open B00
-open B0_web
+
 
 module Trace_event = struct
   let str pp get o = Jsong.strf "%a" pp (get o)
