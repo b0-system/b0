@@ -1945,6 +1945,10 @@ module Memo = struct
     in
     fun cmd_args -> { cmd_tool; cmd_args }
 
+  let tool_opt m t = match Env.tool m.m.env (Tool.name t) with
+  | Error e (* FIXME distinguish no lookup from errors *) -> None
+  | Ok _ -> Some (tool m t)
+
   let spawn
       m ?(reads = []) ?(writes = []) ?env ?cwd ?stdin ?(stdout = `Ui)
       ?(stderr = `Ui) ?(success_exits = [0]) ?k cmd

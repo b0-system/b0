@@ -1209,6 +1209,10 @@ module Memo : sig
   (** [tool m t] is tool [t] memoized. Use the resulting function
       to spawn the tool with the given arguments. *)
 
+  val tool_opt : t -> Tool.t -> (Cmd.t -> cmd) option
+  (** [tool_opt m t] is like {!tool}, except [None] is returned
+      if the tool cannot be found. *)
+
   val spawn :
     t -> ?reads:Fpath.t list -> ?writes:Fpath.t list -> ?env:Os.Env.t ->
     ?cwd:Fpath.t -> ?stdin:Fpath.t -> ?stdout:Op.Spawn.stdo ->
