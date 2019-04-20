@@ -344,6 +344,37 @@ module Htmlg = struct
     let var = v "var"
     let video = v "video"
     let wbr = v_void "wbr"
+
+    (* Convenience *)
+
+    let basic_page
+        ?(generator = "") ?(lang = "") ?(scripts = []) ?(styles = [])
+        ?(more_head = []) ?title:(t = "") body
+      =
+      let viewport = "width=device-width, initial-scale=1.0" in
+      let generator = match generator with
+      | "" -> []
+      | g -> [meta ~a:Att.[name "generator"; content g]];
+      in
+      let style uri =
+        link ~a:Att.[rel "stylesheet"; type' "text/css"; href uri]
+      in
+      let script uri =
+        script ~a:Att.[type' "text/javascript"; v "defer" "defer"; src uri][]
+      in
+      let title = if t = "" then [] else [title [txt t]] in
+      let head =
+        head [
+          meta ~a:Att.[charset "utf-8"];
+          splice generator;
+          meta ~a:Att.[name "viewport"; content viewport];
+          splice (List.map style styles);
+          splice (List.map script scripts);
+          splice more_head;
+          splice title ]
+      in
+      let a = if lang = "" then [] else [Att.v "lang" lang] in
+      html ~a [head; body]
   end
 end
 

@@ -179,6 +179,30 @@ module Htmlg : sig
     (** [raw s] is the raw string [s] without escaping markup delimiters.
         This can be used to include foreign markup. *)
 
+    (** {1:convenience Convenience} *)
+
+    val basic_page :
+      ?generator:string -> ?lang:string -> ?scripts:string list ->
+      ?styles:string list -> ?more_head:child list -> ?title:string ->
+      child -> child
+    (** [basic_page ~generator ~lang ~scripts ~styles ~more_head ~title body]
+        is an {!El.html} element containing a {!El.head} element followed
+        by [body]. The parameters are used to define a [head] as follows.
+        {ul
+        {- The page has a charset of UTF-8 (unconditional).}
+        {- The page has a viewport with [width=device-width, initial-scale=1]
+         (unconditional).}
+        {- The page has a generator {!El.meta} tag of [generator], if
+           specified and non-empty.}
+        {- The page has language [lang], if specified and non-empty.}
+        {- The page has a defered script of type [text/javascript] for
+           each element of [scripts], in order (defaults to [[]]).}
+        {- The page has a stylesheet link of type [text/css] for each element
+           of [styles], in order (defaults to [[]]).}
+        {- The page has [more_head] in the {!El.head} element
+           (defaults to [[]]).}
+        {- The page has a title [title], if specified and non-empty.}} *)
+
     (** {1:output Output} *)
 
     val buffer_add : doc_type:bool -> Buffer.t -> child -> unit
