@@ -23,6 +23,7 @@ The core [b0] build library.
 Tools for software construction care.
 
 {!modules:
+B0_cmark
 B0_github
 B0_json
 B0_machine
