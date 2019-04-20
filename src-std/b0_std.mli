@@ -1310,6 +1310,15 @@ module Fpath : sig
         [ppf] using [pp_v] to print the map codomain elements. *)
   end
 
+  (** {1:sorts Sorts} *)
+
+  val sort_by_parent : Set.t -> Set.t Map.t
+  (** [sort_by_parent ps] maps elements of [ps] by their {!Fpath.parent}. *)
+
+  val sort_by_ext : ?multi:bool -> Set.t -> Set.t String.Map.t
+  (** [sort_by_ext ~multi ps] maps elements of [ps] by their extension as
+      determined by {!Fpath.get_ext}[ ~multi]. *)
+
   (** {1:sp Search paths}
 
       A {e search path} is a list of paths separated by a designated

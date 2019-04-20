@@ -1623,6 +1623,26 @@ module Fpath = struct
   module Set = String.Set
   module Map = String.Map
 
+  (* Sorts *)
+
+  let sort_by_parent ps =
+    let add_path p acc =
+      let dir = parent p in
+      match Map.find dir acc with
+      | exception Not_found -> Map.add dir (Set.singleton p) acc
+      | ps -> Map.add dir (Set.add p ps) acc
+    in
+    Set.fold add_path ps Map.empty
+
+  let sort_by_ext ?multi ps =
+    let add_path p acc =
+      let ext = get_ext ?multi p in
+      match String.Map.find ext acc with
+      | exception Not_found -> String.Map.add ext (Set.singleton p) acc
+      | ps -> String.Map.add ext (Set.add p ps) acc
+    in
+    Set.fold add_path ps String.Map.empty
+
   (* Search paths *)
 
   let search_path_sep = if Sys.win32 then ";" else ":"
