@@ -1141,6 +1141,18 @@ module String = struct
     include Map.Make (String)
     let dom m = fold (fun k _ acc -> Set.add k acc) m Set.empty
     let of_list bs = List.fold_left (fun m (k,v) -> add k v m) empty bs
+
+    let add_to_list k v m = match find k m with
+    | exception Not_found -> add k [v] m
+    | l -> add k (v :: l) m
+
+    let add_to_set
+        (type set) (type elt)
+        (module S : Stdlib.Set.S with type elt = elt and type t = set)
+        k v m = match find k m with
+    | exception Not_found -> add k (S.singleton v) m
+    | set -> add k (S.add v set) m
+
     let pp ?sep pp_binding = Fmt.iter_bindings ?sep iter pp_binding
     let dump_str = dump
     let dump pp_v ppf m =
@@ -1638,20 +1650,12 @@ module Fpath = struct
   (* Sorts *)
 
   let sort_by_parent ps =
-    let add_path p acc =
-      let dir = parent p in
-      match Map.find dir acc with
-      | exception Not_found -> Map.add dir (Set.singleton p) acc
-      | ps -> Map.add dir (Set.add p ps) acc
-    in
+    let add_path p acc = Map.add_to_set (module Set) (parent p) p acc in
     Set.fold add_path ps Map.empty
 
   let sort_by_ext ?multi ps =
     let add_path p acc =
-      let ext = get_ext ?multi p in
-      match String.Map.find ext acc with
-      | exception Not_found -> String.Map.add ext (Set.singleton p) acc
-      | ps -> String.Map.add ext (Set.add p ps) acc
+      String.Map.add_to_set (module Set) (get_ext ?multi p) p acc
     in
     Set.fold add_path ps String.Map.empty
 

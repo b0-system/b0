@@ -951,6 +951,8 @@ module String : sig
 
     include Set.S with type elt := string
 
+    type elt = string
+
     val pp : ?sep:unit Fmt.t -> string Fmt.t -> t Fmt.t
     (** [pp ~sep pp_elt ppf ss] formats the elements of [ss] on
         [ppf]. Each element is formatted with [pp_elt] and elements
@@ -970,12 +972,29 @@ module String : sig
 
     include Map.S with type key := string
 
+    type key = string
+
     val dom : 'a t -> Set.t
     (** [dom m] is the domain of [m]. *)
 
     val of_list : (string * 'a) list -> 'a t
     (** [of_list bs] is [List.fold_left (fun m (k, v) -> add k v m) empty
         bs]. *)
+
+    (** {1:add Additional adds} *)
+
+    val add_to_list : string -> 'a -> 'a list t -> 'a list t
+    (** [add k v m] is [m] with [k] mapping to [l] such that [l] is
+        [v :: find k m] if [k] was bound in [m] and [[v]] otherwise. *)
+
+    val add_to_set :
+      (module Stdlib.Set.S with type elt = 'a and type t = 'set) ->
+      string -> 'a -> 'set t -> 'set t
+    (** [add (module S) k v m] is [m] with [k] mapping to [s] such that [s] is
+        [S.add v (find k m)] if [k] was bound in [m] and [S.singleton [v]]
+        otherwise. *)
+
+    (** {1:fmt Formatting} *)
 
     val pp : ?sep:unit Fmt.t -> (string * 'a) Fmt.t -> 'a t Fmt.t
     (** [pp ~sep pp_binding ppf m] formats the bindings of [m] on
@@ -1274,6 +1293,7 @@ module Fpath : sig
     (** {1 Path sets} *)
 
     include Set.S with type elt := t
+    type elt = path
 
     val pp : ?sep:unit Fmt.t -> path Fmt.t -> t Fmt.t
     (** [pp ~sep pp_elt ppf ss] formats the elements of [ss] on
@@ -1293,6 +1313,7 @@ module Fpath : sig
     (** {1 Path maps} *)
 
     include Map.S with type key := t
+    type key = path
 
     val dom : 'a t -> Set.t
     (** [dom m] is the domain of [m]. *)
@@ -1300,6 +1321,21 @@ module Fpath : sig
     val of_list : (path * 'a) list -> 'a t
     (** [of_list bs] is [List.fold_left (fun m (k, v) -> add k v m) empty
         bs]. *)
+
+    (** {1:add Additional adds} *)
+
+    val add_to_list : string -> 'a -> 'a list t -> 'a list t
+    (** [add k v m] is [m] with [k] mapping to [l] such that [l] is
+        [v :: find k m] if [k] was bound in [m] and [[v]] otherwise. *)
+
+    val add_to_set :
+      (module Stdlib.Set.S with type elt = 'a and type t = 'set) ->
+      string -> 'a -> 'set t -> 'set t
+    (** [add (module S) k v m] is [m] with [k] mapping to [s] such that [s] is
+        [S.add v (find k m)] if [k] was bound in [m] and [S.singleton [v]]
+        otherwise. *)
+
+    (** {1:fmt Formatting} *)
 
     val pp : ?sep:unit Fmt.t -> (path * 'a) Fmt.t -> 'a t Fmt.t
     (** [pp ~sep pp_binding ppf m] formats the bindings of [m] on
