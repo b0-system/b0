@@ -1018,18 +1018,18 @@ end
     {ol
     {- An optional, platform-dependent, volume.}
     {- An optional root directory separator {!dir_sep} whose presence
-       distiguishes absolute paths (["/a"]) from {e relative} ones
+       distinguishes absolute paths (["/a"]) from {e relative} ones
        (["a"])}
     {- A non-empty list of {!dir_sep} separated segments. {e Segments}
        are non empty strings except for maybe the last one. The latter
-       syntactically distiguishes {e directory paths} (["a/b/"]) from
+       syntactically distinguishes {e directory paths} (["a/b/"]) from
        file paths (["a/b"]).}}
 
     The paths segments ["."] and [".."] are relative path segments
     that respectively denote the current and parent directory. The
     {{!basename}basename} of a path is its last non-empty segment if
     it is not a relative path segment or the empty string otherwise (e.g.
-    on ["/"]). *)
+    on ["/"] or [".."]). *)
 module Fpath : sig
 
   (** {1:segments Separators and segments} *)
@@ -1074,8 +1074,9 @@ module Fpath : sig
   val append : t -> t -> t
   (** [append p q] appends [q] to [p] as follows:
       {ul
-      {- [q] is absolute or has a non-empty volume then [q] is returned.}
-      {- Otherwise appends [q]'s segment to [p] using {!add_seg}.}} *)
+      {- If [q] is {{!is_abs}absolute} or has a non-empty volume then
+         [q] is returned.}
+      {- Otherwise appends [q]'s segments to [p] using {!add_seg}.}} *)
 
   val ( / ) : t -> string -> t
   (** [p / seg] is [add_seg p seg]. Left associative. *)
@@ -1096,8 +1097,8 @@ module Fpath : sig
 
   val to_dir_path : t -> t
   (** [to_dir_path p] is [add_seg p ""]. It ensures that the resulting
-      path represents a {{!is_dir_path}directory} and, if converted
-      to a string, that it ends with a {!dir_sep}. *)
+      path syntactically represents a {{!is_dir_path}directory} and thus,
+      if converted to a string, that it ends with a {!dir_sep}. *)
 
   (** {1:baseparent Basename and parent directory}
 
@@ -1105,10 +1106,12 @@ module Fpath : sig
       properties of paths. Given a path, these properties can be
       different from the ones your file system attributes to it. *)
 
-  val basename : t -> string
+  val basename : ?no_ext:bool -> t -> string
   (** [basename p] is the last non-empty segment of [p] or the empty
       string otherwise. The latter occurs only on root paths and on
-      paths whose last non-empty segment is a relative segment. *)
+      paths whose last non-empty segment is a {{!is_rel_seg}relative
+      segment}. If [no_ext] is [true] (default to [false]) the basename's
+      {{!file_ext}multiple extension}, if any, is removed from the result. *)
 
   val parent : t -> t
   (** [parent p] is a {{!is_dir_path}directory path} that contains

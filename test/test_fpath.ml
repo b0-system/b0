@@ -46,6 +46,43 @@ let test_is_prefix_rem_prefix () =
   end;
   ()
 
+let test_basename () =
+  let test p b ~no_ext:b' =
+    let p = Fpath.v p in
+    assert (Fpath.basename p = b);
+    assert (Fpath.basename ~no_ext:true p = b');
+  in
+  test "bla" "bla" ~no_ext:"bla";
+  test "bla" "bla" ~no_ext:"bla";
+  test "/" "" ~no_ext:"";
+  test "/.." "" ~no_ext:"";
+  test "/." "" ~no_ext:"";
+  test "bla/.." "" ~no_ext:"";
+  test "bla/." "" ~no_ext:"";
+  test ".." "" ~no_ext:"";
+  test "." "" ~no_ext:"";
+  test "./a" "a" ~no_ext:"a";
+  test "./a/" "a" ~no_ext:"a";
+  test "./abla" "abla" ~no_ext:"abla";
+  test "./abla/" "abla" ~no_ext:"abla";
+  test "/abla" "abla" ~no_ext:"abla";
+  test "/abla/" "abla" ~no_ext:"abla";
+  test "/.ocamlinit" ".ocamlinit" ~no_ext:".ocamlinit";
+  test "/.ocamlinit/" ".ocamlinit" ~no_ext:".ocamlinit";
+  test "/..ocamlinit/" "..ocamlinit" ~no_ext:"..ocamlinit";
+  test "hop/.emacs.d" ".emacs.d" ~no_ext:".emacs";
+  test "hap/.emacs.d/" ".emacs.d" ~no_ext:".emacs";
+  test "hop/.emacs.d" ".emacs.d" ~no_ext:".emacs";
+  test "hap/.emacs.d/" ".emacs.d" ~no_ext:".emacs";
+  test "hap/archive.tar.gz/" "archive.tar.gz" ~no_ext:"archive";
+  test "hap/archive.tar.gz" "archive.tar.gz" ~no_ext:"archive";
+  test "/archive.tar.gz" "archive.tar.gz" ~no_ext:"archive";
+  test "archive.tar.gz/" "archive.tar.gz" ~no_ext:"archive";
+  test "archive.tar.gz" "archive.tar.gz" ~no_ext:"archive";
+  if Sys.win32 then begin
+    test "C:archive.tar.gz" "archive.tar.gz" ~no_ext:"archive";
+  end;
+  ()
 
 let test_parent () =
   let test p pp =
@@ -78,6 +115,7 @@ let test_parent () =
 let test () =
   test_is_prefix_rem_prefix ();
   test_parent ();
+  test_basename ();
   ()
 
 (*---------------------------------------------------------------------------

@@ -1364,6 +1364,7 @@ module Fpath = struct
             | exception Not_found -> 0
             | k -> k + 1
 
+    let path_start p = 0
     let chop_volume p = p
     let append p0 p1 =
       if p1.[0] = dir_sep_char (* absolute *) then p1 else
@@ -1379,6 +1380,7 @@ module Fpath = struct
         (pct_esc_set_char ~escape_space) p
   end
 
+  let path_start = if Sys.win32 then Windows.path_start else Posix.path_start
   let chop_volume = if Sys.win32 then Windows.chop_volume else Posix.chop_volume
 
   (* Separators and segments *)
@@ -1394,7 +1396,6 @@ module Fpath = struct
 
   let is_seg = if Sys.win32 then Windows.is_seg else Posix.is_seg
   let is_rel_seg = function "." | ".." -> true | _ -> false
-  let rel_to_empty = function "." | ".." -> "" | seg -> seg
 
   let last_seg_len p = match String.rindex p dir_sep_char with
   | exception Not_found -> String.length p
@@ -1416,8 +1417,6 @@ module Fpath = struct
     String.concat sep [p; seg]
 
   let append = if Sys.win32 then Windows.append else Posix.append
-  let ( / ) = add_seg
-  let ( // ) = append
 
   (* Directory paths *)
 
@@ -1440,38 +1439,6 @@ module Fpath = struct
 
   let to_dir_path p = add_seg p ""
 
-  (* Basename and parent directory *)
-
-  let basename p = match String.rindex p dir_sep_char with
-  | exception Not_found -> if is_rel_seg p then "" else chop_volume p
-  | k ->
-      match k <> String.length p - 1 (* seg not empty ? *) || k = 0 with
-      | true -> rel_to_empty @@ String.with_index_range ~first:(k + 1) p
-      | false ->
-          let j = k - 1 in
-          match String.rindex_from p j dir_sep_char with
-          | exception Not_found ->
-              rel_to_empty @@ String.with_index_range ~last:j p
-          | i ->
-              rel_to_empty @@ String.with_index_range ~first:(i + 1) ~last:j p
-
-  let rec parent p =
-    let plen = String.length p in
-    let seg_start = last_non_empty_seg_start p in
-    let seg_stop = match last_is_dir_sep p with
-    | true -> plen - 2
-    | false -> plen - 1
-    in
-    let seg_len = seg_stop - seg_start + 1 in
-    let via_dotdot p = add_seg (add_seg p "..") "" in
-    match seg_len with
-    | 0 -> p
-    | 1 when p.[seg_start] = '.' ->
-        if seg_start = 0 then "../" else
-        parent (String.with_index_range ~last:(seg_start - 1) p)
-    | 2 when p.[seg_start] = '.' && p.[seg_stop] = '.' -> via_dotdot p
-    | _ when seg_start = 0 -> "./"
-    | _ -> add_seg (String.with_index_range ~last:(seg_start - 1) p) ""
 
   (* Strict prefixes *)
 
@@ -1507,8 +1474,6 @@ module Fpath = struct
 
   let equal = String.equal
   let compare = String.compare
-  let equal_basename p0 p1 = (* XXX could avoid alloc *)
-    String.equal (basename p0) (basename p1)
 
   (* File extensions *)
 
@@ -1603,8 +1568,55 @@ module Fpath = struct
       let p = _rem_ext efirst elast p in
       p, ext
 
-  let ( + ) p e = add_ext e p
-  let ( -+ ) p e = set_ext e p
+  (* Basename and parent directory *)
+
+  let basename ?(no_ext = false) p =
+    let max = String.length p - 1 in
+    let first, last = match String.rindex p dir_sep_char with
+    | exception Not_found -> (* B *) path_start p, max
+    | k when k <> max || k = 0 -> (* /B or .../B *) k + 1, max
+    | k -> (* .../ *)
+        let j = k - 1 in
+        match String.rindex_from p j dir_sep_char with
+        | exception Not_found -> (* B/ *) path_start p, j
+        | i -> (* .../B/ *) i + 1, j
+    in
+    match last - first + 1 with
+    | 1 when p.[first] = '.' -> ""
+    | 2 when p.[first] = '.' && p.[first + 1] = '.' -> ""
+    | _ when not no_ext -> String.with_index_range ~first ~last p
+    | _ -> (* Drop multi ext *)
+        let rec loop first last i = match i > last with
+        | true -> String.with_index_range ~first ~last p
+        | false ->
+            match p.[i] = ext_sep_char with
+            | false -> loop first last (i + 1)
+            | true ->
+                if p.[i - 1] = ext_sep_char then loop first last (i + 1) else
+                String.with_index_range ~first ~last:(i - 1) p
+        in
+        loop first last (first + 1)
+
+  let rec parent p =
+    let plen = String.length p in
+    let seg_start = last_non_empty_seg_start p in
+    let seg_stop = match last_is_dir_sep p with
+    | true -> plen - 2
+    | false -> plen - 1
+    in
+    let seg_len = seg_stop - seg_start + 1 in
+    let via_dotdot p = add_seg (add_seg p "..") "" in
+    match seg_len with
+    | 0 -> p
+    | 1 when p.[seg_start] = '.' ->
+        if seg_start = 0 then "../" else
+        parent (String.with_index_range ~last:(seg_start - 1) p)
+    | 2 when p.[seg_start] = '.' && p.[seg_stop] = '.' -> via_dotdot p
+    | _ when seg_start = 0 -> "./"
+    | _ -> add_seg (String.with_index_range ~last:(seg_start - 1) p) ""
+
+  let equal_basename p0 p1 = (* XXX could avoid alloc *)
+    String.equal (basename p0) (basename p1)
 
   (* Converting *)
 
@@ -1660,6 +1672,13 @@ module Fpath = struct
         | Ok d -> loop (d :: acc) p
     in
     loop [] path
+
+  (* Operators *)
+
+  let ( / ) = add_seg
+  let ( // ) = append
+  let ( + ) p e = add_ext e p
+  let ( -+ ) p e = set_ext e p
 end
 
 (* Hash values and functions *)
