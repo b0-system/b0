@@ -5,7 +5,7 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std;;
-#install_printer Fpath.pp_quoted;;
+#install_printer Fpath.pp;;
 #install_printer Hash.pp;;
 #install_printer Cmd.dump;;
 #install_printer Time.Span.pp;;

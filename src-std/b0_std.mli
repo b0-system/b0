@@ -1269,10 +1269,10 @@ module Fpath : sig
       definition} of URI parsing. *)
 
   val pp : t Fmt.t
-  (** [pp ppf p] prints path [p] on [ppf] using {!to_string}. *)
+  (** [pp ppf p] prints path [p] on [ppf] using {!Filename.quote}. *)
 
-  val pp_quoted : t Fmt.t
-  (** [pp_quoted p] prints path [p] on [ppf] using {!Filename.quote}. *)
+  val pp_unquoted : t Fmt.t
+  (** [pp_unquoted p] prints path [p] on [ppf] using {to_string}. *)
 
   val dump : t Fmt.t
   (** [dump ppf p] prints path [p] on [ppf] using {!String.dump}. *)
@@ -1302,9 +1302,13 @@ module Fpath : sig
         {!Format.pp_print_cut}). If the set is empty leaves [ppf]
         untouched. *)
 
+    val pp_set : t Fmt.t
+    (** [pp_set ppf ss] prints an unspecified set-like representation
+        of [ss] on [ppf] using {!Fpath.pp}.} *)
+
     val dump : t Fmt.t
     (** [dump ppf ss] prints an unspecified representation of [ss] on
-        [ppf]. *)
+        [ppf] with {!Fpath.dump} *)
   end
 
   (** Path maps. *)

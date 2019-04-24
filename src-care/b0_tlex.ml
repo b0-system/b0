@@ -103,7 +103,8 @@ module Tloc = struct
 
   let pp_ocaml ppf l = match l.byte_e < 0 with
   | true ->
-      Fmt.pf ppf "File \"%a\", line n/a, characters n/a" Fpath.pp l.file
+      Fmt.pf ppf "File \"%a\", line n/a, characters n/a"
+        Fpath.pp_unquoted l.file
   | false ->
       let pp_lines ppf l = match (snd l.line_s) = (snd l.line_e) with
       | true -> Fmt.pf ppf "line %d" (snd l.line_s)
@@ -112,10 +113,10 @@ module Tloc = struct
       let col_s = l.byte_s - (fst l.line_s) in
       let col_e = l.byte_e - (fst l.line_e) in
       Fmt.pf ppf "File \"%a\", %a, characters %d-%d"
-        Fpath.pp l.file pp_lines l col_s col_e
+        Fpath.pp_unquoted l.file pp_lines l col_s col_e
 
   let pp_gnu ppf l = match l.byte_e < 0 with
-  | true -> Fmt.pf ppf "%a" Fpath.pp l.file
+  | true -> Fmt.pf ppf "%a" Fpath.pp_unquoted l.file
   | false ->
       let pp_lines ppf l =
         let col_s = l.byte_s - (fst l.line_s) in
@@ -125,7 +126,7 @@ module Tloc = struct
         | false ->
             Fmt.pf ppf "%d.%d-%d.%d" (snd l.line_s) col_s (snd l.line_e) col_e
       in
-      Fmt.pf ppf "%a:%a" Fpath.pp l.file pp_lines l
+      Fmt.pf ppf "%a:%a" Fpath.pp_unquoted l.file pp_lines l
 
   let pp = pp_gnu
 end

@@ -697,8 +697,8 @@ module Op = struct
 
     let pp_stdo ppf = function
     | `Ui -> Fmt.pf ppf "<ui>"
-    | `File f -> Fpath.pp_quoted ppf f
-    | `Tee f -> Fmt.pf ppf "@[<hov><ui> and@ %a@]" Fpath.pp_quoted f
+    | `File f -> Fpath.pp ppf f
+    | `Tee f -> Fmt.pf ppf "@[<hov><ui> and@ %a@]" Fpath.pp f
 
     let pp_stdo_ui ~elide ppf s = match s.stdo_ui with
     | None -> Fmt.none ppf ()
@@ -711,11 +711,11 @@ module Op = struct
 
     let pp ppf s =
       let pp_env = Fmt.(vbox @@ list string) in
-      let pp_opt_path = Fmt.(option ~none:none) Fpath.pp_quoted in
+      let pp_opt_path = Fmt.(option ~none:none) Fpath.pp in
       Fmt.field "cmd" pp_cmd ppf s; Fmt.cut ppf ();
       Fmt.field "env" pp_env ppf s.env; Fmt.cut ppf ();
       Fmt.field "relevant-env" pp_env ppf s.relevant_env; Fmt.cut ppf ();
-      Fmt.field "cwd" Fpath.pp_quoted ppf s.cwd; Fmt.cut ppf ();
+      Fmt.field "cwd" Fpath.pp ppf s.cwd; Fmt.cut ppf ();
       Fmt.field "success-exits" pp_success_exits ppf s.success_exits;
       Fmt.cut ppf ();
       Fmt.field "stdin" pp_opt_path ppf s.stdin; Fmt.cut ppf ();
@@ -744,7 +744,7 @@ module Op = struct
     | Ok d -> pp_file_contents ppf d
 
     let pp ppf r =
-      Fmt.field "file" Fpath.pp_quoted ppf r.read_file; Fmt.cut ppf ();
+      Fmt.field "file" Fpath.pp ppf r.read_file; Fmt.cut ppf ();
       Fmt.field "result" pp_result ppf r.read_result; Fmt.cut ppf ()
   end
 
@@ -774,7 +774,7 @@ module Op = struct
     | Ok () -> Fmt.string ppf "written"
 
     let pp ppf w =
-      Fmt.field "file" Fpath.pp_quoted ppf w.write_file; Fmt.cut ppf ();
+      Fmt.field "file" Fpath.pp ppf w.write_file; Fmt.cut ppf ();
       Fmt.field "mode" Fmt.int ppf w.write_mode; Fmt.cut ppf ();
       Fmt.field "result" pp_result ppf w.write_result
   end
@@ -828,7 +828,7 @@ module Op = struct
     | Ok created -> Fmt.string ppf (if created then "created" else "existed")
 
     let pp ppf m =
-      Fmt.field "dir" Fpath.pp_quoted ppf m.mkdir_dir; Fmt.cut ppf ();
+      Fmt.field "dir" Fpath.pp ppf m.mkdir_dir; Fmt.cut ppf ();
       Fmt.field "result" pp_result ppf m.mkdir_result
   end
 
@@ -853,13 +853,13 @@ module Op = struct
 
   let pp_kind_short ppf = function
   | Spawn s -> Spawn.pp_cmd ppf s
-  | Read r -> Fpath.pp_quoted ppf (Read.file r)
-  | Write w -> (Fmt.tty file_write_color Fpath.pp_quoted) ppf (Write.file w)
-  | Mkdir m -> Fpath.pp_quoted ppf (Mkdir.dir m)
+  | Read r -> Fpath.pp ppf (Read.file r)
+  | Write w -> (Fmt.tty file_write_color Fpath.pp) ppf (Write.file w)
+  | Mkdir m -> Fpath.pp ppf (Mkdir.dir m)
   | Copy c ->
       Fmt.pf ppf "%a to %a"
-        Fpath.pp_quoted (Copy.src c)
-        (Fmt.tty file_write_color Fpath.pp_quoted) (Copy.dst c)
+        Fpath.pp (Copy.src c)
+        (Fmt.tty file_write_color Fpath.pp) (Copy.dst c)
   | Wait_files -> ()
 
   let pp_synopsis ppf o =
@@ -882,14 +882,14 @@ module Op = struct
     Fmt.pf ppf "@[<h>%a %a@]" pp_synopsis o pp_kind_short o.kind
 
   let pp_writes =
-    let pp_file_write = Fmt.tty file_write_color Fpath.pp_quoted in
+    let pp_file_write = Fmt.tty file_write_color Fpath.pp in
     Fmt.braces @@ Fmt.list pp_file_write
 
   let pp_op ppf o =
     let pp_span ppf s =
       Fmt.pf ppf "%a (%ans)" Time.Span.pp s Time.Span.pp_ns s
     in
-    let pp_reads = Fmt.braces @@ Fmt.list Fpath.pp_quoted in
+    let pp_reads = Fmt.braces @@ Fmt.list Fpath.pp in
     let dur = Time.Span.abs_diff o.exec_end_time o.exec_start_time in
     Fmt.field "group" Fmt.string ppf (o.group); Fmt.cut ppf ();
     Fmt.field "writes" pp_writes ppf o.writes; Fmt.cut ppf ();

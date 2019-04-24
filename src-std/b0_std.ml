@@ -275,7 +275,7 @@ module Fmt = struct
   (* Fields *)
 
   let field ?(style = [`Fg `Yellow]) f pp_v ppf v =
-    pf ppf "@[%a: @[%a@]@]" (tty_string style) f pp_v v
+    pf ppf "@[<hov 1>%a:@ @[%a@]@]" (tty_string style) f pp_v v
 
   (* Alternatives *)
 
@@ -1451,7 +1451,6 @@ module Fpath = struct
 
   let to_dir_path p = add_seg p ""
 
-
   (* Strict prefixes *)
 
   let is_prefix pre p = match String.is_prefix pre p with
@@ -1633,8 +1632,8 @@ module Fpath = struct
   (* Converting *)
 
   let to_uri_path = if Sys.win32 then Windows.to_uri_path else Posix.to_uri_path
-  let pp = String.pp
-  let pp_quoted ppf p = String.pp ppf (Filename.quote p)
+  let pp ppf p = String.pp ppf (Filename.quote p)
+  let pp_unquoted = String.pp
   let dump = String.dump
 
   (* Uniqueness *)
@@ -1644,7 +1643,12 @@ module Fpath = struct
   (* Path and sets *)
 
   type path = t
-  module Set = String.Set
+  module Set = struct
+    let pp_set ppf ss =
+      Fmt.pf ppf "@[<1>{%a}@]" (String.Set.pp ~sep:Fmt.sp pp) ss
+
+    include String.Set
+  end
   module Map = String.Map
 
   (* Sorts *)
@@ -3269,7 +3273,7 @@ module Os = struct
     | Ok None ->
         let pp_search ppf = function
         | None -> Fmt.string ppf "PATH"
-        | Some dirs ->Fmt.(list ~sep:comma Fpath.pp_quoted) ppf dirs
+        | Some dirs ->Fmt.(list ~sep:comma Fpath.pp) ppf dirs
         in
         Fmt.error "%s: No such tool found in %a" tool pp_search search
 
