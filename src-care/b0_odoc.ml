@@ -8,7 +8,7 @@ open B0_std
 open B00
 
 let parse_lines ~file data parse acc =
-  let err n e = Fmt.error "%a:%d: %s" Fpath.pp file n e in
+  let err n e = Fmt.error "%a:%d: %s" Fpath.pp_unquoted file n e in
   let rec loop acc n data = match String.cut_left ~sep:"\n" data with
   | Some (line, rest) ->
       begin match parse line acc with

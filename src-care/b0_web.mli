@@ -12,9 +12,20 @@
 
 open B0_std
 
-(** HTTP requests.
+(** URIs. *)
+module Uri : sig
 
-    HTTP requests via [curl]. *)
+  type t = string
+  (** The type for URIs. *)
+
+  val parse_scheme : string -> string option
+  (** [parse_scheme s] tries to parse a scheme at the beginning of [s]. *)
+
+  val parse_authority : string -> string option
+  val parse_path_and_query : string -> string option
+end
+
+(** HTTP methods, requests and responses. *)
 module Http : sig
 
   (** {1:meth HTTP methods and headers} *)
@@ -28,7 +39,8 @@ module Http : sig
   (** [meth_to_string m] is a string representation of [m]. *)
 
   type headers = (string * string) list
-  (** The type for HTTP headers. *)
+  (** The type for HTTP headers. List of header names (without the [:])
+      tupled with their value. *)
 
   (** {1:requests HTTP requests} *)
 
@@ -40,7 +52,7 @@ module Http : sig
       headers [headers] (defaults to [[]]) and body [body] (defaults to
       [""]). *)
 
-  val req_uri : req -> string
+  val req_uri : req -> Uri.t
   (** [req_uri r] is [r]'s request URI. *)
 
   val req_meth : req -> meth
@@ -57,6 +69,10 @@ module Http : sig
   type resp
   (** The type for HTTP responses. *)
 
+  val resp : ?headers:headers -> ?body:string -> int -> resp
+  (** [resp status ~headers ~body] is a response with status [status],
+      headers [headers] (defaults to [[]]) and body [body] (defaults to [""]) *)
+
   val resp_headers : resp -> headers
   (** [resp_headers r] are the HTTP response headers. *)
 
@@ -65,6 +81,10 @@ module Http : sig
 
   val resp_body : resp -> string
   (** [resp_body r] is the HTTP response body. *)
+end
+
+(** HTTP requests via [curl]. *)
+module Httpr : sig
 
   (** {1:peforming Performing requests} *)
 
@@ -79,7 +99,7 @@ module Http : sig
   val find_curl :
     ?search:Fpath.t list -> curl:Cmd.t -> unit -> (t, string) result
 
-  val perform : ?follow:bool -> t -> req -> (resp, string) result
+  val perform : ?follow:bool -> t -> Http.req -> (Http.resp, string) result
   (** [perform curl r] performs request [r] via [curl] which is looked up
       in the PATH or in the environment variable [B0_CURL].  If
       [follow] is [true] (default) HTTP redirects for GET and HEAD

@@ -33,13 +33,13 @@ type v3_body = [ `Json of Jsong.t | `Other of content_type * string | `Empty ]
     else tagged with its content type or nothing. *)
 
 val req_json_v3 :
-  ?headers:Http.headers -> Http.t -> auth -> path:string -> Http.meth ->
+  ?headers:Http.headers -> Httpr.t -> auth -> path:string -> Http.meth ->
   v3_body -> (Json.t, string) result
 (** [req_json_v3 auth path m ~headers body] performs the request for json
     on [path] using method [m], additional headers [headers], body [body] and
     authentication [auth]. *)
 
-val query_v4 : Http.t -> auth -> string -> (Json.t, string) result
+val query_v4 : Httpr.t -> auth -> string -> (Json.t, string) result
 (** [query_v4 auth q] performs the {{:https://developer.github.com/v4/}
     the GitHub GraphQL V4} query [q] using authentication [auth]. *)
 
@@ -61,12 +61,12 @@ module Repo : sig
   (** [name r] is [r]'s name. *)
 
   val req_json_v3 :
-    ?headers:Http.headers -> Http.t -> auth -> t -> path:string -> Http.meth ->
+    ?headers:Http.headers -> Httpr.t -> auth -> t -> path:string -> Http.meth ->
     v3_body -> (Json.t, string) result
   (** [req_json_v3] is like {!req_json_v3} but performs given the root
       subpath on the given repo. *)
 
-  val query_v4 : Http.t -> auth -> t -> string -> (Json.t, string) result
+  val query_v4 : Httpr.t -> auth -> t -> string -> (Json.t, string) result
   (** [query_v4 auth r q] performs the subgraph query [q] on repo [r]
       using authentication [auth]. *)
 end
@@ -103,19 +103,19 @@ module Issue : sig
   val pp_short : t Fmt.t
   (** [pp_short] is a short formatter for issues. *)
 
-  val list : Http.t -> auth -> Repo.t -> (int * t list, string) result
+  val list : Httpr.t -> auth -> Repo.t -> (int * t list, string) result
   (** [list auth repo] lists the issues for repository [repo].
       The integer is the total number of issues. *)
 
   (** {1:req Requests} *)
 
   val create :
-    Http.t -> auth -> Repo.t -> title:string -> body:string -> unit ->
+    Httpr.t -> auth -> Repo.t -> title:string -> body:string -> unit ->
     (num * uri, string) result
   (** [create auth repo] opens an issue on the repository [repo] with
       the given [title] and [body]. *)
 
-  val close : Http.t -> auth -> Repo.t -> num -> (num * uri, string) result
+  val close : Httpr.t -> auth -> Repo.t -> num -> (num * uri, string) result
   (** [close auth repo n] closes issues [n] on the repository [repo] *)
 end
 
@@ -151,18 +151,18 @@ module Release : sig
   (** {1:req Requests} *)
 
   val create :
-    Http.t -> auth -> Repo.t -> tag_name:string -> body:string -> unit ->
+    Httpr.t -> auth -> Repo.t -> tag_name:string -> body:string -> unit ->
     (t, string) result
   (** [create auth repo ~tag_name ~body ()] creates a new release in
       repository [repo] with given [tag_name] and [body] description. *)
 
   val get :
-    Http.t -> auth -> Repo.t -> tag_name:string -> unit -> (t, string) result
+    Httpr.t -> auth -> Repo.t -> tag_name:string -> unit -> (t, string) result
   (** [get auth repo ~tag_name ()] gets the release with given [tag_name]
       in repo [tag_name]. *)
 
   val upload_asset :
-    Http.t -> auth -> Repo.t -> t -> content_type:string -> name:string ->
+    Httpr.t -> auth -> Repo.t -> t -> content_type:string -> name:string ->
     string -> (unit, string) result
   (** [upload_asset auth repo r ~content_type ~name asset] uploads
       assets content [asset] with file name [name] and content type

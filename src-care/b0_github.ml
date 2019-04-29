@@ -90,7 +90,7 @@ let req_json_v3 ?(headers = []) http auth ~path m body =
   in
   let uri = v3_api_uri ^ path in
   let req = Http.req ~uri m ~headers ~body in
-  let resp = Http.perform http req in
+  let resp = Httpr.perform http req in
   Result.bind resp @@ fun resp -> resp_success auth req resp
 
 let query_v4 http auth q =
@@ -99,7 +99,7 @@ let query_v4 http auth q =
   let headers = req_v4_headers auth in
   let body = Jsong.to_string query in
   let req = Http.req ~uri:v4_api_uri `POST ~headers ~body in
-  let resp = Http.perform http req in
+  let resp = Httpr.perform http req in
   Result.bind resp @@ fun resp -> resp_success auth req resp
 
 (* Higher-level interfaces *)

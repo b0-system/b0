@@ -6,6 +6,55 @@
 
 open B0_std
 
+module Uri = struct
+  type t = string
+
+  let alpha = Char.Ascii.is_letter
+  let digit = Char.Ascii.is_digit
+
+  let parse_scheme u =
+    let scheme_char c =
+      alpha c || digit c || Char.equal c '+' || Char.equal c '-' ||
+      Char.equal '.' c
+    in
+    match String.keep_left scheme_char u with
+    | "" -> None
+    | s ->
+        let ulen = String.length u and slen = String.length s in
+        if alpha s.[0] && slen < ulen && u.[slen] = ':' then Some s else None
+
+  let parse_authority u = match String.index u ':' with
+  | exception Not_found -> None
+  | i ->
+      let max = String.length u - 1 in
+      if i + 2 >= max then None else
+      if not (u.[i + 1] = '/' && u.[i + 2] = '/') then None else
+      let first = i + 3 in
+      let last = match String.index_from u first '/' with
+      | exception Not_found -> max
+      | j -> j - 1
+      in
+      if last - first < 0 then None else
+      Some (String.with_index_range ~first ~last u)
+
+  let parse_path_and_query u = match String.index u ':' with
+  | exception Not_found -> None
+  | i ->
+      let max = String.length u - 1 in
+      if i = max then None else
+      match u.[i + 1] = '/' with
+      | false -> Some (String.with_index_range ~first:(i + 1) u)
+      | true ->
+          if i + 1 = max then Some "/" else
+          match u.[i + 2] = '/' with
+          | false -> Some (String.with_index_range ~first:(i + 1) u)
+          | true ->
+              match String.index_from u (i + 3) '/' with
+              | exception Not_found -> None
+              | i -> Some (String.with_index_range ~first:i u)
+
+end
+
 module Http = struct
   type meth =
   [ `CONNECT | `DELETE | `GET | `HEAD | `OPTIONS | `Other of string
@@ -46,6 +95,8 @@ module Http = struct
   let resp_status r = r.resp_status
   let resp_headers r = r.resp_headers
   let resp_body r = r.resp_body
+  let resp ?(headers = []) ?(body = "") status =
+    { resp_status = status; resp_headers = headers; resp_body = body }
 
   let status_of_status_line l =
     let err i = Fmt.error "%S: could not parse HTTP status code" i in
@@ -74,18 +125,22 @@ module Http = struct
       fun (resp_headers, resp_body) ->
       Ok { resp_status; resp_headers; resp_body }
 
+end
+
+module Httpr = struct
+
   let redirect_resp visited req resp =
     let find_location resp =
-      try Ok (List.assoc "location" resp.resp_headers) with
+      try Ok (List.assoc "location" (Http.resp_headers resp)) with
       | Not_found -> Error "No 'location' header found in 3XX response"
     in
-    match resp.resp_status with
+    match Http.resp_status resp with
     | 301 | 302 | 303 | 305 | 307 ->
         begin
           Result.bind (find_location resp) @@ fun uri ->
           match List.mem uri visited with
           | true -> Error "Infinite redirection loop"
-          | false -> Ok (Some { req with req_uri = uri })
+          | false -> Ok (Some { req with Http.req_uri = uri })
         end
     | _ -> Ok None
 
@@ -103,10 +158,14 @@ module Http = struct
   let find_curl ?search ~curl () = Os.Cmd.must_find ?search curl
   let perform ?(follow = true) curl r =
     let rec loop follow visited r =
-      let meth = Cmd.(arg "-X" % meth_to_string r.req_meth) in
-      let headers = Cmd.of_list ~slip:"-h" header_to_string r.req_headers in
-      let body = Cmd.if' (req_has_body r) Cmd.(arg "--data-binary" % "@-") in
-      let stdin = match req_has_body r with
+      let meth = Cmd.(arg "-X" % Http.(meth_to_string (req_meth r))) in
+      let headers =
+        Cmd.of_list ~slip:"-H" Http.header_to_string Http.(req_headers r)
+      in
+      let body =
+        Cmd.if' (Http.req_has_body r) Cmd.(arg "--data-binary" % "@-")
+      in
+      let stdin = match Http.req_has_body r with
       | true -> Os.Cmd.in_string r.req_body
       | false -> Os.Cmd.in_stdin
       in
@@ -115,8 +174,8 @@ module Http = struct
         Cmd.(curl % "-s" % "-i" %% meth %% headers %% body % r.req_uri)
       in
       Result.bind out @@ fun stdout ->
-      Result.bind (resp_of_string stdout) @@ fun resp ->
-      match follow, r.req_meth with
+      Result.bind (Http.resp_of_string stdout) @@ fun resp ->
+      match follow, (Http.req_meth r) with
       | true, (`GET | `HEAD) ->
           begin
             Result.bind (redirect_resp visited r resp) @@ function
@@ -126,7 +185,9 @@ module Http = struct
       | _, _ -> Ok resp
     in
     loop follow [] r
+
 end
+
 
 module Htmlg = struct
   module Att = struct
