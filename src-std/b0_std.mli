@@ -785,12 +785,14 @@ module String : sig
 
   val escaper :
     (char -> int) -> (bytes -> int -> char -> int) -> string -> string
-  (** [escaper char_len set_char] is a byte escaper that given a
-       byte [c] uses [char_len c] bytes in the escaped form and
-       uses [set_char b i c] to set the escaped form for [c] in [b] at
-       index [i] returning the next writable index (no bounds
-       check need to be performed). For any [b], [c] and [i] the
-       invariant [i + char_len c = set_char b i c] must hold. *)
+  (** [escaper char_len set_char] is a byte escaper that given a byte
+      [c] uses [char_len c] bytes in the escaped form.  [set_char b i
+      c] is used to set the index [i] if a buffer [b] to byte [c] in
+      the escaped form nd must return the next writable index (no
+      bounds checks need to be peformed). [set_char] is invoked both
+      for bytes that need escaping and those that do not. For any [b],
+      [c] and [i] the invariant [i + char_len c = set_char b i c] must
+      hold. *)
 
   exception Illegal_escape of int
   (** See {!unescaper}. *)
@@ -807,7 +809,7 @@ module String : sig
       + char_len_at s i = set_char b k s i].
 
       Both [char_len_at] and [set_char] may raise [Illegal_escape i]
-      if the given index [i] has an illegal or truncated escape.  The
+      if the given index [i] has an illegal or truncated escape. The
       unescaper only uses this exception internally it returns [Error
       i] if it found an illegal escape at index [i]. *)
 
