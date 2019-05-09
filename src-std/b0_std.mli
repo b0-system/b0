@@ -1306,11 +1306,11 @@ module Fpath : sig
 
     val pp_set : t Fmt.t
     (** [pp_set ppf ss] prints an unspecified set-like representation
-        of [ss] on [ppf] using {!Fpath.pp}.} *)
+        of [ss] on [ppf] using {!Fpath.pp}. *)
 
     val dump : t Fmt.t
     (** [dump ppf ss] prints an unspecified representation of [ss] on
-        [ppf] with {!Fpath.dump} *)
+        [ppf] with {!Fpath.dump}. *)
   end
 
   (** Path maps. *)
@@ -1330,13 +1330,13 @@ module Fpath : sig
 
     (** {1:add Additional adds} *)
 
-    val add_to_list : string -> 'a -> 'a list t -> 'a list t
+    val add_to_list : path -> 'a -> 'a list t -> 'a list t
     (** [add k v m] is [m] with [k] mapping to [l] such that [l] is
         [v :: find k m] if [k] was bound in [m] and [[v]] otherwise. *)
 
     val add_to_set :
       (module Stdlib.Set.S with type elt = 'a and type t = 'set) ->
-      string -> 'a -> 'set t -> 'set t
+      path -> 'a -> 'set t -> 'set t
     (** [add (module S) k v m] is [m] with [k] mapping to [s] such that [s] is
         [S.add v (find k m)] if [k] was bound in [m] and [S.singleton [v]]
         otherwise. *)
