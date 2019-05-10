@@ -6,6 +6,16 @@
 
 open B0_std
 
+let test_double_sep () =
+  let test p q = assert (String.equal (Fpath.to_string (Fpath.v p)) q) in
+  test "/////////" "//";
+  test "//a///" "//a/";
+  test "//////a///" "//a/";
+  test "/a///bc" "/a/bc";
+  test "a///bc//" "a/bc/";
+  test "a///bc//c///////////////d" "a/bc/c/d";
+  ()
+
 let test_is_prefix_rem_prefix () =
   let test p q r =
     let p = Fpath.v p and q = Fpath.v q in
@@ -113,6 +123,7 @@ let test_parent () =
   ()
 
 let test () =
+  test_double_sep ();
   test_is_prefix_rem_prefix ();
   test_parent ();
   test_basename ();

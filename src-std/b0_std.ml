@@ -1239,6 +1239,20 @@ module Fpath = struct
 
   (* Platform specifics. *)
 
+  let undouble_sep sep dbl_sep s =
+    let rec loop last_is_sep b k s i max = match i > max with
+    | true -> Bytes.unsafe_to_string b
+    | false ->
+        let c = String.get s i in
+        let c_is_sep = Char.equal c sep && i <> 0 (* handle // *) in
+        let is_dbl = last_is_sep && c_is_sep in
+        match is_dbl with
+        | true -> loop c_is_sep b k s (i + 1) max
+        | false -> Bytes.set b k c; loop c_is_sep b (k + 1) s (i + 1) max
+    in
+    let len = String.length s in
+    loop false (Bytes.create (len - dbl_sep)) 0 s 0 (len - 1)
+
   module Windows = struct
 
     (* XXX the {of_string,path_start} needs reviewing/testing *)
@@ -1294,29 +1308,37 @@ module Fpath = struct
       done;
       Bytes.unsafe_to_string b
 
-    let of_string = function
-    | "" as s -> err_empty s
-    | s ->
-        try
-          let rec loop max i has_slash = match i < max with
-          | false -> has_slash
-          | true ->
-              match s.[i] with
-              | '\x00' -> raise Exit
-              | '/' -> loop max (i + 1) true
-              | c -> loop max (i + 1) has_slash
+    let of_string s =
+      if s = "" then err_empty s else
+      try
+        let p =
+          let rec loop has_slash last_is_sep dbl_sep i max =
+            match i > max with
+            | true ->
+                let s = if has_slash then backslashify s else s in
+                if dbl_sep > 0 then undouble_sep dir_sep_char dbl_sep s else s
+            | false ->
+                let c = String.unsafe_get s i in
+                if Char.equal c '\x00' then raise Exit else
+                let is_slash = Char.equal c '/' in
+                let has_slash = has_slash || is_slash in
+                let c_is_sep = (is_slash || Char.equal c dir_sep_char) && i <> 0
+                in
+                let is_dbl = last_is_sep && c_is_sep in
+                let dbl_sep = if is_dbl then dbl_sep + 1 else dbl_sep in
+                loop has_slash c_is_sep dbl_sep (i + 1) max
           in
-          let has_slash = loop (String.length s - 1) 0 false in
-          let p = if has_slash then backslashify s else s in
-          match path_start p with
-          | exception Not_found -> err_start p
-          | n ->
-              let p = match n = String.length p with
-              | true -> (* add root if there's only a UNC volume *) p ^ dir_sep
-              | false -> p
-              in
-              Ok p
-        with Exit -> err_null s
+          loop false false 0 0 (String.length s - 1)
+        in
+        match path_start p with
+        | exception Not_found -> err_start p
+        | n ->
+            let p = match n = String.length p with
+            | true -> (* add root if there's only a UNC volume *) p ^ dir_sep
+            | false -> p
+            in
+            Ok p
+      with Exit -> err_null s
 
     let append p0 p1 =
       match is_unc_path p1 || has_drive p1 || p1.[0] = dir_sep_char with
@@ -1342,16 +1364,26 @@ module Fpath = struct
 
   module Posix = struct
     let dir_sep_char = '/'
-    let char_is_dir_sep c = c = '/'
+    let char_is_dir_sep c = Char.equal c '/'
     let dir_sep = "/"
     let is_seg s = String.for_all (fun c -> c <> dir_sep_char && c <> '\x00') s
     let of_string = function
     | "" as s -> err_empty s
     | s ->
         try
-          let max = String.length s - 1 in
-          for i = 0 to max do if s.[i] = '\x00' then raise Exit done;
-          Ok s
+          let rec loop last_is_sep dbl_sep i max = match i > max with
+          | true ->
+              if dbl_sep > 0 then Ok (undouble_sep dir_sep_char dbl_sep s) else
+              Ok s
+          | false ->
+              let c = String.unsafe_get s i in
+              if Char.equal c '\x00' then raise Exit else
+              let c_is_sep = Char.equal c dir_sep_char && i <> 0 in
+              let is_dbl = last_is_sep && c_is_sep in
+              let dbl_sep = if is_dbl then dbl_sep + 1 else dbl_sep in
+              loop c_is_sep dbl_sep (i + 1) max
+          in
+          loop false 0 0 (String.length s - 1)
         with
         | Exit -> err_null s
 

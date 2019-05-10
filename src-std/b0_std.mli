@@ -1247,7 +1247,9 @@ module Fpath : sig
   (** [of_string s] is the string [s] as a path. The following transformations
       are performed on the string:
       {ul
-      {- On Windows any / ([0x2F]) occurence is converted to \ ([0x5C])}}
+      {- On Windows any / ([0x2F]) occurence is converted to \ ([0x5C])}
+      {- Non initial empty segments are suppressed; "a//b" becomes "a/b",
+         "//a////b//" becomes "//a/b/", etc}}
       An error returned if [s] is [""] or if it contains a null byte. The
       error string mentions [s]. *)
 
@@ -1266,7 +1268,7 @@ module Fpath : sig
       {b Note.} In 2019, the standard definition of URIs is in a sorry
       state. Assuming the original file path was UTF-8 encoded. It is
       {e believed} the above function should lead to an URI path
-      comp§onent that can be parsed by HTML5's
+      component that can be parsed by HTML5's
       {{:https://dev.w3.org/html5/spec-LC/urls.html#parsing-urls}
       definition} of URI parsing. *)
 
