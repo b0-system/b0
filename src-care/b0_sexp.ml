@@ -455,6 +455,18 @@ module Sexpq = struct
       let l = Tloc.with_start (Tloc.to_start (Sexp.loc v)) l in
       q p (`L (s, l))
 
+  let nth n q p = function
+  | `A (_, l) -> err_list_but_atom p l
+  | `L (vs, l) ->
+      let p = (`L, l) :: p in
+      let k, vs = if n < 0 then -n - 1, List.rev vs else n, vs in
+      let rec loop k = function
+      | v :: vs when k = 0 -> q p v
+      | _ :: vs -> loop (k - 1) vs
+      | [] -> errf p l "%d: no such index in list" n
+      in
+      loop k vs
+
   let fold_list f q acc p = function
   | `A (_, l) -> err_list_but_atom p l
   | `L (vs, l) ->
@@ -466,31 +478,48 @@ module Sexpq = struct
 
   (* Dictionaries *)
 
-  let err_miss_key p dl k = errf p dl "key %a unbound in dictionary" pp_key k
   let err_dict_atom p l = err_exp p l "a dictionary" "an atom"
 
   let dict_find bs k =
     let bs = List.rev bs in (* last one takes over. *)
     let rec loop = function
-    | `L (`A (a, _) :: vs, l) :: _ when String.equal a k -> Some (`L (vs, l))
+    | `L (`A (a, _) :: vs, l) :: _ when String.equal a k ->
+        let vsl = match vs with
+        | `L (_, s) :: _ | `A (_, s) :: _ -> Tloc.with_start s l
+        | [] -> Tloc.to_end l
+        in
+        Some (l, `L (vs, vsl))
     | _ :: bs -> loop bs
     | [] -> None
     in
     loop bs
 
+  let dict_dom bs =
+    let rec loop dom = function
+    | `L (`A (a, _) :: _, _) :: vs -> loop (String.Set.add a dom) vs
+    | _ :: bs -> loop dom bs
+    | [] -> dom
+    in
+    loop String.Set.empty bs
+
   let key k q p = function
   | `A (_, l) -> err_dict_atom p l
   | `L (bs, dl) ->
       match dict_find bs k with
-      | None -> err_miss_key p dl k
-      | Some v -> q ((`K k, Sexp.loc v) :: p) v
+      | Some (kl, v) -> q ((`K k, kl) :: p) v
+      | None ->
+          let dom = dict_dom bs in
+          let keys = String.Set.elements dom in
+          let pre = Fmt.unit "unbound" in
+          let did_you_mean = Fmt.did_you_mean ~pre ~kind:"key" pp_key in
+          errf p dl "%a" did_you_mean (k, String.suggest keys k)
 
   let key_opt k q p = function
   | `A (_, l) -> err_dict_atom p l
   | `L (bs, dl) ->
       match dict_find bs k with
       | None -> None
-      | Some v -> Some (q ((`K k, Sexp.loc v) :: p) v)
+      | Some (kl, v) -> Some (q ((`K k, kl) :: p) v)
 
   let key_dom ~validate p = function
   | `A (_, l) -> err_dict_atom p l
@@ -531,6 +560,95 @@ module Sexpq = struct
       err_exp p l "none or (some ...)" ("(" ^ (esc_atom a))
   | `L (_, l) ->
       err_exp p l "none or (some ...)" "an arbitrary list"
+end
+
+module Sexpl = struct
+  type index = Key of string | Nth of int
+  type path = index list (* reversed *)
+  let start = []
+  let key k p = Key k :: p
+  let nth i p = Nth i :: p
+  let query_path p q =
+    let rec loop acc = function
+    | Key k :: is -> loop (Sexpq.key k acc) is
+    | Nth n :: is -> loop (Sexpq.nth n acc) is
+    | [] -> acc
+    in
+    loop q p
+
+  let query_path_opt p q = failwith "TODO"
+
+  type t =
+  | Before of path
+  | Onto of path
+  | After of path
+
+  let path = function Before p | After p | Onto p -> p
+  let edit_loc t = failwith "TODO"
+
+  let err i fmt = Fmt.failwith ("%d: " ^^ fmt) i
+  let err_unexp_eoi i = err i "unexpected end of input"
+  let err_unexp_char i s = err i "unexpected character: %C" s.[i]
+  let err_illegal_char i s = err i "illegal character here: %C" s.[i]
+  let err_unexp i s =
+    err i "unexpected input: %S" (String.with_index_range ~first:i s)
+
+  let parse_eoi s i max = if i > max then () else err_unexp i s
+  let parse_index p s i max =
+    let first, stop = match s.[i] with '[' -> i + 1, ']' | _ -> i, '.' in
+    let last, next =
+      let rec loop stop s i max = match i > max with
+      | true -> if stop = ']' then err_unexp_eoi i else (i - 1), i
+      | false ->
+          let illegal = s.[i] = '[' || (s.[i] = ']' && stop = '.') in
+          if illegal then err_illegal_char i s else
+          if s.[i] <> stop then loop stop s (i + 1) max else
+          (i - 1), if stop = ']' then i + 1 else i
+      in
+      loop stop s first max
+    in
+    let idx = String.with_index_range ~first ~last s in
+    if idx = "" then err first "illegal empty index" else
+    match int_of_string idx with
+    | exception Failure _ -> next, key idx p
+    | idx -> next, nth idx p
+
+  let path_of_string s =
+    let rec loop p s i max =
+      if i > max then p else
+      let next, p = parse_index p s i max in
+      if next > max then p else
+      if s.[next] <> '.' then err_unexp_char next s else
+      if next + 1 <= max then loop p s (next + 1) max else
+      err_unexp_eoi next
+    in
+    try
+      if s = "" then err_unexp_eoi 0 else
+      let start = if s.[0] = '.' then 1 else 0 in
+      Ok (loop [] s start (String.length s - 1))
+    with Failure e -> Error e
+
+  let of_string s =
+    let rec loop p s i max =
+      if i > max then Onto p else
+      let next = i + 1 in
+      match s.[i] with
+      | 'v' when next <= max && s.[next] = '[' ->
+          let next, p = parse_index p s next max in
+          parse_eoi s next max; Before p
+      | c ->
+          let next, p = parse_index p s i max in
+          if next > max then Onto p else
+          if s.[next] = 'v' then (parse_eoi s (next + 1) max; After p) else
+          if s.[next] <> '.' then err_unexp_char next s else
+          if next + 1 <= max then loop p s (next + 1) max else
+          err_unexp_eoi next
+    in
+    try
+      if s = "" then err_unexp_eoi 0 else
+      let start = if s.[0] = '.' then 1 else 0 in
+      Ok (loop [] s start (String.length s - 1))
+    with Failure e -> Error e
 end
 
 (*---------------------------------------------------------------------------

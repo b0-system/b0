@@ -274,6 +274,11 @@ module Sexpq : sig
   val tl : 'a t -> 'a t
   (** [tail q] queries the tail of a list with [q]. *)
 
+  val nth : int -> 'a t -> 'a t
+  (** [nth n q] queries the [n]th element of a list with [q]. If [n]
+      is negative counts from the end of the list, so [-1] is the last
+      list element. *)
+
   val fold_list : ('a -> 'b -> 'b) -> 'a t -> 'b -> 'b t
   (** [fold_list f q acc] queries the elements of a list from left to
       right with [q] and folds the result with [f] starting with
@@ -319,6 +324,88 @@ v}
   val option : 'a t -> 'a option t
   (** [option q] queries with [q] the value of an option represented
       according the encoding of {!Sexpg.option}. *)
+end
+
+(** S-expression locators.
+
+    Locators provide a way for end users to address specific locations in
+    s-expressions. A location is either before, after or onto an
+    s-expression.
+
+{v
+ocaml.deps        # value of key 'deps' of dictionary 'ocaml'
+ocaml.v[deps]     # before key binding
+ocaml.[deps]v     # after key binding
+
+ocaml.deps.[0]    # first element of key 'deps' of dictionary 'ocaml'
+ocaml.deps.v[0]   # before first element
+ocaml.deps.[0]v   # after first element
+
+ocaml.deps.[-1]   # last element of key 'deps' of dictionary 'ocaml'
+ocaml.deps.v[-1]  # before last element
+ocaml.deps.[-1]v  # after last element
+v}
+
+    More formally a {e locator} is a [.] separated list of indices
+    ended by a location. A location is either an index or an index prefixed
+    or suffixed by the character [v] to respectively denote insertion
+    before or after.
+
+    An {e index} is written [[i]] with [i] either a zero-based list index
+    (with negative indices counting from the end of the list) or a
+    dictionary key [key]; in the latter case if there is no ambiguity,
+    the surrounding brackets can be dropped.
+
+    {b Note.} There's no form of quoting at the moment this means
+    key names can't contain, [, ], or be numbers. *)
+module Sexpl : sig
+
+  (** {1:path Paths}
+
+      FIXME we likely want to move that to Sexpq. *)
+
+  type path
+  (** The type for paths. A sequence of indexing operations. *)
+
+  val start : path
+  (** [start] is the starting s-expression to index. *)
+
+  val key : string -> path -> path
+  (** [key k p] indexes the s-expression at path [p] using key [k]. *)
+
+  val nth : int -> path -> path
+  (** [nth i p] indexes the s-expression at path [p] with [i].
+      If [i] is negative counts the number of element from the end of
+      the list, i.e. [-1] is the last list element.  *)
+
+  val query_path : path -> 'a Sexpq.t -> 'a Sexpq.t
+  (** [query_path p q] queries the value indexed by [p] using [q]. *)
+
+  val query_path_opt : path -> 'a Sexpq.t -> 'a option Sexpq.t
+  (** [query_path p q] queries the value indexed by [p] using [q],
+      the query succeeds with [None] if the path doesn't exist. *)
+
+  val path_of_string : string -> (path, string) result
+
+  (** {1:loc Locators} *)
+
+  type t =
+  | Before of path (** The void before the path. *)
+  | Onto of path  (** The value at the path. *)
+  | After of path (** The void after the path. *)
+  (** The type for locators. *)
+
+  val path : t -> path
+  (** [path l] is the locator's path. *)
+
+  val edit_loc : t -> Sexp.loc * string list Sexpq.t
+  (** [edit_loc t] is a query that returns a text location
+      where the locator [t] should perform an edition and
+      a list of nested key bindings that need to be created. *)
+
+  val of_string : string -> (t, string) result
+  (** [of_string s] parses a locator [s] according to the
+      syntax defined in the preamble. *)
 end
 
 (** {1:sexp_syntax S-expressions syntax}
