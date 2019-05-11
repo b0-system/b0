@@ -345,9 +345,11 @@ module Sexpq = struct
 
   exception Err of path * Tloc.t * string
 
-  let err_to_string p loc msg =
-    Fmt.str "%a:@\n%a@\n  @[%a@]"
-      Tloc.pp loc Fmt.lines msg Fmt.lines (path_to_trace p)
+  let err_to_string p loc msg = match p with
+  | [] -> Fmt.str "%a:@\n%a" Tloc.pp loc Fmt.lines msg
+  | p ->
+      Fmt.str "%a:@\n%a@\n  @[%a@]"
+        Tloc.pp loc Fmt.lines msg Fmt.lines (path_to_trace p)
 
   let err p l msg = raise_notrace (Err (p, l, msg))
   let errf p l fmt = Fmt.kstr (err p l) fmt
