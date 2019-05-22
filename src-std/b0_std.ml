@@ -2978,7 +2978,9 @@ module Os = struct
       _fold ~filter:`Dir ?rel ?dotfiles ?follow_symlinks ?prune ~recurse
         f dir acc
 
-    let path_list _ _ f acc = f :: acc
+    let path_list stat _ f acc = match stat.Unix.st_kind with
+    | Unix.S_DIR -> Fpath.to_dir_path f :: acc
+    | _ -> f :: acc
 
     (* copy *)
 

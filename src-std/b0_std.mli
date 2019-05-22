@@ -2209,7 +2209,8 @@ module Os : sig
     val path_list :
       Unix.stats -> string -> Fpath.t -> Fpath.t list -> Fpath.t list
     (** [path_list] is a {{!fold}folding} function to get a (reverse w.r.t.
-        folding order) list of paths. *)
+        list of paths. Paths which are directories satisfy
+        {!Fpath.is_dir_path}. *)
 
     (** {1:copy Copying} *)
 
