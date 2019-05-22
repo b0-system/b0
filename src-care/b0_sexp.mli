@@ -201,6 +201,9 @@ module Sexpq : sig
   val map : ('a -> 'b) -> 'a t -> 'b t
   (** [map f q] is [app (succeed f) q]. *)
 
+  val some : 'a t -> 'a option t
+  (** [some q] is [map Option.some q]. *)
+
   (** {1:qsexp S-expression queries} *)
 
   val fold : atom:'a t -> list:'a t -> 'a t
@@ -304,14 +307,17 @@ v}
   (** [key k q] queries the value of key [k] of a dictionary with [q].
       The query fails if [k] is not bound or on atoms. *)
 
-  val key_opt : string -> 'a t -> 'a option t
-  (** [key_opt k q] queries the optional key [k] of a dictionary. The
-      query fails on atoms. *)
+  val opt_key : string -> 'a t -> absent:'a -> 'a t
+  (** [opt_key k q ~absent] queries the value of the optional key [k]
+      of a dictionary with [q] and uses [absent] if [k] is not bound.
+      The query fails on atoms. *)
 
   val key_dom : validate:String.Set.t option -> String.Set.t t
   (** [key_dom validate] queries the key domain of a list of bindings.
-      If [validate] is [Some dom], the fails if a key is not in
-      [dom]. The query also fails if a binding is not well-formed.  *)
+      If [validate] is [Some dom], the query fails if a key is not in
+      [dom]. The query also fails if a binding is not well-formed.
+
+      {b XXX} Would be nice to provide support for deprecation. *)
 
   val batom : 'a t -> 'a t
   (** [batom q] queries a singleton atom list with an atom query

@@ -378,6 +378,7 @@ module Sexpq = struct
   let ( $ ) = app
   let bind q f p s = f (q p s) p s
   let map f q p s = f (q p s)
+  let some q p s = Some (q p s)
 
   (* S-expression queries *)
 
@@ -514,12 +515,12 @@ module Sexpq = struct
           let did_you_mean = Fmt.did_you_mean ~pre ~kind:"key" pp_key in
           errf p dl "%a" did_you_mean (k, String.suggest keys k)
 
-  let key_opt k q p = function
+  let opt_key k q ~absent p = function
   | `A (_, l) -> err_dict_atom p l
   | `L (bs, dl) ->
       match dict_find bs k with
-      | None -> None
-      | Some (kl, v) -> Some (q ((`K k, kl) :: p) v)
+      | None -> absent
+      | Some (kl, v) -> q ((`K k, kl) :: p) v
 
   let key_dom ~validate p = function
   | `A (_, l) -> err_dict_atom p l
