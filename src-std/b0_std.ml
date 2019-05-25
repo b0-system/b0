@@ -116,6 +116,15 @@ module Fmt = struct
   let cut = Format.pp_print_cut
   let sp = Format.pp_print_space
   let comma ppf () = pf ppf ",@ "
+  let proj f pp_v ppf v = pp_v ppf (f v)
+  let concat ?sep:(pp_sep = cut) pps ppf v =
+    let rec loop ppf v = function
+    | pp :: pps ->
+        pp ppf v;
+        if pps = [] then () else (pp_sep ppf (); loop ppf v pps)
+    | [] -> assert false
+    in
+    loop ppf v pps
 
   (* Base type formatters *)
 

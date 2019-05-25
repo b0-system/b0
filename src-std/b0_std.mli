@@ -127,6 +127,13 @@ module Fmt : sig
   val comma : unit t
   (** [comma] is [unit ",@ "]. *)
 
+  val proj : ('a -> 'b) -> 'b t -> 'a t
+  (** [proj f pp ppf v] is [pp ppf (f v)]. *)
+
+  val concat : ?sep:unit t -> 'a t list -> 'a t
+  (** [concat ~sep pps] concatenates the formatters [pps] separating them
+      with [sep] (defaults to {!cut}. *)
+
   (** {1:basetypes Base type formatters} *)
 
   val bool : bool t
