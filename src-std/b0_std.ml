@@ -3427,7 +3427,8 @@ module Os = struct
     (* Low-level command spawn *)
 
     type spawn_tracer =
-      int -> Env.assignments option -> cwd:Fpath.t option -> Cmd.t -> unit
+      int option -> Env.assignments option -> cwd:Fpath.t option -> Cmd.t ->
+      unit
 
     let spawn_tracer_nop _ _ ~cwd:_ _ = ()
     let _spawn_tracer = ref spawn_tracer_nop
@@ -3471,7 +3472,7 @@ module Os = struct
             in
             if change_cwd then chdir old_cwd; (* XXX pid zombie on fail. *)
             Fd.Set.close_all fds;
-            !_spawn_tracer pid env cwd cmd;
+            !_spawn_tracer (Some pid) env cwd cmd;
             pid
           with
           | e ->
@@ -3586,13 +3587,15 @@ module Os = struct
       let env = spawn_env env in
       exit Unix.(create_process_env f cmd env stdin stderr stderr)
 
-    let _execv_posix ~env f cmd = Ok (Unix.execve f cmd (spawn_env env))
+    let _execv_posix ~env f cmd =
+      Ok (Unix.execve f cmd (spawn_env env))
     let _execv = if Sys.win32 then _execv_win32 else _execv_posix
 
     let execv ?env ?cwd f cmd =
       let err_execv f e = Fmt.error "execv %a: %s" Fpath.pp f e in
       try
         Option.iter chdir cwd;
+        !_spawn_tracer None env cwd cmd;
         _execv ~env (Fpath.to_string f) (Array.of_list @@ Cmd.to_list cmd)
       with
       | Failure e -> err_execv f e

@@ -2592,12 +2592,14 @@ module Os : sig
     (** {2:tracing Tracing} *)
 
     type spawn_tracer =
-      pid -> Env.assignments option -> cwd:Fpath.t option -> Cmd.t -> unit
-    (** The type for spawn tracers. Called with each blocking
-        and non-blocking spawned command. The function is given the process
-        identifier of the spawn, the environment if different from
-        the program's one, the current working directory if different
-        from the program's one and the acctual command. *)
+      pid option -> Env.assignments option -> cwd:Fpath.t option -> Cmd.t ->
+      unit
+    (** The type for spawn tracers. Called with each blocking and
+        non-blocking spawned command aswell as {!execv}. The function
+        is given the process identifier of the spawn (or [None] in
+        case of {!execv}), the environment if different from the
+        program's one, the current working directory if different from
+        the program's one and the actual command. *)
 
     val spawn_tracer_nop : spawn_tracer
     (** [spawn_tracer_nop] is a spawn tracer that does nothing.

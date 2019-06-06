@@ -62,7 +62,10 @@ module Cli = struct
       Term.(const choose $ quiet $ verbosity $ vopts)
 
     let log_spawn level =
-      let header pid = "EXEC:" ^ string_of_int (Os.Cmd.pid_to_int pid) in
+      let header = function
+      | None -> "EXECV"
+      | Some pid -> "EXEC:" ^ string_of_int (Os.Cmd.pid_to_int pid)
+      in
       let pp_env ppf = function
       | None -> ()
       | Some env -> Fmt.pf ppf "%a@," (Fmt.list String.dump) env
