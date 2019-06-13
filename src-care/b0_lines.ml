@@ -21,6 +21,7 @@ let err n fmt = Fmt.failwith_notrace ("%d:" ^^ fmt) n
 let err_file file e = Fmt.error "%a:%s" Fpath.pp_unquoted file e
 
 let fold ?(file = Os.File.dash) data f acc =
+  if String.equal data "" then Ok acc else
   let rec loop f acc n = function
   | [] -> acc
   | l :: ls -> loop f (f n l acc) (n + 1) ls

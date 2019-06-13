@@ -27,7 +27,7 @@ val fold :
       error which turns it in an [Error _] for [file] via
       {!err_file}.
 
-      If [data] is [""] this folds once with [""]. *)
+      If [data] is [""] this returns [acc]. *)
 
 (** {1:errors Parse errors} *)
 
