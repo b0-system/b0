@@ -851,7 +851,7 @@ module Op = struct
   | Mkdir m -> Mkdir.pp ppf m
   | Wait_files -> ()
 
-  let pp_kind_short ppf = function
+  let pp_kind_short o ppf = function
   | Spawn s -> Spawn.pp_cmd ppf s
   | Read r -> Fpath.pp ppf (Read.file r)
   | Write w -> (Fmt.tty file_write_color Fpath.pp) ppf (Write.file w)
@@ -860,7 +860,8 @@ module Op = struct
       Fmt.pf ppf "%a to %a"
         Fpath.pp (Copy.src c)
         (Fmt.tty file_write_color Fpath.pp) (Copy.dst c)
-  | Wait_files -> ()
+  | Wait_files ->
+      Fmt.pf ppf "@[<v>%a@]" (Fmt.list Fpath.pp) o.reads
 
   let pp_synopsis ppf o =
     let pp_kind ppf k = Fmt.tty_string [`Fg `Green] ppf k in
@@ -879,7 +880,7 @@ module Op = struct
       pp_revived o.exec_revived o.id
 
   let pp_short ppf o =
-    Fmt.pf ppf "@[<h>%a %a@]" pp_synopsis o pp_kind_short o.kind
+    Fmt.pf ppf "@[<h>%a %a@]" pp_synopsis o (pp_kind_short o) o.kind
 
   let pp_writes =
     let pp_file_write = Fmt.tty file_write_color Fpath.pp in
@@ -1242,7 +1243,7 @@ module Exec = struct
       in
       Fmt.pf ppf "@[[SUBMIT][%s:%d]%a %a@]"
         (Op.kind_name (Op.kind op)) (Op.id op) pp_pid pid
-        Op.pp_kind_short (Op.kind op)
+        (Op.pp_kind_short op) (Op.kind op)
 
   type t =
     { clock : Time.counter;
