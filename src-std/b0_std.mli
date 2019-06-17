@@ -349,11 +349,11 @@ module Option : sig
   (** [value o ~default] is [v] if [o] is [Some v] and [default] otherwise. *)
 
   val get : 'a option -> 'a
-  (** [get o] is [v] if [o] is [Some v] and @raise Invalid_argument
+  (** [get o] is [v] if [o] is [Some v] and raises {!Invalid_argument}
       otherwise. *)
 
   val bind : 'a option -> ('a -> 'b option) -> 'b option
-  (** [bind o f] is [Some (f v)] if [o] is [Some v] and [None] if [o] is
+  (** [bind o f] is [f v] if [o] is [Some v] and [None] if [o] is
       [None]. *)
 
   val join : 'a option option -> 'a option
@@ -418,15 +418,15 @@ module Result : sig
   (** [value r ~default] is [v] if [r] is [Ok v] and [default] otherwise. *)
 
   val get_ok : ('a, 'e) result -> 'a
-  (** [get_ok r] is [v] if [r] is [Ok v] and @raise Invalid_argument
+  (** [get_ok r] is [v] if [r] is [Ok v] and raises {!Invalid_argument}
       otherwise. *)
 
   val get_error : ('a, 'e) result -> 'e
-  (** [get_error r] is [e] if [r] is [Error e] and @raise Invalid_argument
+  (** [get_error r] is [e] if [r] is [Error e] and raises {!Invalid_argument}
       otherwise. *)
 
   val bind : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
-  (** [bind r f] is [Ok (f v)] if [r] is [Ok v] and [r] if [r] is [Error _]. *)
+  (** [bind r f] is [f v] if [r] is [Ok v] and [r] if [r] is [Error _]. *)
 
   val join : (('a, 'e) result, 'e) result -> ('a, 'e) result
   (** [join rr] is [r] if [rr] is [Ok r] and [rr] if [rr] is [Error _]. *)
@@ -470,7 +470,7 @@ module Result : sig
       [error] to respectively compare values wrapped by [Ok _ ] and [Error _].
       [Ok _] values are smaller than [Error _] values. *)
 
-  (** {1:exn Interacting with {!Stdlib} exceptions} *)
+  (** {1:exn Interacting with [Stdlib] exceptions} *)
 
   val to_failure : ('a, string) result -> 'a
   (** [to_failure r] is [failwith e] if [r] is [Error e] and [v]
@@ -527,7 +527,7 @@ module Char : sig
 
     val hex_digit_value : char -> int
     (** [hex_digit_value c] is the numerical value of a digit that
-        satisfies {!is_hex_digit}. @raise Invalid_argument if
+        satisfies {!is_hex_digit}. Raises {!Invalid_argument} if
         [is_hex_digit c] is [false]. *)
 
     val lower_hex_digit : int -> char
@@ -1283,7 +1283,7 @@ module Fpath : sig
   (** [pp ppf p] prints path [p] on [ppf] using {!Filename.quote}. *)
 
   val pp_unquoted : t Fmt.t
-  (** [pp_unquoted p] prints path [p] on [ppf] using {to_string}. *)
+  (** [pp_unquoted p] prints path [p] on [ppf] using {!to_string}. *)
 
   val dump : t Fmt.t
   (** [dump ppf p] prints path [p] on [ppf] using {!String.dump}. *)
@@ -1686,7 +1686,7 @@ module Cmd : sig
       is [None] if [l] is {!empty}. *)
 
   val get_tool : t -> tool
-  (** [get_tool] is like {!tool} but @raise Invalid_argument in case
+  (** [get_tool] is like {!tool} but raises {!Invalid_argument} in case
       of error. *)
 
   (** {1:preds Predicates} *)
@@ -2382,12 +2382,12 @@ module Os : sig
     val copy : ?buf:Bytes.t -> src:Unix.file_descr -> Unix.file_descr -> unit
     (** [copy ~buf ~src dst] reads [src] and writes it to [dst] using
         [buf] as a buffer; if unspecified a buffer of length
-        {!unix_buffer_size} is created for the call. @raise Unix_error
+        {!unix_buffer_size} is created for the call. Raise {!Unix.Unix_error}
         if that happens *)
 
     val to_string : Unix.file_descr -> string
-    (** [to_string fd] reads [fd] to a string. @raise Unix_error in case
-        of error. *)
+    (** [to_string fd] reads [fd] to a string. Raises {!Unix.Unix_error} in
+        case of error. *)
 
     val read_file : string -> Unix.file_descr -> string
     (** [read_file fn fd] reads [fd] to a string assuming it is a file
@@ -2531,7 +2531,7 @@ module Os : sig
         {- [cwd] defaults to {!Dir.cwd}[ ()]}
         {- [stdin] defaults to {!in_stdin}}
         {- [stdout] defaults to {!out_stdout}}
-        {- [stderr] defaults to {!out_stderr}}}. *)
+        {- [stderr] defaults to {!out_stderr}}} *)
 
     val run_status_out :
       ?env:Env.assignments -> ?cwd:Fpath.t -> ?stdin:stdi ->

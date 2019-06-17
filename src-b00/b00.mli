@@ -323,7 +323,7 @@ module Op : sig
         accessors in {!Spawn} for the semantics of the various arguments. *)
 
     val get : op -> t
-    (** [get o] is the spawn [o]. @raise Invalid_argument if [o] is
+    (** [get o] is the spawn [o]. Raises {!Invalid_argument} if [o] is
         not a spawn. *)
 
     val env : t -> Os.Env.assignments
@@ -411,7 +411,7 @@ module Op : sig
         arguments. *)
 
     val get : op -> t
-    (** [get_read o] is the read [o]. @raise Invalid_argument if [o]
+    (** [get_read o] is the read [o]. Raise {!Invalid_argument} if [o]
         is not a read. *)
 
     val file : t -> Fpath.t
@@ -454,7 +454,7 @@ module Op : sig
         accessors in {!Write} for the semantics of the various arguments. *)
 
     val get : op -> t
-    (** [geo o] is the write [o]. @raise Invalid_argument if [o] is
+    (** [geo o] is the write [o]. Raises {!Invalid_argument} if [o] is
         not a write. *)
 
     val stamp : t -> string
@@ -505,7 +505,7 @@ module Op : sig
         accessors for the semantics of various arguments. *)
 
     val get : op -> t
-    (** [get o] is the copy operation [o]. @raise Invalid_argument if [o]
+    (** [get o] is the copy operation [o]. Raises {!Invalid_argument} if [o]
         is not a copy. *)
 
     val src : t -> Fpath.t
@@ -556,7 +556,7 @@ module Op : sig
         arguments. *)
 
     val get : op -> t
-    (** [get o] is the mkdir [o]. @raise Invalid_argument if [o] is not
+    (** [get o] is the mkdir [o]. Raises {!Invalid_argument} if [o] is not
         a mkdir. *)
 
     val dir : t -> Fpath.t

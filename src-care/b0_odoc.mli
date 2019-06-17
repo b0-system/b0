@@ -212,7 +212,7 @@ module Support_files : sig
       for the HTML to the directory [to_dir].
       {ul
       {- [writes] specifies the writes of the command they can be
-      obtained via {!Writes.}}
+         obtained via {!Writes}}
       {- [without_theme] is the corresponding [odoc support-file-targets]
          option.}}  *)
 end

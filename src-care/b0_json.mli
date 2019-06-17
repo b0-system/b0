@@ -32,7 +32,7 @@ module Json : sig
       limitations:
       {ul
       {- Numbers are parsed with [string_of_float] which is not
-       compliant.}.
+       compliant.}
       {- Unicode escapes are left unparsed (this will not round trip
        with {!to_string}).}} *)
 

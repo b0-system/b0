@@ -505,7 +505,7 @@ subdescriptions are either:
 {- Ignored (e.g. [ocamlc], [ocamlopt], etc.).}
 {- Merged according to key specific strategies which can
    fail; one example of failure is when one subdescription mandates
-   [(compile-kind native)] and another one [(compile-kind byte)].}} *)
+   [(compile-kind native)] and another one [(compile-kind byte)].}}
 
 {1:more More build concepts}
 

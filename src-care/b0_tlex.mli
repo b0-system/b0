@@ -74,7 +74,7 @@ module Tloc : sig
 
   val pp : t Fmt.t
   (** [pp_loc] formats locations using the
-      {{!https://www.gnu.org/prep/standards/standards.html#Errors}GNU
+      {{:https://www.gnu.org/prep/standards/standards.html#Errors}GNU
       convention}. *)
 end
 
@@ -153,8 +153,8 @@ module Tdec : sig
 
   val accept_uchar : t -> unit
   (** [accept_uchar d] accepts an UTF-8 encoded character starting at
-      the current position and moves to the byte after it. @raise Err
-      in case of UTF-8 decoding error. *)
+      the current position and moves to the byte after it. Raises
+      {!Err} in case of UTF-8 decoding error. *)
 
   val accept_byte : t -> unit
   (** [accept_byte d] accepts the byte at the current position and

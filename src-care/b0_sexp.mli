@@ -47,11 +47,11 @@ module Sexp : sig
       error with the location formatted according to {!Tloc.pp} is returned. *)
 
   val get_atom : t -> string
-  (** [get_atom s] is like {!to_atom} but @raise Invalid_argument if
+  (** [get_atom s] is like {!to_atom} but raises {!Invalid_argument} if
       [s] is not an atom. *)
 
   val get_list : t -> t list
-  (** [get_atom s] is like {!to_list} but @raise Invalid_argument if
+  (** [get_atom s] is like {!to_list} but raises {!Invalid_argument} if
       [s] is not an list. *)
 
   val loc : t -> loc
