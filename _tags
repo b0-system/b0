@@ -21,3 +21,5 @@ true : package(unix)
 <tools/**> : use_b0_stubs
 <tools/b00_cache*> : package(cmdliner)
 <tools/show_uri*> : package(cmdliner)
+
+<_b0> : -traverse

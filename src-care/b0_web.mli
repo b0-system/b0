@@ -104,7 +104,9 @@ module Httpr : sig
       in the PATH or in the environment variable [B0_CURL].  If
       [follow] is [true] (default) HTTP redirects for GET and HEAD
       requests that return 301, 302, 303, 305 or 307 are automatically
-      followed. *)
+      followed.
+
+      The response's {!Http.resp_headers} are lowercased. *)
 end
 
 (** HTML generation.

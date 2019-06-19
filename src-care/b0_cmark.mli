@@ -36,9 +36,9 @@ val write_page :
   frag:Fpath.t -> o:Fpath.t -> unit
 (** [write_page m ~title ~frag ~o] writes to [o] a full HTML document
     whose {!B0_web.Htmlg.El.body} contains the contents of file [frag]
-    (inserted using {!B0_web.Htmlg.raw}). [title] defaults to the
+    (inserted using {!B0_web.Htmlg.El.raw}). [title] defaults to the
     basename of [o] without its extension, for the other arguments
-    and more information see {!B0_web.Htmlg.basic_page}. *)
+    and more information see {!B0_web.Htmlg.El.basic_page}. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2019 The b0 programmers
