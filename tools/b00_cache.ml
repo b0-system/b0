@@ -283,12 +283,6 @@ let out_fmt =
   in
   Arg.(value & vflag `Normal [`Short, short; `Long, long])
 
-let path_arg =
-  let fpath_of_string f =
-    Result.map_error (fun s -> `Msg s) (Fpath.of_string f)
-  in
-  Arg.conv (fpath_of_string, Fpath.pp) ~docv:"PATH"
-
 let key_arg =
   let of_string s = match Fpath.is_seg s with
   | true -> Ok s | false -> Error (`Msg "Not a valid key (not a path segment)")
@@ -308,13 +302,6 @@ let only_unused =
   in
   Arg.(value & flag & info ["u"; "unused"] ~doc)
 
-let dir =
-  let doc = "The b0 cache directory to operate on." in
-  let env = Arg.env_var "B0_CACHE_DIR" ~doc:"See argument $(docv)" in
-  let default = Fpath.v "_b0/cache" in
-  Arg.(value & opt path_arg default & info ["cache-dir"] ~env ~doc ~docv:"DIR"
-         ~docs:Manpage.s_common_options)
-
 let req_key =
   let doc = "The key." in
   Arg.(required & pos 0 (some key_arg) None & info [] ~doc ~docv:"KEY")
@@ -325,6 +312,17 @@ let keys_all_is_none =
   Term.(const (function [] -> `All | ks -> `Keys ks) $ keys)
 
 (* Command clis *)
+
+let fpath = B0_ui.Cli.Arg.fpath
+let dir =
+  let get_dir cache_dir = match Os.Dir.cwd () with
+  | Error e -> `Error (false, e)
+  | Ok cwd ->
+      let b0_dir = Fpath.(cwd / B0_ui.Memo.b0_dir_name) in
+      `Ok (B0_ui.Memo.get_cache_dir ~cwd ~b0_dir ~cache_dir)
+  in
+  let cache_dir = B0_ui.Memo.cache_dir ~doc_none:"$(b,_b0/.cache)" () in
+  Term.(ret (const get_dir $ cache_dir))
 
 let sdocs = Manpage.s_common_options
 let add_cmd =
@@ -345,7 +343,7 @@ let add_cmd =
                by binary lexicographic order; use the $(b,--rec) option to
                add the file hierarchies rooted at directory arguments."
     in
-    Arg.(non_empty & pos_right 0 path_arg [] & info [] ~doc ~docv:"PATH")
+    Arg.(non_empty & pos_right 0 fpath [] & info [] ~doc ~docv:"PATH")
   in
   let recurse =
     let doc = "Add file hierarchies rooted at directory $(b,PATH) arguments. \
@@ -433,7 +431,7 @@ let revive_cmd =
                  bound but kept intact. The number of files specified must match
                  the length of the file list stored by $(b,KEY)."
       in
-      Arg.(value & pos_right 0 path_arg [] & info [] ~doc ~docv:"PATH")
+      Arg.(value & pos_right 0 fpath [] & info [] ~doc ~docv:"PATH")
     in
     let prefix =
       let doc = "Bind cache files to prefix path $(docv). This results
@@ -443,8 +441,8 @@ let revive_cmd =
                  already exists it is left untouched. If intermediate
                  directories of $(docv) do not exist they are created."
       in
-      Arg.(value & opt (some path_arg) None & info ["p"; "prefix"]
-             ~doc ~docv:"PATH")
+      Arg.(value & opt (some fpath) None & info ["p"; "prefix"]
+              ~doc ~docv:"PATH")
     in
     let either explicit prefix = match explicit, prefix with
     | [], None -> Error (`Msg ("No file to bind specified"))

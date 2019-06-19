@@ -5,9 +5,10 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
-open Cmdliner
 
 module Cli = struct
+  open Cmdliner
+
   module B0_std = struct
     let color ?(docs = Manpage.s_common_options) ?env () =
       let enum = ["auto", None; "always", Some `Ansi; "never", Some `None] in
@@ -98,9 +99,43 @@ module Cli = struct
     let fpath = Arg.conv ~docv:"PATH" (err_msg Fpath.of_string, Fpath.pp)
     let cmd = Arg.conv ~docv:"CMD" (err_msg Cmd.of_string, Cmd.dump)
   end
+
 end
 
 module Memo = struct
+  open Cmdliner
+
+  let b0_dir_name = "_b0"
+  let cache_dir_name = ".cache"
+  let trash_dir_name = ".trash"
+  let b0_dir_env = "B0_DIR"
+  let cache_dir_env = "B0_CACHE_DIR"
+  let b0_dir
+      ?(docs = Manpage.s_common_options)
+      ?(doc = "Use $(docv) for the b0 directory.")
+      ?(doc_none = "$(b,_b0) in root directory")
+      ?(env = Cmdliner.Arg.env_var b0_dir_env) ()
+    =
+    Arg.(value & opt (some ~none:doc_none Cli.Arg.fpath) None &
+         info ["b0-dir"] ~env ~doc ~docs ~docv:"DIR")
+
+  let cache_dir
+      ?(docs = Manpage.s_common_options)
+      ?(doc = "Use $(docv) for the build cache directory.")
+      ?(doc_none = "$(b,.cache) in b0 directory")
+      ?(env = Cmdliner.Arg.env_var cache_dir_env) ()
+    =
+    Arg.(value & opt (some ~none:doc_none Cli.Arg.fpath) None &
+         info ["cache-dir"] ~env ~doc ~docs ~docv:"DIR")
+
+  let get_b0_dir ~cwd ~root ~b0_dir = match b0_dir with
+  | None -> Fpath.(root / b0_dir_name)
+  | Some d -> Fpath.(cwd // d)
+
+  let get_cache_dir ~cwd ~b0_dir ~cache_dir = match cache_dir with
+  | None -> Fpath.(b0_dir / cache_dir_name)
+  | Some d -> Fpath.(cwd // d)
+
   let jobs ?docs ?env () =
     let doc = "Maximal number of commands to spawn concurrently." in
     let docv = "COUNT" in
@@ -239,6 +274,8 @@ module Memo = struct
 end
 
 module Pager = struct
+  open Cmdliner
+
   let envs =
     Term.env_info "PAGER"
       ~doc:"The pager used to display content. This is a command \
@@ -329,6 +366,8 @@ module Pager = struct
 end
 
 module Editor = struct
+  open Cmdliner
+
   let envs =
     Term.env_info "VISUAL"
       ~doc:"The editor used to edit files. This is a command \
@@ -358,6 +397,7 @@ module Editor = struct
 end
 
 module Browser = struct
+  open Cmdliner
 
   (* Cli *)
 

@@ -73,6 +73,67 @@ end
 (** [Memo] interaction. *)
 module Memo : sig
 
+  (** {1:dirs Specifying directories} *)
+
+  val b0_dir_name : string
+  (** [b0_dir_name] is ["_b0"] the default b0 directory name. *)
+
+  val cache_dir_name : string
+  (** [cache_dir_name] is [".cache"] the default cache directory name
+      in the [b0] directory. *)
+
+  val trash_dir_name : string
+  (** [default_trash_dir] is [".trash"] the default trash directoy name
+      in the [b0] directory. *)
+
+  val b0_dir_env : string
+  (** [b0_dir_env] is ["B0_DIR"]. *)
+
+  val cache_dir_env : string
+  (** [b0_dir_env] is ["B0_CACHE_DIR"]. *)
+
+  val b0_dir :
+    ?docs:string -> ?doc:string -> ?doc_none:string -> ?env:Cmdliner.Arg.env ->
+    unit -> Fpath.t option Term.t
+  (** [b0_dir ~doc_none ~docs ~doc ~env] is a cli interface for specifying
+      a b0 directory.
+      {ul
+      {- [docs] is where the option is documented, defaults to
+         {!Manpage.s_common_options}}
+      {- [doc] is a doc string.}
+      {- [doc_none] describes how the value is determined if the term is
+         evaluates to [None].}
+      {- [env] is a variable that can be used to override the default
+         value, defaults to {!b0_dir_env}.}} *)
+
+  val cache_dir :
+    ?docs:string -> ?doc:string -> ?doc_none:string -> ?env:Cmdliner.Arg.env ->
+    unit -> Fpath.t option Term.t
+  (** [cache_dir ~doc_none ~docs ~doc ~env] is a cli interface for specifying
+      a b0 cache directory.
+      {ul
+      {- [docs] is where the option is documented, defaults to
+         {!Manpage.s_common_options}}
+      {- [doc] is a doc string.}
+      {- [doc_none] describes how the value is determined if the term is
+         evaluates to [None].}
+      {- [env] is a variable that can be used to override the default
+         value, defaults to {!cache_dir_env}.}} *)
+
+  val get_b0_dir :
+    cwd:Fpath.t -> root:Fpath.t -> b0_dir:Fpath.t option -> Fpath.t
+ (** [get_b0_dir ~cwd ~root ~b0_dir] determines a b0 directory. If
+     [b0_dir] is [Some d] then this is [Fpath.(cwd // d)]. If [None]
+     then this is [Fpath.(root / b0_dir_name)]. *)
+
+  val get_cache_dir :
+    cwd:Fpath.t -> b0_dir:Fpath.t -> cache_dir:Fpath.t option -> Fpath.t
+  (** [get_cache_dir ~cwd ~b0_dir ~cache_dir] determines a cache directory.
+      If [cache_dir] is [Some d] then this is [Fpath.(cwd // d)]. If [None]
+      then this is [Fpath.(b0_dir / cache_dir)]. *)
+
+  (** {1:build Build parameters} *)
+
   val jobs : ?docs:string -> ?env:Arg.env -> unit -> int option Term.t
   (** [jobs] is a cli interface for specifying the maximal number of
       commands to spawn concurrently. *)
@@ -81,6 +142,8 @@ module Memo : sig
   (** [max_spawn jobs] determines a maximal number of spans.  This is
       either, in order, [jobs] or {!B0_machine.logical_cpu_count} or
       [1]. *)
+
+  (** {1:build_feedback Build feedback} *)
 
   val log_feedback :
     show_spawn_ui:Log.level ->
