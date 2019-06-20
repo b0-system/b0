@@ -316,7 +316,7 @@ module Op : sig
     (** The type for process spawn operations. *)
 
     val v :
-      id:id -> group:group -> Time.span -> reads:Fpath.t list ->
+      id:id -> group:group -> Time.span -> stamp:string -> reads:Fpath.t list ->
       writes:Fpath.t list -> env:Os.Env.assignments ->
       relevant_env:Os.Env.assignments -> cwd:Fpath.t ->
       stdin:Fpath.t option -> stdout:stdo -> stderr:stdo ->
@@ -358,6 +358,14 @@ module Op : sig
 
     val args : t -> Cmd.t
     (** [args s] are the spawned tool arguments. *)
+
+    val stamp : t -> string
+    (** [stamp s] is a stamp that is used for caching. Two spans
+        operations all otherwise equal but differing only in their
+        stamp must not cache to the same key. *)
+
+    val set_stamp : t -> string -> unit
+    (** [set_stamp s st] sets the stamp of [s] to [st]. See {!stamp}. *)
 
     val stdo_ui : t -> (string, string) result option
     (** [stdo_ui sr] is the standard outputs redirection contents
@@ -1217,8 +1225,8 @@ module Memo : sig
       if the tool cannot be found. *)
 
   val spawn :
-    t -> ?reads:Fpath.t list -> ?writes:Fpath.t list -> ?env:Os.Env.t ->
-    ?cwd:Fpath.t -> ?stdin:Fpath.t -> ?stdout:Op.Spawn.stdo ->
+    t -> ?stamp:string -> ?reads:Fpath.t list -> ?writes:Fpath.t list ->
+    ?env:Os.Env.t -> ?cwd:Fpath.t -> ?stdin:Fpath.t -> ?stdout:Op.Spawn.stdo ->
     ?stderr:Op.Spawn.stdo -> ?success_exits:Op.Spawn.success_exits ->
     ?k:(int -> unit) -> cmd -> unit
   (** [spawn m ~reads ~writes ~env ~cwd ~stdin ~stdout ~stderr
@@ -1249,6 +1257,11 @@ module Memo : sig
          independent from the [cwd].}
       {- [k], if specified a fiber invoked once the spawn has succesfully
          executed with the exit code.}}
+      {- [stamp] is used for caching if two spawns diff only in their
+         stamp they will cache to different keys. This can be used to
+         memoize tool whose outputs may not entirely depend on the environment,
+         the cli stamp and the the content of read files.}}
+
       {b TODO.} More expressive power could by added by:
       {ol
       {- Support to refine the read and write set after the operation

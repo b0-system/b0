@@ -514,6 +514,7 @@ module Op = struct
       success_exits : spawn_success_exits;
       tool : Cmd.tool;
       args : Cmd.t;
+      mutable spawn_stamp : string;
       mutable stdo_ui : (string, string) result option;
       mutable spawn_result  : (Os.Cmd.status, string) result; }
 
@@ -626,12 +627,13 @@ module Op = struct
     type success_exits = spawn_success_exits
     type t = spawn
     let v
-        ~id ~group creation_time ~reads ~writes ~env ~relevant_env ~cwd
-        ~stdin ~stdout ~stderr ~success_exits tool args
+        ~id ~group creation_time ~stamp:spawn_stamp ~reads ~writes ~env
+        ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits tool args
       =
       let spawn =
         { env; relevant_env; cwd; stdin; stdout; stderr; success_exits;
-          tool; args; stdo_ui = None; spawn_result = Error "not spawned" }
+          tool; args; spawn_stamp; stdo_ui = None;
+          spawn_result = Error "not spawned" }
       in
       v ~id ~group creation_time ~reads ~writes (Spawn spawn)
 
@@ -645,6 +647,8 @@ module Op = struct
     let success_exits s = s.success_exits
     let tool s = s.tool
     let args s = s.args
+    let stamp s = s.spawn_stamp
+    let set_stamp s stamp = s.spawn_stamp <- stamp
     let stdo_ui s = s.stdo_ui
     let set_stdo_ui s ui = s.stdo_ui <- ui
     let result s = s.spawn_result
@@ -975,7 +979,8 @@ module Reviver = struct
     let stdin_stamp = function None -> "0" | Some _ -> "1" in
     let stdo_stamp = function `File _ -> "0" | `Tee _ -> "1" | `Ui -> "2" in
     let module H = (val r.hash_fun : Hash.T) in
-    let acc = [Hash.to_bytes (_hash_file r (Op.Spawn.tool s))] in
+    let acc = [Op.Spawn.stamp s] in
+    let acc = (Hash.to_bytes (_hash_file r (Op.Spawn.tool s))) :: acc in
     let acc = hash_op_reads r o acc in
     let acc = stdin_stamp (Op.Spawn.stdin s) :: acc in
     let acc = stdo_stamp (Op.Spawn.stdout s) :: acc in
@@ -1952,18 +1957,18 @@ module Memo = struct
   | Ok _ -> Some (tool m t)
 
   let spawn
-      m ?(reads = []) ?(writes = []) ?env ?cwd ?stdin ?(stdout = `Ui)
-      ?(stderr = `Ui) ?(success_exits = [0]) ?k cmd
+      m ?(stamp = "") ?(reads = []) ?(writes = []) ?env ?cwd ?stdin
+      ?(stdout = `Ui) ?(stderr = `Ui) ?(success_exits = [0]) ?k cmd
     =
     match cmd.cmd_tool with
     | Miss (tool, e) -> m.m.feedback (`Miss_tool (tool, e))
     | Tool tool ->
         let id = new_op_id m in
-        let stamp = timestamp m in
+        let timestamp = timestamp m in
         let env, relevant_env = spawn_env m tool env in
         let cwd = match cwd with None -> m.m.cwd | Some d -> d in
         let o =
-          Op.Spawn.v ~id ~group:m.c.group stamp ~reads ~writes ~env
+          Op.Spawn.v ~id ~group:m.c.group timestamp ~stamp ~reads ~writes ~env
             ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits
             tool.tool_file cmd.cmd_args
         in
