@@ -467,6 +467,7 @@ module File_cache = struct
       | Failure e -> Error (err "keys stats" e)
 
     type cache = { all_keys : keys; unused_keys : keys }
+    let zero = { all_keys = keys_zero; unused_keys = keys_zero }
     let all_keys s = s.all_keys
     let unused_keys s = s.unused_keys
     let pp ppf s =

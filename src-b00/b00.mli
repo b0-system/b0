@@ -195,6 +195,9 @@ module File_cache : sig
     type cache
     (** The type for cache statistics *)
 
+    val zero : cache
+    (** [zero] are zeros. *)
+
     val all_keys : cache -> keys
     (** [all_keys s] are statistics about all keys in the cache. *)
 
