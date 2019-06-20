@@ -37,7 +37,7 @@ let show_uris () background prefix browser uris =
 open Cmdliner
 
 let uris =
-  let doc = "URI to show. If URI is an existing file path
+  let doc = "URI to show. If URI is an existing file path \
              a corresponding file:// URI is opened."
   in
   Arg.(non_empty & pos_all string [] & info [] ~doc ~docv:"URI")

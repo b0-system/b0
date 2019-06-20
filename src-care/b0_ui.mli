@@ -67,10 +67,63 @@ module Cli : sig
           and [color_env] and [verbosity_env] are used with the [env] argument
           of {!color} and {!verbosity}. *)
   end
+
+  (** {1:out_fmt Specifying output formats} *)
+
+  type out_fmt = [ `Normal | `Short | `Long ]
+  (** The type for specifying output format details. *)
+
+  val out_fmt :
+    ?short_opts:string list -> ?long_opts:string list -> unit ->
+    out_fmt Term.t
+  (** [out_fmt ~short_opts ~long_opts ()] are mutually exclusive options
+      to specify short and long output format, without options this is
+      [`Normal]. [short_opts] defaults to [["s"; "short"]] and
+      [long_opts] default to [["l"; "long"]]. *)
 end
 
+(** {!B00.File_cache} interaction. *)
+module File_cache : sig
 
-(** [Memo] interaction. *)
+  (** {1:high-level High-level commands.}
+
+      These commands act on a cache directory. They avoid to create
+      it via {!B00.File_cache.create} if it doesn't exists and mostly
+      return [Ok ()] in these cases. *)
+
+  val delete :
+    dir:Fpath.t -> [ `All | `Keys of B00.File_cache.key list ] ->
+    (unit, string) result
+  (** [delete dir keys] deletes [keys] in [dirs] if an explicit key
+      does not exist in [dir] a {!Log.warn} is issued. If [`All] is
+      specified [dir] is deleted and recreated. *)
+
+  val gc : dir:Fpath.t -> (unit, string) result
+  (** [gc dir] deletes unused keys via {!B00.File_cache.delete_unused}. *)
+
+  val size : dir:Fpath.t -> (unit, string) result
+  (** [size dir] shows statistics about the file cache on stdout
+      via {!B00.File_cache.Stats.pp}. *)
+
+  val trim :
+    dir:Fpath.t -> max_byte_size:int -> pct:int -> (unit, string) result
+    (** [trim dir ~max_byte_size ~pct] trims the cache using
+        {!B00.File_cache.trim_size}. *)
+
+  (** {1:cli Cli fragments} *)
+
+  val key_arg : B00.File_cache.key Cmdliner.Arg.conv
+  (** [key_arg] is an argument converter for cache keys. *)
+
+  val keys_none_is_all :
+    ?pos_right:int -> unit ->
+    [ `All | `Keys of B00.File_cache.key list ] Cmdliner.Term.t
+   (** [keys_none_is_all ~pos_right ()] are the keys at the right
+       of position [pos_right] (defaults is all positional arguments).
+       If none is specified this is [`All]. *)
+end
+
+(** {!B00.Memo} interaction. *)
 module Memo : sig
 
   (** {1:dirs Specifying directories} *)

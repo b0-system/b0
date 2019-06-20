@@ -7,6 +7,11 @@
 open B0_std
 open B00
 
+(* FIXME we are not using B0_ui.File_cache.* because this
+   errors on missing caches. Unclear whether the behaviour
+   here should be changed. *)
+
+
 (* Exit codes and errors *)
 
 let err_no_cache = 1
@@ -14,33 +19,27 @@ let err_key_unknown = 2
 let err_key_exists = 3
 let err_unknown = 123
 
-let exe = Filename.basename Sys.executable_name
-let log_err fmt =  Fmt.epr ("%s: " ^^ fmt ^^ "@.") exe
-let log_warn fmt = Fmt.epr ("%s: [WARNING]" ^^ fmt ^^ "@.") exe
-
 let handle_unknown_error = function
-| Ok i -> i | Error e -> log_err "%s" e; err_unknown
-
-let did_you_mean ?(pre = "Unknown") ?(post = "") ~kind (n, hints) =
-  match hints with
-  | [] -> Fmt.str "@[%s %s '%s'%s.@]" pre kind n post
-  | hints ->
-      Fmt.str "@[%s %s '%s'%s.@ Did you mean %a ?@]"
-        pre kind n post Fmt.text (Cmdliner.Arg.doc_alts hints)
+| Ok i -> i | Error e -> Log.err (fun m -> m "%s" e); err_unknown
 
 (* Commonalities *)
 
 let with_cache dir f =
   let feedback = function
   | `File_cache_need_copy file ->
-    log_warn "@[<v>Using slow copying cache due to:@,%a@,@[%a@]@]"
-      Fpath.pp file Fmt.text
-      "The cache may be on a different file system or hard links \
-       are not supported, or the maximal number of links was reached."
+      (* FIXME move that to B0_log.ui *)
+      Log.warn begin fun m ->
+          m "@[<v>Using slow copying cache due to:@,%a@,@[%a@]@]"
+          Fpath.pp file Fmt.text
+          "The cache may be on a different file system or hard links \
+           are not supported, or the maximal number of links was reached."
+      end
   in
   Result.bind (Os.Dir.exists dir) @@ function
-  | false -> log_err "%a: Not a directory cache" Fpath.pp dir; Ok err_no_cache
   | true -> Result.bind (File_cache.create ~feedback dir) f
+  | false ->
+      Log.err (fun m -> m "%a: Not a directory cache" Fpath.pp dir);
+      Ok err_no_cache
 
 let keys_exist c keys =
   let rec loop c miss = function
@@ -50,7 +49,8 @@ let keys_exist c keys =
   | [] ->
       Result.bind (File_cache.keys c) @@ fun dom ->
       let add_error acc n =
-        did_you_mean ~kind:"key" (n, String.suggest dom n) :: acc
+        Fmt.(str "%a" (did_you_mean text ~kind:"key") (n, String.suggest dom n))
+        :: acc
       in
       Error (String.concat "\n" (List.fold_left add_error [] miss))
   in
@@ -69,11 +69,12 @@ let with_key_selection c ~only_unused keys f =
   | `All ->
       Result.bind (File_cache.keys c) @@ fun ks -> f (filter c ~only_unused ks)
   | `Keys [] ->
-      log_err "No key specified"; Ok Cmdliner.Term.exit_status_cli_error
+      Log.err (fun m -> m "No key specified");
+      Ok Cmdliner.Term.exit_status_cli_error
   | `Keys keys ->
       match keys_exist c keys with
-      | Error e -> log_err "%s" e; Ok err_key_unknown
       | Ok () -> f (filter c ~only_unused keys)
+      | Error e -> Log.err (fun m -> m  "%s" e); Ok err_key_unknown
 
 (* Commands *)
 
@@ -81,7 +82,8 @@ let files_to_bind ~recurse paths f =
   let rec loop acc = function
   | [] ->
       if acc <> [] then f (List.rev acc) else
-      (log_err "No file to store"; Ok Cmdliner.Term.exit_status_cli_error)
+      (Log.err (fun m -> m "No file to store");
+       (Ok Cmdliner.Term.exit_status_cli_error))
   | p :: ps ->
       match Os.Dir.exists p with
       | Error _ as e -> e
@@ -97,12 +99,13 @@ let files_to_bind ~recurse paths f =
   in
   loop [] paths
 
-let add_cmd dir force key recurse paths =
+let add_cmd () dir force key recurse paths =
   handle_unknown_error @@
   with_cache dir @@ fun c ->
   match File_cache.mem c key && not force with
   | true ->
-      log_err "%s: key already bound in cache, use -f to force" key;
+      Log.err
+        (fun m -> m "%s: key already bound in cache, use -f to force" key);
       Ok err_key_exists
   | false ->
       files_to_bind ~recurse paths @@ fun files ->
@@ -110,11 +113,13 @@ let add_cmd dir force key recurse paths =
       | true -> Ok 0
       | false ->
           let miss f = not @@ Result.value ~default:false @@ Os.File.exists f in
-          log_err "@[<v>%s: key not bound, can't access these files:@,%a@]"
-            key (Fmt.list Fpath.pp) (List.filter miss files);
+          Log.err
+            (fun m ->
+               m "@[<v>%s: key not bound, can't access these files:@,%a@]"
+            key (Fmt.list Fpath.pp) (List.filter miss files));
           Ok err_unknown
 
-let delete_cmd dir only_unused keys =
+let delete_cmd () dir only_unused keys =
   handle_unknown_error @@
   with_cache dir @@ fun c ->
   match only_unused && keys = `All with
@@ -128,7 +133,7 @@ let delete_cmd dir only_unused keys =
       in
       loop keys
 
-let files_cmd dir only_unused keys out_fmt =
+let files_cmd () dir only_unused keys out_fmt =
   handle_unknown_error @@
   with_cache dir @@ fun c ->
   with_key_selection c ~only_unused keys @@ fun keys ->
@@ -156,15 +161,14 @@ let files_cmd dir only_unused keys out_fmt =
       end;
       Ok 0
 
-let gc_cmd dir quiet =
+let gc_cmd () dir =
   handle_unknown_error @@
   with_cache dir @@ fun c ->
   Result.bind (File_cache.Stats.of_cache c) @@ fun s ->
   Result.bind (File_cache.delete_unused c) @@ fun () ->
-  if not quiet
-  then
-    Fmt.pr "deleted: %a@."
-      File_cache.Stats.pp_keys (File_cache.Stats.unused_keys s);
+  Log.app (fun m ->
+      m "deleted: %a"
+        File_cache.Stats.pp_keys (File_cache.Stats.unused_keys s));
   Ok 0
 
 let pp_key c byte_size = function
@@ -178,7 +182,7 @@ let pp_key c byte_size = function
         let bs = File_cache.Stats.keys_byte_size s in
         Fmt.pr "%d %a %s" fc pp_byte_size bs k
 
-let keys_cmd dir only_unused keys out_fmt byte_size =
+let keys_cmd () dir only_unused keys out_fmt byte_size =
   handle_unknown_error @@
   with_cache dir @@ fun c ->
   with_key_selection c ~only_unused keys @@ function
@@ -186,9 +190,9 @@ let keys_cmd dir only_unused keys out_fmt byte_size =
   | keys ->
       Fmt.pr "@[<v>%a@]@." (Fmt.list (pp_key c byte_size out_fmt)) keys; Ok 0
 
-let path_cmd dir = Fmt.pr "%a@." Fpath.pp dir; 0
+let path_cmd () dir = Fmt.pr "%a@." Fpath.pp dir; 0
 
-let size_cmd dir only_unused keys =
+let size_cmd () dir only_unused keys =
   handle_unknown_error @@
   with_cache dir @@ fun c ->
   match keys with
@@ -210,7 +214,7 @@ let size_cmd dir only_unused keys =
           Result.bind (File_cache.Stats.of_keys c keys) @@ fun s ->
           Fmt.pr "@[<v>%a@]@." File_cache.Stats.pp_keys s; Ok 0
 
-let revive_cmd dir quiet key paths =
+let revive_cmd () dir key paths =
   handle_unknown_error @@
   with_cache dir @@ fun c ->
   with_key_selection c ~only_unused:false (`Keys [key]) @@ fun _ ->
@@ -226,13 +230,12 @@ let revive_cmd dir quiet key paths =
   Result.bind paths @@ fun paths ->
   Result.bind (File_cache.revive c key paths) @@ function
   | Some (_, existed) ->
-      if not quiet then begin
-        let log_exist f = log_err "%a: Not bound, file exists." Fpath.pp f in
-        List.iter log_exist existed;
-      end;
+      let log_exist f =
+        Log.err (fun m -> m "%a: Not bound, file exists." Fpath.pp f)
+      in
+      List.iter log_exist existed;
       Ok 0
   | None ->
-      if quiet then Ok err_unknown else
       Result.bind (File_cache.find c key) @@ fun r ->
       let cfiles = match r with
       | None -> []
@@ -240,25 +243,22 @@ let revive_cmd dir quiet key paths =
       in
       let ccount = List.length cfiles in
       let pcount = List.length paths in
-      log_err
-        "%s: key has %d cached file(s) but %d file path(s) to bind specified"
-        key ccount pcount;
+      Log.err (fun m ->
+          m "%s: key has %d cached file(s) but %d file path(s) to bind \
+            specified" key ccount pcount);
       Ok err_unknown
 
-let trim_cmd dir quiet (max_byte_size, pct)  =
+let trim_cmd () dir (max_byte_size, pct) =
   handle_unknown_error @@
   with_cache dir @@ fun c ->
-  let stats quiet c = match quiet with
-  | true -> Ok File_cache.Stats.keys_zero
-  | false -> Result.map File_cache.Stats.all_keys (File_cache.Stats.of_cache c)
+  let stats c =
+    Result.map File_cache.Stats.all_keys (File_cache.Stats.of_cache c)
   in
-  Result.bind (stats quiet c) @@ fun stats_before ->
+  Result.bind (stats c) @@ fun stats_before ->
   Result.bind (File_cache.trim_size c ~max_byte_size ~pct) @@ fun () ->
-  Result.bind (stats quiet c) @@ fun stats_after ->
-  if not quiet then begin
-    let deleted = File_cache.Stats.keys_sub stats_before stats_after in
-    Fmt.pr "deleted: %a@." File_cache.Stats.pp_keys deleted;
-  end;
+  Result.bind (stats c) @@ fun stats_after ->
+  let deleted = File_cache.Stats.keys_sub stats_before stats_after in
+  Log.app (fun m -> m "deleted: %a" File_cache.Stats.pp_keys deleted);
   Ok 0
 
 (* Command line interface *)
@@ -271,27 +271,7 @@ let exits =
   Term.exit_info err_unknown ~doc:"unknown error reported on stderr." ::
   Term.default_exits
 
-type out_fmt = [ `Normal | `Short | `Long ]
-let out_fmt =
-  let short =
-    let doc = "Short output. Line based output with only relevant data." in
-    Arg.info ["s"; "short"] ~doc
-  in
-  let long =
-    let doc = "Long output. Outputs as much information as possible." in
-    Arg.info ["long"] ~doc
-  in
-  Arg.(value & vflag `Normal [`Short, short; `Long, long])
-
-let key_arg =
-  let of_string s = match Fpath.is_seg s with
-  | true -> Ok s | false -> Error (`Msg "Not a valid key (not a path segment)")
-  in
-  Arg.conv (of_string, String.pp) ~docv:"KEY"
-
-let quiet =
-  let doc = "Be quiet." in
-  Arg.(value & flag & info ["q"; "quiet"] ~doc)
+let cli_conf = B0_ui.Cli.B0_std.setup ()
 
 let only_unused =
   let doc = "Keep only unused keys from the selection. $(b,WARNING) Unused key
@@ -302,14 +282,13 @@ let only_unused =
   in
   Arg.(value & flag & info ["u"; "unused"] ~doc)
 
+let out_fmt = B0_ui.Cli.out_fmt ()
+let key_arg = B0_ui.File_cache.key_arg
 let req_key =
   let doc = "The key." in
   Arg.(required & pos 0 (some key_arg) None & info [] ~doc ~docv:"KEY")
 
-let keys_all_is_none =
-  let doc = "Key to select (repeatable). If unspecified selects all keys." in
-  let keys = Arg.(value & pos_all key_arg [] & info [] ~doc ~docv:"KEY") in
-  Term.(const (function [] -> `All | ks -> `Keys ks) $ keys)
+let keys_none_is_all = B0_ui.File_cache.keys_none_is_all ()
 
 (* Command clis *)
 
@@ -326,8 +305,7 @@ let dir =
 
 let sdocs = Manpage.s_common_options
 let add_cmd =
-  let doc = "Bind a key to files" in
-  let man_xrefs = [ `Main ] in
+  let doc = "Bind a key to files" and man_xrefs = [ `Main ] in
   let man = [
     `S Manpage.s_description;
     `P "$(tname) stores an ordered sequence of files in the cache under
@@ -352,31 +330,29 @@ let add_cmd =
     in
     Arg.(value & flag & info ["r"; "rec"] ~doc)
   in
-  Term.(const add_cmd $ dir $ force $ req_key $ recurse $ paths),
+  Term.(const add_cmd $ cli_conf $ dir $ force $ req_key $ recurse $ paths),
   Term.info "add" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 let delete_cmd =
-  let doc = "Delete keys" in
-  let man_xrefs = [`Main] in
+  let doc = "Delete keys" and man_xrefs = [ `Main ] in
   let man = [
     `S Manpage.s_description; `P "$(tname) deletes keys."] in
-  Term.(const delete_cmd $ dir $ only_unused $ keys_all_is_none),
+  Term.(const delete_cmd $ cli_conf $ dir $ only_unused $ keys_none_is_all),
   Term.info "delete" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 let files_cmd =
-  let doc = "List key files" in
-  let man_xrefs = [`Main] in
+  let doc = "List key files" and man_xrefs = [ `Main ] in
   let man = [
     `S Manpage.s_description;
     `P "$(tname) lists key files. By default outputs one file path per line
         preceeded by the key name to which it belongs." ]
   in
-  Term.(const files_cmd $ dir $ only_unused $ keys_all_is_none $ out_fmt),
+  Term.(const files_cmd $ cli_conf $ dir $ only_unused $ keys_none_is_all $
+        out_fmt),
   Term.info "files" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 let gc_cmd =
-  let doc ="Delete unused keys" in
-  let man_xrefs = [`Main] in
+  let doc ="Delete unused keys" and man_xrefs = [ `Main ] in
   let man = [
     `S Manpage.s_description;
     `P "$(tname) is $(mname) $(b,delete --unused) put also prints on standard
@@ -387,12 +363,11 @@ let gc_cmd =
         keys appear unused and this command deletes all the cache,
         i.e. is equivalent to $(mname) $(b,delete).";]
   in
-  Term.(const gc_cmd $ dir $ quiet),
+  Term.(const gc_cmd $ cli_conf $ dir),
   Term.info "gc" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 let keys_cmd =
-  let doc = "List keys" in
-  let man_xrefs = [`Main] in
+  let doc = "List keys" and man_xrefs = [ `Main ] in
   let man = [
     `S Manpage.s_description;
     `P "$(tname) lists keys. By default outputs one key per line
@@ -402,24 +377,22 @@ let keys_cmd =
     let doc = "Output the size in bytes (rather than human friendly units)." in
     Arg.(value & flag & info ["byte-size"] ~doc)
   in
-  Term.(const keys_cmd $ dir $ only_unused $ keys_all_is_none $ out_fmt $
-        byte_size),
+  Term.(const keys_cmd $ cli_conf $ dir $ only_unused $ keys_none_is_all $
+        out_fmt $ byte_size),
   Term.info "keys" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 let path_cmd =
-  let doc = "Print path to cache directory" in
-  let man_xrefs = [`Main] in
+  let doc = "Show path to cache directory" and man_xrefs = [ `Main ] in
   let man = [
     `S Manpage.s_description;
-    `P "$(tname) prints on standard output the path to the cache directory
+    `P "$(tname) prints on standard output the path to the cache directory \
         (which may not exist)."];
   in
-  Term.(const path_cmd $ dir),
+  Term.(const path_cmd $ cli_conf $ dir),
   Term.info "path" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 let revive_cmd =
-  let doc = "Use a cache key" in
-  let man_xrefs = [`Main] in
+  let doc = "Use a cache key" and man_xrefs = [ `Main ] in
   let man = [
     `S Manpage.s_description;
     `P "$(tname) binds file paths to the cached files of a key."];
@@ -442,7 +415,7 @@ let revive_cmd =
                  directories of $(docv) do not exist they are created."
       in
       Arg.(value & opt (some fpath) None & info ["p"; "prefix"]
-              ~doc ~docv:"PATH")
+             ~doc ~docv:"PATH")
     in
     let either explicit prefix = match explicit, prefix with
     | [], None -> Error (`Msg ("No file to bind specified"))
@@ -453,7 +426,7 @@ let revive_cmd =
     in
     Term.(term_result (const either $ explicit $ prefix))
   in
-  Term.(const revive_cmd $ dir $ quiet $ req_key $ paths),
+  Term.(const revive_cmd $ cli_conf $ dir $ req_key $ paths),
   Term.info "revive" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 let size_cmd =
@@ -464,16 +437,15 @@ let size_cmd =
     `P "$(tname) prints on standard output statistics about the size of the
         cache." ]
   in
-  Term.(const size_cmd $ dir $ only_unused $ keys_all_is_none),
+  Term.(const size_cmd $ cli_conf $ dir $ only_unused $ keys_none_is_all),
   Term.info "size" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 let trim_cmd =
-  let doc = "Reduce cache size" in
-  let man_xrefs = [ `Main ] in
+  let doc = "Reduce cache size" and man_xrefs = [ `Main ] in
   let man = [
     `S Manpage.s_description;
     `P "$(tname) trims the cache to a specific size. Without options
-        this is equivalent to specifying the option $(b,--to-half).
+        this is equivalent to $(b,--to-% 50).
         If more than one trim option is specified the smallest requested
         size is met.";
     `P "Keys are deleted by order of increasing access time but unused keys,
@@ -484,40 +456,27 @@ let trim_cmd =
     let docv = "MB" in
     Arg.(value & opt (some int) None & info ["m"; "to-mb"] ~doc ~docv)
   in
-  let trim_half =
-    let doc = "Trim the cache to at most 50% of the current size (default)." in
-    Arg.(value & flag & info ["h"; "to-half"] ~doc)
-  in
   let trim_to_pct =
-    let doc = "Trim the cache to at most $(docv)% of the current size."
-    in
+    let doc = "Trim the cache to at most $(docv)% of the current size." in
     let docv = "PCT" in
     Arg.(value & opt (some int) None & info ["p";"to-%";"to-pct"] ~doc ~docv)
   in
   let trim_spec  =
-    let combine trim_to_mb trim_half trim_to_pct =
-      let pct_opt = match trim_half, trim_to_pct with
-      | true, None -> Some 50
-      | true, Some pct -> Some (min 50 pct)
-      | false, None -> None
-      | false, Some pct -> Some pct
-      in
-      match trim_to_mb, pct_opt with
-      | None, None -> max_int, 50
-      | None, Some pct -> max_int, pct
-      | Some mb, None -> mb * 1000 * 1000, 100
-      | Some mb, Some pct -> mb * 1000 * 1000, pct
+    let combine trim_to_mb trim_to_pct = match trim_to_mb, trim_to_pct with
+    | None, None -> max_int, 50
+    | None, Some pct -> max_int, pct
+    | Some mb, None -> mb * 1000 * 1000, 100
+    | Some mb, Some pct -> mb * 1000 * 1000, pct
     in
-    Term.(const combine $ trim_to_mb $ trim_half $ trim_to_pct)
+    Term.(const combine $ trim_to_mb $ trim_to_pct)
   in
-  Term.(const trim_cmd $ dir $ quiet $ trim_spec),
+  Term.(const trim_cmd $ cli_conf $ dir $ trim_spec),
   Term.info "trim" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 (* Main command *)
 
 let b00_cache =
-  let doc = "Low-level operations on b0 caches" in
-  let man_xrefs = [`Tool "b0"] in
+  let doc = "Low-level operations on b0 caches" and man_xrefs = [`Tool "b0"] in
   let man = [
     `S Manpage.s_description;
     `P "$(mname) is a low-level tool to operates on b0 caches. Not for the

@@ -94,12 +94,96 @@ module Cli = struct
       in
       Term.(const setup $ color $ verbosity)
   end
+
   module Arg = struct
     let err_msg of_string s = Result.map_error (fun e -> `Msg e) (of_string s)
     let fpath = Arg.conv ~docv:"PATH" (err_msg Fpath.of_string, Fpath.pp)
     let cmd = Arg.conv ~docv:"CMD" (err_msg Cmd.of_string, Cmd.dump)
   end
 
+  (* Specifying output formats *)
+
+  type out_fmt = [ `Normal | `Short | `Long ]
+  let out_fmt ?(short_opts = ["s"; "short"]) ?(long_opts = ["l"; "long"]) () =
+    let short =
+      let doc = "Short output. Line based output with only relevant data." in
+      Cmdliner.Arg.info short_opts ~doc
+    in
+    let long =
+      let doc = "Long output. Outputs as much information as possible." in
+      Cmdliner.Arg.info long_opts ~doc
+    in
+    Cmdliner.Arg.(value & vflag `Normal [`Short, short; `Long, long])
+end
+
+module File_cache = struct
+
+  (* High-level commands *)
+
+  let delete ~dir keys = Result.bind (Os.Dir.exists dir) @@ function
+  | false -> Ok ()
+  | true ->
+      match keys with
+      | `All ->
+          Result.bind (Os.Path.delete ~recurse:true dir) @@ fun _ ->
+          Result.bind (Os.Dir.create ~make_path:true dir) @@ (* recreate dir *)
+          fun _ -> Ok ()
+      | `Keys keys ->
+          Result.bind (B00.File_cache.create dir) @@ fun c ->
+          let rec loop = function
+          | [] -> Ok ()
+          | k :: ks ->
+              match B00.File_cache.rem c k with
+              | Error _ as e -> e
+              | Ok true -> loop ks
+              | Ok false ->
+                  Log.warn (fun m -> m "%s: no such key in cache, ignored" k);
+                  loop ks
+          in
+          loop keys
+
+  let gc ~dir = Result.bind (Os.Dir.exists dir) @@ function
+  | false -> Ok ()
+  | true ->
+      Result.bind (B00.File_cache.create dir) @@ fun c ->
+      Result.bind (B00.File_cache.delete_unused c) @@ fun () ->
+      Ok ()
+
+  let size ~dir =
+    let stats = Result.bind (Os.Dir.exists dir) @@ function
+    | false -> Ok B00.File_cache.Stats.zero
+    | true ->
+        Result.bind (B00.File_cache.create dir) @@ fun c ->
+        B00.File_cache.Stats.of_cache c
+    in
+    Result.bind stats @@ fun stats ->
+    Log.app (fun m -> m "@[<v>%a@]" B00.File_cache.Stats.pp stats);
+    Ok ()
+
+  let trim ~dir ~max_byte_size ~pct =
+    Result.bind (Os.Dir.exists dir) @@ function
+    | false -> Ok ()
+    | true ->
+        Result.bind (B00.File_cache.create dir) @@ fun c ->
+        B00.File_cache.trim_size c ~max_byte_size ~pct
+
+  (* Cli fragments *)
+
+  open Cmdliner
+
+  let key_arg =
+    let of_string s = match Fpath.is_seg s with
+    | true -> Ok s
+    | false -> Error (`Msg "Not a valid key (not a path segment)")
+    in
+    Arg.conv (of_string, String.pp) ~docv:"KEY"
+
+  let keys_none_is_all ?(pos_right = -1) () =
+    let doc =
+      "Select key $(docv) (repeatable). If unspecified selects all keys."
+    in
+    let keys = Arg.(value & pos_right 0 key_arg [] & info [] ~doc ~docv:"KEY")in
+    Term.(const (function [] -> `All | ks -> `Keys ks) $ keys)
 end
 
 module Memo = struct

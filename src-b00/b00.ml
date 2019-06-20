@@ -453,7 +453,7 @@ module File_cache = struct
         keys_byte_size = s0.keys_byte_size - s1.keys_byte_size }
 
     let pp_keys ppf s =
-      Fmt.pf ppf "keys: %d files: %d size: %a"
+      Fmt.pf ppf "keys: %4d files: %4d size: %6a"
         s.keys_count s.keys_file_count Fmt.byte_size s.keys_byte_size
 
     let of_keys c ns =
@@ -472,8 +472,8 @@ module File_cache = struct
     let unused_keys s = s.unused_keys
     let pp ppf s =
       Fmt.pf ppf "@[<v>";
-      Fmt.field "total" pp_keys ppf s.all_keys; Fmt.cut ppf ();
-      Fmt.field "unused" pp_keys ppf s.unused_keys;
+      Fmt.field "unused" pp_keys ppf s.unused_keys; Fmt.cut ppf ();
+      Fmt.field "total " pp_keys ppf s.all_keys;
       Fmt.pf ppf "@]"
 
     let of_cache c =
