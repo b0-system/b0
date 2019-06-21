@@ -61,16 +61,13 @@ end
     Helpers for dealing with {!Format}. *)
 module Fmt : sig
 
-  (** {1:stdoutput Standard outputs and formatters} *)
+  (** {1:stdoutput Standard outputs} *)
 
   val stdout : Format.formatter
   (** [stdout] outputs to standard output. *)
 
   val stderr : Format.formatter
   (** [stderr] outputs to standard error. *)
-
-  val flush : Format.formatter -> unit
-  (** [flush] is {!Format.pp_print_flush}. *)
 
   (** {1:formatting Formatting} *)
 
@@ -95,14 +92,14 @@ module Fmt : sig
   (** kstr is {!Format.kasprintf}. *)
 
   val failwith : ('b, Format.formatter, unit, 'a) format4 -> 'b
-  (** [failwith fmt ...] is [kstr (fun s -> failwith s) fmt ...] *)
+  (** [failwith fmt ...] is [kstr failwith fmt ...] *)
 
   val failwith_notrace : ('b, Format.formatter, unit, 'a) format4 -> 'b
-  (** [failwith_notrace] is like {!nt} but [Failure] is raised with
+  (** [failwith_notrace] is like {!failwith} but [Failure] is raised with
       {!raise_notrace}. *)
 
   val invalid_arg : ('b, Format.formatter, unit, 'a) format4 -> 'b
-  (** [invalid_arg fmt ...] is [kstr (fun s -> invalid_arg s) fmt ...] *)
+  (** [invalid_arg fmt ...] is [kstr invalid_arg fmt ...] *)
 
   val error : ('b, Format.formatter , unit, ('a, string) result) format4 -> 'b
   (** [error fmt ...] is [kstr (fun s -> Error s) fmt ...] *)
@@ -112,29 +109,118 @@ module Fmt : sig
   type 'a t = Format.formatter -> 'a -> unit
   (** The type for formatter of values of type ['a]. *)
 
+  val flush : 'a t
+  (** [flush] has the effect of {!Format.pp_print_flush}. *)
+
   val nop : 'a t
   (** [nop] formats nothing. *)
 
-  val unit : (unit, Format.formatter, unit) Pervasives.format -> unit t
-  (** [unit fmt] formats a unit value with the format [fmt]. *)
+  val any : (unit, Format.formatter, unit) format -> 'a t
+  (** [any fmt] formats any value with [fmt]. *)
 
-  val cut : unit t
-  (** [cut] is {!Format.pp_print_cut}. *)
+  val using : ('a -> 'b) -> 'b t -> 'a t
+  (** [using f pp ppf v] is [pp ppf (f v)]. *)
 
-  val sp : unit t
-  (** [sp] is {!Format.pp_print_space}. *)
+  (** {1:separators Separators} *)
 
-  val comma : unit t
-  (** [comma] is [unit ",@ "]. *)
+  val cut : 'a t
+  (** [cut] has the effect of {!Format.pp_print_cut}. *)
 
-  val proj : ('a -> 'b) -> 'b t -> 'a t
-  (** [proj f pp ppf v] is [pp ppf (f v)]. *)
+  val sp : 'a t
+  (** [sp] has the effect of {!Format.pp_print_space}. *)
+
+  val sps : int -> 'a t
+  (** [sps n] has the effect of {!Format.pp_print_break}[ n 0]. *)
+
+  val comma : 'a t
+  (** [comma] is {!Fmt.any}[ ",@ "]. *)
+
+  val semi : 'a t
+  (** [semi] is {!Fmt.any}[ ";@ "]. *)
+
+  (** {1:sequencing Sequencing} *)
+
+  val iter : ?sep:unit t -> (('a -> unit) -> 'b -> unit) -> 'a t -> 'b t
+  (** [iter ~sep iter pp_elt] formats the iterations of [iter] over a
+      value using [pp_elt]. Iterations are separated by [sep] (defaults to
+      {!cut}). *)
+
+  val iter_bindings :
+    ?sep:unit t -> (('a -> 'b -> unit) -> 'c -> unit) -> ('a * 'b) t -> 'c t
+  (** [iter_bindings ~sep iter pp_binding] formats the iterations of
+      [iter] over a value using [pp_binding]. Iterations are separated
+      by [sep] (defaults to {!cut}). *)
+
+  val append : 'a t -> 'a t -> 'a t
+  (** [append pp_v0 pp_v1 ppf v] is [pp_v0 ppf v; pp_v1 ppf v]. *)
+
+  val (++) : 'a t -> 'a t -> 'a t
+  (** ( ++ ) is {!append}. *)
 
   val concat : ?sep:unit t -> 'a t list -> 'a t
   (** [concat ~sep pps] concatenates the formatters [pps] separating them
-      with [sep] (defaults to {!cut}. *)
+      with [sep] (defaults to {!cut}). *)
 
-  (** {1:basetypes Base type formatters} *)
+  (** {1:boxes Boxes} *)
+
+  val box : ?indent:int -> 'a t -> 'a t
+  (** [box ~indent pp ppf] wraps [pp] in a horizontal or vertical box. Break
+      hints that lead to a new line add [indent] to the current indentation
+      (defaults to [0]). *)
+
+  val hbox : 'a t -> 'a t
+  (** [hbox] is like {!box} but is a horizontal box: the line is not split
+      in this box (but may be in sub-boxes). *)
+
+  val vbox : ?indent:int -> 'a t -> 'a t
+  (** [vbox] is like {!box} but is a vertical box: every break hint leads
+      to a new line which adds [indent] to the current indentation
+      (default to [0]). *)
+
+  val hvbox : ?indent:int -> 'a t -> 'a t
+  (** [hvbox] is like {!box} but is either {!hbox} if its fits on
+      a single line or {!vbox} otherwise. *)
+
+  val hovbox : ?indent:int -> 'a t -> 'a t
+  (** [hovbox] is a condensed {!box}, see {!Format.pp_open_hovbox}. *)
+
+  (** {1:bracks Brackets} *)
+
+  val parens : 'a t -> 'a t
+  (** [parens pp_v ppf] is [pf "@[<1>(%a)@]" pp_v]. *)
+
+  val brackets : 'a t -> 'a t
+  (** [brackets pp_v ppf] is [pf "@[<1>[%a]@]" pp_v]. *)
+
+  val braces : 'a t -> 'a t
+  (** [braces pp_v ppf] is [pf "@[<1>{%a}@]" pp_v]. *)
+
+  val quote : ?mark:string -> 'a t -> 'a t
+  (** [quote ~mark pp_v ppf] is [pf "@[<1>@<1>%s%a@<1>%s@]" mark pp_v mark],
+      [mark] defaults to ["\""], it is always counted as spanning as single
+      column (this allows for UTF-8 encoded marks). *)
+
+  (** {1:records Records} *)
+
+  val id : 'a -> 'a
+  (** [id] is {!Fun.id}. *)
+
+  val field :
+    ?label:string t -> ?sep:unit t -> string -> ('b -> 'a) -> 'a t -> 'b t
+  (** [field ~label ~sep l prj pp_v] pretty prints a labelled field value as
+      [pf "@[<1>%a%a%a@]" label l sep () (using prj pp_v)]. [label] defaults
+      to [tty_string [`Yellow]] and [sep] to [any ":@ "]. *)
+
+  val record : ?sep:unit t -> 'a t list -> 'a t
+  (** [record ~sep fields] pretty-prints a value using the concatenation of
+      [fields], separated by [sep] (defaults to [cut]) and framed in a vertical
+      box. *)
+
+  (** {1:stdlib Stdlib types}
+
+      Formatters for structures give full control to the client over the
+      formatting process and do not wrap the formatted structures with
+      boxes. *)
 
   val bool : bool t
   (** [bool] is {!Format.pp_print_bool}. *)
@@ -157,15 +243,28 @@ module Fmt : sig
   val string : string t
   (** [string] is {!Format.pp_print_string}. *)
 
-  val elided_string : max:int -> string t
-  (** [elieded_string ~max] formats a string using at most [max]
-      characters, eliding it if it is too long with three consecutive
-      dots which do count towards [max]. *)
+  val sys_signal : int t
+  (** [sys_signal] formats an OCaml {{!Sys.sigabrt}signal number} as
+      a C POSIX {{:http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/signal.h.html}constant}
+      or ["SIG(%d)"] if the signal number is unknown. *)
+
+  val exn : exn t
+  (** [exn] formats an exception. *)
+
+  val exn_backtrace : (exn * Printexc.raw_backtrace) t
+  (** [exn_backtrace] formats an exception backtrace. *)
 
   val pair : ?sep:unit t -> 'a t -> 'b t -> ('a * 'b) t
   (** [pair ~sep pp_fst pp_snd] formats a pair. The first and second
       projection are formatted using [pp_fst] and [pp_snd] and are
       separated by [sep] (defaults to {!cut}). *)
+
+  val option : ?none:unit t -> 'a t -> 'a option t
+  (** [option ~none pp_v] formats an option. The [Some] case uses
+      [pp_v] and [None] uses [none] (defaults to {!nop}). *)
+
+  val none : unit t
+  (** [none] is [any "<none>"]. *)
 
   val list : ?empty:unit t -> ?sep:unit t -> 'a t -> 'a list t
   (** [list ~sep pp_v] formats list elements. Each element of the list is
@@ -179,123 +278,7 @@ module Fmt : sig
       seperated by [sep] (defaults to {!cut}). If the array is empty
       this is [empty] (defauls to {!nop}). *)
 
-  val option : ?none:unit t -> 'a t -> 'a option t
-  (** [option ~none pp_v] formats an option. The [Some] case uses
-      [pp_v] and [None] uses [none] (defaults to {!nop}). *)
-
-  val none : unit t
-  (** [none] is [unit "<none>"]. *)
-
-  val iter : ?sep:unit t -> (('a -> unit) -> 'b -> unit) -> 'a t -> 'b t
-  (** [iter ~sep iter pp_elt] formats the iterations of [iter] over a
-      value using [pp_elt]. Iterations are separated by [sep] (defaults to
-      {!cut}). *)
-
-  val iter_bindings :
-    ?sep:unit t -> (('a -> 'b -> unit) -> 'c -> unit) -> ('a * 'b) t -> 'c t
-  (** [iter_bindings ~sep iter pp_binding] formats the iterations of
-      [iter] over a value using [pp_binding]. Iterations are separated
-      by [sep] (defaults to {!cut}). *)
-
-  val text : string t
-  (** [text] is {!Format.pp_print_text}. *)
-
-  val lines : string t
-  (** [lines] formats lines by replacing newlines (['\n']) in the string
-      with calls to {!Format.pp_force_newline}. *)
-
-  val exn : exn t
-  (** [exn] formats an exception. *)
-
-  val exn_backtrace : (exn * Printexc.raw_backtrace) t
-  (** [exn_backtrace] formats an exception backtrace. *)
-
-  val sys_signal : int t
-  (** [sys_signal] formats an OCaml {{!Sys.sigabrt}signal number} as
-      a C POSIX {{:http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/signal.h.html}constant}
-      or ["SIG(%d)"] if the signal number is unknown. *)
-
-  (** {1:boxes Boxes} *)
-
-  val box : ?indent:int -> 'a t -> 'a t
-  (** [box ~indent pp ppf] wraps [pp] in a horizontal or vertical box. Break
-      hints that lead to a new line add [indent] to the current indentation
-      (defaults to [0]). *)
-
-  val hbox : 'a t -> 'a t
-  (** [hbox] is like {!box} but is a horizontal box: the line is not split
-      in this box (but may be in sub-boxes). *)
-
-  val vbox : ?indent:int -> 'a t -> 'a t
-  (** [vbox] is like {!box} but is a vertical box: every break hint leads
-      to a new line which adds [indent] to the current indentation
-      (default to [0]). *)
-
-  val hvbox : ?indent:int -> 'a t -> 'a t
-  (** [hvbox] is like {!box} but is either {!hbox} if its fits on
-      a single line or {!vbox} otherwise. *)
-
-  (** {1:quoting Quoting} *)
-
-  val squotes : 'a t -> 'a t
-  (** [squotes pp_v] is [pf "'%a'" pp_v] *)
-
-  val dquotes : 'a t -> 'a t
-  (** [dquotes pp_v] is [pf "\"%a\"" pp_v] *)
-
-  (** {1:bracks Brackets} *)
-
-  val parens : 'a t -> 'a t
-  (** [parens pp_v ppf] is [pf ppf "@[<1>(%a)@]" pp_v]. *)
-
-  val brackets : 'a t -> 'a t
-  (** [brackets pp_v ppf] is [pf ppf "@[<1>[%a]@]" pp_v]. *)
-
-  val braces : 'a t -> 'a t
-  (** [braces pp_v ppf] is [pf ppf "@[<1>{%a}@]" pp_v]. *)
-
-  (** {1:tty ANSI TTY styling} *)
-
-  val set_tty_styling_cap : Tty.cap -> unit
-  (** [set_tty_styling_cap c] sets the global styling capabilities to
-      [c]. Affects the output of {!tty_str} and {!tty}. *)
-
-  val tty_styling_cap : unit -> Tty.cap
-  (** [tty_styling_cap ()] is the global styling capability. *)
-
-  val tty_string : Tty.style list -> string t
-  (** [tty_string styles ppf s] prints [s] on [ppf] according to [styles]
-      and the value of {!tty_styling_cap}. *)
-
-  val tty : Tty.style list -> 'a t -> 'a t
-  (** [tty styles pp_v ppf v] prints [v] with [pp_v] on [ppf]
-      according to [styles] and the value of {!tty_styling_cap}. *)
-
-  (** {1:alts Alternatives} *)
-
-  val one_of : ?empty:unit t -> 'a t -> 'a list t
-  (** [one_of ~empty pp_v ppf l] formats according to the length of [l]
-      {ul
-      {- [0], formats {!empty} (defaults to {!nop}).}
-      {- [1], formats the element with [pp_v].}
-      {- [2], formats ["either %a or %a"] with the list elements}
-      {- [n], formats ["one of %a, ... or %a"] with the list elements}} *)
-
-  val did_you_mean :
-    ?pre:unit t -> ?post:unit t -> kind:string -> 'a t -> ('a * 'a list) t
-  (** [did_you_mean ~pre kind ~post pp_v] formats a faulty value [v]
-      and a list of [hints] that could have been mistaken for
-      [v]. [pre] defaults to [unit "Unknown"], [post] to
-      {!nop}. Hints are formatted using {!one_of}. *)
-
-  (** {1:fields Fields} *)
-
-  val field : ?style:Tty.style list -> string -> 'a t -> 'a t
-  (** [field ~style l pp_v] pretty prints a named field with label [l]
-      styled according to [style] (defaults to [[`Fg `Yellow]]),
-      using [pp_v] to print the value. *)
-
-  (** {1:mag Magnitudes} *)
+    (** {1:mag Magnitudes} *)
 
   val si_size : scale:int -> string -> int t
   (** [si_size ~scale unit] formats a non negative integer
@@ -329,6 +312,58 @@ module Fmt : sig
       {{:http://www.iau.org/publications/proceedings_rules/units/}defined}
       by the International Astronomical Union (IAU). Only US-ASCII characters
       are used ([us] is used for [µs]). *)
+
+  (** {1:text_lines Text and lines} *)
+
+  val text : string t
+  (** [text] is {!Format.pp_print_text}. *)
+
+  val lines : string t
+  (** [lines] formats lines by replacing newlines (['\n']) in the string
+      with calls to {!Format.pp_force_newline}. *)
+
+  val truncated : max:int -> string t
+  (** [truncated ~max] formats a string using at most [max]
+      characters. If the string doesn't fit, it is truncated and ended
+      with three consecutive dots which do count towards [max]. *)
+
+  (** {1:hci HCI fragments} *)
+
+  val one_of : ?empty:unit t -> 'a t -> 'a list t
+  (** [one_of ~empty pp_v ppf l] formats according to the length of [l]
+      {ul
+      {- [0], formats {!empty} (defaults to {!nop}).}
+      {- [1], formats the element with [pp_v].}
+      {- [2], formats ["either %a or %a"] with the list elements}
+      {- [n], formats ["one of %a, ... or %a"] with the list elements}} *)
+
+  val did_you_mean :
+    ?pre:unit t -> ?post:unit t -> kind:string -> 'a t -> ('a * 'a list) t
+  (** [did_you_mean ~pre kind ~post pp_v] formats a faulty value [v] of
+    kind [kind] and a list of [hints] that [v] could have been
+    mistaken for.
+
+    [pre] defaults to [unit "Unknown"], [post] to {!nop} they surround
+    the faulty value before the "did you mean" part as follows ["%a %s
+    %a%a." pre () kind pp_v v post ()]. If [hints] is empty no "did
+    you mean" part is printed. *)
+
+  (** {1:tty ANSI TTY styling} *)
+
+  val set_tty_styling_cap : Tty.cap -> unit
+  (** [set_tty_styling_cap c] sets the global styling capabilities to
+      [c]. Affects the output of {!tty_str} and {!tty}. *)
+
+  val tty_styling_cap : unit -> Tty.cap
+  (** [tty_styling_cap ()] is the global styling capability. *)
+
+  val tty_string : Tty.style list -> string t
+  (** [tty_string styles ppf s] prints [s] on [ppf] according to [styles]
+      and the value of {!tty_styling_cap}. *)
+
+  val tty : Tty.style list -> 'a t -> 'a t
+  (** [tty styles pp_v ppf v] prints [v] with [pp_v] on [ppf]
+      according to [styles] and the value of {!tty_styling_cap}. *)
 end
 
 (** Option values (as in [4.08)]. *)

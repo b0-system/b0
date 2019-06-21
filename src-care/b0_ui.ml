@@ -284,7 +284,7 @@ module Memo = struct
                       else
                         Fmt.pf ppf "@[<v>@[<h>%a:@]@, %a@]@."
                           B00.Op.pp_short op
-                          (B00.Op.Spawn.pp_stdo_ui ~elide:false) s
+                          (B00.Op.Spawn.pp_stdo_ui ~truncate:false) s
                   end
               | _ ->
                   if Log.level () < show_success then () else
@@ -298,8 +298,9 @@ module Memo = struct
     let pp_op_no_cache ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
     let pp_totals ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
     let pp_xtime ppf (self, children) =
+      let label = Fmt.tty_string [`Faint; `Fg `Yellow ] in
       Fmt.pf ppf "%a %a" Time.Span.pp self
-        (Fmt.field ~style:[`Faint; `Fg `Yellow ] "children" Time.Span.pp)
+        (Fmt.field ~label "children" (fun c -> c) Time.Span.pp)
         children
     in
     let pp_stime ppf cpu =
@@ -343,18 +344,17 @@ module Memo = struct
     in
     let dur = Time.count (Memo.clock m)in
     let cpu = Time.cpu_count (Memo.cpu_clock m) in
-    Fmt.pf ppf "@[<v>";
-    Fmt.field "spawns" pp_op ppf (sc, st, sd); Fmt.cut ppf ();
-    Fmt.field "writes" pp_op ppf (wc, wt, wd); Fmt.cut ppf ();
-    Fmt.field "copies" pp_op ppf (cc, ct, cd); Fmt.cut ppf ();
-    Fmt.field "reads" pp_op_no_cache ppf (rt, rd); Fmt.cut ppf ();
-    Fmt.field "all" pp_totals ppf (ot, od); Fmt.cut ppf ();
-    Fmt.field "hashes" pp_totals ppf (ht, hd); Fmt.cut ppf ();
-    Fmt.field "utime" pp_utime ppf cpu; Fmt.cut ppf ();
-    Fmt.field "stime" pp_stime ppf cpu; Fmt.cut ppf ();
-    Fmt.field "real" Time.Span.pp ppf dur;
-    Fmt.pf ppf "@]";
-    ()
+    (Fmt.record @@
+     [ Fmt.field "spawns" (fun _ -> (sc, st, sd)) pp_op;
+       Fmt.field "writes" (fun _ -> (wc, wt, wd)) pp_op;
+       Fmt.field "copies" (fun _ -> (cc, ct, cd)) pp_op;
+       Fmt.field "reads" (fun _ -> (rt, rd)) pp_op_no_cache;
+       Fmt.field "all" (fun _ -> (ot, od)) pp_totals;
+       Fmt.field "hashes" (fun _ -> (ht, hd)) pp_totals;
+       Fmt.field "utime" (fun _ -> cpu) pp_utime;
+       Fmt.field "stime" (fun _ -> cpu) pp_stime;
+       Fmt.field "real" (fun _ -> dur) Time.Span.pp ]) ppf m
+
 end
 
 module Pager = struct
@@ -422,7 +422,7 @@ module Pager = struct
                    formatter and channels. Otherwise it's done later
                    by OCaml's standard shutdown procedure and it
                    raises Sys_error as the fd is no longer valid. *)
-                (try Fmt.flush Fmt.stdout with Sys_error _ -> ());
+                (try Fmt.flush Fmt.stdout () with Sys_error _ -> ());
                 (try flush stdout with Sys_error _ -> ());
                 (try Unix.close Unix.stdout with Unix.Unix_error _ -> ());
                 (Result.map (fun st -> ()) (Os.Cmd.spawn_wait_status pid)

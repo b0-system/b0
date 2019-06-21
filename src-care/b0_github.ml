@@ -130,13 +130,12 @@ module Issue = struct
   let title i = i.title
   let body i = i.body
   let url i = i.url
-  let pp ppf i =
-    Fmt.pf ppf "@[<v>%a@]" begin fun ppf () ->
-      Fmt.field "number" Fmt.int ppf i.number; Fmt.cut ppf ();
-      Fmt.field "title" Fmt.string ppf i.title; Fmt.cut ppf ();
-      Fmt.field "body" Fmt.string ppf i.body; Fmt.cut ppf ();
-      Fmt.field "url" Fmt.string ppf i.url; Fmt.cut ppf ();
-    end ()
+  let pp =
+    Fmt.record @@
+    [ Fmt.field "number" number Fmt.int;
+      Fmt.field "title" title Fmt.string;
+      Fmt.field "body" body Fmt.string;
+      Fmt.field "url" url Fmt.string ]
 
   let pp_short ppf i = Fmt.pf ppf "@[%d %s@]" i.number i.title
 
@@ -197,14 +196,14 @@ module Release = struct
   let html_url r = r.html_url
   let assets_url r = r.assets_url
 
-  let pp ppf r =
-    Fmt.pf ppf "@[<v>%a@]" begin fun ppf () ->
-      Fmt.field "id" Fmt.int ppf r.id; Fmt.cut ppf ();
-      Fmt.field "tag_name" Fmt.string ppf r.tag_name; Fmt.cut ppf ();
-      Fmt.field "body" Fmt.string ppf r.body; Fmt.cut ppf ();
-      Fmt.field "html_url" Fmt.string ppf r.html_url; Fmt.cut ppf ();
-      Fmt.field "assets_url" Fmt.string ppf r.assets_url; Fmt.cut ppf ();
-    end ()
+  let pp =
+    Fmt.record @@
+    [ Fmt.field "id" id Fmt.int;
+      Fmt.field "tag_name" tag_name Fmt.string;
+      Fmt.field "body" body Fmt.string;
+      Fmt.field "html_url" html_url Fmt.string;
+      Fmt.field "assets_url" assets_url Fmt.string; ]
+
 
   let pp_short ppf i = Fmt.pf ppf "@[%s %s@]" i.tag_name i.html_url
 

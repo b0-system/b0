@@ -108,20 +108,20 @@ module Sexpg : sig
 
   (** {1:derived Derived generators} *)
 
-  val strf : ('a, Format.formatter, unit, t) format4 -> 'a
-  (** [strf fmt ...] is an atom formatted according to [fmt]. *)
+  val atomf : ('a, Format.formatter, unit, t) format4 -> 'a
+  (** [atomf fmt ...] is an atom formatted according to [fmt]. *)
 
   val bool : bool -> t
-  (** [bool b] is [strf "%b" b]. *)
+  (** [bool b] is [atomf "%b" b]. *)
 
   val int : int -> t
-  (** [int i] is [strf "%d" i]. *)
+  (** [int i] is [atomf "%d" i]. *)
 
   val float : float -> t
-  (** [float f] is [strf "%g" f]. *)
+  (** [float f] is [atomf "%g" f]. *)
 
   val float_hex : float -> t
-  (** [float_hex f] is [strf "%h" f]. *)
+  (** [float_hex f] is [atomf "%h" f]. *)
 
   val string : string -> t
   (** [string s] is {!atom}. *)

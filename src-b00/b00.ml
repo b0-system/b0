@@ -470,11 +470,10 @@ module File_cache = struct
     let zero = { all_keys = keys_zero; unused_keys = keys_zero }
     let all_keys s = s.all_keys
     let unused_keys s = s.unused_keys
-    let pp ppf s =
-      Fmt.pf ppf "@[<v>";
-      Fmt.field "unused" pp_keys ppf s.unused_keys; Fmt.cut ppf ();
-      Fmt.field "total " pp_keys ppf s.all_keys;
-      Fmt.pf ppf "@]"
+    let pp =
+      Fmt.record @@
+      [ Fmt.field "unused" unused_keys pp_keys;
+        Fmt.field "total" all_keys pp_keys ]
 
     let of_cache c =
       let rec loop k f b uk uf ub = function
@@ -499,7 +498,7 @@ end
 
 module Op = struct
   let file_write_color = [`Faint; `Fg `Green]
-  let pp_file_contents = Fmt.elided_string ~max:150
+  let pp_file_contents = Fmt.truncated ~max:150
   let pp_error_msg ppf e = Fmt.pf ppf "@[error: %s@]" e
 
   type spawn_stdo = [ `Ui | `File of Fpath.t | `Tee of Fpath.t ]
@@ -551,7 +550,7 @@ module Op = struct
   | Wait_files
 
   let kind_name = function
-  | Spawn _ -> "spawn" | Read  _ -> "read" | Write _ -> "write"
+  | Spawn _ -> "spawn" | Read _ -> "read" | Write _ -> "write"
   | Copy _ -> "copy" | Mkdir _ -> "mkdir" | Wait_files -> "wait-files"
 
   let kind_name_padded = function
@@ -705,29 +704,30 @@ module Op = struct
     | `File f -> Fpath.pp ppf f
     | `Tee f -> Fmt.pf ppf "@[<hov><ui> and@ %a@]" Fpath.pp f
 
-    let pp_stdo_ui ~elide ppf s = match s.stdo_ui with
+    let pp_stdo_ui ~truncate ppf s = match s.stdo_ui with
     | None -> Fmt.none ppf ()
-    | Some (Ok d) -> if elide then pp_file_contents ppf d else String.pp ppf d
+    | Some (Ok d) ->
+        if truncate then pp_file_contents ppf d else String.pp ppf d
     | Some (Error e) -> pp_error_msg ppf e
 
     let pp_result ppf = function
     | Ok st -> Os.Cmd.pp_status ppf st
     | Error e -> pp_error_msg ppf e
 
-    let pp ppf s =
+    let pp =
       let pp_env = Fmt.(vbox @@ list string) in
       let pp_opt_path = Fmt.(option ~none:none) Fpath.pp in
-      Fmt.field "cmd" pp_cmd ppf s; Fmt.cut ppf ();
-      Fmt.field "env" pp_env ppf s.env; Fmt.cut ppf ();
-      Fmt.field "relevant-env" pp_env ppf s.relevant_env; Fmt.cut ppf ();
-      Fmt.field "cwd" Fpath.pp ppf s.cwd; Fmt.cut ppf ();
-      Fmt.field "success-exits" pp_success_exits ppf s.success_exits;
-      Fmt.cut ppf ();
-      Fmt.field "stdin" pp_opt_path ppf s.stdin; Fmt.cut ppf ();
-      Fmt.field "stdout" pp_stdo ppf s.stdout; Fmt.cut ppf ();
-      Fmt.field "stderr" pp_stdo ppf s.stderr; Fmt.cut ppf ();
-      Fmt.field "stdo-ui" (pp_stdo_ui ~elide:false) ppf s; Fmt.cut ppf ();
-      Fmt.field "result" pp_result ppf s.spawn_result
+      Fmt.record @@
+      [ Fmt.field "cmd" Fmt.id pp_cmd;
+        Fmt.field "env" env pp_env;
+        Fmt.field "relevant-env" relevant_env pp_env;
+        Fmt.field "cwd" cwd Fpath.pp;
+        Fmt.field "success-exits" success_exits pp_success_exits;
+        Fmt.field "stdin" stdin pp_opt_path;
+        Fmt.field "stdout" stdout pp_stdo;
+        Fmt.field "stderr" stderr pp_stdo;
+        Fmt.field "stdo-ui" Fmt.id (pp_stdo_ui ~truncate:false);
+        Fmt.field "result" result pp_result ]
   end
 
   module Read = struct
@@ -748,9 +748,10 @@ module Op = struct
     | Error e -> pp_error_msg ppf e
     | Ok d -> pp_file_contents ppf d
 
-    let pp ppf r =
-      Fmt.field "file" Fpath.pp ppf r.read_file; Fmt.cut ppf ();
-      Fmt.field "result" pp_result ppf r.read_result; Fmt.cut ppf ()
+    let pp =
+      Fmt.concat @@
+      [ Fmt.field "file" file Fpath.pp;
+        Fmt.field "result" result pp_result ]
   end
 
   module Write = struct
@@ -778,10 +779,11 @@ module Op = struct
     | Error e -> pp_error_msg ppf e
     | Ok () -> Fmt.string ppf "written"
 
-    let pp ppf w =
-      Fmt.field "file" Fpath.pp ppf w.write_file; Fmt.cut ppf ();
-      Fmt.field "mode" Fmt.int ppf w.write_mode; Fmt.cut ppf ();
-      Fmt.field "result" pp_result ppf w.write_result
+    let pp =
+      Fmt.concat @@
+      [ Fmt.field "file" file Fpath.pp;
+        Fmt.field "mode" mode Fmt.int;
+        Fmt.field "result" result pp_result; ]
   end
 
   module Copy = struct
@@ -810,8 +812,7 @@ module Op = struct
     | Error e -> pp_error_msg ppf e
     | Ok () -> Fmt.string ppf "copied"
 
-    let pp ppf m =
-      Fmt.field "result" pp_result ppf m.copy_result
+    let pp = Fmt.field "result" result pp_result
   end
 
   module Mkdir = struct
@@ -832,9 +833,10 @@ module Op = struct
     | Error e -> pp_error_msg ppf e
     | Ok created -> Fmt.string ppf (if created then "created" else "existed")
 
-    let pp ppf m =
-      Fmt.field "dir" Fpath.pp ppf m.mkdir_dir; Fmt.cut ppf ();
-      Fmt.field "result" pp_result ppf m.mkdir_result
+    let pp =
+      Fmt.concat @@
+      [ Fmt.field "dir" dir Fpath.pp;
+        Fmt.field "result" result pp_result ]
   end
 
   module Wait_files = struct
@@ -891,20 +893,21 @@ module Op = struct
     let pp_file_write = Fmt.tty file_write_color Fpath.pp in
     Fmt.braces @@ Fmt.list pp_file_write
 
-  let pp_op ppf o =
+  let pp_op =
     let pp_span ppf s =
       Fmt.pf ppf "%a (%ans)" Time.Span.pp s Time.Span.pp_ns s
     in
     let pp_reads = Fmt.braces @@ Fmt.list Fpath.pp in
-    let dur = Time.Span.abs_diff o.exec_end_time o.exec_start_time in
-    Fmt.field "group" Fmt.string ppf (o.group); Fmt.cut ppf ();
-    Fmt.field "writes" pp_writes ppf o.writes; Fmt.cut ppf ();
-    Fmt.field "reads" pp_reads ppf o.reads; Fmt.cut ppf ();
-    Fmt.field "created" pp_span ppf o.creation_time; Fmt.cut ppf ();
-    Fmt.field "start" pp_span ppf o.exec_start_time; Fmt.cut ppf ();
-    Fmt.field "duration" pp_span ppf dur; Fmt.cut ppf ();
-    Fmt.field "hash" Hash.pp ppf o.hash; Fmt.cut ppf ();
-    Fmt.field "kind" Fmt.string ppf (kind_name o.kind)
+    let dur o = Time.Span.abs_diff o.exec_end_time o.exec_start_time in
+    Fmt.concat @@
+    [ Fmt.field "group" group Fmt.string;
+      Fmt.field "writes" writes pp_writes;
+      Fmt.field "reads" reads pp_reads;
+      Fmt.field "created" creation_time pp_span;
+      Fmt.field "start" exec_start_time pp_span;
+      Fmt.field "duration" dur pp_span;
+      Fmt.field "hash" hash Hash.pp;
+      Fmt.field "kind" (fun o -> kind_name o.kind) Fmt.string; ]
 
   let pp ppf o =
     Fmt.pf ppf "@[<v>%a@, @[<v>%a@]@, @[<v>%a@]@]"
@@ -912,8 +915,9 @@ module Op = struct
 
   let err_style = [`Fg `Red]
   let pp_did_not_write ppf (o, fs) =
+    let label = Fmt.tty_string err_style in
     Fmt.pf ppf "@[<v>%a@, %a@, @[<v>%a@]@, @[<v>%a@]@]"
-      pp_synopsis o (Fmt.field ~style:err_style "Did not write" pp_writes) fs
+      pp_synopsis o (Fmt.field ~label "Did not write" Fmt.id pp_writes) fs
       pp_kind o.kind pp_op o
 
   let pp_spawn_status_fail ppf o =
@@ -1668,7 +1672,7 @@ module Memo = struct
           match Op.kind op with
           | Op.Spawn s when Op.Spawn.stdo_ui s <> None ->
               Fmt.pf ppf "@[<v>@[<h>[DONE]%a:@]@, %a@]"
-                Op.pp_short op (Op.Spawn.pp_stdo_ui ~elide:false) s
+                Op.pp_short op (Op.Spawn.pp_stdo_ui ~truncate:false) s
           | _ -> Fmt.pf ppf "@[<h>[DONE]%a@]" Op.pp_short op
 
   exception Fail of string

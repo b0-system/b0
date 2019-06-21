@@ -254,7 +254,7 @@ module Sexp = struct
 
     (* Derived generators. *)
 
-    let strf fmt = Fmt.kstr atom fmt
+    let atomf fmt = Fmt.kstr atom fmt
     let list elv data = le (List.fold_left (fun l v -> el (elv v) l) ls data)
 
     let bool b = adds (string_of_bool b)
@@ -328,7 +328,7 @@ module Sexpq = struct
     (* Paths in s-expressions interpreted as nested lists and dictionaries *)
     ([`L | `K of string ] * Sexp.loc) list (* in reverse order *)
 
-  let pp_key = Fmt.tty [`Fg `Yellow; `Bold] (Fmt.squotes Fmt.string)
+  let pp_key = Fmt.tty [`Fg `Yellow; `Bold] (Fmt.quote ~mark:"'" Fmt.string)
 
   let path_to_string p =
     let seg = function `L, _ -> "()" | `K n, _ -> "." ^ n in
@@ -397,7 +397,8 @@ module Sexpq = struct
   | `A (a, _) when String.Set.mem a ss -> a
   | `A (a, l) ->
       let ss = String.Set.elements ss in
-      let did_you_mean = Fmt.did_you_mean ~kind (Fmt.squotes Fmt.string) in
+      let el = Fmt.quote ~mark:"'" Fmt.string in
+      let did_you_mean = Fmt.did_you_mean ~kind el in
       let suggestions = match String.suggest ss a with [] -> ss | ss -> ss in
       errf p l "%a" did_you_mean (a, suggestions)
   | `L (_, l) -> err_atom_but_list p l
@@ -409,7 +410,8 @@ module Sexpq = struct
       | v -> v
       | exception Not_found ->
           let ss = String.Map.fold (fun k _ acc -> k :: acc) sm [] in
-          let did_you_mean = Fmt.did_you_mean ~kind (Fmt.squotes Fmt.string) in
+          let el = Fmt.quote ~mark:"'" Fmt.string in
+          let did_you_mean = Fmt.did_you_mean ~kind el in
           let suggs = match String.suggest ss a with [] -> ss | ss -> ss in
           errf p l "%a" did_you_mean (a, suggs)
 
@@ -511,7 +513,7 @@ module Sexpq = struct
       | None ->
           let dom = dict_dom bs in
           let keys = String.Set.elements dom in
-          let pre = Fmt.unit "unbound" in
+          let pre = Fmt.any "unbound" in
           let did_you_mean = Fmt.did_you_mean ~pre ~kind:"key" pp_key in
           errf p dl "%a" did_you_mean (k, String.suggest keys k)
 

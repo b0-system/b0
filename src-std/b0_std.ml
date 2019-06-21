@@ -93,7 +93,6 @@ module Fmt = struct
 
   let stdout = Format.std_formatter
   let stderr = Format.err_formatter
-  let flush ppf = Format.pp_print_flush ppf ()
 
   (* Formatting *)
 
@@ -103,55 +102,29 @@ module Fmt = struct
   let str = Format.asprintf
   let kpf = Format.kfprintf
   let kstr = Format.kasprintf
-  let failwith fmt = kstr (fun s -> failwith s) fmt
+  let failwith fmt = kstr failwith fmt
   let failwith_notrace fmt = kstr (fun s -> raise_notrace (Failure s)) fmt
-  let invalid_arg fmt = kstr (fun s -> invalid_arg s) fmt
+  let invalid_arg fmt = kstr invalid_arg fmt
   let error fmt = kstr (fun s -> Error s) fmt
 
   (* Formatters *)
 
   type 'a t = Format.formatter -> 'a -> unit
+
+  let flush ppf _ = Format.pp_print_flush ppf ()
   let nop ppf _ = ()
-  let unit fmt ppf () = pf ppf fmt
-  let cut = Format.pp_print_cut
-  let sp = Format.pp_print_space
-  let comma ppf () = pf ppf ",@ "
-  let proj f pp_v ppf v = pp_v ppf (f v)
-  let concat ?sep:(pp_sep = cut) pps ppf v =
-    let rec loop ppf v = function
-    | pp :: pps ->
-        pp ppf v;
-        if pps = [] then () else (pp_sep ppf (); loop ppf v pps)
-    | [] -> assert false
-    in
-    loop ppf v pps
+  let any fmt ppf _ = pf ppf fmt
+  let using f pp_v ppf v = pp_v ppf (f v)
 
-  (* Base type formatters *)
+  (* Separators *)
 
-  let bool = Format.pp_print_bool
-  let int = Format.pp_print_int
-  let int32 ppf i = pf ppf "%ld" i
-  let int64 ppf i = pf ppf "%Ld" i
-  let float ppf f = pf ppf "%g" f
-  let char = Format.pp_print_char
-  let string = Format.pp_print_string
-  let elided_string ~max ppf s = match String.length s <= max with
-  | true -> Format.pp_print_string ppf s
-  | false ->
-      for i = 0 to max - 4 do Format.pp_print_char ppf s.[i] done;
-      Format.pp_print_string ppf "..."
+  let cut ppf _ = Format.pp_print_cut ppf ()
+  let sp ppf _ = Format.pp_print_space ppf ()
+  let sps n ppf _ = Format.pp_print_break ppf n 0
+  let comma ppf _ = Format.pp_print_string ppf ","; sp ppf ()
+  let semi ppf _ = Format.pp_print_string ppf ";"; sp ppf ()
 
-  let pair ?sep:(pp_sep = cut) pp_fst pp_snd ppf (fst, snd) =
-    pp_fst ppf fst; pp_sep ppf (); pp_snd ppf snd
-
-  let list ?(empty = nop) ?sep:pp_sep pp_elt ppf = function
-  | [] -> empty ppf ()
-  | l -> Format.pp_print_list ?pp_sep pp_elt ppf l
-
-  let none ppf () = string ppf "<none>"
-  let option ?none:(pp_none = nop) pp_v ppf = function
-  | None -> pp_none ppf ()
-  | Some v -> pp_v ppf v
+  (* Sequencing *)
 
   let iter ?sep:(pp_sep = cut) iter pp_elt ppf v =
     let is_first = ref true in
@@ -161,10 +134,6 @@ module Fmt = struct
     in
     iter pp_elt v
 
-  let array ?(empty = nop) ?sep pp_elt ppf a = match Array.length a with
-  | 0 -> empty ppf ()
-  | n -> iter ?sep Array.iter pp_elt ppf a
-
   let iter_bindings ?sep:(pp_sep = cut) iter pp_binding ppf v =
     let is_first = ref true in
     let pp_binding k v =
@@ -173,28 +142,65 @@ module Fmt = struct
     in
     iter pp_binding v
 
-  let text = Format.pp_print_text
-  let lines ppf s =
-    let rec stop_at sat ~start ~max s =
-      if start > max then start else
-      if sat s.[start] then start else
-      stop_at sat ~start:(start + 1) ~max s
+  let append pp_v0 pp_v1 ppf v = pp_v0 ppf v; pp_v1 ppf v
+  let ( ++ ) = append
+  let concat ?sep pps ppf v =
+    iter ?sep List.iter (fun ppf pp -> pp ppf v) ppf pps
+
+  (* Boxes *)
+
+  let box ?(indent = 0) pp_v ppf v =
+    Format.(pp_open_box ppf indent; pp_v ppf v; pp_close_box ppf ())
+
+  let hbox pp_v ppf v =
+    Format.(pp_open_hbox ppf (); pp_v ppf v; pp_close_box ppf ())
+
+  let vbox ?(indent = 0) pp_v ppf v =
+    Format.(pp_open_vbox ppf indent; pp_v ppf v; pp_close_box ppf ())
+
+  let hvbox ?(indent = 0) pp_v ppf v =
+    Format.(pp_open_hvbox ppf indent; pp_v ppf v; pp_close_box ppf ())
+
+  let hovbox ?(indent = 0) pp_v ppf v =
+    Format.(pp_open_hovbox ppf indent; pp_v ppf v; pp_close_box ppf ())
+
+  (* Brackets *)
+
+  let surround s1 s2 pp_v ppf v =
+    Format.(pp_print_string ppf s1; pp_v ppf v; pp_print_string ppf s2)
+
+  let parens pp_v = box ~indent:1 (surround "(" ")" pp_v)
+  let brackets pp_v = box ~indent:1 (surround "[" "]" pp_v)
+  let oxford_brackets pp_v = box ~indent:2 (surround "[|" "|]" pp_v)
+  let braces pp_v = box ~indent:1 (surround "{" "}" pp_v)
+  let quote ?(mark = "\"") pp_v =
+    let pp_mark ppf _ = Format.pp_print_as ppf 1 mark in
+    box ~indent:1 (pp_mark ++ pp_v ++ pp_mark)
+
+  (* Stdlib formatters *)
+
+  let bool = Format.pp_print_bool
+  let int = Format.pp_print_int
+  let int32 ppf i = pf ppf "%ld" i
+  let int64 ppf i = pf ppf "%Ld" i
+  let float ppf f = pf ppf "%g" f
+  let char = Format.pp_print_char
+  let string = Format.pp_print_string
+  let sys_signal ppf snum =
+    let sigs = [
+      Sys.sigabrt, "SIGABRT"; Sys.sigalrm, "SIGALRM"; Sys.sigfpe, "SIGFPE";
+      Sys.sighup, "SIGHUP"; Sys.sigill, "SIGILL"; Sys.sigint, "SIGINT";
+      Sys.sigkill, "SIGKILL"; Sys.sigpipe, "SIGPIPE"; Sys.sigquit, "SIGQUIT";
+      Sys.sigsegv, "SIGSEGV"; Sys.sigterm, "SIGTERM"; Sys.sigusr1, "SIGUSR1";
+      Sys.sigusr2, "SIGUSR2"; Sys.sigchld, "SIGCHLD"; Sys.sigcont, "SIGCONT";
+      Sys.sigstop, "SIGSTOP"; Sys.sigtstp, "SIGTSTP"; Sys.sigttin, "SIGTTIN";
+      Sys.sigttou, "SIGTTOU"; Sys.sigvtalrm, "SIGVTALRM";
+      Sys.sigprof, "SIGPROF"; Sys.sigbus, "SIGBUS"; Sys.sigpoll, "SIGPOLL";
+      Sys.sigsys, "SIGSYS"; Sys.sigtrap, "SIGTRAP"; Sys.sigurg, "SIGURG";
+      Sys.sigxcpu, "SIGXCPU"; Sys.sigxfsz, "SIGXFSZ"; ]
     in
-    let sub s start stop ~max =
-      if start = stop then "" else
-      if start = 0 && stop > max then s else
-      String.sub s start (stop - start)
-    in
-    let is_nl c = c = '\n' in
-    let max = String.length s - 1 in
-    let rec loop start s = match stop_at is_nl ~start ~max s with
-    | stop when stop > max -> Format.pp_print_string ppf (sub s start stop ~max)
-    | stop ->
-        Format.pp_print_string ppf (sub s start stop ~max);
-        Format.pp_force_newline ppf ();
-        loop (stop + 1) s
-    in
-    loop 0 s
+    try string ppf (List.assoc snum sigs) with
+    | Not_found -> pf ppf "SIG(%d)" snum
 
   let exn ppf e = string ppf (Printexc.to_string e)
   let exn_backtrace ppf (e, bt) =
@@ -215,99 +221,22 @@ module Fmt = struct
     pf ppf "@[<v>Exception: %a@,%a@]"
       exn e pp_backtrace_str (Printexc.raw_backtrace_to_string bt)
 
-  let sys_signal ppf snum =
-    let sigs = [
-      Sys.sigabrt, "SIGABRT"; Sys.sigalrm, "SIGALRM"; Sys.sigfpe, "SIGFPE";
-      Sys.sighup, "SIGHUP"; Sys.sigill, "SIGILL"; Sys.sigint, "SIGINT";
-      Sys.sigkill, "SIGKILL"; Sys.sigpipe, "SIGPIPE"; Sys.sigquit, "SIGQUIT";
-      Sys.sigsegv, "SIGSEGV"; Sys.sigterm, "SIGTERM"; Sys.sigusr1, "SIGUSR1";
-      Sys.sigusr2, "SIGUSR2"; Sys.sigchld, "SIGCHLD"; Sys.sigcont, "SIGCONT";
-      Sys.sigstop, "SIGSTOP"; Sys.sigtstp, "SIGTSTP"; Sys.sigttin, "SIGTTIN";
-      Sys.sigttou, "SIGTTOU"; Sys.sigvtalrm, "SIGVTALRM";
-      Sys.sigprof, "SIGPROF"; Sys.sigbus, "SIGBUS"; Sys.sigpoll, "SIGPOLL";
-      Sys.sigsys, "SIGSYS"; Sys.sigtrap, "SIGTRAP"; Sys.sigurg, "SIGURG";
-      Sys.sigxcpu, "SIGXCPU"; Sys.sigxfsz, "SIGXFSZ"; ]
-    in
-    try string ppf (List.assoc snum sigs) with
-    | Not_found -> pf ppf "SIG(%d)" snum
+  let pair ?sep:(pp_sep = cut) pp_fst pp_snd ppf (fst, snd) =
+    pp_fst ppf fst; pp_sep ppf (); pp_snd ppf snd
 
-  (* Boxes *)
+  let option ?none:(pp_none = nop) pp_v ppf = function
+  | None -> pp_none ppf ()
+  | Some v -> pp_v ppf v
 
-  let box ?(indent = 0) pp ppf =
-    Format.pp_open_hovbox ppf indent; pf ppf "%a@]" pp
+  let none ppf () = string ppf "<none>"
 
-  let hbox pp ppf =
-    Format.pp_open_hbox ppf (); pf ppf "%a@]" pp
-
-  let vbox ?(indent = 0) pp ppf =
-    Format.pp_open_vbox ppf indent; pf ppf "%a@]" pp
-
-  let hvbox ?(indent = 0) pp ppf =
-    Format.pp_open_hvbox ppf indent; pf ppf "%a@]" pp
-
-  (* Quotes *)
-
-  let squotes pp_v ppf v = pf ppf "'%a'" pp_v v
-  let dquotes pp_v ppf v = pf ppf "\"%a\"" pp_v v
-
-  (* Brackets *)
-
-  let parens pp_v ppf v = pf ppf "@[<1>(%a)@]" pp_v v
-  let brackets pp_v ppf v = pf ppf "@[<1>[%a]@]" pp_v v
-  let braces pp_v ppf v = pf ppf "@[<1>{%a}@]" pp_v v
-
-  (* ANSI TTY styling
-
-     XXX What we are doing here is less subtle than what we did in Fmt
-     where capability was associated to formatters and hence could
-     distinguish between stdout/stderr, maybe we should do that again. *)
-
-  let _tty_styling_cap = ref `None
-  let set_tty_styling_cap cap = _tty_styling_cap := cap
-  let tty_styling_cap () = !_tty_styling_cap
-
-  let tty_string styles ppf s = match !_tty_styling_cap with
-  | `None -> Format.pp_print_string ppf s
-  | `Ansi ->
-      Format.fprintf ppf "@<0>%s%s@<0>%s"
-        (Printf.sprintf "\027[%sm" @@ Tty.sgrs_of_styles styles) s "\027[m"
-
-  let tty styles pp_v ppf v = match !_tty_styling_cap with
-  | `None -> pp_v ppf v
-  | `Ansi ->
-      (* XXX This doesn't compose well, we should get the current state
-         and restore it afterwards rather than resetting. *)
-      let reset ppf = Format.fprintf ppf "@<0>%s" "\027[m" in
-      Format.kfprintf reset ppf "@<0>%s%a"
-        (Printf.sprintf "\027[%sm" @@ Tty.sgrs_of_styles styles) pp_v v
-
-  (* Fields *)
-
-  let field ?(style = [`Fg `Yellow]) f pp_v ppf v =
-    pf ppf "@[<hov 1>%a:@ @[%a@]@]" (tty_string style) f pp_v v
-
-  (* Alternatives *)
-
-  let one_of ?(empty = nop) pp_v ppf = function
+  let list ?(empty = nop) ?sep:pp_sep pp_elt ppf = function
   | [] -> empty ppf ()
-  | [v] -> pp_v ppf v
-  | [v0; v1] -> pf ppf "@[either %a or@ %a@]" pp_v v0 pp_v v1
-  | _ :: _ as vs ->
-      let rec loop ppf = function
-      | [v] -> pf ppf "or@ %a" pp_v v
-      | v :: vs -> pf ppf "%a,@ " pp_v v; loop ppf vs
-      | [] -> assert false
-      in
-      pf ppf "@[one@ of@ %a@]" loop vs
+  | l -> Format.pp_print_list ?pp_sep pp_elt ppf l
 
-  let did_you_mean
-      ?(pre = unit "Unknown") ?(post = nop) ~kind pp_v ppf (v, hints)
-    =
-    match hints with
-    | [] -> pf ppf "@[%a %s %a%a.@]" pre () kind pp_v v post ()
-    | hints ->
-        pf ppf "@[%a %s %a%a.@ Did you mean %a ?@]"
-          pre () kind pp_v v post () (one_of pp_v) hints
+  let array ?(empty = nop) ?sep pp_elt ppf a = match Array.length a with
+  | 0 -> empty ppf ()
+  | n -> iter ?sep Array.iter pp_elt ppf a
 
   (* Magnitudes *)
 
@@ -460,6 +389,95 @@ module Fmt = struct
         match f_m_up with
         | f when geq f 366L -> pf ppf "%Lda" (Int64.succ m)
         | f -> pf ppf "%Lda%Ldd" m f
+
+  (* Text *)
+
+  let text = Format.pp_print_text
+  let lines ppf s =
+    let rec stop_at sat ~start ~max s =
+      if start > max then start else
+      if sat s.[start] then start else
+      stop_at sat ~start:(start + 1) ~max s
+    in
+    let sub s start stop ~max =
+      if start = stop then "" else
+      if start = 0 && stop > max then s else
+      String.sub s start (stop - start)
+    in
+    let is_nl c = c = '\n' in
+    let max = String.length s - 1 in
+    let rec loop start s = match stop_at is_nl ~start ~max s with
+    | stop when stop > max -> Format.pp_print_string ppf (sub s start stop ~max)
+    | stop ->
+        Format.pp_print_string ppf (sub s start stop ~max);
+        Format.pp_force_newline ppf ();
+        loop (stop + 1) s
+    in
+    loop 0 s
+
+  let truncated ~max ppf s = match String.length s <= max with
+  | true -> Format.pp_print_string ppf s
+  | false ->
+      for i = 0 to max - 4 do Format.pp_print_char ppf s.[i] done;
+      Format.pp_print_string ppf "..."
+
+  (* HCI fragments *)
+
+  let one_of ?(empty = nop) pp_v ppf = function
+  | [] -> empty ppf ()
+  | [v] -> pp_v ppf v
+  | [v0; v1] -> pf ppf "@[either %a or@ %a@]" pp_v v0 pp_v v1
+  | _ :: _ as vs ->
+      let rec loop ppf = function
+      | [v] -> pf ppf "or@ %a" pp_v v
+      | v :: vs -> pf ppf "%a,@ " pp_v v; loop ppf vs
+      | [] -> assert false
+      in
+      pf ppf "@[one@ of@ %a@]" loop vs
+
+  let did_you_mean
+      ?(pre = any "Unknown") ?(post = nop) ~kind pp_v ppf (v, hints)
+    =
+    match hints with
+    | [] -> pf ppf "@[%a %s %a%a.@]" pre () kind pp_v v post ()
+    | hints ->
+        pf ppf "@[%a %s %a%a.@ Did you mean %a ?@]"
+          pre () kind pp_v v post () (one_of pp_v) hints
+
+  (* ANSI TTY styling
+
+     XXX What we are doing here is less subtle than what we did in Fmt
+     where capability was associated to formatters and hence could
+     distinguish between stdout/stderr, maybe we should do that again. *)
+
+  let _tty_styling_cap = ref `None
+  let set_tty_styling_cap cap = _tty_styling_cap := cap
+  let tty_styling_cap () = !_tty_styling_cap
+
+  let tty_string styles ppf s = match !_tty_styling_cap with
+  | `None -> Format.pp_print_string ppf s
+  | `Ansi ->
+      Format.fprintf ppf "@<0>%s%s@<0>%s"
+        (Printf.sprintf "\027[%sm" @@ Tty.sgrs_of_styles styles) s "\027[m"
+
+  let tty styles pp_v ppf v = match !_tty_styling_cap with
+  | `None -> pp_v ppf v
+  | `Ansi ->
+      (* XXX This doesn't compose well, we should get the current state
+         and restore it afterwards rather than resetting. *)
+      let reset ppf = Format.fprintf ppf "@<0>%s" "\027[m" in
+      Format.kfprintf reset ppf "@<0>%s%a"
+        (Printf.sprintf "\027[%sm" @@ Tty.sgrs_of_styles styles) pp_v v
+
+  (* Records *)
+
+  external id : 'a -> 'a = "%identity"
+  let field
+      ?(label = tty_string [`Fg `Yellow]) ?(sep = any ":@ ") l prj pp_v ppf v
+    =
+    pf ppf "@[<1>%a%a%a@]" label l sep () pp_v (prj v)
+
+  let record ?(sep = cut) pps = vbox (concat ~sep pps)
 end
 
 (* Option values *)
@@ -3622,7 +3640,7 @@ module Log = struct
   | "warning" -> Ok Warning
   | "info" -> Ok Info
   | "debug" -> Ok Debug
-  | l -> Fmt.error "%a: unknown log level" Fmt.(dquotes string) l
+  | l -> Fmt.error "%a: unknown log level" Fmt.(quote string) l
 
   (* Reporting *)
 
@@ -3946,12 +3964,12 @@ module Conv = struct
 
     let dec_err_lexeme ~kind i l ~exp =
       dec_err ~kind i "%a: expected %a" pp_lexeme l
-        Fmt.(list ~sep:(unit " or ") pp_lexeme) exp
+        Fmt.(list ~sep:(any " or ") pp_lexeme) exp
 
     let dec_err_atom ~kind i a ~exp =
       let exp = List.map (fun s -> Fmt.str "\"%s\"" s) exp in
       dec_err ~kind i "%s: expected %a"
-        a Fmt.(list ~sep:(unit " or ") string) exp
+        a Fmt.(list ~sep:(any " or ") string) exp
 
     let dec_err_unclosed ~kind i = dec_err ~kind i "unclosed list"
     let dec_err_esc_truncated ~kind i = dec_err ~kind i "truncated escape"

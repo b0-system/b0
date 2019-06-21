@@ -27,7 +27,7 @@ module Trace_event = struct
         |> Jsong.mem "success-exits"
           (str Op.Spawn.pp_success_exits Op.Spawn.success_exits s)
         |> Jsong.mem "stdo-ui"
-          (Jsong.strf "%a" (Op.Spawn.pp_stdo_ui ~elide:false) s)
+          (Jsong.strf "%a" (Op.Spawn.pp_stdo_ui ~truncate:false) s)
     | Op.Read r ->
         obj
         |> Jsong.mem "file" (Jsong.fpath (Op.Read.file r))

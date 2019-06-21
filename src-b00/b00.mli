@@ -397,9 +397,9 @@ module Op : sig
     (** [pp_cmd] formats the command issued by the spawn, including
         redirections. *)
 
-    val pp_stdo_ui : elide:bool -> t Fmt.t
+    val pp_stdo_ui : truncate:bool -> t Fmt.t
     (** [pp_stdo_ui] formats the standard output ui of the spawn. If
-        [elide] is true elides long outputs. *)
+        [truncate] is [true] truncates long outputs. *)
 
     val pp_result : (Os.Cmd.status, string) result Fmt.t
     (** [pp_result] formats the command status of the spawn. *)
@@ -1256,7 +1256,7 @@ module Memo : sig
          {{!dirs}directory functions} and make your invocations
          independent from the [cwd].}
       {- [k], if specified a fiber invoked once the spawn has succesfully
-         executed with the exit code.}}
+         executed with the exit code.}
       {- [stamp] is used for caching if two spawns diff only in their
          stamp they will cache to different keys. This can be used to
          memoize tool whose outputs may not entirely depend on the environment,
