@@ -27,47 +27,6 @@ module Cli : sig
     (** [cmd] is a converter for commands. *)
   end
 
-  (** {!B0_std} configuration.
-
-      Configure {!B0_std}'s colored output and {!B0_std.Log} verbosity. *)
-  module B0_std : sig
-
-    (** {1:cli Cli arguments} *)
-
-    val color :
-      ?docs:string -> ?env:Cmdliner.Arg.env -> unit -> Tty.cap option Term.t
-    (** [color ~docs ~env] is a cli interface for specifiying the color
-        capability of the terminal. Can be used with
-        {!Fmt.set_tty_styling_cap}. [docs] is where the options are
-        documented [env] is an environment variable that can be used to
-        override the default [None] (auto configuration). *)
-
-    val verbosity :
-      ?docs:string -> ?env:Cmdliner.Arg.env -> unit -> Log.level Term.t
-    (** [verbosity ~docs ~env ()] is a cli interface for specifiying the
-        logging level. Can be used with {!Log.set_level}. [docs] is
-        where the options are documented. [env] is an environment
-        variable that can be used to override the default value
-        ({!Log.Warning}). *)
-
-    val setup :
-      ?docs:string -> ?log_spawns:Log.level -> ?color_env:Cmdliner.Arg.env ->
-      ?verbosity_env:Cmdliner.Arg.env -> unit -> unit Term.t
-      (** [setup ~docs ~log_spawns ~color_env ~verbosity_env ()] uses
-          {!color} and {!verbosity} to setup:
-          {ul
-          {- {!B0_std.Fmt.set_tty_styling_cap}, using {!Tty.of_fd}
-          on {!Unix.stdout} if {!color} is [None].}
-          {- {!B0_std.Log.set_level} with {!verbosity}.}
-          {- [log_spawns] log {!B0_std.Os.Cmd} spawns by setting up
-          a {!B0_std.Os.Cmd.spawn_tracer} that traces with the given level.
-          If [Level.Quiet] is specified no tracer is registered. Defaults
-          to {!B0_std.Log.Debug}.}}
-          [docs] is where the section in which the options are documented
-          and [color_env] and [verbosity_env] are used with the [env] argument
-          of {!color} and {!verbosity}. *)
-  end
-
   (** {1:out_fmt Specifying output formats} *)
 
   type out_fmt = [ `Normal | `Short | `Long ]
@@ -80,6 +39,47 @@ module Cli : sig
       to specify short and long output format, without options this is
       [`Normal]. [short_opts] defaults to [["s"; "short"]] and
       [long_opts] default to [["l"; "long"]]. *)
+end
+
+(** {!B0_std} configuration.
+
+    Configure {!B0_std}'s colored output and {!B0_std.Log} verbosity. *)
+module B0_std : sig
+
+  (** {1:cli Cli arguments} *)
+
+  val color :
+    ?docs:string -> ?env:Cmdliner.Arg.env -> unit -> Tty.cap option Term.t
+  (** [color ~docs ~env] is a cli interface for specifiying the color
+      capability of the terminal. Can be used with
+      {!Fmt.set_tty_styling_cap}. [docs] is where the options are
+      documented [env] is an environment variable that can be used to
+      override the default [None] (auto configuration). *)
+
+  val verbosity :
+    ?docs:string -> ?env:Cmdliner.Arg.env -> unit -> Log.level Term.t
+  (** [verbosity ~docs ~env ()] is a cli interface for specifiying the
+      logging level. Can be used with {!Log.set_level}. [docs] is
+      where the options are documented. [env] is an environment
+      variable that can be used to override the default value
+      ({!Log.Warning}). *)
+
+  val cli_setup :
+    ?docs:string -> ?log_spawns:Log.level -> ?color_env:Cmdliner.Arg.env ->
+    ?verbosity_env:Cmdliner.Arg.env -> unit -> unit Term.t
+    (** [setup ~docs ~log_spawns ~color_env ~verbosity_env ()] uses
+        {!color} and {!verbosity} to setup:
+        {ul
+        {- {!B0_std.Fmt.set_tty_styling_cap}, using {!Tty.of_fd}
+            on {!Unix.stdout} if {!color} is [None].}
+        {- {!B0_std.Log.set_level} with {!verbosity}.}
+        {- [log_spawns] log {!B0_std.Os.Cmd} spawns by setting up
+            a {!B0_std.Os.Cmd.spawn_tracer} that traces with the given level.
+            If [Level.Quiet] is specified no tracer is registered. Defaults
+            to {!B0_std.Log.Debug}.}}
+        [docs] is where the section in which the options are documented
+        and [color_env] and [verbosity_env] are used with the [env]
+        argument of {!color} and {!verbosity}. *)
 end
 
 (** {!B00.File_cache} interaction. *)
@@ -175,9 +175,9 @@ module Memo : sig
 
   val get_b0_dir :
     cwd:Fpath.t -> root:Fpath.t -> b0_dir:Fpath.t option -> Fpath.t
- (** [get_b0_dir ~cwd ~root ~b0_dir] determines a b0 directory. If
-     [b0_dir] is [Some d] then this is [Fpath.(cwd // d)]. If [None]
-     then this is [Fpath.(root / b0_dir_name)]. *)
+  (** [get_b0_dir ~cwd ~root ~b0_dir] determines a b0 directory. If
+      [b0_dir] is [Some d] then this is [Fpath.(cwd // d)]. If [None]
+      then this is [Fpath.(root / b0_dir_name)]. *)
 
   val get_cache_dir :
     cwd:Fpath.t -> b0_dir:Fpath.t -> cache_dir:Fpath.t option -> Fpath.t
@@ -192,7 +192,7 @@ module Memo : sig
       commands to spawn concurrently. *)
 
   val max_spawn : jobs:int option -> unit -> int
-  (** [max_spawn jobs] determines a maximal number of spans.  This is
+  (** [max_spawn jobs] determines a maximal number of spans. This is
       either, in order, [jobs] or {!B0_machine.logical_cpu_count} or
       [1]. *)
 
@@ -222,7 +222,6 @@ module Memo : sig
   val pp_stats : B00.Memo.t Fmt.t
   (** [pp_stats] formats statistics about the memoizer. *)
 end
-
 
 (** Pager interaction. *)
 module Pager : sig
@@ -307,6 +306,34 @@ module Editor : sig
          was found.}
       {- [Some editor] invokes the command with files [fs] and returns the
          exit status of the program.}} *)
+end
+
+(** PDF viewer interaction. *)
+module Pdf_viewer : sig
+
+  (** {1:cli Cli arguments} *)
+
+  val pdf_viewer :
+    ?docs:string -> ?opts:string list -> unit -> Cmd.t option Term.t
+  (** [pdf_viewer ~docs ~opts ()] is an option and [PDFVIEWER] environment
+      variable to use with [pdf_viewer] argument of {!find}. [opts] are
+      the cli options and default to ["pdf-viewer"]. *)
+
+  (** {1:pdf Show PDFs} *)
+
+  type t
+  (** The type for specifying a PDF viewer. *)
+
+  val find :
+    ?search:Fpath.t list -> pdf_viewer:Cmd.t option -> unit ->
+    (t option, string) result
+  (** [find ~search ~pdf_viewer] tries to find a PDF viewer in a platform
+      dependent way. *)
+
+  val show : t option -> Fpath.t -> (unit, string) result
+  (** [show pdf_viewer file] shows PDF file using the viewer
+      [pdf_viewer] (if [None] an error message is returned mentioning
+      no viewer was found). *)
 end
 
 (** Web browser interaction.

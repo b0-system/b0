@@ -271,7 +271,7 @@ let exits =
   Term.exit_info err_unknown ~doc:"unknown error reported on stderr." ::
   Term.default_exits
 
-let cli_conf = B0_ui.Cli.B0_std.setup ()
+let cli_conf = B0_ui.B0_std.cli_setup ()
 
 let only_unused =
   let doc = "Keep only unused keys from the selection. $(b,WARNING) Unused key

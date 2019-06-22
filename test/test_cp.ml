@@ -41,7 +41,7 @@ let () =
       Arg.(required & pos 1 (some B0_ui.Cli.Arg.fpath) None &
            info [] ~doc ~docv:"DST")
     in
-    Term.(const cp_cmd $ B0_ui.Cli.B0_std.setup () $ allow_hardlinks $
+    Term.(const cp_cmd $ B0_ui.B0_std.cli_setup () $ allow_hardlinks $
           follow_symlinks $ recurse $ src $ dst),
     Term.info "test-cp" ~sdocs:Manpage.s_common_options
   in

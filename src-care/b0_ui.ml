@@ -9,92 +9,6 @@ open B0_std
 module Cli = struct
   open Cmdliner
 
-  module B0_std = struct
-    let color ?(docs = Manpage.s_common_options) ?env () =
-      let enum = ["auto", None; "always", Some `Ansi; "never", Some `None] in
-      let color = Arg.enum enum in
-      let enum_alts = Arg.doc_alts_enum enum in
-      let doc = Fmt.str "Colorize the output. $(docv) must be %s." enum_alts in
-      let docv = "WHEN" in
-      Arg.(value & opt color None & info ["color"] ?env ~doc ~docv ~docs)
-
-    let verbosity ?(docs = Manpage.s_common_options) ?env () =
-      let vopts =
-        let doc = "Increase verbosity. Repeatable, but more than twice does \
-                   not bring more. Takes over $(b,--verbosity)."
-                 (* The reason for taking over verbosity is due to
-                    cmdliner limitation: we cannot distinguish in
-                    choose below if it was set via an env var. And
-                    cli args should always take over env var. So verbosity
-                    set through the env var would take over -v otherwise. *)
-        in
-        Arg.(value & flag_all & info ["v"; "verbose"] ~doc ~docs)
-      in
-      let verbosity =
-        let enum =
-          [ "warning", None; (* Hack for the option's absent rendering *)
-            "quiet", Some Log.Quiet;
-            "error", Some Log.Error;
-            "warning", Some Log.Warning;
-            "info", Some Log.Info;
-            "debug", Some Log.Debug; ]
-        in
-        let log_level = Arg.enum enum in
-        let enum_alts = Arg.doc_alts_enum List.(tl enum) in
-        let doc =
-          Fmt.str "Be more or less verbose. $(docv) must be %s." enum_alts
-        in
-        Arg.(value & opt log_level None &
-             info ["verbosity"] ?env ~docv:"LEVEL" ~doc ~docs)
-      in
-      let quiet =
-        let doc = "Be quiet. Takes over $(b,-v) and $(b,--verbosity)." in
-        Arg.(value & flag & info ["q"; "quiet"] ~doc ~docs)
-      in
-      let choose quiet verbosity vopts =
-        if quiet then Log.Quiet else match vopts with
-        | (_ :: []) -> Log.Info
-        | ( _:: _ :: _) -> Log.Debug
-        | [] ->
-            match verbosity with
-            | Some verbosity -> verbosity
-            | None -> Log.Warning
-      in
-      Term.(const choose $ quiet $ verbosity $ vopts)
-
-    let log_spawn level =
-      let header = function
-      | None -> "EXECV"
-      | Some pid -> "EXEC:" ^ string_of_int (Os.Cmd.pid_to_int pid)
-      in
-      let pp_env ppf = function
-      | None -> ()
-      | Some env -> Fmt.pf ppf "%a@," (Fmt.list String.dump) env
-      in
-      fun pid env ~cwd cmd ->
-        Log.msg level begin fun m ->
-          m ~header:(header pid) "@[<v>%a%a@]" pp_env env Cmd.dump cmd
-        end
-
-    let setup_log_spawns = function
-    | Log.Quiet -> ()
-    | level -> Os.Cmd.set_spawn_tracer (log_spawn level)
-
-    let setup ?docs ?(log_spawns = Log.Debug) ?color_env ?verbosity_env () =
-      let color = color ?docs ?env:color_env () in
-      let verbosity = verbosity ?docs ?env:verbosity_env () in
-      let setup color verbosity =
-        let cap = match color with
-        | None -> Tty.cap (Tty.of_fd Unix.stdout)
-        | Some cap -> cap
-        in
-        Fmt.set_tty_styling_cap cap;
-        B0_std.Log.set_level verbosity;
-        setup_log_spawns log_spawns;
-      in
-      Term.(const setup $ color $ verbosity)
-  end
-
   module Arg = struct
     let err_msg of_string s = Result.map_error (fun e -> `Msg e) (of_string s)
     let fpath = Arg.conv ~docv:"PATH" (err_msg Fpath.of_string, Fpath.pp)
@@ -114,6 +28,94 @@ module Cli = struct
       Cmdliner.Arg.info long_opts ~doc
     in
     Cmdliner.Arg.(value & vflag `Normal [`Short, short; `Long, long])
+end
+
+module B0_std = struct
+  open Cmdliner
+
+  let color ?(docs = Manpage.s_common_options) ?env () =
+    let enum = ["auto", None; "always", Some `Ansi; "never", Some `None] in
+    let color = Arg.enum enum in
+    let enum_alts = Arg.doc_alts_enum enum in
+    let doc = Fmt.str "Colorize the output. $(docv) must be %s." enum_alts in
+    let docv = "WHEN" in
+    Arg.(value & opt color None & info ["color"] ?env ~doc ~docv ~docs)
+
+  let verbosity ?(docs = Manpage.s_common_options) ?env () =
+    let vopts =
+      let doc =
+        "Increase verbosity. Repeatable, but more than twice does \
+         not bring more. Takes over $(b,--verbosity)."
+       (* The reason for taking over verbosity is due to cmdliner
+          limitation: we cannot distinguish in choose below if it was
+          set via an env var. And cli args should always take over env
+          var. So verbosity set through the env var would take over -v
+          otherwise. *)
+      in
+      Arg.(value & flag_all & info ["v"; "verbose"] ~doc ~docs)
+    in
+    let verbosity =
+      let enum =
+        [ "warning", None; (* Hack for the option's absent rendering *)
+          "quiet", Some Log.Quiet;
+          "error", Some Log.Error;
+          "warning", Some Log.Warning;
+          "info", Some Log.Info;
+          "debug", Some Log.Debug; ]
+      in
+      let log_level = Arg.enum enum in
+      let enum_alts = Arg.doc_alts_enum List.(tl enum) in
+      let doc =
+        Fmt.str "Be more or less verbose. $(docv) must be %s." enum_alts
+      in
+      Arg.(value & opt log_level None &
+           info ["verbosity"] ?env ~docv:"LEVEL" ~doc ~docs)
+      in
+      let quiet =
+        let doc = "Be quiet. Takes over $(b,-v) and $(b,--verbosity)." in
+        Arg.(value & flag & info ["q"; "quiet"] ~doc ~docs)
+      in
+      let choose quiet verbosity vopts =
+        if quiet then Log.Quiet else match vopts with
+        | (_ :: []) -> Log.Info
+        | ( _:: _ :: _) -> Log.Debug
+        | [] ->
+            match verbosity with
+            | Some verbosity -> verbosity
+            | None -> Log.Warning
+      in
+      Term.(const choose $ quiet $ verbosity $ vopts)
+
+  let log_spawn level =
+    let header = function
+    | None -> "EXECV"
+    | Some pid -> "EXEC:" ^ string_of_int (Os.Cmd.pid_to_int pid)
+    in
+    let pp_env ppf = function
+    | None -> ()
+    | Some env -> Fmt.pf ppf "%a@," (Fmt.list String.dump) env
+    in
+    fun pid env ~cwd cmd ->
+      Log.msg level
+        (fun m -> m ~header:(header pid) "@[<v>%a%a@]" pp_env env Cmd.dump cmd)
+
+  let setup_log_spawns = function
+  | Log.Quiet -> ()
+  | level -> Os.Cmd.set_spawn_tracer (log_spawn level)
+
+  let cli_setup ?docs ?(log_spawns = Log.Debug) ?color_env ?verbosity_env () =
+    let color = color ?docs ?env:color_env () in
+    let verbosity = verbosity ?docs ?env:verbosity_env () in
+    let setup color verbosity =
+      let cap = match color with
+      | None -> Tty.cap (Tty.of_fd Unix.stdout)
+      | Some cap -> cap
+      in
+      Fmt.set_tty_styling_cap cap;
+      B0_std.Log.set_level verbosity;
+      setup_log_spawns log_spawns;
+    in
+    Term.(const setup $ color $ verbosity)
 end
 
 module File_cache = struct
@@ -146,8 +148,7 @@ module File_cache = struct
   | false -> Ok ()
   | true ->
       Result.bind (B00.File_cache.create dir) @@ fun c ->
-      Result.bind (B00.File_cache.delete_unused c) @@ fun () ->
-      Ok ()
+      Result.bind (B00.File_cache.delete_unused c) @@ fun () -> Ok ()
 
   let size ~dir =
     let stats = Result.bind (Os.Dir.exists dir) @@ function
@@ -157,8 +158,7 @@ module File_cache = struct
         B00.File_cache.Stats.of_cache c
     in
     Result.bind stats @@ fun stats ->
-    Log.app (fun m -> m "@[<v>%a@]" B00.File_cache.Stats.pp stats);
-    Ok ()
+    Log.app (fun m -> m "@[<v>%a@]" B00.File_cache.Stats.pp stats); Ok ()
 
   let trim ~dir ~max_byte_size ~pct =
     Result.bind (Os.Dir.exists dir) @@ function
@@ -480,6 +480,50 @@ module Editor = struct
   | Some editor -> Os.Cmd.run_status Cmd.(editor %% paths fs)
 end
 
+module Pdf_viewer = struct
+  open Cmdliner
+
+  (* XXX support background *)
+
+  (* Cli *)
+
+  let pdf_viewer_var = "PDFVIEWER"
+  let pdf_viewer ?docs ?(opts = ["pdf-viewer"]) () =
+    let env = Arg.env_var pdf_viewer_var in
+    let doc =
+      "The PDF viewer command $(docv) to use. If absent either one \
+       of $(b,xdg-open(1)) or $(b,open(1)) is used. If not found and \
+       on Windows $(b,start) is used."
+    in
+    let cmd = Arg.some ~none:"OS dependent fallback" Cli.Arg.cmd in
+    Arg.(value & opt cmd None & info opts ~env ~doc ?docs ~docv:"CMD")
+
+  (* Viewer *)
+
+  type t = Cmd.t
+
+  let find ?search ~pdf_viewer () =
+    Result.map_error (fun e -> Fmt.str "find PDF viewer: %s" e) @@
+    match pdf_viewer with
+    | Some cmd -> Os.Cmd.find ?search cmd
+    | None ->
+        Result.bind (Os.Cmd.find ?search Cmd.(arg "xdg-open")) @@ function
+        | Some xdg -> Ok (Some xdg)
+        | None ->
+            Result.bind (Os.Cmd.find ?search Cmd.(arg "open")) @@ function
+            | Some oopen -> Ok (Some oopen)
+            | None ->
+                if Sys.win32
+                then Ok (Some Cmd.(arg "start" % "")) (* really ? *)
+                else Ok None
+
+  let show pdf_viewer file =
+    Result.map_error (fun e -> Fmt.str "show PDF %a: %s" Fpath.pp file e) @@
+    match pdf_viewer with
+    | None -> Error "No PDF viewer found, use the PDFVIEWER env var to set one."
+    | Some cmd -> Os.Cmd.run Cmd.(cmd %% path file)
+end
+
 module Browser = struct
   open Cmdliner
 
@@ -500,15 +544,17 @@ module Browser = struct
     Arg.(value & opt cmd None & info opts ~env ~doc ?docs ~docv:"CMD")
 
   let prefix ?docs ?(opts = ["p"; "prefix"]) () =
-    let doc = "Rather than the exact URI, reload if possible, the first \
-               browser tab which has the URI as a prefix. Platform and browser \
-               support for this feature is severly limited."
+    let doc =
+      "Rather than the exact URI, reload if possible, the first browser tab \
+       which has the URI as a prefix. Platform and browser support for this \
+       feature is severly limited."
     in
     Arg.(value & flag & info opts ~doc ?docs)
 
   let background ?docs ?(opts = ["g"; "background"]) () =
-    let doc = "Show URI but keep the browser application in the background. \
-               Platform and browser support for this feature is limited."
+    let doc =
+      "Keep launched applications in the background. Platform support for \
+       this feature is limited."
     in
     Arg.(value & flag & info opts ~doc ?docs)
 
@@ -666,7 +712,7 @@ function run(argv) {
   let show ~background ~prefix browser uri =
     Result.map_error (fun e -> Fmt.str "show uri %s: %s" uri e) @@
     match browser with
-    | None -> Error "No browser found"
+    | None -> Error "No browser found. Use the BROWSER env var to set one."
     | Some b ->
         match b with
         | Cmd cmd -> show_cmd ~background ~prefix cmd uri

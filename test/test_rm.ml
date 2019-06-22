@@ -24,7 +24,7 @@ let () =
       Arg.(required & pos 0 (some B0_ui.Cli.Arg.fpath) None &
            info [] ~doc ~docv:"PATH")
     in
-    Term.(const rm_cmd $ B0_ui.Cli.B0_std.setup () $ recurse $ path),
+    Term.(const rm_cmd $ B0_ui.B0_std.cli_setup () $ recurse $ path),
     Term.info "test-rm" ~sdocs:Manpage.s_common_options
   in
   Term.exit_status (Term.eval cmd)
