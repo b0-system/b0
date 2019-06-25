@@ -1,4 +1,4 @@
-{0:b0 B0 – software construction care}
+{0:b0 B0 {%html: <span class="version">%%VERSION%%</span>%}}
 
 This package is unstable, do not depend on it.
 

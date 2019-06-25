@@ -20,7 +20,7 @@ module Json : sig
   (** {1:json JSON text} *)
 
   type t =
-  [ `Null | `Bool of bool | `Float of float| `String of string
+  [ `Null | `Bool of bool | `Float of float | `String of string
   | `A of t list | `O of (string * t) list ]
   (** The type for generic JSON text representations. *)
 

@@ -204,7 +204,8 @@ module Theme = struct
   | t -> Ok t
   | exception Not_found ->
       let ss = String.suggest (List.rev_map name ts) n in
-      Fmt.error "%a" (Fmt.did_you_mean ~kind:"theme" Fmt.string) (n, ss)
+      let post ppf () = Fmt.pf ppf " using %s instead." default in
+      Fmt.error "%a" (Fmt.did_you_mean ~kind:"theme" ~post Fmt.string) (n, ss)
 end
 
 
