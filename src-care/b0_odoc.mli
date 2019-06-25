@@ -86,6 +86,15 @@ module Compile : sig
           obtained via {!Writes}.}
       {- [resolve_forward_deps] and [hidden] are the corresponding [odoc]
          options. See [odoc compile --help].}} *)
+
+  (** {1:conv Convenience} *)
+
+  val to_odoc :
+    Memo.t -> ?hidden:bool -> pkg:string -> odoc_deps:B0_std.Fpath.t list ->
+    B0_std.Fpath.t -> o:B0_std.Fpath.t -> unit
+  (** [to_odoc m ~hidden ~pkg ~odoc_deps obj ~o] compiles [obj] (which
+      can be any of a [.cmi], [.cmt], [.cmti] or [.mld] file) to an odoc
+      file [o] assuming it depends on [odoc_deps] and is part of package [pkg]. *)
 end
 
 (** Generate HTML from [.odoc] files. *)
@@ -170,6 +179,15 @@ module Html : sig
          via {!Writes}.}
       {- [theme_uri] and [hidden] are the corresponding [odoc]
          options. See [odoc compile --help].}} *)
+
+  (** {1:conv Convenience} *)
+
+  val write :
+    Memo.t -> ?theme_uri:string -> html_dir:B0_std.Fpath.t ->
+    odoc_deps:B0_std.Fpath.t list -> B0_std.Fpath.t -> unit
+   (** [write m ~theme_uri ~html_dir ~odoc_deps odoc] writes the [html]
+       for [odoc] in [html_dir] assuming it depends on the [odoc_files]
+       in [odoc_deps]. *)
 end
 
 (** Generate HTML fragments from [.mld] files. *)
@@ -215,6 +233,14 @@ module Support_files : sig
          obtained via {!Writes}}
       {- [without_theme] is the corresponding [odoc support-file-targets]
          option.}}  *)
+
+  (** {1:conv Convenience} *)
+
+  val write :
+    Memo.t -> without_theme:bool -> html_dir:Fpath.t -> build_dir:Fpath.t ->
+    unit
+  (** [write m ~without_theme ~html_dir ~build_dir] writes the support
+      files to [html_dir] using [build_dir] for memoizing the command. *)
 end
 
 (** Odoc theme support. *)

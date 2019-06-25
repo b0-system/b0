@@ -67,6 +67,12 @@ module Compile = struct
     odoc Cmd.(arg "compile" % "--pkg" % pkg %% if' hidden (arg "--hidden") %%
               if' resolve_forward_deps (arg "--resolve-fwd-refs") %
               "-o" %% path o %% path cobj %% incs)
+
+  let to_odoc m ?hidden ~pkg ~odoc_deps obj ~o:odoc =
+    let writes = Fpath.(odoc + ".writes") in
+    Writes.write m obj ~to_odoc:odoc ~o:writes;
+    Writes.read m writes @@ fun writes ->
+    cmd m ?hidden ~odoc_deps ~writes ~pkg obj ~o:odoc
 end
 
 module Html = struct
@@ -119,6 +125,20 @@ module Html = struct
     Memo.spawn m ~reads:(odoc_file :: odoc_deps) ~writes @@
     odoc Cmd.(arg "html" %% if' hidden (arg "--hidden") %% theme_uri % "-o" %%
               path to_dir %% path odoc_file %% incs)
+
+  let write m ?theme_uri ~html_dir ~odoc_deps odoc =
+    let writes = Fpath.(odoc -+ ".html.writes") in
+    let odoc_deps = match odoc_deps with
+    | [] ->
+        (* Hack to work around https://github.com/ocaml/odoc/issues/290.
+           If we have only mld's html-deps returns nothing. This
+           will at least include the package directory. *)
+        [odoc]
+    | deps -> deps
+    in
+    Writes.write m ~odoc_deps odoc ~to_dir:html_dir ~o:writes;
+    Writes.read m writes @@ fun writes ->
+    cmd m ?theme_uri ~odoc_deps ~writes odoc ~to_dir:html_dir
 end
 
 module Html_fragment = struct
@@ -142,9 +162,16 @@ module Support_files = struct
 
   let cmd ?(without_theme = false) m ~writes ~to_dir =
     let odoc = Memo.tool m tool in
+    let theme = Cmd.(if' without_theme (arg "--without-theme")) in
     Memo.spawn m ~reads:[] ~writes @@
-    odoc Cmd.(arg "support-files" %%
-              if' without_theme (arg "--without-theme") % "-o" %% path to_dir)
+    odoc Cmd.(arg "support-files" %% theme % "-o" %% path to_dir)
+
+  let write m ~without_theme ~html_dir ~build_dir =
+    let o = Fpath.(build_dir / "odoc-support-files.writes") in
+    let to_dir = html_dir in
+    Writes.write m ~without_theme ~to_dir ~o;
+    Writes.read m o @@ fun writes ->
+    cmd m ~writes ~without_theme ~to_dir
 end
 
 module Theme = struct
@@ -204,7 +231,7 @@ module Theme = struct
   | t -> Ok t
   | exception Not_found ->
       let ss = String.suggest (List.rev_map name ts) n in
-      let post ppf () = Fmt.pf ppf " using %s instead." default in
+      let post ppf () = Fmt.pf ppf " using %s instead" default in
       Fmt.error "%a" (Fmt.did_you_mean ~kind:"theme" ~post Fmt.string) (n, ss)
 end
 
