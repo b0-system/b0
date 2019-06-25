@@ -1209,6 +1209,46 @@ module String = struct
         if exists r then loop (i + 1) n else Ok r
     in
     if exists n then loop 1 n else Ok n
+
+  (* Substituting *)
+
+  let subst_pct_vars ?buf vars s =
+    let max = String.length s - 1 in
+    let buf = match buf with
+    | None -> Buffer.create (max + 1)
+    | Some buf -> Buffer.clear buf; buf
+    in
+    let add buf s ~start ~last =
+      Buffer.add_substring buf s start (last - start + 1)
+    in
+    let rec find_var_end s i max = match i > max with
+    | true -> None
+    | false ->
+        if i + 1 > max then None else
+        if s.[i] = '%' && s.[i + 1] = '%' then Some (i + 1) else
+        find_var_end s (i + 1) max
+    in
+    let rec loop buf s start i max = match i > max with
+    | true ->
+        if start = 0 then None else
+        if start > max then Some (Buffer.contents buf) else
+        (add buf s ~start ~last:max; Some (Buffer.contents buf))
+    | false ->
+        if i + 4 > max then loop buf s start (max + 1) max else
+        if s.[i] <> '%' then loop buf s start (i + 1) max else
+        if s.[i + 1] <> '%' then loop buf s start (i + 2) max else
+        match find_var_end s (i + 3) max with
+        | None -> loop buf s start (max + 1) max
+        | Some k ->
+            let var = with_index_range ~first:(i + 2) ~last:(k - 2) s in
+            match Map.find var vars with
+            | exception Not_found -> loop buf s start (k + 1) max
+            | v ->
+                add buf s ~start ~last:(i - 1);
+                Buffer.add_string buf v;
+                loop buf s (k + 1) (k + 1) max
+    in
+    loop buf s 0 0 max
 end
 
 module List = struct

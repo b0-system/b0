@@ -1055,6 +1055,14 @@ module String : sig
     (** [dump_string_map ppf m] prints an unspecified representation of the
         string map [m] on [ppf]. *)
   end
+
+  (** {1:subst Substituting} *)
+
+  val subst_pct_vars :
+    ?buf:Buffer.t -> string Map.t -> string -> string option
+  (** [subst_pct_vars ~buf vars s] substitutes in [s] strings of the
+      form [%%VAR%%] by the value of ["VAR"] in [vars] (if any).
+      [None] is returned if no substition was performed. *)
 end
 
 (** Lists. *)
