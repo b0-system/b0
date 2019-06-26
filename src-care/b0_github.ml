@@ -5,8 +5,8 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
-open B0_web
 open B0_json
+open B0_http
 
 let v4_api_uri = "https://api.github.com/graphql"
 let v3_api_uri = "https://api.github.com"

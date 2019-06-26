@@ -25,6 +25,8 @@ Tools for software construction care.
 {!modules:
 B0_cmark
 B0_github
+B0_htmlg
+B0_http
 B0_json
 B0_lines
 B0_machine
@@ -33,5 +35,4 @@ B0_sexp
 B0_tlex
 B0_trace
 B0_ui
-B0_vcs
-B0_web}
+B0_vcs}

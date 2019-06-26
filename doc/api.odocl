@@ -1,6 +1,8 @@
 B0_std
 B00
 B0_cmark
+B0_http
+B0_htmlg
 B0_github
 B0_json
 B0_lines
@@ -11,4 +13,3 @@ B0_tlex
 B0_trace
 B0_ui
 B0_vcs
-B0_web

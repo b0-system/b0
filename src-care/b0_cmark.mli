@@ -30,27 +30,16 @@ val cmd :
     {- [args] are additional command line arguments you may want to
        pass to [cmark].}} *)
 
-val write_page :
-  ?generator:string -> ?lang:string -> ?scripts:string list ->
-  ?styles:string list -> ?title:string -> B00.Memo.t -> frag:Fpath.t ->
-  o:Fpath.t -> unit
-(** [write_page m ~title ~frag ~o] writes to [o] a full HTML document
-    whose {!B0_web.Htmlg.El.body} contains the contents of file [frag]
-    (inserted using {!B0_web.Htmlg.El.raw}). If title is [""] or
-    unspecified it defaults to {!B0_web.Htmlg.page_title}[ o], for the
-    other arguments and more information see
-    {!B0_web.Htmlg.El.basic_page}. *)
-
 (** {1:conv Convenience} *)
 
 val to_html :
   ?generator:string -> ?lang:string -> ?scripts:string list ->
   ?styles:string list -> ?title:string -> B00.Memo.t -> mds:Fpath.t list ->
   o_frag:Fpath.t -> o:Fpath.t -> unit
-(** [to_html] compiles the concatenation of [mds] to an HTML fragment
-    [o_frag] and then to an HTML page [o] by combining {!cmd} and
-    {!write_page}; for the documentation of optional arguments see
-    {!write_page}. *)
+(** [to_html m ~mds ~o_frag o] compiles the concatenation of [mds] to
+    an HTML fragment [o_frag] and then to an HTML page [o] by invoking
+    {!cmd} and {!B0_htmlg.El.write_page}; for the documentation of
+    optional arguments see the later. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2019 The b0 programmers
