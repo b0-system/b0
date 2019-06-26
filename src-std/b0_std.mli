@@ -1216,6 +1216,13 @@ module Fpath : sig
 
       {b Warning.} By definition [rem_prefix p p] is [None]. *)
 
+  val reroot : root:t -> dst:t -> t -> t
+  (** [reroot ~root ~dst p] assumes [root] {{!is_prefix}prefixes} [p]
+      removes the prefix and prepends [dst] to the result.
+
+      @raise Invalid_argument if [root] is not a prefix of [src].
+      In particular note that [p] cannot be [root]. *)
+
   (** {1:preds Predicates and comparison} *)
 
   val is_rel : t -> bool

@@ -1570,6 +1570,10 @@ module Fpath = struct
       let first = if p.[len] = dir_sep_char then len + 1 else len in
       Some (String.with_index_range p ~first)
 
+  let reroot ~root ~dst src =
+    let rel_file = Option.get (rem_prefix root src) in
+    append dst rel_file
+
   (* Predicates and comparisons *)
 
   let is_rel = if Sys.win32 then Windows.is_rel else Posix.is_rel
