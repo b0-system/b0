@@ -21,9 +21,11 @@ let write_page
     ?(generator = "") ?(lang = "") ?(scripts = []) ?(styles = []) ?(title = "")
     m ~frag ~o
   =
+  (* FIXME this is a general fragment wrapper maybe we
+     should move to Htmlg. *)
   let open B0_web.Htmlg in
   Memo.read m frag @@ fun contents ->
-  let title = if title = "" then Fpath.basename ~no_ext:true o else title in
+  let title = if title = "" then El.title_of_fpath o else title in
   let stamp =
     let data = generator :: lang :: title :: List.rev_append styles scripts in
     Hash.to_bytes (Memo.hash_string m (String.concat "" data))
@@ -33,6 +35,12 @@ let write_page
   let body = El.body [El.raw contents] in
   let page = El.basic_page ~generator ~lang ~scripts ~styles ~title body in
   Ok (El.to_string ~doc_type:true page)
+
+let to_html
+    ?generator ?lang ?scripts ?styles ?title m ~mds ~o_frag:frag ~o
+  =
+  cmd m ~mds ~o:frag;
+  write_page ?generator ?lang ?scripts ?styles ?title m ~frag ~o
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2019 The b0 programmers

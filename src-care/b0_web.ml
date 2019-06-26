@@ -408,6 +408,14 @@ module Htmlg = struct
 
     (* Convenience *)
 
+    let title_of_fpath file = match Fpath.basename ~no_ext:true file with
+    | "index" | "" ->
+        begin match Fpath.(basename ~no_ext:true (parent file)) with
+        | "" -> "Untitled"
+        | title -> title
+        end
+    | title -> title
+
     let basic_page
         ?(generator = "") ?(lang = "") ?(scripts = []) ?(styles = [])
         ?(more_head = []) ?title:(t = "") body

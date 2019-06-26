@@ -203,6 +203,13 @@ module Htmlg : sig
 
     (** {1:convenience Convenience} *)
 
+    val title_of_fpath : Fpath.t -> string
+    (** [title_of_fpath p] is a page title for [p] guaranteed to be
+        non empty. Either the basename of [file] without extension or
+        if that results in ["index"] or [""] the basename of the
+        parent directory with out extension or if that results in
+        [""], ["Untitled"]. *)
+
     val basic_page :
       ?generator:string -> ?lang:string -> ?scripts:string list ->
       ?styles:string list -> ?more_head:child list -> ?title:string ->
