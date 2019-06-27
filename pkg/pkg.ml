@@ -5,8 +5,8 @@ open Topkg
 
 let () =
   Pkg.describe "b0" @@ fun c ->
-  Ok [ Pkg.mllib ~api:["B00"] "src-b00/b00.mllib";
-       Pkg.mllib ~api:["B0_std"] "src-std/b0_std.mllib";
+  Ok [ Pkg.mllib "src-b00/b00.mllib";
+       Pkg.mllib "src-std/b0_std.mllib";
        Pkg.mllib "src-care/b0_care.mllib";
        Pkg.lib "src-std/b0_std_top_init.ml";
        Pkg.clib "src-std/libb0_stubs.clib";

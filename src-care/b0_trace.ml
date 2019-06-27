@@ -21,21 +21,23 @@ module Trace_event = struct
         let cmd = Cmd.(path (Op.Spawn.tool s) %% (Op.Spawn.args s)) in
         obj
         |> Jsong.mem "cmd" (Jsong.cmd cmd)
-        |> Jsong.mem "result" (str Op.Spawn.pp_result Op.Spawn.result s)
+        |> Jsong.mem "result"
+          (str B00_conv.Op.Spawn.pp_result Op.Spawn.result s)
         |> Jsong.mem "cwd" (Jsong.fpath (Op.Spawn.cwd s))
         |> Jsong.mem "env" (Jsong.(list string) (Op.Spawn.env s))
         |> Jsong.mem "success-exits"
-          (str Op.Spawn.pp_success_exits Op.Spawn.success_exits s)
+          (str B00_conv.Op.Spawn.pp_success_exits Op.Spawn.success_exits s)
         |> Jsong.mem "stdo-ui"
-          (Jsong.strf "%a" (Op.Spawn.pp_stdo_ui ~truncate:false) s)
+          (Jsong.strf "%a" (B00_conv.Op.Spawn.pp_stdo_ui ~truncate:false) s)
     | Op.Read r ->
         obj
         |> Jsong.mem "file" (Jsong.fpath (Op.Read.file r))
-        |> Jsong.mem "result" (str Op.Read.pp_result Op.Read.result r)
+        |> Jsong.mem "result" (str B00_conv.Op.Read.pp_result Op.Read.result r)
     | Op.Write w ->
         obj
         |> Jsong.mem "file" (Jsong.fpath (Op.Write.file w))
-        |> Jsong.mem "result" (str Op.Write.pp_result Op.Write.result w)
+        |> Jsong.mem "result"
+          (str B00_conv.Op.Write.pp_result Op.Write.result w)
     | Op.Copy c ->
         obj
         |> Jsong.mem "src" (Jsong.fpath (Op.Copy.src c))
@@ -45,14 +47,15 @@ module Trace_event = struct
     | Op.Mkdir m ->
         obj
         |> Jsong.mem "dir" (Jsong.fpath (Op.Mkdir.dir m))
-        |> Jsong.mem "result" (str Op.Mkdir.pp_result Op.Mkdir.result m)
+        |> Jsong.mem "result"
+          (str B00_conv.Op.Mkdir.pp_result Op.Mkdir.result m)
     | Op.Wait_files -> obj
     in
     (* The order here is for the viewer. *)
     Jsong.obj
     |> Jsong.mem "kind" (Jsong.string (Op.kind_name (Op.kind o)))
     |> Jsong.mem "group" (Jsong.string (Op.group o))
-    |> Jsong.mem "status" (str Op.pp_status Op.status o)
+    |> Jsong.mem "status" (str B00_conv.Op.pp_status Op.status o)
     |> Jsong.mem "revived" (Jsong.bool (Op.exec_revived o))
     |> Jsong.mem "writes" (Jsong.(list fpath) (Op.writes o))
     |> Jsong.mem "created" (span_us (Op.creation_time o))

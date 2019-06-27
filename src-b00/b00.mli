@@ -46,9 +46,6 @@ module File_cache : sig
   type feedback = [ `File_cache_need_copy of Fpath.t ]
   (** The type for file cache feedback. See {!create}. *)
 
-  val pp_feedback : feedback Fmt.t
-  (** [pp_feedback] formats file cache feedback. *)
-
   type key = string
   (** The type for keys. A key maps to a metadata hunk and an ordered
       list of file contents. The module treats keys as sequence of
@@ -229,9 +226,6 @@ module Op : sig
   | Aborted  (** Aborted due to prerequisite failure. *)
   (** The type for operation statuses. *)
 
-  val pp_status : status Fmt.t
-  (** [pp_status] formats execution status. *)
-
   (** {1:op Operations} *)
 
   type id = int
@@ -387,25 +381,6 @@ module Op : sig
     (** [set_exec_status o (get o) end_time stdo_ui result] sets the
         result of operation [o]. In particular this set the operation
         status according to [result]. *)
-
-    (** {1:fmt Formatters} *)
-
-    val pp_success_exits : int list Fmt.t
-    (** [pp_success_exits] formats the success exits. *)
-
-    val pp_cmd : t Fmt.t
-    (** [pp_cmd] formats the command issued by the spawn, including
-        redirections. *)
-
-    val pp_stdo_ui : truncate:bool -> t Fmt.t
-    (** [pp_stdo_ui] formats the standard output ui of the spawn. If
-        [truncate] is [true] truncates long outputs. *)
-
-    val pp_result : (Os.Cmd.status, string) result Fmt.t
-    (** [pp_result] formats the command status of the spawn. *)
-
-    val pp : t Fmt.t
-    (** [pp] formats a spawn. *)
   end
 
   (** File reads. *)
@@ -439,14 +414,6 @@ module Op : sig
     (** [set_exec_status o (get o) end_time result] sets the result of
         operation [o]. In particular this set the operation status
         according to [result]. *)
-
-    (** {1:formatting Formatters} *)
-
-    val pp_result : (string, string) result Fmt.t
-    (** [pp_result] formats the read result. *)
-
-    val pp : t Fmt.t
-    (** [pp] formats a read. *)
   end
 
   (** File writes. *)
@@ -491,14 +458,6 @@ module Op : sig
     (** [set_exec_status o (get o) end_time result] sets the result of
         operation [o]. In particular this set the operation status
         according to [result]. *)
-
-    (** {1:fmt Formatters} *)
-
-    val pp_result : (unit, string) result Fmt.t
-    (** [pp_result] formats a write result. *)
-
-    val pp : t Fmt.t
-    (** [pp] formats a write. *)
   end
 
   (** File copy *)
@@ -543,14 +502,6 @@ module Op : sig
     (** [set_exec_status o (get o) end_time result] sets the result of
         operation [o]. In particular this set the operation status
         according to [result]. *)
-
-    (** {1:fmt Formatters} *)
-
-    val pp_result : (unit, string) result Fmt.t
-    (** [pp_result] formats a write result. *)
-
-    val pp : t Fmt.t
-    (** [pp] formats a write. *)
   end
 
   (** Directory creation. *)
@@ -584,14 +535,6 @@ module Op : sig
     (** [set_exec_status o (get o) end_time result] sets the operation
         result of [o]. In particular this set the operation status
         according to [result]. *)
-
-    (** {1:fmt Formatters} *)
-
-    val pp_result : (bool, string) result Fmt.t
-    (** [pp_result] formats directory creation results. *)
-
-    val pp : t Fmt.t
-    (** [pp] formats directory creations. *)
   end
 
   module Wait_files : sig
@@ -620,22 +563,6 @@ module Op : sig
 
   val compare : t -> t -> int
   (** [compare o0 o1] is [Pervasives.compare (id o0) (id o1)]. *)
-
-  (** {1:fmt Formatters} *)
-
-  val pp : t Fmt.t
-  (** [pp] formats a build operation. *)
-
-  val pp_short : t Fmt.t
-  (** [pp_short] formats a build operation on a single line. *)
-
-  val pp_did_not_write : (t * Fpath.t list) Fmt.t
-  (** [pp_did_not_write] formats a build operation and the files
-      it failed to write. *)
-
-  val pp_spawn_status_fail : t Fmt.t
-  (** [pp_spawn_status_fail] formats a spawn operation failure due to
-      exit result. *)
 
   (** {1:upd Updating the build operation} *)
 
@@ -835,9 +762,6 @@ module Exec : sig
 
   type feedback = [ `Exec_submit of Os.Cmd.pid option * Op.t ]
   (** The type for executor feedbacks. *)
-
-  val pp_feedback : feedback Fmt.t
-  (** [pp_feedback] formats executor feedback. *)
 
   type t
   (** The type for executors. *)
@@ -1068,9 +992,6 @@ module Memo : sig
   | `Op_complete of Op.t * [`Did_not_write of Fpath.t list] ]
   (** The type for memoizer feedback. *)
 
-  val pp_feedback : feedback Fmt.t
-  (** [pp_feedback ppf] formats feedback. *)
-
   type t
   (** The type for memoizers. This ties together an environment, a
       aguard, an operation cache and an executor. *)
@@ -1085,7 +1006,6 @@ module Memo : sig
     ?cwd:B0_std.Fpath.t -> ?cache_dir:B0_std.Fpath.t ->
     ?trash_dir:B0_std.Fpath.t -> ?max_spawn:int ->
     ?feedback:([feedback | File_cache.feedback | Exec.feedback] -> unit) ->
-
     unit -> (t, string) result
   (** [memo] is a simpler {!create}
       {ul

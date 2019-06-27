@@ -78,10 +78,6 @@ module File_cache = struct
         fs get slow on many entries (NTFS ?) *)
 
   type feedback = [ `File_cache_need_copy of Fpath.t ]
-  let pp_feedback ppf = function
-  | `File_cache_need_copy p ->
-      Fmt.pf ppf "@[Warning: need copy: %a@]" Fpath.pp p
-
   type key = string
   type t =
     { feedback : feedback -> unit;
@@ -497,10 +493,6 @@ module File_cache = struct
 end
 
 module Op = struct
-  let file_write_color = [`Faint; `Fg `Green]
-  let pp_file_contents = Fmt.truncated ~max:150
-  let pp_error_msg ppf e = Fmt.pf ppf "@[error: %s@]" e
-
   type spawn_stdo = [ `Ui | `File of Fpath.t | `Tee of Fpath.t ]
   type spawn_success_exits = int list
   type spawn =
@@ -553,18 +545,9 @@ module Op = struct
   | Spawn _ -> "spawn" | Read _ -> "read" | Write _ -> "write"
   | Copy _ -> "copy" | Mkdir _ -> "mkdir" | Wait_files -> "wait-files"
 
-  let kind_name_padded = function
-  | Spawn _ -> "spawn" | Read _ -> "read " | Write _ -> "write"
-  | Copy _ -> "copy " | Mkdir _ -> "mkdir" | Wait_files -> "wait "
-
-  type status = Waiting | Executed | Failed | Aborted
-
-  let pp_status ppf v = Fmt.string ppf @@ match v with
-  | Waiting -> "waiting" | Executed -> "executed"
-  | Failed -> "failed" | Aborted -> "aborted"
-
   type id = int
   type group = string
+  type status = Waiting | Executed | Failed | Aborted
   type t =
     { id : id;
       group : group;
@@ -662,72 +645,6 @@ module Op = struct
       in
       set_stdo_ui s stdo_ui; set_result s result; set_status o status;
       set_exec_end_time o end_time
-
-    (* Formatting *)
-
-    let pp_success_exits ppf = function
-    | [] -> Fmt.string ppf "any"
-    | cs -> Fmt.(list ~sep:comma int) ppf cs
-
-    let pp_cmd ppf s =
-      (* XXX part of this could maybe moved to B0_std.Cmd. *)
-      let tool = Fpath.to_string s.tool in
-      let args = Cmd.to_list s.args in
-      let quote = Filename.quote in
-      let pp_brack = Fmt.tty_string [`Fg `Yellow] in
-      let pp_tool ppf e = Fmt.tty_string [`Fg `Blue; `Bold] ppf (quote e) in
-      let pp_arg ppf a = Fmt.pf ppf "%s" (quote a) in
-      let pp_o_arg ppf a = Fmt.tty_string file_write_color ppf (quote a) in
-      let rec pp_args last_was_o ppf = function
-      | [] -> ()
-      | a :: args ->
-          Fmt.char ppf ' ';
-          if last_was_o then pp_o_arg ppf a else pp_arg ppf a;
-          pp_args (String.equal a "-o") ppf args
-      in
-      let pp_stdin ppf = function
-      | None -> ()
-      | Some file -> Fmt.pf ppf "< %s" (quote (Fpath.to_string file))
-      in
-      let pp_stdo redir ppf = function
-      | `Ui -> ()
-      | `Tee f | `File f ->
-          Fmt.pf ppf " %s %a" redir pp_o_arg (Fpath.to_string f)
-      in
-      Fmt.pf ppf "@[<h>"; pp_brack ppf "[";
-      pp_tool ppf tool; pp_args false ppf args;
-      pp_stdin ppf s.stdin; pp_stdo ">" ppf s.stdout; pp_stdo "2>" ppf s.stderr;
-      pp_brack ppf "]"; Fmt.pf ppf "@]"
-
-    let pp_stdo ppf = function
-    | `Ui -> Fmt.pf ppf "<ui>"
-    | `File f -> Fpath.pp ppf f
-    | `Tee f -> Fmt.pf ppf "@[<hov><ui> and@ %a@]" Fpath.pp f
-
-    let pp_stdo_ui ~truncate ppf s = match s.stdo_ui with
-    | None -> Fmt.none ppf ()
-    | Some (Ok d) ->
-        if truncate then pp_file_contents ppf d else String.pp ppf d
-    | Some (Error e) -> pp_error_msg ppf e
-
-    let pp_result ppf = function
-    | Ok st -> Os.Cmd.pp_status ppf st
-    | Error e -> pp_error_msg ppf e
-
-    let pp =
-      let pp_env = Fmt.(vbox @@ list string) in
-      let pp_opt_path = Fmt.(option ~none:none) Fpath.pp in
-      Fmt.record @@
-      [ Fmt.field "cmd" Fmt.id pp_cmd;
-        Fmt.field "env" env pp_env;
-        Fmt.field "relevant-env" relevant_env pp_env;
-        Fmt.field "cwd" cwd Fpath.pp;
-        Fmt.field "success-exits" success_exits pp_success_exits;
-        Fmt.field "stdin" stdin pp_opt_path;
-        Fmt.field "stdout" stdout pp_stdo;
-        Fmt.field "stderr" stderr pp_stdo;
-        Fmt.field "stdo-ui" Fmt.id (pp_stdo_ui ~truncate:false);
-        Fmt.field "result" result pp_result ]
   end
 
   module Read = struct
@@ -743,15 +660,6 @@ module Op = struct
     let set_exec_status o r end_time res =
       let status = match res with Ok _ -> Executed | Error _ -> Failed in
       set_result r res; set_status o status; set_exec_end_time o end_time
-
-    let pp_result ppf = function
-    | Error e -> pp_error_msg ppf e
-    | Ok d -> pp_file_contents ppf d
-
-    let pp =
-      Fmt.concat @@
-      [ Fmt.field "file" file Fpath.pp;
-        Fmt.field "result" result pp_result ]
   end
 
   module Write = struct
@@ -774,16 +682,6 @@ module Op = struct
     let set_exec_status o w end_time res =
       let status = match res with Ok _ -> Executed | Error _ -> Failed in
       set_result w res; set_status o status; set_exec_end_time o end_time
-
-    let pp_result ppf = function
-    | Error e -> pp_error_msg ppf e
-    | Ok () -> Fmt.string ppf "written"
-
-    let pp =
-      Fmt.concat @@
-      [ Fmt.field "file" file Fpath.pp;
-        Fmt.field "mode" mode Fmt.int;
-        Fmt.field "result" result pp_result; ]
   end
 
   module Copy = struct
@@ -807,12 +705,6 @@ module Op = struct
     let set_exec_status o c end_time res =
       let status = match res with Ok _ -> Executed | Error _ -> Failed in
       set_result c res; set_status o status; set_exec_end_time o end_time
-
-    let pp_result ppf = function
-    | Error e -> pp_error_msg ppf e
-    | Ok () -> Fmt.string ppf "copied"
-
-    let pp = Fmt.field "result" result pp_result
   end
 
   module Mkdir = struct
@@ -828,15 +720,6 @@ module Op = struct
     let set_exec_status o mk end_time res =
       let status = match res with Ok _ -> Executed | Error _ -> Failed in
       set_result mk res; set_status o status; set_exec_end_time o end_time
-
-    let pp_result ppf = function
-    | Error e -> pp_error_msg ppf e
-    | Ok created -> Fmt.string ppf (if created then "created" else "existed")
-
-    let pp =
-      Fmt.concat @@
-      [ Fmt.field "dir" dir Fpath.pp;
-        Fmt.field "result" result pp_result ]
   end
 
   module Wait_files = struct
@@ -847,89 +730,6 @@ module Op = struct
   module T = struct type nonrec t = t let compare = compare end
   module Set = Set.Make (T)
   module Map = Map.Make (T)
-
-  (* Formatting *)
-
-  let pp_kind ppf = function
-  | Spawn s -> Spawn.pp ppf s
-  | Read r -> Read.pp ppf r
-  | Write w -> Write.pp ppf w
-  | Copy c -> Copy.pp ppf c
-  | Mkdir m -> Mkdir.pp ppf m
-  | Wait_files -> ()
-
-  let pp_kind_short o ppf = function
-  | Spawn s -> Spawn.pp_cmd ppf s
-  | Read r -> Fpath.pp ppf (Read.file r)
-  | Write w -> (Fmt.tty file_write_color Fpath.pp) ppf (Write.file w)
-  | Mkdir m -> Fpath.pp ppf (Mkdir.dir m)
-  | Copy c ->
-      Fmt.pf ppf "%a to %a"
-        Fpath.pp (Copy.src c)
-        (Fmt.tty file_write_color Fpath.pp) (Copy.dst c)
-  | Wait_files ->
-      Fmt.pf ppf "@[<v>%a@]" (Fmt.list Fpath.pp) o.reads
-
-  let pp_synopsis ppf o =
-    let pp_kind ppf k = Fmt.tty_string [`Fg `Green] ppf k in
-    let pp_status ppf = function
-    | Executed -> ()
-    | Failed -> Fmt.pf ppf "[%a]" (Fmt.tty_string [`Fg `Red]) "FAILED"
-    | Aborted -> Fmt.pf ppf "[%a]" (Fmt.tty_string [`Fg `Red]) "ABORTED"
-    | Waiting -> Fmt.pf ppf "[waiting]"
-    in
-    let pp_revived ppf = function
-    | true -> Fmt.tty_string [`Fg `Magenta; `Faint] ppf "R"
-    | false -> Fmt.tty_string [`Fg `Magenta] ppf "E"
-    in
-    Fmt.pf ppf "@[%a[%a %a:%03d]@]"
-      pp_status o.status pp_kind (kind_name_padded o.kind)
-      pp_revived o.exec_revived o.id
-
-  let pp_short ppf o =
-    Fmt.pf ppf "@[<h>%a %a@]" pp_synopsis o (pp_kind_short o) o.kind
-
-  let pp_writes =
-    let pp_file_write = Fmt.tty file_write_color Fpath.pp in
-    Fmt.braces @@ Fmt.list pp_file_write
-
-  let pp_op =
-    let pp_span ppf s =
-      Fmt.pf ppf "%a (%ans)" Time.Span.pp s Time.Span.pp_ns s
-    in
-    let pp_reads = Fmt.braces @@ Fmt.list Fpath.pp in
-    let dur o = Time.Span.abs_diff o.exec_end_time o.exec_start_time in
-    Fmt.concat @@
-    [ Fmt.field "group" group Fmt.string;
-      Fmt.field "writes" writes pp_writes;
-      Fmt.field "reads" reads pp_reads;
-      Fmt.field "created" creation_time pp_span;
-      Fmt.field "start" exec_start_time pp_span;
-      Fmt.field "duration" dur pp_span;
-      Fmt.field "hash" hash Hash.pp;
-      Fmt.field "kind" (fun o -> kind_name o.kind) Fmt.string; ]
-
-  let pp ppf o =
-    Fmt.pf ppf "@[<v>%a@, @[<v>%a@]@, @[<v>%a@]@]"
-      pp_synopsis o pp_kind o.kind pp_op o
-
-  let err_style = [`Fg `Red]
-  let pp_did_not_write ppf (o, fs) =
-    let label = Fmt.tty_string err_style in
-    Fmt.pf ppf "@[<v>%a@, %a@, @[<v>%a@]@, @[<v>%a@]@]"
-      pp_synopsis o (Fmt.field ~label "Did not write" Fmt.id pp_writes) fs
-      pp_kind o.kind pp_op o
-
-  let pp_spawn_status_fail ppf o =
-    let s = Spawn.get o in
-    Fmt.pf ppf "@[<v>%a@, Illegal exit status: %a expected: %a@, @[<v>%a@]\
-                @, @[<v>%a@]@]"
-      pp_synopsis o
-      (Fmt.tty err_style Spawn.pp_result)
-      (Spawn.result s)
-      Spawn.pp_success_exits
-      (Spawn.success_exits s)
-      pp_kind o.kind pp_op o
 end
 
 module Reviver = struct
@@ -1112,10 +912,6 @@ module Guard = struct
   [ `File_status_repeat of Fpath.t
   | `File_status_unstable of Fpath.t ]
 
-  let pp_feedback ppf = function
-  | `File_status_repeat f -> Fmt.pf ppf "%s: file status repeated" f
-  | `File_status_unstable f -> Fmt.pf ppf "%s: file status unstable" f
-
   (* The type [gop] keeps in [awaits] the files that need to become
      ready before the operation [op] can be added to the [allowed]
      queue of the type [t].
@@ -1246,14 +1042,6 @@ end
 
 module Exec = struct
   type feedback = [ `Exec_submit of Os.Cmd.pid option * Op.t ]
-  let pp_feedback ppf = function
-  | `Exec_submit (pid, op) ->
-      let pp_pid ppf = function
-      | None -> () | Some pid -> Fmt.pf ppf "[pid:%d]" (Os.Cmd.pid_to_int pid)
-      in
-      Fmt.pf ppf "@[[SUBMIT][%s:%d]%a %a@]"
-        (Op.kind_name (Op.kind op)) (Op.id op) pp_pid pid
-        (Op.pp_kind_short op) (Op.kind op)
 
   type t =
     { clock : Time.counter;
@@ -1648,33 +1436,6 @@ module Memo = struct
   | `Op_cache_error of Op.t * string
   | `Op_complete of Op.t * [`Did_not_write of Fpath.t list]]
 
-  let pp_feedback ppf = function
-  | `Fiber_exn (exn, bt) ->
-      Fmt.pf ppf "@[<v>fiber exception:@,%a@]" Fmt.exn_backtrace (exn, bt)
-  | `Fiber_fail e ->
-      Fmt.pf ppf "@[<v>fiber failed:@,%s@]" e
-  | `Miss_tool (t, e) ->
-      Fmt.pf ppf "@[<v>missing tool:@,%s@]" e
-  | `Op_cache_error (op, e) ->
-      Fmt.pf ppf "@[op %d: cache error: %s@]" (Op.id op) e
-  | `Op_complete (op, (`Did_not_write fs)) ->
-      match (Op.status op) with
-      | Op.Failed ->
-          begin match fs with
-          | [] ->
-              begin match Op.kind op with
-              | Op.Spawn _ -> Fmt.pf ppf "@[%a@]" Op.pp_spawn_status_fail op;
-              | _ -> Fmt.pf ppf "@[%a@]" Op.pp op;
-              end
-          | fs -> Fmt.pf ppf "@[%a@]" Op.pp_did_not_write (op, fs);
-          end
-      | _ ->
-          match Op.kind op with
-          | Op.Spawn s when Op.Spawn.stdo_ui s <> None ->
-              Fmt.pf ppf "@[<v>@[<h>[DONE]%a:@]@, %a@]"
-                Op.pp_short op (Op.Spawn.pp_stdo_ui ~truncate:false) s
-          | _ -> Fmt.pf ppf "@[<h>[DONE]%a@]" Op.pp_short op
-
   exception Fail of string
 
   type ctx = { group : Op.group }
@@ -1719,13 +1480,7 @@ module Memo = struct
     =
     let feedback = match feedback with
     | Some f -> f
-    | None ->
-        let pp_feedback ppf = function
-        | #feedback as f -> pp_feedback ppf f
-        | #File_cache.feedback as f -> File_cache.pp_feedback ppf f
-        | #Exec.feedback as f -> Exec.pp_feedback ppf f
-        in
-        Fmt.pr "@[%a@]@." pp_feedback
+    | None -> fun _ -> ()
     in
     let fb_cache = (feedback :> File_cache.feedback -> unit) in
     let fb_exec = (feedback :> Exec.feedback -> unit) in

@@ -236,19 +236,19 @@ module Memo = struct
   | `Exec_submit (_, _) -> () (* we have the spawn tracer on debug *)
   | `Fiber_exn _ as v ->
       if Log.level () < Log.Error then () else
-      Fmt.pf ppf "@[%a@]@." B00.Memo.pp_feedback v
+      Fmt.pf ppf "@[%a@]@." B00_conv.Memo.pp_feedback v
   | `Fiber_fail _ as v  ->
       if Log.level () < Log.Error then () else
-      Fmt.pf ppf "@[%a@]@." B00.Memo.pp_feedback v
+      Fmt.pf ppf "@[%a@]@." B00_conv.Memo.pp_feedback v
   | `File_cache_need_copy _ as v ->
       if Log.level () < Log.Warning then () else
-      Fmt.pf ppf "@[%a@]@." B00.File_cache.pp_feedback v
+      Fmt.pf ppf "@[%a@]@." B00_conv.File_cache.pp_feedback v
   | `Miss_tool _ as v ->
       if Log.level () < Log.Error then () else
-      Fmt.pf ppf "@[%a@]@." B00.Memo.pp_feedback v
+      Fmt.pf ppf "@[%a@]@." B00_conv.Memo.pp_feedback v
   | `Op_cache_error _ as v ->
       if Log.level () < Log.Error then () else
-      Fmt.pf ppf "@[%a@]@." B00.Memo.pp_feedback v
+      Fmt.pf ppf "@[%a@]@." B00_conv.Memo.pp_feedback v
   | `Op_complete (op, `Did_not_write fs) ->
       match (B00.Op.status op) with
       | B00.Op.Failed ->
@@ -256,39 +256,39 @@ module Memo = struct
           if Log.level () < Log.Error then () else
           let pp_op_failed ppf (op, fs) =
             if fs <> []
-            then Fmt.pf ppf "@[%a@]@." B00.Op.pp_did_not_write (op, fs)
+            then Fmt.pf ppf "@[%a@]@." B00_conv.Op.pp_did_not_write (op, fs)
             else begin match B00.Op.kind op with
             | B00.Op.Spawn _ ->
-                Fmt.pf ppf "@[%a@]@." B00.Op.pp_spawn_status_fail op;
+                Fmt.pf ppf "@[%a@]@." B00_conv.Op.pp_spawn_status_fail op;
             | _ ->
-                Fmt.pf ppf "@[%a@]@." B00.Op.pp op;
+                Fmt.pf ppf "@[%a@]@." B00_conv.Op.pp op;
             end
           in
           pp_op_failed ppf (op, fs)
       | B00.Op.Aborted ->
           if Log.level () < Log.Error then () else
-          Fmt.pr "@[%a@]@." B00.Op.pp_short op;
+          Fmt.pr "@[%a@]@." B00_conv.Op.pp_short op;
       | _ ->
           match Log.level () = Log.Debug with
-          | true -> Fmt.pf ppf "@[%a@]@." B00.Op.pp op
+          | true -> Fmt.pf ppf "@[%a@]@." B00_conv.Op.pp op
           | false ->
               match B00.Op.kind op with
               | B00.Op.Spawn s ->
                   begin match B00.Op.Spawn.stdo_ui s with
                   | None ->
                       if Log.level () < show_success then () else
-                      Fmt.pf ppf "@[<h>%a@]@." B00.Op.pp_short op
+                      Fmt.pf ppf "@[<h>%a@]@." B00_conv.Op.pp_short op
                   | Some _ ->
                       let level = Log.level () in
                       if level < show_success && level < show_spawn_ui then ()
                       else
                         Fmt.pf ppf "@[<v>@[<h>%a:@]@, %a@]@."
-                          B00.Op.pp_short op
-                          (B00.Op.Spawn.pp_stdo_ui ~truncate:false) s
+                          B00_conv.Op.pp_short op
+                          (B00_conv.Op.Spawn.pp_stdo_ui ~truncate:false) s
                   end
               | _ ->
                   if Log.level () < show_success then () else
-                  Fmt.pf ppf "@[<h>%a@]@." B00.Op.pp_short op
+                  Fmt.pf ppf "@[<h>%a@]@." B00_conv.Op.pp_short op
 
   let pp_stats ppf m =
     let open B00 in
