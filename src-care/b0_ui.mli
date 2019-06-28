@@ -198,22 +198,33 @@ module Memo : sig
 
   (** {1:build_feedback Build feedback} *)
 
+  val pp_never_ready : op_howto:Fpath.t Fmt.t -> Fpath.Set.t Fmt.t
+  (** [pp_never_reads ~op_howto] formats a failure indicating
+      the given set of files never became ready.
+
+      [op_howto] is prefixed before each file and should be a command
+      fragment to get information about which operation needed the file. *)
+
   val log_feedback :
+    ?op_howto:B00.Op.t Fmt.t ->
     show_spawn_ui:Log.level ->
     show_success:Log.level ->
     Format.formatter ->
     [B00.Memo.feedback | B00.File_cache.feedback | B00.Exec.feedback] -> unit
   (** [log_feedback ~show_spawn_ui ppf] is memo feedback that logs on
       [ppf] depending on {!Log.level}. [show_spawn_ui] is the level at
-      which spawn's ui outputs get logged if even if they are
+      which spawn's ui outputs get logged even if they are
       successful. [show_success] is the level at which all successful
       operations have their synopsis logged. Other than that operations
-      get logged as follows:
+      get logged according to {!Log.level} as follows:
       {ul
       {- {!Log.Quiet} logs nothing.}
       {- {!Log.Error} and {!Log.Warning} only report failures.}
       {- {!Log.Info} report failures and short successful spawn operations.}
       {- {!Log.Debug} report all operations with all the information.}}
+
+      [op_howto] should format a way to get more information about an
+      operation, defaults to {!nop}.
 
       {b Note.} This function does not use {!Log}'s functions to
       report. That is the output doesn't go through {!Log}'s reporting
