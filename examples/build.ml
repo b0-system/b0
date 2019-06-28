@@ -19,7 +19,7 @@ let hello m =
   let cmo = Fpath.(exe + ".cmo") in
   let did_mkdir, set_did_mkdir = Memo.Fut.create m in
   Memo.Fut.wait did_mkdir
-    (fun d -> Log.app (fun m -> m "did mkdir %a!" Fpath.pp d));
+    (fun d -> Log.app (fun m -> m "did mkdir %a!" Fpath.pp_quoted d));
   Memo.file_ready m src;
   Memo.spawn m ~reads:[cmo] ~writes:[exe] @@
   ocamlc Cmd.(arg "-verbose" %% arg "-o" %% path exe %% path cmo);

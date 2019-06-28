@@ -205,10 +205,12 @@ module Theme = struct
   type t = name * Fpath.t
   let name (n, _) = n
   let path (_, p) = p
-  let pp ppf (n, p) = Fmt.pf ppf "@[<h>%s %a@]" n (Fmt.tty [`Faint] Fpath.pp) p
+  let pp ppf (n, p) =
+    Fmt.pf ppf "@[<h>%s %a@]" n (Fmt.tty [`Faint] Fpath.pp_quoted) p
+
   let pp_name ppf (n, _) = Fmt.string ppf n
   let of_dir dir =
-    Log.time (fun _ m -> m "theme list of %a" Fpath.pp dir) @@ fun () ->
+    Log.time (fun _ m -> m "theme list of %a" Fpath.pp_quoted dir) @@ fun () ->
     try
       let add_themes _ pkg dir acc =
         let tdir = Fpath.(dir / "odoc-theme") in

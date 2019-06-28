@@ -30,7 +30,7 @@ let with_cache dir f =
       (* FIXME move that to B0_log.ui *)
       Log.warn begin fun m ->
           m "@[<v>Using slow copying cache due to:@,%a@,@[%a@]@]"
-          Fpath.pp file Fmt.text
+          Fpath.pp_quoted file Fmt.text
           "The cache may be on a different file system or hard links \
            are not supported, or the maximal number of links was reached."
       end
@@ -38,7 +38,7 @@ let with_cache dir f =
   Result.bind (Os.Dir.exists dir) @@ function
   | true -> Result.bind (File_cache.create ~feedback dir) f
   | false ->
-      Log.err (fun m -> m "%a: Not a directory cache" Fpath.pp dir);
+      Log.err (fun m -> m "%a: Not a directory cache" Fpath.pp_quoted dir);
       Ok err_no_cache
 
 let keys_exist c keys =
@@ -116,7 +116,7 @@ let add_cmd () dir force key recurse paths =
           Log.err
             (fun m ->
                m "@[<v>%s: key not bound, can't access these files:@,%a@]"
-            key (Fmt.list Fpath.pp) (List.filter miss files));
+            key (Fmt.list Fpath.pp_quoted) (List.filter miss files));
           Ok err_unknown
 
 let delete_cmd () dir only_unused keys =
@@ -153,10 +153,10 @@ let files_cmd () dir only_unused keys out_fmt =
       begin match out_fmt with
       | `Short ->
           let files = List.sort Fpath.compare @@ List.rev_map snd files in
-          Fmt.pr "@[<v>%a@]@." Fmt.(list Fpath.pp) files
+          Fmt.pr "@[<v>%a@]@." Fmt.(list Fpath.pp_quoted) files
       | `Normal | `Long ->
           let files = List.sort compare files in
-          let pp_file = Fmt.(hbox @@ pair ~sep:sp string Fpath.pp) in
+          let pp_file = Fmt.(hbox @@ pair ~sep:sp string Fpath.pp_quoted) in
           Fmt.pr "@[<v>%a@]@." Fmt.(list pp_file) files
       end;
       Ok 0
@@ -190,7 +190,7 @@ let keys_cmd () dir only_unused keys out_fmt byte_size =
   | keys ->
       Fmt.pr "@[<v>%a@]@." (Fmt.list (pp_key c byte_size out_fmt)) keys; Ok 0
 
-let path_cmd () dir = Fmt.pr "%a@." Fpath.pp dir; 0
+let path_cmd () dir = Fmt.pr "%a@." Fpath.pp_quoted dir; 0
 
 let size_cmd () dir only_unused keys =
   handle_unknown_error @@
@@ -231,7 +231,7 @@ let revive_cmd () dir key paths =
   Result.bind (File_cache.revive c key paths) @@ function
   | Some (_, existed) ->
       let log_exist f =
-        Log.err (fun m -> m "%a: Not bound, file exists." Fpath.pp f)
+        Log.err (fun m -> m "%a: Not bound, file exists." Fpath.pp_quoted f)
       in
       List.iter log_exist existed;
       Ok 0

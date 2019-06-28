@@ -11,7 +11,7 @@ module Cli = struct
 
   module Arg = struct
     let err_msg of_string s = Result.map_error (fun e -> `Msg e) (of_string s)
-    let fpath = Arg.conv ~docv:"PATH" (err_msg Fpath.of_string, Fpath.pp)
+    let fpath = Arg.conv ~docv:"PATH" (err_msg Fpath.of_string, Fpath.pp_quoted)
     let cmd = Arg.conv ~docv:"CMD" (err_msg Cmd.of_string, Cmd.dump)
   end
 
@@ -234,7 +234,7 @@ module Memo = struct
 
   (* Maybe a few of these things should go back in B0_conv *)
 
-  let pp_file = Fmt.tty [`Faint; `Fg `Green] Fpath.pp
+  let pp_file = Fmt.tty [`Faint; `Fg `Green] Fpath.pp_quoted
   let pp_file_list = Fmt.list pp_file
   let pp_file_set = Fpath.Set.pp pp_file
   let pp_faint pp_v = Fmt.tty [`Faint] pp_v
@@ -568,7 +568,8 @@ module Pdf_viewer = struct
                 else Ok None
 
   let show pdf_viewer file =
-    Result.map_error (fun e -> Fmt.str "show PDF %a: %s" Fpath.pp file e) @@
+    Result.map_error
+      (fun e -> Fmt.str "show PDF %a: %s" Fpath.pp_quoted file e) @@
     match pdf_viewer with
     | None -> Error "No PDF viewer found, use the PDFVIEWER env var to set one."
     | Some cmd -> Os.Cmd.run Cmd.(cmd %% path file)

@@ -1735,8 +1735,9 @@ module Fpath = struct
   (* Converting *)
 
   let to_uri_path = if Sys.win32 then Windows.to_uri_path else Posix.to_uri_path
-  let pp ppf p = String.pp ppf (Filename.quote p)
+  let pp_quoted ppf p = String.pp ppf (Filename.quote p)
   let pp_unquoted = String.pp
+  let pp = pp_quoted
   let dump = String.dump
 
   (* Uniqueness *)

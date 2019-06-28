@@ -51,15 +51,15 @@ end
 module File_cache = struct
   let pp_feedback ppf = function
   | `File_cache_need_copy p ->
-      Fmt.pf ppf "@[Warning: need copy: %a@]" Fpath.pp p
+      Fmt.pf ppf "@[Warning: need copy: %a@]" Fpath.pp_quoted p
 end
 
 module Guard = struct
   let pp_feedback ppf = function
   | `File_status_repeat f ->
-      Fmt.pf ppf "%a: file status repeated" Fpath.pp_unquoted f
+      Fmt.pf ppf "%a: file status repeated" Fpath.pp_quoted f
   | `File_status_unstable f ->
-      Fmt.pf ppf "%a: file status unstable" Fpath.pp_unquoted f
+      Fmt.pf ppf "%a: file status unstable" Fpath.pp_quoted f
 end
 
 module Op = struct
@@ -117,8 +117,8 @@ module Op = struct
 
     let pp_stdo ppf = function
     | `Ui -> Fmt.pf ppf "<ui>"
-    | `File f -> Fpath.pp ppf f
-    | `Tee f -> Fmt.pf ppf "@[<hov><ui> and@ %a@]" Fpath.pp f
+    | `File f -> Fpath.pp_quoted ppf f
+    | `Tee f -> Fmt.pf ppf "@[<hov><ui> and@ %a@]" Fpath.pp_quoted f
 
     let pp_stdo_ui ~truncate ppf s = match (Op.Spawn.stdo_ui s) with
     | None -> Fmt.none ppf ()
@@ -132,12 +132,12 @@ module Op = struct
 
     let pp =
       let pp_env = Fmt.(vbox @@ list string) in
-      let pp_opt_path = Fmt.(option ~none:none) Fpath.pp in
+      let pp_opt_path = Fmt.(option ~none:none) Fpath.pp_quoted in
       Fmt.record @@
       [ Fmt.field "cmd" Fmt.id pp_cmd;
         Fmt.field "env" Op.Spawn.env pp_env;
         Fmt.field "relevant_env" Op.Spawn.relevant_env pp_env;
-        Fmt.field "cwd" Op.Spawn.cwd Fpath.pp;
+        Fmt.field "cwd" Op.Spawn.cwd Fpath.pp_quoted;
         Fmt.field "success-exits" Op.Spawn.success_exits pp_success_exits;
         Fmt.field "stdin" Op.Spawn.stdin pp_opt_path;
         Fmt.field "stdout" Op.Spawn.stdout pp_stdo;
@@ -153,7 +153,7 @@ module Op = struct
 
     let pp =
       Fmt.concat @@
-      [ Fmt.field "file" Op.Read.file Fpath.pp;
+      [ Fmt.field "file" Op.Read.file Fpath.pp_quoted;
         Fmt.field "result" Op.Read.result pp_result ]
   end
 
@@ -164,7 +164,7 @@ module Op = struct
 
     let pp =
       Fmt.concat @@
-      [ Fmt.field "file" Op.Write.file Fpath.pp;
+      [ Fmt.field "file" Op.Write.file Fpath.pp_quoted;
         Fmt.field "mode" Op.Write.mode Fmt.int;
         Fmt.field "result" Op.Write.result pp_result; ]
   end
@@ -184,7 +184,7 @@ module Op = struct
 
     let pp =
       Fmt.concat @@
-      [ Fmt.field "dir" Op.Mkdir.dir Fpath.pp;
+      [ Fmt.field "dir" Op.Mkdir.dir Fpath.pp_quoted;
         Fmt.field "result" Op.Mkdir.result pp_result ]
   end
 
@@ -203,15 +203,16 @@ module Op = struct
 
   let pp_kind_short o ppf = function
   | Op.Spawn s -> Spawn.pp_cmd ppf s
-  | Op.Read r -> Fpath.pp ppf (Op.Read.file r)
-  | Op.Write w -> (Fmt.tty file_write_color Fpath.pp) ppf (Op.Write.file w)
-  | Op.Mkdir m -> Fpath.pp ppf (Op.Mkdir.dir m)
+  | Op.Read r -> Fpath.pp_quoted ppf (Op.Read.file r)
+  | Op.Write w ->
+      (Fmt.tty file_write_color Fpath.pp_quoted) ppf (Op.Write.file w)
+  | Op.Mkdir m -> Fpath.pp_quoted ppf (Op.Mkdir.dir m)
   | Op.Copy c ->
       Fmt.pf ppf "%a to %a"
-        Fpath.pp (Op.Copy.src c)
-        (Fmt.tty file_write_color Fpath.pp) (Op.Copy.dst c)
+        Fpath.pp_quoted (Op.Copy.src c)
+        (Fmt.tty file_write_color Fpath.pp_quoted) (Op.Copy.dst c)
   | Op.Wait_files ->
-      Fmt.pf ppf "@[<v>%a@]" (Fmt.list Fpath.pp) (Op.reads o)
+      Fmt.pf ppf "@[<v>%a@]" (Fmt.list Fpath.pp_quoted) (Op.reads o)
 
   let pp_synopsis ppf o =
     let pp_kind ppf k = Fmt.tty_string [`Fg `Green] ppf k in
@@ -233,14 +234,14 @@ module Op = struct
     Fmt.pf ppf "@[<h>%a %a@]" pp_synopsis o (pp_kind_short o) (Op.kind o)
 
   let pp_writes =
-    let pp_file_write = Fmt.tty file_write_color Fpath.pp in
+    let pp_file_write = Fmt.tty file_write_color Fpath.pp_quoted in
     Fmt.braces @@ Fmt.list pp_file_write
 
   let pp_op =
     let pp_span ppf s =
       Fmt.pf ppf "%a (%ans)" Time.Span.pp s Time.Span.pp_ns s
     in
-    let pp_reads = Fmt.braces @@ Fmt.list Fpath.pp in
+    let pp_reads = Fmt.braces @@ Fmt.list Fpath.pp_quoted in
     let dur o = Time.Span.abs_diff (Op.exec_end_time o) (Op.exec_start_time o)in
     Fmt.concat @@
     [ Fmt.field "group" Op.group Fmt.string;

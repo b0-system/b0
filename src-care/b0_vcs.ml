@@ -191,7 +191,7 @@ module Git_vcs : VCS = struct
     Result.bind (run_out_stdout r args) @@ fun () ->
     Result.bind (find ~dir ()) @@ function
     | Some r -> Ok r
-    | None -> Fmt.error "%a: no clone found" Fpath.pp dir
+    | None -> Fmt.error "%a: no clone found" Fpath.pp_quoted dir
 
   (* Tags *)
 
@@ -233,7 +233,7 @@ module Hg_vcs : VCS = struct
                            work_dir})
             | None ->
               Fmt.error "%a: repo found but no hg executable in PATH"
-                Fpath.pp repo_dir
+                Fpath.pp_quoted repo_dir
       end
   | None ->
       Result.bind (Lazy.force vcs_cmd) @@ function
@@ -325,7 +325,7 @@ module Hg_vcs : VCS = struct
     Result.bind (run_out_stdout r args) @@ fun _ ->
     Result.bind (find ~dir ()) @@ function
     | Some r -> Ok r
-    | None -> Fmt.error "%a: no clone found" Fpath.pp dir
+    | None -> Fmt.error "%a: no clone found" Fpath.pp_quoted dir
 
   (* Tags *)
 
@@ -348,7 +348,8 @@ module Hg_vcs : VCS = struct
   let describe r ~dirty_mark commit_ish =
     let get_distance s = try Ok (int_of_string s) with
     | Failure _ ->
-        Fmt.error "%a: Could not parse hg tag distance." Fpath.pp r.repo_dir
+        Fmt.error "%a: Could not parse hg tag distance."
+          Fpath.pp_quoted r.repo_dir
     in
     let rev = revision commit_ish in
     let parent t = Cmd.(arg "parent" % "--rev" % rev % "--template" % t) in
@@ -365,7 +366,8 @@ let kind (r, _) = r.kind
 let repo_dir (r, _) = r.repo_dir
 let work_dir (r, _) = r.work_dir
 let cmd (r, (module Vcs : VCS)) = Vcs.cmd r
-let pp ppf (r, _) = Fmt.pf ppf "(%a, %a)" pp_kind r.kind Fpath.pp r.repo_dir
+let pp ppf (r, _) =
+  Fmt.pf ppf "(%a, %a)" pp_kind r.kind Fpath.pp_quoted r.repo_dir
 
 (* Finding reposistories *)
 
@@ -380,7 +382,7 @@ let get ?dir () = Result.bind (find ?dir ()) @@ function
 | Some r -> Ok r
 | None ->
     let dir = match dir with None -> Os.Dir.cwd () | Some dir -> Ok dir in
-    Result.bind dir @@ (Fmt.error "%a: No VCS repository found" Fpath.pp)
+    Result.bind dir @@ (Fmt.error "%a: No VCS repository found" Fpath.pp_quoted)
 
 (* Commits *)
 
@@ -414,7 +416,7 @@ let describe (r, (module Vcs : VCS)) = Vcs.describe r
 
 module Git = struct
   let check_kind (r, _) = match r.kind with
-  | Hg -> Fmt.error "%a: not a git repository" Fpath.pp r.repo_dir
+  | Hg -> Fmt.error "%a: not a git repository" Fpath.pp_quoted r.repo_dir
   | Git -> Ok ()
 
   (* Branches *)

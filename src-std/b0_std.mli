@@ -1328,9 +1328,12 @@ module Fpath : sig
       component that can be parsed by HTML5's
       {{:https://dev.w3.org/html5/spec-LC/urls.html#parsing-urls}
       definition} of URI parsing. *)
-
+(*
   val pp : t Fmt.t
   (** [pp ppf p] prints path [p] on [ppf] using {!Filename.quote}. *)
+*)
+  val pp_quoted : t Fmt.t
+  (** [pp_quoted ppf p] prints path [p] on [ppf] using {!Filename.quote}. *)
 
   val pp_unquoted : t Fmt.t
   (** [pp_unquoted p] prints path [p] on [ppf] using {!to_string}. *)

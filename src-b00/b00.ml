@@ -354,7 +354,7 @@ module File_cache = struct
           c.feedback (`File_cache_need_copy dst);
           revive_file ~did_path cfile ~dst
       | Unix.Unix_error (e, _, arg) ->
-          Fmt.failwith_notrace "%a: %s: %s" Fpath.pp dst arg (uerr e)
+          Fmt.failwith_notrace "%a: %s: %s" Fpath.pp_quoted dst arg (uerr e)
     in
     try
       let fs_len = List.length fs in
@@ -1161,8 +1161,8 @@ module Exec = struct
     let res = match Op.Copy.linenum c with
     | None -> Os.File.copy ~atomic ~force ~make_path ~mode ~src dst
     | Some line ->
-        Result.bind (Os.File.read src) @@ fun data ->
-        let data = Fmt.str "#line %d \"%a\"\n%s" line Fpath.pp src data in
+        Result.bind (Os.File.read src) @@ fun c ->
+        let data = Fmt.str "#line %d \"%a\"\n%s" line Fpath.pp_unquoted src c in
         Os.File.write ~atomic ~force ~make_path ~mode dst data
     in
     Op.Copy.set_exec_status o c (timestamp e) res;
@@ -1261,7 +1261,7 @@ module Trash = struct
   let create dir = { dir }
   let dir t = t.dir
   let trash t p =
-    Result.map_error (fun e -> Fmt.str "trashing %a: %s" Fpath.pp p e) @@
+    Result.map_error (fun e -> Fmt.str "trashing %a: %s" Fpath.pp_quoted p e) @@
     Result.bind (Os.Path.exists p) @@ function
     | false -> Ok ()
     | true ->
@@ -1269,7 +1269,8 @@ module Trash = struct
         Result.bind (Os.Path.tmp ~make_path ~dir:t.dir ~name:"%s" ()) @@
         fun garbage -> Os.Path.rename ~force ~make_path ~src:p garbage
 
-  let err_delete t err = Fmt.error "delete trash %a: %s" Fpath.pp t.dir err
+  let err_delete t err =
+    Fmt.error "delete trash %a: %s" Fpath.pp_quoted t.dir err
 
   let delete_blocking t =
     Result.bind (Os.Path.delete ~recurse:true t.dir) @@ fun _ -> Ok ()

@@ -27,7 +27,7 @@ type auth =
 
 let pp_token_src ppf = function
 | `Env -> Fmt.pf ppf "environment variable %s" token_env
-| `File file -> Fmt.pf ppf "file %a" Fpath.pp file
+| `File file -> Fmt.pf ppf "file %a" Fpath.pp_quoted file
 
 let github_conf_dir () =
   Result.bind (Os.Dir.config ()) (fun config -> Ok Fpath.(config / "github"))
@@ -51,11 +51,11 @@ let auth ~user () = match Os.Env.find ~empty_to_none:true token_env with
            \ \ mkdir -p %a  # Make sure the directory exists@\n\
            \ \ cat - > %a   # Paste the token@\n\
            \ \ chmod 600 %a # Make that readable only by yourself@\n"
-          user Fpath.pp tokfile token_env token_scope token_help_uri
-          Fpath.pp ghdir Fpath.pp tokfile Fpath.pp tokfile
+          user Fpath.pp_quoted tokfile token_env token_scope token_help_uri
+          Fpath.pp_quoted ghdir Fpath.pp_quoted tokfile Fpath.pp_quoted tokfile
     | true ->
         Result.bind (Os.File.read tokfile) @@ function
-        | "" -> Fmt.error "token file %a is empty" Fpath.pp tokfile
+        | "" -> Fmt.error "token file %a is empty" Fpath.pp_quoted tokfile
         | token -> Ok { user; token; token_src = `File tokfile }
 
 (* GitHub API queries *)
