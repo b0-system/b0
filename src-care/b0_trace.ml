@@ -49,7 +49,7 @@ module Trace_event = struct
         |> Jsong.mem "dir" (Jsong.fpath (Op.Mkdir.dir m))
         |> Jsong.mem "result"
           (str B00_conv.Op.Mkdir.pp_result Op.Mkdir.result m)
-    | Op.Wait_files -> obj
+    | Op.Wait_files _ -> obj
     in
     (* The order here is for the viewer. *)
     Jsong.obj

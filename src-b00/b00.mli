@@ -220,10 +220,10 @@ module Op : sig
   (** {1:op_status Operation status} *)
 
   type status =
-  | Waiting  (** Waiting for execution. *)
+  | Aborted  (** Aborted due to prerequisite failure. *)
   | Executed (** Executed successfully. *)
   | Failed   (** Executed unsuccessfully. *)
-  | Aborted  (** Aborted due to prerequisite failure. *)
+  | Waiting  (** Waiting for execution. *)
   (** The type for operation statuses. *)
 
   (** {1:op Operations} *)
@@ -286,6 +286,127 @@ module Op : sig
 
   (** {1:op_kind Operations kinds} *)
 
+  (** File copy *)
+  module Copy : sig
+
+    (** {1:copy File copy} *)
+
+    type t
+    (** The type for file copies. *)
+
+    val v_op :
+      id:id -> group:group -> Time.span -> mode:int -> linenum:int option ->
+      src:Fpath.t -> Fpath.t -> op
+    (** [v] declares a file link operation, see the corresponding
+        accessors for the semantics of various arguments. *)
+
+    val v :
+      src:Fpath.t -> dst:Fpath.t -> mode:int -> linenum:int option ->
+      result:(unit, string) result -> t
+    (** [v] constructs a bare copy operation. *)
+
+    val get : op -> t
+    (** [get o] is the copy operation [o]. Raises {!Invalid_argument} if [o]
+        is not a copy. *)
+
+    val src : t -> Fpath.t
+    (** [src c] is the file read for the copy. *)
+
+    val dst : t -> Fpath.t
+    (** [dst c] is the written by the copy. *)
+
+    val mode : t -> int
+    (** [mode c] is the mode of the file written by the copy. *)
+
+    val linenum : t -> int option
+    (** [linenum c] is the linumber directive to write at the begining
+        of the destination file (if any). *)
+
+    val result : t -> (unit, string) result
+    (** [result c] is the result of the file copy. *)
+
+    val set_result : t -> (unit, string) result -> unit
+    (** [set_result c res] sets the result of [c] to [res]. *)
+
+    val set_exec_status :
+      op -> t -> Time.span -> (unit, string) result -> unit
+    (** [set_exec_status o (get o) end_time result] sets the result of
+        operation [o]. In particular this set the operation status
+        according to [result]. *)
+  end
+
+  (** Directory creation. *)
+  module Mkdir : sig
+
+    (** {1:mkdir Directory creation} *)
+
+    type t
+    (** The type for directory creation operations. *)
+
+    val v_op : id:id -> group:group -> Time.span -> Fpath.t -> op
+    (** [v_op] declares a directory creation operation, see the
+        corresponding accessors for the semantics of the various
+        arguments. *)
+
+    val v : dir:Fpath.t -> result:(bool, string) result -> t
+    (** [v] constructs a bare mkdir operation. *)
+
+    val get : op -> t
+    (** [get o] is the mkdir [o]. Raises {!Invalid_argument} if [o] is not
+        a mkdir. *)
+
+    val dir : t -> Fpath.t
+    (** [dir mk] is the directory created by [mk]. *)
+
+    val result : t -> (bool, string) result
+    (** [result mk] is the result of the directory creation. *)
+
+    val set_result : t -> (bool, string) result -> unit
+    (** [set_result r res] sets the mkdir result of [r] to [res]. *)
+
+    val set_exec_status :
+      op -> t -> Time.span ->  (bool, string) result -> unit
+    (** [set_exec_status o (get o) end_time result] sets the operation
+        result of [o]. In particular this set the operation status
+        according to [result]. *)
+  end
+
+  (** File reads. *)
+  module Read : sig
+
+    (** {1:read File reads} *)
+
+    type t
+    (** The type for file read operations. *)
+
+    val v_op : id:id -> group:group -> Time.span -> Fpath.t -> op
+    (** [v] declares a file read operation, see the corresponding
+        accessors in {!Read} for the semantics of the various
+        arguments. *)
+
+    val v : file:Fpath.t -> result:(string, string) result -> t
+    (** [v] constructs a bare read operation. *)
+
+    val get : op -> t
+    (** [get_read o] is the read [o]. Raise {!Invalid_argument} if [o]
+        is not a read. *)
+
+    val file : t -> Fpath.t
+    (** [file r] is the file read by [r]. *)
+
+    val result : t -> (string, string) result
+    (** [result r] is the contents of the read file or an error. *)
+
+    val set_result : t -> (string, string) result -> unit
+    (** [set_result r res] sets the file read result of [r] to [res]. *)
+
+    val set_exec_status :
+      op -> t -> Time.span ->  (string, string) result -> unit
+    (** [set_exec_status o (get o) end_time result] sets the result of
+        operation [o]. In particular this set the operation status
+        according to [result]. *)
+  end
+
   (** Tool spawns. *)
   module Spawn : sig
 
@@ -309,15 +430,22 @@ module Op : sig
     type t
     (** The type for process spawn operations. *)
 
-    val v :
+    val v_op :
       id:id -> group:group -> Time.span -> stamp:string -> reads:Fpath.t list ->
       writes:Fpath.t list -> env:Os.Env.assignments ->
       relevant_env:Os.Env.assignments -> cwd:Fpath.t ->
       stdin:Fpath.t option -> stdout:stdo -> stderr:stdo ->
       success_exits:success_exits -> Cmd.tool -> Cmd.t -> op
-
-    (** [spawn] declares a spawn build operation, see the corresponding
+    (** [v_op] declares a spawn build operation, see the corresponding
         accessors in {!Spawn} for the semantics of the various arguments. *)
+
+    val v :
+      env:Os.Env.assignments -> relevant_env:Os.Env.assignments ->
+      cwd:Fpath.t -> stdin:Fpath.t option -> stdout:stdo ->
+      stderr:stdo -> success_exits:success_exits -> Cmd.tool ->
+      Cmd.t -> stamp:string -> stdo_ui:(string, string) result option ->
+      result:(Os.Cmd.status, string) result -> t
+    (** [v] constructs a bare spawn operation. *)
 
     val get : op -> t
     (** [get o] is the spawn [o]. Raises {!Invalid_argument} if [o] is
@@ -383,37 +511,16 @@ module Op : sig
         status according to [result]. *)
   end
 
-  (** File reads. *)
-  module Read : sig
-
-    (** {1:read File reads} *)
-
+  module Wait_files : sig
     type t
-    (** The type for file read operations. *)
+    (** The type for wait files operations. *)
 
-    val v : id:id -> group:group -> Time.span -> Fpath.t -> op
-    (** [v] declares a file read operation, see the corresponding
-        accessors in {!Read} for the semantics of the various
-        arguments. *)
+    val v_op : id:id -> group:group -> Time.span -> Fpath.t list -> op
+    (** [v] declares a wait files operation, these are stored in
+          {!reads}. *)
 
-    val get : op -> t
-    (** [get_read o] is the read [o]. Raise {!Invalid_argument} if [o]
-        is not a read. *)
-
-    val file : t -> Fpath.t
-    (** [file r] is the file read by [r]. *)
-
-    val result : t -> (string, string) result
-    (** [result r] is the contents of the read file or an error. *)
-
-    val set_result : t -> (string, string) result -> unit
-    (** [set_result r res] sets the file read result of [r] to [res]. *)
-
-    val set_exec_status :
-      op -> t -> Time.span ->  (string, string) result -> unit
-    (** [set_exec_status o (get o) end_time result] sets the result of
-        operation [o]. In particular this set the operation status
-        according to [result]. *)
+    val v : unit -> t
+    (** [v] constructs a bare wait files operation. *)
   end
 
   (** File writes. *)
@@ -424,12 +531,18 @@ module Op : sig
     type t
     (** The type for file write operations. *)
 
-    val v :
+    val v_op :
       id:id -> group:group -> Time.span -> stamp:string ->
       reads:Fpath.t list -> mode:int -> write:Fpath.t ->
       (unit -> (string, string) result) -> op
     (** [write] declares a file write operations, see the corresponding
         accessors in {!Write} for the semantics of the various arguments. *)
+
+    val v :
+      stamp:string -> mode:int -> file:Fpath.t ->
+      data:(unit -> (string, string) result) -> result:(unit, string) result ->
+      t
+    (** [v] constructs a bare write operation. *)
 
     val get : op -> t
     (** [geo o] is the write [o]. Raises {!Invalid_argument} if [o] is
@@ -460,97 +573,19 @@ module Op : sig
         according to [result]. *)
   end
 
-  (** File copy *)
-  module Copy : sig
-
-    (** {1:copy File copy} *)
-
-    type t
-    (** The type for file copies. *)
-
-    val v :
-      id:id -> group:group -> Time.span -> mode:int -> linenum:int option ->
-      src:Fpath.t -> Fpath.t -> op
-    (** [v] declares a file link operation, see the corresponding
-        accessors for the semantics of various arguments. *)
-
-    val get : op -> t
-    (** [get o] is the copy operation [o]. Raises {!Invalid_argument} if [o]
-        is not a copy. *)
-
-    val src : t -> Fpath.t
-    (** [src c] is the file read for the copy. *)
-
-    val dst : t -> Fpath.t
-    (** [dst c] is the written by the copy. *)
-
-    val mode : t -> int
-    (** [mode c] is the mode of the file written by the copy. *)
-
-    val linenum : t -> int option
-    (** [linenum c] is the linumber directive to write at the begining
-        of the destination file (if any). *)
-
-    val result : t -> (unit, string) result
-    (** [result c] is the result of the file copy. *)
-
-    val set_result : t -> (unit, string) result -> unit
-    (** [set_result c res] sets the result of [c] to [res]. *)
-
-    val set_exec_status :
-      op -> t -> Time.span -> (unit, string) result -> unit
-    (** [set_exec_status o (get o) end_time result] sets the result of
-        operation [o]. In particular this set the operation status
-        according to [result]. *)
-  end
-
-  (** Directory creation. *)
-  module Mkdir : sig
-
-    (** {1:mkdir Directory creation} *)
-
-    type t
-    (** The type for directory creation operations. *)
-
-    val v : id:id -> group:group -> Time.span -> Fpath.t -> op
-    (** [v] declares a directory creation operation, see the
-        corresponding accessors for the semantics of the various
-        arguments. *)
-
-    val get : op -> t
-    (** [get o] is the mkdir [o]. Raises {!Invalid_argument} if [o] is not
-        a mkdir. *)
-
-    val dir : t -> Fpath.t
-    (** [dir mk] is the directory created by [mk]. *)
-
-    val result : t -> (bool, string) result
-    (** [result mk] is the result of the directory creation. *)
-
-    val set_result : t -> (bool, string) result -> unit
-    (** [set_result r res] sets the mkdir result of [r] to [res]. *)
-
-    val set_exec_status :
-      op -> t -> Time.span ->  (bool, string) result -> unit
-    (** [set_exec_status o (get o) end_time result] sets the operation
-        result of [o]. In particular this set the operation status
-        according to [result]. *)
-  end
-
-  module Wait_files : sig
-    val v : id:id -> group:group -> Time.span -> Fpath.t list -> t
-    (** [v] declares a wait files operation, these are stored in
-        {!reads}. *)
-  end
-
   type kind =
-  | Spawn of Spawn.t
-  | Read of Read.t
-  | Write of Write.t
   | Copy of Copy.t
   | Mkdir of Mkdir.t
-  | Wait_files (** *)
+  | Read of Read.t
+  | Spawn of Spawn.t
+  | Wait_files of Wait_files.t
+  | Write of Write.t
   (** The type for operation kinds. *)
+
+  val v :
+    id -> group:group -> creation_time:Time.span -> exec_start_time:Time.span ->
+    exec_end_time:Time.span -> exec_revived:bool -> status:status ->
+    reads:Fpath.t list -> writes:Fpath.t list -> hash:Hash.t -> kind -> t
 
   val kind_name : kind -> string
   (** [kind_name k] is a end user name for kind [k]. *)

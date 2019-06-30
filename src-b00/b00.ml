@@ -493,6 +493,21 @@ module File_cache = struct
 end
 
 module Op = struct
+  type copy =
+    { copy_src : Fpath.t;
+      copy_dst : Fpath.t;
+      copy_mode : int;
+      copy_linenum : int option;
+      mutable copy_result : (unit, string) result; }
+
+  type mkdir =
+    { mkdir_dir : Fpath.t;
+      mutable mkdir_result : (bool, string) result; }
+
+  type read =
+    { read_file : Fpath.t;
+      mutable read_result : (string, string) result; }
+
   type spawn_stdo = [ `Ui | `File of Fpath.t | `Tee of Fpath.t ]
   type spawn_success_exits = int list
   type spawn =
@@ -509,10 +524,7 @@ module Op = struct
       mutable stdo_ui : (string, string) result option;
       mutable spawn_result  : (Os.Cmd.status, string) result; }
 
-  type read =
-    { read_file : Fpath.t;
-      mutable read_result : (string, string) result; }
-
+  type wait_files = unit
   type write =
     { write_stamp : string;
       write_mode : int;
@@ -520,34 +532,24 @@ module Op = struct
       write_data : unit -> (string, string) result;
       mutable write_result : (unit, string) result; }
 
-  type copy =
-    { copy_src : Fpath.t;
-      copy_dst : Fpath.t;
-      copy_mode : int;
-      copy_linenum : int option;
-      mutable copy_result : (unit, string) result; }
-
-  type mkdir =
-    { mkdir_dir : Fpath.t;
-      mutable mkdir_result : (bool, string) result; }
-
   (* Operations *)
 
   type kind =
-  | Spawn of spawn
-  | Read of read
-  | Write of write
   | Copy of copy
   | Mkdir of mkdir
-  | Wait_files
+  | Read of read
+  | Spawn of spawn
+  | Wait_files of wait_files
+  | Write of write
 
   let kind_name = function
-  | Spawn _ -> "spawn" | Read _ -> "read" | Write _ -> "write"
-  | Copy _ -> "copy" | Mkdir _ -> "mkdir" | Wait_files -> "wait-files"
+  | Copy _ -> "copy" | Mkdir _ -> "mkdir" | Read _ -> "read"
+  | Spawn _ -> "spawn" | Wait_files _ -> "wait-files" | Write _ -> "write"
 
   type id = int
   type group = string
-  type status = Waiting | Executed | Failed | Aborted
+  type status = Aborted | Executed | Failed | Waiting
+
   type t =
     { id : id;
       group : group;
@@ -563,12 +565,19 @@ module Op = struct
 
   type op = t
 
-  let v ~id ~group creation_time ~reads ~writes kind =
+  let v_kind ~id ~group creation_time ~reads ~writes kind =
     let exec_start_time = Time.Span.zero in
     let exec_end_time = Time.Span.zero in
     let exec_revived = false in
     let status = Waiting in
     let hash = Hash.nil in
+    { id; group; creation_time; exec_start_time; exec_end_time; exec_revived;
+      status; reads; writes; hash; kind; }
+
+  let v
+      id ~group ~creation_time ~exec_start_time ~exec_end_time ~exec_revived
+      ~status ~reads ~writes ~hash kind
+    =
     { id; group; creation_time; exec_start_time; exec_end_time; exec_revived;
       status; reads; writes; hash; kind; }
 
@@ -604,11 +613,72 @@ module Op = struct
   let set_hash o h = o.hash <- h
   let kind o = o.kind
 
+  module Copy = struct
+    type t = copy
+    let v_op
+      ~id ~group creation_time ~mode:copy_mode ~linenum:copy_linenum
+      ~src:copy_src copy_dst
+      =
+      let copy_result = Error "not copied" in
+      let c = {copy_src; copy_dst; copy_mode; copy_linenum; copy_result} in
+      let reads = [copy_src] and writes = [copy_dst] in
+      v_kind ~id ~group creation_time ~reads ~writes (Copy c)
+
+    let v
+        ~src:copy_src ~dst:copy_dst ~mode:copy_mode ~linenum:copy_linenum
+        ~result:copy_result =
+      { copy_src; copy_dst; copy_mode; copy_linenum; copy_result }
+
+    let get o = match o.kind with Copy c -> c | _ -> assert false
+    let src c = c.copy_src
+    let dst c = c.copy_dst
+    let mode c = c.copy_mode
+    let linenum c = c.copy_linenum
+    let result c = c.copy_result
+    let set_result c res = c.copy_result <- res
+    let set_exec_status o c end_time res =
+      let status = match res with Ok _ -> Executed | Error _ -> Failed in
+      set_result c res; set_status o status; set_exec_end_time o end_time
+  end
+
+  module Mkdir = struct
+    type t = mkdir
+    let v_op ~id ~group creation_time dir =
+      let mkdir = { mkdir_dir = dir; mkdir_result = Error "not created" } in
+      v_kind ~id ~group creation_time ~reads:[] ~writes:[dir] (Mkdir mkdir)
+
+    let v ~dir:mkdir_dir ~result:mkdir_result = { mkdir_dir; mkdir_result }
+    let get o = match o.kind with Mkdir mk -> mk | _ -> assert false
+    let dir mk = mk.mkdir_dir
+    let result mk = mk.mkdir_result
+    let set_result mk res = mk.mkdir_result <- res
+    let set_exec_status o mk end_time res =
+      let status = match res with Ok _ -> Executed | Error _ -> Failed in
+      set_result mk res; set_status o status; set_exec_end_time o end_time
+  end
+
+  module Read = struct
+    type t = read
+    let v_op ~id ~group creation_time file =
+      let read = { read_file = file; read_result = Error "not read" } in
+      v_kind ~id ~group creation_time ~reads:[file] ~writes:[] (Read read)
+
+    let v ~file:read_file ~result:read_result = { read_file; read_result }
+    let get o = match o.kind with Read r -> r | _ -> assert false
+    let file r = r.read_file
+    let result r = r.read_result
+    let set_result r res = r.read_result <- res
+    let set_exec_status o r end_time res =
+      let status = match res with Ok _ -> Executed | Error _ -> Failed in
+      set_result r res; set_status o status; set_exec_end_time o end_time
+  end
+
   module Spawn = struct
     type stdo = spawn_stdo
     type success_exits = spawn_success_exits
     type t = spawn
-    let v
+
+    let v_op
         ~id ~group creation_time ~stamp:spawn_stamp ~reads ~writes ~env
         ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits tool args
       =
@@ -617,7 +687,14 @@ module Op = struct
           tool; args; spawn_stamp; stdo_ui = None;
           spawn_result = Error "not spawned" }
       in
-      v ~id ~group creation_time ~reads ~writes (Spawn spawn)
+      v_kind ~id ~group creation_time ~reads ~writes (Spawn spawn)
+
+    let v
+        ~env ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits tool
+        args ~stamp:spawn_stamp ~stdo_ui ~result:spawn_result
+      =
+      { env; relevant_env; cwd; stdin; stdout; stderr;
+        success_exits; tool; args; spawn_stamp; stdo_ui; spawn_result }
 
     let get o = match o.kind with Spawn s -> s | _ -> assert false
     let env s = s.env
@@ -647,30 +724,29 @@ module Op = struct
       set_exec_end_time o end_time
   end
 
-  module Read = struct
-    type t = read
-    let v ~id ~group creation_time file =
-      let read = { read_file = file; read_result = Error "not read" } in
-      v ~id ~group creation_time ~reads:[file] ~writes:[] (Read read)
+  module Wait_files = struct
+    type t = wait_files
+    let v_op ~id ~group creation_time reads =
+      v_kind ~id ~group creation_time ~reads ~writes:[] (Wait_files ())
 
-    let get o = match o.kind with Read r -> r | _ -> assert false
-    let file r = r.read_file
-    let result r = r.read_result
-    let set_result r res = r.read_result <- res
-    let set_exec_status o r end_time res =
-      let status = match res with Ok _ -> Executed | Error _ -> Failed in
-      set_result r res; set_status o status; set_exec_end_time o end_time
+    let v () = ()
   end
 
   module Write = struct
     type t = write
-    let v
+    let v_op
         ~id ~group creation_time ~stamp:write_stamp ~reads ~mode:write_mode
         ~write:write_file write_data
       =
       let write_result = Error "not written" in
       let w = {write_stamp; write_mode; write_file; write_data; write_result} in
-      v ~id ~group creation_time ~reads ~writes:[write_file] (Write w)
+      v_kind ~id ~group creation_time ~reads ~writes:[write_file] (Write w)
+
+    let v
+        ~stamp:write_stamp ~mode:write_mode ~file:write_file ~data:write_data
+        ~result:write_result
+      =
+      { write_stamp; write_mode; write_file; write_data; write_result }
 
     let get o = match o.kind with Write r -> r | _ -> assert false
     let stamp w = w.write_stamp
@@ -684,48 +760,6 @@ module Op = struct
       set_result w res; set_status o status; set_exec_end_time o end_time
   end
 
-  module Copy = struct
-    type t = copy
-    let v
-      ~id ~group creation_time ~mode:copy_mode ~linenum:copy_linenum
-      ~src:copy_src copy_dst
-      =
-      let copy_result = Error "not copied" in
-      let c = {copy_src; copy_dst; copy_mode; copy_linenum; copy_result} in
-      let reads = [copy_src] and writes = [copy_dst] in
-      v ~id ~group creation_time ~reads ~writes (Copy c)
-
-    let get o = match o.kind with Copy c -> c | _ -> assert false
-    let src c = c.copy_src
-    let dst c = c.copy_dst
-    let mode c = c.copy_mode
-    let linenum c = c.copy_linenum
-    let result c = c.copy_result
-    let set_result c res = c.copy_result <- res
-    let set_exec_status o c end_time res =
-      let status = match res with Ok _ -> Executed | Error _ -> Failed in
-      set_result c res; set_status o status; set_exec_end_time o end_time
-  end
-
-  module Mkdir = struct
-    type t = mkdir
-    let v ~id ~group creation_time dir =
-      let mkdir = { mkdir_dir = dir; mkdir_result = Error "not created" } in
-      v ~id ~group creation_time ~reads:[] ~writes:[dir] (Mkdir mkdir)
-
-    let get o = match o.kind with Mkdir mk -> mk | _ -> assert false
-    let dir mk = mk.mkdir_dir
-    let result mk = mk.mkdir_result
-    let set_result mk res = mk.mkdir_result <- res
-    let set_exec_status o mk end_time res =
-      let status = match res with Ok _ -> Executed | Error _ -> Failed in
-      set_result mk res; set_status o status; set_exec_end_time o end_time
-  end
-
-  module Wait_files = struct
-    let v ~id ~group creation_time reads =
-      v ~id ~group creation_time ~reads ~writes:[] Wait_files
-  end
 
   module T = struct type nonrec t = t let compare = compare end
   module Set = Set.Make (T)
@@ -814,7 +848,7 @@ module Reviver = struct
       | Op.Spawn s -> hash_spawn r o s
       | Op.Write w -> hash_write r o w
       | Op.Copy c -> hash_copy r o c
-      | Op.Read _ | Op.Mkdir _ | Op.Wait_files -> Hash.nil
+      | Op.Read _ | Op.Mkdir _ | Op.Wait_files _ -> Hash.nil
       end
     with Failure e -> Error e
 
@@ -874,7 +908,7 @@ module Reviver = struct
     | Op.Spawn s -> revive_spawn r o s
     | Op.Write w -> revive_write r o w
     | Op.Copy c -> revive_copy r o c
-    | Op.Read _ | Op.Mkdir _ | Op.Wait_files -> Ok None
+    | Op.Read _ | Op.Mkdir _ | Op.Wait_files _ -> Ok None
 
   let record_spawn r o s =
     let spawn_meta = Op.Spawn.stdo_ui s, Op.Spawn.result s in
@@ -898,7 +932,7 @@ module Reviver = struct
   | Op.Spawn s -> record_spawn r o s
   | Op.Write w -> record_write r o w
   | Op.Copy c -> record_copy r o c
-  | Op.Read _ | Op.Mkdir _ | Op.Wait_files -> Ok true
+  | Op.Read _ | Op.Mkdir _ | Op.Wait_files _ -> Ok true
 end
 
 module Guard = struct
@@ -1194,7 +1228,7 @@ module Exec = struct
   | Op.Write w -> exec_write e o w
   | Op.Copy c -> exec_copy e o c
   | Op.Mkdir mk -> exec_mkdir e o mk
-  | Op.Wait_files -> exec_wait_files e o
+  | Op.Wait_files _ -> exec_wait_files e o
 
   let submit_spawns e =
     let free = e.max_spawn - e.spawn_count in
@@ -1636,28 +1670,30 @@ module Memo = struct
     Guard.set_file_ready m.m.guard p
 
   let read m file k =
-    let o = Op.Read.v ~id:(new_op_id m) ~group:m.c.group (timestamp m) file in
+    let id = new_op_id m in
+    let o = Op.Read.v_op ~id ~group:m.c.group (timestamp m) file in
     let k m o = k (Result.get_ok @@ Op.Read.result (Op.Read.get o)) in
     add_op_kont m o k; add_op m o
 
   let wait_files m files k =
     let id = new_op_id m in
-    let o = Op.Wait_files.v ~id ~group:m.c.group (timestamp m) files in
+    let o = Op.Wait_files.v_op ~id ~group:m.c.group (timestamp m) files in
     let k m o = k () in
     add_op_kont m o k; add_op m o
 
   let write m ?(stamp = "") ?(reads = []) ?(mode = 0o644) write data =
     let id = new_op_id m and group = m.c.group and start = timestamp m in
-    let o = Op.Write.v ~id start ~group ~stamp ~reads ~mode ~write data in
+    let o = Op.Write.v_op ~id start ~group ~stamp ~reads ~mode ~write data in
     add_op m o
 
   let copy m ?(mode = 0o644) ?linenum ~src dst =
     let id = new_op_id m and group = m.c.group and start = timestamp m in
-    let o = Op.Copy.v ~id start ~group ~mode ~linenum ~src dst in
+    let o = Op.Copy.v_op ~id start ~group ~mode ~linenum ~src dst in
     add_op m o
 
   let mkdir m dir k =
-    let o = Op.Mkdir.v ~id:(new_op_id m) ~group:m.c.group (timestamp m) dir in
+    let id = new_op_id m in
+    let o = Op.Mkdir.v_op ~id ~group:m.c.group (timestamp m) dir in
     let k m o = k (Result.get_ok @@ Op.Mkdir.result (Op.Mkdir.get o)) in
     add_op_kont m o k; add_op m o
 
@@ -1728,8 +1764,8 @@ module Memo = struct
         let env, relevant_env = spawn_env m tool env in
         let cwd = match cwd with None -> m.m.cwd | Some d -> d in
         let o =
-          Op.Spawn.v ~id ~group:m.c.group timestamp ~stamp ~reads ~writes ~env
-            ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits
+          Op.Spawn.v_op ~id ~group:m.c.group timestamp ~stamp ~reads ~writes
+            ~env ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits
             tool.tool_file cmd.cmd_args
         in
         begin match k with

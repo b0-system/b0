@@ -1749,6 +1749,17 @@ module Cmd : sig
 
   (** {1:converting Converting} *)
 
+  val fold :
+    arg:(string -> 'a) -> shield:('a -> 'a) -> append:('a -> 'a -> 'a) ->
+    empty:'a -> t -> 'a
+  (** [fold ~arg ~shield ~append ~empty l] folds over [l]'s structure. *)
+
+  val iter_enc :
+    arg:('a -> string -> unit) ->
+    shield:('a -> unit) ->
+    append:('a -> unit) ->
+    empty:('a -> unit) -> 'a -> t -> unit
+
   val to_list : t -> string list
   (** [to_list l] converts [l] to a list of strings. *)
 

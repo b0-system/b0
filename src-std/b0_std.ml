@@ -2123,6 +2123,20 @@ module Cmd = struct
     let pp_arg ppf a = Fmt.string ppf (Filename.quote a) in
     Fmt.pf ppf "@[<h>%a@]" Fmt.(list ~sep:sp pp_arg) (to_list l)
 
+  let rec fold ~arg ~shield ~append ~empty = function
+  | A a -> arg a
+  | Shield c -> shield (fold ~arg ~shield ~append ~empty c)
+  | Rseq l ->
+      let append acc v = append (fold ~arg ~shield ~append ~empty v) acc in
+      List.fold_left append empty l
+
+  let rec iter_enc ~arg ~shield ~append ~empty e = function
+  | A a -> arg e a
+  | Shield c -> shield e; iter_enc ~arg ~shield ~append ~empty e c
+  | Rseq l ->
+      let append e v = append e; iter_enc ~arg ~shield ~append ~empty e v; e in
+      ignore (List.fold_left append e l); empty e
+
   (* Tools *)
 
   type tool = Fpath.t
