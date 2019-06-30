@@ -112,6 +112,9 @@ module Fmt : sig
   val flush : 'a t
   (** [flush] has the effect of {!Format.pp_print_flush}. *)
 
+  val flush_nl : 'a t
+  (** [flush_nl] has the effect of {!Format.pp_print_newline}. *)
+
   val nop : 'a t
   (** [nop] formats nothing. *)
 
@@ -1741,6 +1744,9 @@ module Cmd : sig
   val get_tool : t -> tool
   (** [get_tool] is like {!tool} but raises {!Invalid_argument} in case
       of error. *)
+
+  val pp_tool : tool Fmt.t
+  (** [pp_tool] formats a tool for the TTY. *)
 
   (** {1:preds Predicates} *)
 

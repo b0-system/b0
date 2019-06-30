@@ -18,14 +18,16 @@ module Cli = struct
   (* Specifying output formats *)
 
   type out_fmt = [ `Normal | `Short | `Long ]
-  let out_fmt ?(short_opts = ["s"; "short"]) ?(long_opts = ["l"; "long"]) () =
+  let out_fmt
+      ?docs ?(short_opts = ["s"; "short"]) ?(long_opts = ["l"; "long"]) ()
+    =
     let short =
       let doc = "Short output. Line based output with only relevant data." in
-      Cmdliner.Arg.info short_opts ~doc
+      Cmdliner.Arg.info short_opts ~doc ?docs
     in
     let long =
       let doc = "Long output. Outputs as much information as possible." in
-      Cmdliner.Arg.info long_opts ~doc
+      Cmdliner.Arg.info long_opts ~doc ?docs
     in
     Cmdliner.Arg.(value & vflag `Normal [`Short, short; `Long, long])
 end
@@ -231,180 +233,6 @@ module Memo = struct
       let cpu_count = B0_machine.logical_cpu_count () in
       let cpu_count = Log.if_error ~level:Log.Warning ~use:None cpu_count in
       Option.value ~default:1 cpu_count
-
-  (* Maybe a few of these things should go back in B0_conv *)
-
-  let pp_file = Fmt.tty [`Faint; `Fg `Green] Fpath.pp_quoted
-  let pp_file_list = Fmt.list pp_file
-  let pp_file_set = Fpath.Set.pp pp_file
-  let pp_faint pp_v = Fmt.tty [`Faint] pp_v
-  let pp_red pp_v = Fmt.tty [`Fg `Red] pp_v
-
-  let pp_never_ready ~op_howto ppf fs =
-    let err = match Fpath.Set.cardinal fs with
-    | 1 -> "This file never became ready"
-    | _ -> "These files never became ready"
-    in
-    let pp_failed = pp_red Fmt.string in
-    let pp_file = Fmt.(op_howto ++ pp_file) in
-    let pp_file_set = Fpath.Set.pp pp_file in
-    Fmt.pf ppf "@[<v>[%a] %s: %a@, @[%a@]@]@."
-      pp_failed "FAILED" err (pp_faint Fmt.string) "(see ops reading them)"
-      pp_file_set fs
-
-  let pp_did_not_write ~op_howto ppf (o, fs) =
-    let exp = match fs with
-    | [_] -> "this expected file"
-    |  _  -> "these expected files"
-    in
-    Fmt.pf ppf "@[<v>%a:@,@[%a %s: %a@]@, @[%a@]@]"
-      B00_conv.Op.pp_short o (pp_red Fmt.string) "Operation did not write" exp
-      (pp_faint op_howto) o pp_file_list fs
-
-  let pp_spawn_exit ppf s = match B00.Op.Spawn.result s with
-  | Error e -> Fmt.pf ppf "@,%s" e
-  | Ok (`Signaled c) -> Fmt.pf ppf "[signaled:%d]" c
-  | Ok (`Exited c) as result ->
-      match B00.Op.Spawn.success_exits s with
-      | ([] | [0]) when c <> 0 -> Fmt.pf ppf "[%d]" c
-      | cs ->
-          Fmt.pf ppf "@,@[<h>Error: %a expected: %a@]"
-            (pp_red B00_conv.Op.Spawn.pp_result) result
-            B00_conv.Op.Spawn.pp_success_exits cs
-
-  let pp_spawn_status_fail ppf o =
-    let s = B00.Op.Spawn.get o in
-    Fmt.pf ppf "@[<v>%a%a@,%a@]"
-      B00_conv.Op.pp_short o pp_spawn_exit s
-      (B00_conv.Op.Spawn.pp_stdo_ui ~truncate:false) s
-
-  let log_feedback
-      ?(op_howto = Fmt.nop) ~show_spawn_ui ~show_success ppf
-  = function
-  | `Exec_submit (_, _) -> () (* we have the B0_std.Os spawn tracer on debug *)
-  | `Fiber_exn _ as v ->
-      if Log.level () < Log.Error then () else
-      Fmt.pf ppf "@[%a@]@." B00_conv.Memo.pp_feedback v
-  | `Fiber_fail _ as v  ->
-      if Log.level () < Log.Error then () else
-      Fmt.pf ppf "@[%a@]@." B00_conv.Memo.pp_feedback v
-  | `File_cache_need_copy _ as v ->
-      if Log.level () < Log.Warning then () else
-      Fmt.pf ppf "@[%a@]@." B00_conv.File_cache.pp_feedback v
-  | `Miss_tool _ as v ->
-      if Log.level () < Log.Error then () else
-      Fmt.pf ppf "@[%a@]@." B00_conv.Memo.pp_feedback v
-  | `Op_cache_error _ as v ->
-      if Log.level () < Log.Error then () else
-      Fmt.pf ppf "@[%a@]@." B00_conv.Memo.pp_feedback v
-  | `Op_complete (op, `Did_not_write fs) ->
-      match Log.level () = Log.Debug with
-      | true -> Fmt.pf ppf "@[%a@]@." B00_conv.Op.pp op
-      | false ->
-          match (B00.Op.status op) with
-          | B00.Op.Failed ->
-              if Log.level () < Log.Error then () else
-              let pp_op_failed ppf (op, fs) = match fs with
-              | [] ->
-                  begin match B00.Op.kind op with
-                  | B00.Op.Spawn _ ->
-                      Fmt.pf ppf "@[%a@]@." pp_spawn_status_fail op;
-                  | _ ->
-                      Fmt.pf ppf "@[%a@]@." B00_conv.Op.pp op;
-                  end
-              | fs ->
-                  Fmt.pf ppf "@[%a@]@." (pp_did_not_write ~op_howto) (op, fs)
-              in
-              pp_op_failed ppf (op, fs)
-          | B00.Op.Aborted ->
-              if Log.level () < Log.Info then () else
-              Fmt.pr "@[%a@]@." B00_conv.Op.pp_short op;
-          | _ ->
-              let show_success = Log.Info in
-              let show_spawn_ui = Log.Error in
-              match B00.Op.kind op with
-              | B00.Op.Spawn s ->
-                  begin match B00.Op.Spawn.stdo_ui s with
-                  | None ->
-                      if Log.level () < show_success then () else
-                      Fmt.pf ppf "@[<h>%a@]@." B00_conv.Op.pp_short op
-                  | Some _ ->
-                      let level = Log.level () in
-                      if level < show_success && level < show_spawn_ui then ()
-                      else
-                      Fmt.pf ppf "@[<v>@[<h>%a:@]@,%a@]@."
-                        B00_conv.Op.pp_short op
-                        (B00_conv.Op.Spawn.pp_stdo_ui ~truncate:false) s
-                  end
-              | _ ->
-                  if Log.level () < show_success then () else
-                  Fmt.pf ppf "@[<h>%a@]@." B00_conv.Op.pp_short op
-
-  let pp_stats ppf m =
-    let open B00 in
-    let pp_op ppf (oc, ot, od) =
-      Fmt.pf ppf "%a %d (%d revived)" Time.Span.pp od ot oc
-    in
-    let pp_op_no_cache ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
-    let pp_totals ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
-    let pp_xtime ppf (self, children) =
-      let label = Fmt.tty_string [`Faint; `Fg `Yellow ] in
-      Fmt.pf ppf "%a %a" Time.Span.pp self
-        (Fmt.field ~label "children" (fun c -> c) Time.Span.pp)
-        children
-    in
-    let pp_stime ppf cpu =
-      pp_xtime ppf Time.(cpu_stime cpu, cpu_children_stime cpu)
-    in
-    let pp_utime ppf cpu =
-      pp_xtime ppf Time.(cpu_utime cpu, cpu_children_utime cpu)
-    in
-    let sc, st, sd, wc, wt, wd, cc, ct, cd, rt, rd, ot, od =
-      let ( ++ ) = Time.Span.add in
-      let rec loop sc st sd wc wt wd cc ct cd rt rd ot od = function
-      | [] -> sc, st, sd, wc, wt, wd, cc, ct, cd, rt, rd, ot, od
-      | o :: os ->
-          let cached = Op.exec_revived o in
-          let d = Op.exec_duration o in
-          let ot = ot + 1 in
-          let od = od ++ d in
-          match Op.kind o with
-          | Op.Spawn _ ->
-              let sc = if cached then sc + 1 else sc in
-              loop sc (st + 1) (sd ++ d) wc wt wd cc ct cd rt rd ot od os
-          | Op.Write _ ->
-              let wc = if cached then wc + 1 else wc in
-              loop sc st sd wc (wt + 1) (wd ++ d) cc ct cd rt rd ot od os
-          | Op.Copy _ ->
-              let cc = if cached then cc + 1 else cc in
-              loop sc st sd wc wt wd cc (ct + 1) (cd ++ d) rt rd ot od os
-          | Op.Read _ ->
-              loop sc st sd wc wt wd cc ct cd (rt + 1) (rd ++ d) ot od os
-          | _ ->
-              loop sc st sd wc wt wd cc ct cd rt rd ot od os
-      in
-      loop
-        0 0 Time.Span.zero 0 0 Time.Span.zero 0 0 Time.Span.zero
-        0 Time.Span.zero 0 Time.Span.zero (Memo.ops m)
-    in
-    let ht, hd =
-      let c = Memo.reviver m in
-      Fpath.Map.cardinal (Reviver.file_hashes c),
-      Reviver.file_hash_dur c
-    in
-    let dur = Time.count (Memo.clock m)in
-    let cpu = Time.cpu_count (Memo.cpu_clock m) in
-    (Fmt.record @@
-     [ Fmt.field "spawns" (fun _ -> (sc, st, sd)) pp_op;
-       Fmt.field "writes" (fun _ -> (wc, wt, wd)) pp_op;
-       Fmt.field "copies" (fun _ -> (cc, ct, cd)) pp_op;
-       Fmt.field "reads" (fun _ -> (rt, rd)) pp_op_no_cache;
-       Fmt.field "all" (fun _ -> (ot, od)) pp_totals;
-       Fmt.field "hashes" (fun _ -> (ht, hd)) pp_totals;
-       Fmt.field "utime" (fun _ -> cpu) pp_utime;
-       Fmt.field "stime" (fun _ -> cpu) pp_stime;
-       Fmt.field "real" (fun _ -> dur) Time.Span.pp ]) ppf m
-
 end
 
 module Pager = struct

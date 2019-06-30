@@ -33,12 +33,13 @@ module Cli : sig
   (** The type for specifying output format details. *)
 
   val out_fmt :
-    ?short_opts:string list -> ?long_opts:string list -> unit ->
-    out_fmt Term.t
+    ?docs:string -> ?short_opts:string list -> ?long_opts:string list ->
+    unit -> out_fmt Term.t
   (** [out_fmt ~short_opts ~long_opts ()] are mutually exclusive options
       to specify short and long output format, without options this is
       [`Normal]. [short_opts] defaults to [["s"; "short"]] and
-      [long_opts] default to [["l"; "long"]]. *)
+      [long_opts] default to [["l"; "long"]]. [docs] is the manual section
+      in which options are documtend. *)
 end
 
 (** {!B0_std} configuration.
@@ -195,43 +196,6 @@ module Memo : sig
   (** [max_spawn jobs] determines a maximal number of spans. This is
       either, in order, [jobs] or {!B0_machine.logical_cpu_count} or
       [1]. *)
-
-  (** {1:build_feedback Build feedback} *)
-
-  val pp_never_ready : op_howto:Fpath.t Fmt.t -> Fpath.Set.t Fmt.t
-  (** [pp_never_reads ~op_howto] formats a failure indicating
-      the given set of files never became ready.
-
-      [op_howto] is prefixed before each file and should be a command
-      fragment to get information about which operation needed the file. *)
-
-  val log_feedback :
-    ?op_howto:B00.Op.t Fmt.t ->
-    show_spawn_ui:Log.level ->
-    show_success:Log.level ->
-    Format.formatter ->
-    [B00.Memo.feedback | B00.File_cache.feedback | B00.Exec.feedback] -> unit
-  (** [log_feedback ~show_spawn_ui ppf] is memo feedback that logs on
-      [ppf] depending on {!Log.level}. [show_spawn_ui] is the level at
-      which spawn's ui outputs get logged even if they are
-      successful. [show_success] is the level at which all successful
-      operations have their synopsis logged. Other than that operations
-      get logged according to {!Log.level} as follows:
-      {ul
-      {- {!Log.Quiet} logs nothing.}
-      {- {!Log.Error} and {!Log.Warning} only report failures.}
-      {- {!Log.Info} report failures and short successful spawn operations.}
-      {- {!Log.Debug} report all operations with all the information.}}
-
-      [op_howto] should format a way to get more information about an
-      operation, defaults to {!nop}.
-
-      {b Note.} This function does not use {!Log}'s functions to
-      report. That is the output doesn't go through {!Log}'s reporting
-      functions. *)
-
-  val pp_stats : B00.Memo.t Fmt.t
-  (** [pp_stats] formats statistics about the memoizer. *)
 end
 
 (** Pager interaction. *)

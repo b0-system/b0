@@ -626,10 +626,10 @@ module Op : sig
   (** {1:set_map Operation sets and map} *)
 
   (** Operation sets *)
-  module Set : Set.S with type elt := t
+  module Set : Set.S with type elt = t
 
   (** Operation maps *)
-  module Map : Map.S with type key := t
+  module Map : Map.S with type key = t
 end
 
 (** Build operation revivers.

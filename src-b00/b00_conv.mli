@@ -105,8 +105,21 @@ module Op : sig
 
   (** {1:fmt Formatters} *)
 
+  val pp_file_read : Fpath.t Fmt.t
+  val pp_file_write : Fpath.t Fmt.t
+  val pp_file_wait : Fpath.t Fmt.t
+  val pp_hash : Hash.t Fmt.t
+
   val pp_status : Op.status Fmt.t
   (** [pp_status] formats build operation statuses. *)
+
+  val pp_short_status : Op.t Fmt.t
+  (** [pp_short_status] formats {!Op.status} and {!Op.exec_revived}
+      as a single letter. *)
+
+  val pp_kind_short : Op.t Fmt.t
+  val pp_kind_micro : Op.t Fmt.t
+  val pp_header : Op.t Fmt.t
 
   val pp : Op.t Fmt.t
   (** [pp] formats a build operation. *)
@@ -114,13 +127,17 @@ module Op : sig
   val pp_short : Op.t Fmt.t
   (** [pp_short] formats a build operation on a single line. *)
 
-  val pp_did_not_write : (Op.t * Fpath.t list) Fmt.t
-  (** [pp_did_not_write] formats a build operation and the files
-      it failed to write. *)
+  val pp_short_with_ui : Op.t Fmt.t
+  (** [pp_short_with_stdo_ui] formats like {!pp_short} but also
+      a feedback UI if the operation has one. *)
 
-  val pp_spawn_status_fail : Op.t Fmt.t
-  (** [pp_spawn_status_fail] formats a spawn operation failure due to
-       exit result. *)
+  val pp_failed :
+    op_howto:B00.Op.t Fmt.t ->
+    (B00.Op.t * [< `Did_not_write of Fpath.t list ]) Fmt.t
+
+  val pp_short_log : Op.t Fmt.t
+  val pp_normal_log : Op.t Fmt.t
+  val pp_long_log : Op.t Fmt.t
 
   (** {1:bin_serial Binary serialization} *)
 
@@ -133,11 +150,41 @@ module Op : sig
 end
 
 module Memo : sig
+  (*
   val pp_feedback : Memo.feedback Fmt.t
   (** [pp_feedback] formats file cache feedback. *)
+*)
 
-  val stdo_feedback :
+  val pp_leveled_feedback :
+    ?sep:unit Fmt.t ->
+    ?op_howto:B00.Op.t Fmt.t -> show_op_ui:Log.level -> show_op:Log.level ->
+    level:Log.level ->
     [B00.Memo.feedback | B00.File_cache.feedback | B00.Exec.feedback] Fmt.t
+  (** [pp_leveled_feedback ~sep ~op_howto ~show_spawn_ui ~show_success ~level
+      ppf] formats memo feedback on [ppf] followed by [sep] iff something
+      is printed (defaults to {!Fmt.flush_nl}).
+      {ul
+      {- {!Log.Quiet} formats nothing}
+      {- {!Log.Error} and {!Log.Warning} only report build operation failures}
+      {- {!Log.Debug} report all operations with all the information.}}
+      besides for operations that execute without failure:
+      {ul
+      {- [show_op_ui] is the level at which any executed operation with a
+         feedback UI is logged with {!B00_conv.Op.pp_short_and_ui}}
+      {- [show_op] is the level at which any executed operation gets
+         logged with {!B00_conv.Op.pp_short_and_ui}}}
+      The formatter [op_howto] should format a way to got more information
+      about an operation, default to {!nop}. *)
+
+  val pp_never_ready : op_howto:Fpath.t Fmt.t -> Fpath.Set.t Fmt.t
+  (** [pp_never_reads ~op_howto] formats a failure indicating
+      the given set of files never became ready.
+
+      [op_howto] is prefixed before each file and should be a command
+      fragment to get information about which operation needed the file. *)
+
+  val pp_stats : B00.Memo.t Fmt.t
+  (** [pp_stats] formats statistics about the memoizer. *)
 end
 
 (*---------------------------------------------------------------------------

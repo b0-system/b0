@@ -112,6 +112,7 @@ module Fmt = struct
   type 'a t = Format.formatter -> 'a -> unit
 
   let flush ppf _ = Format.pp_print_flush ppf ()
+  let flush_nl ppf _ = Format.pp_print_newline ppf ()
   let nop ppf _ = ()
   let any fmt ppf _ = pf ppf fmt
   let using f pp_v ppf v = pp_v ppf (f v)
@@ -2169,6 +2170,9 @@ module Cmd = struct
   | Some t -> t
   | None when is_empty l -> invalid_arg "empty command line"
   | None -> Fmt.invalid_arg "cmd %s: tool parse error" (to_string l)
+
+  let pp_tool ppf t =
+    Fmt.tty_string [`Fg `Blue; `Bold] ppf (Filename.quote (Fpath.to_string t))
 
   (* Predicates *)
 
