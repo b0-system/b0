@@ -581,7 +581,7 @@ module Browser = struct
   (* Cli *)
 
   let browser_var = "BROWSER"
-  let browser ?docs ?(opts = ["b"; "browser"]) () =
+  let browser ?docs ?(opts = ["browser"]) () =
     let env = Arg.env_var browser_var in
     let doc =
       "The WWW browser command $(docv) to use. The value may be interpreted \

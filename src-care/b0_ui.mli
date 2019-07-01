@@ -360,7 +360,7 @@ module Browser : sig
   val browser : ?docs:string -> ?opts:string list -> unit -> Cmd.t option Term.t
   (** [browser] is an option and [BROWSER] environment variable to use
       with the [browser] argument of {!find}. [opts] are the cli
-      options and default to [["b"; "browser"]]. *)
+      options and default to [["browser"]]. *)
 
   val prefix :  ?docs:string -> ?opts:string list -> unit -> bool Term.t
   (** [prefix] is  option to use the with [prefix] argument of
