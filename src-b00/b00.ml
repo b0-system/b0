@@ -469,7 +469,7 @@ module File_cache = struct
     let pp =
       Fmt.record @@
       [ Fmt.field "unused" unused_keys pp_keys;
-        Fmt.field "total" all_keys pp_keys ]
+        Fmt.field " total" all_keys pp_keys ]
 
     let of_cache c =
       let rec loop k f b uk uf ub = function

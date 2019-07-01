@@ -57,7 +57,8 @@ let cmd =
     Term.default_exits
   in
   Term.(const show_uris $ B0_ui.B0_std.cli_setup () $
-        B0_ui.Browser.background () $ B0_ui.Browser.prefix () $
+        B0_ui.Browser.background ~opts:["g"; "background"] () $
+        B0_ui.Browser.prefix ~opts:["p"; "prefix"] () $
         B0_ui.Browser.browser ~opts:["b"; "browser"] () $ uris),
   Term.info "show-uri" ~doc ~sdocs:Manpage.s_common_options ~man ~exits
 

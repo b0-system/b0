@@ -141,11 +141,11 @@ module Op : sig
 
   (** {1:bin_serial Binary serialization} *)
 
-  val to_string : Op.t list -> string
-  (** [to_string ops] is a binary encoding of [ops]. *)
+  val list_to_string : Op.t list -> string
+  (** [list_to_string ops] is a binary encoding of [ops]. *)
 
-  val of_string : ?file:Fpath.t -> string -> (Op.t list, string) result
-  (** [of_string ops] is a binary decoding of a {!to_string} encoding.
+  val list_of_string : ?file:Fpath.t -> string -> (Op.t list, string) result
+  (** [lsit_of_string ops] is a binary decoding of a {!to_string} encoding.
       [file] is a filename to report errors (defaults to {!Os.File.dash}). *)
 end
 

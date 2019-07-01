@@ -124,10 +124,69 @@ module File_cache : sig
        If none is specified this is [`All]. *)
 end
 
+
+(** {!B00.Op} interaction. *)
+module Op : sig
+
+  val select :
+    reads:Fpath.t list ->
+    writes:Fpath.t list ->
+    ids:B00.Op.id list ->
+    hashes:string list ->
+    groups:string list -> B00.Op.t -> bool
+  (** [select ~reads ~writes ~ids ~hashes ~groups o] is [true]
+      iff [o] reads a file in [reads] or writes a file in [writes]
+      or has its id in [ids], or has its hash in [hashes] or has
+      is [group] in [groups] or if all these lists are empty. *)
+
+  val order :
+    by:[`Create | `Dur | `End | `Start] -> B00.Op.t list -> B00.Op.t list
+  (** [order ~by ops] orders [ops] by [by] time. *)
+
+  val read_write_indices :
+    B00.Op.t list -> B00.Op.Set.t Fpath.Map.t * B00.Op.Set.t Fpath.Map.t
+  (** [read_write_indices ops] is [reads, writes] with [reads] mapping
+      file path to operations that reads them and [writes] mapping file
+      paths to operations that write them. *)
+
+  val find_needs :
+    ?acc:B00.Op.Set.t -> recursive:bool -> writes:B00.Op.Set.t Fpath.Map.t ->
+    B00.Op.Set.t -> B00.Op.Set.t
+  (** [find_needs ~recursive ~writes ~acc ops] add to [acc] (defaults
+      to {!B00.Op.Set.empty}) the set of operations in the write index
+      [writes] that need to be executed for the set of operations
+      [ops] to be able to proceed. If [recursive] is [false] only direct
+      dependencies are reported. *)
+
+  val find_enables :
+    ?acc:B00.Op.Set.t -> recursive:bool ->
+    reads:B00.Op.Set.t Fpath.Map.t -> B00.Op.Set.t -> B00.Op.Set.t
+    (** [find_enables ~recursive ~writes ~acc ops] add to [acc]
+      (defaults to {!B00.Op.Set.empty}) the set of operations in the
+      read index [reads] that are enabled by the set of operations
+      [ops]. If [recursive] is [false] only direct dependencies are
+        reported. *)
+
+  val log_filter :
+    reads:Fpath.t list -> writes:Fpath.t list -> ids:B00.Op.id list ->
+    hashes:string list -> groups:string list -> needs:bool ->
+    enables:bool -> recursive:bool -> revived:bool option ->
+    order_by:[ `Create | `Dur | `End | `Start ] ->
+    B00.Op.t list -> B00.Op.t list
+
+  val log_filter_cli : (B00.Op.t list -> B00.Op.t list) Cmdliner.Term.t
+
+  type out_fmt = [`Long | `Normal | `Short | `Trace_event]
+  val log_out : out_fmt -> (out_fmt * (B00.Op.t list -> unit))
+  val log_out_fmt_cli :
+    ?docs:string -> unit -> (out_fmt * (B00.Op.t list -> unit)) Cmdliner.Term.t
+end
+
+
 (** {!B00.Memo} interaction. *)
 module Memo : sig
 
-  (** {1:dirs Specifying directories} *)
+  (** {1:dirs_files Specifying directories and files} *)
 
   val b0_dir_name : string
   (** [b0_dir_name] is ["_b0"] the default b0 directory name. *)
@@ -137,14 +196,21 @@ module Memo : sig
       in the [b0] directory. *)
 
   val trash_dir_name : string
-  (** [default_trash_dir] is [".trash"] the default trash directoy name
+  (** [trash_dir_name] is [".trash"] the default trash directoy name
       in the [b0] directory. *)
+
+  val log_file_name : string
+  (** [log_file_name] is [".log"] the default log file name in
+      the [b0] directory. *)
 
   val b0_dir_env : string
   (** [b0_dir_env] is ["B0_DIR"]. *)
 
   val cache_dir_env : string
   (** [b0_dir_env] is ["B0_CACHE_DIR"]. *)
+
+  val log_file_env : string
+  (** [b0_dir_env] is ["B0_LOG_FILE"]. *)
 
   val b0_dir :
     ?docs:string -> ?doc:string -> ?doc_none:string -> ?env:Cmdliner.Arg.env ->
@@ -161,11 +227,27 @@ module Memo : sig
          value, defaults to {!b0_dir_env}.}} *)
 
   val cache_dir :
-    ?docs:string -> ?doc:string -> ?doc_none:string -> ?env:Cmdliner.Arg.env ->
-    unit -> Fpath.t option Term.t
+    ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
+    ?env:Cmdliner.Arg.env -> unit -> Fpath.t option Term.t
   (** [cache_dir ~doc_none ~docs ~doc ~env] is a cli interface for specifying
       a b0 cache directory.
       {ul
+      {- [opts] are the cli options to specify it.}
+      {- [docs] is where the option is documented, defaults to
+         {!Manpage.s_common_options}}
+      {- [doc] is a doc string.}
+      {- [doc_none] describes how the value is determined if the term is
+         evaluates to [None].}
+      {- [env] is a variable that can be used to override the default
+         value, defaults to {!cache_dir_env}.}} *)
+
+  val log_file :
+    ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
+    ?env:Cmdliner.Arg.env -> unit -> Fpath.t option Term.t
+  (** [log_file ~doc_none ~docs ~doc ~env] is a cli interface for
+      specifing a b0 log file.
+      {ul
+      {- [opts] are the cli options to specify it.}
       {- [docs] is where the option is documented, defaults to
          {!Manpage.s_common_options}}
       {- [doc] is a doc string.}
@@ -186,6 +268,18 @@ module Memo : sig
       If [cache_dir] is [Some d] then this is [Fpath.(cwd // d)]. If [None]
       then this is [Fpath.(b0_dir / cache_dir)]. *)
 
+  val get_trash_dir :
+    cwd:Fpath.t -> b0_dir:Fpath.t -> trash_dir:Fpath.t option -> Fpath.t
+  (** [get_trash_dir ~cwd ~b0_dir ~trash_dir] dtermiens a trash directory.
+      If [trash_dir] is [Some d] then this is [Fpath.(cwd // d]. If
+      [None] then this is [Fpath.(b0_dir /trash_dir)]. *)
+
+  val get_log_file :
+    cwd:Fpath.t -> b0_dir:Fpath.t -> log_file:Fpath.t option -> Fpath.t
+  (** [get_log_file ~cwd ~b0_dir ~log_file] determines a log file.
+      If [log_file] is [Some f] then this is [Fpath.(cwd // f)]. If [None]
+      then this is [Fpath.(b0_dir /log_file)]. *)
+
   (** {1:build Build parameters} *)
 
   val jobs : ?docs:string -> ?env:Arg.env -> unit -> int option Term.t
@@ -196,6 +290,13 @@ module Memo : sig
   (** [max_spawn jobs] determines a maximal number of spans. This is
       either, in order, [jobs] or {!B0_machine.logical_cpu_count} or
       [1]. *)
+
+  (** {1:build_log Build log} *)
+
+  module Log : sig
+    val write_file : Fpath.t -> B00.Memo.t -> (unit, string) result
+    val read_file : Fpath.t -> (B00.Op.t list, string) result
+  end
 end
 
 (** Pager interaction. *)
@@ -329,12 +430,11 @@ module Browser : sig
   val prefix :  ?docs:string -> ?opts:string list -> unit -> bool Term.t
   (** [prefix] is  option to use the with [prefix] argument of
       {!show}. [opts] are the cli options and default to
-      [["p"; "prefix"]]. *)
+      [["prefix"]]. *)
 
   val background : ?docs:string -> ?opts:string list -> unit -> bool Term.t
   (** [background] is an option to use with the [background] argument
-      of [!show]. [opts] are the cli options and default to [["g";
-      "background"]] *)
+      of [!show]. [opts] are the cli options and default to [["background"]] *)
 
   (** {1:show Show URIs} *)
 

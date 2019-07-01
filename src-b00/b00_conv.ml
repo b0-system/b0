@@ -364,8 +364,8 @@ module Op = struct
       Time.Span.pp (B00.Op.exec_duration o)
 
   let pp_short ppf o =
-    Fmt.pf ppf "@[<h>%a%a %a@]"
-      pp_status_header (Op.status o) pp_header o pp_kind_short o
+    Fmt.pf ppf "@[<h>%a%a %a %a@]"
+      pp_status_header (Op.status o) pp_header o pp_kind_short o pp_op_hash o
 
   let pp_short_with_ui ppf o = match Op.kind o with
   | Op.Spawn s ->
@@ -398,24 +398,8 @@ module Op = struct
     Fmt.pf ppf "@[<v>%a@, @[<v>%a@]@, @[<v>%a@]@]"
       pp_header o pp_kind_full (Op.kind o) pp_op o
 
-  let pp_short_log ppf o =
-    Fmt.pf ppf "@[<h>%a %a %a@]" pp_header o pp_kind_micro o pp_op_hash o
-
-  let pp_normal_log ppf o =
-    let pp_normal ppf o =
-      Fmt.pf ppf "@[<h>%a%a %a %a@]"
-        pp_status_header (Op.status o) pp_header o pp_kind_short o pp_op_hash o
-    in
-    match Op.kind o with
-    | Op.Spawn s ->
-        begin match Op.Spawn.stdo_ui s with
-        | None -> pp_normal ppf o
-        | Some _ ->
-            Fmt.pf ppf "@[<v>@[<h>%a:@]@,%a@]"
-              pp_normal o (Spawn.pp_stdo_ui ~truncate:false) s
-        end
-    | _ -> pp_normal ppf o
-
+  let pp_short_log = pp_short
+  let pp_normal_log = pp_short_with_ui
   let pp_long_log = pp
 
   let pp_did_not_write ~op_howto ppf (o, fs) =
@@ -670,13 +654,13 @@ module Op = struct
       ~exec_revived ~status ~reads ~writes ~hash kind
 
   let magic = "b\x00\x00\x00"
-  let to_string ops =
+  let list_to_string ops =
     let b = Buffer.create (1024 * 1024) in
     Bin.enc_magic b magic;
     Bin.enc_list enc_op b ops;
     Buffer.contents b
 
-  let of_string ?(file = Os.File.dash) s =
+  let list_of_string ?(file = Os.File.dash) s =
     try
       let i = Bin.dec_magic s 0 magic in
       let i, ops = Bin.dec_list dec_op s i in
