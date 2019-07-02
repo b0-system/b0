@@ -12,7 +12,7 @@ module Cli = struct
   module Arg = struct
     let err_msg of_string s = Result.map_error (fun e -> `Msg e) (of_string s)
     let fpath = Arg.conv ~docv:"PATH" (err_msg Fpath.of_string, Fpath.pp_quoted)
-    let cmd = Arg.conv ~docv:"CMD" (err_msg Cmd.of_string, Cmd.dump)
+    let cmd = Arg.conv ~docv:"CMD" (err_msg Cmd.of_string, Cmd.pp_dump)
   end
 
   (* Specifying output formats *)
@@ -95,11 +95,11 @@ module B0_std = struct
     in
     let pp_env ppf = function
     | None -> ()
-    | Some env -> Fmt.pf ppf "%a@," (Fmt.list String.dump) env
+    | Some env -> Fmt.pf ppf "%a@," (Fmt.list String.pp_dump) env
     in
     fun pid env ~cwd cmd ->
-      Log.msg level
-        (fun m -> m ~header:(header pid) "@[<v>%a%a@]" pp_env env Cmd.dump cmd)
+      Log.msg level (fun m ->
+          m ~header:(header pid) "@[<v>%a%a@]" pp_env env Cmd.pp_dump cmd)
 
   let setup_log_spawns = function
   | Log.Quiet -> ()

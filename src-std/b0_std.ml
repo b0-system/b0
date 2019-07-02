@@ -847,7 +847,7 @@ module String = struct
   (* Formatting *)
 
   let pp = Fmt.string
-  let dump ppf s = Fmt.pf ppf "%S" s
+  let pp_dump ppf s = Fmt.pf ppf "%S" s
 
   (* Suggesting *)
 
@@ -1162,7 +1162,7 @@ module String = struct
   module Set = struct
     include Set.Make (String)
     let pp ?sep pp_elt = Fmt.iter ?sep iter pp_elt
-    let dump ppf ss = Fmt.pf ppf "@[<1>{%a}@]" (pp ~sep:Fmt.sp dump) ss
+    let pp_dump ppf ss = Fmt.pf ppf "@[<1>{%a}@]" (pp ~sep:Fmt.sp pp_dump) ss
   end
 
   module Map = struct
@@ -1182,14 +1182,14 @@ module String = struct
     | set -> add k (S.add v set) m
 
     let pp ?sep pp_binding = Fmt.iter_bindings ?sep iter pp_binding
-    let dump_str = dump
-    let dump pp_v ppf m =
+    let pp_dump_str = pp_dump
+    let pp_dump pp_v ppf m =
       let pp_binding ppf (k, v) =
-        Fmt.pf ppf "@[<1>(@[%a@],@ @[%a@])@]" dump_str k pp_v v
+        Fmt.pf ppf "@[<1>(@[%a@],@ @[%a@])@]" pp_dump_str k pp_v v
       in
       Fmt.pf ppf "@[<1>{%a}@]" (pp ~sep:Fmt.sp pp_binding) m
 
-    let dump_string_map ppf m = dump dump_str ppf m
+    let pp_dump_string_map ppf m = pp_dump pp_dump_str ppf m
   end
 
   (* Uniqueness *)
@@ -1279,10 +1279,10 @@ module Fpath = struct
 
   (* Errors *)
 
-  let err_invalid_seg s = Fmt.str "%a: Invalid path segment" String.dump s
-  let err_start s = Fmt.error "%a: Not a path" String.dump s
-  let err_null s = Fmt.error "%a: Not a path: has null bytes" String.dump s
-  let err_empty s = Fmt.error "%a: Not a path: is empty" String.dump s
+  let err_invalid_seg s = Fmt.str "%a: Invalid path segment" String.pp_dump s
+  let err_start s = Fmt.error "%a: Not a path" String.pp_dump s
+  let err_null s = Fmt.error "%a: Not a path: has null bytes" String.pp_dump s
+  let err_empty s = Fmt.error "%a: Not a path: is empty" String.pp_dump s
 
   (* Pct encoding *)
 
@@ -1739,7 +1739,7 @@ module Fpath = struct
   let pp_quoted ppf p = String.pp ppf (Filename.quote p)
   let pp_unquoted = String.pp
   let pp = pp_quoted
-  let dump = String.dump
+  let pp_dump = String.pp_dump
 
   (* Uniqueness *)
 
@@ -2116,11 +2116,11 @@ module Cmd = struct
           | acc -> Rseq acc
       in
       Ok (loop [] (skip_white s))
-    with Failure err -> Fmt.error "command line %a: %s" String.dump s err
+    with Failure err -> Fmt.error "command line %a: %s" String.pp_dump s err
 
   let to_string l = String.concat " " (List.map Filename.quote @@ to_list l)
   let pp ppf l = Fmt.pf ppf "@[%a@]" Fmt.(list ~sep:sp string) (to_list l)
-  let dump ppf l =
+  let pp_dump ppf l =
     let pp_arg ppf a = Fmt.string ppf (Filename.quote a) in
     Fmt.pf ppf "@[<h>%a@]" Fmt.(list ~sep:sp pp_arg) (to_list l)
 
@@ -3416,7 +3416,7 @@ module Os = struct
         | None -> Ok None
 
     let must_find ?search cmd = match Cmd.tool cmd with
-    | None -> Fmt.error "%a: No tool specified" Cmd.dump cmd
+    | None -> Fmt.error "%a: No tool specified" Cmd.pp_dump cmd
     | Some tool ->
         Result.bind (must_find_tool ?search tool) @@ fun tool ->
         Ok (match Cmd.set_tool tool cmd with None -> assert false | Some c -> c)

@@ -789,8 +789,8 @@ module String : sig
   val pp : string Fmt.t
   (** [pp ppf s] prints [s]'s bytes on [ppf]. *)
 
-  val dump : string Fmt.t
-  (** [dump ppf s] prints [s] as a syntactically valid OCaml string
+  val pp_dump : string Fmt.t
+  (** [pp_dump ppf s] prints [s] as a syntactically valid OCaml string
       on [ppf]. *)
 
   (** {1:unique Uniqueness} *)
@@ -1007,8 +1007,8 @@ module String : sig
         {!Format.pp_print_cut}). If the set is empty leaves [ppf]
         untouched. *)
 
-    val dump : t Fmt.t
-    (** [dump ppf ss] prints an unspecified representation of [ss] on
+    val pp_dump : t Fmt.t
+    (** [pp_dump ppf ss] prints an unspecified representation of [ss] on
         [ppf]. *)
   end
 
@@ -1050,12 +1050,12 @@ module String : sig
         {!Format.pp_print_cut}). If the map is empty leaves [ppf]
         untouched. *)
 
-    val dump : 'a Fmt.t -> 'a t Fmt.t
-    (** [dump pp_v ppf m] prints an unspecified representation of [m] on
+    val pp_dump : 'a Fmt.t -> 'a t Fmt.t
+    (** [pp_dump pp_v ppf m] prints an unspecified representation of [m] on
         [ppf] using [pp_v] to print the map codomain elements. *)
 
-    val dump_string_map : string t Fmt.t
-    (** [dump_string_map ppf m] prints an unspecified representation of the
+    val pp_dump_string_map : string t Fmt.t
+    (** [pp_dump_string_map ppf m] prints an unspecified representation of the
         string map [m] on [ppf]. *)
   end
 
@@ -1341,8 +1341,8 @@ module Fpath : sig
   val pp_unquoted : t Fmt.t
   (** [pp_unquoted p] prints path [p] on [ppf] using {!to_string}. *)
 
-  val dump : t Fmt.t
-  (** [dump ppf p] prints path [p] on [ppf] using {!String.dump}. *)
+  val pp_dump : t Fmt.t
+  (** [pp_dump ppf p] prints path [p] on [ppf] using {!String.dump}. *)
 
   (** {1:unique Uniqueness} *)
 
@@ -1373,9 +1373,9 @@ module Fpath : sig
     (** [pp_set ppf ss] prints an unspecified set-like representation
         of [ss] on [ppf] using {!Fpath.pp}. *)
 
-    val dump : t Fmt.t
-    (** [dump ppf ss] prints an unspecified representation of [ss] on
-        [ppf] with {!Fpath.dump}. *)
+    val pp_dump : t Fmt.t
+    (** [pp_dump ppf ss] prints an unspecified representation of [ss] on
+        [ppf] with {!Fpath.pp_dump}. *)
   end
 
   (** Path maps. *)
@@ -1415,8 +1415,8 @@ module Fpath : sig
         {!Format.pp_print_cut}). If the map is empty leaves [ppf]
         untouched. *)
 
-    val dump : 'a Fmt.t -> 'a t Fmt.t
-    (** [dump pp_v ppf m] prints an unspecified representation of [m] on
+    val pp_dump : 'a Fmt.t -> 'a t Fmt.t
+    (** [pp_dump pp_v ppf m] prints an unspecified representation of [m] on
         [ppf] using [pp_v] to print the map codomain elements. *)
   end
 
@@ -1806,8 +1806,8 @@ v}
   (** [pp ppf l] formats an unspecified representation of [l] on
       [ppf]. *)
 
-  val dump : t Fmt.t
-  (** [dump ppf l] dumps and unspecified representation of [l]
+  val pp_dump : t Fmt.t
+  (** [pp_dump ppf l] dumps and unspecified representation of [l]
       on [ppf]. *)
 
   (** {1:examples Examples}

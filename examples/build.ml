@@ -54,7 +54,7 @@ let () =
   Result.bind (Memo.memo ~cwd ~cache_dir ~trash_dir ()) @@ fun m ->
   hello m;
   Log.if_error_pp
-    (fun ppf fs -> Fmt.pf ppf "[<v>Never became ready:@,%a@]" Fpath.Set.dump fs)
+    (fun ppf fs -> Fmt.pf ppf "[<v>Never became ready:@,%a@]" Fpath.Set.pp_dump fs)
     ~use:()
     (Memo.finish m);
   Ok ()
