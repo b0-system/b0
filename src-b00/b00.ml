@@ -56,6 +56,45 @@ end = struct
   let length q = q.length
 end
 
+module Trash = struct
+  type t = { dir : Fpath.t }
+  let create dir = { dir }
+  let dir t = t.dir
+  let trash t p =
+    Result.map_error (fun e -> Fmt.str "trashing %a: %s" Fpath.pp_quoted p e) @@
+    Result.bind (Os.Path.exists p) @@ function
+    | false -> Ok ()
+    | true ->
+        let (* deal with races *) force = true and make_path = true in
+        Result.bind (Os.Path.tmp ~make_path ~dir:t.dir ~name:"%s" ()) @@
+        fun garbage -> Os.Path.rename ~force ~make_path ~src:p garbage
+
+  let err_delete t err =
+    Fmt.error "delete trash %a: %s" Fpath.pp_quoted t.dir err
+
+  let delete_blocking t =
+    Result.bind (Os.Path.delete ~recurse:true t.dir) @@ fun _ -> Ok ()
+
+  let delete_win32 ~block t = match block with
+  | true -> delete_blocking t
+  | false ->
+      let rm = Cmd.(arg "cmd.exe" % "/c" % "rd" % "/s" % "/q" %% path t.dir) in
+      match Os.Cmd.spawn rm (* XXX redirect stdio to Fpath.null ? *) with
+      | Ok _pid -> Ok ()
+      | Error e -> err_delete t e
+
+  let rec delete_posix ~block t = match block with
+  | true -> delete_blocking t
+  | false ->
+      try match Unix.fork () with
+      | 0 -> ignore (delete_blocking t); exit 0
+      | _pid -> Ok ()
+      with
+      | Unix.Unix_error (err, _, _) -> err_delete t (Unix.error_message err)
+
+  let delete = if Sys.win32 then delete_win32 else delete_posix
+end
+
 module File_cache = struct
   let uerr = Unix.error_message
   let err op err = Fmt.str "cache %s: %s" op err
@@ -500,6 +539,10 @@ module Op = struct
       copy_linenum : int option;
       mutable copy_result : (unit, string) result; }
 
+  type delete =
+    { delete_path : Fpath.t;
+      mutable delete_result : (unit, string) result; }
+
   type mkdir =
     { mkdir_dir : Fpath.t;
       mutable mkdir_result : (bool, string) result; }
@@ -536,6 +579,7 @@ module Op = struct
 
   type kind =
   | Copy of copy
+  | Delete of delete
   | Mkdir of mkdir
   | Read of read
   | Spawn of spawn
@@ -543,8 +587,9 @@ module Op = struct
   | Write of write
 
   let kind_name = function
-  | Copy _ -> "copy" | Mkdir _ -> "mkdir" | Read _ -> "read"
-  | Spawn _ -> "spawn" | Wait_files _ -> "wait-files" | Write _ -> "write"
+  | Copy _ -> "copy" | Delete _ -> "delete" | Mkdir _ -> "mkdir"
+  | Read _ -> "read" | Spawn _ -> "spawn" | Wait_files _ -> "wait-files"
+  | Write _ -> "write"
 
   type id = int
   type group = string
@@ -639,6 +684,25 @@ module Op = struct
     let set_exec_status o c end_time res =
       let status = match res with Ok _ -> Executed | Error _ -> Failed in
       set_result c res; set_status o status; set_exec_end_time o end_time
+  end
+
+  module Delete = struct
+    type t = delete
+    let v_op ~id ~group creation_time delete_path =
+      let delete_result = Error "not deleted" in
+      let d = { delete_path; delete_result } in
+      v_kind ~id ~group creation_time ~reads:[] ~writes:[] (Delete d)
+
+    let v ~path:delete_path ~result:delete_result =
+      { delete_path; delete_result }
+
+    let get o = match o.kind with Delete d -> d | _ -> assert false
+    let path d = d.delete_path
+    let result d = d.delete_result
+    let set_result d res = d.delete_result <- res
+    let set_exec_status o d end_time res =
+      let status = match res with Ok _ -> Executed | Error _ -> Failed in
+      set_result d res; set_status o status; set_exec_end_time o end_time
   end
 
   module Mkdir = struct
@@ -848,7 +912,7 @@ module Reviver = struct
       | Op.Spawn s -> hash_spawn r o s
       | Op.Write w -> hash_write r o w
       | Op.Copy c -> hash_copy r o c
-      | Op.Read _ | Op.Mkdir _ | Op.Wait_files _ -> Hash.nil
+      | Op.Delete _ | Op.Read _ | Op.Mkdir _ | Op.Wait_files _ -> Hash.nil
       end
     with Failure e -> Error e
 
@@ -908,7 +972,7 @@ module Reviver = struct
     | Op.Spawn s -> revive_spawn r o s
     | Op.Write w -> revive_write r o w
     | Op.Copy c -> revive_copy r o c
-    | Op.Read _ | Op.Mkdir _ | Op.Wait_files _ -> Ok None
+    | Op.Delete _ | Op.Read _ | Op.Mkdir _ | Op.Wait_files _ -> Ok None
 
   let record_spawn r o s =
     let spawn_meta = Op.Spawn.stdo_ui s, Op.Spawn.result s in
@@ -932,7 +996,7 @@ module Reviver = struct
   | Op.Spawn s -> record_spawn r o s
   | Op.Write w -> record_write r o w
   | Op.Copy c -> record_copy r o c
-  | Op.Read _ | Op.Mkdir _ | Op.Wait_files _ -> Ok true
+  | Op.Delete _ | Op.Read _ | Op.Mkdir _ | Op.Wait_files _ -> Ok true
 end
 
 module Guard = struct
@@ -1081,6 +1145,7 @@ module Exec = struct
     { clock : Time.counter;
       tmp_dir : Fpath.t;
       feedback : feedback -> unit;
+      trash : Trash.t;
       todo : Op.t Rqueue.t; (* Waiting for OS submission. *)
       collectable : Op.t Queue.t;
       to_spawn : Op.t Queue.t; (* [dequeued] from [todo] waiting to spawn. *)
@@ -1089,18 +1154,19 @@ module Exec = struct
       mutable spawns : (Os.Cmd.pid * Fpath.t option * Op.t) list; }
 
   let create
-      ?clock ?rand ?tmp_dir:tmp ?(feedback = fun _ -> ()) ~max_spawn ()
+      ?clock ?rand ?tmp_dir:tmp ?(feedback = fun _ -> ()) ~trash ~max_spawn ()
     =
     let clock = match clock with None -> Time.counter () | Some c -> c in
     let tmp_dir = match tmp with None -> Os.Dir.default_tmp () | Some t -> t in
     let todo = Rqueue.empty ?rand () in
     let collectable = Queue.create () in
     let to_spawn = Queue.create () in
-    { clock; tmp_dir; feedback; todo; collectable; to_spawn; max_spawn;
+    { clock; tmp_dir; feedback; trash; todo; collectable; to_spawn; max_spawn;
       spawn_count = 0; spawns = [] }
 
-  let clock c = c.clock
-  let tmp_dir c = c.tmp_dir
+  let clock e = e.clock
+  let tmp_dir e = e.tmp_dir
+  let trash e = e.trash
   let max_spawn c = c.max_spawn
   let incr_spawn_count e = e.spawn_count <- e.spawn_count + 1
   let decr_spawn_count e = e.spawn_count <- e.spawn_count - 1
@@ -1202,6 +1268,13 @@ module Exec = struct
     Op.Copy.set_exec_status o c (timestamp e) res;
     Queue.add o e.collectable
 
+  let exec_delete e o d =
+    Op.set_exec_start_time o (timestamp e);
+    e.feedback (`Exec_submit (None, o));
+    let res = Trash.trash e.trash (Op.Delete.path d) in
+    Op.Delete.set_exec_status o d (timestamp e) res;
+    Queue.add o e.collectable
+
   let exec_mkdir e o mk =
     Op.set_exec_start_time o (timestamp e);
     e.feedback (`Exec_submit (None, o));
@@ -1228,6 +1301,7 @@ module Exec = struct
   | Op.Write w -> exec_write e o w
   | Op.Copy c -> exec_copy e o c
   | Op.Mkdir mk -> exec_mkdir e o mk
+  | Op.Delete d -> exec_delete e o d
   | Op.Wait_files _ -> exec_wait_files e o
 
   let submit_spawns e =
@@ -1288,45 +1362,6 @@ module Exec = struct
     | exception Queue.Empty ->
         if not block || all_done e then None else
         (stir ~block:true e; Some (Queue.take e.collectable))
-end
-
-module Trash = struct
-  type t = { dir : Fpath.t }
-  let create dir = { dir }
-  let dir t = t.dir
-  let trash t p =
-    Result.map_error (fun e -> Fmt.str "trashing %a: %s" Fpath.pp_quoted p e) @@
-    Result.bind (Os.Path.exists p) @@ function
-    | false -> Ok ()
-    | true ->
-        let (* deal with races *) force = true and make_path = true in
-        Result.bind (Os.Path.tmp ~make_path ~dir:t.dir ~name:"%s" ()) @@
-        fun garbage -> Os.Path.rename ~force ~make_path ~src:p garbage
-
-  let err_delete t err =
-    Fmt.error "delete trash %a: %s" Fpath.pp_quoted t.dir err
-
-  let delete_blocking t =
-    Result.bind (Os.Path.delete ~recurse:true t.dir) @@ fun _ -> Ok ()
-
-  let delete_win32 ~block t = match block with
-  | true -> delete_blocking t
-  | false ->
-      let rm = Cmd.(arg "cmd.exe" % "/c" % "rd" % "/s" % "/q" %% path t.dir) in
-      match Os.Cmd.spawn rm (* XXX redirect stdio to Fpath.null ? *) with
-      | Ok _pid -> Ok ()
-      | Error e -> err_delete t e
-
-  let rec delete_posix ~block t = match block with
-  | true -> delete_blocking t
-  | false ->
-      try match Unix.fork () with
-      | 0 -> ignore (delete_blocking t); exit 0
-      | _pid -> Ok ()
-      with
-      | Unix.Unix_error (err, _, _) -> err_delete t (Unix.error_message err)
-
-  let delete = if Sys.win32 then delete_win32 else delete_posix
 end
 
 (* B01 *)
@@ -1483,7 +1518,6 @@ module Memo = struct
       guard : Guard.t;
       reviver : Reviver.t;
       exec : Exec.t;
-      trash : Trash.t;
       futs : Futs.t;
       mutable op_id : int;
       (* XXX The fact that continuations are not part of operations
@@ -1495,7 +1529,7 @@ module Memo = struct
 
   and t = { c : ctx; m : memo }
 
-  let create ?clock ?cpu_clock:cc ~feedback ~cwd env guard reviver exec trash =
+  let create ?clock ?cpu_clock:cc ~feedback ~cwd env guard reviver exec =
     let c = { group = "" } in
     let clock = match clock with None -> Time.counter () | Some c -> c in
     let cpu_clock = match cc with None -> Time.cpu_counter () | Some c -> c in
@@ -1504,7 +1538,7 @@ module Memo = struct
     let konts = Op.Map.empty in
     let ops = [] in
     let m = { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec;
-              trash; futs; op_id; konts; ops; }
+              futs; op_id; konts; ops; }
     in
     { c; m }
 
@@ -1537,9 +1571,9 @@ module Memo = struct
     let env = Env.v env in
     let guard = Guard.create () in
     let reviver = Reviver.create clock hash_fun cache in
-    let exec = Exec.create ~clock ~feedback:fb_exec ~max_spawn () in
     let trash = Trash.create trash_dir in
-    Ok (create ~clock ~feedback:fb_memo ~cwd env guard reviver exec trash)
+    let exec = Exec.create ~clock ~feedback:fb_exec ~trash ~max_spawn () in
+    Ok (create ~clock ~feedback:fb_memo ~cwd env guard reviver exec)
 
   let clock m = m.m.clock
   let cpu_clock m = m.m.cpu_clock
@@ -1547,7 +1581,7 @@ module Memo = struct
   let reviver m = m.m.reviver
   let guard m = m.m.guard
   let exec m = m.m.exec
-  let trash m = m.m.trash
+  let trash m = Exec.trash m.m.exec
   let hash_string m s = Reviver.hash_string m.m.reviver s
   let hash_file m f = Reviver.hash_file m.m.reviver f
   let ops m = m.m.ops
@@ -1655,7 +1689,7 @@ module Memo = struct
         assert (Futs.stir m.m.futs = None);
         Error undecided
 
-  let delete_trash ~block m = Trash.delete ~block m.m.trash
+  let delete_trash ~block m = Trash.delete ~block (trash m)
 
   (* Fibers *)
 
@@ -1697,14 +1731,17 @@ module Memo = struct
     let k m o = k (Result.get_ok @@ Op.Mkdir.result (Op.Mkdir.get o)) in
     add_op_kont m o k; add_op m o
 
-  let trash m p = fail_error (Trash.trash m.m.trash p)
+  let delete m p k =
+    let id = new_op_id m in
+    let o = Op.Delete.v_op ~id ~group:m.c.group (timestamp m) p in
+    let k m o = k () in
+    add_op_kont m o k; add_op m o
 
   (* FIXME better strategy to deal with builded tools. If the tool is a
      path check for readyness if not add it to the operations reads.
      I also suspect the tool lookup approach is not exactly right at
      the moment. Maybe this will clear up when we get the configuration
      story in. *)
-
   type _tool =
   { tool : Tool.t;
     tool_file : Fpath.t;

@@ -179,10 +179,12 @@ module Op = struct
   let file_read_color = [`Faint; `Fg `Magenta ]
   let file_write_color = [`Faint; `Fg `Green]
   let file_wait_color = [`Faint]
+  let file_delete_color = [`Faint; `Fg `Red]
   let hash_color = [`Fg `Cyan]
   let pp_file_read = Fmt.tty file_read_color Fpath.pp_quoted
   let pp_file_write = Fmt.tty file_write_color Fpath.pp_quoted
   let pp_file_wait = Fmt.tty file_wait_color Fpath.pp_quoted
+  let pp_file_delete = Fmt.tty file_delete_color Fpath.pp_quoted
   let pp_hash = Fmt.tty hash_color Hash.pp
   let pp_file_contents = Fmt.truncated ~max:150
   let pp_error_msg ppf e = Fmt.pf ppf "@[error: %s@]" e
@@ -287,6 +289,17 @@ module Op = struct
     let pp = Fmt.field "result" Op.Copy.result pp_result
   end
 
+  module Delete = struct
+    let pp_result ppf = function
+    | Error e -> pp_error_msg ppf e
+    | Ok () -> Fmt.string ppf "deleted"
+
+    let pp =
+      Fmt.concat @@
+      [ Fmt.field "path" Op.Delete.path pp_file_delete;
+        Fmt.field "result" Op.Delete.result pp_result ]
+  end
+
   module Mkdir = struct
     let pp_result ppf = function
     | Error e -> pp_error_msg ppf e
@@ -309,7 +322,8 @@ module Op = struct
 
   let kind_name_padded = function
   | Op.Spawn _ -> "spawn" | Read _ -> "read" | Write _ -> "write"
-  | Copy _ -> "copy" | Mkdir _ -> "mkdir" | Wait_files _ -> "wait"
+  | Copy _ -> "copy" | Delete _ -> "delet" | Mkdir _ -> "mkdir"
+  | Wait_files _ -> "wait"
 
   let pp_status ppf v = Fmt.string ppf @@ match v with
   | Op.Waiting -> "waiting" | Executed -> "executed"
@@ -320,31 +334,34 @@ module Op = struct
   | Op.Read r -> Read.pp ppf r
   | Op.Write w -> Write.pp ppf w
   | Op.Copy c -> Copy.pp ppf c
+  | Op.Delete d -> Delete.pp ppf d
   | Op.Mkdir m -> Mkdir.pp ppf m
   | Op.Wait_files _ -> ()
 
   let pp_kind_short ppf o = match Op.kind o with
-  | Op.Spawn s -> Spawn.pp_cmd ppf s
-  | Op.Read r -> pp_file_read ppf (Op.Read.file r)
-  | Op.Write w -> pp_file_write ppf (Op.Write.file w)
-  | Op.Mkdir m -> pp_file_write ppf (Op.Mkdir.dir m)
   | Op.Copy c ->
       Fmt.pf ppf "%a to %a"
         pp_file_read (Op.Copy.src c) pp_file_write (Op.Copy.dst c)
+  | Op.Delete d -> pp_file_delete ppf (Op.Delete.path d)
+  | Op.Mkdir m -> pp_file_write ppf (Op.Mkdir.dir m)
+  | Op.Read r -> pp_file_read ppf (Op.Read.file r)
+  | Op.Spawn s -> Spawn.pp_cmd ppf s
+  | Op.Write w -> pp_file_write ppf (Op.Write.file w)
   | Op.Wait_files _ ->
       Fmt.pf ppf "@[<v>%a@]" (Fmt.list pp_file_wait) (Op.reads o)
 
   let pp_kind_micro ppf o = match Op.kind o with
-    | Op.Copy c ->  pp_file_write ppf (Op.Copy.dst c)
-    | Op.Mkdir m -> pp_file_write ppf (Op.Mkdir.dir m)
-    | Op.Read r -> pp_file_read ppf (Op.Read.file r)
-    | Op.Spawn s -> Cmd.pp_tool ppf (Op.Spawn.tool s)
-    | Op.Wait_files w ->
-        begin match Op.reads o with
-        | [f] -> pp_file_wait ppf f
-        | _ -> Fmt.string ppf "*"
-        end
-    | Op.Write w -> pp_file_write ppf (Op.Write.file w)
+  | Op.Copy c ->  pp_file_write ppf (Op.Copy.dst c)
+  | Op.Delete d -> pp_file_delete ppf (Op.Delete.path d)
+  | Op.Mkdir m -> pp_file_write ppf (Op.Mkdir.dir m)
+  | Op.Read r -> pp_file_read ppf (Op.Read.file r)
+  | Op.Spawn s -> Cmd.pp_tool ppf (Op.Spawn.tool s)
+  | Op.Wait_files w ->
+      begin match Op.reads o with
+      | [f] -> pp_file_wait ppf f
+      | _ -> Fmt.string ppf "*"
+      end
+  | Op.Write w -> pp_file_write ppf (Op.Write.file w)
 
   let pp_status_header ppf = function
   | Op.Executed -> ()
@@ -485,6 +502,15 @@ module Op = struct
     let i, result = Bin.dec_result ~ok:Bin.dec_unit ~error:Bin.dec_string s i in
     i, Op.Copy.v ~src ~dst ~mode ~linenum ~result
 
+  let enc_delete b d =
+    Bin.enc_fpath b (Op.Delete.path d);
+    Bin.enc_result ~ok:Bin.enc_unit ~error:Bin.enc_string b (Op.Delete.result d)
+
+  let dec_delete s i =
+    let i, path = Bin.dec_fpath s i in
+    let i, result = Bin.dec_result ~ok:Bin.dec_unit ~error:Bin.dec_string s i in
+    i, Op.Delete.v ~path ~result
+
   let enc_mkdir b m =
     Bin.enc_fpath b (Op.Mkdir.dir m);
     Bin.enc_result ~ok:Bin.enc_bool ~error:Bin.enc_string b (Op.Mkdir.result m)
@@ -610,23 +636,25 @@ module Op = struct
     i, Op.Write.v ~stamp ~mode ~file ~data ~result
 
   let enc_kind b = function
-  | Op.Copy copy -> Bin.enc_byte b 0; enc_copy b copy
-  | Op.Mkdir mkdir -> Bin.enc_byte b 1; enc_mkdir b mkdir
-  | Op.Read read -> Bin.enc_byte b 2; enc_read b read
-  | Op.Spawn spawn -> Bin.enc_byte b 3; enc_spawn b spawn
-  | Op.Wait_files wait -> Bin.enc_byte b 4; enc_wait_files b wait
-  | Op.Write write -> Bin.enc_byte b 5; enc_write b write
+  | Op.Copy c -> Bin.enc_byte b 0; enc_copy b c
+  | Op.Delete d -> Bin.enc_byte b 1; enc_delete b d
+  | Op.Mkdir m -> Bin.enc_byte b 2; enc_mkdir b m
+  | Op.Read r -> Bin.enc_byte b 3; enc_read b r
+  | Op.Spawn s -> Bin.enc_byte b 4; enc_spawn b s
+  | Op.Wait_files w -> Bin.enc_byte b 5; enc_wait_files b w
+  | Op.Write w -> Bin.enc_byte b 6; enc_write b w
 
   let dec_kind s i =
     let kind = "Op.kind" in
     let next, b = Bin.dec_byte ~kind s i in
     match b with
     | 0 -> let i, c = dec_copy s next in i, Op.Copy c
-    | 1 -> let i, m = dec_mkdir s next in i, Op.Mkdir m
-    | 2 -> let i, r = dec_read s next in i, Op.Read r
-    | 3 -> let i, s = dec_spawn s next in i, Op.Spawn s
-    | 4 -> let i, w = dec_wait_files s next in i, Op.Wait_files w
-    | 5 -> let i, w = dec_write s next in i, Op.Write w
+    | 1 -> let i, d = dec_delete s next in i, Op.Delete d
+    | 2 -> let i, m = dec_mkdir s next in i, Op.Mkdir m
+    | 3 -> let i, r = dec_read s next in i, Op.Read r
+    | 4 -> let i, s = dec_spawn s next in i, Op.Spawn s
+    | 5 -> let i, w = dec_wait_files s next in i, Op.Wait_files w
+    | 6 -> let i, w = dec_write s next in i, Op.Write w
     | b -> Bin.err_byte ~kind i b
 
   let enc_op b o =

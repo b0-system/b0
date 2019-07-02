@@ -16,6 +16,35 @@
 
 open B0_std
 
+
+(** Trash and delete file hierarchies. *)
+module Trash : sig
+
+  type t
+  (** The type for trashes. *)
+
+  val create : Fpath.t -> t
+  (** [create dir] is a trash using directory [dir] for data
+      storage. [dir] may not exist. *)
+
+  val dir : t -> Fpath.t
+  (** [dir t] is the trash's directory (may not exist) *)
+
+  val trash : t -> Fpath.t -> (unit, string) result
+  (** [trash t p] trashes path [p] in [dir t]. If [p] does not exist
+      this has no effect. Note that [p] needs to be on the same device
+      as [dir t] and that the latter is created if needed. *)
+
+  val delete : block:bool -> t -> (unit, string) result
+  (** [delete ~block t] deletes [t]'s trash directory and its
+      content. If [block] is [true] the operation is synchronous and
+      blocks until the trash is effectively deleted; if [false] the
+      operation is spawn as a separate process.
+
+      {b Note.} On Windows [block:false] relies on [cmd.exe] being
+      available. *)
+end
+
 (** File caches.
 
     A file cache maps a key to a metadata hunk and an ordered list of
@@ -335,6 +364,41 @@ module Op : sig
         according to [result]. *)
   end
 
+  (** Path deletion. *)
+  module Delete : sig
+
+    (** {1:del Path deletion} *)
+
+    type t
+    (** The type for path deletion operations. *)
+
+    val v_op : id:id -> group:group -> Time.span -> Fpath.t -> op
+    (** [v_op] declares a path deletion operation, see the corresponding
+        accessors for the semantics of the various arguments. *)
+
+    val v : path:Fpath.t -> result:(unit, string) result -> t
+    (** [v] constructs a bare deletion operation. *)
+
+    val get : op -> t
+    (** [get o] is the delete operation [o]. Raises {!Invalid_argument} if [o]
+        is not a delete. *)
+
+    val path : t -> Fpath.t
+    (** [path d] is the path to delete. *)
+
+    val result : t -> (unit, string) result
+    (** [result d] is the result of the path deletion. *)
+
+    val set_result : t -> (unit, string) result -> unit
+    (** [set_result d res] sets the results of [d] to [res]. *)
+
+    val set_exec_status :
+      op -> t -> Time.span -> (unit, string) result -> unit
+    (** [set_exec_status o (get o) end_time result] sets the operation
+        result of [o]. In particular this set the operation status
+        according to [result]. *)
+  end
+
   (** Directory creation. *)
   module Mkdir : sig
 
@@ -575,6 +639,7 @@ module Op : sig
 
   type kind =
   | Copy of Copy.t
+  | Delete of Delete.t
   | Mkdir of Mkdir.t
   | Read of Read.t
   | Spawn of Spawn.t
@@ -803,10 +868,11 @@ module Exec : sig
 
   val create :
     ?clock:Time.counter -> ?rand:Random.State.t -> ?tmp_dir:Fpath.t ->
-    ?feedback:(feedback -> unit) -> max_spawn:int -> unit -> t
+    ?feedback:(feedback -> unit) -> trash:Trash.t -> max_spawn:int -> unit -> t
   (** [create ~clock ~rand ~tmp_dir ~notify_submit ~max_spawn] with:
       {ul
       {- [max_spawn] the maximal number of processes spawn simultaneously.}
+      {- [trash] is used to execute delete build operations.}
       {- [feedback] called with each {{!schedule}scheduled} operation
          when it gets submitted for execution. Default is a nop.}
       {- [tmp_dir] is a directory for temporary files,
@@ -821,6 +887,9 @@ module Exec : sig
 
   val tmp_dir : t -> Fpath.t
   (** [tmp_dir e] is [e]'s temporary directory. *)
+
+  val trash : t -> Trash.t
+  (** [trash e] is [e]'s trash. *)
 
   val max_spawn : t -> int
   (** [max_spawn e] is [e]'s maximal number of simultaneous process spawns. *)
@@ -839,34 +908,6 @@ module Exec : sig
       [block] is [true] and at least one incomplete operation exists
       in [e], the call blocks until an operation completes. If [block]
       is [true] and no operation exists in [e] [None] is returned. *)
-end
-
-(** Trash and delete file hierarchies. *)
-module Trash : sig
-
-  type t
-  (** The type for trashes. *)
-
-  val create : Fpath.t -> t
-  (** [create dir] is a trash using directory [dir] for data
-      storage. [dir] may not exist. *)
-
-  val dir : t -> Fpath.t
-  (** [dir t] is the trash's directory (may not exist) *)
-
-  val trash : t -> Fpath.t -> (unit, string) result
-  (** [trash t p] trashes path [p] in [dir t]. If [p] does not exist
-      this has no effect. Note that [p] needs to be on the same device
-      as [dir t] and that the latter is created if needed. *)
-
-  val delete : block:bool -> t -> (unit, string) result
-  (** [delete ~block t] deletes [t]'s trash directory and its
-      content. If [block] is [true] the operation is synchronous and
-      blocks until the trash is effectively deleted; if [false] the
-      operation is spawn as a separate process.
-
-      {b Note.} On Windows [block:false] relies on [cmd.exe] being
-      available. *)
 end
 
 (** {1:b01 B01} *)
@@ -1034,7 +1075,7 @@ module Memo : sig
   val create :
     ?clock:Time.counter -> ?cpu_clock:Time.cpu_counter ->
     feedback:(feedback -> unit) -> cwd:Fpath.t -> Env.t -> Guard.t ->
-    Reviver.t -> Exec.t -> Trash.t -> t
+    Reviver.t -> Exec.t -> t
 
   val memo :
     ?hash_fun:(module B0_std.Hash.T) -> ?env:B0_std.Os.Env.t ->
@@ -1159,9 +1200,9 @@ module Memo : sig
       which point file [dir] is ready and [created] indicates if the
       directory was created by the operation. *)
 
-  val trash : t -> Fpath.t -> unit
-  (** [trash m p] trashes path [p]. After the function returns path [p]
-      should be free to use. *)
+  val delete : t -> Fpath.t -> unit fiber
+  (** [delete m p] deletes (trashes in fact) path [p] and continues
+      with [k ()] when the path [p] is free to use. *)
 
   (** {1:spawn Memoizing tool spawns} *)
 

@@ -44,6 +44,11 @@ module Trace_event = struct
         |> Jsong.mem "dst" (Jsong.fpath (Op.Copy.dst c))
         |> Jsong.mem "mode" (Jsong.strf "%o" (Op.Copy.mode c))
         |> Jsong.mem "linenum" (Jsong.(option int) (Op.Copy.linenum c))
+    | Op.Delete d ->
+        obj
+        |> Jsong.mem "path" (Jsong.fpath (Op.Delete.path d))
+        |> Jsong.mem "result"
+          (str B00_conv.Op.Delete.pp_result Op.Delete.result d)
     | Op.Mkdir m ->
         obj
         |> Jsong.mem "dir" (Jsong.fpath (Op.Mkdir.dir m))

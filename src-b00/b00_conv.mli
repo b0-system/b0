@@ -88,6 +88,17 @@ module Op : sig
     (** [pp] formats a write. *)
   end
 
+  (** File delete *)
+  module Delete : sig
+    (** {1:fmt Formatters} *)
+
+    val pp_result : (unit, string) result Fmt.t
+    (** [pp_result] formats a write result. *)
+
+    val pp : Op.Delete.t Fmt.t
+    (** [pp] formats a deletion. *)
+  end
+
   (** Directory creation. *)
   module Mkdir : sig
 
