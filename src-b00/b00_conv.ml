@@ -42,14 +42,19 @@ module Bin = struct
     next, b
   [@@ocaml.inline]
 
-  let enc_unit b () = ()
-  let dec_unit s i = i, ()
+  let enc_unit b () = enc_byte b 0
+  let dec_unit s i =
+    let kind = "unit" in
+    let next, b = dec_byte ~kind s i in
+    match b with
+    | 0 -> next, ()
+    | b -> err_byte ~kind i b
 
   let enc_bool b bool = enc_byte b (if bool then 1 else 0)
   let dec_bool s i =
     let kind = "bool" in
     let next, b = dec_byte ~kind s i in
-    match b  with
+    match b with
     | 0 -> next, false
     | 1 -> next, true
     | b -> err_byte ~kind i b
@@ -390,8 +395,8 @@ module Op = struct
       Fmt.field "kind" (fun o -> Op.kind_name (Op.kind o)) Fmt.string;
       Fmt.field "reads" Op.reads pp_reads;
       Fmt.field "time-created" Op.creation_time pp_span;
-      Fmt.field "time-duration" dur pp_span;
       Fmt.field "time-start" Op.exec_start_time pp_span;
+      Fmt.field "time-duration" dur pp_span;
       Fmt.field "writes" Op.writes pp_writes; ]
 
   let pp ppf o =
