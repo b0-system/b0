@@ -8,7 +8,6 @@ open B0_std
 open B0_json
 open B00
 
-
 module Trace_event = struct
   let str pp get o = Jsong.strf "%a" pp (get o)
   let span_us s =
@@ -61,9 +60,9 @@ module Trace_event = struct
     |> Jsong.mem "kind" (Jsong.string (Op.kind_name (Op.kind o)))
     |> Jsong.mem "group" (Jsong.string (Op.group o))
     |> Jsong.mem "status" (str B00_conv.Op.pp_status Op.status o)
-    |> Jsong.mem "revived" (Jsong.bool (Op.exec_revived o))
+    |> Jsong.mem "revived" (Jsong.bool (Op.revived o))
     |> Jsong.mem "writes" (Jsong.(list fpath) (Op.writes o))
-    |> Jsong.mem "created" (span_us (Op.creation_time o))
+    |> Jsong.mem "time-created" (span_us (Op.time_created o))
     |> kind_mems
     |> Jsong.mem "reads" (Jsong.(list fpath) (Op.reads o))
     |> Jsong.mem "hash" (Jsong.string (Hash.to_hex (Op.hash o)))
@@ -76,8 +75,8 @@ module Trace_event = struct
     |> Jsong.mem "name" (id o)
     |> Jsong.mem "cat" (cat o)
     |> Jsong.mem "ph" (Jsong.string "X")
-    |> Jsong.mem "ts" (span_us (Op.exec_start_time o))
-    |> Jsong.mem "dur" (span_us (Op.exec_duration o))
+    |> Jsong.mem "ts" (span_us (Op.time_started o))
+    |> Jsong.mem "dur" (span_us (Op.duration o))
     |> Jsong.mem "pid" (Jsong.int 1)
     |> Jsong.mem "tid" (Jsong.int 1)
     |> Jsong.mem "args" (args o)

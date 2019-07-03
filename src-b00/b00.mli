@@ -275,25 +275,27 @@ module Op : sig
   val group : t -> string
   (** [group o] is the group of [o]. *)
 
-  val creation_time : t -> Time.span
-  (** [creation_time o] is [o]'s creation time. *)
+  val time_created : t -> Time.span
+  (** [time_created o] is [o]'s creation time. *)
 
-  val exec_start_time : t -> Time.span
-  (** [exec_start_time o] is [o]'s execution start time. This is
-      different from {!B0_std.Time.Span.zero} once the operation has
+  val time_started : t -> Time.span
+  (** [time_started o] is [o]'s execution start time. This is
+      different from {!B0_std.Time.Span.max} once the operation has
       been submitted for execution. *)
 
-  val exec_end_time : t -> Time.span
+  val time_ended : t -> Time.span
   (** [exec_end_time o] is [o]'s execution end time. This is different
-      from {!B0_std.Time.Span.zero} once the operation has been completed
+      from {!B0_std.Time.Span.max} once the operation has been completed
       and collected. *)
 
-  val exec_duration : t -> Time.span
-  (** [exec_duration] is the difference between {!exec_end_time} and
-      {!exec_start_time}. *)
+  val waited : t -> Time.span
+  (** [waited] is [o]'s waiting time between creation and execution. *)
 
-  val exec_revived : t -> bool
-  (** [exec_revived o] is [true] iff [o] was revived from a cache. *)
+  val duration : t -> Time.span
+  (** [duration] is [o]'s execution duration time. *)
+
+  val revived : t -> bool
+  (** [revived o] is [true] iff [o] was revived from a cache. *)
 
   val status : t -> status
   (** [status o] is [o] execution status. *)
@@ -428,12 +430,43 @@ module Op : sig
     val set_result : t -> (bool, string) result -> unit
     (** [set_result r res] sets the mkdir result of [r] to [res]. *)
 
-    val set_exec_status :
-      op -> t -> Time.span ->  (bool, string) result -> unit
+    val set_exec_status : op -> t -> Time.span -> (bool, string) result -> unit
     (** [set_exec_status o (get o) end_time result] sets the operation
         result of [o]. In particular this set the operation status
         according to [result]. *)
   end
+
+  (*
+  (** End-user notifications. *)
+  module Notify : sig
+
+    (** {1:mkdir Notification} *)
+
+    type t
+    (** The type for notification. *)
+
+    type kind = Warn | Progress | Info
+
+    val v_op : id:id -> group:group -> Time.span -> kind -> string -> op
+    (** [v_op] declares a notification operation see the corresponding
+        accessors in {!Notify} for the semantics of the various
+        arguments. *)
+
+    val v : kind:kind -> msg:string -> t
+    (** [v] constructs a abre notification operation. *)
+
+    val get : op -> t
+    (** [get o] is the notification [o]. Raise {!Invalid_argument} if [o]
+        is not a notification. *)
+
+    val kind : t -> kind
+    (** [kind] is the kind of notification. *)
+
+    val set_exec_status : op -> t -> Time.span -> unit
+    (** [set_exec_status o (get o) end_time] sets the result of
+        operation [o]. In particular this set the operation status. *)
+  end
+*)
 
   (** File reads. *)
   module Read : sig
@@ -444,7 +477,7 @@ module Op : sig
     (** The type for file read operations. *)
 
     val v_op : id:id -> group:group -> Time.span -> Fpath.t -> op
-    (** [v] declares a file read operation, see the corresponding
+    (** [v_op] declares a file read operation, see the corresponding
         accessors in {!Read} for the semantics of the various
         arguments. *)
 
@@ -452,7 +485,7 @@ module Op : sig
     (** [v] constructs a bare read operation. *)
 
     val get : op -> t
-    (** [get_read o] is the read [o]. Raise {!Invalid_argument} if [o]
+    (** [get o] is the read [o]. Raise {!Invalid_argument} if [o]
         is not a read. *)
 
     val file : t -> Fpath.t
@@ -648,8 +681,8 @@ module Op : sig
   (** The type for operation kinds. *)
 
   val v :
-    id -> group:group -> creation_time:Time.span -> exec_start_time:Time.span ->
-    exec_end_time:Time.span -> exec_revived:bool -> status:status ->
+    id -> group:group -> time_created:Time.span -> time_started:Time.span ->
+    duration:Time.span -> revived:bool -> status:status ->
     reads:Fpath.t list -> writes:Fpath.t list -> hash:Hash.t -> kind -> t
 
   val kind_name : kind -> string
@@ -666,14 +699,14 @@ module Op : sig
 
   (** {1:upd Updating the build operation} *)
 
-  val set_exec_start_time : t -> Time.span -> unit
-  (** [exec_start_time o t] sets [o]'s execution start time to [t]. *)
+  val set_time_started : t -> Time.span -> unit
+  (** [set_time_started o t] sets [o]'s execution start time to [t]. *)
 
-  val set_exec_end_time : t -> Time.span -> unit
-  (** [set_exec_end_time o t] sets [o]'s execution end time to [s]. *)
+  val set_time_ended : t -> Time.span -> unit
+  (** [set_time_ended o t] sets [o]'s execution end time to [s]. *)
 
-  val set_exec_revived : t -> bool -> unit
-  (** [set_exec_revived o b] sets [o]'s cache revival status to [b]. *)
+  val set_revived : t -> bool -> unit
+  (** [set_revived o b] sets [o]'s cache revival status to [b]. *)
 
   val set_status : t -> status -> unit
   (** [set_status o s] sets the execution status to [s]. *)
@@ -868,10 +901,10 @@ module Exec : sig
 
   val create :
     ?clock:Time.counter -> ?rand:Random.State.t -> ?tmp_dir:Fpath.t ->
-    ?feedback:(feedback -> unit) -> trash:Trash.t -> max_spawn:int -> unit -> t
-  (** [create ~clock ~rand ~tmp_dir ~notify_submit ~max_spawn] with:
+    ?feedback:(feedback -> unit) -> trash:Trash.t -> jobs:int -> unit -> t
+  (** [create ~clock ~rand ~tmp_dir ~notify_submit ~jobs] with:
       {ul
-      {- [max_spawn] the maximal number of processes spawn simultaneously.}
+      {- [jobs] the maximal number of processes spawn simultaneously.}
       {- [trash] is used to execute delete build operations.}
       {- [feedback] called with each {{!schedule}scheduled} operation
          when it gets submitted for execution. Default is a nop.}
@@ -891,8 +924,8 @@ module Exec : sig
   val trash : t -> Trash.t
   (** [trash e] is [e]'s trash. *)
 
-  val max_spawn : t -> int
-  (** [max_spawn e] is [e]'s maximal number of simultaneous process spawns. *)
+  val jobs : t -> int
+  (** [jobs e] is [e]'s maximal number of simultaneous process spawns. *)
 
   (** {1:schedcollect Scheduling and collecting operations} *)
 
@@ -1080,13 +1113,13 @@ module Memo : sig
   val memo :
     ?hash_fun:(module B0_std.Hash.T) -> ?env:B0_std.Os.Env.t ->
     ?cwd:B0_std.Fpath.t -> ?cache_dir:B0_std.Fpath.t ->
-    ?trash_dir:B0_std.Fpath.t -> ?max_spawn:int ->
+    ?trash_dir:B0_std.Fpath.t -> ?jobs:int ->
     ?feedback:([feedback | File_cache.feedback | Exec.feedback] -> unit) ->
     unit -> (t, string) result
   (** [memo] is a simpler {!create}
       {ul
       {- [hash_fun] defaults to {!Op_cache.create}'s default.}
-      {- [max_spawn] defaults to {!Exec.create}'s default.}
+      {- [jobs] defaults to {!Exec.create}'s default.}
       {- [env] defaults to {!Os.Env.current}}
       {- [cwd] defaults to {!Os.Dir.cwd}}
       {- [cache_dir] defaults to [Fpath.(cwd / "_b0" / ".cache")]}

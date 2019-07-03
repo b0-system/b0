@@ -140,7 +140,7 @@ module Op : sig
       is [group] in [groups] or if all these lists are empty. *)
 
   val order :
-    by:[`Create | `Dur | `End | `Start] -> B00.Op.t list -> B00.Op.t list
+    by:[`Create | `Dur | `Wait | `Start] -> B00.Op.t list -> B00.Op.t list
   (** [order ~by ops] orders [ops] by [by] time. *)
 
   val read_write_indices :
@@ -171,7 +171,7 @@ module Op : sig
     reads:Fpath.t list -> writes:Fpath.t list -> ids:B00.Op.id list ->
     hashes:string list -> groups:string list -> needs:bool ->
     enables:bool -> recursive:bool -> revived:bool option ->
-    order_by:[ `Create | `Dur | `End | `Start ] ->
+    order_by:[ `Create | `Dur | `Wait | `Start ] ->
     B00.Op.t list -> B00.Op.t list
 
   val log_filter_cli : (B00.Op.t list -> B00.Op.t list) Cmdliner.Term.t
@@ -286,8 +286,8 @@ module Memo : sig
   (** [jobs] is a cli interface for specifying the maximal number of
       commands to spawn concurrently. *)
 
-  val max_spawn : jobs:int option -> unit -> int
-  (** [max_spawn jobs] determines a maximal number of spans. This is
+  val find_jobs : jobs:int option -> unit -> int
+  (** [fin_jobs jobs] determines a maximal number of spans. This is
       either, in order, [jobs] or {!B0_machine.logical_cpu_count} or
       [1]. *)
 

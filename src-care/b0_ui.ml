@@ -221,12 +221,12 @@ module Op = struct
   let order ~by ops =
     let order_by_field cmp f o0 o1 = cmp (f o0) (f o1) in
     let order = match by with
-    | `Create -> order_by_field Time.Span.compare B00.Op.creation_time
-    | `Start -> order_by_field Time.Span.compare B00.Op.exec_start_time
-    | `End -> order_by_field Time.Span.compare B00.Op.exec_end_time
+    | `Create -> order_by_field Time.Span.compare B00.Op.time_created
+    | `Start -> order_by_field Time.Span.compare B00.Op.time_started
+    | `Wait -> order_by_field Time.Span.compare B00.Op.waited
     | `Dur ->
         let rev_compare t0 t1 = Time.Span.compare t1 t0 in
-        order_by_field rev_compare B00.Op.exec_duration
+        order_by_field rev_compare B00.Op.duration
     in
     List.sort order ops
 
@@ -288,7 +288,7 @@ module Op = struct
     let sel = match revived with
     | None -> B00.Op.Set.elements sel
     | Some revived ->
-        let add_op o acc = match B00.Op.exec_revived o = revived with
+        let add_op o acc = match B00.Op.revived o = revived with
         | true -> o :: acc | false -> acc
         in
         B00.Op.Set.fold add_op sel []
@@ -299,7 +299,7 @@ module Op = struct
     let open Cmdliner in
     let order_by =
       let order =
-        [ "create", `Create; "start", `Start; "end", `End; "dur", `Dur; ]
+        [ "create", `Create; "start", `Start; "wait", `Wait; "dur", `Dur; ]
       in
       let doc =
         Fmt.str "Order by $(docv). $(docv) must be %s time."
@@ -476,7 +476,7 @@ module Memo = struct
     let docv = "COUNT" in
     Arg.(value & opt (some int) None & info ["j"; "jobs"] ?env ~doc ?docs ~docv)
 
-  let max_spawn ~jobs () = match jobs with
+  let find_jobs ~jobs () = match jobs with
   | Some max -> max
   | None ->
       let cpu_count = B0_machine.logical_cpu_count () in

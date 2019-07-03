@@ -188,6 +188,9 @@ module Op = struct
   let pp_hash = Fmt.tty hash_color Hash.pp
   let pp_file_contents = Fmt.truncated ~max:150
   let pp_error_msg ppf e = Fmt.pf ppf "@[error: %s@]" e
+  let pp_subfield s f pp =
+    Fmt.field ~label:(Fmt.tty_string [`Faint; `Fg `Yellow]) s f pp
+
 
   module Spawn = struct
 
@@ -245,16 +248,20 @@ module Op = struct
     let pp =
       let pp_env = Fmt.(vbox @@ list string) in
       let pp_opt_path = Fmt.(option ~none:none) Fpath.pp_quoted in
-      Fmt.record @@
+      let pp_stdio =
+        Fmt.concat ~sep:Fmt.sp @@
+        [ pp_subfield "stdin" Op.Spawn.stdin pp_opt_path;
+          pp_subfield "stderr" Op.Spawn.stderr pp_stdo;
+          pp_subfield "stdout" Op.Spawn.stdout pp_stdo; ]
+      in
+      Fmt.concat @@
       [ Fmt.field "cmd" Fmt.id pp_cmd;
+        Fmt.field "result" Op.Spawn.result pp_result;
+        Fmt.field "stdo-ui" Fmt.id (pp_stdo_ui ~truncate:false);
         Fmt.field "cwd" Op.Spawn.cwd Fpath.pp_quoted;
         Fmt.field "env" Op.Spawn.env pp_env;
         Fmt.field "relevant-env" Op.Spawn.relevant_env pp_env;
-        Fmt.field "result" Op.Spawn.result pp_result;
-        Fmt.field "stderr" Op.Spawn.stderr pp_stdo;
-        Fmt.field "stdin" Op.Spawn.stdin pp_opt_path;
-        Fmt.field "stdo-ui" Fmt.id (pp_stdo_ui ~truncate:false);
-        Fmt.field "stdout" Op.Spawn.stdout pp_stdo;
+        Fmt.field "stdio" Fmt.id pp_stdio;
         Fmt.field "success-exits" Op.Spawn.success_exits pp_success_exits; ]
   end
 
@@ -363,31 +370,25 @@ module Op = struct
       end
   | Op.Write w -> pp_file_write ppf (Op.Write.file w)
 
-  let pp_status_header ppf = function
-  | Op.Executed -> ()
-  | Op.Failed -> Fmt.pf ppf "[%a]" (Fmt.tty_string [`Fg `Red]) "FAILED"
-  | Op.Aborted -> Fmt.pf ppf "[%a]" (Fmt.tty_string [`Fg `Red]) "ABORTED"
-  | Op.Waiting -> Fmt.pf ppf "[waiting]"
-
   let pp_short_status ppf o = match Op.status o with
   | Op.Executed ->
-      begin match Op.exec_revived o with
+      begin match Op.revived o with
       | true -> Fmt.tty_string [`Fg `Magenta; `Faint ] ppf "R"
       | false -> Fmt.tty_string [`Fg `Magenta;] ppf "E"
       end
-  | Op.Failed -> Fmt.tty_string [`Fg `Red] ppf "F"
-  | Op.Aborted -> Fmt.tty_string [`Fg `Red] ppf "A"
+  | Op.Failed -> Fmt.tty_string [`Fg `Red] ppf "FAILED"
+  | Op.Aborted -> Fmt.tty_string [`Faint; `Fg `Red] ppf "ABORTED"
   | Op.Waiting -> Fmt.tty_string [`Fg `Cyan] ppf "W"
 
   let pp_header ppf o =
     Fmt.pf ppf "[%a %03d %a %a]"
       pp_short_status o (Op.id o) (Fmt.tty_string [`Fg `Green])
       (kind_name_padded (Op.kind o))
-      Time.Span.pp (B00.Op.exec_duration o)
+      Time.Span.pp (B00.Op.duration o)
 
   let pp_short ppf o =
-    Fmt.pf ppf "@[<h>%a%a %a %a@]"
-      pp_status_header (Op.status o) pp_header o pp_kind_short o pp_op_hash o
+    Fmt.pf ppf "@[<h>%a %a %a@]"
+      pp_header o pp_kind_short o pp_op_hash o
 
   let pp_short_with_ui ppf o = match Op.kind o with
   | Op.Spawn s ->
@@ -399,26 +400,31 @@ module Op = struct
       end
   | _ -> pp_short ppf o
 
-  let pp_op =
-    let pp_span ppf s =
-      Fmt.pf ppf "%a (%ans)" Time.Span.pp s Time.Span.pp_ns s
-    in
+  let pp =
+    let pp_span = Time.Span.pp in
     let pp_reads = Fmt.braces (Fmt.list pp_file_read) in
     let pp_writes = Fmt.braces (Fmt.list pp_file_write) in
-    let dur o = Time.Span.abs_diff (Op.exec_end_time o) (Op.exec_start_time o)in
-    Fmt.concat @@
-    [ Fmt.field "group" Op.group Fmt.string;
-      Fmt.field "hash" Op.hash pp_hash;
-      Fmt.field "kind" (fun o -> Op.kind_name (Op.kind o)) Fmt.string;
+    let pp_timings =
+      let wait o = Time.Span.abs_diff (Op.time_created o) (Op.time_started o) in
+      Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
+      [ pp_subfield "duration" Op.duration pp_span;
+        pp_subfield "created" Op.time_created pp_span;
+        pp_subfield "started" Op.time_started pp_span;
+        pp_subfield "waited" wait pp_span; ]
+    in
+    let pp_caching =
+      Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
+      [ pp_subfield "hash" Op.hash pp_hash;
+        pp_subfield "revived" Op.revived Fmt.bool ]
+    in
+    Fmt.vbox ~indent:1 @@ Fmt.concat [
+      pp_header;
+      Fmt.field "group" Op.group Fmt.string;
+      Fmt.using Op.kind pp_kind_full;
+      Fmt.field "caching" Fmt.id pp_caching;
+      Fmt.field "timings" Fmt.id pp_timings;
       Fmt.field "reads" Op.reads pp_reads;
-      Fmt.field "time-created" Op.creation_time pp_span;
-      Fmt.field "time-start" Op.exec_start_time pp_span;
-      Fmt.field "time-duration" dur pp_span;
-      Fmt.field "writes" Op.writes pp_writes; ]
-
-  let pp ppf o =
-    Fmt.pf ppf "@[<v>%a@, @[<v>%a@]@, @[<v>%a@]@]"
-      pp_header o pp_kind_full (Op.kind o) pp_op o
+      Fmt.field "writes" Op.writes pp_writes ]
 
   let pp_short_log = pp_short
   let pp_normal_log = pp_short_with_ui
@@ -660,10 +666,10 @@ module Op = struct
   let enc_op b o =
     Bin.enc_int b (Op.id o);
     Bin.enc_string b (Op.group o);
-    enc_time_span b (Op.creation_time o);
-    enc_time_span b (Op.exec_start_time o);
-    enc_time_span b (Op.exec_end_time o);
-    Bin.enc_bool b (Op.exec_revived o);
+    enc_time_span b (Op.time_created o);
+    enc_time_span b (Op.time_started o);
+    enc_time_span b (Op.duration o);
+    Bin.enc_bool b (Op.revived o);
     enc_status b (Op.status o);
     Bin.enc_list Bin.enc_fpath b (Op.reads o);
     Bin.enc_list Bin.enc_fpath b (Op.writes o);
@@ -674,17 +680,17 @@ module Op = struct
   let dec_op s i =
     let i, id = Bin.dec_int s i in
     let i, group = Bin.dec_string s i in
-    let i, creation_time = dec_time_span s i in
-    let i, exec_start_time = dec_time_span s i in
-    let i, exec_end_time = dec_time_span s i in
-    let i, exec_revived = Bin.dec_bool s i in
+    let i, time_created = dec_time_span s i in
+    let i, time_started = dec_time_span s i in
+    let i, duration = dec_time_span s i in
+    let i, revived = Bin.dec_bool s i in
     let i, status = dec_status s i in
     let i, reads = Bin.dec_list Bin.dec_fpath s i in
     let i, writes = Bin.dec_list Bin.dec_fpath s i in
     let i, hash = dec_hash s i in
     let i, kind = dec_kind s i in
-    i, Op.v id ~group ~creation_time ~exec_start_time ~exec_end_time
-      ~exec_revived ~status ~reads ~writes ~hash kind
+    i, Op.v id ~group ~time_created ~time_started ~duration ~revived
+      ~status ~reads ~writes ~hash kind
 
   let magic = "b\x00\x00\x00"
   let list_to_string ops =
@@ -792,19 +798,17 @@ module Memo = struct
       let rec loop sc st sd wc wt wd cc ct cd rt rd ot od = function
       | [] -> sc, st, sd, wc, wt, wd, cc, ct, cd, rt, rd, ot, od
       | o :: os ->
-          let cached = Op.exec_revived o in
-          let d = Op.exec_duration o in
-          let ot = ot + 1 in
-          let od = od ++ d in
+          let revived = Op.revived o and d = Op.duration o in
+          let ot = ot + 1 and od = od ++ d in
           match Op.kind o with
           | Op.Spawn _ ->
-              let sc = if cached then sc + 1 else sc in
+              let sc = if revived then sc + 1 else sc in
               loop sc (st + 1) (sd ++ d) wc wt wd cc ct cd rt rd ot od os
           | Op.Write _ ->
-              let wc = if cached then wc + 1 else wc in
+              let wc = if revived then wc + 1 else wc in
               loop sc st sd wc (wt + 1) (wd ++ d) cc ct cd rt rd ot od os
           | Op.Copy _ ->
-              let cc = if cached then cc + 1 else cc in
+              let cc = if revived then cc + 1 else cc in
               loop sc st sd wc wt wd cc (ct + 1) (cd ++ d) rt rd ot od os
           | Op.Read _ ->
               loop sc st sd wc wt wd cc ct cd (rt + 1) (rd ++ d) ot od os

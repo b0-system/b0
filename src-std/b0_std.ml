@@ -1904,6 +1904,7 @@ module Time = struct
     type t = span
     let zero = 0L
     let one = 1L
+    let max = -1L
     let add = Int64.add
     let abs_diff s0 s1 = match uint64_compare s0 s1 < 0 with
     | true ->  Int64.sub s1 s0

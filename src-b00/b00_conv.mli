@@ -116,6 +116,9 @@ module Op : sig
 
   (** {1:fmt Formatters} *)
 
+
+  (** FIXME streamline API here. *)
+
   val pp_file_read : Fpath.t Fmt.t
   val pp_file_write : Fpath.t Fmt.t
   val pp_file_wait : Fpath.t Fmt.t

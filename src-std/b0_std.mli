@@ -1561,6 +1561,9 @@ module Time : sig
     val one : span
     (** [one] is a span of 1ns. *)
 
+    val max : span
+    (** [max_span] is a span of [2^64-1]ns. *)
+
     val add : span -> span -> span
     (** [add s0 s1] is [s0] + [s1]. {b Warning.} Rolls over on overflow. *)
 
