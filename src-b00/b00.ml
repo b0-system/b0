@@ -572,7 +572,7 @@ module Op = struct
     { write_stamp : string;
       write_mode : int;
       write_file : Fpath.t;
-      write_data : unit -> (string, string) result;
+      mutable write_data : unit -> (string, string) result;
       mutable write_result : (unit, string) result; }
 
   (* Operations *)
@@ -818,12 +818,14 @@ module Op = struct
     let file w = w.write_file
     let data w = w.write_data
     let result w = w.write_result
+    let write_data_nop _ = Error "nothing to writes (assert false)"
+    let set_write_data w d = w.write_data <- d
     let set_result w res = w.write_result <- res
     let set_exec_status o w end_time res =
       let status = match res with Ok _ -> Executed | Error _ -> Failed in
-      set_result w res; set_status o status; set_exec_end_time o end_time
+      set_write_data w write_data_nop; set_result w res; set_status o status;
+      set_exec_end_time o end_time
   end
-
 
   module T = struct type nonrec t = t let compare = compare end
   module Set = Set.Make (T)
