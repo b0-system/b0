@@ -3219,17 +3219,18 @@ module Os = struct
 
     let home_dir = "user"
     let home_var = "HOME"
+    let home_win32_var = "%HomePath%"
     let user () =
-      let home_env () = match fpath_of_env_var home_dir home_var with
+      let home_env home_var = match fpath_of_env_var home_dir home_var with
       | Some r -> r
       | None -> err_dir home_dir "%s environment variable is undefined" home_var
       in
-      if Sys.win32 then home_env () else
+      if Sys.win32 then home_env home_win32_var else
       match Fpath.of_string (Unix.getpwuid (Unix.getuid ())).Unix.pw_dir with
       | Ok _ as v -> v
-      | Error _ -> home_env ()
-      | exception Not_found -> home_env ()
-      | exception Unix.Unix_error (e, _, _) -> home_env ()
+      | Error _ -> home_env home_var
+      | exception Not_found -> home_env home_var
+      | exception Unix.Unix_error (e, _, _) -> home_env home_var
 
     let home_fallback dir sub = match user () with
     | Error e -> err_dir dir "%s" e

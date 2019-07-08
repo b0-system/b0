@@ -2403,8 +2403,9 @@ module Os : sig
     val user : unit -> (Fpath.t, string) result
     (** [user ()] is the home directory of the user executing the
         process.  Determined by consulting [passwd] database with the
-        user if of the process. If this fails or on Windows falls back
-        to parse a path from the [HOME] environment variables. *)
+        user if of the process. If this fails falls back to parse
+        a path from the [HOME] environment variables. On Windows
+        parses a path from the [%HomePath%] environment variable. *)
 
     val config : unit -> (Fpath.t, string) result
     (** [config ()] is the directory used to store user-specific program
