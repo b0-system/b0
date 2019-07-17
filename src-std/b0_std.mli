@@ -46,7 +46,8 @@ module Tty : sig
 
   type style =
   [ `Bold | `Faint | `Italic | `Underline | `Blink of [ `Slow | `Rapid ]
-  | `Reverse | `Fg of color | `Bg of color ]
+  | `Reverse | `Fg of [ color | `Hi of color ]
+  | `Bg of [ color | `Hi of color ] ]
   (** The type for ANSI styles. *)
 
   val styled_str : cap -> style list -> string -> string

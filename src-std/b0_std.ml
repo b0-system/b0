@@ -34,16 +34,18 @@ module Tty = struct
   [ `Default | `Black | `Red | `Green | `Yellow | `Blue | `Magenta | `Cyan
   | `White ]
 
-  let sgr_base_int_of_color = function
+  let rec sgr_base_int_of_color = function
   | `Black -> 0 | `Red -> 1 | `Green -> 2 | `Yellow -> 3  | `Blue -> 4
   | `Magenta -> 5 | `Cyan -> 6 | `White -> 7 | `Default -> 9
+  | `Hi (#color as c) -> 60 + sgr_base_int_of_color c
 
   let sgr_of_fg_color c = Printf.sprintf "%d" (30 + sgr_base_int_of_color c)
   let sgr_of_bg_color c = Printf.sprintf "%d" (40 + sgr_base_int_of_color c)
 
   type style =
   [ `Bold | `Faint | `Italic | `Underline | `Blink of [ `Rapid | `Slow ]
-  | `Reverse | `Fg of color | `Bg of color ]
+  | `Reverse | `Fg of [ color | `Hi of color ]
+  | `Bg of [ color | `Hi of color ] ]
 
   let sgr_of_style = function
   | `Bold -> "01"
