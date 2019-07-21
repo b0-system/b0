@@ -134,7 +134,10 @@ module Html = struct
            If we have only mld's html-deps returns nothing. This
            will at least include the package directory. *)
         [odoc]
-    | deps -> deps
+    | deps ->
+        (* This will also be wrong in general for mld pages. So we add
+           again the odoc's file directory by default. *)
+        (odoc :: deps)
     in
     Writes.write m ~odoc_deps odoc ~to_dir:html_dir ~o:writes;
     Writes.read m writes @@ fun writes ->
