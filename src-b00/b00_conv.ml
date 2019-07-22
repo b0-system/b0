@@ -176,259 +176,286 @@ module Guard = struct
 end
 
 module Op = struct
-  let file_read_color = [`Faint; `Fg `Magenta ]
-  let file_write_color = [`Faint; `Fg `Green]
-  let file_wait_color = [`Faint]
-  let file_delete_color = [`Faint; `Fg `Red]
-  let hash_color = [`Fg `Cyan]
-  let pp_file_read = Fmt.tty file_read_color Fpath.pp_quoted
-  let pp_file_write = Fmt.tty file_write_color Fpath.pp_quoted
-  let pp_file_wait = Fmt.tty file_wait_color Fpath.pp_quoted
-  let pp_file_delete = Fmt.tty file_delete_color Fpath.pp_quoted
-  let pp_hash = Fmt.tty hash_color Hash.pp
-  let pp_file_contents = Fmt.truncated ~max:150
-  let pp_error_msg ppf e = Fmt.pf ppf "@[error: %s@]" e
-  let pp_subfield s f pp =
-    Fmt.field ~label:(Fmt.tty_string [`Faint; `Fg `Yellow]) s f pp
-
-
-  module Spawn = struct
-
-    (* Formatting *)
-
-    let pp_success_exits ppf = function
-    | [] -> Fmt.string ppf "any"
-    | cs -> Fmt.(list ~sep:comma int) ppf cs
-
-    let pp_cmd ppf s =
-      (* XXX part of this could maybe moved to B0_std.Cmd. *)
-      let args = Cmd.to_list (Op.Spawn.args s) in
-      let quote = Filename.quote in
-      let pp_brack = Fmt.tty_string [`Fg `Yellow] in
-      let pp_arg ppf a = Fmt.pf ppf "%s" (quote a) in
-      let pp_o_arg ppf a = Fmt.tty_string file_write_color ppf (quote a) in
-      let rec pp_args last_was_o ppf = function
-      | [] -> ()
-      | a :: args ->
-          Fmt.char ppf ' ';
-          if last_was_o then pp_o_arg ppf a else pp_arg ppf a;
-          pp_args (String.equal a "-o") ppf args
-      in
-      let pp_stdin ppf = function
-      | None -> ()
-      | Some file -> Fmt.pf ppf "< %s" (quote (Fpath.to_string file))
-      in
-      let pp_stdo redir ppf = function
-      | `Ui -> ()
-      | `Tee f | `File f ->
-          Fmt.pf ppf " %s %a" redir pp_o_arg (Fpath.to_string f)
-      in
-      Fmt.pf ppf "@[<h>"; pp_brack ppf "[";
-      Cmd.pp_tool ppf (Op.Spawn.tool s); pp_args false ppf args;
-      pp_stdin ppf (Op.Spawn.stdin s);
-      pp_stdo ">" ppf (Op.Spawn.stdout s);
-      pp_stdo "2>" ppf (Op.Spawn.stderr s);
-      pp_brack ppf "]"; Fmt.pf ppf "@]"
-
-    let pp_stdo ppf = function
-    | `Ui -> Fmt.pf ppf "<ui>"
-    | `File f -> Fpath.pp_quoted ppf f
-    | `Tee f -> Fmt.pf ppf "@[<hov><ui> and@ %a@]" Fpath.pp_quoted f
-
-    let pp_stdo_ui ~truncate ppf s = match (Op.Spawn.stdo_ui s) with
-    | None -> Fmt.none ppf ()
-    | Some (Ok d) ->
-        if truncate then pp_file_contents ppf d else String.pp ppf d
-    | Some (Error e) -> pp_error_msg ppf e
-
-    let pp_result ppf = function
-    | Ok st -> Os.Cmd.pp_status ppf st
-    | Error e -> pp_error_msg ppf e
-
-    let pp =
-      let pp_env = Fmt.(vbox @@ list string) in
-      let pp_opt_path = Fmt.(option ~none:none) Fpath.pp_quoted in
-      let pp_stdio =
-        Fmt.concat ~sep:Fmt.sp @@
-        [ pp_subfield "stdin" Op.Spawn.stdin pp_opt_path;
-          pp_subfield "stderr" Op.Spawn.stderr pp_stdo;
-          pp_subfield "stdout" Op.Spawn.stdout pp_stdo; ]
-      in
-      Fmt.concat @@
-      [ Fmt.field "cmd" Fmt.id pp_cmd;
-        Fmt.field "result" Op.Spawn.result pp_result;
-        Fmt.field "stdo-ui" Fmt.id (pp_stdo_ui ~truncate:false);
-        Fmt.field "cwd" Op.Spawn.cwd Fpath.pp_quoted;
-        Fmt.field "env" Op.Spawn.env pp_env;
-        Fmt.field "relevant-env" Op.Spawn.relevant_env pp_env;
-        Fmt.field "stdio" Fmt.id pp_stdio;
-        Fmt.field "success-exits" Op.Spawn.success_exits pp_success_exits; ]
-  end
-
-  module Read = struct
-    let pp_result ppf = function
-    | Error e -> pp_error_msg ppf e
-    | Ok d -> pp_file_contents ppf d
-
-    let pp =
-      Fmt.concat @@
-      [ Fmt.field "file" Op.Read.file pp_file_read;
-        Fmt.field "result" Op.Read.result pp_result ]
-  end
-
-  module Write = struct
-    let pp_result ppf = function
-    | Error e -> pp_error_msg ppf e
-    | Ok () -> Fmt.string ppf "written"
-
-    let pp =
-      Fmt.concat @@
-      [ Fmt.field "file" Op.Write.file pp_file_write;
-        Fmt.field "mode" Op.Write.mode Fmt.int;
-        Fmt.field "result" Op.Write.result pp_result; ]
-  end
-
-  module Copy = struct
-    let pp_result ppf = function
-    | Error e -> pp_error_msg ppf e
-    | Ok () -> Fmt.string ppf "copied"
-
-    let pp = Fmt.field "result" Op.Copy.result pp_result
-  end
-
-  module Delete = struct
-    let pp_result ppf = function
-    | Error e -> pp_error_msg ppf e
-    | Ok () -> Fmt.string ppf "deleted"
-
-    let pp =
-      Fmt.concat @@
-      [ Fmt.field "path" Op.Delete.path pp_file_delete;
-        Fmt.field "result" Op.Delete.result pp_result ]
-  end
-
-  module Mkdir = struct
-    let pp_result ppf = function
-    | Error e -> pp_error_msg ppf e
-    | Ok created -> Fmt.string ppf (if created then "created" else "existed")
-
-    let pp =
-      Fmt.concat @@
-      [ Fmt.field "dir" Op.Mkdir.dir pp_file_write;
-        Fmt.field "result" Op.Mkdir.result pp_result ]
-  end
-
-  module Wait_files = struct
-  end
 
   (* Formatting *)
 
+  let style_op_id = [ `Bold ]
+  let style_file_write = [`Fg `Green]
+  let style_file_delete = [`Fg `Red]
+  let style_hash = [`Italic]
+  let style_subfield = [`Italic]
+  let style_cmd_brackets = [`Bold]
+  let style_cmd_tool = [`Fg `Blue]
+  let style_notify_warn = [`Fg `Yellow]
+  let style_notify_info = [`Fg `Blue]
+  let style_status_exec_revived = [`Faint; `Fg `Green]
+  let style_status_exec = [`Fg (`Hi `Green)]
+  let style_status_failed = [`Fg `Red]
+  let style_status_aborted = [`Faint; `Fg `Red]
+  let style_status_waiting = [`Fg `Cyan]
+  let style_kind_name = [`Bold]
+  let style_err = [`Fg `Red]
+  let style_op_howto = [`Faint]
+
+  let op_field = Fmt.field
+  let pp_path_option = Fmt.(option ~none:none) Fpath.pp_quoted
+  let pp_file_read = Fpath.pp_quoted
+  let pp_file_write = Fmt.tty style_file_write Fpath.pp_quoted
+  let pp_file_wait = Fpath.pp_quoted
+  let pp_file_delete = Fmt.tty style_file_delete Fpath.pp_quoted
+  let pp_file_mode ppf m = Fmt.pf ppf "%o" m
+  let pp_hash = Fmt.tty style_hash Hash.pp
+  let pp_file_contents = Fmt.truncated ~max:150
+  let pp_error_msg ppf e = Fmt.pf ppf "@[error: %s@]" e
+  let pp_subfield_label = Fmt.tty_string style_subfield
+  let pp_subfield s f pp = Fmt.field ~label:pp_subfield_label ~sep:Fmt.sp s f pp
+  let pp_reads = Fmt.list pp_file_read
+  let pp_writes = Fmt.list pp_file_write
+  let pp_timings =
+    let pp_span = Time.Span.pp in
+    let wait o = Time.Span.abs_diff (Op.time_created o) (Op.time_started o) in
+    op_field "timings" Fmt.id @@
+    Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
+    [ pp_subfield "duration" Op.duration pp_span;
+      pp_subfield "created" Op.time_created pp_span;
+      pp_subfield "started" Op.time_started pp_span;
+      pp_subfield "waited" wait pp_span; ]
+
+  let pp_spawn_cmd ppf s =
+    let args = Cmd.to_list (Op.Spawn.args s) in
+    let quote = Filename.quote in
+    let pquote p = Filename.quote (Fpath.to_string p) in
+    let pp_brack = Fmt.tty_string style_cmd_brackets in
+    let pp_tool ppf t = Fmt.tty_string style_cmd_tool ppf (pquote t) in
+    let pp_arg ppf a = Fmt.pf ppf "%s" (quote a) in
+    let pp_o_arg ppf a = Fmt.tty_string style_file_write ppf (quote a) in
+    let rec pp_args last_was_o ppf = function
+    | [] -> ()
+    | a :: args ->
+        Fmt.char ppf ' ';
+        if last_was_o then pp_o_arg ppf a else pp_arg ppf a;
+        pp_args (String.equal a "-o") ppf args
+    in
+    let pp_stdin ppf = function
+    | None -> () | Some file -> Fmt.pf ppf "< %s" (pquote file)
+    in
+    let pp_stdo redir ppf = function
+    | `Ui -> ()
+    | `Tee f | `File f ->
+        Fmt.pf ppf " %s %a" redir pp_o_arg (Fpath.to_string f)
+    in
+    Fmt.pf ppf "@[<h>"; pp_brack ppf "[";
+    pp_tool ppf (Op.Spawn.tool s); pp_args false ppf args;
+    pp_stdin ppf (Op.Spawn.stdin s);
+    pp_stdo ">" ppf (Op.Spawn.stdout s);
+    pp_stdo "2>" ppf (Op.Spawn.stderr s);
+    pp_brack ppf "]"; Fmt.pf ppf "@]"
+
+  let pp_spawn_success_exits ppf = function
+  | [] -> Fmt.string ppf "any"
+  | cs -> Fmt.(list ~sep:comma int) ppf cs
+
+  let pp_spawn_stdo ppf = function
+  | `Ui -> Fmt.pf ppf "<ui>"
+  | `File f -> Fpath.pp_quoted ppf f
+  | `Tee f -> Fmt.pf ppf "@[<hov><ui> and@ %a@]" Fpath.pp_quoted f
+
+  let pp_spawn_stdo_ui ppf s = match (Op.Spawn.stdo_ui s) with
+  | None -> Fmt.none ppf ()
+  | Some (Ok d) -> String.pp ppf d
+  | Some (Error e) -> pp_error_msg ppf e
+
+  let pp_spawn_status ppf = function
+  | `Exited c -> (Fmt.brackets Fmt.int) ppf c
+  | `Signaled c -> (Fmt.brackets Fmt.(any "signaled:" ++ Fmt.int)) ppf c
+
+  let pp_spawn_stdio =
+    Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
+    [ pp_subfield "stdin" Op.Spawn.stdin pp_path_option;
+      pp_subfield "stderr" Op.Spawn.stderr pp_spawn_stdo;
+      pp_subfield "stdout" Op.Spawn.stdout pp_spawn_stdo; ]
+
+  let pp_spawn_result ppf = function
+  | Ok st -> pp_spawn_status ppf st | Error e -> Fmt.pf ppf " %a" pp_error_msg e
+
+  let pp_notify ppf n =
+    let label, s = match Op.Notify.kind n with
+    | `Warn -> "WARNING", style_notify_warn
+    | `Start -> "START", style_notify_info
+    | `End -> "END", style_notify_info
+    | `Info -> "NOTE", style_notify_info
+    in
+    Fmt.pf ppf "[%a] @[%a@]"
+      (Fmt.tty_string s) label Fmt.lines (Op.Notify.msg n)
+
+  (* Operation header formatting *)
+
+  let pp_status ppf o = match Op.status o with
+  | Op.Executed -> ()
+  | Op.Failed -> Fmt.tty_string style_status_failed ppf "FAILED "
+  | Op.Aborted -> Fmt.tty_string style_status_aborted ppf "ABORTED "
+  | Op.Waiting -> Fmt.tty_string style_status_waiting ppf "WAITING "
+
+  let pp_revived ppf o = match Op.revived o with
+  | true -> Fmt.tty_string style_status_exec_revived ppf "R"
+  | false -> Fmt.tty_string style_status_exec ppf "E"
+
   let pp_op_hash ppf o =
-    let h = Op.hash o in
-    if Hash.is_nil h then () else pp_hash ppf h
+    let h = Op.hash o in if Hash.is_nil h then () else
+    (Fmt.sp ppf (); pp_revived ppf o; Fmt.char ppf ':'; pp_hash ppf h)
 
-  let kind_name_padded = function
-  | Op.Spawn _ -> "spawn" | Read _ -> "read" | Write _ -> "write"
-  | Copy _ -> "copy" | Delete _ -> "delet" | Mkdir _ -> "mkdir"
-  | Wait_files _ -> "wait"
+  let pp_kind_name ppf o =
+    (Fmt.tty_string style_kind_name) ppf (Op.kind_name (Op.kind o))
 
-  let pp_status ppf v = Fmt.string ppf @@ match v with
-  | Op.Waiting -> "waiting" | Executed -> "executed"
-  | Failed -> "failed" | Aborted -> "aborted"
+  let pp_id ppf o =
+    let pp_id ppf id = Fmt.pf ppf "%03d" id in
+    Fmt.tty style_op_id pp_id ppf (Op.id o)
 
-  let pp_kind_full ppf = function
-  | Op.Spawn s -> Spawn.pp ppf s
-  | Op.Read r -> Read.pp ppf r
-  | Op.Write w -> Write.pp ppf w
-  | Op.Copy c -> Copy.pp ppf c
-  | Op.Delete d -> Delete.pp ppf d
-  | Op.Mkdir m -> Mkdir.pp ppf m
-  | Op.Wait_files _ -> ()
+  let pp_header_short ppf o =
+    Fmt.pf ppf "[%a%a %a %a%a]"
+      pp_status o pp_id o pp_kind_name o
+      Time.Span.pp (B00.Op.duration o)
+      pp_op_hash o
+
+  let pp_header_long ppf o = (* adds the group *)
+    Fmt.pf ppf "[%a%a %a %a %a%a]"
+      pp_status o pp_id o pp_kind_name o
+      Time.Span.pp (B00.Op.duration o) Fmt.string (Op.group o)
+      pp_op_hash o
+
+  (* Short formatting *)
+
+  let pp_copy_short ppf c =
+    Fmt.pf ppf "%a to %a"
+      pp_file_read (Op.Copy.src c) pp_file_write (Op.Copy.dst c)
+
+  let pp_spawn_short =
+    Fmt.(pp_spawn_cmd ++ using Op.Spawn.result pp_spawn_result)
 
   let pp_kind_short ppf o = match Op.kind o with
-  | Op.Copy c ->
-      Fmt.pf ppf "%a to %a"
-        pp_file_read (Op.Copy.src c) pp_file_write (Op.Copy.dst c)
+  | Op.Copy c -> pp_copy_short ppf c
   | Op.Delete d -> pp_file_delete ppf (Op.Delete.path d)
   | Op.Mkdir m -> pp_file_write ppf (Op.Mkdir.dir m)
+  | Op.Notify n -> pp_notify ppf n
   | Op.Read r -> pp_file_read ppf (Op.Read.file r)
-  | Op.Spawn s -> Spawn.pp_cmd ppf s
-  | Op.Write w -> pp_file_write ppf (Op.Write.file w)
-  | Op.Wait_files _ ->
-      Fmt.pf ppf "@[<v>%a@]" (Fmt.list pp_file_wait) (Op.reads o)
-
-  let pp_kind_micro ppf o = match Op.kind o with
-  | Op.Copy c ->  pp_file_write ppf (Op.Copy.dst c)
-  | Op.Delete d -> pp_file_delete ppf (Op.Delete.path d)
-  | Op.Mkdir m -> pp_file_write ppf (Op.Mkdir.dir m)
-  | Op.Read r -> pp_file_read ppf (Op.Read.file r)
-  | Op.Spawn s -> Cmd.pp_tool ppf (Op.Spawn.tool s)
-  | Op.Wait_files w ->
-      begin match Op.reads o with
-      | [f] -> pp_file_wait ppf f
-      | _ -> Fmt.string ppf "*"
-      end
+  | Op.Spawn s -> pp_spawn_short ppf s
+  | Op.Wait_files _ -> (Fmt.vbox @@ Fmt.list pp_file_wait) ppf (Op.reads o)
   | Op.Write w -> pp_file_write ppf (Op.Write.file w)
 
-  let pp_short_status ppf o = match Op.status o with
-  | Op.Executed ->
-      begin match Op.revived o with
-      | true -> Fmt.tty_string [`Fg `Magenta; `Faint ] ppf "R"
-      | false -> Fmt.tty_string [`Fg `Magenta;] ppf "E"
-      end
-  | Op.Failed -> Fmt.tty_string [`Fg `Red] ppf "FAILED"
-  | Op.Aborted -> Fmt.tty_string [`Faint; `Fg `Red] ppf "ABORTED"
-  | Op.Waiting -> Fmt.tty_string [`Fg `Cyan] ppf "W"
-
-  let pp_header ppf o =
-    Fmt.pf ppf "[%a %03d %a %a]"
-      pp_short_status o (Op.id o) (Fmt.tty_string [`Fg `Green])
-      (kind_name_padded (Op.kind o))
-      Time.Span.pp (B00.Op.duration o)
-
-  let pp_short ppf o =
-    Fmt.pf ppf "@[<h>%a %a %a@]"
-      pp_header o pp_kind_short o pp_op_hash o
+  let pp_short ppf o = match Op.kind o with
+  | Op.Notify n -> (Fmt.box @@ pp_notify) ppf n
+  | _ -> Fmt.pf ppf "@[<h>%a %a@]" pp_header_short o pp_kind_short o
 
   let pp_short_with_ui ppf o = match Op.kind o with
+  | Op.Notify n -> (Fmt.box @@ pp_notify) ppf n
   | Op.Spawn s ->
       begin match Op.Spawn.stdo_ui s with
       | None -> pp_short ppf o
       | Some _ ->
-          Fmt.pf ppf "@[<v>@[<h>%a:@]@,%a@]"
-            pp_short o (Spawn.pp_stdo_ui ~truncate:false) s
+          Fmt.pf ppf "@[<v>@[<h>%a:@]@,@,%a@]" pp_short o pp_spawn_stdo_ui s
       end
   | _ -> pp_short ppf o
 
-  let pp =
-    let pp_span = Time.Span.pp in
-    let pp_reads = Fmt.braces (Fmt.list pp_file_read) in
-    let pp_writes = Fmt.braces (Fmt.list pp_file_write) in
-    let pp_timings =
-      let wait o = Time.Span.abs_diff (Op.time_created o) (Op.time_started o) in
-      Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
-      [ pp_subfield "duration" Op.duration pp_span;
-        pp_subfield "created" Op.time_created pp_span;
-        pp_subfield "started" Op.time_started pp_span;
-        pp_subfield "waited" wait pp_span; ]
-    in
-    let pp_caching =
-      Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
-      [ pp_subfield "hash" Op.hash pp_hash;
-        pp_subfield "revived" Op.revived Fmt.bool ]
-    in
-    Fmt.vbox ~indent:1 @@ Fmt.concat [
-      pp_header;
-      Fmt.field "group" Op.group Fmt.string;
-      Fmt.using Op.kind pp_kind_full;
-      Fmt.field "caching" Fmt.id pp_caching;
-      Fmt.field "timings" Fmt.id pp_timings;
-      Fmt.field "reads" Op.reads pp_reads;
-      Fmt.field "writes" Op.writes pp_writes ]
+  (* Long formatting *)
 
-  let pp_short_log = pp_short
-  let pp_normal_log = pp_short_with_ui
-  let pp_long_log = pp
+  let pp_op_error get result ppf o = match result (get o) with
+  | Ok _ -> ()
+  | Error e ->
+    Fmt.pf ppf "@[%a: @[%a@]@]@," (Fmt.tty_string style_err)
+      "error" Fmt.lines e
+
+  let pp_op_error_and_timings get result ppf o =
+    pp_op_error get result ppf o; pp_timings ppf o
+
+  let pp_copy_long =
+    let pp_meta =
+      Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
+      [ pp_subfield "mode" Op.Copy.mode pp_file_mode;
+        pp_subfield "linenum" Op.Copy.linenum Fmt.(option ~none:none int) ]
+    in
+    Fmt.record
+      [ op_field "src" Op.reads pp_reads;
+        op_field "dst" Op.writes pp_writes;
+        Fmt.using Op.Copy.get pp_meta;
+        pp_op_error_and_timings Op.Copy.get Op.Copy.result; ]
+
+  let pp_delete_long =
+    let pp_path = Fmt.using Op.Delete.path pp_file_delete in
+    Fmt.record
+      [ Fmt.using Op.Delete.get pp_path;
+        pp_op_error_and_timings Op.Delete.get Op.Delete.result ]
+
+  let pp_mkdir_long =
+    let pp_path = Fmt.using Op.Mkdir.dir pp_file_write in
+    Fmt.record
+      [ Fmt.using Op.Mkdir.get pp_path;
+        pp_op_error_and_timings Op.Mkdir.get Op.Mkdir.result ]
+
+  let pp_notify_long =
+    Fmt.record [ Fmt.using Op.Notify.get pp_notify; pp_timings; ]
+
+  let pp_read_long =
+    let pp_path = Fmt.using Op.Read.file pp_file_read in
+    Fmt.record
+      [ Fmt.using Op.Read.get pp_path;
+        pp_op_error_and_timings Op.Read.get Op.Read.result; ]
+
+  let pp_spawn_long =
+    (* FIXME add Cmd stamp env stamp *)
+    let pp_exit =
+      Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
+      [ op_field "exit" Op.Spawn.result pp_spawn_result;
+        pp_subfield "success-exits" Op.Spawn.success_exits
+          pp_spawn_success_exits ]
+    in
+    let pp_env = Fmt.(vbox @@ list string) in
+    let pp_relevant_env = Fmt.using Op.Spawn.relevant_env pp_env in
+    let pp_env = Fmt.using Op.Spawn.env pp_env in
+    let pp_cwd = Fmt.using Op.Spawn.cwd Fpath.pp_quoted in
+    let pp_stamps =
+      let cmd_stamp s = Cmd.to_stamp (Op.Spawn.args s) in
+      Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
+      [ pp_subfield "stamp" Op.Spawn.stamp Fmt.string;
+        pp_subfield "args" cmd_stamp Fmt.(list ~sep:sp string) ]
+      in
+    Fmt.record [
+      Fmt.using Op.Spawn.get pp_spawn_cmd;
+      Fmt.using Op.Spawn.get pp_exit;
+      op_field "writes" Op.writes pp_writes;
+      op_field "reads" Op.reads pp_reads;
+      op_field "stdo-ui" Op.Spawn.get pp_spawn_stdo_ui;
+      op_field "stdio" Op.Spawn.get pp_spawn_stdio;
+      op_field "cwd" Op.Spawn.get pp_cwd;
+      op_field "env" Op.Spawn.get pp_env;
+      op_field "relevant-env" Op.Spawn.get pp_relevant_env;
+      op_field "stamps" Op.Spawn.get pp_stamps;
+      pp_timings ]
+
+  let pp_wait_files_long =
+    Fmt.record [Fmt.using Op.reads pp_reads; pp_timings]
+
+  let pp_write_long =
+    let pp_stamp = Fmt.using Op.Write.stamp Fmt.string in
+    let pp_mode = Fmt.using Op.Write.mode pp_file_mode in
+    let pp_write = Fmt.using Op.Write.file pp_file_write in
+    Fmt.record
+      [ Fmt.using Op.Write.get pp_write;
+        op_field "stamp" Op.Write.get pp_stamp;
+        op_field "mode" Op.Write.get pp_mode;
+        pp_op_error_and_timings Op.Write.get Op.Write.result; ]
+
+  let pp_kind_long ppf o = match Op.kind o with
+  | Op.Copy _ -> pp_copy_long ppf o
+  | Op.Delete _ -> pp_delete_long ppf o
+  | Op.Mkdir _ -> pp_mkdir_long ppf o
+  | Op.Notify _ -> pp_notify_long ppf o
+  | Op.Read _ -> pp_read_long ppf o
+  | Op.Spawn _ -> pp_spawn_long ppf o
+  | Op.Wait_files _ -> pp_wait_files_long ppf o
+  | Op.Write _ -> pp_write_long ppf o
+
+  let pp ppf o =
+    Fmt.pf ppf "@[<v>@[<h>%a@]@, @[%a@]@,@]" pp_header_long o pp_kind_long o
 
   let pp_did_not_write ~op_howto ppf (o, fs) =
     let pp_file_list = Fmt.list pp_file_write in
@@ -437,32 +464,11 @@ module Op = struct
     |  _  -> "these expected files"
     in
     Fmt.pf ppf "@[<v>%a:@,@[%a %s: %a@]@, @[%a@]@]"
-      pp_short o (Fmt.tty [`Fg `Red] Fmt.string) "Operation did not write" exp
-      (Fmt.tty [`Faint] op_howto) o pp_file_list fs
-
-  let pp_spawn_exit ppf s = match Op.Spawn.result s with
-  | Error e -> Fmt.pf ppf "@,%s" e
-  | Ok (`Signaled c) -> Fmt.pf ppf "[signaled:%d]" c
-  | Ok (`Exited c) as result ->
-      match Op.Spawn.success_exits s with
-      | ([] | [0]) when c <> 0 -> Fmt.pf ppf "[%d]" c
-      | cs ->
-          Fmt.pf ppf "@,@[<h>Error: %a expected: %a@]"
-            (Fmt.tty [`Fg `Red] Spawn.pp_result) result
-            Spawn.pp_success_exits cs
-
-  let pp_spawn_status_fail ppf o =
-    let s = Op.Spawn.get o in
-    Fmt.pf ppf "@[<v>%a%a@,%a@]"
-      pp_short o pp_spawn_exit s
-      (Spawn.pp_stdo_ui ~truncate:false) s
+      pp_short o (Fmt.tty style_err Fmt.string) "Operation did not write" exp
+      (Fmt.tty style_op_howto op_howto) o pp_file_list fs
 
   let pp_failed ~op_howto ppf (op, (`Did_not_write fs)) = match fs with
-  | [] ->
-      begin match Op.kind op with
-      | Op.Spawn _ -> pp_spawn_status_fail ppf op
-      | _ -> pp ppf op
-      end
+  | [] -> pp_short_with_ui ppf op
   | fs -> pp_did_not_write ppf ~op_howto (op, fs)
 
   (* Binary serialization *)
@@ -526,6 +532,31 @@ module Op = struct
     let i, result = Bin.dec_result ~ok:Bin.dec_bool ~error:Bin.dec_string s i in
     i, Op.Mkdir.v ~dir ~result
 
+  let enc_notify_kind b = function
+  | `Warn -> Bin.enc_byte b 0
+  | `Start -> Bin.enc_byte b 1
+  | `End -> Bin.enc_byte b 2
+  | `Info -> Bin.enc_byte b 3
+
+  let dec_notify_kind s i =
+    let kind = "Op.Notify.kind" in
+    let next, b = Bin.dec_byte ~kind s i in
+    match b with
+    | 0 -> next, `Warn
+    | 1 -> next, `Start
+    | 2 -> next, `End
+    | 3 -> next, `Info
+    | b -> Bin.err_byte ~kind i b
+
+  let enc_notify b n =
+    enc_notify_kind b (Op.Notify.kind n);
+    Bin.enc_string b (Op.Notify.msg n)
+
+  let dec_notify s i =
+    let i, kind = dec_notify_kind s i in
+    let i, msg = Bin.dec_string s i in
+    i, Op.Notify.v ~kind ~msg
+
   let enc_read b r = (* we don't save the data it's already on the FS *)
     Bin.enc_fpath b (Op.Read.file r);
     let r = Result.bind (Op.Read.result r) @@ fun _ -> Ok () in
@@ -540,7 +571,7 @@ module Op = struct
   let enc_spawn_stdo b = function
   | `Ui -> Bin.enc_byte b 0
   | `File p -> Bin.enc_byte b 1; Bin.enc_fpath b p
-  | `Tee p -> Bin.enc_byte b 1; Bin.enc_fpath b p
+  | `Tee p -> Bin.enc_byte b 2; Bin.enc_fpath b p
 
   let dec_spawn_stdo s i =
     let kind = "Op.spawn_stdo" in
@@ -645,10 +676,11 @@ module Op = struct
   | Op.Copy c -> Bin.enc_byte b 0; enc_copy b c
   | Op.Delete d -> Bin.enc_byte b 1; enc_delete b d
   | Op.Mkdir m -> Bin.enc_byte b 2; enc_mkdir b m
-  | Op.Read r -> Bin.enc_byte b 3; enc_read b r
-  | Op.Spawn s -> Bin.enc_byte b 4; enc_spawn b s
-  | Op.Wait_files w -> Bin.enc_byte b 5; enc_wait_files b w
-  | Op.Write w -> Bin.enc_byte b 6; enc_write b w
+  | Op.Notify n -> Bin.enc_byte b 3; enc_notify b n
+  | Op.Read r -> Bin.enc_byte b 4; enc_read b r
+  | Op.Spawn s -> Bin.enc_byte b 5; enc_spawn b s
+  | Op.Wait_files w -> Bin.enc_byte b 6; enc_wait_files b w
+  | Op.Write w -> Bin.enc_byte b 7; enc_write b w
 
   let dec_kind s i =
     let kind = "Op.kind" in
@@ -657,10 +689,11 @@ module Op = struct
     | 0 -> let i, c = dec_copy s next in i, Op.Copy c
     | 1 -> let i, d = dec_delete s next in i, Op.Delete d
     | 2 -> let i, m = dec_mkdir s next in i, Op.Mkdir m
-    | 3 -> let i, r = dec_read s next in i, Op.Read r
-    | 4 -> let i, s = dec_spawn s next in i, Op.Spawn s
-    | 5 -> let i, w = dec_wait_files s next in i, Op.Wait_files w
-    | 6 -> let i, w = dec_write s next in i, Op.Write w
+    | 3 -> let i, n = dec_notify s next in i, Op.Notify n
+    | 4 -> let i, r = dec_read s next in i, Op.Read r
+    | 5 -> let i, s = dec_spawn s next in i, Op.Spawn s
+    | 6 -> let i, w = dec_wait_files s next in i, Op.Wait_files w
+    | 7 -> let i, w = dec_write s next in i, Op.Write w
     | b -> Bin.err_byte ~kind i b
 
   let enc_op b o =

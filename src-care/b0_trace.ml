@@ -14,29 +14,14 @@ module Trace_event = struct
     let span_us = Int64.(to_int @@ div (Time.Span.to_uint64_ns s) 1000L) in
     Jsong.int span_us
 
+  let result ~ok = function
+  | Error e -> Jsong.string e | Ok v -> Jsong.string (ok v)
+
+  let unit_result = result ~ok:(fun () -> "ok")
+  let bool_result = result ~ok:string_of_bool
+  let string_result = result ~ok:(fun s -> s)
   let args o =
     let kind_mems obj = match Op.kind o with
-    | Op.Spawn s ->
-        let cmd = Cmd.(path (Op.Spawn.tool s) %% (Op.Spawn.args s)) in
-        obj
-        |> Jsong.mem "cmd" (Jsong.cmd cmd)
-        |> Jsong.mem "result"
-          (str B00_conv.Op.Spawn.pp_result Op.Spawn.result s)
-        |> Jsong.mem "cwd" (Jsong.fpath (Op.Spawn.cwd s))
-        |> Jsong.mem "env" (Jsong.(list string) (Op.Spawn.env s))
-        |> Jsong.mem "success-exits"
-          (str B00_conv.Op.Spawn.pp_success_exits Op.Spawn.success_exits s)
-        |> Jsong.mem "stdo-ui"
-          (Jsong.strf "%a" (B00_conv.Op.Spawn.pp_stdo_ui ~truncate:false) s)
-    | Op.Read r ->
-        obj
-        |> Jsong.mem "file" (Jsong.fpath (Op.Read.file r))
-        |> Jsong.mem "result" (str B00_conv.Op.Read.pp_result Op.Read.result r)
-    | Op.Write w ->
-        obj
-        |> Jsong.mem "file" (Jsong.fpath (Op.Write.file w))
-        |> Jsong.mem "result"
-          (str B00_conv.Op.Write.pp_result Op.Write.result w)
     | Op.Copy c ->
         obj
         |> Jsong.mem "src" (Jsong.fpath (Op.Copy.src c))
@@ -46,20 +31,42 @@ module Trace_event = struct
     | Op.Delete d ->
         obj
         |> Jsong.mem "path" (Jsong.fpath (Op.Delete.path d))
-        |> Jsong.mem "result"
-          (str B00_conv.Op.Delete.pp_result Op.Delete.result d)
+        |> Jsong.mem "result" (unit_result (Op.Delete.result d))
     | Op.Mkdir m ->
         obj
         |> Jsong.mem "dir" (Jsong.fpath (Op.Mkdir.dir m))
+        |> Jsong.mem "result" (bool_result (Op.Mkdir.result m))
+    | Op.Notify n ->
+        obj
+        |> Jsong.mem "kind" (Jsong.string Op.Notify.(kind_to_string (kind n)))
+        |> Jsong.mem "msg" (Jsong.string (Op.Notify.msg n))
+    | Op.Read r ->
+        obj
+        |> Jsong.mem "file" (Jsong.fpath (Op.Read.file r))
+        |> Jsong.mem "result" (string_result (Op.Read.result r))
+    | Op.Spawn s ->
+        let cmd = Cmd.(path (Op.Spawn.tool s) %% (Op.Spawn.args s)) in
+        obj
+        |> Jsong.mem "cmd" (Jsong.cmd cmd)
         |> Jsong.mem "result"
-          (str B00_conv.Op.Mkdir.pp_result Op.Mkdir.result m)
+          (str B00_conv.Op.pp_spawn_result Op.Spawn.result s)
+        |> Jsong.mem "cwd" (Jsong.fpath (Op.Spawn.cwd s))
+        |> Jsong.mem "env" (Jsong.(list string) (Op.Spawn.env s))
+        |> Jsong.mem "success-exits"
+          (Jsong.(list int) (Op.Spawn.success_exits s))
+        |> Jsong.mem "stdo-ui"
+          (Jsong.strf "%a" B00_conv.Op.pp_spawn_stdo_ui s)
     | Op.Wait_files _ -> obj
+    | Op.Write w ->
+        obj
+        |> Jsong.mem "file" (Jsong.fpath (Op.Write.file w))
+        |> Jsong.mem "result" (unit_result (Op.Write.result w))
     in
     (* The order here is for the viewer. *)
     Jsong.obj
     |> Jsong.mem "kind" (Jsong.string (Op.kind_name (Op.kind o)))
     |> Jsong.mem "group" (Jsong.string (Op.group o))
-    |> Jsong.mem "status" (str B00_conv.Op.pp_status Op.status o)
+    |> Jsong.mem "status" (Jsong.string (B00.Op.status_to_string (Op.status o)))
     |> Jsong.mem "revived" (Jsong.bool (Op.revived o))
     |> Jsong.mem "writes" (Jsong.(list fpath) (Op.writes o))
     |> Jsong.mem "time-created" (span_us (Op.time_created o))

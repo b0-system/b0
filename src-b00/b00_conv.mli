@@ -27,116 +27,22 @@ end
 (** {!B00.Op} converters *)
 module Op : sig
 
-  (** {1:op_kind Operations kinds} *)
-
-  (** Tool spawns. *)
-  module Spawn : sig
-
-    (** {1:fmt Formatters} *)
-
-    val pp_success_exits : int list Fmt.t
-    (** [pp_success_exits] formats the success exits. *)
-
-    val pp_cmd : Op.Spawn.t Fmt.t
-    (** [pp_cmd] formats the command issued by the spawn, including
-        redirections. *)
-
-    val pp_stdo_ui : truncate:bool -> Op.Spawn.t Fmt.t
-    (** [pp_stdo_ui] formats the standard output ui of the spawn. If
-        [truncate] is [true] truncates long outputs. *)
-
-    val pp_result : (Os.Cmd.status, string) result Fmt.t
-    (** [pp_result] formats the command status of the spawn. *)
-
-    val pp : Op.Spawn.t Fmt.t
-    (** [pp] formats a spawn. *)
-  end
-
-  (** File reads. *)
-  module Read : sig
-
-    (** {1:formatting Formatters} *)
-
-    val pp_result : (string, string) result Fmt.t
-    (** [pp_result] formats the read result. *)
-
-    val pp : Op.Read.t Fmt.t
-    (** [pp] formats a read. *)
-  end
-
-  (** File writes. *)
-  module Write : sig
-
-    (** {1:fmt Formatters} *)
-
-    val pp_result : (unit, string) result Fmt.t
-    (** [pp_result] formats a write result. *)
-
-    val pp : Op.Write.t Fmt.t
-    (** [pp] formats a write. *)
-  end
-
-  (** File copy *)
-  module Copy : sig
-
-    (** {1:fmt Formatters} *)
-
-    val pp_result : (unit, string) result Fmt.t
-    (** [pp_result] formats a write result. *)
-
-    val pp : Op.Copy.t Fmt.t
-    (** [pp] formats a write. *)
-  end
-
-  (** File delete *)
-  module Delete : sig
-    (** {1:fmt Formatters} *)
-
-    val pp_result : (unit, string) result Fmt.t
-    (** [pp_result] formats a write result. *)
-
-    val pp : Op.Delete.t Fmt.t
-    (** [pp] formats a deletion. *)
-  end
-
-  (** Directory creation. *)
-  module Mkdir : sig
-
-    (** {1:fmt Formatters} *)
-
-    val pp_result : (bool, string) result Fmt.t
-    (** [pp_result] formats directory creation results. *)
-
-    val pp : Op.Mkdir.t Fmt.t
-    (** [pp] formats directory creations. *)
-  end
-
-  module Wait_files : sig
-  end
-
   (** {1:fmt Formatters} *)
 
+  val pp_spawn_stdo_ui : Op.Spawn.t Fmt.t
+  (** [pp_spawn_stdo_ui] formats the standard output ui of the spawn. *)
 
-  (** FIXME streamline API here. *)
+  val pp_spawn_result : (Os.Cmd.status, string) result Fmt.t
+  (** [pp_spawn_result] formats the command status of the spawn. *)
 
   val pp_file_read : Fpath.t Fmt.t
+  (** [pp_file_read] formats a read file. *)
+
   val pp_file_write : Fpath.t Fmt.t
-  val pp_file_wait : Fpath.t Fmt.t
+  (** [pp_file_write] formats a written file. *)
+
   val pp_hash : Hash.t Fmt.t
-
-  val pp_status : Op.status Fmt.t
-  (** [pp_status] formats build operation statuses. *)
-
-  val pp_short_status : Op.t Fmt.t
-  (** [pp_short_status] formats {!Op.status} and {!Op.exec_revived}
-      as a single letter. *)
-
-  val pp_kind_short : Op.t Fmt.t
-  val pp_kind_micro : Op.t Fmt.t
-  val pp_header : Op.t Fmt.t
-
-  val pp : Op.t Fmt.t
-  (** [pp] formats a build operation. *)
+  (** [pp_hash] formats an operation hash. *)
 
   val pp_short : Op.t Fmt.t
   (** [pp_short] formats a build operation on a single line. *)
@@ -145,13 +51,14 @@ module Op : sig
   (** [pp_short_with_stdo_ui] formats like {!pp_short} but also
       a feedback UI if the operation has one. *)
 
+  val pp : Op.t Fmt.t
+  (** [pp] formats a build operation. *)
+
   val pp_failed :
     op_howto:B00.Op.t Fmt.t ->
     (B00.Op.t * [< `Did_not_write of Fpath.t list ]) Fmt.t
-
-  val pp_short_log : Op.t Fmt.t
-  val pp_normal_log : Op.t Fmt.t
-  val pp_long_log : Op.t Fmt.t
+  (** [pp] formats an operation failure. [op_howto] formats how
+      to get more information about the failing operartion. *)
 
   (** {1:bin_serial Binary serialization} *)
 

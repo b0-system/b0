@@ -377,9 +377,9 @@ module Op = struct
     | ops -> Fmt.pr "@[<v>%a@]@." (Fmt.list pp_op) ops
     in
     let outf = match out_fmt with
-    | `Short -> outf_pp B00_conv.Op.pp_short_log
-    | `Normal -> outf_pp B00_conv.Op.pp_normal_log
-    | `Long -> outf_pp B00_conv.Op.pp_long_log
+    | `Short -> outf_pp B00_conv.Op.pp_short
+    | `Normal -> outf_pp B00_conv.Op.pp_short_with_ui
+    | `Long -> outf_pp B00_conv.Op.pp
     | `Trace_event ->
         fun ops ->
           Fmt.pr "%s@."

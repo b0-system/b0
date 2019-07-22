@@ -2175,7 +2175,7 @@ module Cmd = struct
   | None -> Fmt.invalid_arg "cmd %s: tool parse error" (to_string l)
 
   let pp_tool ppf t =
-    Fmt.tty_string [`Fg `Blue; `Bold] ppf (Filename.quote (Fpath.to_string t))
+    Fmt.tty_string [`Fg `Blue] ppf (Filename.quote (Fpath.to_string t))
 
   (* Predicates *)
 

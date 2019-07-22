@@ -255,6 +255,9 @@ module Op : sig
   | Waiting  (** Waiting for execution. *)
   (** The type for operation statuses. *)
 
+  val status_to_string : status -> string
+  (** [status_to_string s] is [s] as a string. *)
+
   (** {1:op Operations} *)
 
   type id = int
@@ -436,16 +439,19 @@ module Op : sig
         according to [result]. *)
   end
 
-  (*
   (** End-user notifications. *)
   module Notify : sig
 
-    (** {1:mkdir Notification} *)
+    (** {1:notifications Notification} *)
 
     type t
     (** The type for notification. *)
 
-    type kind = Warn | Progress | Info
+    type kind = [ `Warn | `Start | `End | `Info ]
+    (** The type for kind of notifications. *)
+
+    val kind_to_string : kind -> string
+    (** [kind_to_string k] is [k] as a string. *)
 
     val v_op : id:id -> group:group -> Time.span -> kind -> string -> op
     (** [v_op] declares a notification operation see the corresponding
@@ -453,7 +459,7 @@ module Op : sig
         arguments. *)
 
     val v : kind:kind -> msg:string -> t
-    (** [v] constructs a abre notification operation. *)
+    (** [v] constructs a notification operation. *)
 
     val get : op -> t
     (** [get o] is the notification [o]. Raise {!Invalid_argument} if [o]
@@ -462,11 +468,9 @@ module Op : sig
     val kind : t -> kind
     (** [kind] is the kind of notification. *)
 
-    val set_exec_status : op -> t -> Time.span -> unit
-    (** [set_exec_status o (get o) end_time] sets the result of
-        operation [o]. In particular this set the operation status. *)
+    val msg : t -> string
+    (** [msg] is the message. *)
   end
-*)
 
   (** File reads. *)
   module Read : sig
@@ -608,6 +612,9 @@ module Op : sig
         status according to [result]. *)
   end
 
+  (** Waiting on files.
+
+      FIXME now that we have Futs maybe we can maybe get rid of this. *)
   module Wait_files : sig
     type t
     (** The type for wait files operations. *)
@@ -674,6 +681,7 @@ module Op : sig
   | Copy of Copy.t
   | Delete of Delete.t
   | Mkdir of Mkdir.t
+  | Notify of Notify.t
   | Read of Read.t
   | Spawn of Spawn.t
   | Wait_files of Wait_files.t
@@ -1192,6 +1200,13 @@ module Memo : sig
 
   val fail_error : ('a, string) result -> 'a
   (** [fail_error] fails the fiber with the given error. *)
+
+  (** {1:feedback Feedback} *)
+
+  val notify :
+    t -> [ `Warn | `Start | `End | `Info ] ->
+    ('a, Format.formatter, unit, unit) format4 -> 'a
+  (** [notify kind msg] is a notification [msg] of kind [kind]. *)
 
   (** {1:files Files and directories} *)
 

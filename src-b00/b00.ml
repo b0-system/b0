@@ -545,7 +545,11 @@ module Op = struct
 
   type mkdir =
     { mkdir_dir : Fpath.t;
+(*      mkdir_mode : int; *)
       mutable mkdir_result : (bool, string) result; }
+
+  type notify_kind = [ `Warn | `Start | `End | `Info ]
+  type notify = { notify_kind : notify_kind; notify_msg : string }
 
   type read =
     { read_file : Fpath.t;
@@ -581,19 +585,24 @@ module Op = struct
   | Copy of copy
   | Delete of delete
   | Mkdir of mkdir
+  | Notify of notify
   | Read of read
   | Spawn of spawn
   | Wait_files of wait_files
   | Write of write
 
   let kind_name = function
-  | Copy _ -> "copy" | Delete _ -> "delete" | Mkdir _ -> "mkdir"
-  | Read _ -> "read" | Spawn _ -> "spawn" | Wait_files _ -> "wait-files"
-  | Write _ -> "write"
+  | Copy _ -> "copy" | Delete _ -> "delete" | Notify _ -> "note"
+  | Mkdir _ -> "mkdir" | Read _ -> "read" | Spawn _ -> "spawn"
+  | Wait_files _ -> "wait" | Write _ -> "write"
 
   type id = int
   type group = string
   type status = Aborted | Executed | Failed | Waiting
+
+  let status_to_string = function
+  | Aborted -> "aborted" | Executed -> "executed" | Failed -> "failed"
+  | Waiting -> "waiting"
 
   type t =
     { id : id;
@@ -718,6 +727,23 @@ module Op = struct
     let set_exec_status o mk end_time res =
       let status = match res with Ok _ -> Executed | Error _ -> Failed in
       set_result mk res; set_status o status; set_time_ended o end_time
+  end
+
+  module Notify = struct
+    type kind = notify_kind
+    let kind_to_string = function
+    | `Warn -> "warn" | `Start -> "start" | `End -> "end" | `Info -> "info"
+
+    type t = notify
+
+    let v_op ~id ~group time_created notify_kind notify_msg =
+      let n = { notify_kind; notify_msg } in
+      v_kind ~id ~group time_created ~reads:[] ~writes:[] (Notify n)
+
+    let v ~kind:notify_kind ~msg:notify_msg = { notify_kind; notify_msg }
+    let get o = match o.kind with Notify n -> n | _ -> assert false
+    let kind n = n.notify_kind
+    let msg n = n.notify_msg
   end
 
   module Read = struct
@@ -913,7 +939,8 @@ module Reviver = struct
       | Op.Spawn s -> hash_spawn r o s
       | Op.Write w -> hash_write r o w
       | Op.Copy c -> hash_copy r o c
-      | Op.Delete _ | Op.Read _ | Op.Mkdir _ | Op.Wait_files _ -> Hash.nil
+      | Op.Delete _ | Op.Read _ | Op.Notify _ | Op.Mkdir _ | Op.Wait_files _ ->
+          Hash.nil
       end
     with Failure e -> Error e
 
@@ -973,7 +1000,8 @@ module Reviver = struct
     | Op.Spawn s -> revive_spawn r o s
     | Op.Write w -> revive_write r o w
     | Op.Copy c -> revive_copy r o c
-    | Op.Delete _ | Op.Read _ | Op.Mkdir _ | Op.Wait_files _ -> Ok None
+    | Op.Delete _ | Op.Read _ | Op.Notify _ | Op.Mkdir _ | Op.Wait_files _ ->
+        Ok None
 
   let record_spawn r o s =
     let spawn_meta = Op.Spawn.stdo_ui s, Op.Spawn.result s in
@@ -997,7 +1025,8 @@ module Reviver = struct
   | Op.Spawn s -> record_spawn r o s
   | Op.Write w -> record_write r o w
   | Op.Copy c -> record_copy r o c
-  | Op.Delete _ | Op.Read _ | Op.Mkdir _ | Op.Wait_files _ -> Ok true
+  | Op.Delete _ | Op.Read _ | Op.Notify _ | Op.Mkdir _ | Op.Wait_files _ ->
+      Ok true
 end
 
 module Guard = struct
@@ -1283,7 +1312,7 @@ module Exec = struct
     Op.Mkdir.set_exec_status o mk (timestamp e) res;
     Queue.add o e.collectable
 
-  let exec_wait_files e o =
+  let exec_nop e o =
     Op.set_time_started o (timestamp e);
     e.feedback (`Exec_submit (None, o));
     Op.set_status o Op.Executed;
@@ -1301,9 +1330,10 @@ module Exec = struct
   | Op.Read r -> exec_read e o r
   | Op.Write w -> exec_write e o w
   | Op.Copy c -> exec_copy e o c
+  | Op.Notify _ -> exec_nop e o
   | Op.Mkdir mk -> exec_mkdir e o mk
   | Op.Delete d -> exec_delete e o d
-  | Op.Wait_files _ -> exec_wait_files e o
+  | Op.Wait_files _ -> exec_nop e o
 
   let submit_spawns e =
     let free = e.jobs - e.spawn_count in
@@ -1698,6 +1728,16 @@ module Memo = struct
 
   let fail fmt = Fmt.kstr (fun s -> raise (Fail s)) fmt
   let fail_error = function Ok v -> v | Error e -> raise (Fail e)
+
+  (* Notify *)
+
+  let notify m kind fmt =
+    Fmt.kstr begin fun msg ->
+      let id = new_op_id m in
+      let o = Op.Notify.v_op ~id ~group:m.c.group (timestamp m) kind msg in
+      let k m o = () in
+      add_op_kont m o k; add_op m o
+    end fmt
 
   (* Files *)
 
