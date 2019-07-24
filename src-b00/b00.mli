@@ -412,12 +412,12 @@ module Op : sig
     type t
     (** The type for directory creation operations. *)
 
-    val v_op : id:id -> group:group -> Time.span -> Fpath.t -> op
+    val v_op : id:id -> group:group -> mode:int -> Time.span -> Fpath.t -> op
     (** [v_op] declares a directory creation operation, see the
         corresponding accessors for the semantics of the various
         arguments. *)
 
-    val v : dir:Fpath.t -> result:(bool, string) result -> t
+    val v : dir:Fpath.t -> mode:int -> result:(unit, string) result -> t
     (** [v] constructs a bare mkdir operation. *)
 
     val get : op -> t
@@ -427,13 +427,16 @@ module Op : sig
     val dir : t -> Fpath.t
     (** [dir mk] is the directory created by [mk]. *)
 
-    val result : t -> (bool, string) result
+    val mode : t -> int
+    (** [mode mk] are the permissions of the directory created by [mk]. *)
+
+    val result : t -> (unit, string) result
     (** [result mk] is the result of the directory creation. *)
 
-    val set_result : t -> (bool, string) result -> unit
+    val set_result : t -> (unit, string) result -> unit
     (** [set_result r res] sets the mkdir result of [r] to [res]. *)
 
-    val set_exec_status : op -> t -> Time.span -> (bool, string) result -> unit
+    val set_exec_status : op -> t -> Time.span -> (unit, string) result -> unit
     (** [set_exec_status o (get o) end_time result] sets the operation
         result of [o]. In particular this set the operation status
         according to [result]. *)
@@ -1243,10 +1246,11 @@ module Memo : sig
 #line $(linenum) "$(src)"
 ]} *)
 
-  val mkdir : t -> Fpath.t -> bool fiber
-  (** [mkdir m dir k] creates directory [dir] and continues with [k created] at
-      which point file [dir] is ready and [created] indicates if the
-      directory was created by the operation. *)
+  val mkdir : t -> ?mode:int -> Fpath.t -> unit fiber
+  (** [mkdir m dir p] creates the directory path [p] with [mode]
+      [mode] (defaults to [0o755]) and continues with [k ()] whne
+      [dir] is available. The behaviour with respect to file
+      permission matches {!Os.Dir.create}. *)
 
   val delete : t -> Fpath.t -> unit fiber
   (** [delete m p] deletes (trashes in fact) path [p] and continues

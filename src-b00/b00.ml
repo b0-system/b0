@@ -545,8 +545,8 @@ module Op = struct
 
   type mkdir =
     { mkdir_dir : Fpath.t;
-(*      mkdir_mode : int; *)
-      mutable mkdir_result : (bool, string) result; }
+      mkdir_mode : int;
+      mutable mkdir_result : (unit, string) result; }
 
   type notify_kind = [ `Warn | `Start | `End | `Info ]
   type notify = { notify_kind : notify_kind; notify_msg : string }
@@ -715,13 +715,17 @@ module Op = struct
 
   module Mkdir = struct
     type t = mkdir
-    let v_op ~id ~group time_created dir =
-      let mkdir = { mkdir_dir = dir; mkdir_result = Error "not created" } in
+    let v_op ~id ~group ~mode:mkdir_mode time_created dir =
+      let mkdir_result = Error "not created" in
+      let mkdir = { mkdir_dir = dir; mkdir_mode; mkdir_result; } in
       v_kind ~id ~group time_created ~reads:[] ~writes:[dir] (Mkdir mkdir)
 
-    let v ~dir:mkdir_dir ~result:mkdir_result = { mkdir_dir; mkdir_result }
+    let v ~dir:mkdir_dir ~mode:mkdir_mode ~result:mkdir_result =
+      { mkdir_dir; mkdir_mode; mkdir_result }
+
     let get o = match o.kind with Mkdir mk -> mk | _ -> assert false
     let dir mk = mk.mkdir_dir
+    let mode mk = mk.mkdir_mode
     let result mk = mk.mkdir_result
     let set_result mk res = mk.mkdir_result <- res
     let set_exec_status o mk end_time res =
@@ -1308,7 +1312,11 @@ module Exec = struct
   let exec_mkdir e o mk =
     Op.set_time_started o (timestamp e);
     e.feedback (`Exec_submit (None, o));
-    let res = Os.Dir.create ~make_path:true (Op.Mkdir.dir mk) in
+    let dir = Op.Mkdir.dir mk and mode = Op.Mkdir.mode mk in
+    let res = match Os.Dir.create ~mode ~make_path:true dir with
+    | Ok _ -> Ok ()
+    | Error _ as e -> e
+    in
     Op.Mkdir.set_exec_status o mk (timestamp e) res;
     Queue.add o e.collectable
 
@@ -1766,10 +1774,10 @@ module Memo = struct
     let o = Op.Copy.v_op ~id start ~group ~mode ~linenum ~src dst in
     add_op m o
 
-  let mkdir m dir k =
+  let mkdir m ?(mode = 0o755) dir k =
     let id = new_op_id m in
-    let o = Op.Mkdir.v_op ~id ~group:m.c.group (timestamp m) dir in
-    let k m o = k (Result.get_ok @@ Op.Mkdir.result (Op.Mkdir.get o)) in
+    let o = Op.Mkdir.v_op ~id ~group:m.c.group ~mode (timestamp m) dir in
+    let k m o = k () in
     add_op_kont m o k; add_op m o
 
   let delete m p k =

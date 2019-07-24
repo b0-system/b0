@@ -35,7 +35,7 @@ module Trace_event = struct
     | Op.Mkdir m ->
         obj
         |> Jsong.mem "dir" (Jsong.fpath (Op.Mkdir.dir m))
-        |> Jsong.mem "result" (bool_result (Op.Mkdir.result m))
+        |> Jsong.mem "result" (unit_result (Op.Mkdir.result m))
     | Op.Notify n ->
         obj
         |> Jsong.mem "kind" (Jsong.string Op.Notify.(kind_to_string (kind n)))

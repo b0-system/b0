@@ -525,12 +525,14 @@ module Op = struct
 
   let enc_mkdir b m =
     Bin.enc_fpath b (Op.Mkdir.dir m);
-    Bin.enc_result ~ok:Bin.enc_bool ~error:Bin.enc_string b (Op.Mkdir.result m)
+    Bin.enc_int b (Op.Mkdir.mode m);
+    Bin.enc_result ~ok:Bin.enc_unit ~error:Bin.enc_string b (Op.Mkdir.result m)
 
   let dec_mkdir s i =
     let i, dir = Bin.dec_fpath s i in
-    let i, result = Bin.dec_result ~ok:Bin.dec_bool ~error:Bin.dec_string s i in
-    i, Op.Mkdir.v ~dir ~result
+    let i, mode = Bin.dec_int s i in
+    let i, result = Bin.dec_result ~ok:Bin.dec_unit ~error:Bin.dec_string s i in
+    i, Op.Mkdir.v ~mode ~dir ~result
 
   let enc_notify_kind b = function
   | `Warn -> Bin.enc_byte b 0
