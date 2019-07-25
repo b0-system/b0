@@ -339,9 +339,7 @@ module Op : sig
     (** [v] declares a file link operation, see the corresponding
         accessors for the semantics of various arguments. *)
 
-    val v :
-      src:Fpath.t -> dst:Fpath.t -> mode:int -> linenum:int option ->
-      result:(unit, string) result -> t
+    val v : src:Fpath.t -> dst:Fpath.t -> mode:int -> linenum:int option -> t
     (** [v] constructs a bare copy operation. *)
 
     val get : op -> t
@@ -360,18 +358,6 @@ module Op : sig
     val linenum : t -> int option
     (** [linenum c] is the linumber directive to write at the begining
         of the destination file (if any). *)
-
-    val result : t -> (unit, string) result
-    (** [result c] is the result of the file copy. *)
-
-    val set_result : t -> (unit, string) result -> unit
-    (** [set_result c res] sets the result of [c] to [res]. *)
-
-    val set_exec_status :
-      op -> t -> Time.span -> (unit, string) result -> unit
-    (** [set_exec_status o (get o) end_time result] sets the result of
-        operation [o]. In particular this set the operation status
-        according to [result]. *)
   end
 
   (** Path deletion. *)
@@ -386,7 +372,7 @@ module Op : sig
     (** [v_op] declares a path deletion operation, see the corresponding
         accessors for the semantics of the various arguments. *)
 
-    val v : path:Fpath.t -> result:(unit, string) result -> t
+    val v : path:Fpath.t -> t
     (** [v] constructs a bare deletion operation. *)
 
     val get : op -> t
@@ -395,18 +381,6 @@ module Op : sig
 
     val path : t -> Fpath.t
     (** [path d] is the path to delete. *)
-
-    val result : t -> (unit, string) result
-    (** [result d] is the result of the path deletion. *)
-
-    val set_result : t -> (unit, string) result -> unit
-    (** [set_result d res] sets the results of [d] to [res]. *)
-
-    val set_exec_status :
-      op -> t -> Time.span -> (unit, string) result -> unit
-    (** [set_exec_status o (get o) end_time result] sets the operation
-        result of [o]. In particular this set the operation status
-        according to [result]. *)
   end
 
   (** Directory creation. *)
@@ -422,7 +396,7 @@ module Op : sig
         corresponding accessors for the semantics of the various
         arguments. *)
 
-    val v : dir:Fpath.t -> mode:int -> result:(unit, string) result -> t
+    val v : dir:Fpath.t -> mode:int -> t
     (** [v] constructs a bare mkdir operation. *)
 
     val get : op -> t
@@ -434,17 +408,6 @@ module Op : sig
 
     val mode : t -> int
     (** [mode mk] are the permissions of the directory created by [mk]. *)
-
-    val result : t -> (unit, string) result
-    (** [result mk] is the result of the directory creation. *)
-
-    val set_result : t -> (unit, string) result -> unit
-    (** [set_result r res] sets the mkdir result of [r] to [res]. *)
-
-    val set_exec_status : op -> t -> Time.span -> (unit, string) result -> unit
-    (** [set_exec_status o (get o) end_time result] sets the operation
-        result of [o]. In particular this set the operation status
-        according to [result]. *)
   end
 
   (** End-user notifications. *)
@@ -652,8 +615,7 @@ module Op : sig
 
     val v :
       stamp:string -> mode:int -> file:Fpath.t ->
-      data:(unit -> (string, string) result) -> result:(unit, string) result ->
-      t
+      data:(unit -> (string, string) result) -> t
     (** [v] constructs a bare write operation. *)
 
     val get : op -> t
@@ -672,17 +634,8 @@ module Op : sig
     val data : t -> (unit -> (string, string) result)
     (** [data w ()] is the data to write. *)
 
-    val result : t -> (unit, string) result
-    (** [result w] is the result of the file write. *)
-
-    val set_result : t -> (unit, string) result -> unit
-    (** [set_result w res] sets the write results of [w] to [res]. *)
-
-    val set_exec_status :
-      op -> t -> Time.span -> (unit, string) result -> unit
-    (** [set_exec_status o (get o) end_time result] sets the result of
-        operation [o]. In particular this set the operation status
-        according to [result]. *)
+    val discard_data : t -> unit
+    (** [discard_data ()] gets rid of the write function. *)
   end
 
   type kind =
@@ -738,6 +691,12 @@ module Op : sig
 
   val set_hash : t -> Hash.t -> unit
   (** [set_hash o h] sets the operation hash to [h]. *)
+
+  val set_exec_result : t -> Time.span -> ('a, string) result -> unit
+  (** [set_exec_result o end_time result] sets the end time and
+      execution status of operation [o] with [end_time] and [result].
+      If the latter is [Error e], the status is [Failed (Msg e)], if
+      it is [Ok _] the status is [Executed]. *)
 
   (** {1:set_map Operation sets and map} *)
 

@@ -482,22 +482,15 @@ module File_cache = struct
 end
 
 module Op = struct
+
+  (* Operation kinds *)
+
   type copy =
-    { copy_src : Fpath.t;
-      copy_dst : Fpath.t;
-      copy_mode : int;
-      copy_linenum : int option;
-      mutable copy_result : (unit, string) result; }
+    { copy_src : Fpath.t; copy_dst : Fpath.t;
+      copy_mode : int; copy_linenum : int option; }
 
-  type delete =
-    { delete_path : Fpath.t;
-      mutable delete_result : (unit, string) result; }
-
-  type mkdir =
-    { mkdir_dir : Fpath.t;
-      mkdir_mode : int;
-      mutable mkdir_result : (unit, string) result; }
-
+  type delete = { delete_path : Fpath.t; }
+  type mkdir = { mkdir_dir : Fpath.t; mkdir_mode : int; }
   type notify_kind = [ `Warn | `Start | `End | `Info ]
   type notify = { notify_kind : notify_kind; notify_msg : string }
 
@@ -523,11 +516,9 @@ module Op = struct
 
   type wait_files = unit
   type write =
-    { write_stamp : string;
-      write_mode : int;
-      write_file : Fpath.t;
-      mutable write_data : unit -> (string, string) result;
-      mutable write_result : (unit, string) result; }
+    { write_stamp : string; write_mode : int; write_file : Fpath.t;
+      (* Mutable to discard it after the write is done. *)
+      mutable write_data : unit -> (string, string) result; }
 
   (* Operations *)
 
@@ -621,73 +612,50 @@ module Op = struct
   let set_reads o fs = o.hash <- Hash.nil; o.reads <- fs
   let set_writes o fs = o.writes <- fs
   let set_hash o h = o.hash <- h
+  let set_exec_result o t r =
+    set_time_ended o t;
+    set_status o (match r with Ok _ -> Executed | Error e -> Failed (Msg e))
+
   let kind o = o.kind
 
   module Copy = struct
     type t = copy
-    let v_op
-      ~id ~group time_created ~mode:copy_mode ~linenum:copy_linenum
-      ~src:copy_src copy_dst
-      =
-      let copy_result = Error "not copied" in
-      let c = {copy_src; copy_dst; copy_mode; copy_linenum; copy_result} in
-      let reads = [copy_src] and writes = [copy_dst] in
-      v_kind ~id ~group time_created ~reads ~writes (Copy c)
-
-    let v
-        ~src:copy_src ~dst:copy_dst ~mode:copy_mode ~linenum:copy_linenum
-        ~result:copy_result =
-      { copy_src; copy_dst; copy_mode; copy_linenum; copy_result }
+    let v ~src:copy_src ~dst:copy_dst ~mode:copy_mode ~linenum:copy_linenum =
+      { copy_src; copy_dst; copy_mode; copy_linenum }
 
     let get o = match o.kind with Copy c -> c | _ -> assert false
     let src c = c.copy_src
     let dst c = c.copy_dst
     let mode c = c.copy_mode
     let linenum c = c.copy_linenum
-    let result c = c.copy_result
-    let set_result c res = c.copy_result <- res
-    let set_exec_status o c end_time r =
-      let status = match r with Ok _ -> Executed | Error e -> Failed (Msg e) in
-      set_result c r; set_status o status; set_time_ended o end_time
+    let v_op
+        ~id ~group time_created ~mode:copy_mode ~linenum:copy_linenum
+        ~src:copy_src copy_dst
+      =
+      let c = { copy_src; copy_dst; copy_mode; copy_linenum } in
+      let reads = [copy_src] and writes = [copy_dst] in
+      v_kind ~id ~group time_created ~reads ~writes (Copy c)
   end
 
   module Delete = struct
     type t = delete
-    let v_op ~id ~group time_created delete_path =
-      let delete_result = Error "not deleted" in
-      let d = { delete_path; delete_result } in
-      v_kind ~id ~group time_created ~reads:[] ~writes:[] (Delete d)
-
-    let v ~path:delete_path ~result:delete_result =
-      { delete_path; delete_result }
-
+    let v ~path:delete_path = { delete_path }
     let get o = match o.kind with Delete d -> d | _ -> assert false
     let path d = d.delete_path
-    let result d = d.delete_result
-    let set_result d res = d.delete_result <- res
-    let set_exec_status o d end_time r =
-      let status = match r with Ok _ -> Executed | Error e -> Failed (Msg e) in
-      set_result d r; set_status o status; set_time_ended o end_time
+    let v_op ~id ~group time_created delete_path =
+      let d = { delete_path } in
+      v_kind ~id ~group time_created ~reads:[] ~writes:[] (Delete d)
   end
 
   module Mkdir = struct
     type t = mkdir
-    let v_op ~id ~group ~mode:mkdir_mode time_created dir =
-      let mkdir_result = Error "not created" in
-      let mkdir = { mkdir_dir = dir; mkdir_mode; mkdir_result; } in
-      v_kind ~id ~group time_created ~reads:[] ~writes:[dir] (Mkdir mkdir)
-
-    let v ~dir:mkdir_dir ~mode:mkdir_mode ~result:mkdir_result =
-      { mkdir_dir; mkdir_mode; mkdir_result }
-
+    let v ~dir:mkdir_dir ~mode:mkdir_mode = { mkdir_dir; mkdir_mode }
     let get o = match o.kind with Mkdir mk -> mk | _ -> assert false
     let dir mk = mk.mkdir_dir
     let mode mk = mk.mkdir_mode
-    let result mk = mk.mkdir_result
-    let set_result mk res = mk.mkdir_result <- res
-    let set_exec_status o mk end_time r =
-      let status = match r with Ok _ -> Executed | Error e -> Failed (Msg e) in
-      set_result mk r; set_status o status; set_time_ended o end_time
+    let v_op ~id ~group ~mode:mkdir_mode time_created dir =
+      let mkdir = { mkdir_dir = dir; mkdir_mode; } in
+      v_kind ~id ~group time_created ~reads:[] ~writes:[dir] (Mkdir mkdir)
   end
 
   module Notify = struct
@@ -696,15 +664,13 @@ module Op = struct
     | `Warn -> "warn" | `Start -> "start" | `End -> "end" | `Info -> "info"
 
     type t = notify
-
-    let v_op ~id ~group time_created notify_kind notify_msg =
-      let n = { notify_kind; notify_msg } in
-      v_kind ~id ~group time_created ~reads:[] ~writes:[] (Notify n)
-
     let v ~kind:notify_kind ~msg:notify_msg = { notify_kind; notify_msg }
     let get o = match o.kind with Notify n -> n | _ -> assert false
     let kind n = n.notify_kind
     let msg n = n.notify_msg
+    let v_op ~id ~group time_created notify_kind notify_msg =
+      let n = { notify_kind; notify_msg } in
+      v_kind ~id ~group time_created ~reads:[] ~writes:[] (Notify n)
   end
 
   module Read = struct
@@ -727,18 +693,6 @@ module Op = struct
     type stdo = spawn_stdo
     type success_exits = spawn_success_exits
     type t = spawn
-
-    let v_op
-        ~id ~group time_created ~stamp:spawn_stamp ~reads ~writes ~env
-        ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits tool args
-      =
-      let spawn =
-        { env; relevant_env; cwd; stdin; stdout; stderr; success_exits;
-          tool; args; spawn_stamp; stdo_ui = None;
-          spawn_result = Error "not spawned" }
-      in
-      v_kind ~id ~group time_created ~reads ~writes (Spawn spawn)
-
     let v
         ~env ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits tool
         args ~stamp:spawn_stamp ~stdo_ui ~result:spawn_result
@@ -774,45 +728,47 @@ module Op = struct
       in
       set_stdo_ui s stdo_ui; set_result s r; set_status o status;
       set_time_ended o end_time
+
+    let v_op
+        ~id ~group time_created ~stamp:spawn_stamp ~reads ~writes ~env
+        ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits tool args
+      =
+      let spawn =
+        { env; relevant_env; cwd; stdin; stdout; stderr; success_exits;
+          tool; args; spawn_stamp; stdo_ui = None;
+          spawn_result = Error "not spawned" }
+      in
+      v_kind ~id ~group time_created ~reads ~writes (Spawn spawn)
   end
 
   module Wait_files = struct
     type t = wait_files
+    let v () = ()
     let v_op ~id ~group time_created reads =
       v_kind ~id ~group time_created ~reads ~writes:[] (Wait_files ())
-
-    let v () = ()
   end
 
   module Write = struct
     type t = write
-    let v_op
-        ~id ~group time_created ~stamp:write_stamp ~reads ~mode:write_mode
-        ~write:write_file write_data
-      =
-      let write_result = Error "not written" in
-      let w = {write_stamp; write_mode; write_file; write_data; write_result} in
-      v_kind ~id ~group time_created ~reads ~writes:[write_file] (Write w)
-
     let v
         ~stamp:write_stamp ~mode:write_mode ~file:write_file ~data:write_data
-        ~result:write_result
       =
-      { write_stamp; write_mode; write_file; write_data; write_result }
+      { write_stamp; write_mode; write_file; write_data }
 
     let get o = match o.kind with Write r -> r | _ -> assert false
     let stamp w = w.write_stamp
     let mode w = w.write_mode
     let file w = w.write_file
     let data w = w.write_data
-    let result w = w.write_result
-    let write_data_nop _ = Error "nothing to writes (assert false)"
-    let set_write_data w d = w.write_data <- d
-    let set_result w res = w.write_result <- res
-    let set_exec_status o w end_time r =
-      let status = match r with Ok _ -> Executed | Error e -> Failed (Msg e) in
-      set_write_data w write_data_nop; set_result w r; set_status o status;
-      set_time_ended o end_time
+    let discard_data w =
+      w.write_data <- fun _ -> Error "nothing to write (assert false)"
+
+    let v_op
+        ~id ~group time_created ~stamp:write_stamp ~reads ~mode:write_mode
+        ~write:write_file write_data
+      =
+      let w = { write_stamp; write_mode; write_file; write_data } in
+      v_kind ~id ~group time_created ~reads ~writes:[write_file] (Write w)
   end
 
   module T = struct type nonrec t = t let compare = compare end
@@ -919,9 +875,6 @@ module Reviver = struct
             (option (result string_bytes string_bytes))
             (result os_cmd_status string_bytes))
 
-  let unit_result_meta_conv : (unit, string) result Conv.t =
-    Conv.(result unit string_bytes)
-
   let file_cache_key o = Hash.to_hex (Op.hash o)
 
   let revive_spawn r o s =
@@ -941,9 +894,9 @@ module Reviver = struct
     Result.bind (File_cache.revive r.cache key writes) @@ function
     | None -> Ok None
     | Some (m, existed) ->
-        Result.bind (Conv.of_bin unit_result_meta_conv m) @@ fun res ->
+        Op.Write.discard_data w; (* get rid of write data closure. *)
         Op.set_revived o true;
-        Op.Write.set_exec_status o w (timestamp r) res;
+        Op.set_exec_result o (timestamp r) (Ok ());
         Ok (Some existed)
 
   let revive_copy r o c =
@@ -952,9 +905,8 @@ module Reviver = struct
     Result.bind (File_cache.revive r.cache key writes) @@ function
     | None -> Ok None
     | Some (m, existed) ->
-        Result.bind (Conv.of_bin unit_result_meta_conv m) @@ fun res ->
         Op.set_revived o true;
-        Op.Copy.set_exec_status o c (timestamp r) res;
+        Op.set_exec_result o (timestamp r) (Ok ());
         Ok (Some existed)
 
   let revive r o =
@@ -973,16 +925,10 @@ module Reviver = struct
     | Ok m -> File_cache.add r.cache (file_cache_key o) m (Op.writes o)
 
   let record_write r o w =
-    let write_meta = Op.Write.result w in
-    match Conv.to_bin ~buf:r.buffer unit_result_meta_conv write_meta with
-    | Error _ as e -> e
-    | Ok m -> File_cache.add r.cache (file_cache_key o) m (Op.writes o)
+    File_cache.add r.cache (file_cache_key o) "" (Op.writes o)
 
   let record_copy r o c =
-    let copy_meta = Op.Copy.result c in
-    match Conv.to_bin ~buf:r.buffer unit_result_meta_conv copy_meta with
-    | Error _ as e -> e
-    | Ok m -> File_cache.add r.cache (file_cache_key o) m (Op.writes o)
+    File_cache.add r.cache (file_cache_key o) "" (Op.writes o)
 
   let record r o = match Op.kind o with
   | Op.Spawn s -> record_spawn r o s
@@ -1234,57 +1180,36 @@ module Exec = struct
     Op.Read.set_exec_status o r (timestamp e) res;
     Queue.add o e.collectable
 
-  let exec_write e o w =
+  let exec_op e o k k_op =
     Op.set_time_started o (timestamp e);
     e.feedback (`Exec_submit (None, o));
-    let res = match Op.Write.data w () with
-    | Error _ as e -> e
-    | Ok data ->
-        let mode = Op.Write.mode w in
-        Os.File.write ~force:true ~make_path:true ~mode (Op.Write.file w) data
-    in
-    Op.Write.set_exec_status o w (timestamp e) res;
+    Op.set_exec_result o (timestamp e) (k_op e k);
     Queue.add o e.collectable
 
-  let exec_copy e o c =
-    Op.set_time_started o (timestamp e);
-    e.feedback (`Exec_submit (None, o));
+  let op_copy _e c =
     let atomic = true and force = true and make_path = true in
     let mode = Op.Copy.mode c and src = Op.Copy.src c and dst = Op.Copy.dst c in
-    let res = match Op.Copy.linenum c with
+    match Op.Copy.linenum c with
     | None -> Os.File.copy ~atomic ~force ~make_path ~mode ~src dst
     | Some line ->
         Result.bind (Os.File.read src) @@ fun c ->
         let data = Fmt.str "#line %d \"%a\"\n%s" line Fpath.pp_unquoted src c in
         Os.File.write ~atomic ~force ~make_path ~mode dst data
-    in
-    Op.Copy.set_exec_status o c (timestamp e) res;
-    Queue.add o e.collectable
 
-  let exec_delete e o d =
-    Op.set_time_started o (timestamp e);
-    e.feedback (`Exec_submit (None, o));
-    let res = Trash.trash e.trash (Op.Delete.path d) in
-    Op.Delete.set_exec_status o d (timestamp e) res;
-    Queue.add o e.collectable
-
-  let exec_mkdir e o mk =
-    Op.set_time_started o (timestamp e);
-    e.feedback (`Exec_submit (None, o));
+  let op_delete e d = Trash.trash e.trash (Op.Delete.path d)
+  let op_nop _ _ = Ok ()
+  let op_mkdir _e mk =
     let dir = Op.Mkdir.dir mk and mode = Op.Mkdir.mode mk in
-    let res = match Os.Dir.create ~mode ~make_path:true dir with
-    | Ok _ -> Ok ()
-    | Error _ as e -> e
-    in
-    Op.Mkdir.set_exec_status o mk (timestamp e) res;
-    Queue.add o e.collectable
+    Os.Dir.create ~mode ~make_path:true dir
 
-  let exec_nop e o =
-    Op.set_time_started o (timestamp e);
-    e.feedback (`Exec_submit (None, o));
-    Op.set_status o Op.Executed;
-    Op.set_time_ended o (timestamp e);
-    Queue.add o e.collectable
+  let op_write e w =
+    let r = Op.Write.data w () in
+    Op.Write.discard_data w; (* Get rid of data write closure. *)
+    match r with
+    | Error _ as e -> e
+    | Ok data ->
+        let mode = Op.Write.mode w in
+        Os.File.write ~force:true ~make_path:true ~mode (Op.Write.file w) data
 
   (* Scheduling
 
@@ -1295,12 +1220,12 @@ module Exec = struct
   let submit e o = match Op.kind o with
   | Op.Spawn _ -> Queue.add o e.to_spawn (* see submit_spawns *)
   | Op.Read r -> exec_read e o r
-  | Op.Write w -> exec_write e o w
-  | Op.Copy c -> exec_copy e o c
-  | Op.Notify _ -> exec_nop e o
-  | Op.Mkdir mk -> exec_mkdir e o mk
-  | Op.Delete d -> exec_delete e o d
-  | Op.Wait_files _ -> exec_nop e o
+  | Op.Write w -> exec_op e o w op_write
+  | Op.Copy c -> exec_op e o c op_copy
+  | Op.Notify n -> exec_op e o n op_nop
+  | Op.Mkdir mk -> exec_op e o mk op_mkdir
+  | Op.Delete d -> exec_op e o d op_delete
+  | Op.Wait_files w -> exec_op e o w op_nop
 
   let submit_spawns e =
     let free = e.jobs - e.spawn_count in

@@ -29,13 +29,9 @@ module Trace_event = struct
         |> Jsong.mem "mode" (Jsong.strf "%o" (Op.Copy.mode c))
         |> Jsong.mem "linenum" (Jsong.(option int) (Op.Copy.linenum c))
     | Op.Delete d ->
-        obj
-        |> Jsong.mem "path" (Jsong.fpath (Op.Delete.path d))
-        |> Jsong.mem "result" (unit_result (Op.Delete.result d))
+        obj |> Jsong.mem "path" (Jsong.fpath (Op.Delete.path d))
     | Op.Mkdir m ->
-        obj
-        |> Jsong.mem "dir" (Jsong.fpath (Op.Mkdir.dir m))
-        |> Jsong.mem "result" (unit_result (Op.Mkdir.result m))
+        obj |> Jsong.mem "dir" (Jsong.fpath (Op.Mkdir.dir m))
     | Op.Notify n ->
         obj
         |> Jsong.mem "kind" (Jsong.string Op.Notify.(kind_to_string (kind n)))
@@ -60,7 +56,8 @@ module Trace_event = struct
     | Op.Write w ->
         obj
         |> Jsong.mem "file" (Jsong.fpath (Op.Write.file w))
-        |> Jsong.mem "result" (unit_result (Op.Write.result w))
+        |> Jsong.mem "stamp" (Jsong.string (Op.Write.stamp w))
+        |> Jsong.mem "mode" (Jsong.strf "%o" (Op.Write.mode w))
     in
     (* The order here is for the viewer. *)
     Jsong.obj

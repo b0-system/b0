@@ -367,8 +367,22 @@ module Op = struct
   let pp_op_error_and_timings get result ppf o =
     pp_op_error get result ppf o; pp_timings ppf o
 
+  let pp_op_failure ppf o =
+    let pp_failure ppf = function
+    | Op.Msg m -> Fmt.lines ppf m
+    | Op.Missing_writes fs ->
+        Fmt.pf ppf "@[<v>Did not write:@,%a@]" (Fmt.list pp_file_write) fs
+    in
+    match Op.status o with
+    | Failed f ->
+        Fmt.pf ppf "@[%a: @[%a@]@]@,"
+          (Fmt.tty_string style_err) "error" pp_failure f
+    | _ -> ()
+
+  let pp_op_failure_and_timings ppf o = pp_op_failure ppf o; pp_timings ppf o
+
   let pp_copy_long =
-    let pp_meta =
+    let pp_info =
       Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
       [ pp_subfield "mode" Op.Copy.mode pp_file_mode;
         pp_subfield "linenum" Op.Copy.linenum Fmt.(option ~none:none int) ]
@@ -376,20 +390,18 @@ module Op = struct
     Fmt.record
       [ op_field "src" Op.reads pp_reads;
         op_field "dst" Op.writes pp_writes;
-        Fmt.using Op.Copy.get pp_meta;
-        pp_op_error_and_timings Op.Copy.get Op.Copy.result; ]
+        Fmt.using Op.Copy.get pp_info;
+        pp_op_failure_and_timings; ]
 
   let pp_delete_long =
     let pp_path = Fmt.using Op.Delete.path pp_file_delete in
     Fmt.record
-      [ Fmt.using Op.Delete.get pp_path;
-        pp_op_error_and_timings Op.Delete.get Op.Delete.result ]
+      [ Fmt.using Op.Delete.get pp_path; pp_op_failure_and_timings; ]
 
   let pp_mkdir_long =
     let pp_path = Fmt.using Op.Mkdir.dir pp_file_write in
     Fmt.record
-      [ Fmt.using Op.Mkdir.get pp_path;
-        pp_op_error_and_timings Op.Mkdir.get Op.Mkdir.result ]
+      [ Fmt.using Op.Mkdir.get pp_path; pp_op_failure_and_timings; ]
 
   let pp_notify_long =
     Fmt.record [ Fmt.using Op.Notify.get pp_notify; pp_timings; ]
@@ -417,7 +429,7 @@ module Op = struct
       Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
       [ pp_subfield "stamp" Op.Spawn.stamp Fmt.string;
         pp_subfield "args" cmd_stamp Fmt.(list ~sep:sp string) ]
-      in
+    in
     Fmt.record [
       Fmt.using Op.Spawn.get pp_spawn_cmd;
       Fmt.using Op.Spawn.get pp_exit;
@@ -442,7 +454,7 @@ module Op = struct
       [ Fmt.using Op.Write.get pp_write;
         op_field "stamp" Op.Write.get pp_stamp;
         op_field "mode" Op.Write.get pp_mode;
-        pp_op_error_and_timings Op.Write.get Op.Write.result; ]
+        pp_op_failure_and_timings; ]
 
   let pp_kind_long ppf o = match Op.kind o with
   | Op.Copy _ -> pp_copy_long ppf o
@@ -519,36 +531,28 @@ module Op = struct
     Bin.enc_fpath b (Op.Copy.src c);
     Bin.enc_fpath b (Op.Copy.dst c);
     Bin.enc_int b (Op.Copy.mode c);
-    Bin.enc_option Bin.enc_int b (Op.Copy.linenum c);
-    Bin.enc_result ~ok:Bin.enc_unit ~error:Bin.enc_string b (Op.Copy.result c)
+    Bin.enc_option Bin.enc_int b (Op.Copy.linenum c)
 
   let dec_copy s i =
     let i, src = Bin.dec_fpath s i in
     let i, dst = Bin.dec_fpath s i in
     let i, mode = Bin.dec_int s i in
     let i, linenum = Bin.dec_option Bin.dec_int s i in
-    let i, result = Bin.dec_result ~ok:Bin.dec_unit ~error:Bin.dec_string s i in
-    i, Op.Copy.v ~src ~dst ~mode ~linenum ~result
+    i, Op.Copy.v ~src ~dst ~mode ~linenum
 
-  let enc_delete b d =
-    Bin.enc_fpath b (Op.Delete.path d);
-    Bin.enc_result ~ok:Bin.enc_unit ~error:Bin.enc_string b (Op.Delete.result d)
-
+  let enc_delete b d = Bin.enc_fpath b (Op.Delete.path d)
   let dec_delete s i =
     let i, path = Bin.dec_fpath s i in
-    let i, result = Bin.dec_result ~ok:Bin.dec_unit ~error:Bin.dec_string s i in
-    i, Op.Delete.v ~path ~result
+    i, Op.Delete.v ~path
 
   let enc_mkdir b m =
     Bin.enc_fpath b (Op.Mkdir.dir m);
-    Bin.enc_int b (Op.Mkdir.mode m);
-    Bin.enc_result ~ok:Bin.enc_unit ~error:Bin.enc_string b (Op.Mkdir.result m)
+    Bin.enc_int b (Op.Mkdir.mode m)
 
   let dec_mkdir s i =
     let i, dir = Bin.dec_fpath s i in
     let i, mode = Bin.dec_int s i in
-    let i, result = Bin.dec_result ~ok:Bin.dec_unit ~error:Bin.dec_string s i in
-    i, Op.Mkdir.v ~mode ~dir ~result
+    i, Op.Mkdir.v ~mode ~dir
 
   let enc_notify_kind b = function
   | `Warn -> Bin.enc_byte b 0
@@ -678,17 +682,14 @@ module Op = struct
   let enc_write b w =
     Bin.enc_string b (Op.Write.stamp w);
     Bin.enc_int b (Op.Write.mode w);
-    Bin.enc_fpath b (Op.Write.file w);
-    Bin.enc_result
-      ~ok:Bin.enc_unit ~error:Bin.enc_string b (Op.Write.result w)
+    Bin.enc_fpath b (Op.Write.file w)
 
   let dec_write s i =
     let i, stamp = Bin.dec_string s i in
     let i, mode = Bin.dec_int s i in
     let i, file = Bin.dec_fpath s i in
     let data () = Error "Serialized op, data fun not available" in
-    let i, result = Bin.dec_result ~ok:Bin.dec_unit ~error:Bin.dec_string s i in
-    i, Op.Write.v ~stamp ~mode ~file ~data ~result
+    i, Op.Write.v ~stamp ~mode ~file ~data
 
   let enc_kind b = function
   | Op.Copy c -> Bin.enc_byte b 0; enc_copy b c
