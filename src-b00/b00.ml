@@ -548,10 +548,11 @@ module Op = struct
 
   type id = int
   type group = string
-  type status = Aborted | Executed | Failed | Waiting
+  type failure = Msg of string | Missing_writes of Fpath.t list
+  type status = Aborted | Executed | Failed of failure | Waiting
 
   let status_to_string = function
-  | Aborted -> "aborted" | Executed -> "executed" | Failed -> "failed"
+  | Aborted -> "aborted" | Executed -> "executed" | Failed _ -> "failed"
   | Waiting -> "waiting"
 
   type t =
@@ -639,9 +640,9 @@ module Op = struct
     let linenum c = c.copy_linenum
     let result c = c.copy_result
     let set_result c res = c.copy_result <- res
-    let set_exec_status o c end_time res =
-      let status = match res with Ok _ -> Executed | Error _ -> Failed in
-      set_result c res; set_status o status; set_time_ended o end_time
+    let set_exec_status o c end_time r =
+      let status = match r with Ok _ -> Executed | Error e -> Failed (Msg e) in
+      set_result c r; set_status o status; set_time_ended o end_time
   end
 
   module Delete = struct
@@ -658,9 +659,9 @@ module Op = struct
     let path d = d.delete_path
     let result d = d.delete_result
     let set_result d res = d.delete_result <- res
-    let set_exec_status o d end_time res =
-      let status = match res with Ok _ -> Executed | Error _ -> Failed in
-      set_result d res; set_status o status; set_time_ended o end_time
+    let set_exec_status o d end_time r =
+      let status = match r with Ok _ -> Executed | Error e -> Failed (Msg e) in
+      set_result d r; set_status o status; set_time_ended o end_time
   end
 
   module Mkdir = struct
@@ -678,9 +679,9 @@ module Op = struct
     let mode mk = mk.mkdir_mode
     let result mk = mk.mkdir_result
     let set_result mk res = mk.mkdir_result <- res
-    let set_exec_status o mk end_time res =
-      let status = match res with Ok _ -> Executed | Error _ -> Failed in
-      set_result mk res; set_status o status; set_time_ended o end_time
+    let set_exec_status o mk end_time r =
+      let status = match r with Ok _ -> Executed | Error e -> Failed (Msg e) in
+      set_result mk r; set_status o status; set_time_ended o end_time
   end
 
   module Notify = struct
@@ -711,9 +712,9 @@ module Op = struct
     let file r = r.read_file
     let result r = r.read_result
     let set_result r res = r.read_result <- res
-    let set_exec_status o r end_time res =
-      let status = match res with Ok _ -> Executed | Error _ -> Failed in
-      set_result r res; set_status o status; set_time_ended o end_time
+    let set_exec_status o read end_time r =
+      let status = match r with Ok _ -> Executed | Error e -> Failed (Msg e) in
+      set_result read r; set_status o status; set_time_ended o end_time
   end
 
   module Spawn = struct
@@ -755,15 +756,17 @@ module Op = struct
     let set_stdo_ui s ui = s.stdo_ui <- ui
     let result s = s.spawn_result
     let set_result s e = s.spawn_result <- e
-    let set_exec_status o s end_time stdo_ui result =
-      let status = match result with
-      | Error _ | Ok (`Signaled _) -> Failed
+    let set_exec_status o s end_time stdo_ui r =
+      let status = match r with
+      | Error e -> Failed (Msg e)
+      | Ok (`Signaled c) -> Failed (Msg (Fmt.str "signaled (%d)" c))
       | Ok (`Exited c) ->
           match success_exits s with
           | [] -> Executed
-          | cs -> if (List.mem c cs) then Executed else Failed
+          | cs when List.mem c cs -> Executed
+          | cs -> Failed (Msg (Fmt.str "illegal exit code (%d)" c))
       in
-      set_stdo_ui s stdo_ui; set_result s result; set_status o status;
+      set_stdo_ui s stdo_ui; set_result s r; set_status o status;
       set_time_ended o end_time
   end
 
@@ -800,9 +803,9 @@ module Op = struct
     let write_data_nop _ = Error "nothing to writes (assert false)"
     let set_write_data w d = w.write_data <- d
     let set_result w res = w.write_result <- res
-    let set_exec_status o w end_time res =
-      let status = match res with Ok _ -> Executed | Error _ -> Failed in
-      set_write_data w write_data_nop; set_result w res; set_status o status;
+    let set_exec_status o w end_time r =
+      let status = match r with Ok _ -> Executed | Error e -> Failed (Msg e) in
+      set_write_data w write_data_nop; set_result w r; set_status o status;
       set_time_ended o end_time
   end
 
@@ -1607,22 +1610,27 @@ module Memo = struct
       | true ->
           begin match Op.did_not_write o with
           | [] -> continue_op m o
-          | fs -> Op.set_status o Op.Failed; discontinue_op m o fs
+          | fs ->
+              Op.set_status o (Op.Failed (Op.Missing_writes fs));
+              discontinue_op m o fs
           end
       | false ->
           match Reviver.record m.m.reviver o with
           | Ok true -> continue_op m o
           | Ok false ->
-              Op.set_status o Op.Failed;
+              Op.set_status o
+                (Op.Failed (Op.Missing_writes (Op.did_not_write o)));
               discontinue_op m o (Op.did_not_write o)
           | Error e ->
               m.m.feedback (`Op_cache_error (o, e));
               begin match Op.did_not_write o with
               | [] -> continue_op m o
-              | fs -> Op.set_status o Op.Failed; discontinue_op m o fs
+              | fs ->
+                  Op.set_status o (Op.Failed (Op.Missing_writes fs));
+                  discontinue_op m o fs
               end
       end
-  | Op.Aborted | Op.Failed -> discontinue_op m o []
+  | Op.Aborted | Op.Failed _ -> discontinue_op m o []
   | Op.Waiting -> assert false
 
   let submit_op m o = match Op.status o with
@@ -1645,7 +1653,7 @@ module Memo = struct
               Exec.submit m.m.exec o
           end
       end
-  | Op.Executed | Op.Failed -> assert false
+  | Op.Executed | Op.Failed _ -> assert false
 
   (* XXX we may blow stack continuations can add which stirs.
      XXX futures make it even worse. *)

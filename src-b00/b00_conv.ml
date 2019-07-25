@@ -292,7 +292,7 @@ module Op = struct
 
   let pp_status ppf o = match Op.status o with
   | Op.Executed -> ()
-  | Op.Failed -> Fmt.tty_string style_status_failed ppf "FAILED "
+  | Op.Failed _ -> Fmt.tty_string style_status_failed ppf "FAILED "
   | Op.Aborted -> Fmt.tty_string style_status_aborted ppf "ABORTED "
   | Op.Waiting -> Fmt.tty_string style_status_waiting ppf "WAITING "
 
@@ -483,10 +483,26 @@ module Op = struct
     let i, s = Bin.dec_string s i in
     i, Hash.of_bytes s
 
+  let enc_failure b = function
+  | Op.Msg m -> Bin.enc_byte b 0; Bin.enc_string b m
+  | Op.Missing_writes fs -> Bin.enc_byte b 1; Bin.enc_list Bin.enc_fpath b fs
+
+  let dec_failure s i =
+    let kind = "Op.failure" in
+    let next, b = Bin.dec_byte ~kind s i in
+    match b with
+    | 0 ->
+        let i, msg = Bin.dec_string s next in
+        i, Op.Msg msg
+    | 1 ->
+        let i, fs = Bin.dec_list Bin.dec_fpath s next in
+        i, Op.Missing_writes fs
+    | b -> Bin.err_byte ~kind i b
+
   let enc_status b = function
   | Op.Aborted -> Bin.enc_byte b 0
   | Op.Executed -> Bin.enc_byte b 1
-  | Op.Failed -> Bin.enc_byte b 2
+  | Op.Failed f -> Bin.enc_byte b 2; enc_failure b f
   | Op.Waiting -> Bin.enc_byte b 3
 
   let dec_status s i =
@@ -495,7 +511,9 @@ module Op = struct
     match b with
     | 0 -> next, Op.Aborted
     | 1 -> next, Op.Executed
-    | 2 -> next, Op.Failed
+    | 2 ->
+        let i, f = dec_failure s next in
+        i, Op.Failed f
     | 3 -> next, Op.Waiting
     | b -> Bin.err_byte ~kind i b
 
@@ -780,7 +798,7 @@ module Memo = struct
     | `Op_complete (op, fail) ->
         if level >= Log.Debug then (Op.pp ppf op; sep ppf ()) else
         begin match (B00.Op.status op) with
-        | B00.Op.Failed ->
+        | B00.Op.Failed _ ->
             if level >= Log.Error
             then ((Op.pp_failed ~op_howto) ppf (op, fail); sep ppf ())
         | B00.Op.Aborted ->

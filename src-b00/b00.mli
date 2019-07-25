@@ -248,10 +248,15 @@ module Op : sig
 
   (** {1:op_status Operation status} *)
 
+  type failure =
+  | Msg of string (** Operation specific failure (usually OS error). *)
+  | Missing_writes of Fpath.t list (** Write specification failure. *)
+  (** The type for operation failures. *)
+
   type status =
   | Aborted  (** Aborted due to prerequisite failure. *)
   | Executed (** Executed successfully. *)
-  | Failed   (** Executed unsuccessfully. *)
+  | Failed  of failure (** Executed unsuccessfully. *)
   | Waiting  (** Waiting for execution. *)
   (** The type for operation statuses. *)
 
@@ -688,13 +693,15 @@ module Op : sig
   | Read of Read.t
   | Spawn of Spawn.t
   | Wait_files of Wait_files.t
-  | Write of Write.t
+  | Write of Write.t (** *)
   (** The type for operation kinds. *)
 
   val v :
     id -> group:group -> time_created:Time.span -> time_started:Time.span ->
     duration:Time.span -> revived:bool -> status:status ->
     reads:Fpath.t list -> writes:Fpath.t list -> hash:Hash.t -> kind -> t
+  (** [v] constructs an operation. See the corresponding accessors
+      for the semantics of various arguments. *)
 
   val kind_name : kind -> string
   (** [kind_name k] is a end user name for kind [k]. *)
