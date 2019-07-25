@@ -457,19 +457,17 @@ module Op = struct
   let pp ppf o =
     Fmt.pf ppf "@[<v>@[<h>%a@]@, @[%a@]@,@]" pp_header_long o pp_kind_long o
 
-  let pp_did_not_write ~op_howto ppf (o, fs) =
-    let pp_file_list = Fmt.list pp_file_write in
-    let exp = match fs with
-    | [_] -> "this expected file"
-    |  _  -> "these expected files"
-    in
-    Fmt.pf ppf "@[<v>%a:@,@[%a %s: %a@]@, @[%a@]@]"
-      pp_short o (Fmt.tty style_err Fmt.string) "Operation did not write" exp
-      (Fmt.tty style_op_howto op_howto) o pp_file_list fs
-
-  let pp_failed ~op_howto ppf (op, (`Did_not_write fs)) = match fs with
-  | [] -> pp_short_with_ui ppf op
-  | fs -> pp_did_not_write ppf ~op_howto (op, fs)
+  let pp_failed ~op_howto ppf o = match Op.status o with
+  | Op.Failed (Op.Missing_writes fs) ->
+      let pp_file_list = Fmt.list pp_file_write in
+      let exp = match fs with
+      | [_] -> "this expected file"
+      |  _  -> "these expected files"
+      in
+      Fmt.pf ppf "@[<v>%a:@,@[%a %s: %a@]@, @[%a@]@]"
+        pp_short o (Fmt.tty style_err Fmt.string) "Operation did not write" exp
+        (Fmt.tty style_op_howto op_howto) o pp_file_list fs
+  | _ -> pp_short_with_ui ppf o
 
   (* Binary serialization *)
 
@@ -781,7 +779,7 @@ module Memo = struct
       Fmt.pf ppf "@[<v>missing tool:@,%s@]" e
   | `Op_cache_error (op, e) ->
       Fmt.pf ppf "@[op %d: cache error: %s@]" (B00.Op.id op) e
-  | `Op_complete (op, fail) ->
+  | `Op_complete op ->
       failwith "TODO"
 
   let pp_leveled_feedback
@@ -795,17 +793,17 @@ module Memo = struct
     if level = Log.Quiet then () else
     match f with
     | `Exec_submit (_, _) -> () (* we have B0_std.Os spawn tracer on debug *)
-    | `Op_complete (op, fail) ->
-        if level >= Log.Debug then (Op.pp ppf op; sep ppf ()) else
-        begin match (B00.Op.status op) with
+    | `Op_complete o ->
+        if level >= Log.Debug then (Op.pp ppf o; sep ppf ()) else
+        begin match (B00.Op.status o) with
         | B00.Op.Failed _ ->
             if level >= Log.Error
-            then ((Op.pp_failed ~op_howto) ppf (op, fail); sep ppf ())
+            then ((Op.pp_failed ~op_howto) ppf o; sep ppf ())
         | B00.Op.Aborted ->
-            if level >= Log.Info then (Op.pp_short ppf op; sep ppf ())
+            if level >= Log.Info then (Op.pp_short ppf o; sep ppf ())
         | B00.Op.Executed ->
-            if level >= show_op || (level >= show_op_ui && has_ui op)
-            then (Op.pp_short_with_ui ppf op; sep ppf ())
+            if level >= show_op || (level >= show_op_ui && has_ui o)
+            then (Op.pp_short_with_ui ppf o; sep ppf ())
         | B00.Op.Waiting ->
               assert false
         end

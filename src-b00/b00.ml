@@ -551,8 +551,14 @@ module Op = struct
   type failure = Msg of string | Missing_writes of Fpath.t list
   type status = Aborted | Executed | Failed of failure | Waiting
 
+  let failure_to_string = function
+  | Msg m -> m
+  | Missing_writes fs ->
+      Fmt.str "@[<v>Did not write:@,%a@]" (Fmt.list Fpath.pp_quoted) fs
+
   let status_to_string = function
-  | Aborted -> "aborted" | Executed -> "executed" | Failed _ -> "failed"
+  | Aborted -> "aborted" | Executed -> "executed"
+  | Failed f -> Fmt.str "failed: %s" (failure_to_string f)
   | Waiting -> "waiting"
 
   type t =
@@ -1496,7 +1502,7 @@ module Memo = struct
   | `Fiber_fail of string
   | `Miss_tool of Tool.t * string
   | `Op_cache_error of Op.t * string
-  | `Op_complete of Op.t * [`Did_not_write of Fpath.t list]]
+  | `Op_complete of Op.t ]
 
   exception Fail of string
 
@@ -1594,14 +1600,14 @@ module Memo = struct
 
   let continue_op m o =
     List.iter (fun f -> Guard.set_file_ready m.m.guard f) (Op.writes o);
-    m.m.feedback (`Op_complete (o, `Did_not_write []));
+    m.m.feedback (`Op_complete o);
     match Op.Map.find o m.m.konts with
     | k -> rem_op_kont m o; k m o | exception Not_found -> ()
 
-  let discontinue_op m o did_not_write =
+  let discontinue_op m o =
     List.iter (fun f -> Guard.set_file_never m.m.guard f) (Op.writes o);
     rem_op_kont m o;
-    m.m.feedback (`Op_complete (o, `Did_not_write did_not_write))
+    m.m.feedback (`Op_complete o)
 
   let finish_op m o = match Op.status o with
   | Op.Executed ->
@@ -1610,27 +1616,27 @@ module Memo = struct
       | true ->
           begin match Op.did_not_write o with
           | [] -> continue_op m o
-          | fs ->
-              Op.set_status o (Op.Failed (Op.Missing_writes fs));
-              discontinue_op m o fs
+          | miss ->
+              Op.set_status o (Op.Failed (Op.Missing_writes miss));
+              discontinue_op m o
           end
       | false ->
           match Reviver.record m.m.reviver o with
           | Ok true -> continue_op m o
           | Ok false ->
-              Op.set_status o
-                (Op.Failed (Op.Missing_writes (Op.did_not_write o)));
-              discontinue_op m o (Op.did_not_write o)
+              let miss = Op.did_not_write o in
+              Op.set_status o (Op.Failed (Op.Missing_writes miss));
+              discontinue_op m o
           | Error e ->
               m.m.feedback (`Op_cache_error (o, e));
               begin match Op.did_not_write o with
               | [] -> continue_op m o
-              | fs ->
-                  Op.set_status o (Op.Failed (Op.Missing_writes fs));
-                  discontinue_op m o fs
+              | miss ->
+                  Op.set_status o (Op.Failed (Op.Missing_writes miss));
+                  discontinue_op m o
               end
       end
-  | Op.Aborted | Op.Failed _ -> discontinue_op m o []
+  | Op.Aborted | Op.Failed _ -> discontinue_op m o
   | Op.Waiting -> assert false
 
   let submit_op m o = match Op.status o with

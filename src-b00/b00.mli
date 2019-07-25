@@ -1116,7 +1116,7 @@ module Memo : sig
   | `Fiber_fail of string
   | `Miss_tool of Tool.t * string
   | `Op_cache_error of Op.t * string
-  | `Op_complete of Op.t * [`Did_not_write of Fpath.t list] ]
+  | `Op_complete of Op.t ]
   (** The type for memoizer feedback. *)
 
   type t

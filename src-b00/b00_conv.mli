@@ -54,9 +54,7 @@ module Op : sig
   val pp : Op.t Fmt.t
   (** [pp] formats a build operation. *)
 
-  val pp_failed :
-    op_howto:B00.Op.t Fmt.t ->
-    (B00.Op.t * [< `Did_not_write of Fpath.t list ]) Fmt.t
+  val pp_failed : op_howto:B00.Op.t Fmt.t -> B00.Op.t Fmt.t
   (** [pp] formats an operation failure. [op_howto] formats how
       to get more information about the failing operartion. *)
 
