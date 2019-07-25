@@ -11,7 +11,7 @@ module Trash = struct
   let create dir = { dir }
   let dir t = t.dir
   let trash t p =
-    Result.map_error (fun e -> Fmt.str "trashing %a: %s" Fpath.pp_quoted p e) @@
+    Result.map_error (Fmt.str "trashing %a: %s" Fpath.pp_quoted p) @@
     Result.bind (Os.Path.exists p) @@ function
     | false -> Ok ()
     | true ->

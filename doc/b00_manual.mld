@@ -47,11 +47,11 @@ Concepts dropped and to be seen how we can recover them at a higher level:
 
 {2:rems Handling removals}
 
-Knowing files before hand doesn't fit the build model, besides
-removals is under the responsability of `Memo` clients (e.g. for now
-`odig` doesn't deal with it). The approach currently taken is the
-first one below. The second one could be considered but hampers
-correctness.
+Knowing files before the build starts doesn't fit the build model,
+besides removals is under the responsability of `Memo` clients
+(e.g. for now `odig` doesn't deal with it). The approach currently
+taken is the first one below. The second one could be considered but
+hampers correctness.
 
 {ol
 {- Clean builds. Usually builds are performed in a dedicated
