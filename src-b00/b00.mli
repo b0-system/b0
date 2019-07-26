@@ -8,9 +8,7 @@
 
     {b WARNING.} This is an unstable API use at your own risk.
     See the {{!page-b00_manual}b00 manual} for design issues
-    and discussions.
-
-    {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
+    and discussions. *)
 
 (** {1:b00 B00} *)
 

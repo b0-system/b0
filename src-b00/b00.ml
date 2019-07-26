@@ -486,17 +486,15 @@ module Op = struct
   (* Operation kinds *)
 
   type copy =
-    { copy_src : Fpath.t; copy_dst : Fpath.t;
-      copy_mode : int; copy_linenum : int option; }
+    { copy_src : Fpath.t; copy_dst : Fpath.t; copy_mode : int;
+      copy_linenum : int option; }
 
   type delete = { delete_path : Fpath.t; }
   type mkdir = { mkdir_dir : Fpath.t; mkdir_mode : int; }
   type notify_kind = [ `Warn | `Start | `End | `Info ]
   type notify = { notify_kind : notify_kind; notify_msg : string }
-
   type read =
-    { read_file : Fpath.t;
-      mutable read_result : (string, string) result; }
+    { read_file : Fpath.t; mutable read_result : (string, string) result; }
 
   type spawn_stdo = [ `Ui | `File of Fpath.t | `Tee of Fpath.t ]
   type spawn_success_exits = int list
@@ -567,6 +565,12 @@ module Op = struct
       kind : kind }
 
   type op = t
+  let v
+      id ~group ~time_created ~time_started ~duration ~revived
+      ~status ~reads ~writes ~hash ~k kind
+    =
+    { id; group; time_created; time_started; duration; revived;
+      status; reads; writes; hash; k; kind; }
 
   let v_kind ~id ~group time_created ~reads ~writes ~k kind =
     let time_started = Time.Span.max in
@@ -574,13 +578,6 @@ module Op = struct
     let revived = false and status = Waiting and hash = Hash.nil in
     { id; group; time_created; time_started; duration; revived;
       status; reads; writes; hash; k; kind }
-
-  let v
-      id ~group ~time_created ~time_started ~duration ~revived
-      ~status ~reads ~writes ~hash ~k kind
-    =
-    { id; group; time_created; time_started; duration; revived;
-      status; reads; writes; hash; k; kind; }
 
   let id o = o.id
   let group o = o.group
@@ -898,7 +895,7 @@ module Reviver = struct
     let writes = Op.writes o in
     Result.bind (File_cache.revive r.cache key writes) @@ function
     | None -> Ok None
-    | Some (m, existed) ->
+    | Some (_, existed) ->
         Op.Write.discard_data w; (* get rid of write data closure. *)
         Op.set_revived o true;
         Op.set_exec_result o (timestamp r) (Ok ());
@@ -909,7 +906,7 @@ module Reviver = struct
     let writes = Op.writes o in
     Result.bind (File_cache.revive r.cache key writes) @@ function
     | None -> Ok None
-    | Some (m, existed) ->
+    | Some (_, existed) ->
         Op.set_revived o true;
         Op.set_exec_result o (timestamp r) (Ok ());
         Ok (Some existed)
@@ -951,8 +948,7 @@ module Guard = struct
      especially if other sync objects are introduced. *)
 
   type feedback =
-  [ `File_status_repeat of Fpath.t
-  | `File_status_unstable of Fpath.t ]
+    [ `File_status_repeat of Fpath.t | `File_status_unstable of Fpath.t ]
 
   (* The type [gop] keeps in [awaits] the files that need to become
      ready before the operation [op] can be added to the [allowed]
@@ -1084,7 +1080,6 @@ end
 
 module Exec = struct
   type feedback = [ `Exec_submit of Os.Cmd.pid option * Op.t ]
-
   type t =
     { clock : Time.counter;
       tmp_dir : Fpath.t;
@@ -1097,9 +1092,8 @@ module Exec = struct
       mutable spawn_count : int; (* Number of spawned processes *)
       mutable spawns : (Os.Cmd.pid * Fpath.t option * Op.t) list; }
 
-  let create
-      ?clock ?rand ?tmp_dir:tmp ?(feedback = fun _ -> ()) ~trash ~jobs ()
-    =
+  let create ?clock ?rand ?tmp_dir:tmp ?feedback ~trash ~jobs () =
+    let feedback = match feedback with None -> fun _ -> () | Some f -> f in
     let clock = match clock with None -> Time.counter () | Some c -> c in
     let tmp_dir = match tmp with None -> Os.Dir.default_tmp () | Some t -> t in
     let todo = Rqueue.empty ?rand () in
@@ -1436,7 +1430,8 @@ module Memo = struct
 
   exception Fail of string
 
-  type ctx = { group : Op.group }
+  type t = { c : ctx; m : memo }
+  and ctx = { group : Op.group }
   and memo =
     { clock : Time.counter;
       cpu_clock : Time.cpu_counter;
@@ -1450,19 +1445,15 @@ module Memo = struct
       mutable op_id : int;
       mutable ops : Op.t list; }
 
-  and t = { c : ctx; m : memo }
-
   let create ?clock ?cpu_clock:cc ~feedback ~cwd env guard reviver exec =
-    let c = { group = "" } in
     let clock = match clock with None -> Time.counter () | Some c -> c in
     let cpu_clock = match cc with None -> Time.cpu_counter () | Some c -> c in
-    let futs = Futs.create () in
-    let op_id = 0 in
-    let ops = [] in
+    let futs = Futs.create () and op_id = 0 and  ops = [] in
     let m =
       { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec; futs;
         op_id; ops; }
     in
+    let c = { group = "" } in
     { c; m }
 
   let memo
@@ -1616,25 +1607,22 @@ module Memo = struct
   (* Fibers *)
 
   type 'a fiber = ('a -> unit) -> unit
-
   let fail fmt = Fmt.kstr (fun s -> raise (Fail s)) fmt
   let fail_error = function Ok v -> v | Error e -> raise (Fail e)
 
   (* Notify *)
 
   let notify m kind fmt =
-    Fmt.kstr begin fun msg ->
-      let id = new_op_id m in
-      let k o = () in
+    let op msg =
+      let id = new_op_id m and k o = () in
       let o = Op.Notify.v_op ~id ~group:m.c.group (timestamp m) ~k kind msg in
       add_op m o
-    end fmt
+    in
+    Fmt.kstr op fmt
 
   (* Files *)
 
-  let file_ready m p =
-    Guard.set_file_ready m.m.guard p
-
+  let file_ready m p = Guard.set_file_ready m.m.guard p
   let read m file k =
     let id = new_op_id m in
     let k o = k (Result.get_ok @@ Op.Read.result (Op.Read.get o)) in
@@ -1751,6 +1739,7 @@ module Memo = struct
     type 'a set = 'a Futs.fut_set
     let create m = let f, s = Futs.fut m.m.futs in (f, m), s
     let value (f, _) = Futs.fut_value f
+    let set s = Futs.fut_set s
     let wait (f, m) k =
       let trap_kont_exn v = try k v with
       | Fail e -> m.m.feedback (`Fiber_fail e)
@@ -1760,8 +1749,6 @@ module Memo = struct
       | e -> m.m.feedback (`Fiber_exn (e, Printexc.get_raw_backtrace ()))
       in
       Futs.fut_wait f trap_kont_exn
-
-    let set s = Futs.fut_set s
   end
 end
 
