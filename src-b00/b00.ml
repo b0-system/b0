@@ -563,23 +563,24 @@ module Op = struct
       mutable reads : Fpath.t list;
       mutable writes : Fpath.t list;
       mutable hash : Hash.t;
+      mutable k : t -> unit;
       kind : kind }
 
   type op = t
 
-  let v_kind ~id ~group time_created ~reads ~writes kind =
+  let v_kind ~id ~group time_created ~reads ~writes ~k kind =
     let time_started = Time.Span.max in
     let duration = Time.Span.zero in
     let revived = false and status = Waiting and hash = Hash.nil in
     { id; group; time_created; time_started; duration; revived;
-      status; reads; writes; hash; kind; }
+      status; reads; writes; hash; k; kind }
 
   let v
       id ~group ~time_created ~time_started ~duration ~revived
-      ~status ~reads ~writes ~hash kind
+      ~status ~reads ~writes ~hash ~k kind
     =
     { id; group; time_created; time_started; duration; revived;
-      status; reads; writes; hash; kind; }
+      status; reads; writes; hash; k; kind; }
 
   let id o = o.id
   let group o = o.group
@@ -603,6 +604,10 @@ module Op = struct
     loop [] o.writes
 
   let hash o = o.hash
+  let diskontinue o = o.k <- (fun _ -> invalid_arg "diskontinued")
+  let kontinue o =
+    let k = o.k in o.k <- (fun _ -> invalid_arg "already kontinued" ); k o
+
   let equal o0 o1 = o0.id = o1.id
   let compare o0 o1 = (Pervasives.compare : int -> int -> int) o0.id o1.id
   let set_time_started o t = o.time_started <- t
@@ -629,12 +634,12 @@ module Op = struct
     let mode c = c.copy_mode
     let linenum c = c.copy_linenum
     let v_op
-        ~id ~group time_created ~mode:copy_mode ~linenum:copy_linenum
+        ~id ~group time_created ~k ~mode:copy_mode ~linenum:copy_linenum
         ~src:copy_src copy_dst
       =
       let c = { copy_src; copy_dst; copy_mode; copy_linenum } in
       let reads = [copy_src] and writes = [copy_dst] in
-      v_kind ~id ~group time_created ~reads ~writes (Copy c)
+      v_kind ~id ~group time_created ~reads ~writes ~k (Copy c)
   end
 
   module Delete = struct
@@ -642,9 +647,9 @@ module Op = struct
     let v ~path:delete_path = { delete_path }
     let get o = match o.kind with Delete d -> d | _ -> assert false
     let path d = d.delete_path
-    let v_op ~id ~group time_created delete_path =
+    let v_op ~id ~group time_created ~k delete_path =
       let d = { delete_path } in
-      v_kind ~id ~group time_created ~reads:[] ~writes:[] (Delete d)
+      v_kind ~id ~group time_created ~reads:[] ~writes:[] ~k (Delete d)
   end
 
   module Mkdir = struct
@@ -653,9 +658,9 @@ module Op = struct
     let get o = match o.kind with Mkdir mk -> mk | _ -> assert false
     let dir mk = mk.mkdir_dir
     let mode mk = mk.mkdir_mode
-    let v_op ~id ~group ~mode:mkdir_mode time_created dir =
+    let v_op ~id ~group ~mode:mkdir_mode time_created ~k dir =
       let mkdir = { mkdir_dir = dir; mkdir_mode; } in
-      v_kind ~id ~group time_created ~reads:[] ~writes:[dir] (Mkdir mkdir)
+      v_kind ~id ~group time_created ~reads:[] ~writes:[dir] ~k (Mkdir mkdir)
   end
 
   module Notify = struct
@@ -668,17 +673,13 @@ module Op = struct
     let get o = match o.kind with Notify n -> n | _ -> assert false
     let kind n = n.notify_kind
     let msg n = n.notify_msg
-    let v_op ~id ~group time_created notify_kind notify_msg =
+    let v_op ~id ~group time_created ~k notify_kind notify_msg =
       let n = { notify_kind; notify_msg } in
-      v_kind ~id ~group time_created ~reads:[] ~writes:[] (Notify n)
+      v_kind ~id ~group time_created ~reads:[] ~writes:[] ~k (Notify n)
   end
 
   module Read = struct
     type t = read
-    let v_op ~id ~group time_created file =
-      let read = { read_file = file; read_result = Error "not read" } in
-      v_kind ~id ~group time_created ~reads:[file] ~writes:[] (Read read)
-
     let v ~file:read_file ~result:read_result = { read_file; read_result }
     let get o = match o.kind with Read r -> r | _ -> assert false
     let file r = r.read_file
@@ -687,6 +688,10 @@ module Op = struct
     let set_exec_status o read end_time r =
       let status = match r with Ok _ -> Executed | Error e -> Failed (Msg e) in
       set_result read r; set_status o status; set_time_ended o end_time
+
+    let v_op ~id ~group time_created ~k file =
+      let read = { read_file = file; read_result = Error "not read" } in
+      v_kind ~id ~group time_created ~reads:[file] ~writes:[] ~k (Read read)
   end
 
   module Spawn = struct
@@ -730,7 +735,7 @@ module Op = struct
       set_time_ended o end_time
 
     let v_op
-        ~id ~group time_created ~stamp:spawn_stamp ~reads ~writes ~env
+        ~id ~group time_created ~reads ~writes ~k ~stamp:spawn_stamp ~env
         ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits tool args
       =
       let spawn =
@@ -738,14 +743,14 @@ module Op = struct
           tool; args; spawn_stamp; stdo_ui = None;
           spawn_result = Error "not spawned" }
       in
-      v_kind ~id ~group time_created ~reads ~writes (Spawn spawn)
+      v_kind ~id ~group time_created ~reads ~writes ~k (Spawn spawn)
   end
 
   module Wait_files = struct
     type t = wait_files
     let v () = ()
-    let v_op ~id ~group time_created reads =
-      v_kind ~id ~group time_created ~reads ~writes:[] (Wait_files ())
+    let v_op ~id ~group time_created ~k reads =
+      v_kind ~id ~group time_created ~reads ~writes:[] ~k (Wait_files ())
   end
 
   module Write = struct
@@ -764,11 +769,11 @@ module Op = struct
       w.write_data <- fun _ -> Error "nothing to write (assert false)"
 
     let v_op
-        ~id ~group time_created ~stamp:write_stamp ~reads ~mode:write_mode
+        ~id ~group time_created ~k ~stamp:write_stamp ~reads ~mode:write_mode
         ~write:write_file write_data
       =
       let w = { write_stamp; write_mode; write_file; write_data } in
-      v_kind ~id ~group time_created ~reads ~writes:[write_file] (Write w)
+      v_kind ~id ~group time_created ~reads ~writes:[write_file] ~k (Write w)
   end
 
   module T = struct type nonrec t = t let compare = compare end
@@ -1443,11 +1448,6 @@ module Memo = struct
       exec : Exec.t;
       futs : Futs.t;
       mutable op_id : int;
-      (* XXX The fact that continuations are not part of operations
-         is an artefact of using marshall on op values in B0. Since we
-         won't do this  maybe we could have a field for it in Op.t though
-         it may still be a good idea to not carry these closures around.  *)
-      mutable konts : (t -> Op.t -> unit) Op.Map.t;
       mutable ops : Op.t list; }
 
   and t = { c : ctx; m : memo }
@@ -1458,17 +1458,16 @@ module Memo = struct
     let cpu_clock = match cc with None -> Time.cpu_counter () | Some c -> c in
     let futs = Futs.create () in
     let op_id = 0 in
-    let konts = Op.Map.empty in
     let ops = [] in
-    let m = { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec;
-              futs; op_id; konts; ops; }
+    let m =
+      { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec; futs;
+        op_id; ops; }
     in
     { c; m }
 
   let memo
       ?(hash_fun = (module Hash.Xxh_64 : Hash.T)) ?env ?cwd ?cache_dir
-      ?trash_dir
-      ?(jobs = 4) ?feedback ()
+      ?trash_dir ?(jobs = 4) ?feedback ()
     =
     let feedback = match feedback with
     | Some f -> f
@@ -1520,19 +1519,14 @@ module Memo = struct
   | Sys.Break as e -> raise e
   | e -> m.m.feedback (`Fiber_exn (e, Printexc.get_raw_backtrace ()))
 
-  let add_op_kont m o k = m.m.konts <- Op.Map.add o (trap_kont_exn k) m.m.konts
-  let rem_op_kont m o = m.m.konts <- Op.Map.remove o m.m.konts
-
   let continue_op m o =
     List.iter (fun f -> Guard.set_file_ready m.m.guard f) (Op.writes o);
     m.m.feedback (`Op_complete o);
-    match Op.Map.find o m.m.konts with
-    | k -> rem_op_kont m o; k m o | exception Not_found -> ()
+    trap_kont_exn (fun m o -> Op.kontinue o) m o
 
   let discontinue_op m o =
     List.iter (fun f -> Guard.set_file_never m.m.guard f) (Op.writes o);
-    rem_op_kont m o;
-    m.m.feedback (`Op_complete o)
+    Op.diskontinue o; m.m.feedback (`Op_complete o)
 
   let finish_op m o = match Op.status o with
   | Op.Executed ->
@@ -1631,9 +1625,9 @@ module Memo = struct
   let notify m kind fmt =
     Fmt.kstr begin fun msg ->
       let id = new_op_id m in
-      let o = Op.Notify.v_op ~id ~group:m.c.group (timestamp m) kind msg in
-      let k m o = () in
-      add_op_kont m o k; add_op m o
+      let k o = () in
+      let o = Op.Notify.v_op ~id ~group:m.c.group (timestamp m) ~k kind msg in
+      add_op m o
     end fmt
 
   (* Files *)
@@ -1643,37 +1637,36 @@ module Memo = struct
 
   let read m file k =
     let id = new_op_id m in
-    let o = Op.Read.v_op ~id ~group:m.c.group (timestamp m) file in
-    let k m o = k (Result.get_ok @@ Op.Read.result (Op.Read.get o)) in
-    add_op_kont m o k; add_op m o
+    let k o = k (Result.get_ok @@ Op.Read.result (Op.Read.get o)) in
+    let o = Op.Read.v_op ~id ~group:m.c.group (timestamp m) ~k file in
+    add_op m o
 
   let wait_files m files k =
-    let id = new_op_id m in
-    let o = Op.Wait_files.v_op ~id ~group:m.c.group (timestamp m) files in
-    let k m o = k () in
-    add_op_kont m o k; add_op m o
+    let id = new_op_id m and k o = k () in
+    let o = Op.Wait_files.v_op ~id ~group:m.c.group (timestamp m) ~k files in
+    add_op m o
 
   let write m ?(stamp = "") ?(reads = []) ?(mode = 0o644) write data =
     let id = new_op_id m and group = m.c.group and start = timestamp m in
-    let o = Op.Write.v_op ~id start ~group ~stamp ~reads ~mode ~write data in
+    let k o = () in
+    let o = Op.Write.v_op ~id start ~k ~group ~stamp ~reads ~mode ~write data in
     add_op m o
 
   let copy m ?(mode = 0o644) ?linenum ~src dst =
     let id = new_op_id m and group = m.c.group and start = timestamp m in
-    let o = Op.Copy.v_op ~id start ~group ~mode ~linenum ~src dst in
+    let k o = () in
+    let o = Op.Copy.v_op ~id start ~k ~group ~mode ~linenum ~src dst in
     add_op m o
 
   let mkdir m ?(mode = 0o755) dir k =
-    let id = new_op_id m in
-    let o = Op.Mkdir.v_op ~id ~group:m.c.group ~mode (timestamp m) dir in
-    let k m o = k () in
-    add_op_kont m o k; add_op m o
+    let id = new_op_id m and k o = k () in
+    let o = Op.Mkdir.v_op ~id ~group:m.c.group ~mode (timestamp m) ~k dir in
+    add_op m o
 
   let delete m p k =
-    let id = new_op_id m in
-    let o = Op.Delete.v_op ~id ~group:m.c.group (timestamp m) p in
-    let k m o = k () in
-    add_op_kont m o k; add_op m o
+    let id = new_op_id m and k o = k () in
+    let o = Op.Delete.v_op ~id ~group:m.c.group (timestamp m) ~k p in
+    add_op m o
 
   (* FIXME better strategy to deal with builded tools. If the tool is a
      path check for readyness if not add it to the operations reads.
@@ -1738,20 +1731,18 @@ module Memo = struct
         let timestamp = timestamp m in
         let env, relevant_env = spawn_env m tool env in
         let cwd = match cwd with None -> m.m.cwd | Some d -> d in
+        let k = match k with
+        | None -> fun o -> ()
+        | Some k ->
+            fun o -> match Op.Spawn.result (Op.Spawn.get o) with
+            | Ok (`Exited code) -> k code
+            | _ -> assert false
+        in
         let o =
-          Op.Spawn.v_op ~id ~group:m.c.group timestamp ~stamp ~reads ~writes
+          Op.Spawn.v_op ~id ~group:m.c.group timestamp ~reads ~writes ~k ~stamp
             ~env ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits
             tool.tool_file cmd.cmd_args
         in
-        begin match k with
-        | None -> ()
-        | Some k ->
-            let k m o = match Op.Spawn.result (Op.Spawn.get o) with
-            | Ok (`Exited code) -> k code
-            | _ -> assert false
-            in
-            add_op_kont m o k;
-        end;
         add_op m o
 
   module Fut = struct

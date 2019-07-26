@@ -688,7 +688,7 @@ module Op = struct
     let i, stamp = Bin.dec_string s i in
     let i, mode = Bin.dec_int s i in
     let i, file = Bin.dec_fpath s i in
-    let data () = Error "Serialized op, data fun not available" in
+    let data () = Error "deserialized op, data fun not available" in
     i, Op.Write.v ~stamp ~mode ~file ~data
 
   let enc_kind b = function
@@ -730,6 +730,7 @@ module Op = struct
     ()
 
   let dec_op s i =
+    let k o = invalid_arg "deserialized op, no kontinuation" in
     let i, id = Bin.dec_int s i in
     let i, group = Bin.dec_string s i in
     let i, time_created = dec_time_span s i in
@@ -742,7 +743,7 @@ module Op = struct
     let i, hash = dec_hash s i in
     let i, kind = dec_kind s i in
     i, Op.v id ~group ~time_created ~time_started ~duration ~revived
-      ~status ~reads ~writes ~hash kind
+      ~status ~reads ~writes ~hash ~k kind
 
   let magic = "b\x00\x00\x00"
   let list_to_string ops =

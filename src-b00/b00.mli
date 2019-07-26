@@ -323,6 +323,12 @@ module Op : sig
       operation hash has been effectively computed and set via
       {!set_hash}. *)
 
+  val kontinue : t -> unit
+  (** [kontinue o ()] invokes and discards [o]'s continuation. *)
+
+  val diskontinue : t -> unit
+  (** [diskontinue o] discards [o]'s continuation. *)
+
   (** {1:op_kind Operations kinds} *)
 
   (** File copy *)
@@ -334,8 +340,8 @@ module Op : sig
     (** The type for file copies. *)
 
     val v_op :
-      id:id -> group:group -> Time.span -> mode:int -> linenum:int option ->
-      src:Fpath.t -> Fpath.t -> op
+      id:id -> group:group -> Time.span -> k:(op -> unit) ->
+      mode:int -> linenum:int option -> src:Fpath.t -> Fpath.t -> op
     (** [v] declares a file link operation, see the corresponding
         accessors for the semantics of various arguments. *)
 
@@ -368,7 +374,8 @@ module Op : sig
     type t
     (** The type for path deletion operations. *)
 
-    val v_op : id:id -> group:group -> Time.span -> Fpath.t -> op
+    val v_op :
+      id:id -> group:group -> Time.span -> k:(op -> unit) -> Fpath.t -> op
     (** [v_op] declares a path deletion operation, see the corresponding
         accessors for the semantics of the various arguments. *)
 
@@ -391,7 +398,9 @@ module Op : sig
     type t
     (** The type for directory creation operations. *)
 
-    val v_op : id:id -> group:group -> mode:int -> Time.span -> Fpath.t -> op
+    val v_op :
+      id:id -> group:group -> mode:int -> Time.span -> k:(op -> unit) ->
+      Fpath.t -> op
     (** [v_op] declares a directory creation operation, see the
         corresponding accessors for the semantics of the various
         arguments. *)
@@ -424,7 +433,9 @@ module Op : sig
     val kind_to_string : kind -> string
     (** [kind_to_string k] is [k] as a string. *)
 
-    val v_op : id:id -> group:group -> Time.span -> kind -> string -> op
+    val v_op :
+      id:id -> group:group -> Time.span -> k:(op -> unit) -> kind -> string ->
+      op
     (** [v_op] declares a notification operation see the corresponding
         accessors in {!Notify} for the semantics of the various
         arguments. *)
@@ -451,7 +462,8 @@ module Op : sig
     type t
     (** The type for file read operations. *)
 
-    val v_op : id:id -> group:group -> Time.span -> Fpath.t -> op
+    val v_op :
+      id:id -> group:group -> Time.span -> k:(op -> unit) -> Fpath.t -> op
     (** [v_op] declares a file read operation, see the corresponding
         accessors in {!Read} for the semantics of the various
         arguments. *)
@@ -503,11 +515,12 @@ module Op : sig
     (** The type for process spawn operations. *)
 
     val v_op :
-      id:id -> group:group -> Time.span -> stamp:string -> reads:Fpath.t list ->
-      writes:Fpath.t list -> env:Os.Env.assignments ->
-      relevant_env:Os.Env.assignments -> cwd:Fpath.t ->
-      stdin:Fpath.t option -> stdout:stdo -> stderr:stdo ->
-      success_exits:success_exits -> Cmd.tool -> Cmd.t -> op
+      id:id -> group:group -> Time.span -> reads:Fpath.t list ->
+      writes:Fpath.t list -> k:(op -> unit) -> stamp:string ->
+      env:Os.Env.assignments -> relevant_env:Os.Env.assignments ->
+      cwd:Fpath.t -> stdin:Fpath.t option -> stdout:stdo ->
+      stderr:stdo -> success_exits:success_exits -> Cmd.tool -> Cmd.t
+      -> op
     (** [v_op] declares a spawn build operation, see the corresponding
         accessors in {!Spawn} for the semantics of the various arguments. *)
 
@@ -590,7 +603,8 @@ module Op : sig
     type t
     (** The type for wait files operations. *)
 
-    val v_op : id:id -> group:group -> Time.span -> Fpath.t list -> op
+    val v_op :
+      id:id -> group:group -> Time.span -> k:(op -> unit) -> Fpath.t list -> op
     (** [v] declares a wait files operation, these are stored in
           {!reads}. *)
 
@@ -607,7 +621,7 @@ module Op : sig
     (** The type for file write operations. *)
 
     val v_op :
-      id:id -> group:group -> Time.span -> stamp:string ->
+      id:id -> group:group -> Time.span -> k:(op -> unit) -> stamp:string ->
       reads:Fpath.t list -> mode:int -> write:Fpath.t ->
       (unit -> (string, string) result) -> op
     (** [write] declares a file write operations, see the corresponding
@@ -652,7 +666,8 @@ module Op : sig
   val v :
     id -> group:group -> time_created:Time.span -> time_started:Time.span ->
     duration:Time.span -> revived:bool -> status:status ->
-    reads:Fpath.t list -> writes:Fpath.t list -> hash:Hash.t -> kind -> t
+    reads:Fpath.t list -> writes:Fpath.t list -> hash:Hash.t ->
+    k:(op -> unit) -> kind -> t
   (** [v] constructs an operation. See the corresponding accessors
       for the semantics of various arguments. *)
 
