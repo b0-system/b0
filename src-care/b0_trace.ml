@@ -43,13 +43,13 @@ module Trace_event = struct
         obj
         |> Jsong.mem "cmd" (Jsong.cmd cmd)
         |> Jsong.mem "result"
-          (str B00_conv.Op.pp_spawn_result Op.Spawn.result s)
+          (str B000_conv.Op.pp_spawn_result Op.Spawn.result s)
         |> Jsong.mem "cwd" (Jsong.fpath (Op.Spawn.cwd s))
         |> Jsong.mem "env" (Jsong.(list string) (Op.Spawn.env s))
         |> Jsong.mem "success-exits"
           (Jsong.(list int) (Op.Spawn.success_exits s))
         |> Jsong.mem "stdo-ui"
-          (Jsong.strf "%a" B00_conv.Op.pp_spawn_stdo_ui s)
+          (Jsong.strf "%a" B000_conv.Op.pp_spawn_stdo_ui s)
     | Op.Wait_files _ -> obj
     | Op.Write w ->
         obj

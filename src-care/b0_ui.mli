@@ -177,9 +177,38 @@ module Op : sig
   val log_filter_cli : (B000.Op.t list -> B000.Op.t list) Cmdliner.Term.t
 end
 
-
 (** {!B00.Memo} interaction. *)
 module Memo : sig
+
+  (** {1:feedback Memo feedback} *)
+
+  val pp_leveled_feedback :
+    ?sep:unit Fmt.t ->
+    ?op_howto:B000.Op.t Fmt.t -> show_op_ui:Log.level -> show_op:Log.level ->
+    level:Log.level ->
+    [B00.Memo.feedback | B000.File_cache.feedback | B000.Exec.feedback] Fmt.t
+  (** [pp_leveled_feedback ~sep ~op_howto ~show_spawn_ui ~show_success ~level
+      ppf] formats memo feedback on [ppf] followed by [sep] iff something
+      is printed (defaults to {!Fmt.flush_nl}).
+      {ul
+      {- {!Log.Quiet} formats nothing}
+      {- {!Log.Error} and {!Log.Warning} only report build operation failures}
+      {- {!Log.Debug} report all operations.}}
+      besides for operations that execute without failure:
+      {ul
+      {- [show_op_ui] is the level at which any executed operation with a
+         feedback UI is logged with {!B000_conv.Op.pp_short_and_ui}}
+      {- [show_op] is the level at which any executed operation gets
+         logged with {!B000_conv.Op.pp_short_and_ui}}}
+      The formatter [op_howto] should format a way to got more information
+      about an operation, default to {!nop}. *)
+
+  val pp_never_ready : op_howto:Fpath.t Fmt.t -> Fpath.Set.t Fmt.t
+  (** [pp_never_reads ~op_howto] formats a failure indicating
+      the given set of files never became ready.
+
+      [op_howto] is prefixed before each file and should be a command
+      fragment to get information about which operation needed the file. *)
 
   (** {1:dirs_files Specifying directories and files} *)
 

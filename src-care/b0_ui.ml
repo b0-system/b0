@@ -375,6 +375,68 @@ module Op = struct
 end
 
 module Memo = struct
+
+  let pp_file_cache_feedback ppf = function
+  | `File_cache_need_copy p ->
+      Fmt.pf ppf "@[Warning: need copy: %a@]" Fpath.pp_quoted p
+
+  let pp_feedback ppf = function
+  | `Fiber_exn (exn, bt) ->
+      Fmt.pf ppf "@[<v>fiber exception:@,%a@]" Fmt.exn_backtrace (exn, bt)
+  | `Fiber_fail e ->
+      Fmt.pf ppf "@[<v>fiber failed:@,%s@]" e
+  | `Miss_tool (t, e) ->
+      Fmt.pf ppf "@[<v>missing tool:@,%s@]" e
+  | `Op_cache_error (op, e) ->
+      Fmt.pf ppf "@[op %d: cache error: %s@]" (B000.Op.id op) e
+  | `Op_complete op ->
+      failwith "TODO"
+
+  let pp_leveled_feedback
+      ?(sep = Fmt.flush_nl) ?(op_howto = Fmt.nop) ~show_op_ui ~show_op ~level
+      ppf f
+    =
+    let has_ui o = match B000.Op.kind o with
+    | B000.Op.Spawn s -> Option.is_some (B000.Op.Spawn.stdo_ui s)
+    | _ -> false
+    in
+    if level = Log.Quiet then () else
+    match f with
+    | `Exec_submit (_, _) -> () (* we have B0_std.Os spawn tracer on debug *)
+    | `Op_complete o ->
+        begin match (B000.Op.status o) with
+        | B000.Op.Failed _ ->
+            if level >= Log.Error
+            then ((B000_conv.Op.pp_failed ~op_howto) ppf o; sep ppf ())
+        | B000.Op.Aborted ->
+            if level >= Log.Info then (B000_conv.Op.pp_short ppf o; sep ppf ())
+        | B000.Op.Executed ->
+            if level >= show_op || (level >= show_op_ui && has_ui o)
+            then (B000_conv.Op.pp_short_with_ui ppf o; sep ppf ())
+        | B000.Op.Waiting ->
+            if level >= show_op
+            then (B000_conv.Op.pp_short_with_ui ppf o; sep ppf ())
+        end
+    | #B00.Memo.feedback as f ->
+        if level >= Log.Error
+        then (pp_feedback ppf f; sep ppf ())
+    | `File_cache_need_copy _ as f ->
+        if level >= Log.Warning
+        then (pp_file_cache_feedback ppf f; sep ppf ())
+
+  let pp_never_ready ~op_howto ppf fs =
+    let pp_file = Fmt.(op_howto ++ B000_conv.Op.pp_file_write) in
+    let err = match Fpath.Set.cardinal fs with
+    | 1 -> "This file never became ready"
+    | _ -> "These files never became ready"
+    in
+    Fmt.pf ppf "@[<v>[%a] %s: %a@, @[%a@]@]@."
+      Fmt.(tty [`Fg `Red] string) "FAILED" err
+      Fmt.(tty [`Faint] string) "(see ops reading them)"
+      (Fpath.Set.pp pp_file) fs
+
+  (* Cli *)
+
   open Cmdliner
 
   let b0_dir_name = "_b0"
@@ -495,14 +557,14 @@ module Memo = struct
       let b = Buffer.create (1024 * 1024) in
       Binc.enc_magic b magic;
       enc_info b info;
-      Binc.enc_list B00_conv.Op.enc b ops;
+      Binc.enc_list B000_conv.Op.enc b ops;
       Buffer.contents b
 
     let log_of_string ?(file = Os.File.dash) s =
       try
         let i = Binc.dec_magic s 0 magic in
         let i, info = dec_info s i in
-        let i, ops = Binc.dec_list B00_conv.Op.dec s i in
+        let i, ops = Binc.dec_list B000_conv.Op.dec s i in
         Binc.dec_eoi s i;
         Ok (info, ops)
       with
@@ -562,12 +624,13 @@ module Memo = struct
       let pp_op_no_cache ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
       let pp_totals ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
       (Fmt.record @@
-       [ Fmt.field "spawns" (fun _ -> (sc, st, sd)) pp_op;
+       [ Fmt.field "selected operations" ~sep:Fmt.nop Fmt.id Fmt.nop;
+         Fmt.field "spawns" (fun _ -> (sc, st, sd)) pp_op;
          Fmt.field "writes" (fun _ -> (wc, wt, wd)) pp_op;
          Fmt.field "copies" (fun _ -> (cc, ct, cd)) pp_op;
          Fmt.field "reads" (fun _ -> (rt, rd)) pp_op_no_cache;
-         Fmt.field "global timings" ~sep:Fmt.nop (fun _ -> ()) Fmt.nop;
          Fmt.field "all" (fun _ -> (ot, od)) pp_totals;
+         Fmt.field "global timings" ~sep:Fmt.nop Fmt.id Fmt.nop;
          Fmt.field "hashes" (fun _ -> (hc, hd)) pp_totals;
          Fmt.field "utime" Fmt.id pp_utime;
          Fmt.field "stime" Fmt.id pp_stime;
@@ -579,9 +642,9 @@ module Memo = struct
       | ops -> Fmt.pr "@[<v>%a@]@." (Fmt.list pp_op) ops
       in
       let outf = match out_fmt with
-      | `Short -> outf_pp_ops B00_conv.Op.pp_short
-      | `Normal -> outf_pp_ops B00_conv.Op.pp_short_with_ui
-      | `Long -> outf_pp_ops B00_conv.Op.pp
+      | `Short -> outf_pp_ops B000_conv.Op.pp_short
+      | `Normal -> outf_pp_ops B000_conv.Op.pp_short_with_ui
+      | `Long -> outf_pp_ops B000_conv.Op.pp
       | `Trace_event ->
           fun (_, ops) ->
             Fmt.pr "%s@."
@@ -591,36 +654,36 @@ module Memo = struct
       in
       out_fmt, outf
 
-  type out_fmt = [ `Normal | `Short | `Long | `Trace_event | `Stats ]
-  let out_fmt_cli ?docs () =
-    let out_fmt
-        ?docs ?(short_opts = ["s"; "short"]) ?(long_opts = ["l"; "long"])
-        ?(trace_event_opts = ["t"; "trace-event"]) ?(stats_opts = ["stats"])
-        ()
-      =
-      let short =
-        let doc = "Short output. Line based output with only relevant data." in
-        Cmdliner.Arg.info short_opts ~doc ?docs
+    type out_fmt = [ `Normal | `Short | `Long | `Trace_event | `Stats ]
+    let out_fmt_cli ?docs () =
+      let out_fmt
+          ?docs ?(short_opts = ["s"; "short"]) ?(long_opts = ["l"; "long"])
+          ?(trace_event_opts = ["t"; "trace-event"]) ?(stats_opts = ["stats"])
+          ()
+        =
+        let short =
+          let doc = "Short output. Line based output with only relevant data."in
+          Cmdliner.Arg.info short_opts ~doc ?docs
+        in
+        let long =
+          let doc = "Long output. Outputs as much information as possible." in
+          Cmdliner.Arg.info long_opts ~doc ?docs
+        in
+        let trace_event =
+          let doc = "Output build operations in Trace Event format." in
+          Cmdliner.Arg.info trace_event_opts ~doc ?docs
+        in
+        let stats =
+          let doc = "Output statistics about the operations." in
+          Cmdliner.Arg.info stats_opts ~doc ?docs
+        in
+        let fmts =
+          [`Short, short; `Long, long; `Trace_event, trace_event;
+           `Stats, stats; ]
+        in
+        Cmdliner.Arg.(value & vflag `Normal fmts)
       in
-      let long =
-        let doc = "Long output. Outputs as much information as possible." in
-        Cmdliner.Arg.info long_opts ~doc ?docs
-      in
-      let trace_event =
-        let doc = "Output build operations in Trace Event format." in
-        Cmdliner.Arg.info trace_event_opts ~doc ?docs
-      in
-      let stats =
-        let doc = "Output statistics about the operations." in
-        Cmdliner.Arg.info stats_opts ~doc ?docs
-      in
-      let fmts = [`Short, short; `Long, long; `Trace_event, trace_event;
-                  `Stats, stats; ]
-      in
-      Cmdliner.Arg.(value & vflag `Normal fmts)
-    in
-    Cmdliner.Term.(const out $ out_fmt ?docs ())
-
+      Cmdliner.Term.(const out $ out_fmt ?docs ())
   end
 end
 

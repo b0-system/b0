@@ -5,24 +5,9 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
-open B00
-
-module File_cache = struct
-  let pp_feedback ppf = function
-  | `File_cache_need_copy p ->
-      Fmt.pf ppf "@[Warning: need copy: %a@]" Fpath.pp_quoted p
-end
-
-module Guard = struct
-  let pp_feedback ppf = function
-  | `File_status_repeat f ->
-      Fmt.pf ppf "%a: file status repeated" Fpath.pp_quoted f
-  | `File_status_unstable f ->
-      Fmt.pf ppf "%a: file status unstable" Fpath.pp_quoted f
-end
+open B000
 
 module Op = struct
-  open B000
 
   (* Formatting *)
 
@@ -576,72 +561,6 @@ module Op = struct
     let i, kind = dec_kind s i in
     i, Op.v id ~group ~time_created ~time_started ~duration ~revived
       ~status ~reads ~writes ~hash ~k kind
-end
-
-module Exec = struct
-  let pp_feedback ppf = function
-  | `Exec_submit (pid, op) ->
-      let pp_pid ppf = function
-      | None -> () | Some pid -> Fmt.pf ppf "[pid:%d]" (Os.Cmd.pid_to_int pid)
-      in
-      Fmt.pf ppf "@[[SUBMIT]%a%a" pp_pid pid Op.pp_short op
-end
-
-module Memo = struct
-  let pp_feedback ppf = function
-  | `Fiber_exn (exn, bt) ->
-      Fmt.pf ppf "@[<v>fiber exception:@,%a@]" Fmt.exn_backtrace (exn, bt)
-  | `Fiber_fail e ->
-      Fmt.pf ppf "@[<v>fiber failed:@,%s@]" e
-  | `Miss_tool (t, e) ->
-      Fmt.pf ppf "@[<v>missing tool:@,%s@]" e
-  | `Op_cache_error (op, e) ->
-      Fmt.pf ppf "@[op %d: cache error: %s@]" (B000.Op.id op) e
-  | `Op_complete op ->
-      failwith "TODO"
-
-  let pp_leveled_feedback
-      ?(sep = Fmt.flush_nl) ?(op_howto = Fmt.nop) ~show_op_ui ~show_op ~level
-      ppf f
-    =
-    let has_ui o = match B000.Op.kind o with
-    | B000.Op.Spawn s -> Option.is_some (B000.Op.Spawn.stdo_ui s)
-    | _ -> false
-    in
-    if level = Log.Quiet then () else
-    match f with
-    | `Exec_submit (_, _) -> () (* we have B0_std.Os spawn tracer on debug *)
-    | `Op_complete o ->
-        if level >= Log.Debug then (Op.pp ppf o; sep ppf ()) else
-        begin match (B000.Op.status o) with
-        | B000.Op.Failed _ ->
-            if level >= Log.Error
-            then ((Op.pp_failed ~op_howto) ppf o; sep ppf ())
-        | B000.Op.Aborted ->
-            if level >= Log.Info then (Op.pp_short ppf o; sep ppf ())
-        | B000.Op.Executed ->
-            if level >= show_op || (level >= show_op_ui && has_ui o)
-            then (Op.pp_short_with_ui ppf o; sep ppf ())
-        | B000.Op.Waiting ->
-              assert false
-        end
-    | #Memo.feedback as f ->
-        if level >= Log.Error
-        then (pp_feedback ppf f; sep ppf ())
-    | `File_cache_need_copy _ as f ->
-        if level >= Log.Warning
-        then (File_cache.pp_feedback ppf f; sep ppf ())
-
-  let pp_never_ready ~op_howto ppf fs =
-    let pp_file = Fmt.(op_howto ++ Op.pp_file_write) in
-    let err = match Fpath.Set.cardinal fs with
-    | 1 -> "This file never became ready"
-    | _ -> "These files never became ready"
-    in
-    Fmt.pf ppf "@[<v>[%a] %s: %a@, @[%a@]@]@."
-      Fmt.(tty [`Fg `Red] string) "FAILED" err
-      Fmt.(tty [`Faint] string) "(see ops reading them)"
-      (Fpath.Set.pp pp_file) fs
 end
 
 (*---------------------------------------------------------------------------
