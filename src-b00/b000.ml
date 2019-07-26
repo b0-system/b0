@@ -1270,7 +1270,8 @@ module Exec = struct
   | None when all_done e -> ()
   | None -> submit_spawns e; collect_spawns ~block e
 
-  let schedule e o = Rqueue.add e.todo o
+  let schedule e o = Rqueue.add e.todo o; stir ~block:false e
+
   let collect e ~block =
     stir ~block:false e; (* First stir a bit, it might submit/collect ops *)
     match Queue.take e.collectable with
