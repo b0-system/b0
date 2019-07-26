@@ -176,6 +176,7 @@ module Guard = struct
 end
 
 module Op = struct
+  open B000
 
   (* Formatting *)
 
@@ -314,13 +315,13 @@ module Op = struct
   let pp_header_short ppf o =
     Fmt.pf ppf "[%a%a %a %a%a]"
       pp_status o pp_id o pp_kind_name o
-      Time.Span.pp (B00.Op.duration o)
+      Time.Span.pp (Op.duration o)
       pp_op_hash o
 
   let pp_header_long ppf o = (* adds the group *)
     Fmt.pf ppf "[%a%a %a %a %a%a]"
       pp_status o pp_id o pp_kind_name o
-      Time.Span.pp (B00.Op.duration o) Fmt.string (Op.group o)
+      Time.Span.pp (Op.duration o) Fmt.string (Op.group o)
       pp_op_hash o
 
   (* Short formatting *)
@@ -765,7 +766,7 @@ module Memo = struct
   | `Miss_tool (t, e) ->
       Fmt.pf ppf "@[<v>missing tool:@,%s@]" e
   | `Op_cache_error (op, e) ->
-      Fmt.pf ppf "@[op %d: cache error: %s@]" (B00.Op.id op) e
+      Fmt.pf ppf "@[op %d: cache error: %s@]" (B000.Op.id op) e
   | `Op_complete op ->
       failwith "TODO"
 
@@ -773,8 +774,8 @@ module Memo = struct
       ?(sep = Fmt.flush_nl) ?(op_howto = Fmt.nop) ~show_op_ui ~show_op ~level
       ppf f
     =
-    let has_ui o = match B00.Op.kind o with
-    | B00.Op.Spawn s -> Option.is_some (B00.Op.Spawn.stdo_ui s)
+    let has_ui o = match B000.Op.kind o with
+    | B000.Op.Spawn s -> Option.is_some (B000.Op.Spawn.stdo_ui s)
     | _ -> false
     in
     if level = Log.Quiet then () else
@@ -782,16 +783,16 @@ module Memo = struct
     | `Exec_submit (_, _) -> () (* we have B0_std.Os spawn tracer on debug *)
     | `Op_complete o ->
         if level >= Log.Debug then (Op.pp ppf o; sep ppf ()) else
-        begin match (B00.Op.status o) with
-        | B00.Op.Failed _ ->
+        begin match (B000.Op.status o) with
+        | B000.Op.Failed _ ->
             if level >= Log.Error
             then ((Op.pp_failed ~op_howto) ppf o; sep ppf ())
-        | B00.Op.Aborted ->
+        | B000.Op.Aborted ->
             if level >= Log.Info then (Op.pp_short ppf o; sep ppf ())
-        | B00.Op.Executed ->
+        | B000.Op.Executed ->
             if level >= show_op || (level >= show_op_ui && has_ui o)
             then (Op.pp_short_with_ui ppf o; sep ppf ())
-        | B00.Op.Waiting ->
+        | B000.Op.Waiting ->
               assert false
         end
     | #Memo.feedback as f ->
@@ -836,19 +837,19 @@ module Memo = struct
       let rec loop sc st sd wc wt wd cc ct cd rt rd ot od = function
       | [] -> sc, st, sd, wc, wt, wd, cc, ct, cd, rt, rd, ot, od
       | o :: os ->
-          let revived = Op.revived o and d = Op.duration o in
+          let revived = B000.Op.revived o and d = B000.Op.duration o in
           let ot = ot + 1 and od = od ++ d in
-          match Op.kind o with
-          | Op.Spawn _ ->
+          match B000.Op.kind o with
+          | B000.Op.Spawn _ ->
               let sc = if revived then sc + 1 else sc in
               loop sc (st + 1) (sd ++ d) wc wt wd cc ct cd rt rd ot od os
-          | Op.Write _ ->
+          | B000.Op.Write _ ->
               let wc = if revived then wc + 1 else wc in
               loop sc st sd wc (wt + 1) (wd ++ d) cc ct cd rt rd ot od os
-          | Op.Copy _ ->
+          | B000.Op.Copy _ ->
               let cc = if revived then cc + 1 else cc in
               loop sc st sd wc wt wd cc (ct + 1) (cd ++ d) rt rd ot od os
-          | Op.Read _ ->
+          | B000.Op.Read _ ->
               loop sc st sd wc wt wd cc ct cd (rt + 1) (rd ++ d) ot od os
           | _ ->
               loop sc st sd wc wt wd cc ct cd rt rd ot od os
@@ -859,8 +860,8 @@ module Memo = struct
     in
     let ht, hd =
       let c = Memo.reviver m in
-      Fpath.Map.cardinal (Reviver.file_hashes c),
-      Reviver.file_hash_dur c
+      Fpath.Map.cardinal (B000.Reviver.file_hashes c),
+      B000.Reviver.file_hash_dur c
     in
     let dur = Time.count (Memo.clock m)in
     let cpu = Time.cpu_count (Memo.cpu_clock m) in

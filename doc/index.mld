@@ -16,7 +16,7 @@ shouldn't but are useful for B0 based programs.
 
 The core [b0] build library.
 
-{!modules: B00 B00_conv}
+{!modules: B000 B00 B00_conv}
 
 {1:b0_care B0 care}
 

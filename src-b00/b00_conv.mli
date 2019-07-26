@@ -4,23 +4,23 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** Serialize and format {!B00} values. *)
+(** Serialize and format {!B000} and {!B00} values. *)
 
 open B0_std
 open B00
 
 module File_cache : sig
-  val pp_feedback : File_cache.feedback Fmt.t
+  val pp_feedback : B000.File_cache.feedback Fmt.t
   (** [pp_feedback] formats file cache feedback. *)
 end
 
 module Guard : sig
-  val pp_feedback : Guard.feedback Fmt.t
+  val pp_feedback : B000.Guard.feedback Fmt.t
   (** [pp_feedback] formats guard feedback. *)
 end
 
 module Exec : sig
-  val pp_feedback : Exec.feedback Fmt.t
+  val pp_feedback : B000.Exec.feedback Fmt.t
   (** [pp_feedback] formats executor feedback. *)
 end
 
@@ -29,7 +29,7 @@ module Op : sig
 
   (** {1:fmt Formatters} *)
 
-  val pp_spawn_stdo_ui : Op.Spawn.t Fmt.t
+  val pp_spawn_stdo_ui : B000.Op.Spawn.t Fmt.t
   (** [pp_spawn_stdo_ui] formats the standard output ui of the spawn. *)
 
   val pp_spawn_result : (Os.Cmd.status, string) result Fmt.t
@@ -44,26 +44,27 @@ module Op : sig
   val pp_hash : Hash.t Fmt.t
   (** [pp_hash] formats an operation hash. *)
 
-  val pp_short : Op.t Fmt.t
+  val pp_short : B000.Op.t Fmt.t
   (** [pp_short] formats a build operation on a single line. *)
 
-  val pp_short_with_ui : Op.t Fmt.t
+  val pp_short_with_ui : B000.Op.t Fmt.t
   (** [pp_short_with_stdo_ui] formats like {!pp_short} but also
       a feedback UI if the operation has one. *)
 
-  val pp : Op.t Fmt.t
+  val pp : B000.Op.t Fmt.t
   (** [pp] formats a build operation. *)
 
-  val pp_failed : op_howto:B00.Op.t Fmt.t -> B00.Op.t Fmt.t
+  val pp_failed : op_howto:B000.Op.t Fmt.t -> B000.Op.t Fmt.t
   (** [pp] formats an operation failure. [op_howto] formats how
       to get more information about the failing operartion. *)
 
   (** {1:bin_serial Binary serialization} *)
 
-  val list_to_string : Op.t list -> string
+  val list_to_string : B000.Op.t list -> string
   (** [list_to_string ops] is a binary encoding of [ops]. *)
 
-  val list_of_string : ?file:Fpath.t -> string -> (Op.t list, string) result
+  val list_of_string :
+    ?file:Fpath.t -> string -> (B000.Op.t list, string) result
   (** [lsit_of_string ops] is a binary decoding of a {!to_string} encoding.
       [file] is a filename to report errors (defaults to {!Os.File.dash}). *)
 end
@@ -76,9 +77,9 @@ module Memo : sig
 
   val pp_leveled_feedback :
     ?sep:unit Fmt.t ->
-    ?op_howto:B00.Op.t Fmt.t -> show_op_ui:Log.level -> show_op:Log.level ->
+    ?op_howto:B000.Op.t Fmt.t -> show_op_ui:Log.level -> show_op:Log.level ->
     level:Log.level ->
-    [B00.Memo.feedback | B00.File_cache.feedback | B00.Exec.feedback] Fmt.t
+    [B00.Memo.feedback | B000.File_cache.feedback | B000.Exec.feedback] Fmt.t
   (** [pp_leveled_feedback ~sep ~op_howto ~show_spawn_ui ~show_success ~level
       ppf] formats memo feedback on [ppf] followed by [sep] iff something
       is printed (defaults to {!Fmt.flush_nl}).

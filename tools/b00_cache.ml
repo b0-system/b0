@@ -5,7 +5,7 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
-open B00
+open B000
 
 (* FIXME we are not using B0_ui.File_cache.* because this
    errors on missing caches. Unclear whether the behaviour

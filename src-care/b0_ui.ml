@@ -121,6 +121,7 @@ module B0_std = struct
 end
 
 module File_cache = struct
+  open B000
 
   (* High-level commands *)
 
@@ -133,11 +134,11 @@ module File_cache = struct
           Result.bind (Os.Dir.create ~make_path:true dir) @@ (* recreate dir *)
           fun _ -> Ok ()
       | `Keys keys ->
-          Result.bind (B00.File_cache.create dir) @@ fun c ->
+          Result.bind (File_cache.create dir) @@ fun c ->
           let rec loop = function
           | [] -> Ok ()
           | k :: ks ->
-              match B00.File_cache.rem c k with
+              match File_cache.rem c k with
               | Error _ as e -> e
               | Ok true -> loop ks
               | Ok false ->
@@ -149,25 +150,25 @@ module File_cache = struct
   let gc ~dir = Result.bind (Os.Dir.exists dir) @@ function
   | false -> Ok ()
   | true ->
-      Result.bind (B00.File_cache.create dir) @@ fun c ->
-      Result.bind (B00.File_cache.delete_unused c) @@ fun () -> Ok ()
+      Result.bind (File_cache.create dir) @@ fun c ->
+      Result.bind (File_cache.delete_unused c) @@ fun () -> Ok ()
 
   let size ~dir =
     let stats = Result.bind (Os.Dir.exists dir) @@ function
-    | false -> Ok B00.File_cache.Stats.zero
+    | false -> Ok File_cache.Stats.zero
     | true ->
-        Result.bind (B00.File_cache.create dir) @@ fun c ->
-        B00.File_cache.Stats.of_cache c
+        Result.bind (File_cache.create dir) @@ fun c ->
+        File_cache.Stats.of_cache c
     in
     Result.bind stats @@ fun stats ->
-    Log.app (fun m -> m "@[<v>%a@]" B00.File_cache.Stats.pp stats); Ok ()
+    Log.app (fun m -> m "@[<v>%a@]" File_cache.Stats.pp stats); Ok ()
 
   let trim ~dir ~max_byte_size ~pct =
     Result.bind (Os.Dir.exists dir) @@ function
     | false -> Ok ()
     | true ->
-        Result.bind (B00.File_cache.create dir) @@ fun c ->
-        B00.File_cache.trim_size c ~max_byte_size ~pct
+        Result.bind (File_cache.create dir) @@ fun c ->
+        File_cache.trim_size c ~max_byte_size ~pct
 
   (* Cli fragments *)
 
@@ -189,6 +190,7 @@ module File_cache = struct
 end
 
 module Op = struct
+  open B000
 
   (* XXX cleanup *)
 
@@ -212,86 +214,86 @@ module Op = struct
     let groups = String.Set.of_list groups in
     let mem_group g = String.Set.mem g groups in
     fun o ->
-      List.exists (( = ) (B00.Op.id o)) ids ||
-      mem_hash (Hash.to_bytes (B00.Op.hash o)) ||
-      List.exists mem_reads (B00.Op.reads o) ||
-      List.exists mem_writes (B00.Op.writes o) ||
-      mem_group (B00.Op.group o)
+      List.exists (( = ) (Op.id o)) ids ||
+      mem_hash (Hash.to_bytes (Op.hash o)) ||
+      List.exists mem_reads (Op.reads o) ||
+      List.exists mem_writes (Op.writes o) ||
+      mem_group (Op.group o)
 
   let order ~by ops =
     let order_by_field cmp f o0 o1 = cmp (f o0) (f o1) in
     let order = match by with
-    | `Create -> order_by_field Time.Span.compare B00.Op.time_created
-    | `Start -> order_by_field Time.Span.compare B00.Op.time_started
-    | `Wait -> order_by_field Time.Span.compare B00.Op.waited
+    | `Create -> order_by_field Time.Span.compare Op.time_created
+    | `Start -> order_by_field Time.Span.compare Op.time_started
+    | `Wait -> order_by_field Time.Span.compare Op.waited
     | `Dur ->
         let rev_compare t0 t1 = Time.Span.compare t1 t0 in
-        order_by_field rev_compare B00.Op.duration
+        order_by_field rev_compare Op.duration
     in
     List.sort order ops
 
   let read_write_indices ops =
     let rec loop reads writes = function
     | o :: os ->
-        let add acc p = Fpath.Map.add_to_set (module B00.Op.Set) p o acc in
-        let reads = List.fold_left add reads (B00.Op.reads o) in
-        let writes = List.fold_left add writes (B00.Op.writes o) in
+        let add acc p = Fpath.Map.add_to_set (module Op.Set) p o acc in
+        let reads = List.fold_left add reads (Op.reads o) in
+        let writes = List.fold_left add writes (Op.writes o) in
         loop reads writes os
     | [] -> reads, writes
     in
     loop Fpath.Map.empty Fpath.Map.empty ops
 
-  let find_deps ?(acc = B00.Op.Set.empty) ~recursive index deps ops =
+  let find_deps ?(acc = Op.Set.empty) ~recursive index deps ops =
     let add_direct index o acc =
       let add_index_ops index acc p = match Fpath.Map.find p index with
       | exception Not_found -> acc
-      | ops -> B00.Op.Set.union ops acc
+      | ops -> Op.Set.union ops acc
       in
       List.fold_left (add_index_ops index) acc (deps o)
     in
     match recursive with
-    | false -> B00.Op.Set.fold (add_direct index) ops acc
+    | false -> Op.Set.fold (add_direct index) ops acc
     | true ->
-        let rec loop index acc seen todo = match B00.Op.Set.choose todo with
+        let rec loop index acc seen todo = match Op.Set.choose todo with
         | exception Not_found -> acc
         | o ->
-            let seen = B00.Op.Set.add o seen in
-            let todo = B00.Op.Set.remove o todo in
-            let deps = add_direct index o B00.Op.Set.empty in
-            let todo = B00.Op.Set.(union todo (diff deps seen)) in
-            let acc = B00.Op.Set.union acc deps in
+            let seen = Op.Set.add o seen in
+            let todo = Op.Set.remove o todo in
+            let deps = add_direct index o Op.Set.empty in
+            let todo = Op.Set.(union todo (diff deps seen)) in
+            let acc = Op.Set.union acc deps in
             loop index acc seen todo
         in
-        loop index acc B00.Op.Set.empty ops
+        loop index acc Op.Set.empty ops
 
   let find_needs ?acc ~recursive ~writes ops =
-    find_deps ?acc ~recursive writes B00.Op.reads ops
+    find_deps ?acc ~recursive writes Op.reads ops
 
   let find_enables ?acc ~recursive ~reads ops =
-    find_deps ?acc ~recursive reads B00.Op.writes ops
+    find_deps ?acc ~recursive reads Op.writes ops
 
   let log_filter
       ~reads ~writes ~ids ~hashes ~groups ~needs ~enables ~recursive
       ~revived ~order_by ops
     =
     let sel = List.filter (select ~reads ~writes ~ids ~hashes ~groups) ops in
-    let sel = B00.Op.Set.of_list sel in
+    let sel = Op.Set.of_list sel in
     let sel = match not needs && not enables with
     | true -> sel
     | false ->
         let reads, writes = read_write_indices ops in
-        let acc = B00.Op.Set.empty in
+        let acc = Op.Set.empty in
         let acc = if needs then find_needs ~recursive ~writes ~acc sel else acc
         in
         if enables then find_enables ~recursive ~reads ~acc sel else acc
     in
     let sel = match revived with
-    | None -> B00.Op.Set.elements sel
+    | None -> Op.Set.elements sel
     | Some revived ->
-        let add_op o acc = match B00.Op.revived o = revived with
+        let add_op o acc = match Op.revived o = revived with
         | true -> o :: acc | false -> acc
         in
-        B00.Op.Set.fold add_op sel []
+        Op.Set.fold add_op sel []
     in
     order ~by:order_by sel
 

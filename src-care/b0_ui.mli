@@ -93,7 +93,7 @@ module File_cache : sig
       return [Ok ()] in these cases. *)
 
   val delete :
-    dir:Fpath.t -> [ `All | `Keys of B00.File_cache.key list ] ->
+    dir:Fpath.t -> [ `All | `Keys of B000.File_cache.key list ] ->
     (unit, string) result
   (** [delete dir keys] deletes [keys] in [dirs] if an explicit key
       does not exist in [dir] a {!Log.warn} is issued. If [`All] is
@@ -113,45 +113,45 @@ module File_cache : sig
 
   (** {1:cli Cli fragments} *)
 
-  val key_arg : B00.File_cache.key Cmdliner.Arg.conv
+  val key_arg : B000.File_cache.key Cmdliner.Arg.conv
   (** [key_arg] is an argument converter for cache keys. *)
 
   val keys_none_is_all :
     ?pos_right:int -> unit ->
-    [ `All | `Keys of B00.File_cache.key list ] Cmdliner.Term.t
+    [ `All | `Keys of B000.File_cache.key list ] Cmdliner.Term.t
    (** [keys_none_is_all ~pos_right ()] are the keys at the right
        of position [pos_right] (defaults is all positional arguments).
        If none is specified this is [`All]. *)
 end
 
 
-(** {!B00.Op} interaction. *)
+(** {!B000.Op} interaction. *)
 module Op : sig
 
   val select :
     reads:Fpath.t list ->
     writes:Fpath.t list ->
-    ids:B00.Op.id list ->
+    ids:B000.Op.id list ->
     hashes:string list ->
-    groups:string list -> B00.Op.t -> bool
+    groups:string list -> B000.Op.t -> bool
   (** [select ~reads ~writes ~ids ~hashes ~groups o] is [true]
       iff [o] reads a file in [reads] or writes a file in [writes]
       or has its id in [ids], or has its hash in [hashes] or has
       is [group] in [groups] or if all these lists are empty. *)
 
   val order :
-    by:[`Create | `Dur | `Wait | `Start] -> B00.Op.t list -> B00.Op.t list
+    by:[`Create | `Dur | `Wait | `Start] -> B000.Op.t list -> B000.Op.t list
   (** [order ~by ops] orders [ops] by [by] time. *)
 
   val read_write_indices :
-    B00.Op.t list -> B00.Op.Set.t Fpath.Map.t * B00.Op.Set.t Fpath.Map.t
+    B000.Op.t list -> B000.Op.Set.t Fpath.Map.t * B000.Op.Set.t Fpath.Map.t
   (** [read_write_indices ops] is [reads, writes] with [reads] mapping
       file path to operations that reads them and [writes] mapping file
       paths to operations that write them. *)
 
   val find_needs :
-    ?acc:B00.Op.Set.t -> recursive:bool -> writes:B00.Op.Set.t Fpath.Map.t ->
-    B00.Op.Set.t -> B00.Op.Set.t
+    ?acc:B000.Op.Set.t -> recursive:bool -> writes:B000.Op.Set.t Fpath.Map.t ->
+    B000.Op.Set.t -> B000.Op.Set.t
   (** [find_needs ~recursive ~writes ~acc ops] add to [acc] (defaults
       to {!B00.Op.Set.empty}) the set of operations in the write index
       [writes] that need to be executed for the set of operations
@@ -159,8 +159,8 @@ module Op : sig
       dependencies are reported. *)
 
   val find_enables :
-    ?acc:B00.Op.Set.t -> recursive:bool ->
-    reads:B00.Op.Set.t Fpath.Map.t -> B00.Op.Set.t -> B00.Op.Set.t
+    ?acc:B000.Op.Set.t -> recursive:bool ->
+    reads:B000.Op.Set.t Fpath.Map.t -> B000.Op.Set.t -> B000.Op.Set.t
     (** [find_enables ~recursive ~writes ~acc ops] add to [acc]
       (defaults to {!B00.Op.Set.empty}) the set of operations in the
       read index [reads] that are enabled by the set of operations
@@ -168,18 +168,18 @@ module Op : sig
         reported. *)
 
   val log_filter :
-    reads:Fpath.t list -> writes:Fpath.t list -> ids:B00.Op.id list ->
+    reads:Fpath.t list -> writes:Fpath.t list -> ids:B000.Op.id list ->
     hashes:string list -> groups:string list -> needs:bool ->
     enables:bool -> recursive:bool -> revived:bool option ->
     order_by:[ `Create | `Dur | `Wait | `Start ] ->
-    B00.Op.t list -> B00.Op.t list
+    B000.Op.t list -> B000.Op.t list
 
-  val log_filter_cli : (B00.Op.t list -> B00.Op.t list) Cmdliner.Term.t
+  val log_filter_cli : (B000.Op.t list -> B000.Op.t list) Cmdliner.Term.t
 
   type out_fmt = [`Long | `Normal | `Short | `Trace_event]
-  val log_out : out_fmt -> (out_fmt * (B00.Op.t list -> unit))
+  val log_out : out_fmt -> (out_fmt * (B000.Op.t list -> unit))
   val log_out_fmt_cli :
-    ?docs:string -> unit -> (out_fmt * (B00.Op.t list -> unit)) Cmdliner.Term.t
+    ?docs:string -> unit -> (out_fmt * (B000.Op.t list -> unit)) Cmdliner.Term.t
 end
 
 
@@ -295,7 +295,7 @@ module Memo : sig
 
   module Log : sig
     val write_file : Fpath.t -> B00.Memo.t -> (unit, string) result
-    val read_file : Fpath.t -> (B00.Op.t list, string) result
+    val read_file : Fpath.t -> (B000.Op.t list, string) result
   end
 end
 

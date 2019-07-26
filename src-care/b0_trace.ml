@@ -6,7 +6,7 @@
 
 open B0_std
 open B0_json
-open B00
+open B000
 
 module Trace_event = struct
   let str pp get o = Jsong.strf "%a" pp (get o)
@@ -61,7 +61,7 @@ module Trace_event = struct
     Jsong.obj
     |> Jsong.mem "kind" (Jsong.string (Op.kind_name (Op.kind o)))
     |> Jsong.mem "group" (Jsong.string (Op.group o))
-    |> Jsong.mem "status" (Jsong.string (B00.Op.status_to_string (Op.status o)))
+    |> Jsong.mem "status" (Jsong.string (Op.status_to_string (Op.status o)))
     |> Jsong.mem "revived" (Jsong.bool (Op.revived o))
     |> Jsong.mem "writes" (Jsong.(list fpath) (Op.writes o))
     |> Jsong.mem "time-created" (span_us (Op.time_created o))
