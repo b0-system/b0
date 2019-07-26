@@ -4818,6 +4818,163 @@ module Rqueue = struct
   let length q = q.length
 end
 
+(* Binary encoding *)
+
+module Binc = struct
+  type 'a enc = Buffer.t -> 'a -> unit
+  type 'a dec = string -> int -> int * 'a
+
+  let err i fmt = Fmt.failwith_notrace ("%d: " ^^ fmt) i
+  let err_byte ~kind i b =
+    err i "corrupted input, unexpected byte 0x%x for %s" b kind
+
+  let check_next ~kind s i next =
+   if next <= String.length s then () else
+   err i  "unexpected end of input, expected %d bytes for %s" (next - i) kind
+
+  let get_byte s i = Char.code (String.get s i) [@@ocaml.inline]
+
+  let dec_eoi s i =
+    if i = String.length s then () else
+    err i "expected end of input (len: %d)" (String.length s)
+
+  let enc_magic b magic = Buffer.add_string b magic
+  let dec_magic s i magic =
+    let next = i + String.length magic in
+    check_next ~kind:magic s i next;
+    let magic' = String.with_index_range ~first:i ~last:(next - 1) s in
+    if String.equal magic magic' then next else
+    err i "magic mismatch: %S but expected %S" magic' magic
+
+  let enc_byte b n =
+    Buffer.add_char b (Char.chr (n land 0xFF)) [@@ocaml.inline]
+
+  let dec_byte ~kind s i =
+    let next = i + 1 in
+    check_next ~kind s i next;
+    let b = get_byte s i in
+    next, b
+  [@@ocaml.inline]
+
+  let enc_unit b () = enc_byte b 0
+  let dec_unit s i =
+    let kind = "unit" in
+    let next, b = dec_byte ~kind s i in
+    match b with
+    | 0 -> next, ()
+    | b -> err_byte ~kind i b
+
+  let enc_bool b bool = enc_byte b (if bool then 1 else 0)
+  let dec_bool s i =
+    let kind = "bool" in
+    let next, b = dec_byte ~kind s i in
+    match b with
+    | 0 -> next, false
+    | 1 -> next, true
+    | b -> err_byte ~kind i b
+
+  let enc_int b n =
+    let w = enc_byte in
+    w b n; w b (n lsr 8); w b (n lsr 16); w b (n lsr 24);
+    if Sys.word_size = 32 then (w b 0x00; w b 0x00; w b 0x00; w b 0x00) else
+    (w b (n lsr 32); w b (n lsr 40); w b (n lsr 48); w b (n lsr 56))
+
+  let dec_int s i =
+    let r = get_byte in
+    let next = i + 8 in
+    check_next ~kind:"int" s i next;
+    let b0 = r s (i    ) and b1 = r s (i + 1)
+    and b2 = r s (i + 2) and b3 = r s (i + 3) in
+    let n = (b3 lsl 24) lor (b2 lsl 16) lor (b1 lsl 8) lor b0 in
+    if Sys.word_size = 32 then next, n else
+    let b4 = r s (i + 4) and b5 = r s (i + 5)
+    and b6 = r s (i + 6) and b7 = r s (i + 7) in
+    next, (b7 lsl 56) lor (b6 lsl 48) lor (b5 lsl 40) lor (b4 lsl 32) lor n
+
+  let enc_int64 b i =
+    (* XXX From 4.08 on use Buffer.add_int64_le *)
+    let w = enc_byte in
+    let i0 = Int64.to_int i in
+    let i1 = Int64.to_int (Int64.shift_right_logical i 16) in
+    let i2 = Int64.to_int (Int64.shift_right_logical i 32) in
+    let i3 = Int64.to_int (Int64.shift_right_logical i 48) in
+    let b0 = i0 and b1 = i0 lsr 8 and b2 = i1 and b3 = i1 lsr 8
+    and b4 = i2 and b5 = i2 lsr 8 and b6 = i3 and b7 = i3 lsr 8 in
+    w b b0; w b b1; w b b2; w b b3; w b b4; w b b5; w b b6; w b b7
+
+  external swap64 : int64 -> int64 = "%bswap_int64"
+  external unsafe_get_int64_ne : string -> int -> int64 = "%caml_string_get64u"
+
+  let unsafe_get_int64_le b i = match Sys.big_endian with
+  | true -> swap64 (unsafe_get_int64_ne b i)
+  | false -> unsafe_get_int64_ne b i
+
+  let dec_int64 s i =
+    let next = i + 8 in
+    check_next ~kind:"int64" s i next;
+    next, unsafe_get_int64_le s i
+
+  let enc_string b s =
+    enc_int b (String.length s);
+    Buffer.add_string b s
+
+  let dec_string s i =
+    let i, len = dec_int s i in
+    let next = i + len in
+    check_next ~kind:"string" s i next;
+    next, String.sub s i len
+
+  let enc_fpath b p = enc_string b (Fpath.to_string p)
+  let dec_fpath s i =
+    let next, s = dec_string s i in
+    match Fpath.of_string s with
+    | Error e -> err i "corrupted file path value: %s" e
+    | Ok p -> next, p
+
+  let enc_list el b l =
+    let rec loop len acc = function
+    | [] -> len, acc | v :: vs -> loop (len + 1) (v :: acc) vs
+    in
+    let len, rl = loop 0 [] l in
+    enc_int b len;
+    let rec loop el b = function [] -> () | v :: vs -> el b v; loop el b vs in
+    loop el b rl
+
+  let dec_list el s i  =
+    let i, count = dec_int s i in
+    let rec loop el s i count acc = match count = 0 with
+    | true -> i, acc (* enc_list writes the reverse list. *)
+    | false ->
+        let i, v = el s i in
+        loop el s i (count - 1) (v :: acc)
+    in
+    loop el s i count []
+
+  let enc_option w b = function
+  | None -> enc_byte b 0
+  | Some v -> enc_byte b 1; w b v
+
+  let dec_option some s i =
+    let kind = "option" in
+    let next, b = dec_byte ~kind s i in
+    match b with
+    | 0 -> next, None
+    | 1 -> let i, v = some s next in i, Some v
+    | b -> err_byte ~kind i b
+
+  let enc_result ~ok ~error b = function
+  | Ok v -> enc_byte b 0; ok b v
+  | Error e -> enc_byte b 1; error b e
+
+  let dec_result ~ok ~error s i =
+    let kind = "result" in
+    let next, b = dec_byte ~kind s i in
+    match b with
+    | 0 -> let i, v = ok s next in i, Ok v
+    | 1 -> let i, e = error s next in i, Error e
+    | b -> err_byte ~kind i b
+end
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 The b0 programmers
 

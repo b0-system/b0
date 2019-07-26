@@ -175,11 +175,6 @@ module Op : sig
     B000.Op.t list -> B000.Op.t list
 
   val log_filter_cli : (B000.Op.t list -> B000.Op.t list) Cmdliner.Term.t
-
-  type out_fmt = [`Long | `Normal | `Short | `Trace_event]
-  val log_out : out_fmt -> (out_fmt * (B000.Op.t list -> unit))
-  val log_out_fmt_cli :
-    ?docs:string -> unit -> (out_fmt * (B000.Op.t list -> unit)) Cmdliner.Term.t
 end
 
 
@@ -294,8 +289,19 @@ module Memo : sig
   (** {1:build_log Build log} *)
 
   module Log : sig
+
+    type info
     val write_file : Fpath.t -> B00.Memo.t -> (unit, string) result
-    val read_file : Fpath.t -> (B000.Op.t list, string) result
+    val read_file : Fpath.t -> (info * B000.Op.t list, string) result
+
+    type out_fmt = [`Long | `Normal | `Short | `Trace_event | `Stats ]
+    val out : out_fmt -> (out_fmt * (info * B000.Op.t list -> unit))
+    val out_fmt_cli :
+      ?docs:string -> unit ->
+      (out_fmt * (info * B000.Op.t list -> unit)) Cmdliner.Term.t
+
+    val pp_stats : (info * B000.Op.t list) Fmt.t
+    (** [pp_stats] formats statistics about the memoizer. *)
   end
 end
 

@@ -2866,6 +2866,10 @@ end
 
 (** Value converters.
 
+    {b FIXME.} Likely get rid of this. See {!Benc}.
+    We also have better sexps in {!B0_sexp}. Configuration
+    likely wants something simpler.
+
     A value converter describes how to encode and decode OCaml values
     to a binary presentation and a textual, human specifiable,
     {{!B0_sexp.sexp_syntax}s-expression based}, representation.
@@ -3307,6 +3311,115 @@ module Rqueue : sig
   val length : 'a t -> int
   (** [length q] is the number of elements in [q]. *)
 end
+
+(** Binary coding
+
+    {b FIXME.} Decide with {!Conv}. *)
+module Binc : sig
+
+  type 'a enc = Buffer.t -> 'a -> unit
+  (** The type for encoders of values of type ['a].
+
+      [enc b v] should encode [v] in buffer [b]. *)
+
+  type 'a dec = string -> int -> int * 'a
+  (** The type for decoders of values of type ['a].
+
+      [dec s i] should decode a value in [s] starting at [i] (which
+      may be [String.length s]) and return the index of the byte in
+      [s] after the decoded value (this can be [String.length s]).
+
+      The function should raise {!Failure} in case of error. *)
+
+  val err : int -> ('a, Format.formatter, unit, 'b) format4 -> 'a
+  (** [err i fmt] reports an error for position [i] formatted according
+      to [fmt]. *)
+
+  val err_byte : kind:string -> int -> int -> 'a
+  (** [err_byte ~kind i byte] repors an error for the unexpected byte
+      [byte] at position [i]. *)
+
+  val dec_eoi : string -> int -> unit
+  (** [dec_eoi s i] asserts that [i] is exactly at the end of input. *)
+
+  val get_byte : string -> int -> int
+  (** [get_byte s i] is the byte s.[i]. *)
+
+  val enc_magic : string enc
+  (** [enc_magic] encodes a string as a magic number. *)
+
+  val dec_magic : string -> int -> String.t -> int
+  (** [dec_magic s i m] decodes magic number [m] and returns
+      the next index to read from. *)
+
+  val enc_byte : int enc
+  (** [enc_byte] is a byte encoder. *)
+
+  val dec_byte : kind:string -> int dec
+  (** [dec_byte] decodes a byte for a value of type [kind]. *)
+
+  val enc_unit : Buffer.t -> unit -> unit
+  (** [enc_unit] encodes unit. *)
+
+  val dec_unit : unit dec
+  (** [dec_unit] decodes unit. *)
+
+  val enc_bool : bool enc
+  (** [enc_bool] encodes a boolean. *)
+
+  val dec_bool : bool dec
+  (** [dec_bool] decodes a boolean. *)
+
+  val enc_int : int enc
+  (** [enc_int] encodes an integer. The encoding does
+      not depend on {!Sys.word_size}. *)
+
+  val dec_int : int dec
+  (** [dec_int] dedodes an integer. {b Warning.} An [int]
+      encoded on a 64-bit platform may end up being truncated
+      if read back on 32-bit platform. *)
+
+  val enc_int64 : int64 enc
+  (** [enc_int64] encodes an [int64]. *)
+
+  val dec_int64 : int64 dec
+  (** [dec_int64] decodes an [int64]. *)
+
+  val enc_string : string enc
+  (** [enc_string] encodes a string. *)
+
+  val dec_string : string dec
+  (** [dec_string] decodes a string. *)
+
+  val enc_fpath : Fpath.t enc
+  (** [enc_fpath] encodes an {!Fpath.t}. *)
+
+  val dec_fpath : Fpath.t dec
+  (** [dec_fpath] decodes an {!Fpath.t}. *)
+
+  val enc_list : 'a enc -> 'a list enc
+  (** [enc_list enc] encodes the elements of a list using [enc]. *)
+
+  val dec_list : 'a dec -> 'a list dec
+  (** [dec_list dec] decodes the lements of a list using [dec]. *)
+
+  val enc_option : 'a enc -> 'a option enc
+  (** [enc_option enc] encodes an option using [enc] for the [Some] case
+      value. *)
+
+  val dec_option : 'a dec -> 'a option dec
+  (** [dec_option dec] decodes an option using [dec] for the [Some] case
+      value. *)
+
+  val enc_result : ok:'a enc -> error:'b enc -> ('a, 'b) result enc
+  (** [enc_result ~ok ~error] encodes a result value with the corresponding
+      case encoders. *)
+
+  val dec_result : ok:'a dec -> error:'b dec -> ('a, 'b) result dec
+  (** [dec_result ~ok ~error] decodes a result value with the corresponding
+      case decoders. *)
+end
+
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 The b0 programmers

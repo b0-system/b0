@@ -60,13 +60,11 @@ module Op : sig
 
   (** {1:bin_serial Binary serialization} *)
 
-  val list_to_string : B000.Op.t list -> string
-  (** [list_to_string ops] is a binary encoding of [ops]. *)
+  val enc : B000.Op.t Binc.enc
+  (** [enc] binary encodes an operation. *)
 
-  val list_of_string :
-    ?file:Fpath.t -> string -> (B000.Op.t list, string) result
-  (** [lsit_of_string ops] is a binary decoding of a {!to_string} encoding.
-      [file] is a filename to report errors (defaults to {!Os.File.dash}). *)
+  val dec : B000.Op.t Binc.dec
+  (** [dec] binary decodes an operation. *)
 end
 
 module Memo : sig
@@ -102,9 +100,6 @@ module Memo : sig
 
       [op_howto] is prefixed before each file and should be a command
       fragment to get information about which operation needed the file. *)
-
-  val pp_stats : B00.Memo.t Fmt.t
-  (** [pp_stats] formats statistics about the memoizer. *)
 end
 
 (*---------------------------------------------------------------------------

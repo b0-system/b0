@@ -372,46 +372,6 @@ module Op = struct
     in
     Term.(const log_filter $ reads $ writes $ ids $
         hashes $ groups $ needs $ enables $ recursive $ revived $ order_by)
-
-  let log_out out_fmt =
-    let outf_pp pp_op = function
-    | [] -> ()
-    | ops -> Fmt.pr "@[<v>%a@]@." (Fmt.list pp_op) ops
-    in
-    let outf = match out_fmt with
-    | `Short -> outf_pp B00_conv.Op.pp_short
-    | `Normal -> outf_pp B00_conv.Op.pp_short_with_ui
-    | `Long -> outf_pp B00_conv.Op.pp
-    | `Trace_event ->
-        fun ops ->
-          Fmt.pr "%s@."
-            (B0_json.Jsong.to_string (B0_trace.Trace_event.of_ops ops))
-    in
-    out_fmt, outf
-
-  type out_fmt = [ `Normal | `Short | `Long | `Trace_event ]
-  let log_out_fmt_cli ?docs () =
-    let out_fmt
-        ?docs ?(short_opts = ["s"; "short"]) ?(long_opts = ["l"; "long"])
-        ?(trace_event_opts = ["t"; "trace-event"])
-        ()
-      =
-      let short =
-        let doc = "Short output. Line based output with only relevant data." in
-        Cmdliner.Arg.info short_opts ~doc ?docs
-      in
-      let long =
-        let doc = "Long output. Outputs as much information as possible." in
-        Cmdliner.Arg.info long_opts ~doc ?docs
-      in
-      let trace_event =
-        let doc = "Output build operations in Trace Event format." in
-        Cmdliner.Arg.info trace_event_opts ~doc ?docs
-      in
-      let fmts = [`Short, short; `Long, long; `Trace_event, trace_event] in
-      Cmdliner.Arg.(value & vflag `Normal fmts)
-    in
-    Cmdliner.Term.(const log_out $ out_fmt ?docs ())
 end
 
 module Memo = struct
@@ -488,17 +448,179 @@ module Memo = struct
   (* Build log *)
 
   module Log = struct
-    let write_file file memo =
-      let d =
-        Log.time (fun _ m -> m "generating log") @@ fun () ->
-        B00_conv.Op.list_to_string (B00.Memo.ops memo)
+    type info =
+      { hash_count : int;
+        hash_dur : Time.span;
+        total_dur : Time.span;
+        cpu_utime : Time.span;
+        cpu_stime : Time.span;
+        cpu_children_utime : Time.span;
+        cpu_children_stime : Time.span; }
+
+    let enc_span b s = Binc.enc_int64 b (Time.Span.to_uint64_ns s)
+    let dec_span s i =
+      let i, s = Binc.dec_int64 s i in
+      i, Time.Span.of_uint64_ns s
+
+    let enc_info b i =
+      Binc.enc_int b i.hash_count; enc_span b i.hash_dur;
+      enc_span b i.total_dur;
+      enc_span b i.cpu_utime; enc_span b i.cpu_stime;
+      enc_span b i.cpu_children_utime; enc_span b i.cpu_children_stime
+
+    let dec_info s i =
+      let i, hash_count = Binc.dec_int s i in let i, hash_dur = dec_span s i in
+      let i, total_dur = dec_span s i in
+      let i, cpu_utime = dec_span s i in let i, cpu_stime = dec_span s i in
+      let i, cpu_children_utime = dec_span s i in
+      let i, cpu_children_stime = dec_span s i in
+      i, { hash_count; hash_dur; total_dur; cpu_utime; cpu_stime;
+           cpu_children_utime; cpu_children_stime }
+
+    let info_of_memo m =
+      let open B00 in
+      let c = Memo.reviver m in
+      let hash_count = Fpath.Map.cardinal (B000.Reviver.file_hashes c) in
+      let hash_dur = B000.Reviver.file_hash_dur c in
+      let total_dur = Time.count (Memo.clock m) in
+      let cpu = Time.cpu_count (Memo.cpu_clock m) in
+      { hash_count; hash_dur; total_dur;
+        cpu_utime = Time.cpu_utime cpu; cpu_stime = Time.cpu_stime cpu;
+        cpu_children_utime = Time.cpu_children_utime cpu;
+        cpu_children_stime = Time.cpu_children_stime cpu; }
+
+    let magic = "b\x00\x00\x00"
+
+    let log_to_string info ops =
+      let b = Buffer.create (1024 * 1024) in
+      Binc.enc_magic b magic;
+      enc_info b info;
+      Binc.enc_list B00_conv.Op.enc b ops;
+      Buffer.contents b
+
+    let log_of_string ?(file = Os.File.dash) s =
+      try
+        let i = Binc.dec_magic s 0 magic in
+        let i, info = dec_info s i in
+        let i, ops = Binc.dec_list B00_conv.Op.dec s i in
+        Binc.dec_eoi s i;
+        Ok (info, ops)
+      with
+      | Failure e -> Fmt.error "%a:%s" Fpath.pp_unquoted file e
+
+    let write_file file m =
+      let data =
+        Log.time (fun _ msg -> msg "generating log") @@ fun () ->
+        log_to_string (info_of_memo m) (B00.Memo.ops m)
       in
-      Log.time (fun _ m -> m "writing log") @@ fun () ->
-      Os.File.write ~force:true ~make_path:true file d
+      Log.time (fun _ msg -> msg "writing log") @@ fun () ->
+      Os.File.write ~force:true ~make_path:true file data
 
     let read_file file =
       Result.bind (Os.File.read file) @@ fun data ->
-      B00_conv.Op.list_of_string ~file data
+      log_of_string ~file data
+
+    let pp_stats ppf (info, ops) =
+      let sc, st, sd, wc, wt, wd, cc, ct, cd, rt, rd, ot, od =
+        let ( ++ ) = Time.Span.add in
+        let rec loop sc st sd wc wt wd cc ct cd rt rd ot od = function
+        | [] -> sc, st, sd, wc, wt, wd, cc, ct, cd, rt, rd, ot, od
+        | o :: os ->
+            let revived = B000.Op.revived o and d = B000.Op.duration o in
+            let ot = ot + 1 and od = od ++ d in
+            match B000.Op.kind o with
+            | B000.Op.Spawn _ ->
+                let sc = if revived then sc + 1 else sc in
+                loop sc (st + 1) (sd ++ d) wc wt wd cc ct cd rt rd ot od os
+            | B000.Op.Write _ ->
+                let wc = if revived then wc + 1 else wc in
+                loop sc st sd wc (wt + 1) (wd ++ d) cc ct cd rt rd ot od os
+            | B000.Op.Copy _ ->
+                let cc = if revived then cc + 1 else cc in
+                loop sc st sd wc wt wd cc (ct + 1) (cd ++ d) rt rd ot od os
+            | B000.Op.Read _ ->
+                loop sc st sd wc wt wd cc ct cd (rt + 1) (rd ++ d) ot od os
+            | _ ->
+                loop sc st sd wc wt wd cc ct cd rt rd ot od os
+        in
+        loop
+          0 0 Time.Span.zero 0 0 Time.Span.zero 0 0 Time.Span.zero
+          0 Time.Span.zero 0 Time.Span.zero ops
+      in
+      let hc, hd = info.hash_count, info.hash_dur in
+      let pp_xtime ppf (self, children) =
+        let label = Fmt.tty_string [`Italic] in
+        Fmt.pf ppf "%a %a" Time.Span.pp self
+          (Fmt.field ~label "children" (fun c -> c) Time.Span.pp)
+          children
+      in
+      let pp_stime ppf i = pp_xtime ppf (i.cpu_stime, i.cpu_children_stime) in
+      let pp_utime ppf i = pp_xtime ppf (i.cpu_utime, i.cpu_children_utime) in
+      let pp_op ppf (oc, ot, od) =
+        Fmt.pf ppf "%a %d (%d revived)" Time.Span.pp od ot oc
+      in
+      let pp_op_no_cache ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
+      let pp_totals ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
+      (Fmt.record @@
+       [ Fmt.field "spawns" (fun _ -> (sc, st, sd)) pp_op;
+         Fmt.field "writes" (fun _ -> (wc, wt, wd)) pp_op;
+         Fmt.field "copies" (fun _ -> (cc, ct, cd)) pp_op;
+         Fmt.field "reads" (fun _ -> (rt, rd)) pp_op_no_cache;
+         Fmt.field "global timings" ~sep:Fmt.nop (fun _ -> ()) Fmt.nop;
+         Fmt.field "all" (fun _ -> (ot, od)) pp_totals;
+         Fmt.field "hashes" (fun _ -> (hc, hd)) pp_totals;
+         Fmt.field "utime" Fmt.id pp_utime;
+         Fmt.field "stime" Fmt.id pp_stime;
+         Fmt.field "real" (fun _ -> info.total_dur) Time.Span.pp ]) ppf info
+
+    let out out_fmt =
+      let outf_pp_ops pp_op (_, ops) = match ops with
+      | [] -> ()
+      | ops -> Fmt.pr "@[<v>%a@]@." (Fmt.list pp_op) ops
+      in
+      let outf = match out_fmt with
+      | `Short -> outf_pp_ops B00_conv.Op.pp_short
+      | `Normal -> outf_pp_ops B00_conv.Op.pp_short_with_ui
+      | `Long -> outf_pp_ops B00_conv.Op.pp
+      | `Trace_event ->
+          fun (_, ops) ->
+            Fmt.pr "%s@."
+              (B0_json.Jsong.to_string (B0_trace.Trace_event.of_ops ops))
+      | `Stats -> fun log -> Fmt.pr "%a@." pp_stats log
+
+      in
+      out_fmt, outf
+
+  type out_fmt = [ `Normal | `Short | `Long | `Trace_event | `Stats ]
+  let out_fmt_cli ?docs () =
+    let out_fmt
+        ?docs ?(short_opts = ["s"; "short"]) ?(long_opts = ["l"; "long"])
+        ?(trace_event_opts = ["t"; "trace-event"]) ?(stats_opts = ["stats"])
+        ()
+      =
+      let short =
+        let doc = "Short output. Line based output with only relevant data." in
+        Cmdliner.Arg.info short_opts ~doc ?docs
+      in
+      let long =
+        let doc = "Long output. Outputs as much information as possible." in
+        Cmdliner.Arg.info long_opts ~doc ?docs
+      in
+      let trace_event =
+        let doc = "Output build operations in Trace Event format." in
+        Cmdliner.Arg.info trace_event_opts ~doc ?docs
+      in
+      let stats =
+        let doc = "Output statistics about the operations." in
+        Cmdliner.Arg.info stats_opts ~doc ?docs
+      in
+      let fmts = [`Short, short; `Long, long; `Trace_event, trace_event;
+                  `Stats, stats; ]
+      in
+      Cmdliner.Arg.(value & vflag `Normal fmts)
+    in
+    Cmdliner.Term.(const out $ out_fmt ?docs ())
+
   end
 end
 
