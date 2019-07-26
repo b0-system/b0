@@ -37,9 +37,7 @@ module Trace_event = struct
         |> Jsong.mem "kind" (Jsong.string Op.Notify.(kind_to_string (kind n)))
         |> Jsong.mem "msg" (Jsong.string (Op.Notify.msg n))
     | Op.Read r ->
-        obj
-        |> Jsong.mem "file" (Jsong.fpath (Op.Read.file r))
-        |> Jsong.mem "result" (string_result (Op.Read.result r))
+        obj |> Jsong.mem "file" (Jsong.fpath (Op.Read.file r))
     | Op.Spawn s ->
         let cmd = Cmd.(path (Op.Spawn.tool s) %% (Op.Spawn.args s)) in
         obj

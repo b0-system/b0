@@ -358,15 +358,6 @@ module Op = struct
 
   (* Long formatting *)
 
-  let pp_op_error get result ppf o = match result (get o) with
-  | Ok _ -> ()
-  | Error e ->
-    Fmt.pf ppf "@[%a: @[%a@]@]@," (Fmt.tty_string style_err)
-      "error" Fmt.lines e
-
-  let pp_op_error_and_timings get result ppf o =
-    pp_op_error get result ppf o; pp_timings ppf o
-
   let pp_op_failure ppf o =
     let pp_failure ppf = function
     | Op.Msg m -> Fmt.lines ppf m
@@ -404,13 +395,13 @@ module Op = struct
       [ Fmt.using Op.Mkdir.get pp_path; pp_op_failure_and_timings; ]
 
   let pp_notify_long =
-    Fmt.record [ Fmt.using Op.Notify.get pp_notify; pp_timings; ]
+    Fmt.record [ Fmt.using Op.Notify.get pp_notify; pp_op_failure_and_timings; ]
 
   let pp_read_long =
     let pp_path = Fmt.using Op.Read.file pp_file_read in
     Fmt.record
       [ Fmt.using Op.Read.get pp_path;
-        pp_op_error_and_timings Op.Read.get Op.Read.result; ]
+        pp_op_failure_and_timings; ]
 
   let pp_spawn_long =
     (* FIXME add Cmd stamp env stamp *)
@@ -579,16 +570,10 @@ module Op = struct
     let i, msg = Bin.dec_string s i in
     i, Op.Notify.v ~kind ~msg
 
-  let enc_read b r = (* we don't save the data it's already on the FS *)
-    Bin.enc_fpath b (Op.Read.file r);
-    let r = Result.bind (Op.Read.result r) @@ fun _ -> Ok () in
-    Bin.enc_result ~ok:Bin.enc_unit ~error:Bin.enc_string b r
-
+  let enc_read b r = Bin.enc_fpath b (Op.Read.file r)
   let dec_read s i =
     let i, file = Bin.dec_fpath s i in
-    let i, result = Bin.dec_result ~ok:Bin.dec_unit ~error:Bin.dec_string s i in
-    let result = Result.bind result @@ fun _ -> Ok "<see read file>" in
-    i, Op.Read.v ~file ~result
+    i, Op.Read.v ~file ~data:""
 
   let enc_spawn_stdo b = function
   | `Ui -> Bin.enc_byte b 0

@@ -14,7 +14,6 @@
 
 open B0_std
 
-
 (** Trash and delete file hierarchies. *)
 module Trash : sig
 
@@ -466,7 +465,7 @@ module Op : sig
         accessors in {!Read} for the semantics of the various
         arguments. *)
 
-    val v : file:Fpath.t -> result:(string, string) result -> t
+    val v : file:Fpath.t -> data:string -> t
     (** [v] constructs a bare read operation. *)
 
     val get : op -> t
@@ -476,17 +475,14 @@ module Op : sig
     val file : t -> Fpath.t
     (** [file r] is the file read by [r]. *)
 
-    val result : t -> (string, string) result
-    (** [result r] is the contents of the read file or an error. *)
+    val data : t -> string
+    (** [data r] is the read data. *)
 
-    val set_result : t -> (string, string) result -> unit
-    (** [set_result r res] sets the file read result of [r] to [res]. *)
+    val set_data : t -> string -> unit
+    (** [set_data r d] sets the read data to [d]. *)
 
-    val set_exec_status :
-      op -> t -> Time.span ->  (string, string) result -> unit
-    (** [set_exec_status o (get o) end_time result] sets the result of
-        operation [o]. In particular this set the operation status
-        according to [result]. *)
+    val discard_data : t -> unit
+    (** [discard_data ()] discards read data. *)
   end
 
   (** Tool spawns. *)

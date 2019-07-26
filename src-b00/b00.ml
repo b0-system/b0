@@ -493,9 +493,7 @@ module Op = struct
   type mkdir = { mkdir_dir : Fpath.t; mkdir_mode : int; }
   type notify_kind = [ `Warn | `Start | `End | `Info ]
   type notify = { notify_kind : notify_kind; notify_msg : string }
-  type read =
-    { read_file : Fpath.t; mutable read_result : (string, string) result; }
-
+  type read = { read_file : Fpath.t; mutable read_data : string; }
   type spawn_stdo = [ `Ui | `File of Fpath.t | `Tee of Fpath.t ]
   type spawn_success_exits = int list
   type spawn =
@@ -677,17 +675,14 @@ module Op = struct
 
   module Read = struct
     type t = read
-    let v ~file:read_file ~result:read_result = { read_file; read_result }
+    let v ~file:read_file ~data:read_data = { read_file; read_data }
     let get o = match o.kind with Read r -> r | _ -> assert false
     let file r = r.read_file
-    let result r = r.read_result
-    let set_result r res = r.read_result <- res
-    let set_exec_status o read end_time r =
-      let status = match r with Ok _ -> Executed | Error e -> Failed (Msg e) in
-      set_result read r; set_status o status; set_time_ended o end_time
-
+    let data r = r.read_data
+    let set_data r d = r.read_data <- d
+    let discard_data r = r.read_data <- ""
     let v_op ~id ~group time_created ~k file =
-      let read = { read_file = file; read_result = Error "not read" } in
+      let read = { read_file = file; read_data = "" } in
       v_kind ~id ~group time_created ~reads:[file] ~writes:[] ~k (Read read)
   end
 
@@ -1172,13 +1167,6 @@ module Exec = struct
     Op.set_time_started o (timestamp e);
     spawn (Op.Spawn.get o)
 
-  let exec_read e o r =
-    Op.set_time_started o (timestamp e);
-    e.feedback (`Exec_submit (None, o));
-    let res = Os.File.read (Op.Read.file r) in
-    Op.Read.set_exec_status o r (timestamp e) res;
-    Queue.add o e.collectable
-
   let exec_op e o k k_op =
     Op.set_time_started o (timestamp e);
     e.feedback (`Exec_submit (None, o));
@@ -1201,6 +1189,10 @@ module Exec = struct
     let dir = Op.Mkdir.dir mk and mode = Op.Mkdir.mode mk in
     Os.Dir.create ~mode ~make_path:true dir
 
+  let op_read _e r = match Os.File.read (Op.Read.file r) with
+  | Ok data as res -> Op.Read.set_data r data; res
+  | Error _ as res -> res
+
   let op_write e w =
     let r = Op.Write.data w () in
     Op.Write.discard_data w; (* Get rid of data write closure. *)
@@ -1218,7 +1210,7 @@ module Exec = struct
 
   let submit e o = match Op.kind o with
   | Op.Spawn _ -> Queue.add o e.to_spawn (* see submit_spawns *)
-  | Op.Read r -> exec_read e o r
+  | Op.Read r -> exec_op e o r op_read
   | Op.Write w -> exec_op e o w op_write
   | Op.Copy c -> exec_op e o c op_copy
   | Op.Notify n -> exec_op e o n op_nop
@@ -1625,7 +1617,11 @@ module Memo = struct
   let file_ready m p = Guard.set_file_ready m.m.guard p
   let read m file k =
     let id = new_op_id m in
-    let k o = k (Result.get_ok @@ Op.Read.result (Op.Read.get o)) in
+    let k o =
+      let r = Op.Read.get o in
+      let data = Op.Read.data r in
+      Op.Read.discard_data r; k data
+    in
     let o = Op.Read.v_op ~id ~group:m.c.group (timestamp m) ~k file in
     add_op m o
 
