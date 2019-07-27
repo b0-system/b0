@@ -19,14 +19,14 @@ Concepts dropped and to be seen how we can recover them at a higher level:
 {- Build aims for cross compilation (build/host OS distinction). This
    should be capturable as two separate {!B00.Memo}s.}
 {- Build units (named sets of build operation with metadata),
-   {!B00.Op.group} where now introduced though but they have
+   {!B000.Op.group} where now introduced though but they have
    only have UI semantics.}
 {- Build operation synchronisation, only files for now, we had
    unit-level. Did introduce {!B00.Memo.Fut} for odig.}
 {- Build configuration.}
 {- Build unit/config definition localisation (multiple B0.ml files)}
 {- Build directory structuring}
-{- Forced clean builds. The {!B00.Trash} has been reintroduced
+{- Forced clean builds. The {!B000.Trash} has been reintroduced
    now, but it can be used selectively. See also {!rems} discussion.}
 {- Build metadata, unit and file level, packages.}}
 
@@ -34,16 +34,12 @@ Concepts dropped and to be seen how we can recover them at a higher level:
 
 {ul
 {- Memo.spawn redirections, consider supporting all the options
-   of {!Os.Cmd.spawn}}
-{- The concept of response file in {!B00.Memo.Tool} should likely appear at
-   the {!B00.Op.spawn} level aswell so that we can simply have the sequence
-   of {!B00.Op.t} value for a potential build log
-   (otherwise {!Memo.Op.spawn_args}
-   becomes the line with the response file which is not meanigfull)}
-{- Operations, b0 also had file deletion maybe add them
-   aswell. Delete doesn't fit well in the "file ready" model, but
-   could be useful for concurrency.}
-{- Input files. Should we consider their mode ? E.g. if we cache failure}}
+   of {!B0_std.Os.Cmd.spawn}}
+{- The concept of response file in {!B00.Tool} should likely appear at
+   the {!B000.Op.Spawn} level aswell so that we can simply have the sequence
+   of {!B000.Op.t} value for a potential build log
+   (otherwise {!B000.Op.Spawn.args}
+   becomes the line with the response file which is not meanigfull)}}
 
 {2:rems Handling removals}
 
@@ -78,27 +74,51 @@ in the trash exactly the things that really need to be deleted, rather
 than delete all the build all of the time (note that this is still
 more than say a `make` based build system because those overwrites paths).
 
-{2:fail Reviving failures}
 
-Should build operations be cached or not ?
+{1:design_answers Design answers}
 
-On one hand it can be useful if one tries to build and there's a long
-build operation and nothing changed, you can respond immediately with
-the same error.
+A few explanation about design choices we may not remember in the future.
 
-On the other hand the failure may be due to a reason that is not
-captured by the operation hash.  An example would be a permission
-denied error e.g. on an output directory. If the operation failure is
-cached changing the permission would not affect the hash and thus the
-operation would not be retried. You'd need to reset the cache (either
-globally or for the operation).
+{2:file_mode Why arent't file permission of a read file not part of
+             the build operation stamp ? }
 
-A bit unsure what is best for the end-user here. The first point is
-clearly useful in certain scenarios and/or for slow compilers. The
-second point entails you need to understand that things can be a bit
-subtle (speaking of which I wonder if the file modes of the files
-declared as read by a build operation shouldn't be part of the hash
-aswell).
+It is clearly something that can influence tool outputs and failures.
+However so can any bit of file metadata (e.g. groups) in general and
+a boundary needs to be drawn. For possible wide area cache sharing
+scenarios it also feels better not to consider, say changes in [other]
+file permissions.
 
-At least a low level toggle should be provided for this in the API.
-Whether to expose it to the user is another story.
+Related to the {{!caching_failures}answer} about caching failures.
+
+{2:caching_failures Why are failed operations not cached ?}
+
+First let's define what caching build operations would likely mean. It
+would mean caching it's metadata bit, i.e. for tool spawns the user
+interface output and the exit code. Caching the actual (likely
+partial) file writes would be difficult to do since the actual file
+system state on tool error may be difficult to characterize.
+
+Caching failed operations may report build errors more quicky for
+example if a build operation is slow in erroring and nothing changed
+as far as its operation stamp indicates.
+
+One problem though is is that the failure may be due to a reason that
+is not captured by the operation stamp. In that case even though the
+problem may be resolved by the user, the operation stamp would not
+change and the operation would be revived as a failure rather than
+re-executed.
+
+To give a concrete example, suppose an operation fails because of the
+file permissions of a file it reads. This file permission is not part
+of the build operation stamp (see {{!file_mode}this answer}). So
+changing the file permission to make the build operation succeed would
+not only revive the old failure, but likely also output a puzzling
+error message unrelated to the current state of the system. The way
+out for the user is long head scratching ended by a clear of the cache
+for that operation. That doesn't feel like a great user experience.
+
+It seems not caching failures leads to a better user experience for b0
+based build systems, at least as long as {{!file_mode}this} remains
+true. Also build failure information should be, most of the time,
+available in the build logs so it may not be necessary to reinvoke a
+long failing operation to get its error back.

@@ -1186,7 +1186,7 @@ module Fpath : sig
       string otherwise. The latter occurs only on root paths and on
       paths whose last non-empty segment is a {{!is_rel_seg}relative
       segment}. If [no_ext] is [true] (default to [false]) the basename's
-      {{!file_ext}multiple extension}, if any, is removed from the result. *)
+      {{!file_exts}multiple extension}, if any, is removed from the result. *)
 
   val parent : t -> t
   (** [parent p] is a {{!is_dir_path}directory path} that contains

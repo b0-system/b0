@@ -147,8 +147,6 @@ module Memo = struct
   | `Op_cache_error of Op.t * string
   | `Op_complete of Op.t ]
 
-  exception Fail of string
-
   type t = { c : ctx; m : memo }
   and ctx = { group : Op.group }
   and memo =
@@ -168,21 +166,18 @@ module Memo = struct
     let clock = match clock with None -> Time.counter () | Some c -> c in
     let cpu_clock = match cc with None -> Time.cpu_counter () | Some c -> c in
     let futs = Futs.create () and op_id = 0 and  ops = [] in
+    let c = { group = "" } in
     let m =
       { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec; futs;
         op_id; ops; }
     in
-    let c = { group = "" } in
     { c; m }
 
   let memo
       ?(hash_fun = (module Hash.Xxh_64 : Hash.T)) ?env ?cwd ?cache_dir
       ?trash_dir ?(jobs = 4) ?feedback ()
     =
-    let feedback = match feedback with
-    | Some f -> f
-    | None -> fun _ -> ()
-    in
+    let feedback = match feedback with | Some f -> f | None -> fun _ -> () in
     let fb_cache = (feedback :> File_cache.feedback -> unit) in
     let fb_exec = (feedback :> Exec.feedback -> unit) in
     let fb_memo = (feedback :> feedback -> unit) in
@@ -192,12 +187,10 @@ module Memo = struct
     Result.bind env @@ fun env ->
     Result.bind cwd @@ fun cwd ->
     let cache_dir = match cache_dir with
-    | None -> Fpath.(cwd / "_b0" / ".cache")
-    | Some d -> d
+    | None -> Fpath.(cwd / "_b0" / ".cache") | Some d -> d
     in
     let trash_dir = match trash_dir with
-    | None -> Fpath.(cwd / "_b0" / ".trash")
-    | Some d -> d
+    | None -> Fpath.(cwd / "_b0" / ".trash") | Some d -> d
     in
     Result.bind (File_cache.create ~feedback:fb_cache cache_dir) @@ fun cache ->
     let env = Env.v env in
@@ -222,6 +215,7 @@ module Memo = struct
   let group m = m.c.group
   let with_group m group = { c = { group }; m = m.m }
 
+  exception Fail of string
   let trap_kont_exn k m o = try k m o with
   | Fail e -> m.m.feedback (`Fiber_fail e)
   | Stack_overflow as e -> raise e
@@ -230,12 +224,12 @@ module Memo = struct
   | e -> m.m.feedback (`Fiber_exn (e, Printexc.get_raw_backtrace ()))
 
   let continue_op m o =
-    List.iter (fun f -> Guard.set_file_ready m.m.guard f) (Op.writes o);
+    List.iter (Guard.set_file_ready m.m.guard) (Op.writes o);
     m.m.feedback (`Op_complete o);
     trap_kont_exn (fun m o -> Op.kontinue o) m o
 
   let discontinue_op m o =
-    List.iter (fun f -> Guard.set_file_never m.m.guard f) (Op.writes o);
+    List.iter (Guard.set_file_never m.m.guard) (Op.writes o);
     Op.diskontinue o; m.m.feedback (`Op_complete o)
 
   let finish_op m o = match Op.status o with
@@ -333,8 +327,8 @@ module Memo = struct
 
   let notify m kind fmt =
     let op msg =
-      let id = new_op_id m and k o = () in
-      let o = Op.Notify.v_op ~id ~group:m.c.group (timestamp m) ~k kind msg in
+      let id = new_op_id m and created = timestamp m and k o = () in
+      let o = Op.Notify.v_op ~id ~group:m.c.group ~created ~k kind msg in
       add_op m o
     in
     Fmt.kstr op fmt
@@ -343,40 +337,40 @@ module Memo = struct
 
   let file_ready m p = Guard.set_file_ready m.m.guard p
   let read m file k =
-    let id = new_op_id m in
+    let id = new_op_id m and created = timestamp m in
     let k o =
       let r = Op.Read.get o in
       let data = Op.Read.data r in
       Op.Read.discard_data r; k data
     in
-    let o = Op.Read.v_op ~id ~group:m.c.group (timestamp m) ~k file in
+    let o = Op.Read.v_op ~id ~group:m.c.group ~created ~k file in
     add_op m o
 
   let wait_files m files k =
-    let id = new_op_id m and k o = k () in
-    let o = Op.Wait_files.v_op ~id ~group:m.c.group (timestamp m) ~k files in
+    let id = new_op_id m and created = timestamp m and k o = k () in
+    let o = Op.Wait_files.v_op ~id ~group:m.c.group ~created ~k files in
     add_op m o
 
-  let write m ?(stamp = "") ?(reads = []) ?(mode = 0o644) write data =
-    let id = new_op_id m and group = m.c.group and start = timestamp m in
+  let write m ?(stamp = "") ?(reads = []) ?(mode = 0o644) write d =
+    let id = new_op_id m and group = m.c.group and created = timestamp m in
     let k o = () in
-    let o = Op.Write.v_op ~id start ~k ~group ~stamp ~reads ~mode ~write data in
+    let o = Op.Write.v_op ~id ~group ~created ~k ~stamp ~reads ~mode ~write d in
     add_op m o
 
   let copy m ?(mode = 0o644) ?linenum ~src dst =
-    let id = new_op_id m and group = m.c.group and start = timestamp m in
+    let id = new_op_id m and group = m.c.group and created = timestamp m in
     let k o = () in
-    let o = Op.Copy.v_op ~id start ~k ~group ~mode ~linenum ~src dst in
+    let o = Op.Copy.v_op ~id ~group ~created ~k ~mode ~linenum ~src dst in
     add_op m o
 
   let mkdir m ?(mode = 0o755) dir k =
-    let id = new_op_id m and k o = k () in
-    let o = Op.Mkdir.v_op ~id ~group:m.c.group ~mode (timestamp m) ~k dir in
+    let id = new_op_id m and created = timestamp m and k o = k () in
+    let o = Op.Mkdir.v_op ~id ~group:m.c.group ~created ~k ~mode dir in
     add_op m o
 
   let delete m p k =
-    let id = new_op_id m and k o = k () in
-    let o = Op.Delete.v_op ~id ~group:m.c.group (timestamp m) ~k p in
+    let id = new_op_id m and created = timestamp m and k o = k () in
+    let o = Op.Delete.v_op ~id ~group:m.c.group ~created ~k p in
     add_op m o
 
   (* FIXME better strategy to deal with builded tools. If the tool is a
@@ -438,8 +432,7 @@ module Memo = struct
     match cmd.cmd_tool with
     | Miss (tool, e) -> m.m.feedback (`Miss_tool (tool, e))
     | Tool tool ->
-        let id = new_op_id m in
-        let timestamp = timestamp m in
+        let id = new_op_id m and created = timestamp m in
         let env, relevant_env = spawn_env m tool env in
         let cwd = match cwd with None -> m.m.cwd | Some d -> d in
         let k = match k with
@@ -450,7 +443,7 @@ module Memo = struct
             | _ -> assert false
         in
         let o =
-          Op.Spawn.v_op ~id ~group:m.c.group timestamp ~reads ~writes ~k ~stamp
+          Op.Spawn.v_op ~id ~group:m.c.group ~created ~reads ~writes ~k ~stamp
             ~env ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits
             tool.tool_file cmd.cmd_args
         in

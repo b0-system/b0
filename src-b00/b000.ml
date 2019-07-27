@@ -483,6 +483,20 @@ end
 
 module Op = struct
 
+  (* Operation status *)
+
+  type failure = Msg of string | Missing_writes of Fpath.t list
+  type status = Aborted | Executed | Failed of failure | Waiting
+  let failure_to_string = function
+  | Msg m -> m
+  | Missing_writes fs ->
+      Fmt.str "@[<v>Did not write:@,%a@]" (Fmt.list Fpath.pp_quoted) fs
+
+  let status_to_string = function
+  | Aborted -> "aborted" | Executed -> "executed"
+  | Failed f -> Fmt.str "failed: %s" (failure_to_string f)
+  | Waiting -> "waiting"
+
   (* Operation kinds *)
 
   type copy =
@@ -539,19 +553,6 @@ module Op = struct
 
   type id = int
   type group = string
-  type failure = Msg of string | Missing_writes of Fpath.t list
-  type status = Aborted | Executed | Failed of failure | Waiting
-
-  let failure_to_string = function
-  | Msg m -> m
-  | Missing_writes fs ->
-      Fmt.str "@[<v>Did not write:@,%a@]" (Fmt.list Fpath.pp_quoted) fs
-
-  let status_to_string = function
-  | Aborted -> "aborted" | Executed -> "executed"
-  | Failed f -> Fmt.str "failed: %s" (failure_to_string f)
-  | Waiting -> "waiting"
-
   type t =
     { id : id;
       group : group;
@@ -568,17 +569,16 @@ module Op = struct
 
   type op = t
   let v
-      id ~group ~time_created ~time_started ~duration ~revived
-      ~status ~reads ~writes ~hash ~k kind
+      id ~group ~time_created ~time_started ~duration ~revived ~status ~reads
+      ~writes ~hash ~k kind
     =
     { id; group; time_created; time_started; duration; revived;
       status; reads; writes; hash; k; kind; }
 
-  let v_kind ~id ~group time_created ~reads ~writes ~k kind =
-    let time_started = Time.Span.max in
-    let duration = Time.Span.zero in
+  let v_kind ~id ~group ~created ~reads ~writes ~k kind =
+    let time_started = Time.Span.max and duration = Time.Span.zero in
     let revived = false and status = Waiting and hash = Hash.nil in
-    { id; group; time_created; time_started; duration; revived;
+    { id; group; time_created = created; time_started; duration; revived;
       status; reads; writes; hash; k; kind }
 
   let id o = o.id
@@ -616,7 +616,7 @@ module Op = struct
   let set_reads o fs = o.hash <- Hash.nil; o.reads <- fs
   let set_writes o fs = o.writes <- fs
   let set_hash o h = o.hash <- h
-  let set_exec_result o t r =
+  let set_end_result o t r =
     set_time_ended o t;
     set_status o (match r with Ok _ -> Executed | Error e -> Failed (Msg e))
 
@@ -632,13 +632,13 @@ module Op = struct
     let dst c = c.copy_dst
     let mode c = c.copy_mode
     let linenum c = c.copy_linenum
-    let v_op ~id ~group time_created ~k ~mode ~linenum ~src dst
+    let v_op ~id ~group ~created ~k ~mode ~linenum ~src dst
       =
       let c = { copy_src = src; copy_dst = dst; copy_mode = mode;
                 copy_linenum = linenum }
       in
       let reads = [src] and writes = [dst] in
-      v_kind ~id ~group time_created ~reads ~writes ~k (Copy c)
+      v_kind ~id ~group ~created ~reads ~writes ~k (Copy c)
   end
 
   module Delete = struct
@@ -646,9 +646,9 @@ module Op = struct
     let v ~path = { delete_path = path }
     let get o = match o.kind with Delete d -> d | _ -> assert false
     let path d = d.delete_path
-    let v_op ~id ~group time_created ~k delete_path =
+    let v_op ~id ~group ~created ~k delete_path =
       let d = { delete_path } in
-      v_kind ~id ~group time_created ~reads:[] ~writes:[] ~k (Delete d)
+      v_kind ~id ~group ~created ~reads:[] ~writes:[] ~k (Delete d)
   end
 
   module Mkdir = struct
@@ -657,9 +657,9 @@ module Op = struct
     let get o = match o.kind with Mkdir mk -> mk | _ -> assert false
     let dir mk = mk.mkdir_dir
     let mode mk = mk.mkdir_mode
-    let v_op ~id ~group ~mode time_created ~k dir =
+    let v_op ~id ~group ~mode ~created ~k dir =
       let mkdir = { mkdir_dir = dir; mkdir_mode = mode } in
-      v_kind ~id ~group time_created ~reads:[] ~writes:[dir] ~k (Mkdir mkdir)
+      v_kind ~id ~group ~created ~reads:[] ~writes:[dir] ~k (Mkdir mkdir)
   end
 
   module Notify = struct
@@ -672,9 +672,9 @@ module Op = struct
     let get o = match o.kind with Notify n -> n | _ -> assert false
     let kind n = n.notify_kind
     let msg n = n.notify_msg
-    let v_op ~id ~group time_created ~k notify_kind notify_msg =
+    let v_op ~id ~group ~created ~k notify_kind notify_msg =
       let n = { notify_kind; notify_msg } in
-      v_kind ~id ~group time_created ~reads:[] ~writes:[] ~k (Notify n)
+      v_kind ~id ~group ~created ~reads:[] ~writes:[] ~k (Notify n)
   end
 
   module Read = struct
@@ -685,9 +685,9 @@ module Op = struct
     let data r = r.read_data
     let set_data r d = r.read_data <- d
     let discard_data r = r.read_data <- ""
-    let v_op ~id ~group time_created ~k file =
+    let v_op ~id ~group ~created ~k file =
       let read = { read_file = file; read_data = "" } in
-      v_kind ~id ~group time_created ~reads:[file] ~writes:[] ~k (Read read)
+      v_kind ~id ~group ~created ~reads:[file] ~writes:[] ~k (Read read)
   end
 
   module Spawn = struct
@@ -731,22 +731,22 @@ module Op = struct
       set_time_ended o end_time
 
     let v_op
-        ~id ~group time_created ~reads ~writes ~k ~stamp ~env
-        ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits tool args
+        ~id ~group ~created ~reads ~writes ~k ~stamp ~env ~relevant_env ~cwd
+        ~stdin ~stdout ~stderr ~success_exits tool args
       =
       let spawn =
         { env; relevant_env; cwd; stdin; stdout; stderr; success_exits;
           tool; args; spawn_stamp = stamp; stdo_ui = None;
           spawn_result = Error "not spawned" }
       in
-      v_kind ~id ~group time_created ~reads ~writes ~k (Spawn spawn)
+      v_kind ~id ~group ~created ~reads ~writes ~k (Spawn spawn)
   end
 
   module Wait_files = struct
     type t = wait_files
     let v () = ()
-    let v_op ~id ~group time_created ~k reads =
-      v_kind ~id ~group time_created ~reads ~writes:[] ~k (Wait_files ())
+    let v_op ~id ~group ~created ~k reads =
+      v_kind ~id ~group ~created ~reads ~writes:[] ~k (Wait_files ())
   end
 
   module Write = struct
@@ -764,11 +764,11 @@ module Op = struct
       w.write_data <- fun _ -> Error "nothing to write (assert false)"
 
     let v_op
-        ~id ~group time_created ~k ~stamp:write_stamp ~reads ~mode
-        ~write:f write_data
+        ~id ~group ~created ~k ~stamp:write_stamp ~reads ~mode ~write:f
+        write_data
       =
       let w = { write_stamp; write_mode = mode; write_file = f; write_data } in
-      v_kind ~id ~group time_created ~reads ~writes:[f] ~k (Write w)
+      v_kind ~id ~group ~created ~reads ~writes:[f] ~k (Write w)
   end
 
   module T = struct type nonrec t = t let compare = compare end
@@ -896,7 +896,7 @@ module Reviver = struct
     | Some (_, existed) ->
         Op.Write.discard_data w; (* get rid of write data closure. *)
         Op.set_revived o true;
-        Op.set_exec_result o (timestamp r) (Ok ());
+        Op.set_end_result o (timestamp r) (Ok ());
         Ok (Some existed)
 
   let revive_copy r o c =
@@ -906,7 +906,7 @@ module Reviver = struct
     | None -> Ok None
     | Some (_, existed) ->
         Op.set_revived o true;
-        Op.set_exec_result o (timestamp r) (Ok ());
+        Op.set_end_result o (timestamp r) (Ok ());
         Ok (Some existed)
 
   let revive r o =
@@ -1139,8 +1139,7 @@ module Exec = struct
       | Error e -> failwith e
       in
       try
-        let env = Op.Spawn.env s in
-        let cwd = Op.Spawn.cwd s in
+        let env = Op.Spawn.env s and cwd = Op.Spawn.cwd s in
         let stdin = match Op.Spawn.stdin s with
         | None -> Os.Cmd.in_fd ~close:false Unix.stdin (* XXX /dev/null no ? *)
         | Some f -> Os.Cmd.in_file f
@@ -1172,7 +1171,7 @@ module Exec = struct
   let exec_op e o k k_op =
     Op.set_time_started o (timestamp e);
     e.feedback (`Exec_submit (None, o));
-    Op.set_exec_result o (timestamp e) (k_op e k);
+    Op.set_end_result o (timestamp e) (k_op e k);
     Queue.add o e.collectable
 
   let op_copy _e c =

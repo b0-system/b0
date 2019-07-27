@@ -16,6 +16,9 @@ shouldn't but are useful for B0 based programs.
 
 The core [b0] build library.
 
+{b WARNING.} This is an unstable API use at your own risk. See the
+{{!page-b00_manual}b00 manual} for design issues and discussions.
+
 {!modules: B000 B000_conv B00}
 
 {1:b0_care B0 care}

@@ -6,9 +6,8 @@
 
 (** Build kernel plumbing.
 
-    {b WARNING.} This is an unstable API use at your own risk.
-    See the {{!page-b00_manual}b00 manual} for design issues
-    and discussions. *)
+    These components when tied together appropriately are what makes
+    a build {!B00.Memo}. *)
 
 (** {1:b000 B000} *)
 
@@ -238,9 +237,9 @@ end
 
 (** Build operations.
 
-    This module only provides a type for specifying operations and the
-    result of their execution. Execution and caching is respectively handled
-    by the modules {!Exec} and {!Reviver}. *)
+    This module provides a type for {e specifying} operations and
+    their result. Operation execution and caching is respectively
+    handled by the modules {!Exec} and {!Reviver}. *)
 module Op : sig
 
   (** {1:op_status Operation status} *)
@@ -274,61 +273,7 @@ module Op : sig
   type op = t
   (** Again. *)
 
-  val id : t -> id
-  (** [id o] is the identifier of operation [o]. *)
-
-  val group : t -> string
-  (** [group o] is the group of [o]. *)
-
-  val time_created : t -> Time.span
-  (** [time_created o] is [o]'s creation time. *)
-
-  val time_started : t -> Time.span
-  (** [time_started o] is [o]'s execution start time. This is
-      different from {!B0_std.Time.Span.max} once the operation has
-      been submitted for execution. *)
-
-  val time_ended : t -> Time.span
-  (** [exec_end_time o] is [o]'s execution end time. This is different
-      from {!B0_std.Time.Span.max} once the operation has been completed
-      and collected. *)
-
-  val waited : t -> Time.span
-  (** [waited] is [o]'s waiting time between creation and execution. *)
-
-  val duration : t -> Time.span
-  (** [duration] is [o]'s execution duration time. *)
-
-  val revived : t -> bool
-  (** [revived o] is [true] iff [o] was revived from a cache. *)
-
-  val status : t -> status
-  (** [status o] is [o] execution status. *)
-
-  val reads : t -> Fpath.t list
-  (** [reads o] are the file paths read by the operation. *)
-
-  val writes : t -> Fpath.t list
-  (** [writes o] are the file paths written by [o]. *)
-
-  val did_not_write : t -> Fpath.t list
-  (** [did_not_write o] compares {!writes} with the current state
-      of the file system and reports those files that do not exist on it.  *)
-
-  val hash : t -> Hash.t
-  (** [hash o] is the operation's hash. This is {!Hash.nil} before the
-      operation hash has been effectively computed and set via
-      {!set_hash}. *)
-
-  val kontinue : t -> unit
-  (** [kontinue o ()] invokes and discards [o]'s continuation. *)
-
-  val diskontinue : t -> unit
-  (** [diskontinue o] discards [o]'s continuation. *)
-
-  (** {1:op_kind Operations kinds} *)
-
-  (** File copy *)
+  (** File copy. *)
   module Copy : sig
 
     (** {1:copy File copy} *)
@@ -337,9 +282,9 @@ module Op : sig
     (** The type for file copies. *)
 
     val v_op :
-      id:id -> group:group -> Time.span -> k:(op -> unit) ->
+      id:id -> group:group -> created:Time.span -> k:(op -> unit) ->
       mode:int -> linenum:int option -> src:Fpath.t -> Fpath.t -> op
-    (** [v] declares a file link operation, see the corresponding
+    (** [v] declares a file copy operation, see the corresponding
         accessors for the semantics of various arguments. *)
 
     val v : src:Fpath.t -> dst:Fpath.t -> mode:int -> linenum:int option -> t
@@ -372,7 +317,8 @@ module Op : sig
     (** The type for path deletion operations. *)
 
     val v_op :
-      id:id -> group:group -> Time.span -> k:(op -> unit) -> Fpath.t -> op
+      id:id -> group:group -> created:Time.span -> k:(op -> unit) ->
+      Fpath.t -> op
     (** [v_op] declares a path deletion operation, see the corresponding
         accessors for the semantics of the various arguments. *)
 
@@ -396,8 +342,8 @@ module Op : sig
     (** The type for directory creation operations. *)
 
     val v_op :
-      id:id -> group:group -> mode:int -> Time.span -> k:(op -> unit) ->
-      Fpath.t -> op
+      id:id -> group:group -> mode:int -> created:Time.span ->
+      k:(op -> unit) -> Fpath.t -> op
     (** [v_op] declares a directory creation operation, see the
         corresponding accessors for the semantics of the various
         arguments. *)
@@ -431,8 +377,8 @@ module Op : sig
     (** [kind_to_string k] is [k] as a string. *)
 
     val v_op :
-      id:id -> group:group -> Time.span -> k:(op -> unit) -> kind -> string ->
-      op
+      id:id -> group:group -> created:Time.span -> k:(op -> unit) -> kind ->
+      string -> op
     (** [v_op] declares a notification operation see the corresponding
         accessors in {!Notify} for the semantics of the various
         arguments. *)
@@ -460,7 +406,8 @@ module Op : sig
     (** The type for file read operations. *)
 
     val v_op :
-      id:id -> group:group -> Time.span -> k:(op -> unit) -> Fpath.t -> op
+      id:id -> group:group -> created:Time.span -> k:(op -> unit) -> Fpath.t ->
+      op
     (** [v_op] declares a file read operation, see the corresponding
         accessors in {!Read} for the semantics of the various
         arguments. *)
@@ -509,7 +456,7 @@ module Op : sig
     (** The type for process spawn operations. *)
 
     val v_op :
-      id:id -> group:group -> Time.span -> reads:Fpath.t list ->
+      id:id -> group:group -> created:Time.span -> reads:Fpath.t list ->
       writes:Fpath.t list -> k:(op -> unit) -> stamp:string ->
       env:Os.Env.assignments -> relevant_env:Os.Env.assignments ->
       cwd:Fpath.t -> stdin:Fpath.t option -> stdout:stdo ->
@@ -598,7 +545,8 @@ module Op : sig
     (** The type for wait files operations. *)
 
     val v_op :
-      id:id -> group:group -> Time.span -> k:(op -> unit) -> Fpath.t list -> op
+      id:id -> group:group -> created:Time.span -> k:(op -> unit) ->
+      Fpath.t list -> op
     (** [v] declares a wait files operation, these are stored in
           {!reads}. *)
 
@@ -615,8 +563,8 @@ module Op : sig
     (** The type for file write operations. *)
 
     val v_op :
-      id:id -> group:group -> Time.span -> k:(op -> unit) -> stamp:string ->
-      reads:Fpath.t list -> mode:int -> write:Fpath.t ->
+      id:id -> group:group -> created:Time.span -> k:(op -> unit) ->
+      stamp:string -> reads:Fpath.t list -> mode:int -> write:Fpath.t ->
       (unit -> (string, string) result) -> op
     (** [write] declares a file write operations, see the corresponding
         accessors in {!Write} for the semantics of the various arguments. *)
@@ -657,6 +605,9 @@ module Op : sig
   | Write of Write.t (** *)
   (** The type for operation kinds. *)
 
+  val kind_name : kind -> string
+  (** [kind_name k] is an end user name for kind [k]. *)
+
   val v :
     id -> group:group -> time_created:Time.span -> time_started:Time.span ->
     duration:Time.span -> revived:bool -> status:status ->
@@ -664,9 +615,6 @@ module Op : sig
     k:(op -> unit) -> kind -> t
   (** [v] constructs an operation. See the corresponding accessors
       for the semantics of various arguments. *)
-
-  val kind_name : kind -> string
-  (** [kind_name k] is a end user name for kind [k]. *)
 
   val kind : t -> kind
   (** [kind o] is [o]'s kind. *)
@@ -676,6 +624,58 @@ module Op : sig
 
   val compare : t -> t -> int
   (** [compare o0 o1] is [Pervasives.compare (id o0) (id o1)]. *)
+
+  val id : t -> id
+  (** [id o] is the identifier of operation [o]. *)
+
+  val group : t -> string
+  (** [group o] is the group of [o]. *)
+
+  val time_created : t -> Time.span
+  (** [time_created o] is [o]'s creation time. *)
+
+  val time_started : t -> Time.span
+  (** [time_started o] is [o]'s execution start time. This is
+      different from {!B0_std.Time.Span.max} once the operation has
+      been submitted for execution. *)
+
+  val time_ended : t -> Time.span
+  (** [exec_end_time o] is [o]'s execution end time. This is different
+      from {!B0_std.Time.Span.max} once the operation has been completed
+      and collected. *)
+
+  val waited : t -> Time.span
+  (** [waited] is [o]'s waiting time between creation and execution. *)
+
+  val duration : t -> Time.span
+  (** [duration] is [o]'s execution duration time. *)
+
+  val revived : t -> bool
+  (** [revived o] is [true] iff [o] was revived from a cache. *)
+
+  val status : t -> status
+  (** [status o] is [o] execution status. *)
+
+  val reads : t -> Fpath.t list
+  (** [reads o] are the file paths read by the operation. *)
+
+  val writes : t -> Fpath.t list
+  (** [writes o] are the file paths written by [o]. *)
+
+  val did_not_write : t -> Fpath.t list
+  (** [did_not_write o] compares {!writes} with the current state
+      of the file system and reports those files that do not exist on it.  *)
+
+  val hash : t -> Hash.t
+  (** [hash o] is the operation's hash. This is {!Hash.nil} before the
+      operation hash has been effectively computed and set via
+      {!set_hash}. *)
+
+  val kontinue : t -> unit
+  (** [kontinue o ()] invokes and discards [o]'s continuation. *)
+
+  val diskontinue : t -> unit
+  (** [diskontinue o] discards [o]'s continuation. *)
 
   (** {1:upd Updating the build operation} *)
 
@@ -701,8 +701,8 @@ module Op : sig
   val set_hash : t -> Hash.t -> unit
   (** [set_hash o h] sets the operation hash to [h]. *)
 
-  val set_exec_result : t -> Time.span -> ('a, string) result -> unit
-  (** [set_exec_result o end_time result] sets the end time and
+  val set_end_result : t -> Time.span -> ('a, string) result -> unit
+  (** [set_end_result o end_time result] sets the end time and
       execution status of operation [o] with [end_time] and [result].
       If the latter is [Error e], the status is [Failed (Msg e)], if
       it is [Ok _] the status is [Executed]. *)

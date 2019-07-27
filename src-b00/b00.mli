@@ -4,11 +4,7 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** Build kernel
-
-    {b WARNING.} This is an unstable API use at your own risk.
-    See the {{!page-b00_manual}b00 manual} for design issues
-    and discussions. *)
+(** Build kernel *)
 
 (** {1:b00 B00} *)
 
