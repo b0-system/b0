@@ -587,11 +587,12 @@ module Op : sig
     val file : t -> Fpath.t
     (** [file w] is the file written by [w]. *)
 
-    val data : t -> (unit -> (string, string) result)
-    (** [data w ()] is the data to write. *)
+    val data : t -> (string, string) result
+    (** [data w] invokes and discards the write data function. If the
+        write data function raises this is turned into an [Error _]. *)
 
     val discard_data : t -> unit
-    (** [discard_data ()] gets rid of the write function. *)
+    (** [discard_data w] discards the write data function. *)
   end
 
   type kind =

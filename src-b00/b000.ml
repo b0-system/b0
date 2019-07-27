@@ -759,9 +759,20 @@ module Op = struct
     let stamp w = w.write_stamp
     let mode w = w.write_mode
     let file w = w.write_file
-    let data w = w.write_data
     let discard_data w =
-      w.write_data <- fun _ -> Error "nothing to write (assert false)"
+      w.write_data <- fun _ -> Error "write function discarded"
+
+    let data w =
+      let data = w.write_data in
+      discard_data w;
+      try data () with
+      | Stack_overflow as e -> raise e
+      | Out_of_memory as e -> raise e
+      | Sys.Break as e -> raise e
+      | e ->
+          let bt = Printexc.get_raw_backtrace () in
+          Fmt.error "[@<v>Write function raised:@,%a@]"
+            Fmt.exn_backtrace (e, bt)
 
     let v_op
         ~id ~group ~created ~k ~stamp:write_stamp ~reads ~mode ~write:f
@@ -894,7 +905,7 @@ module Reviver = struct
     Result.bind (File_cache.revive r.cache key writes) @@ function
     | None -> Ok None
     | Some (_, existed) ->
-        Op.Write.discard_data w; (* get rid of write data closure. *)
+        Op.Write.discard_data w; (* get rid of data closure. *)
         Op.set_revived o true;
         Op.set_end_result o (timestamp r) (Ok ());
         Ok (Some existed)
@@ -1194,14 +1205,11 @@ module Exec = struct
   | Ok data as res -> Op.Read.set_data r data; res
   | Error _ as res -> res
 
-  let op_write e w =
-    let r = Op.Write.data w () in
-    Op.Write.discard_data w; (* Get rid of data write closure. *)
-    match r with
-    | Error _ as e -> e
-    | Ok data ->
-        let mode = Op.Write.mode w in
-        Os.File.write ~force:true ~make_path:true ~mode (Op.Write.file w) data
+  let op_write e w = match Op.Write.data w with
+  | Error _ as e -> e
+  | Ok data ->
+      let mode = Op.Write.mode w in
+      Os.File.write ~force:true ~make_path:true ~mode (Op.Write.file w) data
 
   (* Scheduling
 
