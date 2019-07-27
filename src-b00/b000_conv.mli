@@ -4,7 +4,7 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** Serialize and format {!B000}values. *)
+(** Serialize and format {!B000} values. *)
 
 open B0_std
 open B000

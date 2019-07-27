@@ -207,6 +207,7 @@ module Memo = struct
   let guard m = m.m.guard
   let exec m = m.m.exec
   let trash m = Exec.trash m.m.exec
+  let delete_trash ~block m = Trash.delete ~block (trash m)
   let hash_string m s = Reviver.hash_string m.m.reviver s
   let hash_file m f = Reviver.hash_file m.m.reviver f
   let ops m = m.m.ops
@@ -216,21 +217,20 @@ module Memo = struct
   let with_group m group = { c = { group }; m = m.m }
 
   exception Fail of string
-  let trap_kont_exn k m o = try k m o with
-  | Fail e -> m.m.feedback (`Fiber_fail e)
-  | Stack_overflow as e -> raise e
-  | Out_of_memory as e -> raise e
-  | Sys.Break as e -> raise e
-  | e -> m.m.feedback (`Fiber_exn (e, Printexc.get_raw_backtrace ()))
 
   let continue_op m o =
     List.iter (Guard.set_file_ready m.m.guard) (Op.writes o);
     m.m.feedback (`Op_complete o);
-    trap_kont_exn (fun m o -> Op.kontinue o) m o
+    try Op.exec_k o with
+    | Fail e -> m.m.feedback (`Fiber_fail e)
+    | Stack_overflow as e -> raise e
+    | Out_of_memory as e -> raise e
+    | Sys.Break as e -> raise e
+    | e -> m.m.feedback (`Fiber_exn (e, Printexc.get_raw_backtrace ()))
 
   let discontinue_op m o =
     List.iter (Guard.set_file_never m.m.guard) (Op.writes o);
-    Op.diskontinue o; m.m.feedback (`Op_complete o)
+    Op.discard_k o; m.m.feedback (`Op_complete o)
 
   let finish_op m o = match Op.status o with
   | Op.Executed ->
@@ -315,8 +315,6 @@ module Memo = struct
         assert (Futs.stir m.m.futs = None);
         Error undecided
 
-  let delete_trash ~block m = Trash.delete ~block (trash m)
-
   (* Fibers *)
 
   type 'a fiber = ('a -> unit) -> unit
@@ -325,10 +323,11 @@ module Memo = struct
 
   (* Notify *)
 
-  let notify m kind fmt =
+  let notify ?k m kind fmt =
+    let k = match k with None -> None | Some k -> Some (fun o -> k ()) in
     let op msg =
-      let id = new_op_id m and created = timestamp m and k o = () in
-      let o = Op.Notify.v_op ~id ~group:m.c.group ~created ~k kind msg in
+      let id = new_op_id m and created = timestamp m in
+      let o = Op.Notify.v_op ~id ~group:m.c.group ~created ?k kind msg in
       add_op m o
     in
     Fmt.kstr op fmt
@@ -353,14 +352,12 @@ module Memo = struct
 
   let write m ?(stamp = "") ?(reads = []) ?(mode = 0o644) write d =
     let id = new_op_id m and group = m.c.group and created = timestamp m in
-    let k o = () in
-    let o = Op.Write.v_op ~id ~group ~created ~k ~stamp ~reads ~mode ~write d in
+    let o = Op.Write.v_op ~id ~group ~created ~stamp ~reads ~mode ~write d in
     add_op m o
 
   let copy m ?(mode = 0o644) ?linenum ~src dst =
     let id = new_op_id m and group = m.c.group and created = timestamp m in
-    let k o = () in
-    let o = Op.Copy.v_op ~id ~group ~created ~k ~mode ~linenum ~src dst in
+    let o = Op.Copy.v_op ~id ~group ~created ~mode ~linenum ~src dst in
     add_op m o
 
   let mkdir m ?(mode = 0o755) dir k =
@@ -427,7 +424,7 @@ module Memo = struct
 
   let spawn
       m ?(stamp = "") ?(reads = []) ?(writes = []) ?env ?cwd ?stdin
-      ?(stdout = `Ui) ?(stderr = `Ui) ?(success_exits = [0]) ?k cmd
+      ?(stdout = `Ui) ?(stderr = `Ui) ?(success_exits = [0]) ?post_exec ?k cmd
     =
     match cmd.cmd_tool with
     | Miss (tool, e) -> m.m.feedback (`Miss_tool (tool, e))
@@ -443,7 +440,8 @@ module Memo = struct
             | _ -> assert false
         in
         let o =
-          Op.Spawn.v_op ~id ~group:m.c.group ~created ~reads ~writes ~k ~stamp
+          Op.Spawn.v_op
+            ~id ~group:m.c.group ~created ~reads ~writes ?post_exec ~k ~stamp
             ~env ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits
             tool.tool_file cmd.cmd_args
         in

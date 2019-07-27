@@ -11,7 +11,6 @@ open B000
    errors on missing caches. Unclear whether the behaviour
    here should be changed. *)
 
-
 (* Exit codes and errors *)
 
 let err_no_cache = 1

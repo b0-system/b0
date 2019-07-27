@@ -261,7 +261,7 @@ module Memo : sig
   (** {1:feedback Feedback} *)
 
   val notify :
-    t -> [ `Warn | `Start | `End | `Info ] ->
+    ?k:(unit -> unit) -> t -> [ `Warn | `Start | `End | `Info ] ->
     ('a, Format.formatter, unit, unit) format4 -> 'a
   (** [notify kind msg] is a notification [msg] of kind [kind]. *)
 
@@ -271,12 +271,6 @@ module Memo : sig
   (** [ready m p] declares path [p] to be ready, that is exists and is
       up-to-date in [b]. This is typically used with source files
       and files external to the build (e.g. installed libraries). *)
-
-  val wait_files : t -> Fpath.t list -> unit fiber
-  (** [wait_files m files k] continues with [k ()] when [files]
-      become ready. {b FIXME} Unclear whether
-      we really want this though this is kind of a [reads] constraint
-      for a pure OCaml operation, but then we got {!read}. *)
 
   val read : t -> Fpath.t -> string fiber
   (** [read m file k] reads the contents of file [file] as [s] when it
@@ -310,6 +304,10 @@ module Memo : sig
   (** [delete m p] deletes (trashes in fact) path [p] and continues
       with [k ()] when the path [p] is free to use. *)
 
+  val wait_files : t -> Fpath.t list -> unit fiber
+  (** [wait_files m files k] continues with [k ()] when [files] become
+      ready. {b FIXME} Unclear whether we really want this. *)
+
   (** {1:spawn Memoizing tool spawns} *)
 
   type tool
@@ -331,6 +329,7 @@ module Memo : sig
     ?env:Os.Env.t -> ?cwd:Fpath.t -> ?stdin:Fpath.t ->
     ?stdout:B000.Op.Spawn.stdo -> ?stderr:B000.Op.Spawn.stdo ->
     ?success_exits:B000.Op.Spawn.success_exits ->
+    ?post_exec:(B000.Op.t -> unit) ->
     ?k:(int -> unit) -> cmd -> unit
   (** [spawn m ~reads ~writes ~env ~cwd ~stdin ~stdout ~stderr
       ~success_exits cmd] spawns [cmd] once [reads] files are ready
@@ -340,12 +339,12 @@ module Memo : sig
       {- [stdin] reads input from the given file. If unspecified reads
          from the standard input of the program running the build.  {b
          Warning.} The file is not automatically added to [reads],
-         this allows for example to use {!Os.File.null}.}
+         this allows for example to use {!B0_std.Os.File.null}.}
       {- [stdout] and [stderr], the redirections for the standard
          outputs of the command, see {!stdo}. Path to files are
          created if needed. {b Warning.} File redirections
          are not automatically added to [writes]; this allows for example
-         to use {!Os.File.null}.}
+         to use {!B0_std.Os.File.null}.}
       {- [success_exits] the exit codes that determine if the build operation
          is successful (defaults to [0], use [[]] to always succeed)}
       {- [env], environment variables added to the build environment.
@@ -358,17 +357,18 @@ module Memo : sig
          tweaking the [cwd]. Construct your paths using the absolute
          {{!dirs}directory functions} and make your invocations
          independent from the [cwd].}
+      {- [post_exec], if specified is called with the build operation
+         after it has been executed or revived. If it was executed
+         this is called before the operation gets recorded. It can
+         be used to define the [reads] and [writes] of the operation
+         if they are difficult to find out before hand. {b Do not}
+         access [m] in that function.}
       {- [k], if specified a fiber invoked once the spawn has succesfully
          executed with the exit code.}
       {- [stamp] is used for caching if two spawns diff only in their
          stamp they will cache to different keys. This can be used to
          memoize tool whose outputs may not entirely depend on the environment,
          the cli stamp and the the content of read files.}}
-
-      {b TODO.} More expressive power could by added by:
-      {ol
-      {- Support to refine the read and write set after the operation
-         returns.}}
 
       {b Note.} If the tool spawn acts on a sort of "main" file
       (e.g. a source file) it should be specified as the first element

@@ -396,24 +396,25 @@ module Memo = struct
       ?(sep = Fmt.flush_nl) ?(op_howto = Fmt.nop) ~show_op_ui ~show_op ~level
       ppf f
     =
-    let has_ui o = match B000.Op.kind o with
-    | B000.Op.Spawn s -> Option.is_some (B000.Op.Spawn.stdo_ui s)
+    let open B000 in
+    let has_ui o = match Op.kind o with
+    | Op.Spawn s -> Option.is_some (Op.Spawn.stdo_ui s)
     | _ -> false
     in
     if level = Log.Quiet then () else
     match f with
-    | `Exec_submit (_, _) -> () (* we have B0_std.Os spawn tracer on debug *)
+    | `Exec_start (_, _) -> () (* we have B0_std.Os spawn tracer on debug *)
     | `Op_complete o ->
-        begin match (B000.Op.status o) with
-        | B000.Op.Failed _ ->
+        begin match (Op.status o) with
+        | Op.Failed _ ->
             if level >= Log.Error
             then ((B000_conv.Op.pp_failed ~op_howto) ppf o; sep ppf ())
-        | B000.Op.Aborted ->
+        | Op.Aborted ->
             if level >= Log.Info then (B000_conv.Op.pp_short ppf o; sep ppf ())
-        | B000.Op.Executed ->
+        | Op.Executed ->
             if level >= show_op || (level >= show_op_ui && has_ui o)
             then (B000_conv.Op.pp_short_with_ui ppf o; sep ppf ())
-        | B000.Op.Waiting ->
+        | Op.Waiting ->
             if level >= show_op
             then (B000_conv.Op.pp_short_with_ui ppf o; sep ppf ())
         end
@@ -551,7 +552,7 @@ module Memo = struct
         cpu_children_utime = Time.cpu_children_utime cpu;
         cpu_children_stime = Time.cpu_children_stime cpu; }
 
-    let magic = "b\x00\x00\x00"
+    let magic = "b\x00\x00\x00log"
 
     let log_to_string info ops =
       let b = Buffer.create (1024 * 1024) in

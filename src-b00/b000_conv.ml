@@ -192,7 +192,7 @@ module Op = struct
 
   let pp_op_failure ppf o =
     let pp_failure ppf = function
-    | Op.Msg m -> Fmt.lines ppf m
+    | Op.Exec m -> Fmt.lines ppf m
     | Op.Missing_writes fs ->
         Fmt.pf ppf "@[<v>Did not write:@,%a@]" (Fmt.list pp_file_write) fs
     in
@@ -317,7 +317,7 @@ module Op = struct
     i, Hash.of_bytes s
 
   let enc_failure b = function
-  | Op.Msg m -> Binc.enc_byte b 0; Binc.enc_string b m
+  | Op.Exec e -> Binc.enc_byte b 0; Binc.enc_string b e
   | Op.Missing_writes fs -> Binc.enc_byte b 1; Binc.enc_list Binc.enc_fpath b fs
 
   let dec_failure s i =
@@ -325,8 +325,8 @@ module Op = struct
     let next, b = Binc.dec_byte ~kind s i in
     match b with
     | 0 ->
-        let i, msg = Binc.dec_string s next in
-        i, Op.Msg msg
+        let i, e = Binc.dec_string s next in
+        i, Op.Exec e
     | 1 ->
         let i, fs = Binc.dec_list Binc.dec_fpath s next in
         i, Op.Missing_writes fs

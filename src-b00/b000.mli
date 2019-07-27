@@ -13,7 +13,11 @@
 
 open B0_std
 
-(** Trash and delete file hierarchies. *)
+(** Delete file hierarchies.
+
+    Deleting file hierarchies may be slow. This clears a given
+    path by moving it to a trash directory which can be deleted
+    at the end of the build asynchronously. *)
 module Trash : sig
 
   type t
@@ -51,9 +55,9 @@ end
     metadata. This allows to recreate the effect of a build operation
     without having to rerun it.
 
-    {b FIXME.} The following notions use the file system information
+    {b Warning.} The following notions use the file system information
     and can be inaccurate. It's a bit unclear whether it's a good idea
-    to rely on them. They are only used for cache {{!trim_size}trimming}.
+    to rely on them but they are only used for cache {{!trim_size}trimming}.
     {ul
     {- The {e access time} of a key is the greatest access time to the
        file contents or metadata hunk it maps to.}
@@ -238,14 +242,14 @@ end
 (** Build operations.
 
     This module provides a type for {e specifying} operations and
-    their result. Operation execution and caching is respectively
-    handled by the modules {!Exec} and {!Reviver}. *)
+    their result. Operation execution and caching are respectively
+    handled by the {!Exec} and {!Reviver} modules. *)
 module Op : sig
 
   (** {1:op_status Operation status} *)
 
   type failure =
-  | Msg of string (** Operation specific failure (usually OS error). *)
+  | Exec of string (** Execution failure (usually OS error). *)
   | Missing_writes of Fpath.t list (** Write specification failure. *)
   (** The type for operation failures. *)
 
@@ -282,8 +286,9 @@ module Op : sig
     (** The type for file copies. *)
 
     val v_op :
-      id:id -> group:group -> created:Time.span -> k:(op -> unit) ->
-      mode:int -> linenum:int option -> src:Fpath.t -> Fpath.t -> op
+      id:id -> group:group -> created:Time.span -> ?post_exec:(op -> unit) ->
+      ?k:(op -> unit) -> mode:int -> linenum:int option -> src:Fpath.t ->
+      Fpath.t -> op
     (** [v] declares a file copy operation, see the corresponding
         accessors for the semantics of various arguments. *)
 
@@ -317,8 +322,8 @@ module Op : sig
     (** The type for path deletion operations. *)
 
     val v_op :
-      id:id -> group:group -> created:Time.span -> k:(op -> unit) ->
-      Fpath.t -> op
+      id:id -> group:group -> created:Time.span -> ?post_exec:(op -> unit) ->
+      ?k:(op -> unit) -> Fpath.t -> op
     (** [v_op] declares a path deletion operation, see the corresponding
         accessors for the semantics of the various arguments. *)
 
@@ -343,7 +348,7 @@ module Op : sig
 
     val v_op :
       id:id -> group:group -> mode:int -> created:Time.span ->
-      k:(op -> unit) -> Fpath.t -> op
+      ?post_exec:(op -> unit) -> ?k:(op -> unit) -> Fpath.t -> op
     (** [v_op] declares a directory creation operation, see the
         corresponding accessors for the semantics of the various
         arguments. *)
@@ -377,8 +382,8 @@ module Op : sig
     (** [kind_to_string k] is [k] as a string. *)
 
     val v_op :
-      id:id -> group:group -> created:Time.span -> k:(op -> unit) -> kind ->
-      string -> op
+      id:id -> group:group -> created:Time.span -> ?post_exec:(op -> unit) ->
+      ?k:(op -> unit) -> kind -> string -> op
     (** [v_op] declares a notification operation see the corresponding
         accessors in {!Notify} for the semantics of the various
         arguments. *)
@@ -406,8 +411,8 @@ module Op : sig
     (** The type for file read operations. *)
 
     val v_op :
-      id:id -> group:group -> created:Time.span -> k:(op -> unit) -> Fpath.t ->
-      op
+      id:id -> group:group -> created:Time.span -> ?post_exec:(op -> unit) ->
+      ?k:(op -> unit) -> Fpath.t -> op
     (** [v_op] declares a file read operation, see the corresponding
         accessors in {!Read} for the semantics of the various
         arguments. *)
@@ -457,11 +462,11 @@ module Op : sig
 
     val v_op :
       id:id -> group:group -> created:Time.span -> reads:Fpath.t list ->
-      writes:Fpath.t list -> k:(op -> unit) -> stamp:string ->
-      env:Os.Env.assignments -> relevant_env:Os.Env.assignments ->
-      cwd:Fpath.t -> stdin:Fpath.t option -> stdout:stdo ->
-      stderr:stdo -> success_exits:success_exits -> Cmd.tool -> Cmd.t
-      -> op
+      writes:Fpath.t list -> ?post_exec:(op -> unit) -> ?k:(op -> unit) ->
+      stamp:string -> env:Os.Env.assignments ->
+      relevant_env:Os.Env.assignments -> cwd:Fpath.t ->
+      stdin:Fpath.t option -> stdout:stdo -> stderr:stdo ->
+      success_exits:success_exits -> Cmd.tool -> Cmd.t -> op
     (** [v_op] declares a spawn build operation, see the corresponding
         accessors in {!Spawn} for the semantics of the various arguments. *)
 
@@ -529,12 +534,12 @@ module Op : sig
     val set_result : t -> (Os.Cmd.status, string) result -> unit
     (** [set_result s e] the spawn result of [s] to [e]. *)
 
-    val set_exec_status :
-      op -> t -> Time.span -> (string, string) result option ->
+    val set_exec_result :
+      op -> t -> (string, string) result option ->
       (Os.Cmd.status, string) result -> unit
-    (** [set_exec_status o (get o) end_time stdo_ui result] sets the
+    (** [set_exec_result o (get o) stdo_ui r] sets the
         result of operation [o]. In particular this set the operation
-        status according to [result]. *)
+        status according to [r]. *)
   end
 
   (** Waiting on files.
@@ -545,8 +550,8 @@ module Op : sig
     (** The type for wait files operations. *)
 
     val v_op :
-      id:id -> group:group -> created:Time.span -> k:(op -> unit) ->
-      Fpath.t list -> op
+      id:id -> group:group -> created:Time.span -> ?post_exec:(op -> unit) ->
+      ?k:(op -> unit) -> Fpath.t list -> op
     (** [v] declares a wait files operation, these are stored in
           {!reads}. *)
 
@@ -563,9 +568,9 @@ module Op : sig
     (** The type for file write operations. *)
 
     val v_op :
-      id:id -> group:group -> created:Time.span -> k:(op -> unit) ->
-      stamp:string -> reads:Fpath.t list -> mode:int -> write:Fpath.t ->
-      (unit -> (string, string) result) -> op
+      id:id -> group:group -> created:Time.span -> ?post_exec:(op -> unit) ->
+      ?k:(op -> unit) -> stamp:string -> reads:Fpath.t list -> mode:int ->
+      write:Fpath.t -> (unit -> (string, string) result) -> op
     (** [write] declares a file write operations, see the corresponding
         accessors in {!Write} for the semantics of the various arguments. *)
 
@@ -613,7 +618,7 @@ module Op : sig
     id -> group:group -> time_created:Time.span -> time_started:Time.span ->
     duration:Time.span -> revived:bool -> status:status ->
     reads:Fpath.t list -> writes:Fpath.t list -> hash:Hash.t ->
-    k:(op -> unit) -> kind -> t
+    ?post_exec:(op -> unit) -> ?k:(op -> unit) -> kind -> t
   (** [v] constructs an operation. See the corresponding accessors
       for the semantics of various arguments. *)
 
@@ -672,13 +677,26 @@ module Op : sig
       operation hash has been effectively computed and set via
       {!set_hash}. *)
 
-  val kontinue : t -> unit
-  (** [kontinue o ()] invokes and discards [o]'s continuation. *)
-
-  val diskontinue : t -> unit
-  (** [diskontinue o] discards [o]'s continuation. *)
-
   (** {1:upd Updating the build operation} *)
+
+  val exec_k : t -> unit
+  (** [exec_k o ()] invokes and discards [o]'s continuation.
+      Note that this does {b not} protect against the continuation
+      raising. *)
+
+  val discard_k : t -> unit
+  (** [discard o] discards [o]'s continuation. *)
+
+  val exec_post_exec : t -> unit
+  (** [exec_post_exec o] invokes and discards [o]'s post execution
+      hook. This hook called is right after the operation execution
+      and, if applicable, {b before} reviver recording. It is always
+      called even if the operation fails or is revived (use {!status}
+      and {!revived} to check these conditions). Note that if the hook
+      unexpectedly raises this turns [o] in to a failure. *)
+
+  val discard_post_exec : t -> unit
+  (** [discard_post_exec t] discards [o]'s post execution hook. *)
 
   val set_time_started : t -> Time.span -> unit
   (** [set_time_started o t] sets [o]'s execution start time to [t]. *)
@@ -692,6 +710,11 @@ module Op : sig
   val set_status : t -> status -> unit
   (** [set_status o s] sets the execution status to [s]. *)
 
+  val set_status_from_result : t -> ('a, string) result -> unit
+  (** [set_status_from_result o r] sets status of operation [o]
+      to [Executed] if [r] is [Ok _] and [Failed (Exec e)] if [r]
+      is [Error e]. *)
+
   val set_reads : t -> Fpath.t list -> unit
   (** [set_reads t fs] sets the file paths read by [o] to [fs].
       Note that this resets the {!hash}. *)
@@ -702,11 +725,6 @@ module Op : sig
   val set_hash : t -> Hash.t -> unit
   (** [set_hash o h] sets the operation hash to [h]. *)
 
-  val set_end_result : t -> Time.span -> ('a, string) result -> unit
-  (** [set_end_result o end_time result] sets the end time and
-      execution status of operation [o] with [end_time] and [result].
-      If the latter is [Error e], the status is [Failed (Msg e)], if
-      it is [Ok _] the status is [Executed]. *)
 
   (** {1:set_map Operation sets and map} *)
 
@@ -843,8 +861,8 @@ module Guard : sig
 
   val allowed : t -> Op.t option
   (** [allowed g] is an operation that is either ready or aborted
-      in [g] (if any). In the second case the {!Op.exec_status} is
-      [Op.Aborted]. *)
+      in [g] (if any). In the second case the {!Op.status} is
+      {!Op.Aborted}. *)
 
   (** {1:stuck Stuck build analysis}
 
@@ -861,7 +879,7 @@ module Guard : sig
   (** [never_files g] are the files that never got ready in [g]. *)
 
   val undecided_files : t -> Fpath.Set.t
-  (** [undecided_files g] are the files that are neither got ready nor
+  (** [undecided_files g] are the files that neither got ready nor
       never got ready in [g]. *)
 
   val root_undecided_files : t -> Fpath.Set.t
@@ -880,8 +898,10 @@ module Exec : sig
 
   (** {1:execs Executors} *)
 
-  type feedback = [ `Exec_submit of Os.Cmd.pid option * Op.t ]
-  (** The type for executor feedbacks. *)
+  type feedback = [ `Exec_start of Os.Cmd.pid option * Op.t ]
+  (** The type for executor feedbacks. Indicates the given
+      operation starts executig with, for spawn operations,
+      their operating system process identifier. *)
 
   type t
   (** The type for executors. *)
@@ -889,18 +909,20 @@ module Exec : sig
   val create :
     ?clock:Time.counter -> ?rand:Random.State.t -> ?tmp_dir:Fpath.t ->
     ?feedback:(feedback -> unit) -> trash:Trash.t -> jobs:int -> unit -> t
-  (** [create ~clock ~rand ~tmp_dir ~notify_submit ~jobs] with:
+  (** [create ~clock ~rand ~tmp_dir ~feedback ~trash ~jobs] with:
       {ul
-      {- [jobs] the maximal number of processes spawn simultaneously.}
-      {- [trash] is used to execute delete build operations.}
-      {- [feedback] called with each {{!schedule}scheduled} operation
-         when it gets submitted for execution. Default is a nop.}
-      {- [tmp_dir] is a directory for temporary files,
-          it must exist; defaults to {!B0_std.Os.Dir.default_tmp}[ ()].}
+      {- [clock], the clock used to timestamp build operations;
+         defaults to {!B0_std.Time.counter}[ ()].}
       {- [rand] random state used for internal queues; defaults to
          {!Random.State.make_self_init}.}
-      {- [clock], the clock used to {{!Op.set_exec_start_time}timestamp}
-         the operations; defaults to {!B0_std.Time.counter}[ ()].}} *)
+      {- [tmp_dir] is a directory for temporary files, it must exist;
+          defaults to {!B0_std.Os.Dir.default_tmp}[ ()].}
+      {- [feedback] a function called with each {{!schedule}scheduled}
+         operation when it starts executing. Default is a nop.}
+      {- [trash], the trash used to execute {!Op.Delete} build
+         operations.}
+      {- [jobs] the maximal number of processes spawn simultaneously.}}
+ *)
 
   val clock : t -> Time.counter
   (** [clock e] is [e]'s clock. *)
@@ -917,9 +939,9 @@ module Exec : sig
   (** {1:schedcollect Scheduling and collecting operations} *)
 
   val schedule : t -> Op.t -> unit
-  (** [schedule e o] schedules [o] for execution in [e]. Just before
-      [o] is actually submitted for execution it is given to the
-      [notify_submit] callback of [e] (see {!create}). *)
+  (** [schedule e o] schedules [o] for execution in [e]. When [o]
+      starts executing it is given to the [feedback] callback of [e]
+      (see {!create}). *)
 
   val collect : t -> block:bool -> Op.t option
   (** [collect e ~block] removes from [e] an operation that has
