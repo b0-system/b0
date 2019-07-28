@@ -18,8 +18,6 @@ true : package(unix)
 
 <test/**> : use_b0_stubs, package(cmdliner)
 <examples/**> : use_b0_stubs, not_hygienic
-<tools/**> : use_b0_stubs
-<tools/b00_cache*> : package(cmdliner)
-<tools/show_uri*> : package(cmdliner)
+<tools/**> : use_b0_stubs, package(cmdliner)
 
 <_b0> : -traverse

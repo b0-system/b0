@@ -679,7 +679,7 @@ module Op : sig
 
   (** {1:upd Updating the build operation} *)
 
-  val exec_k : t -> unit
+  val invoke_k : t -> unit
   (** [exec_k o ()] invokes and discards [o]'s continuation.
       Note that this does {b not} protect against the continuation
       raising. *)
@@ -687,7 +687,7 @@ module Op : sig
   val discard_k : t -> unit
   (** [discard o] discards [o]'s continuation. *)
 
-  val exec_post_exec : t -> unit
+  val invoke_post_exec : t -> unit
   (** [exec_post_exec o] invokes and discards [o]'s post execution
       hook. This hook called is right after the operation execution
       and, if applicable, {b before} reviver recording. It is always
@@ -696,7 +696,11 @@ module Op : sig
       unexpectedly raises this turns [o] in to a failure. *)
 
   val discard_post_exec : t -> unit
-  (** [discard_post_exec t] discards [o]'s post execution hook. *)
+  (** [discard_post_exec o] discards [o]'s post execution hook. *)
+
+  val abort : t -> unit
+  (** [abort o] sets the status of [o] to {!Op.Aborted} and discards
+      the operation closures (including kind specific ones). *)
 
   val set_time_started : t -> Time.span -> unit
   (** [set_time_started o t] sets [o]'s execution start time to [t]. *)
@@ -725,7 +729,6 @@ module Op : sig
   val set_hash : t -> Hash.t -> unit
   (** [set_hash o h] sets the operation hash to [h]. *)
 
-
   (** {1:set_map Operation sets and map} *)
 
   (** Operation sets *)
@@ -733,6 +736,28 @@ module Op : sig
 
   (** Operation maps *)
   module Map : Map.S with type key = t
+
+  (** {1:analyze Analyzing operations} *)
+
+  val unwritten_reads : t list -> Fpath.Set.t
+  (** [unwritten_reads os] are the file read by [os] that are not written
+      by those. *)
+
+  val write_map : t list -> Set.t Fpath.Map.t
+  (** [write_map os] are the file written by [os] mapped to the
+      operation that writes them. If one of the operation sets is not
+      a singleton the operations should likely not be run
+      toghether, see {!single_writes}. *)
+
+  val single_writes : t list -> bool
+  (** [single_writes os] is [true] iff for each couple in [os] their
+      {!writes} do not intersect. *)
+
+  val find_read_write_cycle : t list -> t list option
+  (** [find_read_write_cycle os] is [Some cs] if there exists a
+      read/write cycle among the operations [os]. This means each each
+      element of [cs] writes a file read by its successor in the list
+      with the successor of the last element being the first. *)
 end
 
 (** Build operation revivers.
@@ -880,7 +905,8 @@ module Guard : sig
 
   val undecided_files : t -> Fpath.Set.t
   (** [undecided_files g] are the files that neither got ready nor
-      never got ready in [g]. *)
+      never got ready in [g]. Any file in this set is read by some
+      operation but not yet written by another or made ready. *)
 
   val root_undecided_files : t -> Fpath.Set.t
   (** [root_undecided_file g] is like {!undecided_files} but has only

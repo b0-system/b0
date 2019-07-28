@@ -159,6 +159,7 @@ module Memo = struct
       reviver : Reviver.t;
       exec : Exec.t;
       futs : Futs.t;
+      mutable finished : bool;
       mutable op_id : int;
       mutable ops : Op.t list; }
 
@@ -169,7 +170,7 @@ module Memo = struct
     let c = { group = "" } in
     let m =
       { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec; futs;
-        op_id; ops; }
+        finished = false; op_id; ops; }
     in
     { c; m }
 
@@ -215,13 +216,14 @@ module Memo = struct
   let new_op_id m = let id = m.m.op_id in m.m.op_id <- id + 1; id
   let group m = m.c.group
   let with_group m group = { c = { group }; m = m.m }
+  let finished m = m.m.finished
 
   exception Fail of string
 
   let continue_op m o =
     List.iter (Guard.set_file_ready m.m.guard) (Op.writes o);
     m.m.feedback (`Op_complete o);
-    try Op.exec_k o with
+    try Op.invoke_k o with
     | Fail e -> m.m.feedback (`Fiber_fail e)
     | Stack_overflow as e -> raise e
     | Out_of_memory as e -> raise e
@@ -270,7 +272,7 @@ module Memo = struct
           (* FIXME Does this report errors cleanly ? We really want to
              be able to say which reads were supposed to be there and are not *)
           m.m.feedback (`Op_cache_error (o, e));
-          Op.set_status o Op.Aborted;
+          Op.set_status o Op.Aborted; (* FIXME add a case *)
           finish_op m o
       | Ok hash ->
           Op.set_hash o hash;
@@ -300,20 +302,42 @@ module Memo = struct
   let add_op m o =
     m.m.ops <- o :: m.m.ops; Guard.add m.m.guard o; stir ~block:false m
 
-  let rec finish m =
+  (* Finishing the memo *)
+
+  type finish_error =
+  | Failures
+  | Cycle of B000.Op.t list
+  | Never_became_ready of Fpath.Set.t
+  (* The type [finish_error] reports memo finish error conditions.
+     Formally more than one of these condition may be true at the same
+     time. It is however important not to try to detect and report
+     [Never_became_ready] when [Failures] happens as those files that
+     never became ready may be created by continuations of the
+     failures and that would not lead the user to focus on the right
+     thing. It's also better to report [Cycle]s before for this reason. *)
+
+  let find_finish_condition os =
+    let rec loop ws = function
+    | [] -> if ws <> [] then Error (`Waiting ws) else (Ok ())
+    | o :: os ->
+        match Op.status o with
+        | Op.Executed -> loop ws os
+        | Op.Waiting -> loop (o :: ws) os
+        | Op.Aborted | Op.Failed _ -> Error (`Failures)
+    in
+    loop [] os
+
+  let finish m =
     stir ~block:true m;
-    match List.exists (fun o -> Op.status o = Op.Waiting) m.m.ops with
-    | false ->
-        assert (Futs.stir m.m.futs = None);
-        Ok ()
-    | true ->
-        let undecided = Guard.root_undecided_files m.m.guard in
-        Fpath.Set.iter (Guard.set_file_never m.m.guard) undecided;
-        stir ~block:true m;
-        (* TODO a cycle dep between ops will break this assertion. *)
-        assert (not (List.exists (fun o -> Op.status o = Op.Waiting) m.m.ops));
-        assert (Futs.stir m.m.futs = None);
-        Error undecided
+    m.m.finished <- true;
+    (* Any Waiting operation is guaranteed to be guarded at that point. *)
+    match find_finish_condition m.m.ops with
+    | Ok _ as v  -> assert (Futs.stir m.m.futs = None); v
+    | Error `Failures -> Error Failures
+    | Error (`Waiting ws) ->
+        match Op.find_read_write_cycle ws with
+        | Some os -> Error (Cycle ws)
+        | None -> Error (Never_became_ready (Op.unwritten_reads ws))
 
   (* Fibers *)
 

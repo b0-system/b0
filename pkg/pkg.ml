@@ -13,8 +13,9 @@ let () =
        Pkg.test "test/test";
        Pkg.test "test/test_cp";
        Pkg.test "test/test_rm";
-       Pkg.test "examples/build";
+       Pkg.test "test/test_memo_failures";
        Pkg.bin "tools/b00_cache" ~dst:"b00-cache";
+       Pkg.bin "tools/b00_log" ~dst:"b00-log";
        Pkg.bin "tools/show_uri" ~dst:"show-uri";
        Pkg.doc "doc/index.mld" ~dst:"odoc-pages/index.mld";
        Pkg.doc "doc/b00_manual.mld" ~dst:"odoc-pages/b00_manual.mld";

@@ -6,6 +6,14 @@
 
 open B0_std
 
+module Sig_exit = struct
+  let on_sigint ~hook f =
+    let hook _ = hook (); exit 130 (* as if SIGINT signaled *) in
+    let restore = Sys.signal Sys.sigint (Sys.Signal_handle hook) in
+    let restore () = Sys.set_signal Sys.sigint restore in
+    try let v = f () in restore (); v with e -> restore (); raise e
+end
+
 module Cli = struct
   open Cmdliner
 
@@ -375,6 +383,11 @@ module Op = struct
 end
 
 module Memo = struct
+  let pp_faint pp = Fmt.tty [`Faint] pp
+  let read_howto = Fmt.any "b00-log -r "
+  let write_howto = Fmt.any "b00-log -w "
+  let op_howto ppf o = Fmt.pf ppf "b00-log --id %d" (B000.Op.id o)
+  let pp_howto_file howto = Fmt.(pp_faint howto ++ B000_conv.Op.pp_file_write)
 
   let pp_file_cache_feedback ppf = function
   | `File_cache_need_copy p ->
@@ -393,31 +406,18 @@ module Memo = struct
       failwith "TODO"
 
   let pp_leveled_feedback
-      ?(sep = Fmt.flush_nl) ?(op_howto = Fmt.nop) ~show_op_ui ~show_op ~level
+      ?(sep = Fmt.flush_nl) ?(op_howto = op_howto) ~show_op ~show_ui ~level
       ppf f
     =
     let open B000 in
-    let has_ui o = match Op.kind o with
-    | Op.Spawn s -> Option.is_some (Op.Spawn.stdo_ui s)
-    | _ -> false
-    in
     if level = Log.Quiet then () else
     match f with
     | `Exec_start (_, _) -> () (* we have B0_std.Os spawn tracer on debug *)
     | `Op_complete o ->
-        begin match (Op.status o) with
-        | Op.Failed _ ->
-            if level >= Log.Error
-            then ((B000_conv.Op.pp_failed ~op_howto) ppf o; sep ppf ())
-        | Op.Aborted ->
-            if level >= Log.Info then (B000_conv.Op.pp_short ppf o; sep ppf ())
-        | Op.Executed ->
-            if level >= show_op || (level >= show_op_ui && has_ui o)
-            then (B000_conv.Op.pp_short_with_ui ppf o; sep ppf ())
-        | Op.Waiting ->
-            if level >= show_op
-            then (B000_conv.Op.pp_short_with_ui ppf o; sep ppf ())
-        end
+        if level >= show_op || level = Log.Debug
+        then (B000_conv.Op.pp_short_ui ppf o; sep ppf ()) else
+        if level >= show_ui
+        then (B000_conv.Op.pp_ui ~sep ~op_howto ppf o)
     | #B00.Memo.feedback as f ->
         if level >= Log.Error
         then (pp_feedback ppf f; sep ppf ())
@@ -425,16 +425,70 @@ module Memo = struct
         if level >= Log.Warning
         then (pp_file_cache_feedback ppf f; sep ppf ())
 
-  let pp_never_ready ~op_howto ppf fs =
-    let pp_file = Fmt.(op_howto ++ B000_conv.Op.pp_file_write) in
+  let pp_failed ppf () = Fmt.(tty [`Fg `Red] string) ppf  "FAILED"
+  let pp_never_ready ?(read_howto = read_howto) ppf fs =
     let err = match Fpath.Set.cardinal fs with
     | 1 -> "This file never became ready"
     | _ -> "These files never became ready"
     in
-    Fmt.pf ppf "@[<v>[%a] %s: %a@, @[%a@]@]@."
-      Fmt.(tty [`Fg `Red] string) "FAILED" err
-      Fmt.(tty [`Faint] string) "(see ops reading them)"
-      (Fpath.Set.pp pp_file) fs
+    Fmt.pf ppf "@[<v>[%a] %s:@,\
+               \ @[<v>%a@,See operations reading them for details.@]@]"
+      pp_failed () err (Fpath.Set.pp (pp_howto_file read_howto)) fs
+
+  let writes_cycle os =
+    let deps prev next =
+      let prev_writes = Fpath.Set.of_list (B000.Op.writes prev) in
+      let next_reads = Fpath.Set.of_list (B000.Op.reads next) in
+      Fpath.Set.inter prev_writes next_reads
+    in
+    match os with
+    | [] -> []
+    | [o] -> [deps o o]
+    | first :: _ ->
+        let rec loop first acc = function
+        | prev :: (next :: _ as os) -> loop first (deps prev next :: acc) os
+        | prev :: [] -> deps prev first :: acc
+        | [] -> assert false
+        in
+        loop first [] os
+
+  let pp_ops_cycle ?(write_howto = write_howto) ppf os =
+    let pp_self_cycle ~write_howto ppf writes =
+      let these_file, them = match Fpath.Set.cardinal writes with
+      | 1 -> "This file is", "it"
+      | _ -> "These files are", "them"
+      in
+      Fmt.pf ppf
+        "%s read and written by the same operation:@,\
+        \ @[<v>%a@,See the operation writing %s for details.@]@]"
+        these_file (Fpath.Set.pp (pp_howto_file write_howto)) writes them
+    in
+    let pp_cycle ~write_howto ppf ws =
+      Fmt.pf ppf
+        "Operations writing these files form \
+         a cycle:@, @[<v>%a@,\
+         The last written file is read by the operation writing the first \
+         one.@,\
+         See operations writing them for details.@]"
+        (Fmt.list (pp_howto_file write_howto)) ws
+    in
+    let pp_ops ppf os =
+      let writes = writes_cycle os in
+      match os with
+      | [] -> assert false
+      | [o] -> pp_self_cycle ~write_howto ppf (List.hd writes)
+      | os ->
+          let writes = try List.(rev @@ rev_map Fpath.Set.choose writes) with
+          | Not_found -> assert false
+          in
+          pp_cycle ~write_howto ppf writes
+    in
+    Fmt.pf ppf "@[<v>[%a] %a@]" pp_failed () pp_ops os
+
+  let pp_finish_error ?read_howto ?write_howto () ppf = function
+  | B00.Memo.Failures -> ()
+  | B00.Memo.Never_became_ready fs -> pp_never_ready ?read_howto ppf fs
+  | B00.Memo.Cycle ops -> pp_ops_cycle ?write_howto ppf ops
 
   (* Cli *)
 
@@ -644,7 +698,7 @@ module Memo = struct
       in
       let outf = match out_fmt with
       | `Short -> outf_pp_ops B000_conv.Op.pp_short
-      | `Normal -> outf_pp_ops B000_conv.Op.pp_short_with_ui
+      | `Normal -> outf_pp_ops B000_conv.Op.pp_short_ui
       | `Long -> outf_pp_ops B000_conv.Op.pp
       | `Trace_event ->
           fun (_, ops) ->

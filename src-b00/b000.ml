@@ -584,6 +584,7 @@ module Op = struct
 
   let id o = o.id
   let group o = o.group
+  let kind o = o.kind
   let time_created o = o.time_created
   let time_started o = o.time_started
   let time_ended o = Time.Span.add o.time_created o.duration
@@ -605,11 +606,11 @@ module Op = struct
 
   let hash o = o.hash
   let discard_k o = o.k <- None
-  let exec_k o = match o.k with
+  let invoke_k o = match o.k with
   | None -> () | Some k -> o.k <- None; k o
 
   let discard_post_exec o = o.post_exec <- None
-  let exec_post_exec o = match o.post_exec with
+  let invoke_post_exec o = match o.post_exec with
   | None -> () | Some p ->
       o.post_exec <- None;
       try p o with
@@ -635,9 +636,6 @@ module Op = struct
   let set_hash o h = o.hash <- h
   let set_status_from_result o r =
     set_status o (match r with Ok _ -> Executed | Error e -> Failed (Exec e))
-
-
-  let kind o = o.kind
 
   module Copy = struct
     type t = copy
@@ -800,9 +798,87 @@ module Op = struct
       v_kind ~id ~group ~created ~reads ~writes:[f] ?post_exec ?k (Write w)
   end
 
+  let abort o =
+    set_status o Aborted;
+    discard_k o; discard_post_exec o;
+    match o.kind with
+    | Write w -> Write.discard_data w
+    | _ -> ()
+
+  (* Operation sets and maps *)
+
   module T = struct type nonrec t = t let compare = compare end
   module Set = Set.Make (T)
   module Map = Map.Make (T)
+
+  (* Operation analyses *)
+
+  let unwritten_reads os =
+    let add_path acc p = Fpath.Set.add p acc in
+    let rec loop ws rs = function
+    | [] -> Fpath.Set.diff rs ws
+    | o :: os ->
+        let ws = List.fold_left add_path ws (writes o) in
+        let rs = List.fold_left add_path rs (reads o) in
+        loop ws rs os
+    in
+    loop Fpath.Set.empty Fpath.Set.empty os
+
+
+  let _write_map ~check_single os =
+    let add_write o acc w = match Fpath.Map.find w acc with
+    | exception Not_found -> Fpath.Map.add w (Set.singleton o) acc
+    | os when check_single -> raise Exit
+    | os -> Fpath.Map.add w (Set.add o os) acc
+    in
+    let add_writes acc o = List.fold_left (add_write o) acc (writes o) in
+    List.fold_left add_writes Fpath.Map.empty os
+
+  let write_map = _write_map ~check_single:false
+  let single_writes os =
+    try ignore (_write_map ~check_single:true os); true with Exit -> false
+
+  let op_deps ~write_map o =
+      let add_read_deps acc r = match Fpath.Map.find r write_map with
+      | exception Not_found -> acc
+      | os -> Set.union os acc
+      in
+      List.fold_left add_read_deps Set.empty (reads o)
+
+  let find_read_write_cycle os =
+    let path_to_start ~start path =
+      let rec loop start acc = function
+      | o :: os when (id o = id start) -> o :: acc
+      | o :: os -> loop start (o :: acc) os
+      | [] -> assert false
+      in
+      loop start [] path
+    in
+    let rec loop write_map unvisited in_path path = function
+    | [] ->
+        begin match Set.choose unvisited with
+        | exception Not_found -> None
+        | o ->
+            let unvisited = Set.remove o unvisited in
+            let in_path = Set.singleton o and path = [o] in
+            loop write_map unvisited in_path path [o, op_deps ~write_map o]
+        end
+    | (o, ds) :: todo ->
+        match Set.choose ds with
+        | exception Not_found ->
+            loop write_map unvisited (Set.remove o in_path) (List.tl path) todo
+        | d ->
+            if Set.mem d in_path then Some (path_to_start ~start:d path) else
+            let todo = (o, Set.remove d ds) :: todo in
+            match Set.mem d unvisited with
+            | false -> loop write_map unvisited in_path path todo
+            | true ->
+                let unvisited = Set.remove d unvisited in
+                let in_path = Set.add d in_path and path = d :: path in
+                let todo = (d, op_deps ~write_map d) :: todo in
+                loop write_map unvisited in_path path todo
+    in
+    loop (write_map os) (Set.of_list os) Set.empty [] []
 end
 
 module Reviver = struct
@@ -915,7 +991,7 @@ module Reviver = struct
         Result.bind (Conv.of_bin spawn_meta_conv m) @@ fun (stdo_ui, res) ->
         Op.set_revived o true;
         Op.Spawn.set_exec_result o s stdo_ui res;
-        Op.exec_post_exec o;
+        Op.invoke_post_exec o;
         Op.set_time_ended o (timestamp r);
         Ok (Some existed)
 
@@ -928,7 +1004,7 @@ module Reviver = struct
         op_kind kind;
         Op.set_revived o true;
         Op.set_status o Op.Executed;
-        Op.exec_post_exec o;
+        Op.invoke_post_exec o;
         Op.set_time_ended o (timestamp r);
         Ok (Some existed)
 
@@ -966,30 +1042,32 @@ end
 
 module Guard = struct
 
-  (* XXX. The original [b0] had a more general and maybe efficient
-     implementation by assigning integer's to events to be waited
-     upon. It might be worth to reconsider that at a certain point,
-     especially if other sync objects are introduced. *)
-
   type feedback =
     [ `File_status_repeat of Fpath.t | `File_status_unstable of Fpath.t ]
 
-  (* The type [gop] keeps in [awaits] the files that need to become
-     ready before the operation [op] can be added to the [allowed]
-     queue of the type [t].
+  (* The type [gop] holds a guarded operation. It keeps in [awaits]
+     the files that need to become ready before the operation [op] can
+     be added to the [allowed] queue of the type [t].
 
-     The type [t] has operations that are allowed to proceed in
-     [allowed] and maps files to their status in [files].
+     The type [t] is the guard. It has operations that are allowed to
+     proceed in [allowed] and maps files to their status in [files].
 
-     If a file becomes ready it maps to Ready in [files] and the [Blocks]
-     operation that were waiting on it get their [await]s changed so that
-     it no longer mentions the file.
+     If a file becomes ready it maps to Ready in [files] and the
+     [Blocks] operation that were waiting on it get their [await]s
+     changed so that it no longer mentions the file.
 
      If a file never becomes ready it maps to [Never] in [files] and
      the [Blocks] operations that where waiting on it are immediately
      aborted and added to [allowed]. These operations may still exist
      in other [Blocks] but functions take care to ignore these when
-     they hit them. *)
+     they hit them rather than try to hunt them in a data structure
+     that is not made for this. This makes sure they only get into
+     [allowed] once.
+
+     Note that when an operation is aborted by this module, it doesn't
+     mark its writes as `Never in the guard (this may not be used by
+     B00.Memo but it allows for example to let other operations take
+     over the writes of these files). *)
 
   type gop = { op : Op.t; mutable awaits : Fpath.Set.t; }
   type file_status = Ready | Never | Blocks of gop list
@@ -1024,9 +1102,7 @@ module Guard = struct
   | Blocks gops ->
       let rem_await g f gop = match Op.status gop.op with
       | Op.Aborted -> ()
-      | _ ->
-          Op.set_status gop.op Op.Aborted;
-          Queue.add gop.op g.allowed
+      | _ -> Op.abort gop.op; Queue.add gop.op g.allowed
       in
       g.files <- Fpath.Map.add f Never g.files;
       List.iter (rem_await g f) gops
@@ -1043,9 +1119,7 @@ module Guard = struct
             let awaits = Fpath.Set.add f awaits in
             let files = Fpath.Map.add f (Blocks [gop]) files in
             loop g gop awaits files fs
-        | Never ->
-            Op.set_status gop.op Op.Aborted;
-            Queue.add gop.op g.allowed
+        | Never -> Op.abort gop.op; Queue.add gop.op g.allowed
         | Ready -> loop g gop awaits files fs
         | Blocks gops ->
             let awaits = Fpath.Set.add f awaits in
@@ -1155,7 +1229,7 @@ module Exec = struct
     let s = Op.Spawn.get o in
     let stdo_ui = match ui with None -> None | Some ui -> (read_stdo_ui s ui) in
     Op.Spawn.set_exec_result o s stdo_ui result;
-    Op.exec_post_exec o;
+    Op.invoke_post_exec o;
     Op.set_time_ended o (timestamp e);
     decr_spawn_count e;
     Queue.add o e.collectable
@@ -1200,7 +1274,7 @@ module Exec = struct
     Op.set_time_started o (timestamp e);
     e.feedback (`Exec_start (None, o));
     Op.set_status_from_result o (op_kind e kind);
-    Op.exec_post_exec o;
+    Op.invoke_post_exec o;
     Op.set_time_ended o (timestamp e);
     Queue.add o e.collectable
 
@@ -1220,12 +1294,12 @@ module Exec = struct
     let dir = Op.Mkdir.dir mk and mode = Op.Mkdir.mode mk in
     Os.Dir.create ~mode ~make_path:true dir
 
-  let op_read _e r = match Os.File.read (Op.Read.file r) with
-  | Ok data as res -> Op.Read.set_data r data; res
-  | Error _ as res -> res
+  let op_read _e read = match Os.File.read (Op.Read.file read) with
+  | Ok data as r -> Op.Read.set_data read data; r
+  | Error _ as r -> r
 
-  let op_write e w = match Op.Write.data w with
-  | Error _ as e -> e
+  let op_write _e w = match Op.Write.data w with
+  | Error _ as r -> r
   | Ok data ->
       let mode = Op.Write.mode w in
       Os.File.write ~force:true ~make_path:true ~mode (Op.Write.file w) data

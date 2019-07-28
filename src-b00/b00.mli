@@ -212,11 +212,14 @@ module Memo : sig
   val trash : t -> B000.Trash.t
   (** [trash m] is [m]'s trash. *)
 
+  val finished : t -> bool
+  (** [finished m] is [true] if [m] has been {!finish}ed. *)
+
   val hash_string : t -> string -> Hash.t
-  (** [hash_string m s] is {!Reviver.hash_string}[ (reviver m) s]. *)
+  (** [hash_string m s] is {!B000.Reviver.hash_string}[ (reviver m) s]. *)
 
   val hash_file : t -> Fpath.t -> (Hash.t, string) result
-  (** [hash_file m f] is {!Reviver.hash_file}[ (reviver m) f].
+  (** [hash_file m f] is {!B000.Reviver.hash_file}[ (reviver m) f].
       Note that these file hashes operations are memoized. *)
 
   val stir : block:bool -> t -> unit
@@ -224,16 +227,28 @@ module Memo : sig
       blocks until the memoizer is stuck with no operation to
       perform. *)
 
-  val finish : t -> (unit, Fpath.Set.t) result
-  (** [finish m] finishes the memoizer and deletes the trash.  This
-      blocks until there are no operation to execute like {!stir}
-      does. If no operations are left waiting this returns [Ok ()]. If
-      there are remaining waiting operations it aborts them and
-      returns [Error fs] with [fs] the files that never became ready
-      and where not supposed to be written by the waiting operations. *)
+  type finish_error =
+  | Failures (** Some operations failed. *)
+  | Cycle of B000.Op.t list (** Cyclic dependency. *)
+  | Never_became_ready of Fpath.Set.t (** Some files never became ready. *)
+  (** The type for memo finish errors.  *)
+
+  val finish : t -> (unit, finish_error) result
+  (** [finish m] the memoizer and deletes the trash.
+      This starts by blocking until there are no operations
+      to execute. After this:
+      {ul
+      {- If all operations {!B000.Op.Executed} this returns [Ok ()]}
+      {- If some operations failed [Error Failures] is returned.}
+      {- If no operation failed but some are {!B000.Op.Waiting}
+         it aborts them and returns either [Error (Never_became_ready fs)]
+         with [fs] files that never became ready and where not supposed
+         to be written by the waiting operations or if a cycle is
+         detected returns [Error (Cycle ops)] with the operations that
+         form a cycle.}} *)
 
   val delete_trash : block:bool -> t -> (unit, string) result
-  (** [delete_trash ~block m] is {!Trash.delete}[ trash m]. *)
+  (** [delete_trash ~block m] is {!B000.Trash.delete}[ ~block (trash m)]. *)
 
   val ops : t -> B000.Op.t list
   (** [ops m] is the list of operations that were submitted to the

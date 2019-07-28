@@ -2745,7 +2745,8 @@ module Log : sig
          to get a better understanding of what the program is doing.}} *)
 
   val level : unit -> level
-  (** [level ()] is the current reporting level. *)
+  (** [level ()] is the current reporting level. The initial level
+      is set to {!Warning}. *)
 
   val set_level : level -> unit
   (** [set_level l] sets the current reporting level to [l]. *)

@@ -13,6 +13,23 @@
 open B0_std
 open Cmdliner
 
+(** Signal exit hooks. *)
+module Sig_exit : sig
+
+  val on_sigint :  hook:(unit -> unit) -> (unit -> 'a) -> 'a
+  (** [on_sigint ~hook f] calls [f ()] and returns its value. If [SIGINT]
+      is signalled during that time [hook] is called followed by [exit 130]
+      – that is the exit code a [SIGINT] would produce.
+
+      [on_sigint] replaces an existing signal handler for
+      {!Sys.sigint} during time of the function call. It is restored
+      when the function returns.
+
+      {b Note.} Since {!exit} is called {!at_exit} functions are
+      called if a [SIGINT] occurs during the function call. This is not
+      the case on an unhandled [SIGINT]. *)
+end
+
 (** {!Cmdliner} fragments. *)
 module Cli : sig
 
@@ -129,11 +146,8 @@ end
 module Op : sig
 
   val select :
-    reads:Fpath.t list ->
-    writes:Fpath.t list ->
-    ids:B000.Op.id list ->
-    hashes:string list ->
-    groups:string list -> B000.Op.t -> bool
+    reads:Fpath.t list -> writes:Fpath.t list -> ids:B000.Op.id list ->
+    hashes:string list -> groups:string list -> B000.Op.t -> bool
   (** [select ~reads ~writes ~ids ~hashes ~groups o] is [true]
       iff [o] reads a file in [reads] or writes a file in [writes]
       or has its id in [ids], or has its hash in [hashes] or has
@@ -169,10 +183,10 @@ module Op : sig
 
   val log_filter :
     reads:Fpath.t list -> writes:Fpath.t list -> ids:B000.Op.id list ->
-    hashes:string list -> groups:string list -> needs:bool ->
-    enables:bool -> recursive:bool -> revived:bool option ->
-    order_by:[ `Create | `Dur | `Wait | `Start ] ->
-    B000.Op.t list -> B000.Op.t list
+    hashes:string list -> groups:string list -> needs:bool -> enables:bool ->
+    recursive:bool -> revived:bool option ->
+    order_by:[ `Create | `Dur | `Wait | `Start ] -> B000.Op.t list ->
+    B000.Op.t list
 
   val log_filter_cli : (B000.Op.t list -> B000.Op.t list) Cmdliner.Term.t
 end
@@ -183,32 +197,33 @@ module Memo : sig
   (** {1:feedback Memo feedback} *)
 
   val pp_leveled_feedback :
-    ?sep:unit Fmt.t ->
-    ?op_howto:B000.Op.t Fmt.t -> show_op_ui:Log.level -> show_op:Log.level ->
-    level:Log.level ->
+    ?sep:unit Fmt.t -> ?op_howto:B000.Op.t Fmt.t -> show_op:Log.level ->
+    show_ui:Log.level -> level:Log.level ->
     [B00.Memo.feedback | B000.File_cache.feedback | B000.Exec.feedback] Fmt.t
   (** [pp_leveled_feedback ~sep ~op_howto ~show_spawn_ui ~show_success ~level
       ppf] formats memo feedback on [ppf] followed by [sep] iff something
       is printed (defaults to {!Fmt.flush_nl}).
       {ul
       {- {!Log.Quiet} formats nothing}
-      {- {!Log.Error} and {!Log.Warning} only report build operation failures}
-      {- {!Log.Debug} report all operations.}}
-      besides for operations that execute without failure:
+      {- {!Log.Debug} report all operations with {!B000_conv.Op.pp_short_ui}.}}
       {ul
-      {- [show_op_ui] is the level at which any executed operation with a
-         feedback UI is logged with {!B000_conv.Op.pp_short_and_ui}}
-      {- [show_op] is the level at which any executed operation gets
-         logged with {!B000_conv.Op.pp_short_and_ui}}}
+      {- [show_ui] is the level at which any completed operation
+         gets logged with {!B000_conv.Op.pp_ui}.}
+      {- [show_op] is the level at which any completed operation gets
+         logged with {!B000_conv.Op.pp_short_ui}}}
       The formatter [op_howto] should format a way to got more information
       about an operation, default to {!nop}. *)
 
-  val pp_never_ready : op_howto:Fpath.t Fmt.t -> Fpath.Set.t Fmt.t
-  (** [pp_never_reads ~op_howto] formats a failure indicating
-      the given set of files never became ready.
-
-      [op_howto] is prefixed before each file and should be a command
-      fragment to get information about which operation needed the file. *)
+  val pp_finish_error :
+    ?read_howto:Fpath.t Fmt.t -> ?write_howto:Fpath.t Fmt.t ->
+    unit ->  B00.Memo.finish_error Fmt.t
+  (** [pp_finish_error ~read_howto ~write_howto] formats a memo
+      finish error as follows:
+      {ul
+      {- {!B00.Memo.Failures} formats {!Fmt.nop}.}
+      {- {!B00.Memo.Never_became_ready} formats each file
+         prefixing it with [op_reading_howto].}
+      {- {!B00.Memo.Cycle}, formats the operations of the cycle.}} *)
 
   (** {1:dirs_files Specifying directories and files} *)
 

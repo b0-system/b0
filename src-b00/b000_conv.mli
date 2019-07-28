@@ -34,16 +34,19 @@ module Op : sig
   val pp_short : Op.t Fmt.t
   (** [pp_short] formats a build operation on a single line. *)
 
-  val pp_short_with_ui : Op.t Fmt.t
-  (** [pp_short_with_stdo_ui] formats like {!pp_short} but also
-      a feedback UI if the operation has one. *)
+  val pp_short_ui : Op.t Fmt.t
+  (** [pp_short_with_ui] formats like {!pp_short} but also a feedback
+      UI and failure errors if the operation have one.  [op_howto]
+      formats how to get more information about operations with
+      feedback. *)
+
+  val pp_ui : sep:unit Fmt.t -> op_howto:Op.t Fmt.t -> Op.t Fmt.t
+  (** [pp] formats operations in order to report failures assuming to
+      be due to the user rather than build logic. In case something is
+      printed [sep] is added at the end. *)
 
   val pp : Op.t Fmt.t
-  (** [pp] formats a build operation with details. *)
-
-  val pp_failed : op_howto:Op.t Fmt.t -> Op.t Fmt.t
-  (** [pp] formats an operation failure. [op_howto] formats how
-      to get more information about the failing operartion. *)
+  (** [pp] formats a build operation with full details. *)
 
   (** {1:bin_serial Binary serialization} *)
 
