@@ -386,25 +386,8 @@ module Memo = struct
   let pp_faint pp = Fmt.tty [`Faint] pp
   let read_howto = Fmt.any "b00-log -r "
   let write_howto = Fmt.any "b00-log -w "
-  let op_howto ppf o = Fmt.pf ppf "b00-log --id %d" (B000.Op.id o)
+  let op_howto ppf o = Fmt.pf ppf "b00-log -i %d" (B000.Op.id o)
   let pp_howto_file howto = Fmt.(pp_faint howto ++ B000_conv.Op.pp_file_write)
-
-  let pp_file_cache_feedback ppf = function
-  | `File_cache_need_copy p ->
-      Fmt.pf ppf "@[Warning: need copy: %a@]" Fpath.pp_quoted p
-
-  let pp_feedback ppf = function
-  | `Fiber_exn (exn, bt) ->
-      Fmt.pf ppf "@[<v>fiber exception:@,%a@]" Fmt.exn_backtrace (exn, bt)
-  | `Fiber_fail e ->
-      Fmt.pf ppf "@[<v>fiber failed:@,%s@]" e
-  | `Miss_tool (t, e) ->
-      Fmt.pf ppf "@[<v>missing tool:@,%s@]" e
-  | `Op_cache_error (op, e) ->
-      Fmt.pf ppf "@[op %d: cache error: %s@]" (B000.Op.id op) e
-  | `Op_complete op ->
-      failwith "TODO"
-
   let pp_leveled_feedback
       ?(sep = Fmt.flush_nl) ?(op_howto = op_howto) ~show_op ~show_ui ~level
       ppf f
@@ -415,15 +398,21 @@ module Memo = struct
     | `Exec_start (_, _) -> () (* we have B0_std.Os spawn tracer on debug *)
     | `Op_complete o ->
         if level >= show_op || level = Log.Debug
-        then (B000_conv.Op.pp_short_ui ppf o; sep ppf ()) else
+        then (B000_conv.Op.pp_line_and_ui ppf o; sep ppf ()) else
         if level >= show_ui
         then (B000_conv.Op.pp_ui ~sep ~op_howto ppf o)
-    | #B00.Memo.feedback as f ->
-        if level >= Log.Error
-        then (pp_feedback ppf f; sep ppf ())
-    | `File_cache_need_copy _ as f ->
-        if level >= Log.Warning
-        then (pp_file_cache_feedback ppf f; sep ppf ())
+    | `Fiber (`Exn (exn, bt)) when level >= Log.Error ->
+        Fmt.pf ppf "@[<v>Fiber exception:@,%a@]%a"
+          Fmt.exn_backtrace (exn, bt) sep ()
+    | `Fiber (`Fail e) when level >= Log.Error ->
+        Fmt.pf ppf "@[<v>Fiber failed:@,%s@]%a" e sep ()
+    | `Miss_tool (t, e) when level >= Log.Error ->
+        Fmt.pf ppf "@[<v>Missing tool:@,%s@]%a" e sep ()
+    | `Op_cache_error (op, e) when level >= Log.Error ->
+        Fmt.pf ppf "@[op %d: cache error: %s@]%a" (B000.Op.id op) e sep ()
+    | `File_cache_need_copy p when level >= Log.Warning ->
+        Fmt.pf ppf "@[Warning: cache need copy: %a@]%a" Fpath.pp_quoted p sep ()
+    | _ ->  ()
 
   let pp_failed ppf () = Fmt.(tty [`Fg `Red] string) ppf  "FAILED"
   let pp_never_ready ?(read_howto = read_howto) ppf fs =
@@ -485,10 +474,12 @@ module Memo = struct
     in
     Fmt.pf ppf "@[<v>[%a] %a@]" pp_failed () pp_ops os
 
-  let pp_finish_error ?read_howto ?write_howto () ppf = function
-  | B00.Memo.Failures -> ()
-  | B00.Memo.Never_became_ready fs -> pp_never_ready ?read_howto ppf fs
-  | B00.Memo.Cycle ops -> pp_ops_cycle ?write_howto ppf ops
+  let pp_finish_error ?(sep = Fmt.flush_nl) ?read_howto ?write_howto () ppf =
+    function
+    | B00.Memo.Failures -> ()
+    | B00.Memo.Cycle ops -> pp_ops_cycle ?write_howto ppf ops; sep ppf ()
+    | B00.Memo.Never_became_ready fs ->
+        pp_never_ready ?read_howto ppf fs; sep ppf ()
 
   (* Cli *)
 
@@ -678,14 +669,15 @@ module Memo = struct
       in
       let pp_op_no_cache ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
       let pp_totals ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
+      let pp_sec s ppf _ = Fmt.tty_string [`Bold] ppf s in
       (Fmt.record @@
-       [ Fmt.field "selected operations" ~sep:Fmt.nop Fmt.id Fmt.nop;
+       [ pp_sec "selected operations";
          Fmt.field "spawns" (fun _ -> (sc, st, sd)) pp_op;
          Fmt.field "writes" (fun _ -> (wc, wt, wd)) pp_op;
          Fmt.field "copies" (fun _ -> (cc, ct, cd)) pp_op;
          Fmt.field "reads" (fun _ -> (rt, rd)) pp_op_no_cache;
          Fmt.field "all" (fun _ -> (ot, od)) pp_totals;
-         Fmt.field "global timings" ~sep:Fmt.nop Fmt.id Fmt.nop;
+         pp_sec "global timings";
          Fmt.field "hashes" (fun _ -> (hc, hd)) pp_totals;
          Fmt.field "utime" Fmt.id pp_utime;
          Fmt.field "stime" Fmt.id pp_stime;
@@ -697,8 +689,8 @@ module Memo = struct
       | ops -> Fmt.pr "@[<v>%a@]@." (Fmt.list pp_op) ops
       in
       let outf = match out_fmt with
-      | `Short -> outf_pp_ops B000_conv.Op.pp_short
-      | `Normal -> outf_pp_ops B000_conv.Op.pp_short_ui
+      | `Short -> outf_pp_ops B000_conv.Op.pp_line
+      | `Normal -> outf_pp_ops B000_conv.Op.pp_line_and_ui
       | `Long -> outf_pp_ops B000_conv.Op.pp
       | `Trace_event ->
           fun (_, ops) ->

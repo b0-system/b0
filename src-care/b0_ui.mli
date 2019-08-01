@@ -215,10 +215,11 @@ module Memo : sig
       about an operation, default to {!nop}. *)
 
   val pp_finish_error :
-    ?read_howto:Fpath.t Fmt.t -> ?write_howto:Fpath.t Fmt.t ->
-    unit ->  B00.Memo.finish_error Fmt.t
+    ?sep:unit Fmt.t -> ?read_howto:Fpath.t Fmt.t ->
+    ?write_howto:Fpath.t Fmt.t -> unit ->  B00.Memo.finish_error Fmt.t
   (** [pp_finish_error ~read_howto ~write_howto] formats a memo
-      finish error as follows:
+      finish error followed by [sep] iff somethings is printed (defaults
+      to {!Fmt.flush_nl}). The errors are formatted as follows:
       {ul
       {- {!B00.Memo.Failures} formats {!Fmt.nop}.}
       {- {!B00.Memo.Never_became_ready} formats each file

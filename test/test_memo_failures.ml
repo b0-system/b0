@@ -48,14 +48,10 @@ let cycle2 build_dir m =
   echo m ~reads:[c1] ~writes:[c2] c2 "c2"
 
 let test_failures () =
-  let sep () = Fmt.pr "@." in
   with_memo failures;
   with_memo never_ready;
-  sep ();
   with_memo cycle0;
-  sep ();
   with_memo cycle1;
-  sep ();
   with_memo cycle2;
   ()
 

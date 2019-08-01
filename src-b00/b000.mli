@@ -475,7 +475,7 @@ module Op : sig
       cwd:Fpath.t -> stdin:Fpath.t option -> stdout:stdo ->
       stderr:stdo -> success_exits:success_exits -> Cmd.tool ->
       Cmd.t -> stamp:string -> stdo_ui:(string, string) result option ->
-      result:(Os.Cmd.status, string) result -> t
+      exit:Os.Cmd.status option -> t
     (** [v] constructs a bare spawn operation. *)
 
     val get : op -> t
@@ -528,18 +528,16 @@ module Op : sig
     (** [set_stdo_ui w ui] sets [w]'s standard output redirection contents
         to [ui]. *)
 
-    val result : t -> (Os.Cmd.status, string) result
-    (** [result s] is the spawn result of [s]. *)
+    val exit : t -> Os.Cmd.status option
+    (** [exit s] is the spawn exit status of [s]. *)
 
-    val set_result : t -> (Os.Cmd.status, string) result -> unit
-    (** [set_result s e] the spawn result of [s] to [e]. *)
+    val set_exit : t -> Os.Cmd.status option -> unit
+    (** [set_exit s e] the spawn exit status of [s] to [e]. *)
 
-    val set_exec_result :
-      op -> t -> (string, string) result option ->
-      (Os.Cmd.status, string) result -> unit
-    (** [set_exec_result o (get o) stdo_ui r] sets the
-        result of operation [o]. In particular this set the operation
-        status according to [r]. *)
+    val exit_to_status : t -> status
+    (** [exit_to_status s] assumes [s] has been executed and
+        determines an operation status according to {!exit}
+        and {!success_exits}. *)
   end
 
   (** Waiting on files.

@@ -25,8 +25,10 @@ let with_memo ?jobs f =
   Result.bind (Memo.memo ~cwd ~cache_dir ~trash_dir ?jobs ~feedback ()) @@
   fun m ->
   f build_dir m;
-  let finish = Memo.finish m in
-  Log.if_error_pp ~use:() ~header:"" (B0_ui.Memo.pp_finish_error ()) finish;
+  begin match Memo.finish m with
+  | Ok () -> ()
+  | Error e -> (B0_ui.Memo.pp_finish_error ()) Fmt.stderr e
+  end;
   Log.if_error ~use:() (B0_ui.Memo.Log.write_file log_file m);
   Ok ()
 

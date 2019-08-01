@@ -20,6 +20,16 @@ module Trace_event = struct
   let unit_result = result ~ok:(fun () -> "ok")
   let bool_result = result ~ok:string_of_bool
   let string_result = result ~ok:(fun s -> s)
+  let spawn_exit = function
+  | None -> Jsong.(obj |> obj_end)
+  | Some (`Exited c) -> Jsong.(obj |> mem "exited" (int c) |> obj_end)
+  | Some (`Signaled c) -> Jsong.(obj |> mem "signaled" (int c) |> obj_end)
+
+  let spawn_stdo_ui s = match Op.Spawn.stdo_ui s with
+  | None -> "none"
+  | Some (Ok d) -> d
+  | Some (Error e) -> Fmt.str "error: %s" e
+
   let args o =
     let kind_mems obj = match Op.kind o with
     | Op.Copy c ->
@@ -42,14 +52,12 @@ module Trace_event = struct
         let cmd = Cmd.(path (Op.Spawn.tool s) %% (Op.Spawn.args s)) in
         obj
         |> Jsong.mem "cmd" (Jsong.cmd cmd)
-        |> Jsong.mem "result"
-          (str B000_conv.Op.pp_spawn_result Op.Spawn.result s)
+        |> Jsong.mem "exit" (spawn_exit (Op.Spawn.exit s))
         |> Jsong.mem "cwd" (Jsong.fpath (Op.Spawn.cwd s))
         |> Jsong.mem "env" (Jsong.(list string) (Op.Spawn.env s))
         |> Jsong.mem "success-exits"
           (Jsong.(list int) (Op.Spawn.success_exits s))
-        |> Jsong.mem "stdo-ui"
-          (Jsong.strf "%a" B000_conv.Op.pp_spawn_stdo_ui s)
+        |> Jsong.mem "stdo-ui" (Jsong.string (spawn_stdo_ui s))
     | Op.Wait_files _ -> obj
     | Op.Write w ->
         obj

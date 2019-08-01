@@ -29,86 +29,52 @@ module Op = struct
   let style_err = [`Fg `Red]
   let style_op_howto = [`Faint]
 
-  let op_field = Fmt.field
-  let pp_path_option = Fmt.(option ~none:none) Fpath.pp_quoted
   let pp_file_read = Fpath.pp_quoted
   let pp_file_write = Fmt.tty style_file_write Fpath.pp_quoted
-  let pp_file_wait = Fpath.pp_quoted
   let pp_file_delete = Fmt.tty style_file_delete Fpath.pp_quoted
-  let pp_file_mode ppf m = Fmt.pf ppf "%o" m
   let pp_hash = Fmt.tty style_hash Hash.pp
-  let pp_file_contents = Fmt.truncated ~max:150
-  let pp_error_msg ppf e = Fmt.pf ppf "@[error: %s@]" e
   let pp_subfield_label = Fmt.tty_string style_subfield
   let pp_subfield s f pp = Fmt.field ~label:pp_subfield_label ~sep:Fmt.sp s f pp
-  let pp_reads = Fmt.list pp_file_read
-  let pp_writes = Fmt.list pp_file_write
-  let pp_timings =
-    let pp_span = Time.Span.pp in
-    let wait o = Time.Span.abs_diff (Op.time_created o) (Op.time_started o) in
-    op_field "timings" Fmt.id @@
-    Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
-    [ pp_subfield "duration" Op.duration pp_span;
-      pp_subfield "created" Op.time_created pp_span;
-      pp_subfield "started" Op.time_started pp_span;
-      pp_subfield "waited" wait pp_span; ]
+  let pp_did_not_write ppf fs =
+    Fmt.pf ppf "@[<v>Did not write:@,%a@]" (Fmt.list pp_file_write) fs
 
-  let pp_spawn_cmd ppf s =
-    let args = Cmd.to_list (Op.Spawn.args s) in
-    let quote = Filename.quote in
-    let pquote p = Filename.quote (Fpath.to_string p) in
-    let pp_brack = Fmt.tty_string style_cmd_brackets in
-    let pp_tool ppf t = Fmt.tty_string style_cmd_tool ppf (pquote t) in
-    let pp_arg ppf a = Fmt.pf ppf "%s" (quote a) in
-    let pp_o_arg ppf a = Fmt.tty_string style_file_write ppf (quote a) in
-    let rec pp_args last_was_o ppf = function
-    | [] -> ()
-    | a :: args ->
-        Fmt.char ppf ' ';
-        if last_was_o then pp_o_arg ppf a else pp_arg ppf a;
-        pp_args (String.equal a "-o") ppf args
+  let pp_spawn_exit ppf = function
+  | Some (`Exited c) -> (Fmt.brackets Fmt.int) ppf c
+  | Some (`Signaled c) -> (Fmt.brackets Fmt.(any "signaled:" ++ Fmt.int)) ppf c
+  | None -> ()
+
+  let pp_spawn_and_exit =
+    let pp_spawn_cmd ppf s =
+      let args = Cmd.to_list (Op.Spawn.args s) in
+      let quote = Filename.quote in
+      let pquote p = Filename.quote (Fpath.to_string p) in
+      let pp_brack = Fmt.tty_string style_cmd_brackets in
+      let pp_tool ppf t = Fmt.tty_string style_cmd_tool ppf (pquote t) in
+      let pp_arg ppf a = Fmt.pf ppf "%s" (quote a) in
+      let pp_o_arg ppf a = Fmt.tty_string style_file_write ppf (quote a) in
+      let rec pp_args last_was_o ppf = function
+      | [] -> ()
+      | a :: args ->
+          Fmt.char ppf ' ';
+          if last_was_o then pp_o_arg ppf a else pp_arg ppf a;
+          pp_args (String.equal a "-o") ppf args
+      in
+      let pp_stdin ppf = function
+      | None -> () | Some file -> Fmt.pf ppf "< %s" (pquote file)
+      in
+      let pp_stdo redir ppf = function
+      | `Ui -> ()
+      | `Tee f | `File f ->
+          Fmt.pf ppf " %s %a" redir pp_o_arg (Fpath.to_string f)
+      in
+      Fmt.pf ppf "@[<h>"; pp_brack ppf "[";
+      pp_tool ppf (Op.Spawn.tool s); pp_args false ppf args;
+      pp_stdin ppf (Op.Spawn.stdin s);
+      pp_stdo ">" ppf (Op.Spawn.stdout s);
+      pp_stdo "2>" ppf (Op.Spawn.stderr s);
+      pp_brack ppf "]"; Fmt.pf ppf "@]"
     in
-    let pp_stdin ppf = function
-    | None -> () | Some file -> Fmt.pf ppf "< %s" (pquote file)
-    in
-    let pp_stdo redir ppf = function
-    | `Ui -> ()
-    | `Tee f | `File f ->
-        Fmt.pf ppf " %s %a" redir pp_o_arg (Fpath.to_string f)
-    in
-    Fmt.pf ppf "@[<h>"; pp_brack ppf "[";
-    pp_tool ppf (Op.Spawn.tool s); pp_args false ppf args;
-    pp_stdin ppf (Op.Spawn.stdin s);
-    pp_stdo ">" ppf (Op.Spawn.stdout s);
-    pp_stdo "2>" ppf (Op.Spawn.stderr s);
-    pp_brack ppf "]"; Fmt.pf ppf "@]"
-
-  let pp_spawn_success_exits ppf = function
-  | [] -> Fmt.string ppf "any"
-  | cs -> Fmt.(list ~sep:comma int) ppf cs
-
-  let pp_spawn_stdo ppf = function
-  | `Ui -> Fmt.pf ppf "<ui>"
-  | `File f -> Fpath.pp_quoted ppf f
-  | `Tee f -> Fmt.pf ppf "@[<hov><ui> and@ %a@]" Fpath.pp_quoted f
-
-  let pp_spawn_stdo_ui ppf s = match (Op.Spawn.stdo_ui s) with
-  | None -> Fmt.none ppf ()
-  | Some (Ok d) -> String.pp ppf d
-  | Some (Error e) -> pp_error_msg ppf e
-
-  let pp_spawn_status ppf = function
-  | `Exited c -> (Fmt.brackets Fmt.int) ppf c
-  | `Signaled c -> (Fmt.brackets Fmt.(any "signaled:" ++ Fmt.int)) ppf c
-
-  let pp_spawn_stdio =
-    Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
-    [ pp_subfield "stdin" Op.Spawn.stdin pp_path_option;
-      pp_subfield "stderr" Op.Spawn.stderr pp_spawn_stdo;
-      pp_subfield "stdout" Op.Spawn.stdout pp_spawn_stdo; ]
-
-  let pp_spawn_result ppf = function
-  | Ok st -> pp_spawn_status ppf st | Error e -> Fmt.pf ppf " %a" pp_error_msg e
+    Fmt.(pp_spawn_cmd ++ using Op.Spawn.exit pp_spawn_exit)
 
   let pp_notify ppf n =
     let label, s = match Op.Notify.kind n with
@@ -117,236 +83,248 @@ module Op = struct
     | `End -> "END", style_notify_info
     | `Info -> "NOTE", style_notify_info
     in
-    Fmt.pf ppf "[%a] @[%a@]"
+    Fmt.pf ppf "@[[%a] @[%a@]@]"
       (Fmt.tty_string s) label Fmt.lines (Op.Notify.msg n)
 
-  (* Operation header formatting *)
-
-  let pp_status ppf o = match Op.status o with
-  | Op.Executed -> ()
-  | Op.Failed _ -> Fmt.tty_string style_status_failed ppf "FAILED "
-  | Op.Aborted -> Fmt.tty_string style_status_aborted ppf "ABORTED "
-  | Op.Waiting -> Fmt.tty_string style_status_waiting ppf "WAITING "
-
-  let pp_revived ppf o = match Op.revived o with
-  | true -> Fmt.tty_string style_status_exec_revived ppf "R"
-  | false -> Fmt.tty_string style_status_exec ppf "E"
-
-  let pp_op_hash ppf o =
-    let h = Op.hash o in if Hash.is_nil h then () else
-    (Fmt.sp ppf (); pp_revived ppf o; Fmt.char ppf ':'; pp_hash ppf h)
-
-  let pp_kind_name ppf o =
-    (Fmt.tty_string style_kind_name) ppf (Op.kind_name (Op.kind o))
-
-  let pp_id ppf o =
-    let pp_id ppf id = Fmt.pf ppf "%03d" id in
-    Fmt.tty style_op_id pp_id ppf (Op.id o)
-
-  let pp_failure ppf = function
-  | Op.Exec None -> ()
-  | Op.Exec (Some m) -> Fmt.lines ppf m
-  | Op.Missing_writes fs ->
-      Fmt.pf ppf "@[<v>Did not write:@,%a@]" (Fmt.list pp_file_write) fs
-
-  let pp_op_failure ppf o = match Op.status o with
-  | Failed f ->
-      Fmt.pf ppf "@[%a: @[%a@]@]@,"
-        (Fmt.tty_string style_err) "error" pp_failure f
-  | _ -> ()
-
-  let pp_op_failure_and_timings ppf o = pp_op_failure ppf o; pp_timings ppf o
-
-  let pp_header_long ppf o = (* adds the group *)
+  let pp_header ppf o =
+    let pp_status ppf o = match Op.status o with
+    | Op.Executed -> ()
+    | Op.Failed _ -> Fmt.tty_string style_status_failed ppf "FAILED "
+    | Op.Aborted -> Fmt.tty_string style_status_aborted ppf "ABORTED "
+    | Op.Waiting -> Fmt.tty_string style_status_waiting ppf "WAITING "
+    in
+    let pp_id ppf o =
+      let pp_id ppf id = Fmt.pf ppf "%03d" id in
+      Fmt.tty style_op_id pp_id ppf (Op.id o)
+    in
+    let pp_kind_name ppf o =
+      (Fmt.tty_string style_kind_name) ppf (Op.kind_name (Op.kind o))
+    in
+    let pp_revived ppf o = match Op.revived o with
+    | false -> Fmt.tty_string style_status_exec ppf "e"
+    | true -> Fmt.tty_string style_status_exec_revived ppf "r"
+    in
+    let pp_op_hash ppf o =
+      let h = Op.hash o in if Hash.is_nil h then () else
+      (Fmt.sp ppf (); pp_revived ppf o; Fmt.char ppf ':'; pp_hash ppf h)
+    in
     Fmt.pf ppf "[%a%a:%a %a %s%a]"
       pp_status o pp_id o pp_kind_name o
       Time.Span.pp (Op.duration o) (Op.group o)
       pp_op_hash o
 
-  (* Short formatting *)
+  let pp_op_extra ppf o =
+    let pp_spawn_stdo_ui ppf s = match (Op.Spawn.stdo_ui s) with
+    | None -> Fmt.none ppf ()
+    | Some (Ok d) -> Fmt.lines ppf (String.trim d)
+    | Some (Error e) ->
+        Fmt.pf ppf "@[%a: @[%a@]@]"
+          (Fmt.tty_string style_err) "error" Fmt.lines e
+    in
+    begin match Op.kind o with
+    | Op.Spawn s ->
+        begin match Op.Spawn.stdo_ui s with
+        | None -> ()
+        | Some _ -> Fmt.cut ppf (); pp_spawn_stdo_ui ppf s; Fmt.cut ppf ()
+        end
+    | _ -> ()
+    end;
+    match Op.status o with
+    | Op.Failed failure ->
+        begin match failure with
+        | Op.Exec None -> ()
+        | Op.Exec (Some m) -> Fmt.cut ppf (); Fmt.lines ppf m
+        | Op.Missing_writes fs -> Fmt.cut ppf (); pp_did_not_write ppf fs
+        end
+    | _ -> ()
 
-  let pp_copy_short ppf c =
-    Fmt.pf ppf "%a to %a"
-      pp_file_read (Op.Copy.src c) pp_file_write (Op.Copy.dst c)
-
-  let pp_spawn_short =
-    Fmt.(pp_spawn_cmd ++ using Op.Spawn.result pp_spawn_result)
-
-  let pp_kind_short ppf o = match Op.kind o with
-  | Op.Copy c -> pp_copy_short ppf c
+  let pp_kind_line ppf o = match Op.kind o with
+  | Op.Copy c ->
+      Fmt.pf ppf "%a to %a"
+        pp_file_read (Op.Copy.src c) pp_file_write (Op.Copy.dst c)
   | Op.Delete d -> pp_file_delete ppf (Op.Delete.path d)
   | Op.Mkdir m -> pp_file_write ppf (Op.Mkdir.dir m)
   | Op.Notify n -> pp_notify ppf n
   | Op.Read r -> pp_file_read ppf (Op.Read.file r)
-  | Op.Spawn s -> pp_spawn_short ppf s
-  | Op.Wait_files _ -> (Fmt.vbox @@ Fmt.list pp_file_wait) ppf (Op.reads o)
+  | Op.Spawn s -> pp_spawn_and_exit ppf s
+  | Op.Wait_files _ -> (Fmt.vbox @@ Fmt.list Fpath.pp_quoted) ppf (Op.reads o)
   | Op.Write w -> pp_file_write ppf (Op.Write.file w)
 
-  let pp_header_short ppf o =
-    Fmt.pf ppf "[%a%a:%a %a%a]"
-      pp_status o pp_id o pp_kind_name o Time.Span.pp (Op.duration o)
-      pp_op_hash o
+  (* Line formatting *)
 
-  let pp_short ppf o = match Op.kind o with
-  | Op.Notify n -> (Fmt.box @@ pp_notify) ppf n
-  | _ -> Fmt.pf ppf "@[<h>%a %a@]" pp_header_short o pp_kind_short o
+  let pp_line ppf o = match Op.kind o with
+  | Op.Notify n -> pp_notify ppf n
+  | _ -> Fmt.pf ppf "@[<h>%a %a@]" pp_header o pp_kind_line o
 
-  let pp_short_ui ppf o = match Op.status o with
-  | Op.Failed fail ->
-      begin match Op.kind o with
-      | Op.Spawn s when Op.Spawn.stdo_ui s <> None ->
-          Fmt.pf ppf "@[<v>%a@,@,%a@,%a@]"
-            pp_short o pp_spawn_stdo_ui s pp_failure fail
-      |  _ ->
-          Fmt.pf ppf "@[<v>%a@,%a@]" pp_short o pp_failure fail
-      end
-  | _ ->
-      match Op.kind o with
-      | Op.Notify n -> (Fmt.box @@ pp_notify) ppf n
-      | Op.Spawn s when Op.Spawn.stdo_ui s <> None ->
-          Fmt.pf ppf "@[<v>%a@,@,%a@]" pp_short o pp_spawn_stdo_ui s
-      | _ -> pp_short ppf o
+  let pp_line_and_ui ppf o = match Op.kind o with
+  | Op.Notify n -> pp_notify ppf n
+  | _ -> Fmt.pf ppf "@[<v>%a%a@]" pp_line o pp_op_extra o
 
-  (* Simple ui formatting *)
+  (* Ui formatting *)
 
-  let pp_ui_kind ppf o = match Op.kind o with
-  | Op.Spawn s ->
-      let name = Fpath.basename (Op.Spawn.tool s) in
-      (Fmt.tty_string style_cmd_tool) ppf name
-  | k -> pp_kind_short ppf o
-
-  let pp_ui_header ~op_howto ppf o =
-    let pp_group ppf o = match Op.group o with
-    | "" -> () | g -> Fmt.string ppf g; Fmt.sp ppf ()
+  let pp_ui ~sep ~op_howto ppf o =
+    let is_failed = function Op.Failed _ -> true | _ -> false in
+    let is_spawn_with_ui o = match Op.kind o with
+    | Op.Spawn s when Op.Spawn.stdo_ui s <> None -> true
+    | _ -> false
     in
-    let pp_status ppf o = match Op.status o with
-    | Op.Failed _ ->
-        Fmt.pf ppf "[%a] " (Fmt.tty_string style_status_failed) "FAILED"
-    | _ -> ()
-    in
-    let pp_exit_code ppf o = match Op.kind o with
-    | Op.Spawn s ->
-        begin match Op.Spawn.result s with
-        | Error _ -> ()
-        | Ok s -> pp_spawn_status ppf s
-        end
-    | _ -> ()
-    in
-    let op_howto =
-      Fmt.(parens @@ any "see " ++ quote ~mark:"'" op_howto)
-    in
-    Fmt.pf ppf "@[%a[%a%a]%a: %a"
-      pp_status o pp_group o pp_ui_kind o pp_exit_code o
-      Fmt.(tty [`Faint] (op_howto)) o
-
-  let pp_ui ~sep ~op_howto ppf o = match Op.status o with
-  | Op.Failed fail ->
-      begin match Op.kind o with
-      | Op.Spawn s when Op.Spawn.stdo_ui s <> None ->
-          Fmt.pf ppf "@[<v>%a@,@,%a@,%a@]%a"
-            (pp_ui_header ~op_howto) o pp_spawn_stdo_ui s
-            pp_failure fail sep ()
-      |  _ ->
-          Fmt.pf ppf "@[<v>%a@,%a@]%a"
-            (pp_ui_header ~op_howto) o pp_failure fail sep ()
-        end
-  | _ ->
-      match Op.kind o with
-      | Op.Notify n -> (Fmt.box @@ pp_notify) ppf n
-      | Op.Spawn s when Op.Spawn.stdo_ui s <> None ->
-          Fmt.pf ppf "@[<v>%a@,@,%a@]%a"
-            (pp_ui_header ~op_howto) o pp_spawn_stdo_ui s sep ()
+    let pp_ui_header ~op_howto ppf o =
+      let pp_ui_kind ppf o = match Op.kind o with
+      | Op.Spawn s ->
+          let name = Fpath.basename (Op.Spawn.tool s) in
+          (Fmt.tty_string style_cmd_tool) ppf name
+      | k -> pp_kind_line ppf o
+      in
+      let pp_group ppf o = match Op.group o with
+      | "" -> () | g -> Fmt.string ppf g; Fmt.sp ppf ()
+      in
+      let pp_status ppf o = match Op.status o with
+      | Op.Failed _ ->
+          Fmt.pf ppf "[%a] " (Fmt.tty_string style_status_failed) "FAILED"
       | _ -> ()
+      in
+      let if_spawn_pp_spawn_exit ppf o = match Op.kind o with
+      | Op.Spawn s -> pp_spawn_exit ppf (Op.Spawn.exit s)
+      | _ -> ()
+      in
+      Fmt.pf ppf "@[%a[%a%a]%a: %a@]"
+        pp_status o pp_group o pp_ui_kind o if_spawn_pp_spawn_exit o
+        (Fmt.tty [`Faint] (Fmt.parens op_howto)) o
+    in
+    match Op.kind o with
+    | Op.Notify n -> pp_notify ppf n; sep ppf ()
+    | _ when is_failed (Op.status o) || is_spawn_with_ui o ->
+        Fmt.pf ppf "@[<v>%a%a@]%a"
+          (pp_ui_header ~op_howto) o pp_op_extra o sep ()
+    | _ -> ()
 
-  (* Long formatting *)
+  (* Full formatting *)
 
-  let pp_copy_long =
+  let pp_file_mode ppf m = Fmt.pf ppf "%o" m
+  let pp_reads = Fmt.list pp_file_read
+  let pp_writes = Fmt.list pp_file_write
+  let pp_timings =
+    let pp_span = Time.Span.pp in
+    let wait o = Time.Span.abs_diff (Op.time_created o) (Op.time_started o) in
+    Fmt.field "timings" Fmt.id @@
+    Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
+    [ pp_subfield "duration" Op.duration pp_span;
+      pp_subfield "created" Op.time_created pp_span;
+      pp_subfield "started" Op.time_started pp_span;
+      pp_subfield "waited" wait pp_span; ]
+
+  let maybe_failure_and pp ppf o = match Op.status o with
+  | Failed f ->
+      begin match f with
+      | Op.Exec None -> ()
+      | Op.Exec (Some e) ->
+          Fmt.pf ppf "@[%a: @[%a@]@]@,"
+            (Fmt.tty_string style_err) "error" Fmt.lines e;
+      | Op.Missing_writes fs -> pp_did_not_write ppf fs; Fmt.cut ppf ()
+      end;
+      pp ppf o
+  | _ -> pp ppf o
+
+  let pp_copy_full =
     let pp_info =
       Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
       [ pp_subfield "mode" Op.Copy.mode pp_file_mode;
         pp_subfield "linenum" Op.Copy.linenum Fmt.(option ~none:none int) ]
     in
     Fmt.record
-      [ op_field "src" Op.reads pp_reads;
-        op_field "dst" Op.writes pp_writes;
+      [ maybe_failure_and @@
+        Fmt.field "src" Op.reads pp_reads;
+        Fmt.field "dst" Op.writes pp_writes;
         Fmt.using Op.Copy.get pp_info;
-        pp_op_failure_and_timings; ]
+        pp_timings; ]
 
-  let pp_delete_long =
+  let pp_delete_full =
     let pp_path = Fmt.using Op.Delete.path pp_file_delete in
     Fmt.record
-      [ Fmt.using Op.Delete.get pp_path; pp_op_failure_and_timings; ]
+      [ maybe_failure_and @@ Fmt.using Op.Delete.get pp_path; pp_timings]
 
-  let pp_mkdir_long =
+  let pp_mkdir_full =
     let pp_path = Fmt.using Op.Mkdir.dir pp_file_write in
     Fmt.record
-      [ Fmt.using Op.Mkdir.get pp_path; pp_op_failure_and_timings; ]
+      [ maybe_failure_and @@ Fmt.using Op.Mkdir.get pp_path; pp_timings ]
 
-  let pp_notify_long =
-    Fmt.record [ Fmt.using Op.Notify.get pp_notify; pp_op_failure_and_timings; ]
+  let pp_notify_full =
+    Fmt.record [ Fmt.using Op.Notify.get pp_notify; pp_timings]
 
-  let pp_read_long =
+  let pp_read_full =
     let pp_path = Fmt.using Op.Read.file pp_file_read in
     Fmt.record
-      [ Fmt.using Op.Read.get pp_path;
-        pp_op_failure_and_timings; ]
+      [ maybe_failure_and @@ Fmt.using Op.Read.get pp_path; pp_timings ]
 
-  let pp_spawn_long =
+  let pp_spawn_full =
     (* FIXME add Cmd stamp env stamp *)
-    let pp_exit =
-      Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
-      [ op_field "exit" Op.Spawn.result pp_spawn_result;
-        pp_subfield "success-exits" Op.Spawn.success_exits
-          pp_spawn_success_exits ]
-    in
     let pp_env = Fmt.(vbox @@ list string) in
     let pp_relevant_env = Fmt.using Op.Spawn.relevant_env pp_env in
     let pp_env = Fmt.using Op.Spawn.env pp_env in
     let pp_cwd = Fmt.using Op.Spawn.cwd Fpath.pp_quoted in
+    let pp_success_exits =
+      let pp_spawn_success_exits ppf = function
+      | [] -> Fmt.string ppf "any"
+      | cs -> Fmt.(list ~sep:comma int) ppf cs
+      in
+      Fmt.using Op.Spawn.success_exits pp_spawn_success_exits
+    in
     let pp_stamps =
       let cmd_stamp s = Cmd.to_stamp (Op.Spawn.args s) in
       Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
       [ pp_subfield "stamp" Op.Spawn.stamp Fmt.string;
-        pp_subfield "args" cmd_stamp Fmt.(list ~sep:sp string) ]
+          pp_subfield "args" cmd_stamp Fmt.(list ~sep:sp string) ]
+    in
+    let pp_spawn_base ppf o =
+      pp_spawn_and_exit ppf (Op.Spawn.get o); pp_op_extra ppf o;
+    in
+    let pp_spawn_stdio =
+      let pp_spawn_stdo ppf = function
+      | `Ui -> Fmt.pf ppf "<ui>"
+      | `File f -> Fpath.pp_quoted ppf f
+      | `Tee f -> Fmt.pf ppf "@[<hov><ui> and@ %a@]" Fpath.pp_quoted f
+      in
+      let pp_path_option = Fmt.(option ~none:none) Fpath.pp_quoted in
+      Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
+      [ pp_subfield "stdin" Op.Spawn.stdin pp_path_option;
+        pp_subfield "stderr" Op.Spawn.stderr pp_spawn_stdo;
+        pp_subfield "stdout" Op.Spawn.stdout pp_spawn_stdo; ]
     in
     Fmt.record [
-      Fmt.using Op.Spawn.get pp_spawn_cmd;
-      Fmt.using Op.Spawn.get pp_exit;
-      op_field "writes" Op.writes pp_writes;
-      op_field "reads" Op.reads pp_reads;
-      op_field "stdo-ui" Op.Spawn.get pp_spawn_stdo_ui;
-      op_field "stdio" Op.Spawn.get pp_spawn_stdio;
-      op_field "cwd" Op.Spawn.get pp_cwd;
-      op_field "env" Op.Spawn.get pp_env;
-      op_field "relevant-env" Op.Spawn.get pp_relevant_env;
-      op_field "stamps" Op.Spawn.get pp_stamps;
+      Fmt.using Fmt.id pp_spawn_base;
+      Fmt.field "writes" Op.writes pp_writes;
+      Fmt.field "reads" Op.reads pp_reads;
+      Fmt.field "success-exits" Op.Spawn.get pp_success_exits;
+      Fmt.field "stdio" Op.Spawn.get pp_spawn_stdio;
+      Fmt.field "cwd" Op.Spawn.get pp_cwd;
+      Fmt.field "env" Op.Spawn.get pp_env;
+      Fmt.field "relevant-env" Op.Spawn.get pp_relevant_env;
+      Fmt.field "stamps" Op.Spawn.get pp_stamps;
       pp_timings ]
 
-  let pp_wait_files_long =
-    Fmt.record [Fmt.using Op.reads pp_reads; pp_timings]
-
-  let pp_write_long =
+  let pp_wait_files_full = Fmt.record [Fmt.using Op.reads pp_reads; pp_timings]
+  let pp_write_full =
     let pp_stamp = Fmt.using Op.Write.stamp Fmt.string in
     let pp_mode = Fmt.using Op.Write.mode pp_file_mode in
     let pp_write = Fmt.using Op.Write.file pp_file_write in
     Fmt.record
-      [ Fmt.using Op.Write.get pp_write;
-        op_field "stamp" Op.Write.get pp_stamp;
-        op_field "mode" Op.Write.get pp_mode;
-        pp_op_failure_and_timings; ]
-
-  let pp_kind_long ppf o = match Op.kind o with
-  | Op.Copy _ -> pp_copy_long ppf o
-  | Op.Delete _ -> pp_delete_long ppf o
-  | Op.Mkdir _ -> pp_mkdir_long ppf o
-  | Op.Notify _ -> pp_notify_long ppf o
-  | Op.Read _ -> pp_read_long ppf o
-  | Op.Spawn _ -> pp_spawn_long ppf o
-  | Op.Wait_files _ -> pp_wait_files_long ppf o
-  | Op.Write _ -> pp_write_long ppf o
+      [ maybe_failure_and @@ Fmt.using Op.Write.get pp_write;
+        Fmt.field "stamp" Op.Write.get pp_stamp;
+        Fmt.field "mode" Op.Write.get pp_mode;
+        pp_timings; ]
 
   let pp ppf o =
-    Fmt.pf ppf "@[<v>@[<h>%a@]@, @[%a@]@,@]" pp_header_long o pp_kind_long o
+    let pp_kind_full ppf o = match Op.kind o with
+    | Op.Copy _ -> pp_copy_full ppf o
+    | Op.Delete _ -> pp_delete_full ppf o
+    | Op.Mkdir _ -> pp_mkdir_full ppf o
+    | Op.Notify _ -> pp_notify_full ppf o
+    | Op.Read _ -> pp_read_full ppf o
+    | Op.Spawn _ -> pp_spawn_full ppf o
+    | Op.Wait_files _ -> pp_wait_files_full ppf o
+    | Op.Write _ -> pp_write_full ppf o
+    in
+    Fmt.pf ppf "@[<v>@[<h>%a@]@, @[%a@]@,@]" pp_header o pp_kind_full o
 
   (* Binary serialization *)
 
@@ -510,8 +488,7 @@ module Op = struct
     Binc.enc_string b (Op.Spawn.stamp s);
     Binc.enc_option (Binc.enc_result ~ok:Binc.enc_string ~error:Binc.enc_string)
       b (Op.Spawn.stdo_ui s);
-    Binc.enc_result ~ok:enc_os_cmd_status ~error:Binc.enc_string
-      b (Op.Spawn.result s)
+    Binc.enc_option enc_os_cmd_status b (Op.Spawn.exit s)
 
   let dec_spawn s i =
     let i, env = Binc.dec_list Binc.dec_string s i in
@@ -528,12 +505,9 @@ module Op = struct
       let ok = Binc.dec_string and error = Binc.dec_string in
       Binc.dec_option (Binc.dec_result ~ok ~error) s i
     in
-    let i, result =
-      let ok = dec_os_cmd_status and error = Binc.dec_string in
-      Binc.dec_result ~ok ~error s i
-    in
+    let i, exit = Binc.dec_option dec_os_cmd_status s i in
     i, Op.Spawn.v ~env ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits
-      tool args ~stamp ~stdo_ui ~result
+      tool args ~stamp ~stdo_ui ~exit
 
   let enc_wait_files b wait = Binc.enc_unit b ()
   let dec_wait_files s i =

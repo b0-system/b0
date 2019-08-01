@@ -526,7 +526,7 @@ module Op = struct
       args : Cmd.t;
       mutable spawn_stamp : string;
       mutable stdo_ui : (string, string) result option;
-      mutable spawn_result  : (Os.Cmd.status, string) result; }
+      mutable spawn_exit : Os.Cmd.status option; }
 
   type wait_files = unit
   type write =
@@ -714,10 +714,10 @@ module Op = struct
     type t = spawn
     let v
         ~env ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits tool
-        args ~stamp ~stdo_ui ~result
+        args ~stamp ~stdo_ui ~exit
       =
       { env; relevant_env; cwd; stdin; stdout; stderr; success_exits; tool;
-        args; spawn_stamp = stamp; stdo_ui; spawn_result = result }
+        args; spawn_stamp = stamp; stdo_ui; spawn_exit = exit }
 
     let get o = match o.kind with Spawn s -> s | _ -> assert false
     let env s = s.env
@@ -733,19 +733,16 @@ module Op = struct
     let set_stamp s stamp = s.spawn_stamp <- stamp
     let stdo_ui s = s.stdo_ui
     let set_stdo_ui s ui = s.stdo_ui <- ui
-    let result s = s.spawn_result
-    let set_result s e = s.spawn_result <- e
-    let set_exec_result o s stdo_ui r =
-      let status = match r with
-      | Error e -> Failed (Exec (Some e))
-      | Ok (`Signaled c) -> Failed (Exec None)
-      | Ok (`Exited c) ->
-          match success_exits s with
-          | [] -> Executed
-          | cs when List.mem c cs -> Executed
-          | cs -> Failed (Exec None)
-      in
-      set_stdo_ui s stdo_ui; set_result s r; set_status o status
+    let exit s = s.spawn_exit
+    let set_exit s e = s.spawn_exit <- e
+    let exit_to_status s = match s.spawn_exit with
+    | None -> Failed (Exec None)
+    | Some (`Signaled c) -> Failed (Exec None)
+    | Some (`Exited c) ->
+        match success_exits s with
+        | [] -> Executed
+        | cs when List.mem c cs -> Executed
+        | cs -> Failed (Exec None)
 
     let v_op
         ~id ~group ~created ~reads ~writes ?post_exec ?k ~stamp ~env
@@ -753,8 +750,7 @@ module Op = struct
       =
       let spawn =
         { env; relevant_env; cwd; stdin; stdout; stderr; success_exits;
-          tool; args; spawn_stamp = stamp; stdo_ui = None;
-          spawn_result = Error "not spawned" }
+          tool; args; spawn_stamp = stamp; stdo_ui = None; spawn_exit = None }
       in
       v_kind ~id ~group ~created ~reads ~writes ?post_exec ?k (Spawn spawn)
   end
@@ -975,11 +971,11 @@ module Reviver = struct
   (* Recording and reviving operations *)
 
   let spawn_meta_conv :
-    ((string, string) result option * (Os.Cmd.status, string) result) Conv.t
+    ((string, string) result option * Os.Cmd.status option) Conv.t
     =
-    Conv.(pair ~kind:"spawn-result" ~docvar:"SPAWN"
+    Conv.(pair ~kind:"spawn-meta" ~docvar:"SPAWN"
             (option (result string_bytes string_bytes))
-            (result os_cmd_status string_bytes))
+            (option os_cmd_status))
 
   let file_cache_key o = Hash.to_hex (Op.hash o)
 
@@ -989,9 +985,11 @@ module Reviver = struct
     Result.bind (File_cache.revive r.cache key writes) @@ function
     | None -> Ok None
     | Some (m, existed) ->
-        Result.bind (Conv.of_bin spawn_meta_conv m) @@ fun (stdo_ui, res) ->
+        Result.bind (Conv.of_bin spawn_meta_conv m) @@ fun (stdo_ui, exit) ->
         Op.set_revived o true;
-        Op.Spawn.set_exec_result o s stdo_ui res;
+        Op.Spawn.set_stdo_ui s stdo_ui;
+        Op.Spawn.set_exit s exit;
+        Op.set_status o (Op.Spawn.exit_to_status s);
         Op.invoke_post_exec o;
         Op.set_time_ended o (timestamp r);
         Ok (Some existed)
@@ -1022,7 +1020,7 @@ module Reviver = struct
         Ok None
 
   let record_spawn r o s =
-    let spawn_meta = Op.Spawn.stdo_ui s, Op.Spawn.result s in
+    let spawn_meta = Op.Spawn.stdo_ui s, Op.Spawn.exit s in
     match Conv.to_bin ~buf:r.buffer spawn_meta_conv spawn_meta with
     | Error _ as e -> e
     | Ok m -> File_cache.add r.cache (file_cache_key o) m (Op.writes o)
@@ -1229,7 +1227,13 @@ module Exec = struct
     in
     let s = Op.Spawn.get o in
     let stdo_ui = match ui with None -> None | Some ui -> (read_stdo_ui s ui) in
-    Op.Spawn.set_exec_result o s stdo_ui result;
+    Op.Spawn.set_stdo_ui s stdo_ui;
+    begin match result with
+    | Error _ as e -> Op.set_status_from_result o e
+    | Ok exit ->
+        Op.Spawn.set_exit s (Some exit);
+        Op.set_status o (Op.Spawn.exit_to_status s)
+    end;
     Op.invoke_post_exec o;
     Op.set_time_ended o (timestamp e);
     decr_spawn_count e;

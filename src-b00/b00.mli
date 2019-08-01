@@ -159,8 +159,7 @@ module Memo : sig
   (** {1:memo Memoizer} *)
 
   type feedback =
-  [ `Fiber_exn of exn * Printexc.raw_backtrace
-  | `Fiber_fail of string
+  [ `Fiber of [ `Fail of string | `Exn of exn * Printexc.raw_backtrace ]
   | `Miss_tool of Tool.t * string
   | `Op_cache_error of B000.Op.t * string
   | `Op_complete of B000.Op.t ]

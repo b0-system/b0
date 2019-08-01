@@ -14,36 +14,24 @@ module Op : sig
 
   (** {1:fmt Formatters} *)
 
-  val pp_spawn_stdo_ui : Op.Spawn.t Fmt.t
-  (** [pp_spawn_stdo_ui] formats the standard output ui of the spawn. *)
-
-  val pp_spawn_result : (Os.Cmd.status, string) result Fmt.t
-  (** [pp_spawn_result] formats the command status of the spawn. *)
-
   val pp_file_read : Fpath.t Fmt.t
   (** [pp_file_read] formats a read file. *)
 
   val pp_file_write : Fpath.t Fmt.t
   (** [pp_file_write] formats a written file. *)
 
-  val pp_hash : Hash.t Fmt.t
-  (** [pp_hash] formats an operation hash. *)
+  val pp_line : Op.t Fmt.t
+  (** [pp_line] formats a build operation on a single line. *)
 
-  (** {1:ops Operation formatters} *)
-
-  val pp_short : Op.t Fmt.t
-  (** [pp_short] formats a build operation on a single line. *)
-
-  val pp_short_ui : Op.t Fmt.t
-  (** [pp_short_with_ui] formats like {!pp_short} but also a feedback
-      UI and failure errors if the operation have one.  [op_howto]
-      formats how to get more information about operations with
-      feedback. *)
+  val pp_line_and_ui : Op.t Fmt.t
+  (** [pp_line_and_ui] formats like {!pp_line} but also a potential
+      feedback spawn UI and/or failure error messages. *)
 
   val pp_ui : sep:unit Fmt.t -> op_howto:Op.t Fmt.t -> Op.t Fmt.t
-  (** [pp] formats operations in order to report failures assuming to
-      be due to the user rather than build logic. In case something is
-      printed [sep] is added at the end. *)
+  (** [pp_ui] formats notifications, failed operations and spawn operations
+      with a UI. In case something is printed [sep] is added at the end.
+      [op_howto] should be command fragment to obtain more information
+      about operation failures. *)
 
   val pp : Op.t Fmt.t
   (** [pp] formats a build operation with full details. *)

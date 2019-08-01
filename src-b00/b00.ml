@@ -141,8 +141,7 @@ end
 
 module Memo = struct
   type feedback =
-  [ `Fiber_exn of exn * Printexc.raw_backtrace
-  | `Fiber_fail of string
+  [ `Fiber of [ `Fail of string | `Exn of exn * Printexc.raw_backtrace ]
   | `Miss_tool of Tool.t * string
   | `Op_cache_error of Op.t * string
   | `Op_complete of Op.t ]
@@ -224,11 +223,11 @@ module Memo = struct
     List.iter (Guard.set_file_ready m.m.guard) (Op.writes o);
     m.m.feedback (`Op_complete o);
     try Op.invoke_k o with
-    | Fail e -> m.m.feedback (`Fiber_fail e)
+    | Fail e -> m.m.feedback (`Fiber (`Fail e))
     | Stack_overflow as e -> raise e
     | Out_of_memory as e -> raise e
     | Sys.Break as e -> raise e
-    | e -> m.m.feedback (`Fiber_exn (e, Printexc.get_raw_backtrace ()))
+    | e -> m.m.feedback (`Fiber (`Exn (e, Printexc.get_raw_backtrace ())))
 
   let discontinue_op m o =
     List.iter (Guard.set_file_never m.m.guard) (Op.writes o);
@@ -459,8 +458,8 @@ module Memo = struct
         let k = match k with
         | None -> fun o -> ()
         | Some k ->
-            fun o -> match Op.Spawn.result (Op.Spawn.get o) with
-            | Ok (`Exited code) -> k code
+            fun o -> match Op.Spawn.exit (Op.Spawn.get o) with
+            | Some (`Exited code) -> k code
             | _ -> assert false
         in
         let o =
@@ -480,11 +479,11 @@ module Memo = struct
     let set s = Futs.fut_set s
     let wait (f, m) k =
       let trap_kont_exn v = try k v with
-      | Fail e -> m.m.feedback (`Fiber_fail e)
+      | Fail e -> m.m.feedback (`Fiber (`Fail e))
       | Stack_overflow as e -> raise e
       | Out_of_memory as e -> raise e
       | Sys.Break as e -> raise e
-      | e -> m.m.feedback (`Fiber_exn (e, Printexc.get_raw_backtrace ()))
+      | e -> m.m.feedback (`Fiber (`Exn (e, Printexc.get_raw_backtrace ())))
       in
       Futs.fut_wait f trap_kont_exn
   end
