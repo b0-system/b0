@@ -3221,13 +3221,12 @@ module Os = struct
 
     let home_dir = "user"
     let home_var = "HOME"
-    let home_win32_var = "%HomePath%"
     let user () =
       let home_env home_var = match fpath_of_env_var home_dir home_var with
       | Some r -> r
       | None -> err_dir home_dir "%s environment variable is undefined" home_var
       in
-      if Sys.win32 then home_env home_win32_var else
+(*      if Sys.win32 then home_env home_win32_var else *)
       match Fpath.of_string (Unix.getpwuid (Unix.getuid ())).Unix.pw_dir with
       | Ok _ as v -> v
       | Error _ -> home_env home_var
@@ -3240,14 +3239,14 @@ module Os = struct
 
     let config_dir = "configuration"
     let config_var = "XDG_CONFIG_HOME"
-    let config_var_alt = if Sys.win32 then Some "%LOCALAPPDATA%" else None
+    let config_var_alt = if Sys.win32 then Some "%APPDATA%" else None
     let config_fallback () = home_fallback config_dir (Fpath.v ".config")
     let config () =
       base_dir config_dir config_var config_var_alt config_fallback
 
     let data_dir = "data"
     let data_var = "XDG_DATA_HOME"
-    let data_var_alt = if Sys.win32 then Some "%LOCALAPPDATA%" else None
+    let data_var_alt = if Sys.win32 then Some "%APPDATA%" else None
     let data_fallback () = home_fallback data_dir (Fpath.v ".local/share")
     let data () =
       base_dir data_dir data_var data_var_alt data_fallback

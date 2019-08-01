@@ -2406,14 +2406,14 @@ module Os : sig
         process.  Determined by consulting [passwd] database with the
         user if of the process. If this fails falls back to parse
         a path from the [HOME] environment variables. On Windows
-        parses a path from the [%HomePath%] environment variable. *)
+        no special fallback is implemented. *)
 
     val config : unit -> (Fpath.t, string) result
     (** [config ()] is the directory used to store user-specific program
         configurations. This is in order:
         {ol
         {- If set the value of [XDG_CONFIG_HOME].}
-        {- If set and on Windows® the value of [%LOCALAPPDATA%].}
+        {- If set and on Windows® the value of [APPDATA].}
         {- If [user ()] is [Ok home], [Fpath.(home / ".config")].}} *)
 
     val data : unit -> (Fpath.t, string) result
@@ -2421,7 +2421,7 @@ module Os : sig
         data. This is in order:
         {ol
         {- If set the value of [XDG_DATA_HOME].}
-        {- If set and on Windows® the value of [%LOCALAPPDATA%].}
+        {- If set and on Windows® the value of [APPDATA].}
         {- If [user ()] is [Ok home], [Fpath.(home / ".local" / "share")].}} *)
 
     val cache : unit -> (Fpath.t, string) result
