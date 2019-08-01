@@ -12,16 +12,33 @@ open B000
 let err_no_log_file = 1
 let err_unknown = 123
 
-let handle_unknown_error = function
-| Ok i -> i | Error e -> Log.err (fun m -> m "%s" e); err_unknown
+let find_root_b0 ~cwd =
+  let rec loop p = match Fpath.is_root p with
+  | true -> cwd
+  | false ->
+      if Fpath.is_root p then cwd else
+      match Os.Dir.exists Fpath.(p / B0_ui.Memo.b0_dir_name) with
+      | Error _ | Ok false -> loop (Fpath.parent p)
+      | Ok true -> p
+  in
+  loop cwd
 
-let log_cmd () no_pager (out_fmt, log_output) log_file log_filter =
+let log_cmd () no_pager b0_dir log_file (out_fmt, log_output) log_filter =
   Log.if_error ~use:err_unknown @@
+  Result.bind (Os.Dir.cwd ()) @@ fun cwd ->
+  let b0_dir = B0_ui.Memo.get_b0_dir ~cwd ~root:(find_root_b0 cwd) ~b0_dir in
+  let log_file = B0_ui.Memo.get_log_file ~cwd ~b0_dir ~log_file in
   let don't = no_pager || out_fmt = `Trace_event in
   Result.bind (B0_ui.Pager.find ~don't ()) @@ fun pager ->
   Result.bind (B0_ui.Pager.page_stdout pager) @@ fun () ->
-  Result.bind (B0_ui.Memo.Log.read_file log_file) @@
-  fun (info, ops) -> log_output (info, log_filter ops); Ok 0
+  match Os.File.exists log_file with
+  | Error _ as e -> e
+  | Ok false ->
+      Log.err (fun m -> m "%a: No such file." Fpath.pp_unquoted log_file);
+      Ok err_no_log_file
+  | Ok true ->
+      Result.bind (B0_ui.Memo.Log.read_file log_file) @@
+      fun (info, ops) -> log_output (info, log_filter ops); Ok 0
 
 (* Command line interface *)
 
@@ -35,12 +52,6 @@ let exits =
 let cli_conf = B0_ui.B0_std.cli_setup ()
 
 (* Main command *)
-
-(* FIXME lookup in the file hierarchy for a such file. *)
-let default_log = B0_ui.Memo.(Fpath.(v b0_dir_name / log_file_name))
-let b0_log_file =
-  let doc = "The $(docv) b0 log file to read from." and docv = "FILE" in
-  Arg.(value & pos 0 B0_ui.Cli.Arg.fpath default_log & info [] ~doc ~docv)
 
 let b00_log =
   let doc = "Show b0 build operations from log files" in
@@ -58,9 +69,11 @@ let b00_log =
     `S Manpage.s_bugs;
     `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ];
   in
+  let b0_dir = B0_ui.Memo.b0_dir () in
+  let b0_log_file = B0_ui.Memo.log_file () in
   Term.(const log_cmd $ cli_conf $ B0_ui.Pager.don't () $
+        b0_dir $ b0_log_file $
         B0_ui.Memo.Log.out_fmt_cli ~docs:docs_out_fmt () $
-        b0_log_file $
         B0_ui.Op.log_filter_cli),
   Term.info "b00-log" ~version:"%%VERSION%%" ~doc ~envs ~exits ~man
     ~man_xrefs

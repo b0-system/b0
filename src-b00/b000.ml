@@ -485,17 +485,17 @@ module Op = struct
 
   (* Operation status *)
 
-  type failure = Exec of string | Missing_writes of Fpath.t list
+  type failure = Exec of string option | Missing_writes of Fpath.t list
   type status = Aborted | Executed | Failed of failure | Waiting
-  let failure_to_string = function
-  | Exec e -> e
-  | Missing_writes fs ->
-      Fmt.str "@[<v>Did not write:@,%a@]" (Fmt.list Fpath.pp_quoted) fs
-
   let status_to_string = function
-  | Aborted -> "aborted" | Executed -> "executed"
-  | Failed f -> Fmt.str "failed: %s" (failure_to_string f)
-  | Waiting -> "waiting"
+  | Aborted -> "aborted" | Executed -> "executed" | Waiting -> "waiting"
+  | Failed f ->
+      match f with
+      | Exec None -> "failed"
+      | Exec (Some msg) -> Fmt.str "failed: %s" msg
+      | Missing_writes fs ->
+          Fmt.str "@[<v>failed: Did not write:@,%a@]"
+            (Fmt.list Fpath.pp_quoted) fs
 
   (* Operation kinds *)
 
@@ -623,7 +623,7 @@ module Op = struct
             Fmt.str
               "@[<v>Post execution hook raised:@,%a@]" Fmt.exn_backtrace (e, bt)
           in
-          o.status <- Failed (Exec err)
+          o.status <- Failed (Exec (Some err))
 
   let equal o0 o1 = o0.id = o1.id
   let compare o0 o1 = (Pervasives.compare : int -> int -> int) o0.id o1.id
@@ -635,7 +635,8 @@ module Op = struct
   let set_writes o fs = o.writes <- fs
   let set_hash o h = o.hash <- h
   let set_status_from_result o r =
-    set_status o (match r with Ok _ -> Executed | Error e -> Failed (Exec e))
+    let st = match r with Ok _ -> Executed | Error e -> Failed (Exec (Some e))in
+    set_status o st
 
   module Copy = struct
     type t = copy
@@ -736,13 +737,13 @@ module Op = struct
     let set_result s e = s.spawn_result <- e
     let set_exec_result o s stdo_ui r =
       let status = match r with
-      | Error e -> Failed (Exec e)
-      | Ok (`Signaled c) -> Failed (Exec (Fmt.str "signaled (%d)" c))
+      | Error e -> Failed (Exec (Some e))
+      | Ok (`Signaled c) -> Failed (Exec None)
       | Ok (`Exited c) ->
           match success_exits s with
           | [] -> Executed
           | cs when List.mem c cs -> Executed
-          | cs -> Failed (Exec (Fmt.str "illegal exit code (%d)" c))
+          | cs -> Failed (Exec None)
       in
       set_stdo_ui s stdo_ui; set_result s r; set_status o status
 

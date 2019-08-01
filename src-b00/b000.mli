@@ -249,7 +249,7 @@ module Op : sig
   (** {1:op_status Operation status} *)
 
   type failure =
-  | Exec of string (** Execution failure (usually OS error). *)
+  | Exec of string option (** Execution failure with a potential error msg. *)
   | Missing_writes of Fpath.t list (** Write specification failure. *)
   (** The type for operation failures. *)
 

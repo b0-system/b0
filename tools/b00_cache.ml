@@ -7,7 +7,8 @@
 open B0_std
 open B000
 
-(* FIXME we are not using B0_ui.File_cache.* because this
+(* FIXME redo in light of B0_ui improvements.
+   FIXME we are not using B0_ui.File_cache.* because this
    errors on missing caches. Unclear whether the behaviour
    here should be changed. *)
 
