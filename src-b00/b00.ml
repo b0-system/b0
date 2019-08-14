@@ -223,11 +223,18 @@ module Memo = struct
     List.iter (Guard.set_file_ready m.m.guard) (Op.writes o);
     m.m.feedback (`Op_complete o);
     try Op.invoke_k o with
-    | Fail e -> m.m.feedback (`Fiber (`Fail e))
     | Stack_overflow as e -> raise e
     | Out_of_memory as e -> raise e
     | Sys.Break as e -> raise e
+    | Fail e -> m.m.feedback (`Fiber (`Fail e))
     | e -> m.m.feedback (`Fiber (`Exn (e, Printexc.get_raw_backtrace ())))
+
+  let continue_fut m k = try k () with
+  | Stack_overflow as e -> raise e
+  | Out_of_memory as e -> raise e
+  | Sys.Break as e -> raise e
+  | Fail e -> m.m.feedback (`Fiber (`Fail e))
+  | e -> m.m.feedback (`Fiber (`Exn (e, Printexc.get_raw_backtrace ())))
 
   let discontinue_op m o =
     List.iter (Guard.set_file_never m.m.guard) (Op.writes o);
@@ -295,7 +302,7 @@ module Memo = struct
       | Some o -> finish_op m o; stir ~block m
       | None ->
           match Futs.stir m.m.futs with
-          | Some k -> k (); stir ~block m
+          | Some k -> continue_fut m k; stir ~block m
           | None -> ()
 
   let add_op m o =
@@ -472,20 +479,12 @@ module Memo = struct
 
   module Fut = struct
     type memo = t
-    type 'a t = 'a Futs.fut * memo
+    type 'a t = 'a Futs.fut
     type 'a set = 'a Futs.fut_set
-    let create m = let f, s = Futs.fut m.m.futs in (f, m), s
-    let value (f, _) = Futs.fut_value f
-    let set s = Futs.fut_set s
-    let wait (f, m) k =
-      let trap_kont_exn v = try k v with
-      | Fail e -> m.m.feedback (`Fiber (`Fail e))
-      | Stack_overflow as e -> raise e
-      | Out_of_memory as e -> raise e
-      | Sys.Break as e -> raise e
-      | e -> m.m.feedback (`Fiber (`Exn (e, Printexc.get_raw_backtrace ())))
-      in
-      Futs.fut_wait f trap_kont_exn
+    let create m = Futs.fut m.m.futs
+    let value = Futs.fut_value
+    let set = Futs.fut_set
+    let wait = Futs.fut_wait
   end
 end
 
