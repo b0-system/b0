@@ -78,7 +78,8 @@ module Op = struct
 
   let pp_notify ppf n =
     let label, s = match Op.Notify.kind n with
-    | `Warn -> "WARNING", style_notify_warn
+    | `Fail -> "FAIL", style_err
+    | `Warn -> "WARN", style_notify_warn
     | `Start -> "START", style_notify_info
     | `End -> "END", style_notify_info
     | `Info -> "NOTE", style_notify_info
@@ -180,7 +181,7 @@ module Op = struct
       in
       let pp_status ppf o = match Op.status o with
       | Op.Failed _ ->
-          Fmt.pf ppf "[%a] " (Fmt.tty_string style_status_failed) "FAILED"
+          Fmt.pf ppf "[%a] " (Fmt.tty_string style_status_failed) "FAIL"
       | _ -> ()
       in
       let if_spawn_pp_spawn_exit ppf o = match Op.kind o with
@@ -334,9 +335,7 @@ module Op = struct
     i, Time.Span.of_uint64_ns u
 
   let enc_hash b h = Binc.enc_string b (Hash.to_bytes h)
-  let dec_hash s i =
-    let i, s = Binc.dec_string s i in
-    i, Hash.of_bytes s
+  let dec_hash s i = let i, s = Binc.dec_string s i in i, Hash.of_bytes s
 
   let enc_failure b = function
   | Op.Exec msg -> Binc.enc_byte b 0; (Binc.enc_option Binc.enc_string) b msg
@@ -366,9 +365,7 @@ module Op = struct
     match b with
     | 0 -> next, Op.Aborted
     | 1 -> next, Op.Executed
-    | 2 ->
-        let i, f = dec_failure s next in
-        i, Op.Failed f
+    | 2 -> let i, f = dec_failure s next in i, Op.Failed f
     | 3 -> next, Op.Waiting
     | b -> Binc.err_byte ~kind i b
 
@@ -400,19 +397,21 @@ module Op = struct
     i, Op.Mkdir.v ~mode ~dir
 
   let enc_notify_kind b = function
-  | `Warn -> Binc.enc_byte b 0
-  | `Start -> Binc.enc_byte b 1
-  | `End -> Binc.enc_byte b 2
-  | `Info -> Binc.enc_byte b 3
+  | `End -> Binc.enc_byte b 0
+  | `Fail -> Binc.enc_byte b 1
+  | `Info -> Binc.enc_byte b 2
+  | `Start -> Binc.enc_byte b 3
+  | `Warn -> Binc.enc_byte b 4
 
   let dec_notify_kind s i =
     let kind = "Op.Notify.kind" in
     let next, b = Binc.dec_byte ~kind s i in
     match b with
-    | 0 -> next, `Warn
-    | 1 -> next, `Start
-    | 2 -> next, `End
-    | 3 -> next, `Info
+    | 0 -> next, `End
+    | 1 -> next, `Fail
+    | 2 -> next, `Info
+    | 3 -> next, `Start
+    | 4 -> next, `Warn
     | b -> Binc.err_byte ~kind i b
 
   let enc_notify b n =

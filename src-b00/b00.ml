@@ -141,8 +141,7 @@ end
 
 module Memo = struct
   type feedback =
-  [ `Fiber of [ `Fail of string | `Exn of exn * Printexc.raw_backtrace ]
-  | `Miss_tool of Tool.t * string
+  [ `Miss_tool of Tool.t * string
   | `Op_cache_error of Op.t * string
   | `Op_complete of Op.t ]
 
@@ -216,25 +215,51 @@ module Memo = struct
   let group m = m.c.group
   let with_group m group = { c = { group }; m = m.m }
   let finished m = m.m.finished
+  let add_op m o = m.m.ops <- o :: m.m.ops; Guard.add m.m.guard o
 
-  exception Fail of string
+  (* Fibers *)
 
-  let continue_op m o =
-    List.iter (Guard.set_file_ready m.m.guard) (Op.writes o);
-    m.m.feedback (`Op_complete o);
-    try Op.invoke_k o with
-    | Stack_overflow as e -> raise e
-    | Out_of_memory as e -> raise e
-    | Sys.Break as e -> raise e
-    | Fail e -> m.m.feedback (`Fiber (`Fail e))
-    | e -> m.m.feedback (`Fiber (`Exn (e, Printexc.get_raw_backtrace ())))
+  type 'a fiber = ('a -> unit) -> unit
+  exception Fail
 
-  let continue_fut m k = try k () with
+  let notify_op m ?k kind msg =
+    let k = match k with None -> None | Some k -> Some (fun o -> k ()) in
+    let id = new_op_id m and created = timestamp m in
+    let o = Op.Notify.v_op ~id ~group:m.c.group ~created ?k kind msg in
+    add_op m o
+
+  let fail m fmt =
+    let k msg = notify_op m `Fail msg; raise Fail in
+    Fmt.kstr k fmt
+
+  let fail_if_error m = function Ok v -> v | Error e -> fail m "%s" e
+
+  let invoke_k m ~pp_kind k v = try k v with
   | Stack_overflow as e -> raise e
   | Out_of_memory as e -> raise e
   | Sys.Break as e -> raise e
-  | Fail e -> m.m.feedback (`Fiber (`Fail e))
-  | e -> m.m.feedback (`Fiber (`Exn (e, Printexc.get_raw_backtrace ())))
+  | Fail -> ()
+  | e ->
+      let bt = Printexc.get_raw_backtrace () in
+      let err =
+        Fmt.str "@[<v>%a raised unexpectedly:@,%a@]"
+          pp_kind v Fmt.exn_backtrace (e, bt)
+      in
+      notify_op m `Fail err
+
+  let run_fiber m f =
+    let pp_kind ppf () = Fmt.string ppf "Toplevel fiber" in
+    invoke_k m ~pp_kind f ()
+
+  let continue_fut m k =
+    let pp_kind ppf () = Fmt.string ppf "Future waiter" in
+    invoke_k m ~pp_kind k ()
+
+  let continue_op m o =
+    let pp_kind ppf o = Fmt.pf ppf "Continuation of operation %d" (Op.id o) in
+    List.iter (Guard.set_file_ready m.m.guard) (Op.writes o);
+    m.m.feedback (`Op_complete o);
+    invoke_k m ~pp_kind Op.invoke_k o
 
   let discontinue_op m o =
     List.iter (Guard.set_file_never m.m.guard) (Op.writes o);
@@ -305,8 +330,7 @@ module Memo = struct
           | Some k -> continue_fut m k; stir ~block m
           | None -> ()
 
-  let add_op m o =
-    m.m.ops <- o :: m.m.ops; Guard.add m.m.guard o; stir ~block:false m
+  let add_op_and_stir m o = add_op m o; stir ~block:false m
 
   (* Finishing the memo *)
 
@@ -345,22 +369,10 @@ module Memo = struct
         | Some os -> Error (Cycle ws)
         | None -> Error (Never_became_ready (Op.unwritten_reads ws))
 
-  (* Fibers *)
 
-  type 'a fiber = ('a -> unit) -> unit
-  let fail fmt = Fmt.kstr (fun s -> raise (Fail s)) fmt
-  let fail_error = function Ok v -> v | Error e -> raise (Fail e)
+  (* Notifications *)
 
-  (* Notify *)
-
-  let notify ?k m kind fmt =
-    let k = match k with None -> None | Some k -> Some (fun o -> k ()) in
-    let op msg =
-      let id = new_op_id m and created = timestamp m in
-      let o = Op.Notify.v_op ~id ~group:m.c.group ~created ?k kind msg in
-      add_op m o
-    in
-    Fmt.kstr op fmt
+  let notify ?k m kind fmt = Fmt.kstr (notify_op m ?k kind) fmt
 
   (* Files *)
 
@@ -373,32 +385,32 @@ module Memo = struct
       Op.Read.discard_data r; k data
     in
     let o = Op.Read.v_op ~id ~group:m.c.group ~created ~k file in
-    add_op m o
+    add_op_and_stir m o
 
   let wait_files m files k =
     let id = new_op_id m and created = timestamp m and k o = k () in
     let o = Op.Wait_files.v_op ~id ~group:m.c.group ~created ~k files in
-    add_op m o
+    add_op_and_stir m o
 
   let write m ?(stamp = "") ?(reads = []) ?(mode = 0o644) write d =
     let id = new_op_id m and group = m.c.group and created = timestamp m in
     let o = Op.Write.v_op ~id ~group ~created ~stamp ~reads ~mode ~write d in
-    add_op m o
+    add_op_and_stir m o
 
   let copy m ?(mode = 0o644) ?linenum ~src dst =
     let id = new_op_id m and group = m.c.group and created = timestamp m in
     let o = Op.Copy.v_op ~id ~group ~created ~mode ~linenum ~src dst in
-    add_op m o
+    add_op_and_stir m o
 
   let mkdir m ?(mode = 0o755) dir k =
     let id = new_op_id m and created = timestamp m and k o = k () in
     let o = Op.Mkdir.v_op ~id ~group:m.c.group ~created ~k ~mode dir in
-    add_op m o
+    add_op_and_stir m o
 
   let delete m p k =
     let id = new_op_id m and created = timestamp m and k o = k () in
     let o = Op.Delete.v_op ~id ~group:m.c.group ~created ~k p in
-    add_op m o
+    add_op_and_stir m o
 
   (* FIXME better strategy to deal with builded tools. If the tool is a
      path check for readyness if not add it to the operations reads.
@@ -475,7 +487,7 @@ module Memo = struct
             ~env ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits
             tool.tool_file cmd.cmd_args
         in
-        add_op m o
+        add_op_and_stir m o
 
   module Fut = struct
     type memo = t

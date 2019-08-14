@@ -375,8 +375,8 @@ module Op : sig
     type t
     (** The type for notification. *)
 
-    type kind = [ `Warn | `Start | `End | `Info ]
-    (** The type for kind of notifications. *)
+    type kind = [ `End | `Fail | `Info | `Start | `Warn ]
+    (** The type for kinds of notifications. *)
 
     val kind_to_string : kind -> string
     (** [kind_to_string k] is [k] as a string. *)

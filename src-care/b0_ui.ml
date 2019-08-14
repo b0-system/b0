@@ -401,11 +401,6 @@ module Memo = struct
         then (B000_conv.Op.pp_line_and_ui ppf o; sep ppf ()) else
         if level >= show_ui
         then (B000_conv.Op.pp_ui ~sep ~op_howto ppf o)
-    | `Fiber (`Exn (exn, bt)) when level >= Log.Error ->
-        Fmt.pf ppf "@[<v>Fiber exception:@,%a@]%a"
-          Fmt.exn_backtrace (exn, bt) sep ()
-    | `Fiber (`Fail e) when level >= Log.Error ->
-        Fmt.pf ppf "@[<v>Fiber failed:@,%s@]%a" e sep ()
     | `Miss_tool (t, e) when level >= Log.Error ->
         Fmt.pf ppf "@[<v>Missing tool:@,%s@]%a" e sep ()
     | `Op_cache_error (op, e) when level >= Log.Error ->

@@ -159,15 +159,14 @@ module Memo : sig
   (** {1:memo Memoizer} *)
 
   type feedback =
-  [ `Fiber of [ `Fail of string | `Exn of exn * Printexc.raw_backtrace ]
-  | `Miss_tool of Tool.t * string
+  [ `Miss_tool of Tool.t * string
   | `Op_cache_error of B000.Op.t * string
   | `Op_complete of B000.Op.t ]
   (** The type for memoizer feedback. *)
 
   type t
   (** The type for memoizers. This ties together an environment, a
-      aguard, an operation cache and an executor. *)
+      guard, an operation cache and an executor. *)
 
   val create :
     ?clock:Time.counter -> ?cpu_clock:Time.cpu_counter ->
@@ -261,23 +260,31 @@ module Memo : sig
   val with_group : t -> string -> t
   (** [group m g] is [m] but operations performed on [m] have group [g]. *)
 
+  (** {1:feedback Feedback} *)
+
+  val notify :
+    ?k:(unit -> unit) -> t -> [ `Fail | `Warn | `Start | `End | `Info ] ->
+    ('a, Format.formatter, unit, unit) format4 -> 'a
+  (** [notify m kind msg] is a notification [msg] of kind [kind]. Note that
+      a [`Fail] notification will entail a {!finish_error}, see also {!fail}
+      and {!fail_error}. *)
+
   (** {1:fibers Fibers} *)
 
   type 'a fiber = ('a -> unit) -> unit
   (** The type for memoizer operation fibers. *)
 
-  val fail : ('b, Format.formatter, unit, 'a) format4 -> 'b
-  (** [fail fmt ...] fails the fiber with the given error message. *)
+  val run_fiber : t -> unit fiber
+  (** [run m k] calls [k ()] and handles any fiber {!fail}ure. This
+      also catches non-asynchronous uncaught exceptions and turns them
+      into [`Fail] notification operations. *)
 
-  val fail_error : ('a, string) result -> 'a
-  (** [fail_error] fails the fiber with the given error. *)
+  val fail : t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
+  (** [fail m fmt ...] fails the fiber via a {!notify} operation. *)
 
-  (** {1:feedback Feedback} *)
-
-  val notify :
-    ?k:(unit -> unit) -> t -> [ `Warn | `Start | `End | `Info ] ->
-    ('a, Format.formatter, unit, unit) format4 -> 'a
-  (** [notify kind msg] is a notification [msg] of kind [kind]. *)
+  val fail_if_error : t -> ('a, string) result -> 'a
+  (** [fail_if_error m r] is [v] if [r] is [Ok v] and [fail m "%s" e] if
+      [r] is [Error _]. *)
 
   (** {1:files Files and directories} *)
 

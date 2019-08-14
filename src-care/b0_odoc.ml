@@ -13,7 +13,7 @@ let read_path_writes m file k =
   | Ok p -> p :: acc
   in
   let parse lines = B0_lines.fold ~file (String.trim lines) parse_path [] in
-  Memo.read m file (fun lines -> k (Memo.fail_error (parse lines)))
+  Memo.read m file (fun lines -> k (Memo.fail_if_error m (parse lines)))
 
 let tool = Tool.by_name "odoc" (* FIXME conf ! *)
 
@@ -45,7 +45,7 @@ module Compile = struct
 
     let read m file k =
       let parse lines = B0_lines.fold ~file (String.trim lines) parse_dep [] in
-      Memo.read m file (fun lines -> k (Memo.fail_error (parse lines)))
+      Memo.read m file (fun lines -> k (Memo.fail_if_error m (parse lines)))
   end
 
   module Writes = struct
@@ -100,7 +100,7 @@ module Html = struct
 
     let read m file k =
       let parse lines = B0_lines.fold ~file (String.trim lines) parse_dep [] in
-      Memo.read m file (fun lines -> k (Memo.fail_error (parse lines)))
+      Memo.read m file (fun lines -> k (Memo.fail_if_error m (parse lines)))
   end
 
   module Writes = struct
@@ -239,7 +239,6 @@ module Theme = struct
       let post ppf () = Fmt.pf ppf " using %s instead" default in
       Fmt.error "%a" (Fmt.did_you_mean ~kind:"theme" ~post Fmt.string) (n, ss)
 end
-
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 The b0 programmers

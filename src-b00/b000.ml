@@ -485,6 +485,9 @@ module Op = struct
 
   (* Operation status *)
 
+  exception Fail of string
+  exception Fail_through
+
   type failure = Exec of string option | Missing_writes of Fpath.t list
   type status = Aborted | Executed | Failed of failure | Waiting
   let status_to_string = function
@@ -505,7 +508,7 @@ module Op = struct
 
   type delete = { delete_path : Fpath.t; }
   type mkdir = { mkdir_dir : Fpath.t; mkdir_mode : int; }
-  type notify_kind = [ `Warn | `Start | `End | `Info ]
+  type notify_kind = [ `End | `Fail | `Info | `Start | `Warn ]
   type notify = { notify_kind : notify_kind; notify_msg : string }
   type read =
     { read_file : Fpath.t;
@@ -606,22 +609,21 @@ module Op = struct
 
   let hash o = o.hash
   let discard_k o = o.k <- None
-  let invoke_k o = match o.k with
-  | None -> () | Some k -> o.k <- None; k o
-
+  let invoke_k o = match o.k with None -> () | Some k -> discard_k o; k o
   let discard_post_exec o = o.post_exec <- None
   let invoke_post_exec o = match o.post_exec with
-  | None -> () | Some p ->
-      o.post_exec <- None;
-      try p o with
+  | None -> ()
+  | Some hook ->
+      discard_post_exec o;
+      try hook o with
       | Stack_overflow as e -> raise e
       | Out_of_memory as e -> raise e
       | Sys.Break as e -> raise e
       | e ->
           let bt = Printexc.get_raw_backtrace () in
           let err =
-            Fmt.str
-              "@[<v>Post execution hook raised:@,%a@]" Fmt.exn_backtrace (e, bt)
+            Fmt.str "@[<v>Post execution hook raised unexpectedly:@,%a@]"
+              Fmt.exn_backtrace (e, bt)
           in
           o.status <- Failed (Exec (Some err))
 
@@ -682,7 +684,8 @@ module Op = struct
   module Notify = struct
     type kind = notify_kind
     let kind_to_string = function
-    | `Warn -> "warn" | `Start -> "start" | `End -> "end" | `Info -> "info"
+    | `End -> "end" | `Fail -> "fail" | `Info -> "info" | `Start -> "start"
+    | `Warn -> "warn"
 
     type t = notify
     let v ~kind ~msg = { notify_kind = kind; notify_msg = msg }
@@ -1294,10 +1297,13 @@ module Exec = struct
         Os.File.write ~atomic ~force ~make_path ~mode dst data
 
   let op_delete e d = Trash.trash e.trash (Op.Delete.path d)
-  let op_nop _ _ = Ok ()
   let op_mkdir _e mk =
     let dir = Op.Mkdir.dir mk and mode = Op.Mkdir.mode mk in
     Os.Dir.create ~mode ~make_path:true dir
+
+  let op_notify e n = match Op.Notify.kind n with
+  | `Fail -> Error (Op.Notify.msg n)
+  | _ -> Ok ()
 
   let op_read _e read = match Os.File.read (Op.Read.file read) with
   | Ok data as r -> Op.Read.set_data read data; r
@@ -1308,7 +1314,6 @@ module Exec = struct
   | Ok data ->
       let mode = Op.Write.mode w in
       Os.File.write ~force:true ~make_path:true ~mode (Op.Write.file w) data
-
   (* Scheduling
 
      As it stands this implementation does all the file operations
@@ -1320,10 +1325,10 @@ module Exec = struct
   | Op.Read r -> exec_op e o r op_read
   | Op.Write w -> exec_op e o w op_write
   | Op.Copy c -> exec_op e o c op_copy
-  | Op.Notify n -> exec_op e o n op_nop
+  | Op.Notify n -> exec_op e o n op_notify
   | Op.Mkdir mk -> exec_op e o mk op_mkdir
   | Op.Delete d -> exec_op e o d op_delete
-  | Op.Wait_files w -> exec_op e o w op_nop
+  | Op.Wait_files w -> exec_op e o w (fun _ _ -> Ok ())
 
   let submit_spawns e =
     let free = e.jobs - e.spawn_count in
