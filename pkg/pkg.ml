@@ -14,6 +14,7 @@ let () =
        Pkg.test "test/test_cp";
        Pkg.test "test/test_rm";
        Pkg.test "test/test_memo_failures";
+       Pkg.test "test/test_findex";
        Pkg.bin "tools/b00_cache" ~dst:"b00-cache";
        Pkg.bin "tools/b00_log" ~dst:"b00-log";
        Pkg.bin "tools/show_uri" ~dst:"show-uri";
