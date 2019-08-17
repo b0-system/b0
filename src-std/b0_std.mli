@@ -1192,6 +1192,11 @@ module Fpath : sig
       path syntactically represents a {{!is_dir_path}directory} and thus,
       if converted to a string, that it ends with a {!dir_sep}. *)
 
+  val rem_empty_seg : t -> t
+  (** [rem_empty_seg p] is [p] without an existing last empty segment
+      when [p] is not a root path, ensuring the result has no trailing
+      {!dir_sep} when converted to a string. *)
+
   (** {1:baseparent Basename and parent directory}
 
       {b Note.} The following functions use syntactic semantic
@@ -1210,7 +1215,7 @@ module Fpath : sig
       [p]. If [p] is a {{!is_root}root path} this is [p] itself.
       If [p] is in the current directory this is [./]. *)
 
-  (** {1:prefix Strict prefixes} *)
+  (** {1:prefix Strict prefixes and roots} *)
 
   val is_prefix : t -> t -> bool
   (** [is_prefix prefix p] is [true] iff [prefix] is a strict prefix
@@ -1237,12 +1242,25 @@ module Fpath : sig
 
       {b Warning.} By definition [rem_prefix p p] is [None]. *)
 
+  val drop_prefixed : t list -> t list
+  (** [drop_prefixed ps] is [ps] without elements that have a
+      {{!is_prefix}strict prefixes} in [ps]. The list order is
+      preserved. Duplicates are not removed use {!uniquify} for
+      this. *)
+
   val reroot : root:t -> dst:t -> t -> t
   (** [reroot ~root ~dst p] assumes [root] {{!is_prefix}prefixes} [p]
       removes the prefix and prepends [dst] to the result.
 
       @raise Invalid_argument if [root] is not a prefix of [src].
       In particular note that [p] cannot be [root]. *)
+
+  val relative : to_dir:t -> t -> t
+  (** [relative to_dir p] is [q] such that [to_dir // q] represents
+      the same path as [p]. Note that [q] is not necessarily relative:
+      if [to_dir] is relative and [p] is absolute [p] is returned.
+
+      @raise Invalid_argument if path [to_dir] contains "..". *)
 
   (** {1:preds Predicates and comparison} *)
 

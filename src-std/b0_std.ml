@@ -1572,6 +1572,18 @@ module Fpath = struct
 
   let to_dir_path p = add_seg p ""
 
+  let rem_empty_seg p = match String.length p with
+  | 1 -> p
+  | 2 ->
+      if p.[0] <> dir_sep_char && p.[1] = dir_sep_char
+      then String.of_char p.[0]
+      else p
+  | len ->
+      let max = len - 1 in
+      if p.[max] <> dir_sep_char then p else
+      String.with_index_range p ~last:(max - 1)
+
+
   (* Strict prefixes *)
 
   let is_prefix pre p = match String.is_prefix pre p with
@@ -1591,6 +1603,11 @@ module Fpath = struct
       let len = String.length pre in
       let first = if p.[len] = dir_sep_char then len + 1 else len in
       Some (String.with_index_range p ~first)
+
+  let drop_prefixed dirs =
+    let is_prefixed d by = is_prefix by d in
+    let not_prefixed ~by:dirs d = not (List.exists (is_prefixed d) dirs) in
+    List.filter (not_prefixed ~by:dirs) dirs
 
   let reroot ~root ~dst src =
     let rel_file = Option.get (rem_prefix root src) in
@@ -1753,6 +1770,22 @@ module Fpath = struct
 
   let equal_basename p0 p1 = (* XXX could avoid alloc *)
     String.equal (basename p0) (basename p1)
+
+  let relative ~to_dir p =
+    (* XXX dirty, need a normalization function and/or a better parent
+       to handle that  *)
+    if String.is_infix ".." p then Fmt.invalid_arg "%s: not dotdot allowed" p;
+    let to_dir = to_dir_path to_dir in
+    match rem_prefix to_dir p with
+    | Some q -> q
+    | None ->
+        let rec loop loc dir =
+          if is_current_dir dir then p else
+          match rem_prefix dir p with
+          | Some q -> append loc q
+          | None -> loop (add_seg loc "..") (parent dir)
+        in
+        loop ".." (parent to_dir)
 
   (* Converting *)
 
