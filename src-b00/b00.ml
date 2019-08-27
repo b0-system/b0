@@ -81,64 +81,6 @@ module Tool = struct
     all, relevant
 end
 
-module Futs : sig
-  type t
-  type 'a fut
-  type 'a fut_set
-  val create : ?rand:Random.State.t -> unit -> t
-  val fut : t -> 'a fut * 'a fut_set
-  val fut_value : 'a fut -> 'a option
-  val fut_wait : 'a fut -> ('a -> unit) -> unit
-  val fut_set : 'a fut_set -> 'a -> unit
-  val stir : t -> (unit -> unit) option
-end = struct
-  module Fut_id = struct
-    type t = int
-    let compare : int -> int -> int = compare
-  end
-  module Fmap = Map.Make (Fut_id)
-
-  type 'a fut =
-    { id : Fut_id.t;
-      mutable value : 'a option;
-      mutable konts : ('a -> unit) list;
-      futs : t; }
-  and 'a fut_set = 'a fut
-  and e_fut = F : 'a fut -> e_fut
-  and t =
-    { mutable next : Fut_id.t;
-      mutable waiting : e_fut Fmap.t;
-      mutable kready : (unit -> unit) Rqueue.t; }
-
-  let create ?rand () =
-    { next = 0; waiting = Fmap.empty ; kready = Rqueue.empty ?rand () }
-
-  let fut fs =
-    let id = fs.next in
-    let f = { id; value = None; konts = []; futs = fs} in
-    (fs.next <- fs.next + 1; fs.waiting <- Fmap.add id (F f) fs.waiting; f, f)
-
-  let fut_value f = f.value
-  let fut_wait f k = match f.value with
-  | Some v -> Rqueue.add f.futs.kready (fun () -> k v)
-  | None -> f.konts <- k :: f.konts
-
-  let fut_set f v = match f.value with
-  | Some _ -> invalid_arg "fut value already set"
-  | None ->
-      f.value <- Some v;
-      match Fmap.find f.id f.futs.waiting with
-      | exception Not_found -> assert false
-      | (F f) ->
-          f.futs.waiting <- Fmap.remove f.id f.futs.waiting;
-          let v = Option.get f.value in
-          let add_kont k = Rqueue.add f.futs.kready (fun () -> k v) in
-          List.iter add_kont f.konts;
-          ()
-
-  let stir fs = Rqueue.take fs.kready
-end
-
 module Memo = struct
   type feedback =
   [ `Miss_tool of Tool.t * string
@@ -156,7 +98,7 @@ module Memo = struct
       guard : Guard.t;
       reviver : Reviver.t;
       exec : Exec.t;
-      futs : Futs.t;
+      kready : (unit -> unit) Rqueue.t;
       mutable finished : bool;
       mutable op_id : int;
       mutable ops : Op.t list; }
@@ -164,10 +106,10 @@ module Memo = struct
   let create ?clock ?cpu_clock:cc ~feedback ~cwd env guard reviver exec =
     let clock = match clock with None -> Time.counter () | Some c -> c in
     let cpu_clock = match cc with None -> Time.cpu_counter () | Some c -> c in
-    let futs = Futs.create () and op_id = 0 and  ops = [] in
+    let kready = Rqueue.empty () and op_id = 0 and  ops = [] in
     let c = { group = "" } in
     let m =
-      { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec; futs;
+      { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec; kready;
         finished = false; op_id; ops; }
     in
     { c; m }
@@ -247,12 +189,9 @@ module Memo = struct
       in
       notify_op m `Fail err
 
-  let run_fiber m f =
-    let pp_kind ppf () = Fmt.string ppf "Toplevel fiber" in
-    invoke_k m ~pp_kind f ()
-
-  let continue_fut m k =
-    let pp_kind ppf () = Fmt.string ppf "Future waiter" in
+  let spawn_fiber m k = Rqueue.add m.m.kready (fun () -> k ())
+  let continue_ready m k =
+    let pp_kind ppf () = Fmt.string ppf "Fiber" in
     invoke_k m ~pp_kind k ()
 
   let continue_op m o =
@@ -326,8 +265,8 @@ module Memo = struct
       match Exec.collect m.m.exec ~block with
       | Some o -> finish_op m o; stir ~block m
       | None ->
-          match Futs.stir m.m.futs with
-          | Some k -> continue_fut m k; stir ~block m
+          match Rqueue.take m.m.kready with
+          | Some k -> continue_ready m k; stir ~block m
           | None -> ()
 
   let add_op_and_stir m o = add_op m o; stir ~block:false m
@@ -362,13 +301,60 @@ module Memo = struct
     m.m.finished <- true;
     (* Any Waiting operation is guaranteed to be guarded at that point. *)
     match find_finish_condition m.m.ops with
-    | Ok _ as v  -> assert (Futs.stir m.m.futs = None); v
+    | Ok _ as v  -> assert (Rqueue.take m.m.kready = None); v
     | Error `Failures -> Error Failures
     | Error (`Waiting ws) ->
         match Op.find_read_write_cycle ws with
         | Some os -> Error (Cycle ws)
         | None -> Error (Never_became_ready (Op.unwritten_reads ws))
 
+  (* Futures *)
+
+  module Fut = struct
+    type memo = t
+    type 'a undet =
+      { mutable awaits_det : ('a -> unit) list; (* on Det *)
+        mutable awaits_set : ('a option -> unit) list; (* on Det or Never *)}
+
+    type 'a state = Det of 'a | Undet of 'a undet | Never
+    type 'a t = { mutable state : 'a state; m : memo }
+
+    let undet () = { awaits_det = []; awaits_set = [] }
+    let set f v = match f.state with
+    | Undet u ->
+        begin match v with
+        | None ->
+            f.state <- Never;
+            let add_set k = Rqueue.add f.m.m.kready (fun () -> k None) in
+            List.iter add_set u.awaits_set
+        | Some v as set ->
+            f.state <- Det v;
+            let add_det k = Rqueue.add f.m.m.kready (fun () -> k v) in
+            let add_set k = Rqueue.add f.m.m.kready (fun () -> k set) in
+            List.iter add_det u.awaits_det;
+            List.iter add_set u.awaits_set;
+        end
+    | Never | Det _ -> invalid_arg "fut already set"
+
+    let create m = let f = { state = Undet (undet ()); m } in f, set f
+    let ret m v = { state = Det v; m }
+    let state f = f.state
+    let value f = match f.state with Det v -> Some v | _ -> None
+    let await f k = match f.state with
+    | Det v -> Rqueue.add f.m.m.kready (fun () -> k v)
+    | Undet u -> u.awaits_det <- k :: u.awaits_det
+    | Never -> ()
+
+    let await_set f k = match f.state with
+    | Det v -> Rqueue.add f.m.m.kready (fun () -> k (Some v))
+    | Undet u -> u.awaits_set <- k :: u.awaits_set
+    | Never -> ()
+
+    let of_fiber m k =
+      let f, set = create m in
+      let run () = try k (fun v -> set (Some v)) with e -> set None; raise e in
+      Rqueue.add f.m.m.kready run; f
+  end
 
   (* Notifications *)
 
@@ -488,16 +474,6 @@ module Memo = struct
             tool.tool_file cmd.cmd_args
         in
         add_op_and_stir m o
-
-  module Fut = struct
-    type memo = t
-    type 'a t = 'a Futs.fut
-    type 'a set = 'a Futs.fut_set
-    let create m = Futs.fut m.m.futs
-    let value = Futs.fut_value
-    let set = Futs.fut_set
-    let wait = Futs.fut_wait
-  end
 end
 
 (*---------------------------------------------------------------------------

@@ -176,15 +176,14 @@ module Memo : sig
   val memo :
     ?hash_fun:(module Hash.T) -> ?env:Os.Env.t -> ?cwd:Fpath.t ->
     ?cache_dir:Fpath.t -> ?trash_dir:Fpath.t -> ?jobs:int ->
-    ?feedback:([feedback | B000.File_cache.feedback |
-                B000.Exec.feedback] -> unit) ->
-    unit -> (t, string) result
+    ?feedback:([feedback | B000.File_cache.feedback | B000.Exec.feedback] ->
+               unit) -> unit -> (t, string) result
   (** [memo] is a simpler {!create}
       {ul
-      {- [hash_fun] defaults to {!Op_cache.create}'s default.}
-      {- [jobs] defaults to {!Exec.create}'s default.}
-      {- [env] defaults to {!Os.Env.current}}
-      {- [cwd] defaults to {!Os.Dir.cwd}}
+      {- [hash_fun] defaults to {!B000.Op_cache.create}'s default.}
+      {- [jobs] defaults to {!B00.Exec.create}'s default.}
+      {- [env] defaults to {!B0_std.Os.Env.current}}
+      {- [cwd] defaults to {!B0_std.Os.Dir.cwd}}
       {- [cache_dir] defaults to [Fpath.(cwd / "_b0" / ".cache")]}
       {- [trash_dir] defaults to [Fpath.(cwd / "_b0" / ".trash")]}
       {- [feedback] defaults formats feedback on stdout.}} *)
@@ -211,7 +210,9 @@ module Memo : sig
   (** [trash m] is [m]'s trash. *)
 
   val finished : t -> bool
-  (** [finished m] is [true] if [m] has been {!finish}ed. *)
+  (** [finished m] is [true] if [m] has been {!finish}ed. {b FIXME} do
+      we care ? We can currently call finish more than once and maybe
+      that's not a bad thing. *)
 
   val hash_string : t -> string -> Hash.t
   (** [hash_string m s] is {!B000.Reviver.hash_string}[ (reviver m) s]. *)
@@ -232,7 +233,7 @@ module Memo : sig
   (** The type for memo finish errors.  *)
 
   val finish : t -> (unit, finish_error) result
-  (** [finish m] the memoizer and deletes the trash.
+  (** [finish m] the memoizer {b FIXME not true} and deletes the trash.
       This starts by blocking until there are no operations
       to execute. After this:
       {ul
@@ -252,6 +253,83 @@ module Memo : sig
   (** [ops m] is the list of operations that were submitted to the
       memoizer *)
 
+  (** {1:fibers Futures and fibers} *)
+
+  type 'a fiber = ('a -> unit) -> unit
+  (** The type for memoizer fibers returning values of type ['a]. A
+      fiber [f k] represent a thread of execution that eventually
+      kontinues [k] with its result value when it reaches an end. *)
+
+  val spawn_fiber : t -> unit fiber
+  (** [run m k] calls [k ()] asynchronously and handles any fiber
+      {!fail}ure. This also catches non-asynchronous uncaught
+      exceptions and turns them into [`Fail] notification
+      operations. *)
+
+  val fail : t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
+  (** [fail m fmt ...] fails the fiber via a {!notify} operation. *)
+
+  val fail_if_error : t -> ('a, string) result -> 'a
+  (** [fail_if_error m r] is [v] if [r] is [Ok v] and [fail m "%s" e] if
+      [r] is [Error _]. *)
+
+  (** Future values.
+
+      A future is an undetermined value that becomes determined
+      at an an arbitrary point in the future. The future acts as
+      a placeholder for the value while it is undetermined. *)
+  module Fut : sig
+
+    (** {1:fut Future values} *)
+
+    type memo = t
+    (** See {!Memo.t} *)
+
+    type 'a undet
+    (** The type for undetermined future information. Forget about this,
+        it cannot be acted upon. *)
+
+    type 'a state =
+    | Det of 'a (** The future is determined with the given value. *)
+    | Undet of 'a undet (** The future is undetermined. *)
+    | Never (** The future will never determine. *)
+    (** The type for future state. When the state is [Det _] or [Never] we
+        say the future is {e set}. *)
+
+    type 'a t
+    (** The type for futures with values of type ['a]. *)
+
+    val create : memo -> 'a t * ('a option -> unit)
+    (** [create m] is [(f, set)] with [f] the future value and
+        [set] the function to [set] it. The latter can be called only
+        once, [Invalid_argument] is raised otherwise. If called with
+        [None] the future value becomes [Never]. *)
+
+    val ret : memo -> 'a -> 'a t
+    (** [ret m v] is [v] as a determined future value. *)
+
+    val state : 'a t -> 'a state
+    (** [state f] is the state of [f]'s. *)
+
+    val value : 'a t -> 'a option
+    (** [value f] is [f]'s value, if any. *)
+
+    val await : 'a t -> 'a fiber
+    (** [await f k] waits for [f] to be determined and continues with [k v]
+        with [v] the value of the future. If the future never determines
+        [k] is not invoked. Use {!await_set} to witness never determining
+        futures. *)
+
+    val await_set : 'a t -> 'a option fiber
+    (** [await_set f k] waits for [f] to be set and continues with
+        [k None] if [state f] is [Never] and [k (Some v)] if
+        [state f] is [Det v]. *)
+
+    val of_fiber : memo -> 'a fiber -> 'a t
+    (** [of_fiber m f] runs fiber [f] and sets the resulting future when it
+        returns. If [f] raises then the future is set to [Never]. *)
+  end
+
   (** {1:group Operation groups} *)
 
   val group : t -> string
@@ -267,24 +345,7 @@ module Memo : sig
     ('a, Format.formatter, unit, unit) format4 -> 'a
   (** [notify m kind msg] is a notification [msg] of kind [kind]. Note that
       a [`Fail] notification will entail a {!finish_error}, see also {!fail}
-      and {!fail_error}. *)
-
-  (** {1:fibers Fibers} *)
-
-  type 'a fiber = ('a -> unit) -> unit
-  (** The type for memoizer operation fibers. *)
-
-  val run_fiber : t -> unit fiber
-  (** [run m k] calls [k ()] and handles any fiber {!fail}ure. This
-      also catches non-asynchronous uncaught exceptions and turns them
-      into [`Fail] notification operations. *)
-
-  val fail : t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
-  (** [fail m fmt ...] fails the fiber via a {!notify} operation. *)
-
-  val fail_if_error : t -> ('a, string) result -> 'a
-  (** [fail_if_error m r] is [v] if [r] is [Ok v] and [fail m "%s" e] if
-      [r] is [Error _]. *)
+      and {!fail_if_error}. *)
 
   (** {1:files Files and directories} *)
 
@@ -395,41 +456,6 @@ module Memo : sig
       (e.g. a source file) it should be specified as the first element
       of [reads], this is interpreted specially by certain build
       tracer. *)
-
-  (** {1:futs Future values} *)
-
-  (** Future values. *)
-  module Fut : sig
-
-    (** {1:fut Future value setters} *)
-
-    type 'a set
-    (** The type for setting a future value of type ['a]. *)
-
-    val set : 'a set -> 'a -> unit
-    (** [set s v] sets the future value linked to [s] to the value [v].
-        @raise Invalid_argument if the value was already set. *)
-
-    (** {1:fut Future values} *)
-
-    type memo = t
-    (** See {!Memo.t} *)
-
-    type 'a t
-    (** The type for future values of type ['a]. *)
-
-    val create : memo -> 'a t * 'a set
-    (** [create memo] is [(f, s)] a future value [f] and a setter [s]
-        for it. Fibers waiting on the future are scheduled by
-        {!stir}ing [memo]. *)
-
-    val value : 'a t -> 'a option
-    (** [value f] is [f]'s value if set. *)
-
-    val wait : 'a t -> 'a fiber
-    (** [wait f k] waits for [f] to be set and continues with [k v]
-        with [v] the value of the future. *)
-  end
 end
 
 (*---------------------------------------------------------------------------
