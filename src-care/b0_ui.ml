@@ -800,7 +800,7 @@ module Pager = struct
                 (Result.map (fun st -> ()) (Os.Cmd.spawn_wait_status pid)
                  |> Log.if_error ~use:())
               in
-              Pervasives.at_exit on_exit;
+              at_exit on_exit;
               Ok ()
 
   let page_files pager files = match pager with

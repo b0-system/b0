@@ -628,7 +628,7 @@ module Op = struct
           o.status <- Failed (Exec (Some err))
 
   let equal o0 o1 = o0.id = o1.id
-  let compare o0 o1 = (Pervasives.compare : int -> int -> int) o0.id o1.id
+  let compare o0 o1 = (compare : int -> int -> int) o0.id o1.id
   let set_time_started o t = o.time_started <- t
   let set_time_ended o t = o.duration <- Time.Span.abs_diff t o.time_started
   let set_revived o b = o.revived <- b

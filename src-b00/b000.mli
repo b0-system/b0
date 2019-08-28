@@ -627,7 +627,7 @@ module Op : sig
   (** [equal o0 o1] is [id o0 = id o1]. *)
 
   val compare : t -> t -> int
-  (** [compare o0 o1] is [Pervasives.compare (id o0) (id o1)]. *)
+  (** [compare o0 o1] is [compare (id o0) (id o1)]. *)
 
   val id : t -> id
   (** [id o] is the identifier of operation [o]. *)

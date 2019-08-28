@@ -13,6 +13,10 @@
 
 (** {1:std Std} *)
 
+(**/**)
+module Stdlib_set = Set
+(**/**)
+
 (** {{:http://www.ecma-international.org/publications/standards/Ecma-048.htm}
       ANSI terminal} interaction. *)
 module Tty : sig
@@ -1036,7 +1040,7 @@ module String : sig
         [v :: find k m] if [k] was bound in [m] and [[v]] otherwise. *)
 
     val add_to_set :
-      (module Stdlib.Set.S with type elt = 'a and type t = 'set) ->
+      (module Stdlib_set.S with type elt = 'a and type t = 'set) ->
       string -> 'a -> 'set t -> 'set t
     (** [add (module S) k v m] is [m] with [k] mapping to [s] such that [s] is
         [S.add v (find k m)] if [k] was bound in [m] and [S.singleton [v]]
@@ -1099,7 +1103,7 @@ module List : sig
   (** [classify ~cmp_elts ~cmp_classes ~classes els] bins elements [els]
       into classes as determined by [classes]. [cmp_elts] is used to
       compare elements and [cmp_classes] to compare classes, both
-      default to {!Pervasives.compare}. *)
+      default to {!compare}. *)
 end
 
 (** File paths.
@@ -1436,7 +1440,7 @@ module Fpath : sig
         [v :: find k m] if [k] was bound in [m] and [[v]] otherwise. *)
 
     val add_to_set :
-      (module Stdlib.Set.S with type elt = 'a and type t = 'set) ->
+      (module Stdlib_set.S with type elt = 'a and type t = 'set) ->
       path -> 'a -> 'set t -> 'set t
     (** [add (module S) k v m] is [m] with [k] mapping to [s] such that [s] is
         [S.add v (find k m)] if [k] was bound in [m] and [S.singleton [v]]
@@ -2140,8 +2144,7 @@ module Os : sig
 
     val write_with_fd :
       ?atomic:bool -> ?mode:int -> force:bool -> make_path:bool -> Fpath.t ->
-      (Unix.file_descr -> ('a, 'b) Pervasives.result) ->
-      (('a, 'b) Pervasives.result, string) result
+      (Unix.file_descr -> ('a, 'b) result) -> (('a, 'b) result, string) result
     (** [write_with_fd ~atomic ~mode ~force ~make_path file f] opens
         an output file descriptor [fdo] to write to [file] and returns
         [Ok (f fdo)].  If [file] is {!dash}, [fdo] is
@@ -2172,8 +2175,7 @@ module Os : sig
 
     val write_with_oc :
       ?atomic:bool -> ?mode:int -> force:bool -> make_path:bool -> Fpath.t ->
-      (out_channel -> ('a, 'b) Pervasives.result) ->
-      (('a, 'b) Pervasives.result, string) result
+      (out_channel -> ('a, 'b) result) -> (('a, 'b) result, string) result
     (** [write_with_oc ~atomic ~mode ~force ~make_path file f] operates like
         {!write_with_fd} but opens an OCaml channel. *)
 
@@ -2793,7 +2795,7 @@ module Log : sig
   val level_to_string : level -> string
   (** [level_to_string l] converts [l] to a string representation. *)
 
-  val level_of_string : string -> (level, string) Pervasives.result
+  val level_of_string : string -> (level, string) result
   (** [level_of_string s] parses a level from [s] according to the
       representation of {!level_to_string}. *)
 
@@ -2838,8 +2840,7 @@ module Log : sig
   (** {2:result Logging [result] value [Error] messages} *)
 
   val if_error :
-    ?level:level -> ?header:string -> use:'a ->
-    ('a, string) Pervasives.result -> 'a
+    ?level:level -> ?header:string -> use:'a -> ('a, string) result -> 'a
   (** [if_error ~level ~use v r] is:
       {ul
       {- [v], if [r] is [Ok v]}
@@ -2847,12 +2848,12 @@ module Log : sig
          [r] is [Error e].}} *)
 
   val warn_if_error :
-    ?header:string -> use:'a -> ('a, string) Pervasives.result -> 'a
+    ?header:string -> use:'a -> ('a, string) result -> 'a
   (** [warn_if_error] is [if_error ~level:Warning]. *)
 
   val if_error_pp :
-    ?level:level -> ?header:string -> 'b Fmt.t -> use:'a ->
-    ('a, 'b) Pervasives.result -> 'a
+    ?level:level -> ?header:string -> 'b Fmt.t -> use:'a -> ('a, 'b) result ->
+    'a
   (** [if_error_pp ~level pp ~use r] is
       {ul
       {- [v], if [r] is [Ok v].}

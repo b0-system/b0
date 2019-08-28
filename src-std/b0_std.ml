@@ -4,6 +4,8 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
+module Stdlib_set = Set
+
 (* ANSI terminal interaction *)
 
 module Tty = struct
@@ -1178,7 +1180,7 @@ module String = struct
 
     let add_to_set
         (type set) (type elt)
-        (module S : Stdlib.Set.S with type elt = elt and type t = set)
+        (module S : Stdlib_set.S with type elt = elt and type t = set)
         k v m = match find k m with
     | exception Not_found -> add k (S.singleton v) m
     | set -> add k (S.add v set) m
@@ -1278,8 +1280,8 @@ module List = struct
 
   let classify
       (type a) (type b)
-      ?(cmp_elts : a -> a -> int = Pervasives.compare)
-      ?(cmp_classes : b -> b -> int = Pervasives.compare)
+      ?(cmp_elts : a -> a -> int = compare)
+      ?(cmp_classes : b -> b -> int = compare)
       ~classes:(classes : (a -> b list)) els
     =
     let module S = Set.Make (struct type t = a let compare = cmp_elts end) in
@@ -2136,7 +2138,7 @@ module Cmd = struct
                 loop acc (tail rem)
             | Some ('\n') -> loop (data :: acc) (tail rem)
             | Some c ->
-                let acc = Pervasives.(^) data (Fmt.str "\\%c" c) :: acc in
+                let acc = (data ^ (Fmt.str "\\%c" c)) :: acc in
                 loop acc (tail rem)
             | None ->
                 err_unclosed "double" s
