@@ -27,6 +27,7 @@ Tools for software construction care.
 
 {!modules:
 B0_cmark
+B0_fexts
 B0_findex
 B0_github
 B0_htmlg
