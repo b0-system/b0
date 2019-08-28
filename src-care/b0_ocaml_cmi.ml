@@ -6,33 +6,27 @@
 
 open B0_std
 
-(* FIXME remove path computation in the end. *)
+let add_mod_names i names =
+  let rec loop names = function
+  | [] -> names
+  | [] :: todo -> loop names todo
+  | (i :: is) :: todo ->
+      match i with
+      | Types.Sig_module (i, d, _) ->
+          let names = String.Set.add (Ident.name i) names in
+          begin match d.Types.md_type with
+          | Types.Mty_signature is' -> loop names (is' :: is :: todo)
+          | _ -> loop names (is :: todo)
+          end
+      | _ -> loop names (is :: todo)
+  in
+  loop names [i.Cmi_format.cmi_sign]
 
 let read f =
   try
     let i = Cmi_format.read_cmi (Fpath.to_string f) in
-    let rec loop names ps p = function
-    | [] -> names, List.rev ps
-    | [] :: todo -> loop names ps (List.tl p) todo
-    | (i :: is) :: todo ->
-        match i with
-        | Types.Sig_module (i, d, _) ->
-            let id = Ident.name i in
-            let names = String.Set.add id names in
-            let p' = id :: p in
-            let ps = List.rev p' :: ps in
-            begin match d.Types.md_type with
-            | Types.Mty_signature is' ->
-                loop names ps p' (is' :: is :: todo)
-            | _ -> loop names ps p (is :: todo)
-            end
-        | _ -> loop names ps p (is :: todo)
-    in
     let name = i.Cmi_format.cmi_name in
-    let p = [name] in
-    let is = [i.Cmi_format.cmi_sign] in
-    let mod_names, _mod_paths = loop (String.Set.singleton name) [p] p is in
-    let name = i.Cmi_format.cmi_name in
+    let mod_names = add_mod_names i (String.Set.singleton name) in
     let digest, deps =
       let rec loop d deps = function
       | (n, Some d) :: crcs when String.equal n name -> loop d deps crcs
