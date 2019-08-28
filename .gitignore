@@ -7,3 +7,4 @@ tmp
 \.\#*
 \#*#
 *.install
+src-care/b0_ocaml_cmi.ml

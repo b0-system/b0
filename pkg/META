@@ -25,7 +25,7 @@ package "b00" (
 package "care" (
   description = "B0's system library"
   version = "%%VERSION_NUM%%"
-  requires = "unix cmdliner b0.std b0.b00"
+  requires = "unix cmdliner b0.std b0.b00 compiler-libs.common"
   archive(byte) = "b0_care.cma"
   archive(native) = "b0_care.cmxa"
   plugin(byte) = "b0_care.cma"

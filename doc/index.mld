@@ -35,6 +35,7 @@ B0_http
 B0_json
 B0_lines
 B0_machine
+B0_ocaml_cmi
 B0_odoc
 B0_sexp
 B0_tlex
