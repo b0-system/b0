@@ -214,11 +214,11 @@ module Memo : sig
       The formatter [op_howto] should format a way to got more information
       about an operation, default to {!nop}. *)
 
-  val pp_finish_error :
+  val pp_error :
     ?sep:unit Fmt.t -> ?read_howto:Fpath.t Fmt.t ->
-    ?write_howto:Fpath.t Fmt.t -> unit ->  B00.Memo.finish_error Fmt.t
-  (** [pp_finish_error ~read_howto ~write_howto] formats a memo
-      finish error followed by [sep] iff somethings is printed (defaults
+    ?write_howto:Fpath.t Fmt.t -> unit ->  B00.Memo.error Fmt.t
+  (** [pp_error ~read_howto ~write_howto] formats a memo
+      error followed by [sep] iff somethings is printed (defaults
       to {!Fmt.flush_nl}). The errors are formatted as follows:
       {ul
       {- {!B00.Memo.Failures} formats {!Fmt.nop}.}

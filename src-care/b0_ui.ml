@@ -469,7 +469,7 @@ module Memo = struct
     in
     Fmt.pf ppf "@[<v>[%a] %a@]" pp_failed () pp_ops os
 
-  let pp_finish_error ?(sep = Fmt.flush_nl) ?read_howto ?write_howto () ppf =
+  let pp_error ?(sep = Fmt.flush_nl) ?read_howto ?write_howto () ppf =
     function
     | B00.Memo.Failures -> ()
     | B00.Memo.Cycle ops -> pp_ops_cycle ?write_howto ppf ops; sep ppf ()

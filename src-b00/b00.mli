@@ -209,10 +209,9 @@ module Memo : sig
   val trash : t -> B000.Trash.t
   (** [trash m] is [m]'s trash. *)
 
-  val finished : t -> bool
-  (** [finished m] is [true] if [m] has been {!finish}ed. {b FIXME} do
-      we care ? We can currently call finish more than once and maybe
-      that's not a bad thing. *)
+  val has_failures : t -> bool
+  (** [has_failures m] is [true] iff at least one operation (or fiber)
+      has failed. *)
 
   val hash_string : t -> string -> Hash.t
   (** [hash_string m s] is {!B000.Reviver.hash_string}[ (reviver m) s]. *)
@@ -223,28 +222,33 @@ module Memo : sig
 
   val stir : block:bool -> t -> unit
   (** [stir ~block m] runs the memoizer a bit. If [block] is [true]
-      blocks until the memoizer is stuck with no operation to
-      perform. *)
+      blocks until the memoizer is stuck with no operation and fibers to
+      execute. *)
 
-  type finish_error =
+  type error =
   | Failures (** Some operations failed. *)
   | Cycle of B000.Op.t list (** Cyclic dependency. *)
   | Never_became_ready of Fpath.Set.t (** Some files never became ready. *)
   (** The type for memo finish errors.  *)
 
-  val finish : t -> (unit, finish_error) result
-  (** [finish m] the memoizer {b FIXME not true} and deletes the trash.
-      This starts by blocking until there are no operations
-      to execute. After this:
+  val status : t -> (unit, error) result
+  (** [status m] looks [ops m] and returns:
       {ul
-      {- If all operations {!B000.Op.Executed} this returns [Ok ()]}
-      {- If some operations failed [Error Failures] is returned.}
-      {- If no operation failed but some are {!B000.Op.Waiting}
-         it aborts them and returns either [Error (Never_became_ready fs)]
-         with [fs] files that never became ready and where not supposed
-         to be written by the waiting operations or if a cycle is
-         detected returns [Error (Cycle ops)] with the operations that
-         form a cycle.}} *)
+      {- [Ok ()], if all operations in [m] {!B000.Op.Executed}.}
+      {- [Error Failures], if there exists an operation that {!B000.Op.Failed}
+         (and hence also if a fiber failed, see {{!fiber}here}).}
+      {- [Error (Cycle ops)], if there is a set of {!B000.Op.Waiting}
+         operations whose individual reads and writes leads to a dependency
+         cycle.}
+      {- [Error (Never_became_ready fs)], with [fs] files that are in
+         the reads of {!B000.Op.Waiting} operations but are written
+         by no known operation.}}
+
+      Usually called after a blocking {!stir} to check everything
+      executed as expected. The function itself has no effect more and
+      can be added on [m] afterwards. If you are only interested in
+      checking if a failure occured in the memo {!has_failures} is
+      faster. *)
 
   val delete_trash : block:bool -> t -> (unit, string) result
   (** [delete_trash ~block m] is {!B000.Trash.delete}[ ~block (trash m)]. *)
@@ -258,7 +262,14 @@ module Memo : sig
   type 'a fiber = ('a -> unit) -> unit
   (** The type for memoizer fibers returning values of type ['a]. A
       fiber [f k] represent a thread of execution that eventually
-      kontinues [k] with its result value when it reaches an end. *)
+      kontinues [k] with its result value when it reaches an end.
+
+      Fibers should always be run on a Memo via {!spawn_fiber} or as
+      the continuation of a build operation. A fiber can fail either
+      explictly via {!fail} or because an uncaught exception
+      occurs. In both these cases a [`Fail] {!notify} operation gets
+      added to the memo to witness the fiber failure.  The status of
+      this operation is like any [Fail] notify: {!B000.Op.Failed}. *)
 
   val spawn_fiber : t -> unit fiber
   (** [run m k] calls [k ()] asynchronously and handles any fiber

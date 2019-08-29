@@ -98,19 +98,19 @@ module Memo = struct
       guard : Guard.t;
       reviver : Reviver.t;
       exec : Exec.t;
-      kready : (unit -> unit) Rqueue.t;
-      mutable finished : bool;
+      fiber_ready : (unit -> unit) Rqueue.t;
+      mutable has_failures : bool;
       mutable op_id : int;
       mutable ops : Op.t list; }
 
   let create ?clock ?cpu_clock:cc ~feedback ~cwd env guard reviver exec =
     let clock = match clock with None -> Time.counter () | Some c -> c in
     let cpu_clock = match cc with None -> Time.cpu_counter () | Some c -> c in
-    let kready = Rqueue.empty () and op_id = 0 and  ops = [] in
+    let fiber_ready = Rqueue.empty () and op_id = 0 and  ops = [] in
     let c = { group = "" } in
     let m =
-      { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec; kready;
-        finished = false; op_id; ops; }
+      { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec; fiber_ready;
+        has_failures = false; op_id; ops; }
     in
     { c; m }
 
@@ -156,7 +156,7 @@ module Memo = struct
   let new_op_id m = let id = m.m.op_id in m.m.op_id <- id + 1; id
   let group m = m.c.group
   let with_group m group = { c = { group }; m = m.m }
-  let finished m = m.m.finished
+  let has_failures m = m.m.has_failures
   let add_op m o = m.m.ops <- o :: m.m.ops; Guard.add m.m.guard o
 
   (* Fibers *)
@@ -189,8 +189,8 @@ module Memo = struct
       in
       notify_op m `Fail err
 
-  let spawn_fiber m k = Rqueue.add m.m.kready (fun () -> k ())
-  let continue_ready m k =
+  let spawn_fiber m k = Rqueue.add m.m.fiber_ready (fun () -> k ())
+  let continue_fiber m k =
     let pp_kind ppf () = Fmt.string ppf "Fiber" in
     invoke_k m ~pp_kind k ()
 
@@ -201,6 +201,10 @@ module Memo = struct
     invoke_k m ~pp_kind Op.invoke_k o
 
   let discontinue_op m o =
+    (* This is may not be entirely clear from the code :-( but any failed op
+       or fiber means this function eventually gets called, hereby giving
+       [has_failure] its appropriate semantics. *)
+    m.m.has_failures <- true;
     List.iter (Guard.set_file_never m.m.guard) (Op.writes o);
     Op.discard_k o; m.m.feedback (`Op_complete o)
 
@@ -265,48 +269,46 @@ module Memo = struct
       match Exec.collect m.m.exec ~block with
       | Some o -> finish_op m o; stir ~block m
       | None ->
-          match Rqueue.take m.m.kready with
-          | Some k -> continue_ready m k; stir ~block m
+          match Rqueue.take m.m.fiber_ready with
+          | Some k -> continue_fiber m k; stir ~block m
           | None -> ()
 
   let add_op_and_stir m o = add_op m o; stir ~block:false m
 
-  (* Finishing the memo *)
+  (* Memo status
 
-  type finish_error =
+     XXX Formally the analysis depends only on an list of ops
+     maybe we could move this to B000.Op. *)
+
+  type error =
   | Failures
   | Cycle of B000.Op.t list
   | Never_became_ready of Fpath.Set.t
-  (* The type [finish_error] reports memo finish error conditions.
-     Formally more than one of these condition may be true at the same
-     time. It is however important not to try to detect and report
+  (* More than one of these condition may be true at the same time. It
+     is however important not to try to detect and report
      [Never_became_ready] when [Failures] happens as those files that
      never became ready may be created by continuations of the
      failures and that would not lead the user to focus on the right
-     thing. It's also better to report [Cycle]s before for this reason. *)
+     thing. It's also better to report [Cycle]s before for this
+     reason. *)
 
-  let find_finish_condition os =
+  let ops_status os =
     let rec loop ws = function
-    | [] -> if ws <> [] then Error (`Waiting ws) else (Ok ())
+    | [] ->
+        if ws = [] then Ok () else
+        begin match Op.find_read_write_cycle ws with
+        | Some os -> Error (Cycle ws)
+        | None -> Error (Never_became_ready (Op.unwritten_reads ws))
+        end
     | o :: os ->
         match Op.status o with
         | Op.Executed -> loop ws os
         | Op.Waiting -> loop (o :: ws) os
-        | Op.Aborted | Op.Failed _ -> Error (`Failures)
+        | Op.Aborted | Op.Failed _ -> Error Failures
     in
     loop [] os
 
-  let finish m =
-    stir ~block:true m;
-    m.m.finished <- true;
-    (* Any Waiting operation is guaranteed to be guarded at that point. *)
-    match find_finish_condition m.m.ops with
-    | Ok _ as v  -> assert (Rqueue.take m.m.kready = None); v
-    | Error `Failures -> Error Failures
-    | Error (`Waiting ws) ->
-        match Op.find_read_write_cycle ws with
-        | Some os -> Error (Cycle ws)
-        | None -> Error (Never_became_ready (Op.unwritten_reads ws))
+  let status m = ops_status m.m.ops
 
   (* Futures *)
 
@@ -325,12 +327,12 @@ module Memo = struct
         begin match v with
         | None ->
             f.state <- Never;
-            let add_set k = Rqueue.add f.m.m.kready (fun () -> k None) in
+            let add_set k = Rqueue.add f.m.m.fiber_ready (fun () -> k None) in
             List.iter add_set u.awaits_set
         | Some v as set ->
             f.state <- Det v;
-            let add_det k = Rqueue.add f.m.m.kready (fun () -> k v) in
-            let add_set k = Rqueue.add f.m.m.kready (fun () -> k set) in
+            let add_det k = Rqueue.add f.m.m.fiber_ready (fun () -> k v) in
+            let add_set k = Rqueue.add f.m.m.fiber_ready (fun () -> k set) in
             List.iter add_det u.awaits_det;
             List.iter add_set u.awaits_set;
         end
@@ -341,19 +343,19 @@ module Memo = struct
     let state f = f.state
     let value f = match f.state with Det v -> Some v | _ -> None
     let await f k = match f.state with
-    | Det v -> Rqueue.add f.m.m.kready (fun () -> k v)
+    | Det v -> Rqueue.add f.m.m.fiber_ready (fun () -> k v)
     | Undet u -> u.awaits_det <- k :: u.awaits_det
     | Never -> ()
 
     let await_set f k = match f.state with
-    | Det v -> Rqueue.add f.m.m.kready (fun () -> k (Some v))
+    | Det v -> Rqueue.add f.m.m.fiber_ready (fun () -> k (Some v))
     | Undet u -> u.awaits_set <- k :: u.awaits_set
     | Never -> ()
 
     let of_fiber m k =
       let f, set = create m in
       let run () = try k (fun v -> set (Some v)) with e -> set None; raise e in
-      Rqueue.add f.m.m.kready run; f
+      Rqueue.add f.m.m.fiber_ready run; f
   end
 
   (* Notifications *)

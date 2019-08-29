@@ -824,7 +824,6 @@ module Op = struct
     in
     loop Fpath.Set.empty Fpath.Set.empty os
 
-
   let _write_map ~check_single os =
     let add_write o acc w = match Fpath.Map.find w acc with
     | exception Not_found -> Fpath.Map.add w (Set.singleton o) acc
@@ -1314,6 +1313,7 @@ module Exec = struct
   | Ok data ->
       let mode = Op.Write.mode w in
       Os.File.write ~force:true ~make_path:true ~mode (Op.Write.file w) data
+
   (* Scheduling
 
      As it stands this implementation does all the file operations
@@ -1348,7 +1348,7 @@ module Exec = struct
     match e.spawn_count = 0 with
     | true -> ()
     | false ->
-        (* We don't (and can't through B0_std.OS.Cmd API constraints)
+        (* We don't (and can't through B0_std.Os.Cmd API constraints)
            collect with -1 or 0 because library-wise we might collect
            things we did not spawn. On Windows there wouldn't be the
            choice anyways. This means that on a blocking collection
