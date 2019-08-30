@@ -550,7 +550,7 @@ module Op = struct
   | Write of write
 
   let kind_name = function
-  | Copy _ -> "copy" | Delete _ -> "delete" | Notify _ -> "note"
+  | Copy _ -> "copy" | Delete _ -> "delete" | Notify _ -> "notify"
   | Mkdir _ -> "mkdir" | Read _ -> "read" | Spawn _ -> "spawn"
   | Wait_files _ -> "wait" | Write _ -> "write"
 

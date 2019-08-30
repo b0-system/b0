@@ -200,7 +200,7 @@ end
 module Op = struct
   open B000
 
-  (* XXX cleanup *)
+  (* Selecting *)
 
   let is_selected ~reads ~writes ~ids ~hashes ~groups =
     let all =
@@ -227,18 +227,6 @@ module Op = struct
       List.exists mem_reads (Op.reads o) ||
       List.exists mem_writes (Op.writes o) ||
       mem_group (Op.group o)
-
-  let order ~by ops =
-    let order_by_field cmp f o0 o1 = cmp (f o0) (f o1) in
-    let order = match by with
-    | `Create -> order_by_field Time.Span.compare Op.time_created
-    | `Start -> order_by_field Time.Span.compare Op.time_started
-    | `Wait -> order_by_field Time.Span.compare Op.waited
-    | `Dur ->
-        let rev_compare t0 t1 = Time.Span.compare t1 t0 in
-        order_by_field rev_compare Op.duration
-    in
-    List.sort order ops
 
   let read_write_indexes ops =
     let rec loop reads writes = function
@@ -280,23 +268,50 @@ module Op = struct
   let find_enables ?acc ~recursive ~reads ops =
     find_deps ?acc ~recursive reads Op.writes ops
 
-  let filter ~revived ~status =
+  (* Filtering *)
+
+  let op_kind_enum o = match Op.kind o with
+  | Op.Copy _ -> `Copy | Op.Delete _ -> `Delete | Op.Notify _ -> `Notify
+  | Op.Mkdir _ -> `Mkdir | Op.Read _ -> `Read | Op.Spawn _ -> `Spawn
+  | Op.Wait_files _ -> `Wait_files | Op.Write _ -> `Write
+
+  let op_status_enum o = match Op.status o with
+  | Op.Aborted -> `Aborted | Op.Done -> `Done | Op.Failed _ -> `Failed
+  | Op.Waiting -> `Waiting
+
+  let filter ~revived ~statuses ~kinds =
     let revived_filter = match revived with
     | None -> fun _ -> true | Some revived -> fun o -> Op.revived o = revived
     in
-    let status_filter = match status with
-    | None -> fun _ -> true
-    | Some `Aborted -> fun o -> Op.status o = Op.Aborted
-    | Some `Done -> fun o -> Op.status o = Op.Done
-    | Some `Failed ->
-        fun o -> (match Op.status o with Failed _ -> true | _ -> false)
-    | Some `Waiting -> fun o -> Op.status o = Op.Waiting
+    let status_filter = match statuses with
+    | [] -> fun _ -> true
+    | statuses -> fun o -> List.mem (op_status_enum o) statuses
     in
-    fun o -> revived_filter o && status_filter o
+    let kind_filter = match kinds with
+    | [] -> fun _ -> true
+    | kinds -> fun o -> List.mem (op_kind_enum o) kinds
+    in
+    fun o -> revived_filter o && status_filter o && kind_filter o
+
+  (* Ordering *)
+
+  let order ~by ops =
+    let order_by_field cmp f o0 o1 = cmp (f o0) (f o1) in
+    let order = match by with
+    | `Create -> order_by_field Time.Span.compare Op.time_created
+    | `Start -> order_by_field Time.Span.compare Op.time_started
+    | `Wait -> order_by_field Time.Span.compare Op.waited
+    | `Dur ->
+        let rev_compare t0 t1 = Time.Span.compare t1 t0 in
+        order_by_field rev_compare Op.duration
+    in
+    List.sort order ops
+
+  (* Combine selection, filtering and ordering *)
 
   let select
       ~reads ~writes ~ids ~hashes ~groups ~needs ~enables ~recursive
-      ~revived ~status ~order_by ops
+      ~revived ~statuses ~kinds ~order_by ops
     =
     let is_selected = is_selected ~reads ~writes ~ids ~hashes ~groups in
     let sel = List.filter is_selected ops in
@@ -311,11 +326,11 @@ module Op = struct
         if enables then find_enables ~recursive ~reads ~acc sel else acc
     in
     let sel = Op.Set.elements sel in
-    let filter = filter ~revived ~status in
+    let filter = filter ~revived ~statuses ~kinds in
     let sel = List.filter filter sel in
     order ~by:order_by sel
 
-  let select_cli =
+  let select_cli ?docs () =
     let open Cmdliner in
     let order_by =
       let order =
@@ -325,91 +340,125 @@ module Op = struct
         Fmt.str "Order by $(docv). $(docv) must be %s time."
           (Arg.doc_alts_enum order)
       in
-      let order = Arg.enum order in
-      Arg.(value & opt order `Start & info ["order-by"] ~doc ~docv:"ORDER")
+      let order = Arg.enum order and docv = "ORDER" in
+      Arg.(value & opt order `Start & info ["order-by"] ~doc ?docs ~docv)
     in
     let reads =
       let doc = "Select operations that read file $(docv). Repeatable." in
       Arg.(value & opt_all Cli.Arg.fpath [] &
-           info ["r"; "read"] ~doc ~docv:"FILE")
+           info ["r"; "read"] ~doc ?docs ~docv:"FILE")
     in
     let writes =
       let doc = "Select operations that wrote file $(docv). Repeatable." in
       Arg.(value & opt_all Cli.Arg.fpath [] &
-           info ["w"; "write"] ~doc ~docv:"FILE")
+           info ["w"; "write"] ~doc ?docs ~docv:"FILE")
     in
     let ids =
       let doc = "Select operation with identifier $(docv). Repeatable." in
-      Arg.(value & opt_all int [] & info ["i"; "id"] ~doc ~docv:"ID")
+      Arg.(value & opt_all int [] & info ["o"; "id"] ~doc ?docs ~docv:"ID")
     in
     let hashes =
-      (* Could be properly parsed *)
+      (* XXX Could be properly parsed *)
       let doc = "Select operation with hash $(docv). Repeatable." in
-      Arg.(value & opt_all string [] & info ["hash"] ~doc ~docv:"HASH")
+      Arg.(value & opt_all string [] & info ["hash"] ~doc ?docs ~docv:"HASH")
     in
     let groups =
       let doc = "Select operations with group $(docv). Repeatable." in
-      Arg.(value & opt_all string [] & info ["g"; "group"] ~doc ~docv:"GROUP")
+      let docv = "GROUP" in
+      Arg.(value & opt_all string [] & info ["g"; "group"] ~doc ?docs ~docv)
     in
     let needs =
       let doc =
         "Once operations have been selected, also add all direct operations \
-         needed by these. Use with option $(b,--rec) to get the recursive \
-         operations."
+         needed by these before filtering. Use with option $(b,--rec) to \
+         get the recursive operations."
       in
-      Arg.(value & flag & info ["needs"] ~doc)
+      Arg.(value & flag & info ["needs"] ~doc ?docs)
     in
     let enables =
       let doc =
         "Once operations have been selected, also add all direct operations \
-         enabled by these. Use with option $(b,--rec) to get the recursive \
-         operations."
+         enabled by these before filtering. Use with option $(b,--rec) to \
+         get the recursive operations."
       in
-      Arg.(value & flag & info ["enables"] ~doc)
+      Arg.(value & flag & info ["enables"] ~doc ?docs)
     in
     let recursive =
-      let doc = "Select recursive needs or enables."  in
-      Arg.(value & flag & info ["rec"] ~doc)
+      let doc = "Make $(b,--needs) or $(b,--enables) recursive." in
+      Arg.(value & flag & info ["rec"] ~doc ?docs)
     in
     let revived =
-      let doc = "Keep only revived or non-revived operations." in
-      Arg.(value & opt ~vopt:(Some true) (some ~none:"any" bool) None &
-           info ["revived"] ~doc ~docv:"BOOL")
+      let revived =
+        let doc = "Keep only revived operations." in
+        Some true, Arg.info ["revived"] ~doc ?docs
+      in
+      let executed =
+        let doc = "Keep only truly executed (non revived) operations." in
+        Some false, Arg.info ["executed"] ~doc ?docs
+      in
+      Arg.(value & vflag None [revived; executed])
     in
-    let status =
-      let aborted =
-        let doc = "Keep only aborted operations." in
-        Some `Aborted, Arg.info ["aborted"] ~doc
+    let statuses =
+      let statuses =
+        let status_enum =
+          [ "aborted", `Aborted; "done", `Done; "failed", `Failed;
+            "waiting", `Waiting ]
+        in
+        let status = Arg.enum status_enum in
+        let statuses = Arg.list status and docv = "STATUS,..." in
+        let doc =
+          Fmt.str "Keep only operations that have their status in $(docv). \
+                   $(i,STATUS) must be %s" (Arg.doc_alts_enum status_enum)
+        in
+        Arg.(value & opt statuses [] & info ["status"] ~doc ?docs ~docv)
       in
-      let done_ =
-        let doc = "Keep only done operations." in
-        Some `Done, Arg.info ["done"] ~doc
+      let errors =
+        let doc = "Keep only failed operations (errors). Equivalent
+                   to add 'failed' to the $(b,--status) option."
+        in
+        Arg.(value & flag & info ["e"; "errors"] ~doc ?docs)
       in
-      let failed =
-        let doc = "Keep only failed operations." in
-        Some `Failed, Arg.info ["e"; "failed"] ~doc
+      let sts statuses errs = if errs then `Failed :: statuses else statuses in
+      Term.(pure sts $ statuses $ errors)
+    in
+    let kinds =
+      let kind_enum =
+        [ "copy", `Copy; "delete", `Delete; "notify", `Notify; "mkdir", `Mkdir;
+          "read", `Read; "spawn", `Spawn; "wait", `Wait_files; "write", `Write ]
       in
-      let waiting =
-        let doc = "Keep only waiting operations." in
-        Some `Waiting, Arg.info ["waiting"] ~doc
+      let kind = Arg.enum kind_enum in
+      let kinds = Arg.list kind in
+      let doc =
+        Fmt.str "Keep only operations that have their kind in $(docv). \
+                 $(i,KIND) must be %s."
+          (Arg.doc_alts_enum kind_enum)
       in
-      Arg.(value & vflag None [aborted; done_; failed; waiting])
+      Arg.(value & opt kinds [] & info ["kind"] ~doc ?docs ~docv:"KIND,...")
     in
     let select
-        reads writes ids hashes groups needs enables recursive revived status
-        order_by =
+        reads writes ids hashes groups needs enables recursive revived statuses
+        kinds order_by =
       select ~reads ~writes ~ids ~hashes ~groups ~needs ~enables ~recursive
-        ~revived ~status ~order_by
+        ~revived ~statuses ~kinds ~order_by
     in
     Term.(const select $ reads $ writes $ ids $ hashes $ groups $ needs $
-          enables $ recursive $ revived $ status $ order_by)
+          enables $ recursive $ revived $ statuses $ kinds $ order_by)
+
+  let select_man =
+    [ `P "Options are provided to select and filter operations. \
+          Any operation that satifies one of the selectors and all of the
+          filters is included the result. If no selector is specified all
+          operations are selected. If no filter is specified all selected
+          operations are returned.";
+      `P "The result is sorted by execution start time, this can
+          be changed with the $(b,--order-by) option." ]
 end
 
 module Memo = struct
   let pp_faint pp = Fmt.tty [`Faint] pp
   let read_howto = Fmt.any "b00-log -r "
   let write_howto = Fmt.any "b00-log -w "
-  let op_howto ppf o = Fmt.pf ppf "b00-log -i %d" (B000.Op.id o)
+  let op_howto ppf o = Fmt.pf ppf "b00-log -o %d" (B000.Op.id o)
   let pp_howto_file howto = Fmt.(pp_faint howto ++ B000_conv.Op.pp_file_write)
   let pp_leveled_feedback
       ?(sep = Fmt.flush_nl) ?(op_howto = op_howto) ~show_op ~show_ui ~level

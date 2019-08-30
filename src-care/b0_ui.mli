@@ -153,10 +153,6 @@ module Op : sig
       or has its id in [ids], or has its hash in [hashes] or has
       is [group] in [groups] or if all these lists are empty. *)
 
-  val order :
-    by:[`Create | `Dur | `Wait | `Start] -> B000.Op.t list -> B000.Op.t list
-  (** [order ~by ops] orders [ops] by [by] time. *)
-
   val read_write_indexes :
     B000.Op.t list -> B000.Op.Set.t Fpath.Map.t * B000.Op.Set.t Fpath.Map.t
   (** [read_write_indexes ops] is [reads, writes] with [reads] mapping
@@ -181,15 +177,33 @@ module Op : sig
       [ops]. If [recursive] is [false] only direct dependencies are
         reported. *)
 
+  val filter :
+    revived:bool option ->
+    statuses:[ `Aborted | `Done | `Failed | `Waiting ] list ->
+    kinds:[ `Copy | `Delete | `Mkdir | `Notify | `Read | `Spawn | `Wait_files
+          | `Write ] list ->
+    B000.Op.t -> bool
+  (** [filter ~revived ~statuses ~kinds] is an operation filter for the
+      given filters. *)
+
+  val order :
+    by:[`Create | `Dur | `Wait | `Start] -> B000.Op.t list -> B000.Op.t list
+  (** [order ~by ops] orders [ops] by [by] time. *)
+
   val select :
     reads:Fpath.t list -> writes:Fpath.t list -> ids:B000.Op.id list ->
     hashes:string list -> groups:string list -> needs:bool -> enables:bool ->
     recursive:bool -> revived:bool option ->
-    status:[`Aborted | `Done | `Failed | `Waiting ] option ->
+    statuses:[`Aborted | `Done | `Failed | `Waiting ] list ->
+    kinds:[ `Copy | `Delete | `Notify | `Mkdir | `Read | `Spawn | `Wait_files
+          | `Write ] list ->
     order_by:[ `Create | `Dur | `Wait | `Start ] -> B000.Op.t list ->
     B000.Op.t list
 
-  val select_cli : (B000.Op.t list -> B000.Op.t list) Cmdliner.Term.t
+  val select_cli :
+    ?docs:string -> unit -> (B000.Op.t list -> B000.Op.t list) Cmdliner.Term.t
+
+  val select_man : Cmdliner.Manpage.block list
 end
 
 (** {!B00.Memo} interaction. *)
