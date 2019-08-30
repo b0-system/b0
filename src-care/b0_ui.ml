@@ -202,7 +202,7 @@ module Op = struct
 
   (* XXX cleanup *)
 
-  let select ~reads ~writes ~ids ~hashes ~groups =
+  let is_selected ~reads ~writes ~ids ~hashes ~groups =
     let all =
       reads = [] && writes = [] && ids = [] && hashes = [] && groups = []
     in
@@ -240,7 +240,7 @@ module Op = struct
     in
     List.sort order ops
 
-  let read_write_indices ops =
+  let read_write_indexes ops =
     let rec loop reads writes = function
     | o :: os ->
         let add acc p = Fpath.Map.add_to_set (module Op.Set) p o acc in
@@ -280,32 +280,42 @@ module Op = struct
   let find_enables ?acc ~recursive ~reads ops =
     find_deps ?acc ~recursive reads Op.writes ops
 
-  let log_filter
+  let filter ~revived ~status =
+    let revived_filter = match revived with
+    | None -> fun _ -> true | Some revived -> fun o -> Op.revived o = revived
+    in
+    let status_filter = match status with
+    | None -> fun _ -> true
+    | Some `Aborted -> fun o -> Op.status o = Op.Aborted
+    | Some `Executed -> fun o -> Op.status o = Op.Executed
+    | Some `Failed ->
+        fun o -> (match Op.status o with Failed _ -> true | _ -> false)
+    | Some `Waiting -> fun o -> Op.status o = Op.Waiting
+    in
+    fun o -> revived_filter o && status_filter o
+
+  let select
       ~reads ~writes ~ids ~hashes ~groups ~needs ~enables ~recursive
-      ~revived ~order_by ops
+      ~revived ~status ~order_by ops
     =
-    let sel = List.filter (select ~reads ~writes ~ids ~hashes ~groups) ops in
+    let is_selected = is_selected ~reads ~writes ~ids ~hashes ~groups in
+    let sel = List.filter is_selected ops in
     let sel = Op.Set.of_list sel in
     let sel = match not needs && not enables with
     | true -> sel
     | false ->
-        let reads, writes = read_write_indices ops in
+        let reads, writes = read_write_indexes ops in
         let acc = Op.Set.empty in
         let acc = if needs then find_needs ~recursive ~writes ~acc sel else acc
         in
         if enables then find_enables ~recursive ~reads ~acc sel else acc
     in
-    let sel = match revived with
-    | None -> Op.Set.elements sel
-    | Some revived ->
-        let add_op o acc = match Op.revived o = revived with
-        | true -> o :: acc | false -> acc
-        in
-        Op.Set.fold add_op sel []
-    in
+    let sel = Op.Set.elements sel in
+    let filter = filter ~revived ~status in
+    let sel = List.filter filter sel in
     order ~by:order_by sel
 
-  let log_filter_cli =
+  let select_cli =
     let open Cmdliner in
     let order_by =
       let order =
@@ -319,67 +329,80 @@ module Op = struct
       Arg.(value & opt order `Start & info ["order-by"] ~doc ~docv:"ORDER")
     in
     let reads =
-      let doc = "Show operations that read file $(docv). Repeatable." in
+      let doc = "Select operations that read file $(docv). Repeatable." in
       Arg.(value & opt_all Cli.Arg.fpath [] &
            info ["r"; "read"] ~doc ~docv:"FILE")
     in
     let writes =
-      let doc = "Show operations that wrote file $(docv). Repeatable." in
+      let doc = "Select operations that wrote file $(docv). Repeatable." in
       Arg.(value & opt_all Cli.Arg.fpath [] &
-           info ["w"; "writes"] ~doc ~docv:"FILE")
+           info ["w"; "write"] ~doc ~docv:"FILE")
     in
     let ids =
-      let doc = "Show operation with identifier $(docv). Repeatable." in
-      Arg.(value & opt_all int [] & info ["id"] ~doc ~docv:"ID")
+      let doc = "Select operation with identifier $(docv). Repeatable." in
+      Arg.(value & opt_all int [] & info ["i"; "id"] ~doc ~docv:"ID")
     in
     let hashes =
       (* Could be properly parsed *)
-      let doc = "Show operation with hash $(docv). Repeatable." in
-      Arg.(value & opt_all string [] & info ["h"; "hash"] ~doc ~docv:"HASH")
+      let doc = "Select operation with hash $(docv). Repeatable." in
+      Arg.(value & opt_all string [] & info ["hash"] ~doc ~docv:"HASH")
     in
     let groups =
-      let doc = "Show operations with group $(docv). Repeatable." in
-      Arg.(value & opt_all string [] & info ["group"] ~doc ~docv:"GROUP")
+      let doc = "Select operations with group $(docv). Repeatable." in
+      Arg.(value & opt_all string [] & info ["g"; "group"] ~doc ~docv:"GROUP")
     in
     let needs =
       let doc =
-        "Show the direct operations needed by selected operations. Use with \
-         option $(b,--rec) to get the recursive operations."
+        "Once operations have been selected, also add all direct operations \
+         needed by these. Use with option $(b,--rec) to get the recursive \
+         operations."
       in
-      Arg.(value & flag & info ["n"; "needs"] ~doc)
+      Arg.(value & flag & info ["needs"] ~doc)
     in
     let enables =
       let doc =
-        "Show the direct operations enabled by selected operations. Use with \
-         option $(b,--rec) to get the recursive operations."
+        "Once operations have been selected, also add all direct operations \
+         enabled by these. Use with option $(b,--rec) to get the recursive \
+         operations."
       in
       Arg.(value & flag & info ["enables"] ~doc)
     in
     let recursive =
-      let doc = "Show recursive needs or enables."  in
+      let doc = "Select recursive needs or enables."  in
       Arg.(value & flag & info ["rec"] ~doc)
     in
     let revived =
-      let revived =
-        let doc = "Filter results to show only operations that were revived." in
-        Arg.(info ["revived"] ~doc)
+      let doc = "Keep only revived or non-revived operations." in
+      Arg.(value & opt ~vopt:(Some true) (some ~none:"any" bool) None &
+           info ["revived"] ~doc ~docv:"BOOL")
+    in
+    let status =
+      let aborted =
+        let doc = "Keep only aborted operations." in
+        Some `Aborted, Arg.info ["aborted"] ~doc
       in
       let executed =
-        let doc =
-          "Filter results to show only operations that were really executed."
-        in
-        Arg.(info ["e"; "executed"] ~doc)
+        let doc = "Keep only executed operations." in
+        Some `Executed, Arg.info ["executed"] ~doc
       in
-      Arg.(value & vflag None [(Some true, revived); Some false, executed])
+      let failed =
+        let doc = "Keep only failed operations." in
+        Some `Failed, Arg.info ["e"; "failed"] ~doc
+      in
+      let waiting =
+        let doc = "Keep only waiting operations." in
+        Some `Waiting, Arg.info ["waiting"] ~doc
+      in
+      Arg.(value & vflag None [aborted; executed; failed; waiting])
     in
-    let log_filter
-        reads writes ids hashes groups needs enables recursive
-        revived order_by =
-      log_filter ~reads ~writes ~ids ~hashes ~groups ~needs ~enables
-        ~recursive ~revived ~order_by
+    let select
+        reads writes ids hashes groups needs enables recursive revived status
+        order_by =
+      select ~reads ~writes ~ids ~hashes ~groups ~needs ~enables ~recursive
+        ~revived ~status ~order_by
     in
-    Term.(const log_filter $ reads $ writes $ ids $
-        hashes $ groups $ needs $ enables $ recursive $ revived $ order_by)
+    Term.(const select $ reads $ writes $ ids $ hashes $ groups $ needs $
+          enables $ recursive $ revived $ status $ order_by)
 end
 
 module Memo = struct
@@ -699,16 +722,21 @@ module Memo = struct
     type out_fmt = [ `Normal | `Short | `Long | `Trace_event | `Stats ]
     let out_fmt_cli ?docs () =
       let out_fmt
-          ?docs ?(short_opts = ["s"; "short"]) ?(long_opts = ["l"; "long"])
-          ?(trace_event_opts = ["t"; "trace-event"]) ?(stats_opts = ["stats"])
+          ?docs ?(short_opts = ["s"; "short"])
+          ?(normal_opts = ["normal"]) ?(long_opts = ["l"; "long"])
+          ?(trace_event_opts = ["trace-event"]) ?(stats_opts = ["stats"])
           ()
         =
         let short =
-          let doc = "Short output. Line based output with only relevant data."in
+          let doc = "Short output, mostly line based with only relevant data."in
           Cmdliner.Arg.info short_opts ~doc ?docs
         in
+        let normal =
+          let doc = "Normal output (default)." in
+          Cmdliner.Arg.info normal_opts ~doc ?docs
+        in
         let long =
-          let doc = "Long output. Outputs as much information as possible." in
+          let doc = "Long output with as much information as possible." in
           Cmdliner.Arg.info long_opts ~doc ?docs
         in
         let trace_event =
@@ -716,12 +744,12 @@ module Memo = struct
           Cmdliner.Arg.info trace_event_opts ~doc ?docs
         in
         let stats =
-          let doc = "Output statistics about the operations." in
+          let doc = "Output statistics about the returned operations." in
           Cmdliner.Arg.info stats_opts ~doc ?docs
         in
         let fmts =
-          [`Short, short; `Long, long; `Trace_event, trace_event;
-           `Stats, stats; ]
+          [ `Short, short; `Normal, normal; `Long, long;
+            `Trace_event, trace_event; `Stats, stats ]
         in
         Cmdliner.Arg.(value & vflag `Normal fmts)
       in

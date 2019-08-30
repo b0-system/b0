@@ -54,18 +54,20 @@ let cli_conf = B0_ui.B0_std.cli_setup ()
 (* Main command *)
 
 let b00_log =
-  let doc = "Show b0 build operations from log files" in
+  let doc = "Show B0 log files" in
   let man_xrefs = [`Tool "b0"; `Tool "b00-cache"] in
   let docs_out_fmt = "OUTPUT FORMATS" in
   let envs = B0_ui.Pager.envs in
   let man = [
     `S Manpage.s_description;
-    `P "The $(tname) command shows build operations from b0 log files. \
-        If no specific selection is specified all of them are shown. \
-       The various selection options are implicitely $(b,or)-ed and can \
-       be eventually filtered by $(b,--executed) or $(b,--revived).";
-    `P "Operations are sorted by operation execution start time, this can
-        be changed via the $(b,--order-by) option.";
+    `P "The $(tname) command shows operations stored in binary B0 log files.";
+    `P "Options are provided to select and filter operations. \
+        Any operation that satifies one of the selectors and all of the
+        filters is included the result. If no selector is specified all
+        operations are selected. If no filter is specified all selected
+        operations are returned.";
+    `P "The result is sorted by execution start time, this can
+        be changed with the $(b,--order-by) option.";
     `S Manpage.s_bugs;
     `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ];
   in
@@ -74,7 +76,7 @@ let b00_log =
   Term.(const log_cmd $ cli_conf $ B0_ui.Pager.don't () $
         b0_dir $ b0_log_file $
         B0_ui.Memo.Log.out_fmt_cli ~docs:docs_out_fmt () $
-        B0_ui.Op.log_filter_cli),
+        B0_ui.Op.select_cli),
   Term.info "b00-log" ~version:"%%VERSION%%" ~doc ~envs ~exits ~man
     ~man_xrefs
 

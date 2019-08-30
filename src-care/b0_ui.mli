@@ -145,10 +145,10 @@ end
 (** {!B000.Op} interaction. *)
 module Op : sig
 
-  val select :
+  val is_selected :
     reads:Fpath.t list -> writes:Fpath.t list -> ids:B000.Op.id list ->
     hashes:string list -> groups:string list -> B000.Op.t -> bool
-  (** [select ~reads ~writes ~ids ~hashes ~groups o] is [true]
+  (** [is_selected ~reads ~writes ~ids ~hashes ~groups o] is [true]
       iff [o] reads a file in [reads] or writes a file in [writes]
       or has its id in [ids], or has its hash in [hashes] or has
       is [group] in [groups] or if all these lists are empty. *)
@@ -157,9 +157,9 @@ module Op : sig
     by:[`Create | `Dur | `Wait | `Start] -> B000.Op.t list -> B000.Op.t list
   (** [order ~by ops] orders [ops] by [by] time. *)
 
-  val read_write_indices :
+  val read_write_indexes :
     B000.Op.t list -> B000.Op.Set.t Fpath.Map.t * B000.Op.Set.t Fpath.Map.t
-  (** [read_write_indices ops] is [reads, writes] with [reads] mapping
+  (** [read_write_indexes ops] is [reads, writes] with [reads] mapping
       file path to operations that reads them and [writes] mapping file
       paths to operations that write them. *)
 
@@ -181,14 +181,15 @@ module Op : sig
       [ops]. If [recursive] is [false] only direct dependencies are
         reported. *)
 
-  val log_filter :
+  val select :
     reads:Fpath.t list -> writes:Fpath.t list -> ids:B000.Op.id list ->
     hashes:string list -> groups:string list -> needs:bool -> enables:bool ->
     recursive:bool -> revived:bool option ->
+    status:[`Aborted | `Executed | `Failed | `Waiting ] option ->
     order_by:[ `Create | `Dur | `Wait | `Start ] -> B000.Op.t list ->
     B000.Op.t list
 
-  val log_filter_cli : (B000.Op.t list -> B000.Op.t list) Cmdliner.Term.t
+  val select_cli : (B000.Op.t list -> B000.Op.t list) Cmdliner.Term.t
 end
 
 (** {!B00.Memo} interaction. *)
