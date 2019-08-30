@@ -209,7 +209,7 @@ module Memo = struct
     Op.discard_k o; m.m.feedback (`Op_complete o)
 
   let finish_op m o = match Op.status o with
-  | Op.Executed ->
+  | Op.Done ->
       if Op.revived o then continue_op m o else
       begin match Hash.equal (Op.hash o) Hash.nil with
       | true ->
@@ -258,7 +258,7 @@ module Memo = struct
               Exec.schedule m.m.exec o
           end
       end
-  | Op.Executed | Op.Failed _ -> assert false
+  | Op.Done | Op.Failed _ -> assert false
 
   (* XXX we may blow stack continuations can add which stirs.
      XXX futures make it even worse. *)
@@ -302,7 +302,7 @@ module Memo = struct
         end
     | o :: os ->
         match Op.status o with
-        | Op.Executed -> loop ws os
+        | Op.Done -> loop ws os
         | Op.Waiting -> loop (o :: ws) os
         | Op.Aborted | Op.Failed _ -> Error Failures
     in

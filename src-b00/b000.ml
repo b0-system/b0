@@ -489,9 +489,9 @@ module Op = struct
   exception Fail_through
 
   type failure = Exec of string option | Missing_writes of Fpath.t list
-  type status = Aborted | Executed | Failed of failure | Waiting
+  type status = Aborted | Done | Failed of failure | Waiting
   let status_to_string = function
-  | Aborted -> "aborted" | Executed -> "executed" | Waiting -> "waiting"
+  | Aborted -> "aborted" | Done -> "done" | Waiting -> "waiting"
   | Failed f ->
       match f with
       | Exec None -> "failed"
@@ -637,7 +637,7 @@ module Op = struct
   let set_writes o fs = o.writes <- fs
   let set_hash o h = o.hash <- h
   let set_status_from_result o r =
-    let st = match r with Ok _ -> Executed | Error e -> Failed (Exec (Some e))in
+    let st = match r with Ok _ -> Done | Error e -> Failed (Exec (Some e))in
     set_status o st
 
   module Copy = struct
@@ -743,8 +743,8 @@ module Op = struct
     | Some (`Signaled c) -> Failed (Exec None)
     | Some (`Exited c) ->
         match success_exits s with
-        | [] -> Executed
-        | cs when List.mem c cs -> Executed
+        | [] -> Done
+        | cs when List.mem c cs -> Done
         | cs -> Failed (Exec None)
 
     let v_op
@@ -1004,7 +1004,7 @@ module Reviver = struct
     | Some (_, existed) ->
         op_kind kind;
         Op.set_revived o true;
-        Op.set_status o Op.Executed;
+        Op.set_status o Op.Done;
         Op.invoke_post_exec o;
         Op.set_time_ended o (timestamp r);
         Ok (Some existed)

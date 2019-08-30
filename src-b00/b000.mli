@@ -255,7 +255,7 @@ module Op : sig
 
   type status =
   | Aborted  (** Aborted due to prerequisite failure. *)
-  | Executed (** Executed successfully. *)
+  | Done (** Executed successfully. *)
   | Failed  of failure (** Executed unsuccessfully. *)
   | Waiting  (** Waiting for execution. *)
   (** The type for operation statuses. *)

@@ -89,7 +89,7 @@ module Op = struct
 
   let pp_header ppf o =
     let pp_status ppf o = match Op.status o with
-    | Op.Executed -> ()
+    | Op.Done -> ()
     | Op.Failed _ -> Fmt.tty_string style_status_failed ppf "FAILED "
     | Op.Aborted -> Fmt.tty_string style_status_aborted ppf "ABORTED "
     | Op.Waiting -> Fmt.tty_string style_status_waiting ppf "WAITING "
@@ -355,7 +355,7 @@ module Op = struct
 
   let enc_status b = function
   | Op.Aborted -> Binc.enc_byte b 0
-  | Op.Executed -> Binc.enc_byte b 1
+  | Op.Done -> Binc.enc_byte b 1
   | Op.Failed f -> Binc.enc_byte b 2; enc_failure b f
   | Op.Waiting -> Binc.enc_byte b 3
 
@@ -364,7 +364,7 @@ module Op = struct
     let next, b = Binc.dec_byte ~kind s i in
     match b with
     | 0 -> next, Op.Aborted
-    | 1 -> next, Op.Executed
+    | 1 -> next, Op.Done
     | 2 -> let i, f = dec_failure s next in i, Op.Failed f
     | 3 -> next, Op.Waiting
     | b -> Binc.err_byte ~kind i b

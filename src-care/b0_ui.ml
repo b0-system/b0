@@ -287,7 +287,7 @@ module Op = struct
     let status_filter = match status with
     | None -> fun _ -> true
     | Some `Aborted -> fun o -> Op.status o = Op.Aborted
-    | Some `Executed -> fun o -> Op.status o = Op.Executed
+    | Some `Done -> fun o -> Op.status o = Op.Done
     | Some `Failed ->
         fun o -> (match Op.status o with Failed _ -> true | _ -> false)
     | Some `Waiting -> fun o -> Op.status o = Op.Waiting
@@ -381,9 +381,9 @@ module Op = struct
         let doc = "Keep only aborted operations." in
         Some `Aborted, Arg.info ["aborted"] ~doc
       in
-      let executed =
-        let doc = "Keep only executed operations." in
-        Some `Executed, Arg.info ["executed"] ~doc
+      let done_ =
+        let doc = "Keep only done operations." in
+        Some `Done, Arg.info ["done"] ~doc
       in
       let failed =
         let doc = "Keep only failed operations." in
@@ -393,7 +393,7 @@ module Op = struct
         let doc = "Keep only waiting operations." in
         Some `Waiting, Arg.info ["waiting"] ~doc
       in
-      Arg.(value & vflag None [aborted; executed; failed; waiting])
+      Arg.(value & vflag None [aborted; done_; failed; waiting])
     in
     let select
         reads writes ids hashes groups needs enables recursive revived status

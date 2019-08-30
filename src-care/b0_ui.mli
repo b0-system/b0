@@ -185,7 +185,7 @@ module Op : sig
     reads:Fpath.t list -> writes:Fpath.t list -> ids:B000.Op.id list ->
     hashes:string list -> groups:string list -> needs:bool -> enables:bool ->
     recursive:bool -> revived:bool option ->
-    status:[`Aborted | `Executed | `Failed | `Waiting ] option ->
+    status:[`Aborted | `Done | `Failed | `Waiting ] option ->
     order_by:[ `Create | `Dur | `Wait | `Start ] -> B000.Op.t list ->
     B000.Op.t list
 
