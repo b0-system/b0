@@ -4,7 +4,169 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-open B0_std
+(* Error message helpers. *)
+
+module Err_msg = struct
+  let pp_nop _ () = ()
+  let pp_any fmt ppf _ = Format.fprintf ppf fmt
+  let pp_one_of ?(empty = pp_nop) pp_v ppf = function
+  | [] -> empty ppf ()
+  | [v] -> pp_v ppf v
+  | [v0; v1] -> Format.fprintf ppf "@[either %a or@ %a@]" pp_v v0 pp_v v1
+  | _ :: _ as vs ->
+      let rec loop ppf = function
+      | [v] -> Format.fprintf ppf "or@ %a" pp_v v
+      | v :: vs -> Format.fprintf ppf "%a,@ " pp_v v; loop ppf vs
+      | [] -> assert false
+      in
+      Format.fprintf ppf "@[one@ of@ %a@]" loop vs
+
+  let pp_did_you_mean
+      ?(pre = pp_any "Unknown") ?(post = pp_nop) ~kind pp_v ppf (v, hints)
+    =
+    match hints with
+    | [] -> Format.fprintf ppf "@[%a %s %a%a.@]" pre () kind pp_v v post ()
+    | hints ->
+        Format.fprintf ppf "@[%a %s %a%a.@ Did you mean %a ?@]"
+          pre () kind pp_v v post () (pp_one_of pp_v) hints
+
+  let min_by f a b = if f a <= f b then a else b
+  let max_by f a b = if f a <= f b then b else a
+
+  let edit_distance s0 s1 =
+    let minimum a b c = min a (min b c) in
+    let s0 = min_by String.length s0 s1     (* row *)
+    and s1 = max_by String.length s0 s1 in  (* column *)
+    let m = String.length s0 and n = String.length s1 in
+    let rec rows row0 row i =
+      if i > n then row0.(m) else begin
+        row.(0) <- i;
+        for j = 1 to m do
+          if s0.[j - 1] = s1.[i - 1] then row.(j) <- row0.(j - 1) else
+          row.(j) <-minimum (row0.(j - 1) + 1) (row0.(j) + 1) (row.(j - 1) + 1)
+        done;
+        rows row row0 (i + 1)
+      end in
+    rows (Array.init (m + 1) (fun x -> x)) (Array.make (m + 1) 0) 1
+
+  let suggest ?(dist = 2) candidates s =
+    let add (min, acc) name =
+      let d = edit_distance s name in
+      if d = min then min, (name :: acc) else
+      if d < min then d, [name] else
+      min, acc
+    in
+    let d, suggs = List.fold_left add (max_int, []) candidates in
+    if d <= dist (* suggest only if not too far *) then List.rev suggs else []
+end
+
+(* Text locations *)
+
+module Tloc = struct
+  type fpath = string
+  let pp_path = Format.pp_print_string
+
+  type pos = int
+  type line = int
+  type line_pos = line * pos
+  (* For lines we keep the byte position just after the newlinexs. It
+     editors are still expecting tools to compute visual columns which
+     is stupid.  By keeping these byte positions we can approximate
+     columns by subtracting the line byte position from the byte
+     location. This will only be correct on US-ASCII data though. Best
+     would be to be able to give them [sbyte] and [ebyte]. *)
+
+  let l v = v
+  type t =
+    { file : fpath;
+      sbyte : pos; ebyte : pos;
+      sline : pos * line; eline : pos * line }
+
+  let no_file = "-"
+  let v ~file ~sbyte ~ebyte ~sline ~eline = { file; sbyte; ebyte; sline; eline }
+  let file l = l.file
+  let sbyte l = l.sbyte
+  let ebyte l = l.ebyte
+  let sline l = l.sline
+  let eline l = l.eline
+  let nil =
+    let pnil = -1 in
+    let lnil = (-1, pnil) in
+    v ~file:no_file ~sbyte:pnil ~ebyte:pnil ~sline:lnil ~eline:lnil
+
+  let merge l0 l1 =
+    let sbyte, sline =
+      if l0.sbyte < l1.sbyte then l0.sbyte, l0.sline else l1.sbyte, l1.sline
+    in
+    let ebyte, eline =
+      if l0.ebyte < l1.ebyte then l1.ebyte, l1.eline else l0.ebyte, l0.eline
+    in
+    v ~file:l0.file ~sbyte ~ebyte ~sline ~eline
+
+  let to_start l =
+    v ~file:l.file ~sbyte:l.sbyte ~ebyte:l.sbyte ~sline:l.sline ~eline:l.sline
+
+  let to_end l =
+    v ~file:l.file ~sbyte:l.ebyte ~ebyte:l.ebyte ~sline:l.eline ~eline:l.eline
+
+  let restart ~at:s e =
+    v ~file:e.file ~sbyte:s.sbyte ~ebyte:e.ebyte ~sline:s.sline ~eline:e.eline
+
+  let pf = Format.fprintf
+  let pp_ocaml ppf l = match l.ebyte < 0 with
+  | true -> pf ppf "File \"%a\", line n/a, characters n/a" pp_path l.file
+  | false ->
+      let pp_lines ppf l = match fst l.sline = fst l.eline with
+      | true -> pf ppf "line %d" (fst l.sline)
+      | false -> pf ppf "lines %d-%d" (fst l.sline) (fst l.eline)
+      in
+      let col_s = l.sbyte - snd l.sline in
+      let col_e = l.ebyte - snd l.eline in
+      pf ppf "File \"%a\", %a, characters %d-%d"
+        pp_path l.file pp_lines l col_s col_e
+
+  let pp_gnu ppf l = match l.ebyte < 0 with
+  | true -> pf ppf "%a:" pp_path l.file
+  | false ->
+      let pp_lines ppf l =
+        let col_s = l.sbyte - snd l.sline + 1 in
+        let col_e = l.ebyte - snd l.eline + 1 in
+        match fst l.sline = fst l.eline with
+        | true ->  pf ppf "%d.%d-%d" (fst l.sline) col_s col_e
+        | false ->
+            pf ppf "%d.%d-%d.%d" (fst l.sline) col_s (fst l.eline) col_e
+      in
+      pf ppf "%a:%a" pp_path l.file pp_lines l
+
+  let pp_dump ppf l =
+    pf ppf "[bytes %d;%d][lines %d;%d][lbytes %d;%d]"
+      l.sbyte l.ebyte (fst l.sline) (fst l.eline) (snd l.sline) (snd l.eline)
+
+  let pp = pp_gnu
+
+  (* Insertions and substitutions *)
+
+  let string_with_index_range ?(first = 0) ?last s =
+    let max = String.length s - 1 in
+    let last = match last with
+    | None -> max
+    | Some l when l > max -> max
+    | Some l -> l
+    in
+    let first = if first < 0 then 0 else first in
+    if first > last then "" else
+    String.sub s first (last - first + 1)
+
+  let string_replace ~start ~stop ~rep s =
+    let len = String.length s in
+    if stop < start || start < 0 || start > len || stop < 0 || stop > len
+    then invalid_arg (Printf.sprintf "invalid start:%d stop:%d" start stop) else
+    let b = String.sub s 0 start in
+    let a = String.sub s stop (len - stop) in
+    String.concat "" [b; rep; a]
+end
+
+(* UTF-8 decoding table. *)
 
 module Utf_8 = struct
   type case =
@@ -52,132 +214,58 @@ module Utf_8 = struct
   |]
 end
 
-module Tloc = struct
-  type pos = int
-  type line = int
-
-  type t =
-    { file : Fpath.t;
-      byte_s : pos; byte_e : pos;
-
-      (* For lines we keep their byte locations. It seems editors are still
-         waiting for tools to compute visual columns which is stupid. By
-         keeping the line byte locations we can approximate columns by
-         subtracting the line byte position from the byte location. This
-         will only be correct on US-ASCII data though. Best would of course
-         would be to give them [byte_s] and [byte_e]. *)
-      line_s : pos * line; line_e : pos * line }
-
-  let no_file = Fpath.v "-"
-  let v ~file ~byte_s ~byte_e ~line_s ~line_e =
-    { file; byte_s; byte_e; line_s; line_e;  } [@@ ocaml.inline]
-
-  let file l = l.file
-  let byte_s l = l.byte_s
-  let byte_e l = l.byte_e
-  let line_s l = l.line_s
-  let line_e l = l.line_e
-  let nil = v
-      ~file:no_file ~byte_s:(-1) ~byte_e:(-1) ~line_s:(-1, -1) ~line_e:(-1, -1)
-
-  let merge l0 l1 =
-    let byte_s = if l0.byte_s < l1.byte_s then l0.byte_s else l1.byte_s in
-    let byte_e = if l0.byte_e > l1.byte_e then l0.byte_e else l1.byte_e in
-    let line_s, line_e =
-      (if (fst l0.line_s) < (fst l1.line_s) then l0.line_s else l1.line_s),
-      (if (fst l0.line_s) > (fst l1.line_s) then l0.line_s else l1.line_s)
-    in
-    v ~file:l0.file ~byte_s ~byte_e ~line_s ~line_e
-
-  let to_start l =
-    v ~file:l.file ~byte_s:l.byte_s ~byte_e:l.byte_s ~line_s:l.line_s
-      ~line_e:l.line_s
-
-  let to_end l =
-    v ~file:l.file ~byte_s:l.byte_e ~byte_e:l.byte_e ~line_s:l.line_e
-      ~line_e:l.line_e
-
-  let with_start s e =
-    v ~file:e.file ~byte_s:s.byte_s ~byte_e:e.byte_e ~line_s:s.line_s
-      ~line_e:s.line_e
-
-  let pp_ocaml ppf l = match l.byte_e < 0 with
-  | true ->
-      Fmt.pf ppf "File \"%a\", line n/a, characters n/a"
-        Fpath.pp_unquoted l.file
-  | false ->
-      let pp_lines ppf l = match (snd l.line_s) = (snd l.line_e) with
-      | true -> Fmt.pf ppf "line %d" (snd l.line_s)
-      | false -> Fmt.pf ppf "lines %d-%d" (snd l.line_s) (snd l.line_e)
-      in
-      let col_s = l.byte_s - (fst l.line_s) in
-      let col_e = l.byte_e - (fst l.line_e) in
-      Fmt.pf ppf "File \"%a\", %a, characters %d-%d"
-        Fpath.pp_unquoted l.file pp_lines l col_s col_e
-
-  let pp_gnu ppf l = match l.byte_e < 0 with
-  | true -> Fmt.pf ppf "%a" Fpath.pp_unquoted l.file
-  | false ->
-      let pp_lines ppf l =
-        let col_s = l.byte_s - (fst l.line_s) in
-        let col_e = l.byte_e - (fst l.line_e) in
-        match (snd l.line_s) = (snd l.line_e) with
-        | true ->  Fmt.pf ppf "%d.%d-%d" (snd l.line_s) col_s col_e
-        | false ->
-            Fmt.pf ppf "%d.%d-%d.%d" (snd l.line_s) col_s (snd l.line_e) col_e
-      in
-      Fmt.pf ppf "%a:%a" Fpath.pp_unquoted l.file pp_lines l
-
-  let pp = pp_gnu
-end
+(* UTF-8 text decoder *)
 
 module Tdec = struct
 
   (* Decoders *)
 
   type t =
-    { file : Fpath.t; i : string; tok : Buffer.t;
-      mutable pos : int; mutable line_pos : int; mutable line : int }
+    { file : Tloc.fpath; i : string; tok : Buffer.t;
+      mutable pos : int; mutable line : int; mutable line_pos : int; }
 
   let create ?(file = Tloc.no_file) i =
-    { file; i; tok = Buffer.create 255; pos = 0; line_pos = -1; line = 1 }
+    { file; i; tok = Buffer.create 255; pos = 0; line = 1; line_pos = 0 }
 
   (* Location *)
 
   let file d = d.file
   let pos d = d.pos
-  let line d = d.line_pos, d.line
+  let line d = d.line, d.line_pos
 
-  let loc d ~byte_s ~byte_e ~line_s ~line_e =
-    Tloc.v ~file:d.file ~byte_s ~byte_e ~line_s ~line_e
+  let loc d ~sbyte ~ebyte ~sline ~eline =
+    Tloc.v ~file:d.file ~sbyte ~ebyte ~sline ~eline
 
-  let loc_to_here d ~byte_s ~line_s =
-    loc d ~byte_s ~byte_e:d.pos ~line_s ~line_e:(d.line_pos, d.line)
+  let loc_to_here d ~sbyte ~sline =
+    loc d ~sbyte ~ebyte:d.pos ~sline ~eline:(d.line, d.line_pos)
 
-  let loc_here d = loc_to_here d ~byte_s:d.pos ~line_s:(d.line_pos, d.line)
+  let loc_here d = loc_to_here d ~sbyte:d.pos ~sline:(d.line, d.line_pos)
 
   (* Errors *)
 
   exception Err of Tloc.t * string
 
   let err loc msg = raise_notrace (Err (loc, msg))
-  let err_to_here d ~byte_s ~line_s fmt =
-    Fmt.kstr (err (loc_to_here d ~byte_s ~line_s)) fmt
+  let err_to_here d ~sbyte ~sline fmt =
+    Format.kasprintf (err (loc_to_here d ~sbyte ~sline)) fmt
 
-  let err_here d fmt = Fmt.kstr (err (loc_here d)) fmt
+  let err_here d fmt = Format.kasprintf (err (loc_here d)) fmt
+  let err_suggest = Err_msg.suggest
+  let err_did_you_mean = Err_msg.pp_did_you_mean
 
   (* Lexing *)
 
   let incr_line d = match d.i.[d.pos] with (* assert (not (eoi d)) *)
-  | '\r' -> (d.line_pos <- d.pos; d.line <- d.line + 1)
-  | '\n' when d.pos <> 0 && d.i.[d.pos - 1] <> '\r' ->
-      (d.line_pos <- d.pos; d.line <- d.line + 1)
+  | '\r' -> d.line <- d.line + 1; d.line_pos <- d.pos + 1
+  | '\n' ->
+      (if d.pos = 0 || d.i.[d.pos - 1] <> '\r' then d.line <- d.line + 1);
+      d.line_pos <- d.pos + 1;
   | _ -> ()
   [@@ ocaml.inline]
 
   let eoi d = d.pos >= String.length d.i [@@ ocaml.inline]
   let byte d = if eoi d then 0xFFFF else Char.code d.i.[d.pos] [@@ ocaml.inline]
-  let accept_byte d = d.pos <- d.pos + 1; if eoi d then () else incr_line d
+  let accept_byte d = incr_line d; d.pos <- d.pos + 1
   [@@ ocaml.inline]
 
   let accept_utf_8 accept d =
@@ -189,7 +277,7 @@ module Tdec = struct
     match byte d with
     | 0xFFFF -> err d
     | b ->
-        (* If a subseqent [byte d] invocation is 0xFFFF we get to [err]. *)
+        (* If a subsequent [byte d] invocation is 0xFFFF we get to [err]. *)
         match Utf_8.case.(b) with
         | L1 -> accept d
         | L2 -> accept d; accept_tail d

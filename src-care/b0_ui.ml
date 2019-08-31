@@ -762,7 +762,8 @@ module Memo = struct
       | `Trace_event ->
           fun (_, ops) ->
             Fmt.pr "%s@."
-              (B0_json.Jsong.to_string (B0_trace.Trace_event.of_ops ops))
+              (B0_serialk_json.Jsong.to_string
+                 (B0_trace.Trace_event.of_ops ops))
       | `Stats -> fun log -> Fmt.pr "%a@." pp_stats log
 
       in

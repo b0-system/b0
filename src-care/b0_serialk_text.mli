@@ -8,60 +8,65 @@
 
     Open this module to use it defines only module in your scope. *)
 
-open B0_std
-
 (** Text locations. *)
 module Tloc : sig
 
   (** {1:tloc Text locations} *)
 
-  val no_file : Fpath.t
+  type fpath = string
+  (** The type for file paths. *)
+
+  val no_file : fpath
   (** [no_file] is [Fpath.t "-"], a path used when no file is specified. *)
 
   type pos = int
   (** The type for zero-based, absolute, byte positions in text. *)
 
   type line = int
-  (** The type for one-based, line numbers in the text. Usually lines
+  (** The type for one-based, line numbers in the text. Lines
       increment after a line feed ['\n'] (U+000A), a carriage return
       ['\r'] (U+000D) or a carriage return and a line feed ["\r\n"]
       (<U+000D,U+000A>). *)
 
+  type line_pos = line * pos
+  (** The type for line positions. The line number and the byte
+      position of the first element on the line. The later is the
+      byte position after the newline which may not exist (at the end
+      of file). *)
+
   type t
-  (** The type for text locations. A text location is a range of
-      byte positions and the lines on which they occur in the UTF-8 encoded
+  (** The type for text locations. A text location is a range of byte
+      positions and the lines on which they occur in the UTF-8 encoded
       text of a particular file. *)
 
   val v :
-    file:Fpath.t -> byte_s:pos -> byte_e:pos -> line_s:pos * line ->
-    line_e:pos * line -> t
-  (** [v ~file ~byte_s ~byte_e ~line_s ~line_e] is a contructor for
+    file:fpath -> sbyte:pos -> ebyte:pos -> sline:line_pos -> eline:line_pos ->
+    t
+  (** [v ~file ~sbyte ~ebyte ~sline ~eline] is a contructor for
       text locations. See corresponding accessors for the semantics.
       If you don't have a file use {!no_file}. *)
 
-  val file : t -> Fpath.t
+  val file : t -> fpath
   (** [file l] is [l]'s file. *)
 
-  val byte_s : t -> pos
-  (** [byte_s l] is [l]'s start position. *)
+  val sbyte : t -> pos
+  (** [sbyte l] is [l]'s start position. *)
 
-  val byte_e : t -> pos
-  (** [byte_e l] is [l]'s end position. *)
+  val ebyte : t -> pos
+  (** [ebyte l] is [l]'s end position. *)
 
-  val line_s : t -> pos * line
-  (** [line_s l] is the line's position on which [byte_s l] lies and
-      the one-based line number. *)
+  val sline : t -> line_pos
+  (** [sline l] is the line position on which [sbyte l] lies. *)
 
-  val line_e : t -> pos * line
-  (** [line_e l] is the line's position on which [byte_e l] lies and
-      the one-based line number. *)
+  val eline : t -> line_pos
+  (** [elin l] is the line position on which [ebyte l] lies. *)
 
   val nil : t
   (** [loc_nil] is an invalid location. *)
 
   val merge : t -> t -> t
   (** [merge l0 l1] merges the location [l0] and [l1] to the smallest
-      location that spans both location. The file path is [l0]'s. *)
+      location that spans both location. The file path taken from [l0]. *)
 
   val to_start : t -> t
   (** [to_start l] has both start and end positions at [l]'s start. *)
@@ -69,13 +74,43 @@ module Tloc : sig
   val to_end : t -> t
   (** [to_end l] has both start and end positions at [l]'s end. *)
 
-  val with_start : t -> t -> t
-  (** [with_start s l] is [l] with the start position of [s]. *)
+  val restart : at:t -> t -> t
+  (** [restart ~at l] is [l] with the start position of [at]. *)
 
-  val pp : t Fmt.t
-  (** [pp_loc] formats locations using the
+  val pp_ocaml : Format.formatter -> t -> unit
+  (** [pp_ocaml] formats location like the OCaml compiler. *)
+
+  val pp_gnu : Format.formatter -> t -> unit
+  (** [pp_gnu] formats location according to the
       {{:https://www.gnu.org/prep/standards/standards.html#Errors}GNU
       convention}. *)
+
+  val pp : Format.formatter -> t -> unit
+  (** [pp] is {!pp_gnu}. *)
+
+  val pp_dump : Format.formatter -> t -> unit
+  (** [pp_dump] formats raw data for debugging. *)
+
+  (** {1:text Substitutions and insertions}
+
+      Strictly speaking this doesn't belong here but here you go. *)
+
+  val string_with_index_range : ?first:int -> ?last:int -> string -> string
+  (** [string with_index_range ~first ~last s] are the consecutive bytes of [s]
+      whose indices exist in the range \[[first];[last]\].
+
+      [first] defaults to [0] and last to [String.length s - 1].
+
+      Note that both [first] and [last] can be any integer. If
+      [first > last] the interval is empty and the empty string is
+      returned. *)
+
+  val string_replace : start:int -> stop:int -> rep:string -> string -> string
+  (** [string_replace ~start ~stop ~rep s] replaces the index range
+      \[[start];stop-1\] of [s] with [rep] as follows. If [start = stop]
+      the [rep] is inserted before [start]. [start] and [stop] must be
+      in range \[[0];[String.length s]\] and [start <= stop] or
+      [Invalid_argument] is raised. *)
 end
 
 (** Text decoder.
@@ -90,37 +125,37 @@ module Tdec : sig
   type t
   (** The type for UTF-8 text decoders. *)
 
-  val create : ?file:Fpath.t -> string -> t
-  (** [create ~file input] decodes [input] using [file]
-      (defaults to {!Tloc.no_file}) for text location. *)
+  val create : ?file:Tloc.fpath -> string -> t
+  (** [create ~file input] decodes [input] using [file] (defaults to
+      {!Tloc.no_file}) for text location. *)
 
   (** {1:loc Locations} *)
 
-  val file : t -> Fpath.t
+  val file : t -> Tloc.fpath
   (** [file d] is the input file. *)
 
   val pos : t -> Tloc.pos
-  (** [pos d] is the current decoding position. *)
+  (** [pos d] is the current decoding byte position. *)
 
-  val line : t -> Tloc.pos * Tloc.line
+  val line : t -> Tloc.line_pos
   (** [line d] is the current line position. Lines increment as
       described {{!Tloc.line}here}. *)
 
+  val loc :
+    t -> sbyte:Tloc.pos -> ebyte:Tloc.pos -> sline:Tloc.line_pos ->
+    eline:Tloc.line_pos -> Tloc.t
+  (** [loc d ~sbyte ~ebyte ~sline ~eline] is a location with the
+      correponding position ranges and file according to {!file}. *)
+
   val loc_to_here :
-    t -> byte_s:Tloc.pos -> line_s:Tloc.pos * Tloc.line -> Tloc.t
-  (** [loc_to_here d ~byte_s ~line_s] is a location that starts at
-      [~byte_s] and [~line_s] and ends at the current decoding
+    t -> sbyte:Tloc.pos -> sline:Tloc.line_pos -> Tloc.t
+  (** [loc_to_here d ~sbyte ~sline] is a location that starts at
+      [~sbyte] and [~sline] and ends at the current decoding
       position. *)
 
   val loc_here : t -> Tloc.t
   (** [loc_here d] is like {!loc_to_here} with the start position
       at the current decoding position. *)
-
-  val loc :
-    t -> byte_s:Tloc.pos -> byte_e:Tloc.pos -> line_s:Tloc.pos * Tloc.line ->
-    line_e:Tloc.pos * Tloc.line -> Tloc.t
-  (** [loc d ~byte_s ~byte_e ~line_s ~line_e] is a location with
-      the correponding position range. *)
 
   (** {1:err Errors} *)
 
@@ -131,16 +166,36 @@ module Tdec : sig
   (** [err loc msg] raises [Err (loc, msg)] with no trace. *)
 
   val err_to_here :
-    t -> byte_s:Tloc.pos -> line_s:Tloc.pos * Tloc.line ->
+    t -> sbyte:Tloc.pos -> sline:Tloc.line_pos ->
     ('a, Format.formatter, unit, 'b) format4 -> 'a
-  (** [err_to_here d ~byte_s ~line_s fmt ...] raises [Err] with no
-      trace. The location spans from the given start position to the
-      current decoding position and the message is formatted according
-      to [fmt]. *)
+  (** [err_to_here d ~sbyte ~sline fmt ...] is
+      [err d (loc_to_here d ~sbyte ~sline) fmt ...] *)
 
   val err_here : t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
-  (** [err_here d] is like {!err_to_here} with the start position
-      at the current decoding position. *)
+  (** [err_here d] is [err d (loc_here d) fmt ...]. *)
+
+  (** {2:err_msg Error message helpers} *)
+
+  val err_suggest : ?dist:int -> string list -> string -> string list
+  (** [err_suggest ~dist candidates s] are the elements of [candidates]
+      whose {{!edit_distance}edit distance} is the smallest to [s] and
+      at most at a distance of [dist] of [s] (defaults to [2]). If
+      multiple results are returned the order of [candidates] is
+      preserved. *)
+
+  val err_did_you_mean :
+    ?pre:(Format.formatter -> unit -> unit) ->
+    ?post:(Format.formatter -> unit -> unit) ->
+    kind:string -> (Format.formatter -> 'a -> unit) ->
+    Format.formatter -> 'a * 'a list -> unit
+  (** [did_you_mean ~pre kind ~post pp_v] formats a faulty value [v] of
+      kind [kind] and a list of [hints] that [v] could have been
+      mistaken for.
+
+      [pre] defaults to [unit "Unknown"], [post] to {!nop} they surround
+      the faulty value before the "did you mean" part as follows ["%a %s
+      %a%a." pre () kind pp_v v post ()]. If [hints] is empty no "did
+      you mean" part is printed. *)
 
   (** {1:dec Decoding} *)
 
@@ -171,7 +226,7 @@ module Tdec : sig
   val tok_pop : t -> string
   (** [tok_pop d] returns the token and {!tok_reset}s it. *)
 
-    val tok_accept_uchar : t -> unit
+  val tok_accept_uchar : t -> unit
   (** [tok_accept_uchar d] is like {!accept_uchar} but also
       adds the UTF-8 byte sequence to the token. *)
 
@@ -187,7 +242,7 @@ module Tdec : sig
   (** [tok_add_byte d s] adds bytes [s] to the token. *)
 
   val tok_add_char : t -> char -> unit
-  (** [tok_add_char d b] adds character [b] to the token. *)
+  (** [tok_add_char d c] adds character [c] to the token. *)
 
   val tok_add_uchar : t -> Uchar.t -> unit
   (** [tok_add_uchar t u] adds the UTF-8 encoding of character [u]

@@ -5,8 +5,11 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
-open B0_json
+open B0_serialk_json
 open B000
+
+let fpath p = Jsong.string (Fpath.to_string p)
+let jsong_cmd c = Jsong.(list string (Cmd.to_list c))
 
 module Trace_event = struct
   let str pp get o = Jsong.strf "%a" pp (get o)
@@ -34,26 +37,26 @@ module Trace_event = struct
     let kind_mems obj = match Op.kind o with
     | Op.Copy c ->
         obj
-        |> Jsong.mem "src" (Jsong.fpath (Op.Copy.src c))
-        |> Jsong.mem "dst" (Jsong.fpath (Op.Copy.dst c))
+        |> Jsong.mem "src" (fpath (Op.Copy.src c))
+        |> Jsong.mem "dst" (fpath (Op.Copy.dst c))
         |> Jsong.mem "mode" (Jsong.strf "%o" (Op.Copy.mode c))
         |> Jsong.mem "linenum" (Jsong.(option int) (Op.Copy.linenum c))
     | Op.Delete d ->
-        obj |> Jsong.mem "path" (Jsong.fpath (Op.Delete.path d))
+        obj |> Jsong.mem "path" (fpath (Op.Delete.path d))
     | Op.Mkdir m ->
-        obj |> Jsong.mem "dir" (Jsong.fpath (Op.Mkdir.dir m))
+        obj |> Jsong.mem "dir" (fpath (Op.Mkdir.dir m))
     | Op.Notify n ->
         obj
         |> Jsong.mem "kind" (Jsong.string Op.Notify.(kind_to_string (kind n)))
         |> Jsong.mem "msg" (Jsong.string (Op.Notify.msg n))
     | Op.Read r ->
-        obj |> Jsong.mem "file" (Jsong.fpath (Op.Read.file r))
+        obj |> Jsong.mem "file" (fpath (Op.Read.file r))
     | Op.Spawn s ->
         let cmd = Cmd.(path (Op.Spawn.tool s) %% (Op.Spawn.args s)) in
         obj
-        |> Jsong.mem "cmd" (Jsong.cmd cmd)
+        |> Jsong.mem "cmd" (jsong_cmd cmd)
         |> Jsong.mem "exit" (spawn_exit (Op.Spawn.exit s))
-        |> Jsong.mem "cwd" (Jsong.fpath (Op.Spawn.cwd s))
+        |> Jsong.mem "cwd" (fpath (Op.Spawn.cwd s))
         |> Jsong.mem "env" (Jsong.(list string) (Op.Spawn.env s))
         |> Jsong.mem "success-exits"
           (Jsong.(list int) (Op.Spawn.success_exits s))
@@ -61,7 +64,7 @@ module Trace_event = struct
     | Op.Wait_files _ -> obj
     | Op.Write w ->
         obj
-        |> Jsong.mem "file" (Jsong.fpath (Op.Write.file w))
+        |> Jsong.mem "file" (fpath (Op.Write.file w))
         |> Jsong.mem "stamp" (Jsong.string (Op.Write.stamp w))
         |> Jsong.mem "mode" (Jsong.strf "%o" (Op.Write.mode w))
     in
@@ -100,10 +103,10 @@ module Compilation_database = struct
     let cmd = Cmd.(path (Op.Spawn.tool spawn) %% (Op.Spawn.args spawn)) in
     arr |> Jsong.el begin
       Jsong.obj
-      |> Jsong.mem "directory" (Jsong.fpath (Op.Spawn.cwd spawn))
-      |> Jsong.mem "file" (Jsong.fpath src)
-      |> Jsong.mem "arguments" (Jsong.cmd cmd)
-      |> Jsong.mem "output" (Jsong.fpath out_file)
+      |> Jsong.mem "directory" (fpath (Op.Spawn.cwd spawn))
+      |> Jsong.mem "file" (fpath src)
+      |> Jsong.mem "arguments" (jsong_cmd cmd)
+      |> Jsong.mem "output" (fpath out_file)
       |> Jsong.mem "id" (Jsong.int (Op.id o))
       |> Jsong.obj_end
     end
@@ -114,7 +117,7 @@ module Compilation_database = struct
       List.fold_left (spawn_out o s src) arr (Op.writes o)
   | _ -> arr
 
-  let of_ops os = Jsong.arr_end (List.fold_left add_op Jsong.arr os)
+  let of_ops os = Jsong.array_end (List.fold_left add_op Jsong.array os)
 end
 
 (*---------------------------------------------------------------------------

@@ -20,7 +20,7 @@ module Trace_event : sig
 
   (** {1:trace_event Trace Events} *)
 
-  val of_ops : B000.Op.t list -> B0_json.Jsong.t
+  val of_ops : B000.Op.t list -> B0_serialk_json.Jsong.t
 end
 
 (** JSON compilation database.
@@ -50,7 +50,7 @@ module Compilation_database : sig
 
   (** {1:compilation_database JSON compilation database} *)
 
-  val of_ops : B000.Op.t list -> B0_json.Jsong.t
+  val of_ops : B000.Op.t list -> B0_serialk_json.Jsong.t
 end
 
 (*---------------------------------------------------------------------------

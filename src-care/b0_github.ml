@@ -5,8 +5,10 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
-open B0_json
+open B0_serialk_json
 open B0_http
+
+let jsonq_int = Jsonq.(map truncate float) (* FIXME *)
 
 let v4_api_uri = "https://api.github.com/graphql"
 let v3_api_uri = "https://api.github.com"
@@ -112,8 +114,8 @@ module Repo = struct
   let query_v4 http auth repo q =
     query_v4 http auth @@
     Fmt.str "query { repository(owner:%s, name:%s) { %s }}"
-      (Json.to_string (`String repo.owner))
-      (Json.to_string (`String repo.name)) q
+      (Json.to_string (Json.string repo.owner))
+      (Json.to_string (Json.string repo.name)) q
 
   let req_json_v3 ?headers http auth repo ~path m body =
     let path = Fmt.str "/repos/%s/%s%s" repo.owner repo.name path in
@@ -148,17 +150,16 @@ module Issue = struct
   let issue_list_q =
     let open Jsonq in
     let issue =
-      obj v
-      |> mem "number" int |> mem "title" string
-      |> mem "bodyText" string |> mem "url" string
+      succeed v $ mem "number" jsonq_int
+      $ mem "title" string $ mem "bodyText" string $ mem "url" string
     in
-    sel "data" @@ sel "repository" @@ sel "issues" @@
-    (obj (fun count is -> count, is)
-     |> mem "totalCount" int
-     |> mem "edges" @@ array @@ sel "node" issue)
+    mem "data" @@ mem "repository" @@ mem "issues" @@
+    (succeed (fun count is -> count, is)
+       $ mem "totalCount" jsonq_int $ mem "edges" (array (mem "node" issue)))
 
   let issue_id_q =
-    Jsonq.(obj (fun n uri -> n, uri) |> mem "number" int |> mem "url" string)
+    let issue n uri = n, uri in
+    Jsonq.(succeed issue $ mem "number" jsonq_int $ mem "url" string)
 
   let create_g ~title ~body =
     Jsong.(obj |> mem "title" (string title) |> mem "body" (string body) |>
@@ -210,8 +211,8 @@ module Release = struct
   (* JSON *)
 
   let release_q =
-    Jsonq.(obj v |> mem "id" int |> mem "tag_name" string |> mem "body" string
-           |> mem "html_url" string |> mem "assets_url" string)
+    Jsonq.(succeed v $ mem "id" jsonq_int $ mem "tag_name" string $
+           mem "body" string $ mem "html_url" string $ mem "assets_url" string)
 
   let create_g ~tag_name ~body =
     Jsong.(obj |> mem "tag_name" (string tag_name) |>

@@ -7,7 +7,7 @@
 (** GitHub interaction. *)
 
 open B0_std
-open B0_json
+open B0_serialk_json
 open B0_http
 
 (** {1 GitHub authentication} *)
