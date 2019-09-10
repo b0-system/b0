@@ -1015,7 +1015,7 @@ module String : sig
     val pp_dump : t Fmt.t
     (** [pp_dump ppf ss] prints an unspecified representation of [ss] on
         [ppf]. *)
-  end
+  end with type t = Set.Make(String).t
 
   (** String maps. *)
   module Map : sig
@@ -1062,7 +1062,7 @@ module String : sig
     val pp_dump_string_map : string t Fmt.t
     (** [pp_dump_string_map ppf m] prints an unspecified representation of the
         string map [m] on [ppf]. *)
-  end
+  end with type 'a t = 'a Map.Make(String).t
 
   (** {1:subst Substituting} *)
 
