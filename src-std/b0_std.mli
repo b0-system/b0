@@ -681,9 +681,9 @@ module String : sig
 
   (** {1:subs Extracting substrings} *)
 
-  val with_index_range : ?first:int -> ?last:int -> string -> string
-  (** [with_index_range ~first ~last s] are the consecutive bytes of [s]
-      whose indices exist in the range \[[first];[last]\].
+  val subrange : ?first:int -> ?last:int -> string -> string
+  (** [subrange ~first ~last s] are the consecutive bytes of [s] whose
+      indices exist in the range \[[first];[last]\].
 
       [first] defaults to [0] and last to [String.length s - 1].
 

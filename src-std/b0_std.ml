@@ -691,7 +691,7 @@ module String = struct
 
   (* Extracting substrings *)
 
-  let with_index_range ?(first = 0) ?last s =
+  let subrange ?(first = 0) ?last s =
     let max = String.length s - 1 in
     let last = match last with
     | None -> max
@@ -704,11 +704,11 @@ module String = struct
 
   (* Breaking with magnitudes *)
 
-  let take_left n s = with_index_range ~last:(n - 1) s
-  let drop_left n s = with_index_range ~first:n s
+  let take_left n s = subrange ~last:(n - 1) s
+  let drop_left n s = subrange ~first:n s
   let break_left n s = (take_left n s, drop_left n s)
-  let take_right n s = with_index_range ~first:(String.length s - n) s
-  let drop_right n s = with_index_range ~last:(String.length s - n - 1) s
+  let take_right n s = subrange ~first:(String.length s - n) s
+  let drop_right n s = subrange ~last:(String.length s - n - 1) s
   let break_right n s = (drop_right n s, take_right n s)
 
   (* Breaking with predicates *)
@@ -718,7 +718,7 @@ module String = struct
     let rec loop max s i = match i > max with
     | true -> s
     | false when sat s.[i] -> loop max s (i + 1)
-    | false -> with_index_range ~last:(i - 1) s
+    | false -> subrange ~last:(i - 1) s
     in
     loop max s 0
 
@@ -727,7 +727,7 @@ module String = struct
     let rec loop max s i = match i > max with
     | true -> ""
     | false when sat s.[i] -> loop max s (i + 1)
-    | false -> with_index_range ~first:i s
+    | false -> subrange ~first:i s
     in
     loop max s 0
 
@@ -736,7 +736,7 @@ module String = struct
     let rec loop max s i = match i > max with
     | true -> s, ""
     | false when sat s.[i] -> loop max s (i + 1)
-    | false -> with_index_range ~last:(i - 1) s, with_index_range ~first:i s
+    | false -> subrange ~last:(i - 1) s, subrange ~first:i s
     in
     loop max s 0
 
@@ -745,7 +745,7 @@ module String = struct
     let rec loop s i = match i < 0 with
     | true -> s
     | false when sat s.[i] -> loop s (i - 1)
-    | false -> with_index_range ~first:(i + 1) s
+    | false -> subrange ~first:(i + 1) s
     in
     loop s max
 
@@ -754,7 +754,7 @@ module String = struct
     let rec loop s i = match i < 0 with
     | true -> ""
     | false when sat s.[i] -> loop s (i - 1)
-    | false -> with_index_range ~last:i s
+    | false -> subrange ~last:i s
     in
     loop s max
 
@@ -763,7 +763,7 @@ module String = struct
     let rec loop s i = match i < 0 with
     | true -> "", s
     | false when sat s.[i] -> loop s (i - 1)
-    | false -> with_index_range ~last:i s, with_index_range ~first:(i + 1) s
+    | false -> subrange ~last:i s, subrange ~first:(i + 1) s
     in
     loop s max
 
@@ -1224,7 +1224,7 @@ module String = struct
         match find_var_end s (i + 3) max with
         | None -> loop buf s start (max + 1) max
         | Some k ->
-            let var = with_index_range ~first:(i + 2) ~last:(k - 2) s in
+            let var = subrange ~first:(i + 2) ~last:(k - 2) s in
             match Map.find var vars with
             | exception Not_found -> loop buf s start (k + 1) max
             | v ->
@@ -1369,7 +1369,7 @@ module Fpath = struct
             | exception Not_found -> path_start p
             | k -> k + 1
 
-    let chop_volume p = String.with_index_range ~first:(path_start p) p
+    let chop_volume p = String.subrange ~first:(path_start p) p
 
     let backslashify s =
       let b = Bytes.copy (Bytes.unsafe_of_string s) in
@@ -1562,7 +1562,7 @@ module Fpath = struct
   | len ->
       let max = len - 1 in
       if p.[max] <> dir_sep_char then p else
-      String.with_index_range p ~last:(max - 1)
+      String.subrange p ~last:(max - 1)
 
 
   (* Strict prefixes *)
@@ -1583,7 +1583,7 @@ module Fpath = struct
   | true ->
       let len = String.length pre in
       let first = if p.[len] = dir_sep_char then len + 1 else len in
-      Some (String.with_index_range p ~first)
+      Some (String.subrange p ~first)
 
   let drop_prefixed dirs =
     let is_prefixed d by = is_prefix by d in
@@ -1646,7 +1646,7 @@ module Fpath = struct
 
   let get_ext ?multi p = match ext_range ?multi p with
   | exception Not_found -> ""
-  | first, last -> String.with_index_range ~first ~last p
+  | first, last -> String.subrange ~first ~last p
 
   let has_ext e p = match ext_range ~multi:true p with
   | exception Not_found -> String.equal e ""
@@ -1680,7 +1680,7 @@ module Fpath = struct
   let _rem_ext efirst elast p =
     let plen = String.length p in
     match elast = plen - 1 with
-    | true -> String.with_index_range ~last:(efirst - 1) p
+    | true -> String.subrange ~last:(efirst - 1) p
     | false ->
         let elen = elast - efirst + 1 in
         let nlen = plen - elen in
@@ -1698,7 +1698,7 @@ module Fpath = struct
   let cut_ext ?multi p = match ext_range ?multi p with
   | exception Not_found -> p, ""
   | efirst, elast ->
-      let ext = String.with_index_range ~first:efirst ~last:elast p in
+      let ext = String.subrange ~first:efirst ~last:elast p in
       let p = _rem_ext efirst elast p in
       p, ext
 
@@ -1718,16 +1718,16 @@ module Fpath = struct
     match last - first + 1 with
     | 1 when p.[first] = '.' -> ""
     | 2 when p.[first] = '.' && p.[first + 1] = '.' -> ""
-    | _ when not no_ext -> String.with_index_range ~first ~last p
+    | _ when not no_ext -> String.subrange ~first ~last p
     | _ -> (* Drop multi ext *)
         let rec loop first last i = match i > last with
-        | true -> String.with_index_range ~first ~last p
+        | true -> String.subrange ~first ~last p
         | false ->
             match p.[i] = ext_sep_char with
             | false -> loop first last (i + 1)
             | true ->
                 if p.[i - 1] = ext_sep_char then loop first last (i + 1) else
-                String.with_index_range ~first ~last:(i - 1) p
+                String.subrange ~first ~last:(i - 1) p
         in
         loop first last (first + 1)
 
@@ -1744,10 +1744,10 @@ module Fpath = struct
     | 0 -> p
     | 1 when p.[seg_start] = '.' ->
         if seg_start = 0 then "../" else
-        parent (String.with_index_range ~last:(seg_start - 1) p)
+        parent (String.subrange ~last:(seg_start - 1) p)
     | 2 when p.[seg_start] = '.' && p.[seg_stop] = '.' -> via_dotdot p
     | _ when seg_start = 0 -> "./"
-    | _ -> add_seg (String.with_index_range ~last:(seg_start - 1) p) ""
+    | _ -> add_seg (String.subrange ~last:(seg_start - 1) p) ""
 
   let equal_basename p0 p1 = (* XXX could avoid alloc *)
     String.equal (basename p0) (basename p1)
@@ -2097,7 +2097,7 @@ module Cmd = struct
       let tok_sep c = c = '\'' || c = '\"' || Char.Ascii.is_white c in
       let tok_char c = not (tok_sep c) in
       let not_squote c = c <> '\'' in
-      let tail s = (* Yikes *) String.with_index_range ~first:1 s in
+      let tail s = (* Yikes *) String.subrange ~first:1 s in
       let parse_squoted s =
         let tok, rem = String.span_left not_squote (tail s) in
         if not (String.equal rem "") then tok, tail rem else
@@ -3977,7 +3977,7 @@ module Conv = struct
       let start, len = dec_len ~kind s ~start in
       let last = start + len - 1 in
       dec_need ~kind s ~start ~len;
-      start + len, String.with_index_range ~first:start ~last s
+      start + len, String.subrange ~first:start ~last s
 
     let dec_list dec_v ~kind s ~start =
       let start, len = dec_len ~kind s ~start in
@@ -4203,7 +4203,7 @@ module Conv = struct
               | c -> loop max (i + 1) s
           in
           let last = loop (String.length s - 1) (i + 1) s in
-          let atom = String.with_index_range ~first:i ~last s in
+          let atom = String.subrange ~first:i ~last s in
           last + 1, atom
 
     let dec_lx par ~kind s ~start =
@@ -4874,7 +4874,7 @@ module Binc = struct
   let dec_magic s i magic =
     let next = i + String.length magic in
     check_next ~kind:magic s i next;
-    let magic' = String.with_index_range ~first:i ~last:(next - 1) s in
+    let magic' = String.subrange ~first:i ~last:(next - 1) s in
     if String.equal magic magic' then next else
     err i "magic mismatch: %S but expected %S" magic' magic
 

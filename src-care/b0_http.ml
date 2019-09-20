@@ -35,7 +35,7 @@ module Uri = struct
       | j -> j - 1
       in
       if last - first < 0 then None else
-      Some (String.with_index_range ~first ~last u)
+      Some (String.subrange ~first ~last u)
 
   let parse_path_and_query u = match String.index u ':' with
   | exception Not_found -> None
@@ -43,15 +43,15 @@ module Uri = struct
       let max = String.length u - 1 in
       if i = max then None else
       match u.[i + 1] = '/' with
-      | false -> Some (String.with_index_range ~first:(i + 1) u)
+      | false -> Some (String.subrange ~first:(i + 1) u)
       | true ->
           if i + 1 = max then Some "/" else
           match u.[i + 2] = '/' with
-          | false -> Some (String.with_index_range ~first:(i + 1) u)
+          | false -> Some (String.subrange ~first:(i + 1) u)
           | true ->
               match String.index_from u (i + 3) '/' with
               | exception Not_found -> None
-              | i -> Some (String.with_index_range ~first:i u)
+              | i -> Some (String.subrange ~first:i u)
 
 end
 
