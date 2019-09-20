@@ -781,16 +781,6 @@ module String : sig
   (** [cuts_right sep s] is like {!cuts_left} but matching starts on the
       right of [s]. *)
 
-  (** {1:traversing Traversing} *)
-
-  val map : (char -> char) -> string -> string
-  (** [map f s] is [s'] with [s'.[i] = f s.[i]] for all indices [i] of
-      [s]. [f] is invoked in increasing index order. *)
-
-  val mapi : (int -> char -> char) -> string -> string
-  (** [mapi f s] is [s'] with [s'.[i] = f i s.[i]] for all indices [i]
-      of [s]. [f] is invoked in increasing index order. *)
-
   (** {1:fmt Formatting} *)
 
   val pp : string Fmt.t

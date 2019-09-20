@@ -825,29 +825,6 @@ module String = struct
     in
     loop [] s
 
-  (* Traversing *)
-
-  let mapi f s =
-    let max = length s - 1 in
-    let rec try_no_alloc i = match i > max with
-    | true -> s
-    | false ->
-        let c = String.get s i in
-        let cm = f i c in
-        match cm = c with
-        | true -> try_no_alloc (i + 1)
-        | false ->
-            let b = Bytes.of_string s in
-            Bytes.set b i cm;
-            with_buf b (i + 1)
-    and with_buf b i = match i > max with
-    | true -> Bytes.unsafe_to_string b
-    | false -> Bytes.set b i (f i (String.get s i)); with_buf b (i + 1)
-    in
-    try_no_alloc 0
-
-  let map f s = mapi (fun _ c -> f c) s
-
   (* Formatting *)
 
   let pp = Fmt.string
