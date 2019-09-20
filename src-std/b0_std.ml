@@ -871,29 +871,36 @@ module String = struct
      by tweaking the sigs to return integer pairs but that would allocate
      quite a bit. *)
 
-  let escaped_length char_len s =
+  let byte_replaced_length char_len s =
     let rec loop s max i l = match i > max with
     | true -> l
     | false -> loop s max (i + 1) (l + char_len s.[i])
     in
     loop s (String.length s - 1) 0 0
 
-  let escaper char_len set_char s =
+  let byte_replace set_char s ~len ~replaced_len =
+    let b = Bytes.create replaced_len in
+    let rec loop s max i k = match i > max with
+    | true -> Bytes.unsafe_to_string b
+    | false -> loop s max (i + 1) (set_char b k s.[i])
+    in
+    loop s (len - 1) 0 0
+
+  let byte_escaper char_len set_char s =
     let len = String.length s in
-    let escaped_len = escaped_length char_len s in
-    match escaped_len = len with
+    let replaced_len = byte_replaced_length char_len s in
+    match replaced_len = len with
     | true -> s
-    | false ->
-        let b = Bytes.create escaped_len in
-        let rec loop s max i k = match i > max with
-        | true -> Bytes.unsafe_to_string b
-        | false -> loop s max (i + 1) (set_char b k s.[i])
-        in
-        loop s (len - 1) 0 0
+    | false -> byte_replace set_char s ~len ~replaced_len
+
+  let byte_replacer char_len set_char s =
+    let len = String.length s in
+    let replaced_len = byte_replaced_length char_len s in
+    byte_replace set_char s ~len ~replaced_len
 
   exception Illegal_escape of int (* index *)
 
-  let unescaped_length char_len_at s =
+  let byte_unreplace_length char_len_at s =
     let rec loop max i len = match i > max with
     | true -> len
     | false ->
@@ -902,19 +909,29 @@ module String = struct
     in
     loop (String.length s - 1) 0 (String.length s)
 
-  let unescaper char_len_at set_char s =
+  let byte_unreplace set_char s ~len ~unreplace_len =
+    let b = Bytes.create unreplace_len in
+    let rec loop s max i k = match i > max with
+    | true -> Ok (Bytes.unsafe_to_string b)
+    | false -> loop s max (set_char b k s i) (k + 1)
+    in
+    loop s (String.length s - 1) 0 0
+
+  let byte_unescaper char_len_at set_char s =
     try
       let len = String.length s in
-      let unescaped_len = unescaped_length char_len_at s in
-      match len = unescaped_len with
+      let unreplace_len = byte_unreplace_length char_len_at s in
+      match len = unreplace_len with
       | true -> Ok s
-      | false ->
-          let b = Bytes.create unescaped_len in
-          let rec loop s max i k = match i > max with
-          | true -> Ok (Bytes.unsafe_to_string b)
-          | false -> loop s max (set_char b k s i) (k + 1)
-          in
-          loop s (String.length s - 1) 0 0
+      | false -> byte_unreplace set_char s ~len ~unreplace_len
+    with
+    | Illegal_escape i -> Error i
+
+  let byte_unreplacer char_len_at set_char s =
+    try
+      let len = String.length s in
+      let unreplace_len = byte_unreplace_length char_len_at s in
+      byte_unreplace set_char s ~len ~unreplace_len
     with
     | Illegal_escape i -> Error i
 
@@ -1031,7 +1048,7 @@ module String = struct
       | '\x20' .. '\x5B' | '\x5D' .. '\x7E' as c -> Bytes.set b k c; k + 1
       | c -> set_hex_escape b k c
       in
-      escaper char_len set_char
+      byte_escaper char_len set_char
 
     let unescape =
       let char_len_at s i = match s.[i] <> '\\' with
@@ -1056,7 +1073,7 @@ module String = struct
           let lo = Char.Ascii.hex_digit_value s.[i + 3] in
           Bytes.set b k (Char.chr @@ (hi lsl 4) lor lo); i + 4
       in
-      unescaper char_len_at set_char
+      byte_unescaper char_len_at set_char
 
     let ocaml_string_escape =
       let char_len = function
@@ -1074,7 +1091,7 @@ module String = struct
       | '\x20' .. '\x7E' as c -> Bytes.set b k c; k + 1
       | c -> set_hex_escape b k c
       in
-      escaper char_len set_char
+      byte_escaper char_len set_char
 
     let ocaml_unescape =
       let char_len_at s i = match s.[i] <> '\\' with
@@ -1137,7 +1154,7 @@ module String = struct
             Bytes.set b k (Char.chr byte); i + 4
         | _ -> assert false
       in
-      unescaper char_len_at set_char
+      byte_unescaper char_len_at set_char
   end
 
   (* String map and sets *)
@@ -1429,7 +1446,7 @@ module Fpath = struct
       | '\\' -> Bytes.set b i '/'; i + 1
       | c -> pct_esc_set_char ~escape_space b i c
       in
-      String.escaper (pct_esc_len ~escape_space) set_char p
+      String.byte_escaper (pct_esc_len ~escape_space) set_char p
   end
 
   module Posix = struct
@@ -1490,7 +1507,7 @@ module Fpath = struct
     let is_root p = String.equal p dir_sep || String.equal p "//"
 
     let to_uri_path ?(escape_space = true) p =
-      String.escaper (pct_esc_len ~escape_space)
+      String.byte_escaper (pct_esc_len ~escape_space)
         (pct_esc_set_char ~escape_space) p
   end
 

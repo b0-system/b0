@@ -824,34 +824,47 @@ module String : sig
       also {{!Ascii.escunesc}these functions} to convert a string to
       printable US-ASCII characters. *)
 
-  val escaper :
+  val byte_escaper :
     (char -> int) -> (bytes -> int -> char -> int) -> string -> string
-  (** [escaper char_len set_char] is a byte escaper such that:
+  (** [byte_escaper char_len set_char] is a byte escaper such that:
       {ul
       {- [char_len c] is the length of the unescaped byte [c] in the
-         escaped form.}
-      {- [set_char b i c] sets an unescaped byte [c] to its escaped form
-         at index [i] in [b] and returns the next writable index. [set_char]
-         is called regardless if [c] needs to be escaped or not. No
-         bounds check need to be performed on [i] or the returned value.}}
+         escaped form. If [1] is returned then [c] is assumed
+         to be unchanged use {!byte_replacer} if that does not hold}
+      {- [set_char b i c] sets an unescaped byte [c] to its escaped
+         form at index [i] in [b] and returns the next writable
+         index. [set_char] is called regardless if [c] needs to be
+         escaped or not in the latter case {b you must} write [c] (use
+         {!byte_replacer} if that is not the case). No bounds check
+         need to be performed on [i] or the returned value.}}
+
       For any [b], [c] and [i] the invariant
       [i + char_len c = set_char b i c] must hold. *)
+
+  val byte_replacer :
+    (char -> int) -> (bytes -> int -> char -> int) -> string -> string
+  (** [byte_replacer char_len set_char] is like {!byte_escaper} but
+      a byte can be substituted by another one by [set_char]. *)
 
   exception Illegal_escape of int
   (** See {!unescaper}. *)
 
-  val unescaper :
+  val byte_unescaper :
     (string -> int -> int) -> (bytes -> int -> string -> int -> int) ->
     string -> (string, int) result
-  (** [unescaper char_len_at set_char] is a byte unescaper such that:
+  (** [byte_unescaper char_len_at set_char] is a byte unescaper such that:
       {ul
       {- [char_len_at s i] is the length of an escaped byte at index
-         [i] of [s].}
+         [i] of [s]. If [1] is returned then the byte is assumed
+         to be unchanged by the unescape, use {!byte_unreplace}
+         if that does not hold.}
       {- [set_char b k s i] sets at index [k] in [b] the unescaped
-         byte read at index [i] in [s] and returns the next
-         readable index in [s]. [set_char] is called regardless of
-         wheter the byte at [i] must be unescaped or not. No bounds check
-         need to be performed on [k], [i] or the returned value.}}
+         byte read at index [i] in [s] and returns the next readable
+         index in [s]. [set_char] is called regardless of wheter the
+         byte at [i] must be unescaped or not in the latter case {b
+         you must} write s.[i] only (use {!byte_unreplacer} if that is
+         not the case). No bounds check need to be performed on [k],
+         [i] or the returned value.}}
 
       For any [b], [s], [k] and [i] the invariant [i + char_len_at s i
       = set_char b k s i] must hold.
@@ -859,6 +872,13 @@ module String : sig
       Both [char_len_at] and [set_char] may raise [Illegal_escape i]
       if the given index [i] has an illegal or truncated escape. The
       unescaper turns this exception into [Error i] if that happens. *)
+
+  val byte_unreplacer :
+    (string -> int -> int) -> (bytes -> int -> string -> int -> int) ->
+    string -> (string, int) result
+  (** [byte_unreplacer char_len_at set_char] is like {!byte_unscaper}
+      except [set_char] can set a different byte whenever [char_len_at]
+      returns [1]. *)
 
   (** {1:ascii US-ASCII strings} *)
 
@@ -1576,7 +1596,7 @@ end
 
 (** Measuring time.
 
-    Support to measure monotonic wall-clock {{!monotonic}time}, CPU
+    Support to measure monotonic wall-clock time, CPU
     user and CPU system time. *)
 module Time : sig
 
