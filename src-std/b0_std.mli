@@ -226,9 +226,9 @@ module Fmt : sig
 
   (** {1:stdlib Stdlib types}
 
-      Formatters for structures give full control to the client over the
-      formatting process and do not wrap the formatted structures with
-      boxes. *)
+      Formatters for structures give full control to the client over
+      the formatting process and do not wrap the formatted structures
+      with boxes. *)
 
   val bool : bool t
   (** [bool] is {!Format.pp_print_bool}. *)
@@ -639,9 +639,11 @@ end
 (** Strings. *)
 module String : sig
 
-  (** {1:string String} *)
+  (** {1:stdlib_string Stdlib String} *)
 
   include module type of String
+
+  (** {1:strings Strings} *)
 
   val empty : string
   (** [empty] is [""]. *)
@@ -824,25 +826,24 @@ module String : sig
       multiple results are returned the order of [candidates] is
       preserved. *)
 
-  (** {1:escunesc Escaping and unescaping bytes}
+  (** {1:escunesc (Un)escaping bytes}
 
-      See also the {!Ascii.escunesc}.
-
-      {b XXX.} Limitation cannot escape/unescape multiple bytes (e.g.
-      UTF-8 byte sequences). This could be achieved by tweaking
-      the sigs to return integer pairs but that would allocate
-      quite a bit. *)
+      The following functions can only (un)escape a single byte.  See
+      also {{!Ascii.escunesc}these functions} to convert a string to
+      printable US-ASCII characters. *)
 
   val escaper :
     (char -> int) -> (bytes -> int -> char -> int) -> string -> string
-  (** [escaper char_len set_char] is a byte escaper that given a byte
-      [c] uses [char_len c] bytes in the escaped form.  [set_char b i
-      c] is used to set the index [i] if a buffer [b] to byte [c] in
-      the escaped form nd must return the next writable index (no
-      bounds checks need to be peformed). [set_char] is invoked both
-      for bytes that need escaping and those that do not. For any [b],
-      [c] and [i] the invariant [i + char_len c = set_char b i c] must
-      hold. *)
+  (** [escaper char_len set_char] is a byte escaper such that:
+      {ul
+      {- [char_len c] is the length of the unescaped byte [c] in the
+         escaped form.}
+      {- [set_char b i c] sets an unescaped byte [c] to its escaped form
+         at index [i] in [b] and returns the next writable index. [set_char]
+         is called regardless if [c] needs to be escaped or not. No
+         bounds check need to be performed on [i] or the returned value.}}
+      For any [b], [c] and [i] the invariant
+      [i + char_len c = set_char b i c] must hold. *)
 
   exception Illegal_escape of int
   (** See {!unescaper}. *)
@@ -850,20 +851,24 @@ module String : sig
   val unescaper :
     (string -> int -> int) -> (bytes -> int -> string -> int -> int) ->
     string -> (string, int) result
-  (** [unescaper char_len_at set_char] is a byte unescaper that uses
-      [char_len_at] to determine the length of a byte at a given index
-      in the string to unescape and [set_char b k s i] to set at index
-      [k] in [b] the unescaped character read at index [i] in [s]; and
-      returns the next readable index in [s] (no bound check need
-      to be performed). For any [b], [s], [k] and [i] the invariant [i
-      + char_len_at s i = set_char b k s i].
+  (** [unescaper char_len_at set_char] is a byte unescaper such that:
+      {ul
+      {- [char_len_at s i] is the length of an escaped byte at index
+         [i] of [s].}
+      {- [set_char b k s i] sets at index [k] in [b] the unescaped
+         byte read at index [i] in [s] and returns the next
+         readable index in [s]. [set_char] is called regardless of
+         wheter the byte at [i] must be unescaped or not. No bounds check
+         need to be performed on [k], [i] or the returned value.}}
+
+      For any [b], [s], [k] and [i] the invariant [i + char_len_at s i
+      = set_char b k s i] must hold.
 
       Both [char_len_at] and [set_char] may raise [Illegal_escape i]
       if the given index [i] has an illegal or truncated escape. The
-      unescaper only uses this exception internally it returns [Error
-      i] if it found an illegal escape at index [i]. *)
+      unescaper turns this exception into [Error i] if that happens. *)
 
-  (** {1:ascii Strings as US-ASCII character sequences} *)
+  (** {1:ascii US-ASCII strings} *)
 
   (** US-ASCII string support.
 
@@ -994,7 +999,7 @@ module String : sig
         error in the string. *)
   end
 
-  (** {1:setmap String map and sets} *)
+  (** {1:setmap Sets and maps} *)
 
   (** String sets. *)
   module Set : sig
@@ -1064,13 +1069,12 @@ module String : sig
         string map [m] on [ppf]. *)
   end with type 'a t = 'a Map.Make(String).t
 
-  (** {1:subst Substituting} *)
+  (** {1:var_subst Variable substitution} *)
 
-  val subst_pct_vars :
-    ?buf:Buffer.t -> string Map.t -> string -> string option
+  val subst_pct_vars : ?buf:Buffer.t -> string Map.t -> string -> string option
   (** [subst_pct_vars ~buf vars s] substitutes in [s] strings of the
       form [%%VAR%%] by the value of ["VAR"] in [vars] (if any).
-      [None] is returned if no substition was performed. *)
+      [None] is returned if no substitution was performed. *)
 end
 
 (** Lists. *)

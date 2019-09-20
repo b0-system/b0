@@ -890,7 +890,9 @@ module String = struct
 
   (* Escaping and unescaping bytes
 
-     XXX: limitation cannot escape multiple bytes (i.e. non US-ASCII UTF-8) *)
+     XXX: limitation cannot escape multiple bytes. Multibyte could be achieved
+     by tweaking the sigs to return integer pairs but that would allocate
+     quite a bit. *)
 
   let escaped_length char_len s =
     let rec loop s max i l = match i > max with
