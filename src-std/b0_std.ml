@@ -1347,6 +1347,9 @@ module Fpath = struct
     let dir_sep_char = '\\'
     let char_is_dir_sep c = c = '\\' || c = '/'
     let dir_sep = "\\"
+    let has_dir_sep s =
+      String.exists (function '/' | '\\' -> true | _ -> false) s
+
     let is_seg s =
       let valid c = c <> dir_sep_char && c <> '/' && c <> '\x00' in
       String.for_all valid s
@@ -1453,6 +1456,7 @@ module Fpath = struct
     let dir_sep_char = '/'
     let char_is_dir_sep c = Char.equal c '/'
     let dir_sep = "/"
+    let has_dir_sep s = String.exists (function '/' -> true | _ -> false) s
     let is_seg s = String.for_all (fun c -> c <> dir_sep_char && c <> '\x00') s
     let of_string = function
     | "" as s -> err_empty s
@@ -1524,6 +1528,9 @@ module Fpath = struct
     if Sys.win32 then Windows.char_is_dir_sep else Posix.char_is_dir_sep
 
   let last_is_dir_sep p = Char.equal (p.[String.length p - 1]) dir_sep_char
+
+  let has_dir_sep =
+    if Sys.win32 then Windows.has_dir_sep else Posix.has_dir_sep
 
   let is_seg = if Sys.win32 then Windows.is_seg else Posix.is_seg
   let is_rel_seg = function "." | ".." -> true | _ -> false

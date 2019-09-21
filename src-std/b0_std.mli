@@ -1157,9 +1157,13 @@ module Fpath : sig
   val dir_sep : string
   (** [dir_sep] is {!dir_sep_char} as a string. *)
 
+  val has_dir_sep : string -> bool
+  (** [has_dir_sep s] is [true] iff [s] contains {!dir_sep_char} (on
+      Windows also if it contains ['/']). *)
+
   val is_seg : string -> bool
-  (** [is_seg s] is [true] iff [s] does not contain a {!dir_sep} or
-      a null byte. *)
+  (** [is_seg s] is [true] iff [s] does not contain a {!dir_sep_char}
+      (on Windows also that it does not contain ['/']) or a null byte. *)
 
   val is_rel_seg : string -> bool
   (** [is_rel_seg s] is [true] iff [s] is a relative segment in other
@@ -1391,10 +1395,12 @@ module Fpath : sig
       component that can be parsed by HTML5's
       {{:https://dev.w3.org/html5/spec-LC/urls.html#parsing-urls}
       definition} of URI parsing. *)
+
 (*
   val pp : t Fmt.t
   (** [pp ppf p] prints path [p] on [ppf] using {!Filename.quote}. *)
 *)
+
   val pp_quoted : t Fmt.t
   (** [pp_quoted ppf p] prints path [p] on [ppf] using {!Filename.quote}. *)
 
