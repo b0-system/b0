@@ -10,7 +10,7 @@ open B00
 
 let feedback =
   let show_ui = Log.Error and show_op = Log.Info and level = Log.level () in
-  B0_ui.Memo.pp_leveled_feedback ~show_op ~show_ui ~level
+  B00_ui.Memo.pp_leveled_feedback ~show_op ~show_ui ~level
     Fmt.stderr
 
 let with_memo ?jobs f =
@@ -28,9 +28,9 @@ let with_memo ?jobs f =
   Memo.stir m ~block:true;
   begin match Memo.status m with
   | Ok () -> ()
-  | Error e -> (B0_ui.Memo.pp_error ()) Fmt.stderr e
+  | Error e -> (B00_ui.Memo.pp_error ()) Fmt.stderr e
   end;
-  Log.if_error ~use:() (B0_ui.Memo.Log.write_file log_file m);
+  Log.if_error ~use:() (B00_ui.Memo.Log.write_file log_file m);
   Ok ()
 
 (*---------------------------------------------------------------------------

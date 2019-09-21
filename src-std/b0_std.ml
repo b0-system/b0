@@ -3749,6 +3749,14 @@ module Os = struct
       | Failure e -> err_execv f e
       | Unix.Unix_error (e, _, _) -> err_execv f (uerr e)
   end
+
+  module Sig_exit = struct
+    let on_sigint ~hook f =
+      let hook _ = hook (); exit 130 (* as if SIGINT signaled *) in
+      let restore = Sys.signal Sys.sigint (Sys.Signal_handle hook) in
+      let restore () = Sys.set_signal Sys.sigint restore in
+      try let v = f () in restore (); v with e -> restore (); raise e
+  end
 end
 
 module Log = struct
@@ -3763,14 +3771,17 @@ module Log = struct
   | Quiet -> "quiet" | App -> "app" | Error -> "error" | Warning -> "warning"
   | Info -> "info" | Debug -> "debug"
 
-  let level_of_string = function
+  let level_of_string s = match String.trim s with
   | "quiet" -> Ok Quiet
   | "app" -> Ok App
   | "error" -> Ok Error
   | "warning" -> Ok Warning
-  | "info" -> Ok Info
-  | "debug" -> Ok Debug
-  | l -> Fmt.error "%a: unknown log level" Fmt.(quote string) l
+  | "info" ->  Ok Info
+  | "debug" ->  Ok Debug
+  | e ->
+      let one_of = Fmt.one_of (Fmt.tty_string [`Bold]) in
+      let exps = ["quiet"; "app"; "error"; "warning"; "info"; "debug"] in
+      Fmt.error "%S: unknown log level expected %a" e one_of exps
 
   (* Reporting *)
 

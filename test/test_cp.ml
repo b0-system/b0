@@ -6,14 +6,13 @@
 
 open B0_std
 
-let cp_cmd () allow_hardlinks follow_symlinks recurse src dst =
-  let r =
-    Os.Path.copy
-      ~allow_hardlinks ~follow_symlinks ~make_path:true ~recurse ~src dst
-  in
-  Log.if_error ~use:1 (Result.bind r @@ fun () -> Ok 0)
+let cp_cmd allow_hardlinks follow_symlinks recurse src dst =
+  let error e = Fmt.epr "%s: %s" (Filename.basename Sys.argv.(0)) e; 1 in
+  let make_path = true in
+  Result.fold ~ok:(fun () -> 0) ~error @@
+  Os.Path.copy ~allow_hardlinks ~follow_symlinks ~make_path ~recurse ~src dst
 
-let () =
+let main () =
   let open Cmdliner in
   let cmd =
     let allow_hardlinks =
@@ -33,20 +32,21 @@ let () =
     in
     let src =
       let doc = "$(docv) is the source file or directory" in
-      Arg.(required & pos 0 (some B0_ui.Cli.Arg.fpath) None &
+      Arg.(required & pos 0 (some B0_std_ui.fpath) None &
            info [] ~doc ~docv:"SRC")
     in
     let dst =
       let doc = "$(docv) is the destination path; which must not exist." in
-      Arg.(required & pos 1 (some B0_ui.Cli.Arg.fpath) None &
+      Arg.(required & pos 1 (some B0_std_ui.fpath) None &
            info [] ~doc ~docv:"DST")
     in
-    Term.(const cp_cmd $ B0_ui.B0_std.cli_setup () $ allow_hardlinks $
-          follow_symlinks $ recurse $ src $ dst),
+    Term.(const cp_cmd $ allow_hardlinks $ follow_symlinks $ recurse $
+          src $ dst),
     Term.info "test-cp" ~sdocs:Manpage.s_common_options
   in
   Term.exit_status (Term.eval cmd)
 
+let () = if !Sys.interactive then () else main ()
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2019 The b0 programmers

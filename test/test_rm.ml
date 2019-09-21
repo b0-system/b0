@@ -6,11 +6,11 @@
 
 open B0_std
 
-let rm_cmd () recurse p  =
-  let r = Os.Path.delete ~recurse p in
-  Log.if_error ~use:1 (Result.bind r @@ fun _ -> Ok 0)
+let rm_cmd recurse p  = match Os.Path.delete ~recurse p with
+| Ok _ -> 0
+| Error e -> Fmt.epr "%s: %s" (Filename.basename Sys.argv.(0)) e; 1
 
-let () =
+let main () =
   let open Cmdliner in
   let cmd =
     let recurse =
@@ -21,13 +21,15 @@ let () =
     in
     let path =
       let doc = "$(docv) is file path to delete" in
-      Arg.(required & pos 0 (some B0_ui.Cli.Arg.fpath) None &
+      Arg.(required & pos 0 (some B0_std_ui.fpath) None &
            info [] ~doc ~docv:"PATH")
     in
-    Term.(const rm_cmd $ B0_ui.B0_std.cli_setup () $ recurse $ path),
+    Term.(const rm_cmd $ recurse $ path),
     Term.info "test-rm" ~sdocs:Manpage.s_common_options
   in
   Term.exit_status (Term.eval cmd)
+
+let () = if !Sys.interactive then () else main ()
 
 
 (*---------------------------------------------------------------------------

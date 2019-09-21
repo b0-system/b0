@@ -17,27 +17,32 @@ let find_root_b0 ~cwd =
   | true -> cwd
   | false ->
       if Fpath.is_root p then cwd else
-      match Os.Dir.exists Fpath.(p / B0_ui.Memo.b0_dir_name) with
+      match Os.Dir.exists Fpath.(p / B00_ui.Memo.b0_dir_name) with
       | Error _ | Ok false -> loop (Fpath.parent p)
       | Ok true -> p
   in
   loop cwd
 
-let log_cmd () no_pager b0_dir log_file (out_fmt, log_output) log_filter =
+let log_cmd
+    tty_cap log_level no_pager b0_dir log_file (out_fmt, log_output) log_filter
+  =
+  let tty_cap = B0_std_ui.get_tty_cap tty_cap in
+  let log_level = B0_std_ui.get_log_level log_level in
+  B0_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
   Log.if_error ~use:err_unknown @@
   Result.bind (Os.Dir.cwd ()) @@ fun cwd ->
-  let b0_dir = B0_ui.Memo.get_b0_dir ~cwd ~root:(find_root_b0 cwd) ~b0_dir in
-  let log_file = B0_ui.Memo.get_log_file ~cwd ~b0_dir ~log_file in
+  let b0_dir = B00_ui.Memo.get_b0_dir ~cwd ~root:(find_root_b0 cwd) ~b0_dir in
+  let log_file = B00_ui.Memo.get_log_file ~cwd ~b0_dir ~log_file in
   let don't = no_pager || out_fmt = `Trace_event in
-  Result.bind (B0_ui.Pager.find ~don't ()) @@ fun pager ->
-  Result.bind (B0_ui.Pager.page_stdout pager) @@ fun () ->
+  Result.bind (B0_pager.find ~don't ()) @@ fun pager ->
+  Result.bind (B0_pager.page_stdout pager) @@ fun () ->
   match Os.File.exists log_file with
   | Error _ as e -> e
   | Ok false ->
       Log.err (fun m -> m "%a: No such file." Fpath.pp_unquoted log_file);
       Ok err_no_log_file
   | Ok true ->
-      Result.bind (B0_ui.Memo.Log.read_file log_file) @@
+      Result.bind (B00_ui.Memo.Log.read_file log_file) @@
       fun (info, ops) -> log_output (info, log_filter ops); Ok 0
 
 (* Command line interface *)
@@ -49,8 +54,6 @@ let exits =
   Term.exit_info err_unknown ~doc:"unknown error reported on stderr." ::
   Term.default_exits
 
-let cli_conf = B0_ui.B0_std.cli_setup ()
-
 (* Main command *)
 
 let b00_log =
@@ -59,23 +62,25 @@ let b00_log =
   let man_xrefs = [`Tool "b0"; `Tool "b00-cache"] in
   let docs_out_fmt = "OUTPUT FORMATS" in
   let docs_selection = "OPTIONS FOR SELECTING OPERATIONS" in
-  let envs = B0_ui.Pager.envs in
+  let envs = B0_pager.envs () in
   let man = [
     `S Manpage.s_description;
     `P "The $(tname) command shows operations stored in binary B0 log files.";
-    `Blocks B0_ui.Op.select_man;
+    `Blocks B00_ui.Op.select_man;
     `S docs_out_fmt;
     `S Manpage.s_bugs;
     `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ];
   in
-  let b0_dir = B0_ui.Memo.b0_dir () in
-  let b0_log_file = B0_ui.Memo.log_file () in
-  Term.(const log_cmd $ cli_conf $ B0_ui.Pager.don't () $
+  let tty_cap = B0_std_ui.tty_cap () in
+  let log_level = B0_std_ui.log_level () in
+  let b0_dir = B00_ui.Memo.b0_dir () in
+  let b0_log_file = B00_ui.Memo.log_file () in
+  let version = "%%VERSION%%" in
+  Term.(const log_cmd $ tty_cap $ log_level $ B0_pager.don't () $
         b0_dir $ b0_log_file $
-        B0_ui.Memo.Log.out_fmt_cli ~docs:docs_out_fmt () $
-        B0_ui.Op.select_cli ~docs:docs_selection ()),
-  Term.info "b00-log" ~version:"%%VERSION%%" ~doc ~sdocs ~envs ~exits ~man
-    ~man_xrefs
+        B00_ui.Memo.Log.out_fmt_cli ~docs:docs_out_fmt () $
+        B00_ui.Op.select_cli ~docs:docs_selection ()),
+  Term.info "b00-log" ~version ~doc ~sdocs ~envs ~exits ~man ~man_xrefs
 
 let () = Term.(exit_status @@ eval b00_log)
 

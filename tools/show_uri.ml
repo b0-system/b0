@@ -8,37 +8,33 @@ open B0_std
 
 let urify u = (* Detects if u is simply a file path and urifies it *)
   let file_uri p = Fmt.str "file://%s" (Fpath.to_string p) in
-  try
-    let p = Fpath.of_string u |> Result.to_failure in
-    match Os.File.exists p |> Result.to_failure ||
-          Os.Dir.exists p |> Result.to_failure
-    with
-    | false -> u
-    | true when (Fpath.is_abs p) -> file_uri p
-    | true ->
-        let cwd = Os.Dir.cwd () |> Result.to_failure in
-        file_uri Fpath.(cwd // p)
-  with Failure _ -> u
+  Result.value ~default:u @@
+  Result.bind (Fpath.of_string u) @@ fun p ->
+  Result.bind (Os.Path.exists p) @@ function
+  | false -> Ok u
+  | true when (Fpath.is_abs p) -> Ok (file_uri p)
+  | true ->
+      Result.bind (Os.Dir.cwd ()) @@ fun cwd -> Ok (file_uri Fpath.(cwd // p))
 
-let show_uris () background prefix browser uris =
-  match B0_ui.Browser.find ~browser () with
-  | Error e -> Log.err (fun m -> m "%s" e); 1
-  | Ok browser ->
-      let rec loop = function
-      | [] -> 0
-      | uri :: uris ->
-          let uri = urify uri in
-          match B0_ui.Browser.show ~background ~prefix browser uri with
-          | Error e -> Log.err (fun m -> m "%s" e); 1
-          | Ok () -> loop uris
-      in
-      loop uris
+let show_uris tty_cap log_level background prefix browser uris =
+  let tty_cap = B0_std_ui.get_tty_cap tty_cap in
+  let log_level = B0_std_ui.get_log_level log_level in
+  B0_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
+  Log.if_error ~use:1 @@
+  Result.bind (B0_www_browser.find ~browser ()) @@ fun browser ->
+  let open_uri u = B0_www_browser.show ~background ~prefix browser (urify u) in
+  let rec loop = function
+  | [] -> Ok 0
+  | u :: us -> match open_uri u with Ok () -> loop us | Error _ as e -> e
+  in
+  Log.if_error' ~use:1 (loop uris)
 
 open Cmdliner
 
 let uris =
-  let doc = "URI to show. If URI is an existing file path \
-             a corresponding file:// URI is opened."
+  let doc =
+    "URI to show. If URI is an existing file path a corresponding file:// \
+     URI is opened."
   in
   Arg.(non_empty & pos_all string [] & info [] ~doc ~docv:"URI")
 
@@ -47,22 +43,24 @@ let cmd =
   let man = [
     `S Manpage.s_description;
     `P "The $(mname) command show URIs specified on the command line.";
-    `P "Up to sever platform and browser limitation, $(mname) tries
-        to limit the creation of new tabs, reloading existing ones
-        which have the same URI or are, see option $(b,--prefix),
-        prefixed by the URI."; ]
+    `P "Up to sever platform and browser limitation, $(mname) tries to limit \
+        the creation of new tabs, reloading existing ones which have the same \
+        URI or are, see option $(b,--prefix), prefixed by the URI."; ]
   in
   let exits =
     Term.exit_info 1 ~doc:"if the URI failed to load in some way" ::
     Term.default_exits
   in
-  Term.(const show_uris $ B0_ui.B0_std.cli_setup () $
-        B0_ui.Browser.background ~opts:["g"; "background"] () $
-        B0_ui.Browser.prefix ~opts:["p"; "prefix"] () $
-        B0_ui.Browser.browser ~opts:["b"; "browser"] () $ uris),
+  Term.(const show_uris $
+        B0_std_ui.tty_cap () $
+        B0_std_ui.log_level () $
+        B0_www_browser.background ~opts:["g"; "background"] () $
+        B0_www_browser.prefix ~opts:["p"; "prefix"] () $
+        B0_www_browser.browser ~opts:["b"; "browser"] () $ uris),
   Term.info "show-uri" ~doc ~sdocs:Manpage.s_common_options ~man ~exits
 
-let () = Term.(exit_status @@ eval cmd)
+let main () = Term.(exit_status @@ eval cmd)
+let () = if !Sys.interactive then () else main ()
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2019 The b0 programmers

@@ -271,7 +271,15 @@ let exits =
   Term.exit_info err_unknown ~doc:"unknown error reported on stderr." ::
   Term.default_exits
 
-let cli_conf = B0_ui.B0_std.cli_setup ()
+let set_conf =
+  let tty_cap = B0_std_ui.tty_cap () in
+  let log_level = B0_std_ui.log_level () in
+  let conf tty_cap log_level =
+    let tty_cap = B0_std_ui.get_tty_cap tty_cap in
+    let log_level = B0_std_ui.get_log_level log_level in
+    B0_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug
+  in
+  Term.(pure conf $ tty_cap $ log_level)
 
 let only_unused =
   let doc = "Keep only unused keys from the selection. $(b,WARNING) Unused key
@@ -282,25 +290,25 @@ let only_unused =
   in
   Arg.(value & flag & info ["u"; "unused"] ~doc)
 
-let out_fmt = B0_ui.Cli.out_fmt ()
-let key_arg = B0_ui.File_cache.key_arg
+let out_fmt = B00_ui.Cli.out_fmt ()
+let key_arg = B00_ui.File_cache.key_arg
 let req_key =
   let doc = "The key." in
   Arg.(required & pos 0 (some key_arg) None & info [] ~doc ~docv:"KEY")
 
-let keys_none_is_all = B0_ui.File_cache.keys_none_is_all ()
+let keys_none_is_all = B00_ui.File_cache.keys_none_is_all ()
 
 (* Command clis *)
 
-let fpath = B0_ui.Cli.Arg.fpath
+let fpath = B0_std_ui.fpath
 let dir =
   let get_dir cache_dir = match Os.Dir.cwd () with
   | Error e -> `Error (false, e)
   | Ok cwd ->
-      let b0_dir = Fpath.(cwd / B0_ui.Memo.b0_dir_name) in
-      `Ok (B0_ui.Memo.get_cache_dir ~cwd ~b0_dir ~cache_dir)
+      let b0_dir = Fpath.(cwd / B00_ui.Memo.b0_dir_name) in
+      `Ok (B00_ui.Memo.get_cache_dir ~cwd ~b0_dir ~cache_dir)
   in
-  let cache_dir = B0_ui.Memo.cache_dir ~doc_none:"$(b,_b0/.cache)" () in
+  let cache_dir = B00_ui.Memo.cache_dir ~doc_none:"$(b,_b0/.cache)" () in
   Term.(ret (const get_dir $ cache_dir))
 
 let sdocs = Manpage.s_common_options
@@ -330,14 +338,14 @@ let add_cmd =
     in
     Arg.(value & flag & info ["r"; "rec"] ~doc)
   in
-  Term.(const add_cmd $ cli_conf $ dir $ force $ req_key $ recurse $ paths),
+  Term.(const add_cmd $ set_conf $ dir $ force $ req_key $ recurse $ paths),
   Term.info "add" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 let delete_cmd =
   let doc = "Delete keys" and man_xrefs = [ `Main ] in
   let man = [
     `S Manpage.s_description; `P "$(tname) deletes keys."] in
-  Term.(const delete_cmd $ cli_conf $ dir $ only_unused $ keys_none_is_all),
+  Term.(const delete_cmd $ set_conf $ dir $ only_unused $ keys_none_is_all),
   Term.info "delete" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 let files_cmd =
@@ -347,7 +355,7 @@ let files_cmd =
     `P "$(tname) lists key files. By default outputs one file path per line
         preceeded by the key name to which it belongs." ]
   in
-  Term.(const files_cmd $ cli_conf $ dir $ only_unused $ keys_none_is_all $
+  Term.(const files_cmd $ set_conf $ dir $ only_unused $ keys_none_is_all $
         out_fmt),
   Term.info "files" ~doc ~sdocs ~exits ~man ~man_xrefs
 
@@ -363,7 +371,7 @@ let gc_cmd =
         keys appear unused and this command deletes all the cache,
         i.e. is equivalent to $(mname) $(b,delete).";]
   in
-  Term.(const gc_cmd $ cli_conf $ dir),
+  Term.(const gc_cmd $ set_conf $ dir),
   Term.info "gc" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 let keys_cmd =
@@ -377,7 +385,7 @@ let keys_cmd =
     let doc = "Output the size in bytes (rather than human friendly units)." in
     Arg.(value & flag & info ["byte-size"] ~doc)
   in
-  Term.(const keys_cmd $ cli_conf $ dir $ only_unused $ keys_none_is_all $
+  Term.(const keys_cmd $ set_conf $ dir $ only_unused $ keys_none_is_all $
         out_fmt $ byte_size),
   Term.info "keys" ~doc ~sdocs ~exits ~man ~man_xrefs
 
@@ -388,7 +396,7 @@ let path_cmd =
     `P "$(tname) prints on standard output the path to the cache directory \
         (which may not exist)."];
   in
-  Term.(const path_cmd $ cli_conf $ dir),
+  Term.(const path_cmd $ set_conf $ dir),
   Term.info "path" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 let revive_cmd =
@@ -426,7 +434,7 @@ let revive_cmd =
     in
     Term.(term_result (const either $ explicit $ prefix))
   in
-  Term.(const revive_cmd $ cli_conf $ dir $ req_key $ paths),
+  Term.(const revive_cmd $ set_conf $ dir $ req_key $ paths),
   Term.info "revive" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 let size_cmd =
@@ -437,7 +445,7 @@ let size_cmd =
     `P "$(tname) prints on standard output statistics about the size of the
         cache." ]
   in
-  Term.(const size_cmd $ cli_conf $ dir $ only_unused $ keys_none_is_all),
+  Term.(const size_cmd $ set_conf $ dir $ only_unused $ keys_none_is_all),
   Term.info "size" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 let trim_cmd =
@@ -470,7 +478,7 @@ let trim_cmd =
     in
     Term.(const combine $ trim_to_mb $ trim_to_pct)
   in
-  Term.(const trim_cmd $ cli_conf $ dir $ trim_spec),
+  Term.(const trim_cmd $ set_conf $ dir $ trim_spec),
   Term.info "trim" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 (* Main command *)

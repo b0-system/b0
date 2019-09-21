@@ -2774,6 +2774,23 @@ module Os : sig
         only recturns in case of error. [env] defaults to
         {!B0.OS.Env.current_assignments}[ ()], [cwd] to {!Dir.current}[ ()]. *)
   end
+
+  (** Signal exit hooks. *)
+  module Sig_exit : sig
+
+    val on_sigint :  hook:(unit -> unit) -> (unit -> 'a) -> 'a
+    (** [on_sigint ~hook f] calls [f ()] and returns its value. If [SIGINT]
+        is signalled during that time [hook] is called followed by [exit 130]
+        – that is the exit code a [SIGINT] would produce.
+
+        [on_sigint] replaces an existing signal handler for
+        {!Sys.sigint} during time of the function call. It is restored
+        when the function returns.
+
+        {b Note.} Since {!exit} is called {!at_exit} functions are
+        called if a [SIGINT] occurs during the function call. This is not
+        the case on an unhandled [SIGINT]. *)
+  end
 end
 
 (** Program log.
