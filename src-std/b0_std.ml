@@ -3872,13 +3872,23 @@ module Log = struct
       !_kmsg.kmsg (fun _ -> use) level @@ fun m ->
       m ?header "@[%a@]" Fmt.lines msg
 
+  let if_error' ?(level = Error) ?header ~use = function
+  | Ok _ as v -> v
+  | Error msg ->
+      !_kmsg.kmsg (fun _ -> Ok use) level @@ fun m ->
+      m ?header "@[%a@]" Fmt.lines msg
+
   let warn_if_error ?header ~use r = if_error ~level:Warning ?header ~use r
 
   let if_error_pp ?(level = Error) ?header pp ~use = function
   | Ok v -> v
   | Error e ->
-      !_kmsg.kmsg (fun _ -> use) level @@ fun m ->
-      m ?header "@[%a@]" pp e
+      !_kmsg.kmsg (fun _ -> use) level @@ fun m -> m ?header "@[%a@]" pp e
+
+  let if_error_pp' ?(level = Error) ?header pp ~use = function
+  | Ok _ as v -> v
+  | Error e ->
+      !_kmsg.kmsg (fun _ -> Ok use) level @@ fun m -> m ?header "@[%a@]" pp e
 
   (* Logging timings *)
 

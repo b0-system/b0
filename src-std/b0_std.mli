@@ -2154,7 +2154,7 @@ module Os : sig
         {!stdin}.  After the function returns (normally or via an
         exception raised by [f]), [ic] is ensured to be closed, except
         if it is {!stdin}. The function errors if opening [file]
-        fails. *)
+        fails. Errors have the form [Fmt.str "%s: %s" file err]. *)
 
     val read_with_ic : Fpath.t -> (in_channel -> 'b) -> ('b, string) result
     (** [read_with_ic file f] is exactly like {!read_with_fd} but
@@ -2165,7 +2165,8 @@ module Os : sig
         {!dash} the contents of {!stdin} is read. {b Warning.} The
         signature of this function limits files to be at most
         {!Sys.max_string_length} in size. On 32-bit platforms this is
-        {b only around [16MB]}. *)
+        {b only around [16MB]}. Errors have the form
+        [Fmt.str "%s: %s" file err]. *)
 
     (** {1:writes Writing and copying} *)
 
@@ -2874,9 +2875,10 @@ module Log : sig
       {- [use] and [e] is logged with [level] (defaults to [Error]), if
          [r] is [Error e].}} *)
 
-  val warn_if_error :
-    ?header:string -> use:'a -> ('a, string) result -> 'a
-  (** [warn_if_error] is [if_error ~level:Warning]. *)
+  val if_error' :
+    ?level:level -> ?header:string -> use:'a -> ('a, string) result ->
+    ('a, 'b) result
+  (** [if_error'] is {!if_error} wrapped by {!Result.ok}. *)
 
   val if_error_pp :
     ?level:level -> ?header:string -> 'b Fmt.t -> use:'a -> ('a, 'b) result ->
@@ -2887,6 +2889,11 @@ module Log : sig
       {- [use] and [e] is logged with [level] (defaults to [Error]) using
          [pp], if [r] is [Error e].}} *)
 
+  val if_error_pp' :
+    ?level:level -> ?header:string -> 'b Fmt.t -> use:'a -> ('a, 'b) result ->
+    ('a, 'b) result
+  (** [if_error_pp'] is {!if_error_pp'} wrapped by {!Result.ok} *)
+
   (** {2:timing Logging timings} *)
 
   val time :
@@ -2894,7 +2901,12 @@ module Log : sig
     ('a -> (('b, Format.formatter, unit, 'a) format4 -> 'b) -> 'a) ->
     (unit -> 'a) -> 'a
   (** [time ~level m f] logs [m] with level [level] (defaults to
-      [Info]) and the time [f ()] took as the log header. *)
+      [Info]) and the time [f ()] took as the log header.
+
+      {b Note.} The current log level is determined after [f] has been
+      called this means [f] can change it to affect the log
+      operation. This allows [f] to be the main function of your
+      program and let it set the log level. *)
 
   (** {1:monitoring Log monitoring} *)
 
