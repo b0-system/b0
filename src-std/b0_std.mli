@@ -1390,9 +1390,9 @@ module Fpath : sig
       {{!Char.Ascii.is_control}control characters}.
 
       {b Note.} In 2019, the standard definition of URIs is in a sorry
-      state. Assuming the original file path was UTF-8 encoded. It is
-      {e believed} the above function should lead to an URI path
-      component that can be parsed by HTML5's
+      state. Assuming [p] is UTF-8 encoded. It is {e believed} the
+      above function should lead to an URI path component that can be
+      parsed by HTML5's
       {{:https://dev.w3.org/html5/spec-LC/urls.html#parsing-urls}
       definition} of URI parsing. *)
 
@@ -1907,18 +1907,19 @@ module Os : sig
 
     (** {1:var Variables} *)
 
-    val find : empty_to_none:bool -> string -> string option
-    (** [find ~empty_to_none name] is the value of the environment
+    val find : empty_is_none:bool -> string -> string option
+    (** [find ~empty_is_none name] is the value of the environment
         variable [name] in the current process environment, if
-        defined. If [empty_to_none] is [true] (default), [None] is
-        returned if the variable value is the empty string. *)
+        defined. If [empty_is_none] is [true], [None] is returned if
+        the variable value is the empty string. *)
 
-    val find_value :
-      (string -> ('a, string) result) -> empty_to_none:bool -> string ->
-      ('a, string) result option
-    (** [find_value parse ~empty_to_none name] is [Option.bind parse
-        (find ~empty_to_none name)], except the error message of
-        [parse] is tweaked to mention [name] in case of error. *)
+    val find' :
+      empty_is_none:bool -> (string -> ('a, string) result) -> string ->
+      ('a option, string) result
+    (** [find' ~empty_is_none parse name] is like {!find} but
+        the value is parsed with [parse]. If the latter errors
+        with [Error e], [Error (Fmt.str "%s env: %s" name e)]
+        is returned. *)
 
     (** {1:env Process environement} *)
 

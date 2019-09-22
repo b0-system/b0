@@ -2259,6 +2259,23 @@ module Os = struct
   let ffail_notrace file e = Fmt.failwith_notrace "%a: %s" Fpath.pp file e
 
   module Env = struct
+
+    (* Variables *)
+
+    let find ~empty_is_none name = match Unix.getenv name with
+    | "" when empty_is_none -> None
+    | v -> Some v
+    | exception Not_found -> None
+
+    let find' ~empty_is_none parse name = match find ~empty_is_none name with
+    | None -> Ok None
+    | Some v ->
+        match parse v with
+        | Error e -> Fmt.error "%s env: %s" name e
+        | Ok v -> Ok (Some v)
+
+    (* Process environment *)
+
     type t = string String.Map.t
     let empty = String.Map.empty
     let override env ~by =
@@ -2269,19 +2286,9 @@ module Os = struct
       in
       String.Map.merge lean_right env by
 
-    let env_err e = Fmt.error "process environment: %s" e
-    let find ~empty_to_none name = match Unix.getenv name with
-    | "" when empty_to_none -> None
-    | v -> Some v
-    | exception Not_found -> None
+    (* Assignements *)
 
-    let find_value parse ~empty_to_none name =
-      match find ~empty_to_none name with
-      | None -> None
-      | Some v ->
-          match parse v with
-          | Error e -> Some (Fmt.error "%s environment variable: %s" name e)
-          | Ok v -> Some (Ok v)
+    let env_err e = Fmt.error "process environment: %s" e
 
     type assignments = string list
     let current_assignments () =
@@ -2670,7 +2677,7 @@ module Os = struct
 
     let default_dir =
       let tmp_from_env var ~default =
-        Option.value ~default (Env.find ~empty_to_none:true var)
+        Option.value ~default (Env.find ~empty_is_none:true var)
       in
       let dir = match Sys.win32 with
       | true -> tmp_from_env "TEMP" ~default:Fpath.(v "./")
@@ -3262,7 +3269,7 @@ module Os = struct
     (* Base directories *)
 
     let err_dir dir fmt = Fmt.error ("%s directory: " ^^ fmt) dir
-    let fpath_of_env_var dir var = match Env.find ~empty_to_none:true var with
+    let fpath_of_env_var dir var = match Env.find ~empty_is_none:true var with
     | None -> None
     | Some p ->
         match Fpath.of_string p with

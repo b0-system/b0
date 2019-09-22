@@ -34,7 +34,7 @@ let pp_token_src ppf = function
 let github_conf_dir () =
   Result.bind (Os.Dir.config ()) (fun config -> Ok Fpath.(config / "github"))
 
-let auth ~user () = match Os.Env.find ~empty_to_none:true token_env with
+let auth ~user () = match Os.Env.find ~empty_is_none:true token_env with
 | Some token -> Ok { user; token; token_src = `Env }
 | None ->
     Result.bind (github_conf_dir ()) @@ fun ghdir ->

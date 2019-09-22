@@ -827,20 +827,19 @@ module Pager = struct
   let find ?search ~don't () = match don't with
   | true -> Ok None
   | false ->
-      match Os.Env.find ~empty_to_none:true "TERM" with
+      match Os.Env.find ~empty_is_none:true "TERM" with
       | Some "dumb" | None -> Ok None
       | Some _ ->
           let cmds = [Cmd.arg "less"; Cmd.arg "more"] in
           let cmds =
-            match Os.Env.find_value Cmd.of_string ~empty_to_none:true "PAGER"
-            with
-            | None -> Ok cmds
-            | Some (Ok cmd) -> Ok (cmd :: cmds)
-            | Some (Error _ as e) -> e
+            match Os.Env.find' ~empty_is_none:true Cmd.of_string "PAGER" with
+            | Error _ as e -> e
+            | Ok None -> Ok cmds
+            | Ok (Some cmd) -> Ok (cmd :: cmds)
           in
           Result.bind cmds (Os.Cmd.find_first ?search)
 
-  let pager_env () = match Os.Env.find ~empty_to_none:false "LESS" with
+  let pager_env () = match Os.Env.find ~empty_is_none:false "LESS" with
   | Some _ -> Ok None
   | None ->
       Result.bind (Os.Env.current_assignments ()) @@ fun env ->
@@ -915,10 +914,10 @@ module Editor = struct
     let parse_env cmds env = match cmds with
     | Error _ as e -> e
     | Ok cmds as r ->
-        match Os.Env.find_value Cmd.of_string ~empty_to_none:true env with
-        | None -> r
-        | Some (Ok cmd) -> Ok (cmd :: cmds)
-        | Some (Error _ as e) -> e
+        match Os.Env.find' ~empty_is_none:true Cmd.of_string  env with
+        | Error _ as e -> e
+        | Ok None -> r
+        | Ok (Some cmd) -> Ok (cmd :: cmds)
     in
     let cmds = Ok [Cmd.arg "nano"] in
     let cmds = parse_env cmds "EDITOR" in
@@ -1036,11 +1035,7 @@ module Browser = struct
 
   let browser_env_fallback browser = match browser with
   | Some _ as b -> Ok b
-  | None ->
-      match Os.Env.find_value Cmd.of_string ~empty_to_none:true browser_var with
-      | None -> Ok None
-      | Some (Ok b) -> Ok (Some b)
-      | Some (Error _ as e) -> e
+  | None -> Os.Env.find' ~empty_is_none:true Cmd.of_string browser_var
 
   let find_browser_cmd ?search cmd =
     Result.bind (Os.Cmd.find ?search cmd) @@ function

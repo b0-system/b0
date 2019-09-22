@@ -79,12 +79,10 @@ end
 
 type t = r * (module VCS)
 
-let get_vcs ?search cmd var =
-  let cmd = match Os.Env.find_value Cmd.of_string ~empty_to_none:true var with
-  | None -> Ok (Cmd.arg cmd)
-  | Some cmd -> cmd
-  in
-  Result.bind cmd @@ fun cmd -> Os.Cmd.find ?search cmd
+let get_vcs ?search default_cmd var =
+  let cmd = Os.Env.find' ~empty_is_none:true Cmd.of_string var in
+  Result.bind cmd @@ fun cmd ->
+  Os.Cmd.find ?search (Option.value ~default:(Cmd.arg default_cmd) cmd)
 
 let err cmd status = Fmt.error "%a" Os.Cmd.pp_cmd_status (cmd, status)
 let run ?stderr r cmd_args =
