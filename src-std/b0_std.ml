@@ -3654,8 +3654,7 @@ module Os = struct
           Fd.Set.close_all fds; spawn_err cmd (uerr e)
 
     let run_status_out
-        ?env ?cwd ?(stdin = in_stdin) ?(stderr = `Stdo out_stderr)
-        ?(trim = true) cmd
+        ?env ?cwd ?(stdin = in_stdin) ?(stderr = `Stdo out_stderr) ~trim cmd
       =
       let fds = Fd.Set.empty () in
       try
@@ -3666,9 +3665,8 @@ module Os = struct
         let pid = _spawn fds ?env ?cwd ~stdin ~stdout ~stderr cmd in
         let status = run_collect pid in
         let out = Fd.read_file tmpf fd in
-        let out = if trim then String.trim out else out in
         Tmp.rem_file tmpf;
-        Ok (status, out)
+        Ok (status, if trim then String.trim out else out)
       with
       | Failure e -> Fd.Set.close_all fds; spawn_err cmd e
       | Unix.Unix_error (e, _, _) ->
@@ -3680,8 +3678,8 @@ module Os = struct
       | Ok st -> Fmt.error "%a" pp_cmd_status (cmd, st)
       | Error _ as e -> e
 
-    let run_out ?env ?cwd ?stdin ?stderr ?trim cmd =
-      match run_status_out ?env ?cwd ?stdin ?stderr ?trim cmd with
+    let run_out ?env ?cwd ?stdin ?stderr ~trim cmd =
+      match run_status_out ?env ?cwd ?stdin ?stderr ~trim cmd with
       | Ok (`Exited 0, v) -> Ok v
       | Ok (st, _) -> Fmt.error "%a" pp_cmd_status (cmd, st)
       | Error _ as e -> e

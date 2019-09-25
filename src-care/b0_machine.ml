@@ -16,7 +16,7 @@ let logical_cpu_count ?search () =
   let try_cmd cmd otherwise = Result.bind (Os.Cmd.find cmd) @@ function
   | None -> otherwise ()
   | Some cmd ->
-      Result.bind (Os.Cmd.run_out cmd) @@ fun s ->
+      Result.bind (Os.Cmd.run_out ~trim:true cmd) @@ fun s ->
       Result.map Option.some (int s)
   in
   try_cmd Cmd.(arg "getconf" % "_NPROCESSORS_ONLN") @@ fun () ->

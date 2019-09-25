@@ -14,7 +14,7 @@ let macos_jxa ?search () = Os.Cmd.find_tool ?search (Fpath.v "osascript")
 let macos_jxa_run jxa script cli_args =
   let stdin = Os.Cmd.in_string script in
   let cmd = Cmd.(path jxa % "-l" % "JavaScript" % "-" %% cli_args) in
-  Os.Cmd.(run_out ~stdin cmd)
+  Os.Cmd.(run_out ~stdin ~trim:true cmd)
 
 let macos_jxa_default_browser_appid jxa =
   Result.map_error (fun e -> Fmt.str "default lookup: %s" e) @@

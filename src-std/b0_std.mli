@@ -2675,7 +2675,7 @@ module Os : sig
 
     val run_status_out :
       ?env:Env.assignments -> ?cwd:Fpath.t -> ?stdin:stdi ->
-      ?stderr:[`Stdo of stdo | `Out] -> ?trim:bool -> Cmd.t ->
+      ?stderr:[`Stdo of stdo | `Out] -> trim:bool -> Cmd.t ->
       (status * string, string) result
     (** [run_status_out] is like {!run_status} except [stdout] is read
         from the process to a string. The string is {!String.trim}ed
@@ -2691,7 +2691,7 @@ module Os : sig
 
     val run_out :
       ?env:Env.assignments -> ?cwd:Fpath.t -> ?stdin:stdi ->
-      ?stderr:[`Stdo of stdo | `Out] -> ?trim:bool -> Cmd.t ->
+      ?stderr:[`Stdo of stdo | `Out] -> trim:bool -> Cmd.t ->
       (string, string) result
     (** [run] is {!run_status_out} with non-[`Exited 0] statuses
         turned into errors via {!pp_cmd_status}. *)

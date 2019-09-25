@@ -87,7 +87,7 @@ let get_vcs ?search default_cmd var =
 let err cmd status = Fmt.error "%a" Os.Cmd.pp_cmd_status (cmd, status)
 let run ?stderr r cmd_args =
   let vcs = Cmd.(r.cmd %% cmd_args) in
-  Result.bind (Os.Cmd.run_status_out ?stderr vcs) @@ function
+  Result.bind (Os.Cmd.run_status_out ?stderr ~trim:true vcs) @@ function
   | `Exited 0, v -> Ok v
   | status, _ -> err vcs status
 
@@ -108,7 +108,7 @@ module Git_vcs : VCS = struct
   | Some git ->
       let get_path cmd =
         let stderr = `Stdo Os.Cmd.out_null in
-        Result.bind (Os.Cmd.run_status_out ~stderr cmd) @@ function
+        Result.bind (Os.Cmd.run_status_out ~stderr ~trim:true cmd) @@ function
         | `Exited 0, repo_dir -> Fpath.of_string repo_dir
         | status, _ -> err cmd status
       in
@@ -239,7 +239,7 @@ module Hg_vcs : VCS = struct
       | Some hg ->
           let hg_root = Cmd.(hg % "root") in
           let stderr = `Stdo Os.Cmd.out_null in
-          let res = Os.Cmd.run_status_out ~stderr hg_root in
+          let res = Os.Cmd.run_status_out ~stderr ~trim:true hg_root in
           Result.bind res @@ function
           | `Exited 0, repo_dir ->
               Result.bind (Fpath.of_string repo_dir) @@ fun repo_dir ->
