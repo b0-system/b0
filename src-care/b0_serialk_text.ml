@@ -120,10 +120,11 @@ module Tloc = struct
       | true -> pf ppf "line %d" (fst l.sline)
       | false -> pf ppf "lines %d-%d" (fst l.sline) (fst l.eline)
       in
-      let col_s = l.sbyte - snd l.sline in
-      let col_e = l.ebyte - snd l.eline in
+      (* "characters" represent positions (insertion points) not columns *)
+      let pos_s = l.sbyte - snd l.sline in
+      let pos_e = l.ebyte - snd l.eline + 1 in
       pf ppf "File \"%a\", %a, characters %d-%d"
-        pp_path l.file pp_lines l col_s col_e
+        pp_path l.file pp_lines l pos_s pos_e
 
   let pp_gnu ppf l = match l.ebyte < 0 with
   | true -> pf ppf "%a:" pp_path l.file
