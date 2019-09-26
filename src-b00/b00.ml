@@ -297,7 +297,7 @@ module Memo = struct
     | [] ->
         if ws = [] then Ok () else
         begin match Op.find_read_write_cycle ws with
-        | Some os -> Error (Cycle ws)
+        | Some os -> Error (Cycle os)
         | None -> Error (Never_became_ready (Op.unwritten_reads ws))
         end
     | o :: os ->
