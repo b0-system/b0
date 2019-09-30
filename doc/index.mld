@@ -32,16 +32,14 @@ B0_http
 B0_lines
 B0_serialk_json
 B0_serialk_sexp
-B0_serialk_text
-}
+B0_serialk_text}
 
 {2:ui B0 UI fragments}
 
 {!modules:
 B00_ui
 B0_std_ui
-B0_trace
-}
+B0_trace}
 
 {2:build_logic Build logics}
 
@@ -49,8 +47,8 @@ B0_trace
 B0_cmark
 B0_machine
 B0_ocaml_cmi
-B0_odoc
-}
+B0_ocaml
+B0_odoc}
 
 {2:dev Dev tool interaction}
 
