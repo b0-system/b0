@@ -310,6 +310,7 @@ module Op = struct
     let pp_write = Fmt.using Op.Write.file pp_file_write in
     Fmt.record
       [ maybe_failure_and @@ Fmt.using Op.Write.get pp_write;
+        Fmt.field "reads" Op.reads pp_reads;
         Fmt.field "stamp" Op.Write.get pp_stamp;
         Fmt.field "mode" Op.Write.get pp_mode;
         pp_timings; ]
