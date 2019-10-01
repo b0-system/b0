@@ -1,4 +1,5 @@
 b0_stubs_time.o
 b0_stubs_hash.o
+b0_stubs_realpath.o
 vendor/MurmurHash3.o
 vendor/xxhash.o

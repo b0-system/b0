@@ -2001,6 +2001,13 @@ module Os : sig
            with permission [0o755] (readable and traversable by everyone,
            writable by the user).}} *)
 
+    (** {1:resolving Resolving} *)
+
+    val realpath : Fpath.t -> (Fpath.t, string) result
+    (** [realpath p] expands all symbolic links and resolves all references
+        to [.] and [..] segments. The function errors if [p] does not
+        exist. *)
+
     (** {1:copy Copying} *)
 
     val copy :

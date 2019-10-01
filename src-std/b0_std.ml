@@ -3349,6 +3349,14 @@ module Os = struct
     let delete = Fs_base.path_delete
     let rename = Fs_base.path_rename
 
+    (* Resolving *)
+
+    external _realpath : string -> string = "ocaml_b0_realpath"
+    let rec realpath p =
+      try Fpath.of_string (_realpath (Fpath.to_string p)) with
+      | Unix.Unix_error (Unix.EINTR, _, _) -> realpath p
+      | Unix.Unix_error (e, _, _) -> ferr p (err_doing "Resolving" (uerr e))
+
     (* Copying *)
 
     let copy
