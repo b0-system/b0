@@ -3,6 +3,7 @@ version = "%%VERSION_NUM%%"
 requires = ""
 
 package "std" (
+  directory = "std"
   description = "B0's std library"
   version = "%%VERSION_NUM%%"
   requires = "unix"
@@ -13,6 +14,7 @@ package "std" (
 )
 
 package "b00" (
+ directory = "b00"
  description = "B0's build kernel"
  version = "%%VERSION_NUM%%"
  requires = "b0.std"
@@ -23,6 +25,7 @@ package "b00" (
 )
 
 package "care" (
+  directory = "care"
   description = "B0's system library"
   version = "%%VERSION_NUM%%"
   requires = "unix cmdliner b0.std b0.b00 compiler-libs.common"

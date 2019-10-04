@@ -19,11 +19,11 @@ let ocaml_conditional c =
 let () =
   let build = Pkg.build ~pre:ocaml_conditional () in
   Pkg.describe ~build "b0" @@ fun c ->
-  Ok [ Pkg.mllib "src-b00/b00.mllib";
-       Pkg.mllib "src-std/b0_std.mllib";
-       Pkg.mllib "src-care/b0_care.mllib";
-       Pkg.lib "src-std/b0_std_top_init.ml";
-       Pkg.clib "src-std/libb0_stubs.clib";
+  Ok [ Pkg.mllib "src-b00/b00.mllib" ~dst_dir:"b00";
+       Pkg.mllib "src-std/b0_std.mllib" ~dst_dir:"std";
+       Pkg.lib "src-std/b0_std_top_init.ml" ~dst:"std/b0_std_top_init.ml";
+       Pkg.clib "src-std/libb0_stubs.clib" ~lib_dst_dir:"std";
+       Pkg.mllib "src-care/b0_care.mllib" ~dst_dir:"care";
        Pkg.test "test/test";
        Pkg.test "test/test_cp";
        Pkg.test "test/test_rm";
