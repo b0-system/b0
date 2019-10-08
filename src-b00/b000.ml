@@ -847,37 +847,37 @@ module Op = struct
   let find_read_write_cycle os =
     let path_to_start ~start path =
       let rec loop start acc = function
-      | o :: os when (id o = id start) -> o :: acc
+      | o :: os when (id o = id start) -> List.rev (o :: acc)
       | o :: os -> loop start (o :: acc) os
       | [] -> assert false
       in
       loop start [] path
     in
-    let rec loop write_map unvisited in_path path = function
-    | [] ->
-        begin match Set.choose unvisited with
-        | exception Not_found -> None
-        | o ->
-            let unvisited = Set.remove o unvisited in
-            let in_path = Set.singleton o and path = [o] in
-            loop write_map unvisited in_path path [o, op_deps ~write_map o]
-        end
-    | (o, ds) :: todo ->
-        match Set.choose ds with
-        | exception Not_found ->
-            loop write_map unvisited (Set.remove o in_path) (List.tl path) todo
-        | d ->
-            if Set.mem d in_path then Some (path_to_start ~start:d path) else
-            let todo = (o, Set.remove d ds) :: todo in
-            match Set.mem d unvisited with
-            | false -> loop write_map unvisited in_path path todo
-            | true ->
-                let unvisited = Set.remove d unvisited in
-                let in_path = Set.add d in_path and path = d :: path in
-                let todo = (d, op_deps ~write_map d) :: todo in
-                loop write_map unvisited in_path path todo
+    let rec explore_branch write_map visited in_path path o =
+      if Set.mem o in_path then `Cycle (path_to_start ~start:o path) else
+      if Set.mem o visited then `No_cycle visited else
+      let visited = Set.add o visited in
+      let in_path = Set.add o in_path in
+      let path = o :: path in
+      let preds = Set.elements (op_deps ~write_map o) in
+      let rec loop visited = function
+      | [] -> `No_cycle visited
+      | d :: ds ->
+          match explore_branch write_map visited in_path path d with
+          | `Cycle _ as cycle -> cycle
+          | `No_cycle visited -> loop visited ds
+      in
+      loop visited preds
     in
-    loop (write_map os) (Set.of_list os) Set.empty [] []
+    let rec loop write_map visited = function
+    | [] -> None
+    | o :: os ->
+        if Set.mem o visited then loop write_map visited os else
+        match explore_branch write_map visited Set.empty [] o with
+        | `Cycle cycle -> Some cycle
+        | `No_cycle visited -> loop write_map visited os
+    in
+    loop (write_map os) Set.empty os
 end
 
 module Reviver = struct

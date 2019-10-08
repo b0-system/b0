@@ -401,7 +401,7 @@ module Memo = struct
     | first :: _ ->
         let rec loop first acc = function
         | prev :: (next :: _ as os) -> loop first (deps prev next :: acc) os
-        | prev :: [] -> deps prev first :: acc
+        | prev :: [] -> List.rev (deps prev first :: acc)
         | [] -> assert false
         in
         loop first [] os

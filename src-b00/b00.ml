@@ -277,8 +277,8 @@ module Memo = struct
 
   (* Memo status
 
-     XXX Formally the analysis depends only on an list of ops
-     maybe we could move this to B000.Op. *)
+     XXX Formally the analysis depends only on an list of ops maybe we
+     could move this to B000.Op. *)
 
   type error =
   | Failures
