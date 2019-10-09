@@ -170,7 +170,6 @@ let show ~background ~prefix browser uri =
       | Macos_open (open_tool, appid) ->
           show_macos_open ~background ~prefix open_tool ~appid uri
 
-
 (* Cli interaction *)
 
 let browser ?docs ?(opts = ["browser"]) () =
@@ -179,9 +178,10 @@ let browser ?docs ?(opts = ["browser"]) () =
     "The WWW browser command $(docv) to use. The value may be interpreted \
      and massaged depending on the OS. On macOS: the names $(b,firefox), \
      $(b,chrome) and $(b,safari) are interpreted specially; use $(b,open) \
-     if you would like to use open(2); if absent the application that \
+     if you would like to use $(b,open\\(2\\)); if absent the application that \
      handles the $(b,http) URI scheme is used. On other platforms if
-     xdg-open(1) is found in $(b,PATH) this the program used by default."
+     $(b,xdg-open\\(1\\)) is found in $(b,PATH) this is the program used by
+     default."
   in
   let cmd = Arg.some ~none:"OS dependent fallback" B0_std_ui.cmd in
   Arg.(value & opt cmd None & info opts ~env ~doc ?docs ~docv:"CMD")
