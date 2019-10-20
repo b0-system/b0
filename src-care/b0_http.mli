@@ -82,7 +82,7 @@ module Http : sig
   (** [resp_body r] is the HTTP response body. *)
 end
 
-(** HTTP requests via [curl]. *)
+(** HTTP requestors. *)
 module Httpr : sig
 
   (** {1:peforming Performing requests} *)
@@ -90,22 +90,30 @@ module Httpr : sig
   type t
   (** The type for HTTP requestors. *)
 
+  val perform :
+    ?insecure:bool -> ?follow:bool -> t -> Http.req ->
+    (Http.resp, string) result
+  (** [perform httpr r] performs request [r] via [httpr].  If
+      [follow] is [true] (default) HTTP redirects for GET and HEAD
+      requests that return 301, 302, 303, 305 or 307 are automatically
+      followed. If [insecure] is [true] (defaults to [false]) TLS
+      server certificates are not checked.
+
+      The response's {!Http.resp_headers} are lowercased. *)
+
+  (** {1:curl [curl] requestor} *)
+
   val curl :
     ?docs:string -> ?env:Cmdliner.Arg.env -> unit -> Cmd.t Cmdliner.Term.t
   (** [curl] is a cli interface for specifying the curl command
-      line tool. *)
+      line tool.
+
+      which is looked up
+      in the PATH or in the environment variable [B0_CURL]. *)
 
   val find_curl :
     ?search:Fpath.t list -> curl:Cmd.t -> unit -> (t, string) result
 
-  val perform : ?follow:bool -> t -> Http.req -> (Http.resp, string) result
-  (** [perform curl r] performs request [r] via [curl] which is looked up
-      in the PATH or in the environment variable [B0_CURL].  If
-      [follow] is [true] (default) HTTP redirects for GET and HEAD
-      requests that return 301, 302, 303, 305 or 307 are automatically
-      followed.
-
-      The response's {!Http.resp_headers} are lowercased. *)
 end
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 The b0 programmers

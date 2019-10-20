@@ -147,15 +147,7 @@ module Httpr = struct
 
   type t = Cmd.t
 
-  let curl ?docs ?env () =
-    let open Cmdliner in
-    let doc = "The curl command $(docv) to use." in
-    let cmd = B0_std_ui.cmd in
-    let default = Cmd.arg "curl" in
-    Arg.(value & opt cmd default & info ["curl"] ~doc ?docs ?env ~docv:"CMD")
-
-  let find_curl ?search ~curl () = Os.Cmd.must_find ?search curl
-  let perform ?(follow = true) curl r =
+  let perform ?(insecure = false) ?(follow = true) curl r =
     let rec loop follow visited r =
       let meth = Cmd.(arg "-X" % Http.(meth_to_string (req_meth r))) in
       let headers =
@@ -168,9 +160,11 @@ module Httpr = struct
       | true -> Os.Cmd.in_string r.req_body
       | false -> Os.Cmd.in_stdin
       in
+      let insecure = Cmd.(if' insecure (arg "--insecure")) in
       let out =
         Os.Cmd.run_out ~trim:false ~stdin @@
-        Cmd.(curl % "-s" % "-i" %% meth %% headers %% body % r.req_uri)
+        Cmd.(curl %% insecure % "-s" % "-i" %% meth %% headers %% body %
+             r.req_uri)
       in
       Result.bind out @@ fun stdout ->
       Result.bind (Http.resp_of_string stdout) @@ fun resp ->
@@ -184,6 +178,15 @@ module Httpr = struct
       | _, _ -> Ok resp
     in
     loop follow [] r
+
+  let curl ?docs ?env () =
+    let open Cmdliner in
+    let doc = "The curl command $(docv) to use." in
+    let cmd = B0_std_ui.cmd in
+    let default = Cmd.arg "curl" in
+    Arg.(value & opt cmd default & info ["curl"] ~doc ?docs ?env ~docv:"CMD")
+
+  let find_curl ?search ~curl () = Os.Cmd.must_find ?search curl
 end
 
 (*---------------------------------------------------------------------------
