@@ -359,7 +359,40 @@ module Json = struct
   end
 
   let to_string v = G.to_string (G.json v)
-  let pp ppf v = failwith "TODO"
+
+  let pp ppf (v : t) = (* FIXME not T.R. *)
+    let pp_string ppf s = (* FIXME quick & dirty escaping *)
+      Format.pp_print_string ppf (G.to_string (G.json ((`String (s, loc_nil)))))
+    in
+    let pp_comma ppf () =
+      Format.(pp_print_char ppf ','; pp_print_space ppf ())
+    in
+    let rec loop ppf = function
+    | `Null _ -> Format.pp_print_string ppf "null"
+    | `Bool (b,_ ) -> Format.pp_print_string ppf (if b then "true" else "false")
+    | `Float (f, _) -> Format.fprintf ppf "%.16g" f
+    | `String (s, _) -> pp_string ppf s
+    | `A (a, _) ->
+        Format.pp_open_box ppf 1;
+        Format.pp_print_char ppf '[';
+        Format.pp_print_list ~pp_sep:pp_comma loop ppf a;
+        Format.pp_print_char ppf ']';
+        Format.pp_close_box ppf ();
+    | `O (o, _) ->
+        let pp_mem ppf ((m, _), v) =
+          Format.pp_open_box ppf 1;
+          pp_string ppf m;
+          Format.pp_print_char ppf ':'; Format.pp_print_space ppf ();
+          loop ppf v;
+          Format.pp_close_box ppf ();
+        in
+        Format.pp_open_vbox ppf 1;
+        Format.pp_print_char ppf '{';
+        Format.pp_print_list ~pp_sep:pp_comma pp_mem ppf o;
+        Format.pp_print_char ppf '}';
+        Format.pp_close_box ppf ();
+    in
+    loop ppf v
 end
 
 module Jsong = Json.G
