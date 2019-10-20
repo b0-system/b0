@@ -24,11 +24,23 @@ package "b00" (
  plugin(native) = "b00.cmxs"
 )
 
+package "ocaml" (
+ directory = "ocaml"
+ description = "B0's ocaml support"
+ version = "%%VERSION_NUM%%"
+ requires = "b0.std b0.b00 compiler-libs.common"
+ archive(byte) = "b0_ocaml.cma"
+ archive(native) = "b0_ocaml.cmxa"
+ plugin(byte) = "b0_ocaml.cma"
+ plugin(native) = "b0_ocaml.cmxs"
+)
+
+
 package "care" (
   directory = "care"
   description = "B0's system library"
   version = "%%VERSION_NUM%%"
-  requires = "unix cmdliner b0.std b0.b00 compiler-libs.common"
+  requires = "unix cmdliner b0.std b0.b00"
   archive(byte) = "b0_care.cma"
   archive(native) = "b0_care.cmxa"
   plugin(byte) = "b0_care.cma"

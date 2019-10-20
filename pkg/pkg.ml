@@ -11,10 +11,10 @@ let copy src dst =
 
 let ocaml_conditional c =
   let maj, min, _, _ = Conf.OCaml.version (Conf.OCaml.v c `Host_os) in
-  let dst = "src-care/b0_ocaml_cmi.ml" in
+  let dst = "src-ocaml/b0_ocaml_cmi.ml" in
   match (maj, min) < (4,08) with
-  | true  -> copy "src-care/b0_ocaml_cmi_pre_408/b0_ocaml_cmi.ml" dst
-  | false -> copy "src-care/b0_ocaml_cmi_geq_408/b0_ocaml_cmi.ml" dst
+  | true  -> copy "src-ocaml/b0_ocaml_cmi_pre_408/b0_ocaml_cmi.ml" dst
+  | false -> copy "src-ocaml/b0_ocaml_cmi_geq_408/b0_ocaml_cmi.ml" dst
 
 let () =
   let build = Pkg.build ~pre:ocaml_conditional () in
@@ -24,6 +24,7 @@ let () =
        Pkg.lib "src-std/b0_std_top_init.ml" ~dst:"std/b0_std_top_init.ml";
        Pkg.clib "src-std/libb0_stubs.clib" ~lib_dst_dir:"std";
        Pkg.mllib "src-care/b0_care.mllib" ~dst_dir:"care";
+       Pkg.mllib "src-ocaml/b0_ocaml.mllib" ~dst_dir:"ocaml";
        Pkg.test "test/test";
        Pkg.test "test/test_cp";
        Pkg.test "test/test_rm";

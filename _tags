@@ -15,7 +15,10 @@ true : package(unix)
 
 <src-care> : include
 <src-care/**> : package(cmdliner)
-<src-care/b0_ocaml_cmi*> : package(compiler-libs.common)
+
+<src-ocaml> : include
+<src-ocaml/b0_ocaml_cmi*> : package(compiler-libs.common)
+
 <test/**> : use_b0_stubs, package(cmdliner)
 <test/test_ocaml_cobj_defs*> : package(compiler-libs.common)
 <examples/**> : use_b0_stubs, not_hygienic
