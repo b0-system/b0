@@ -25,6 +25,7 @@ Tools for software construction care.
 {2:io IO}
 
 {!modules:
+B0_base64
 B0_fexts
 B0_findex
 B0_htmlg

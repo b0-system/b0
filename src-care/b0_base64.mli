@@ -1,23 +1,24 @@
 (*---------------------------------------------------------------------------
-   Copyright (c) 2018 The b0 programmers. All rights reserved.
+   Copyright (c) 2019 The b0 programmers. All rights reserved.
    Distributed under the ISC license, see terms at the end of the file.
-   %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-open B0_std
-open B00
+(** Base64 codec.
 
-let () =
-  Test_fmt.test ();
-  Test_conv.test ();
-  Test_fpath.test ();
-  Test_cmd.test ();
-  Test_base64.test ();
-  print_endline "All tests passed!";
-  ()
+    Codecs Base64 according to
+    {{:https://tools.ietf.org/html/rfc4648}RFC 4684}. *)
+
+val encode : string -> string
+(** [encode s] is the Base64 encoding of [s]. *)
+
+val decode : string -> (string, int) result
+(** [decode s] is the Base64 decode of [s]. In case of error the
+    integer indicates the byte index of the error for an invalid
+    alphabet character error or the length of the string if the string
+    length is not a multiple of [4]. *)
 
 (*---------------------------------------------------------------------------
-   Copyright (c) 2018 The b0 programmers
+   Copyright (c) 2019 The b0 programmers
 
    Permission to use, copy, modify, and/or distribute this software for any
    purpose with or without fee is hereby granted, provided that the above
