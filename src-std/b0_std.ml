@@ -5,6 +5,27 @@
 
 module Stdlib_set = Set
 
+(* Type identifiers *)
+
+module Tid = struct
+  (* See http://alan.petitepomme.net/cwn/2015.03.24.html#1 *)
+
+  module Id = struct type _ t = .. end
+  module type ID = sig type t type _ Id.t += Id : t Id.t end
+
+  type 'a t = (module ID with type t = 'a)
+  let create () (type s) =
+    let module Id = struct type t = s type _ Id.t += Id : t Id.t end in
+    (module Id : ID with type t = s)
+
+  type ('a, 'b) eq = Eq : ('a, 'a) eq
+  let equal (type i0) (type i1) (i0 : i0 t) (i1 : i1 t) : (i0, i1) eq option
+    =
+    let module I0 = (val i0 : ID with type t = i0) in
+    let module I1 = (val i1 : ID with type t = i1) in
+    match I0.Id with I1.Id -> Some Eq | _ -> None
+end
+
 (* ANSI terminal interaction *)
 
 module Tty = struct
