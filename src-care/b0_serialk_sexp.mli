@@ -5,19 +5,24 @@
 
 (** S-expression support.
 
-    The module {!Sexp} has a codec for {{!sexp_syntax}his syntax} and
-    general definitions for working with s-expressions. {!Sexpg}
-    generates s-expressions without going through a generic
+    The module {!Sexp} has an s-expression codec and general
+    definitions for working with them. {!Sexpg} generates
+    s-expressions without going through a generic
     representation. {!Sexpq} queries and updates generic
     representations with combinators.
 
-    A short introduction to s-expressions and the syntax parsed by the
-    codec is described {{!sexp_syntax}here}.
+    Consult a {{!sexp_syntax}short introduction} to s-expressions and
+    the syntax parsed by the codec, the encoding of
+    {{!sexp_dict}key-value dictionaries} supported by this module and
+    the end-user syntax for {{!sexp_path_caret}addressing and
+    updating} s-expressions.
 
-    Open this module to usee it, this only introduces modules in your scope.
+    Open this module to use it, this only introduces modules in your
+    scope.
 
-    {b Warning.} Serialization functions always assumes all OCaml strings in
-    the data you provide is UTF-8 encoded. This is not checked by the module. *)
+    {b Warning.} Serialization functions always assumes all OCaml
+    strings in the data you provide is UTF-8 encoded. This is not
+    checked by the module. *)
 
 (** {1:api API} *)
 
@@ -28,17 +33,23 @@ module Sexp : sig
 
   (** {1:meta Meta information} *)
 
+  type 'a fmt = Format.formatter -> 'a -> unit
+  (** The type for formatting functions. *)
+
   type loc = Tloc.t
   (** The type for source text locations. *)
+
+  val loc_nil : Tloc.t
+  (** [loc_nil] is a source text location for non-parsed s-expressions. *)
+
+  val pp_loc : loc fmt
+  (** [pp_loc] is {!Tloc.pp}. *)
 
   type a_meta
   (** The type for meta information about atoms. *)
 
   type l_meta
   (** The type for meta information about lists. *)
-
-  val loc_nil : Tloc.t
-  (** [loc_nil] is a source text location for non-parsed s-expressions. *)
 
   val a_meta_nil : a_meta
   (** [a_meta_nil] is parse information for non-parsed atoms. *)
@@ -87,27 +98,47 @@ module Sexp : sig
 
   (** {1:fmt Formatting} *)
 
-
-  val pp : Format.formatter -> t -> unit
+  val pp : t fmt
   (** [pp] formats an s-expression. *)
 
-  val pp_layout : Format.formatter -> t -> unit
+  val pp_layout : t fmt
   (** [pp_layout ppf l] is like {!pp} but uses layout information. *)
 
-  val pp_seq : Format.formatter -> t -> unit
+  val pp_seq : t fmt
   (** [pp_seq] formats an s-expression but if it is a list the
       outer list separators are not formatted in the output.
 
       {b Warning.} Assumes all OCaml strings in the formatted value are
       UTF-8 encoded. *)
 
-  val pp_seq_layout : Format.formatter -> t -> unit
+  val pp_seq_layout : t fmt
   (** [pp_seq_layout] is like {!pp_seq} but uses layout information. *)
 
   (** {1:codec Codec} *)
 
-  val seq_of_string :
-    ?file:Tloc.fpath -> string -> (t, string) result
+  type error_kind
+  (** The type for kinds of decoding error. *)
+
+  val pp_error_kind : unit -> error_kind fmt
+  (** [pp_error_kind ()] formats an error kind. *)
+
+  type error = error_kind * loc
+  (** The type for decoding errors. *)
+
+  val pp_error :
+    ?pp_loc:loc fmt -> ?pp_error_kind:error_kind fmt ->
+    ?pp_prefix:unit fmt -> unit -> error fmt
+  (** [pp_error ~pp_loc ~pp_error_kind ~pp_prefix ()] formats errors
+      using [pp_loc] (defaults to {!pp_loc}), [pp_error_kind]
+      (defaults to {!pp_error_kind}) and [pp_prefix] (defaults formats
+      ["Error: "]). *)
+
+  val error_to_string :
+    ?pp_error:error fmt -> ('a, error) result -> ('a, string) result
+  (** [error_to_string r] converts an error to a string using [pp_error]
+      (defaults to {!pp_error}). *)
+
+  val seq_of_string : ?file:Tloc.fpath -> string -> (t, error) result
   (** [seq_of_string ?file s] parses a {e sequence} of s-expressions from
       [s]. [file] is the file for locations, defaults to ["-"]. The
       sequence is returned as a fake s-expression list that spans from
@@ -122,8 +153,12 @@ module Sexp : sig
       {b Note.} All OCaml strings returned by this function are UTF-8
       encoded. *)
 
+  val seq_of_string' :
+    ?pp_error:error fmt -> ?file:Tloc.fpath -> string -> (t, string) result
+  (** [seq_of_string'] s {!seq_of_string} composed with {!error_to_string}. *)
+
   val seq_to_string : t -> string
-  (** [seq_to_string ~ws s] encodes [s] to a sequence of s-expressions. If [s]
+  (** [seq_to_string s] encodes [s] to a sequence of s-expressions. If [s]
       is an s-expression list this wrapping list is not syntactically
       represented in the output (see also {!seq_of_string}), use
       [to_string (list [l])] if you want to output [l] as a list.
@@ -143,8 +178,12 @@ module Sexp : sig
       {- [Key k], lookup binding [k] in an s-expression
          {{!sexp_dict}dictionary.}}} *)
 
-  val pp_index : Format.formatter -> index -> unit
-  (** [pp_index] formats indices. Keys are unbracketed. *)
+  val pp_key : string fmt
+  (** [pp_key] formats a key, this is {!Format.pp_print_string}. *)
+
+  val pp_index : ?pp_key:string fmt -> unit -> index fmt
+  (** [pp_index] formats indices. Keys are unbracketed and formatted
+      with [pp_key], defaults to {!pp_key}. *)
 
   (** {1:sexp_path S-expression paths} *)
 
@@ -156,8 +195,9 @@ module Sexp : sig
   (** [path_of_string] parses a path from [s] according to the syntax
       {{!sexp_path_caret}given here}. *)
 
-  val pp_path : Format.formatter -> path -> unit
-  (** [pp_path] is a formatter for paths. *)
+  val pp_path : ?pp_key:string fmt -> unit -> path fmt
+  (** [pp_path ?pp_key ()] is a formatter for paths using [pp_key] to
+      format keys (defaults to {!pp_key}). *)
 
   (** {1:carets Carets} *)
 
@@ -165,7 +205,7 @@ module Sexp : sig
   | Before (** The void before the s-expression found by the path. *)
   | Over  (** The s-expression found by the path. *)
   | After (** The void after the s-expression found by the path. *)
-  (** The type for caret locations *)
+  (** The type for caret locations. *)
 
   type caret = caret_loc * path
   (** The type for carets. A caret location and the path at which it
@@ -175,8 +215,9 @@ module Sexp : sig
   (** [caret_of_string s] parses a caret from [s] according to the
       syntax {{!sexp_path_caret}given here}. *)
 
-  val pp_caret : Format.formatter -> caret -> unit
-  (** [pp_caret] is a formatter for carets. *)
+  val pp_caret : ?pp_key:string fmt -> unit -> caret fmt
+  (** [pp_caret ?pp_key ()] is a formatter for carets using [pp_key]
+      to format keys (defaults to {!pp_key}). *)
 end
 
 (** S-expression generation. *)
@@ -255,28 +296,78 @@ module Sexpq : sig
   type path = (Sexp.index * Sexp.loc) list
   (** The type for result paths. This is a sequence of indexing
       operations tupled with the source text location of the indexed
-      in {b reverse} order. *)
+      s-expression in {b reverse} order. *)
 
   val pp_path :
-    ?pp_key:(Format.formatter -> string -> unit) -> Format.formatter ->
-    path -> unit
-  (** [pp_path ~pp_key] formats path using [pp_key] to format the keys. *)
+    ?pp_loc:Sexp.loc Sexp.fmt -> ?pp_key:string Sexp.fmt -> unit ->
+    path Sexp.fmt
+  (** [pp_path ~pp_loc ~pp_key ()] formats paths using [pp_loc]
+      (defaults to {!Sexp.pp_loc}) and [pp_key] to format the keys
+      (defaults to {!Sexp.pp_key}). *)
+
+  (** {1:query_errors Query errors} *)
+
+  type error_kind =
+  [ `Key_unbound of string * string list
+  | `Msg of string
+  | `Nth_unbound of int * int
+  | `Out_of_dom of string * string * string list ]
+  (** The type for kinds of errors.
+      {ul
+      {- [`Key_unbound (k, dom)] on [k] that should have been in [dom]
+         (if not empty).}
+      {- [`Msg m] an arbitrary message [m] (should not
+         include position information).}
+      {- [`Nth_unbound (n, len)] on [n] an out of bound index in a list
+         of length [len].}
+      {- [`Out_of_dom (kind, v, dom)] on [v] of kind [kind] that
+         should have been in [dom]}} *)
+
+  val pp_error_kind :
+    ?pp_em:string Sexp.fmt -> ?pp_key:string Sexp.fmt -> unit ->
+    error_kind Sexp.fmt
+  (** [pp_error_kind ~pp_loc ~pp_em ~pp_key ()] formats error kinds
+      using [pp_loc] for locations, [pp_em] for emphasis and [pp_key]
+      for keys. *)
+
+  type error = error_kind * (path * Sexp.loc)
+  (** The type for query errors. The error kind tupled with the path
+      to the offending s-expression and the location of the
+      s-expression. *)
+
+  val pp_error :
+    ?pp_loc:Sexp.loc Sexp.fmt -> ?pp_path:path Sexp.fmt ->
+    ?pp_error_kind:error_kind Sexp.fmt -> ?pp_prefix:unit Sexp.fmt -> unit ->
+    error Sexp.fmt
+  (** [pp_error ~pp_loc ~pp_path ~pp_error_kind ~pp_prefix ()] formats
+      errors using [pp_loc], [pp_path] (defaults to {!pp_path}),
+      [pp_error_kind] (defaults to {!pp_error_kind}) and [pp_prefix]
+      (defaults formats ["Error: "]). *)
+
+  val error_to_string :
+    ?pp_error:error Sexp.fmt -> ('a, error) result -> ('a, string) result
+  (** [error_to_string ~pp_error r] converts an error in [r] to a string using
+      [pp_error], defaults to {!pp_error}. *)
 
   (** {1:queries Queries} *)
 
   type 'a t
   (** The type for s-expression queries. A query either succeeds
-      against an s-expression with a value of type ['a] or it fails. *)
+      against an s-expression with a value of type ['a] or it
+      fails. *)
 
-  val query : 'a t -> Sexp.t -> ('a, string) result
-  (** [query q s] is [Ok v] if the query [q] succeeds on [s] and a
-      (multiline) [Error e] with location information otherwise. *)
+  val query : 'a t -> Sexp.t -> ('a, error) result
+  (** [query q s] is [Ok v] if the query [q] succeeds on [s] and
+      [Error e] otherwise. *)
 
-  val query' : 'a t -> Sexp.t -> ('a, path * Sexp.loc * string) result
-  (** [query' q s] is like {!query} except in the error case it
-      returns [Error (p, l, e)] with [p] the query path that leads to
-      the error, [l] the location of the error and [e] the error
-      message. *)
+  val query_at_path : 'a t -> (Sexp.t * path) -> ('a, error) result
+  (** [query_at_path q (s, p)] is like {!query} except it assumes [s]
+      is at path [p]. Use to further query s-expressions obtained with
+      {!sexp_with_path} so that errors return the full path to errors. *)
+
+  val query' : ?pp_error:error Sexp.fmt -> 'a t -> Sexp.t -> ('a, string) result
+  (** [query' q s] is like {!query} except the result is composed with
+      {!error_to_string}. *)
 
   (** {1:outcome Success and failure} *)
 
@@ -284,14 +375,13 @@ module Sexpq : sig
   (** [succeed v] is a query that succeeds with value [v] on any
       s-expression. *)
 
-  val fail : string -> 'a t
-  (** [fail msg] is a query that fails on any s-expression with
-      message [msg]. Do not include position information in [msg], this
-      is automatically handled by the module. *)
+  val fail : error_kind -> 'a t
+  (** [fail k] is a query that fails on any s-expression with error
+      kind [k]. *)
 
   val failf : ('a, Format.formatter, unit, 'b t) format4 -> 'a
-  (** [failf fmt ...] is like {!fail} but formats the message
-      according to [fmt]. *)
+  (** [failf fmt ...] is [fail (`Msg m)] with [m] formatted according
+      to [fmt]. *)
 
   (** {1:qcomb Query combinators} *)
 
@@ -301,6 +391,10 @@ module Sexpq : sig
 
   val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
   (** [f $ v] is [app f v]. *)
+
+  val pair : 'a t -> 'b t -> ('a * 'b) t
+  (** [pair q0 q1] queries an s-expression first with [q0] and then with [q1]
+      and returns the pair of their result. *)
 
   val bind : 'a t -> ('a -> 'b t) -> 'b t
   (** [bind q f] queries an s-expression with [q], applies the result to
@@ -312,41 +406,50 @@ module Sexpq : sig
   val some : 'a t -> 'a option t
   (** [some q] is [map Option.some q]. *)
 
-  val with_path : 'a t -> ('a * (path * Sexp.loc)) t
-  (** [with_path q] queries with [q] an returns the result with the
+  val loc : 'a t -> ('a * (path * Sexp.loc)) t
+  (** [loc q] queries with [q] an returns the result with the
       query path and source text location to the queried
       s-expression. *)
 
-  (** {1:qsexp S-expression queries} *)
+  (** {1:qsexp S-expression queries}
+
+      Queries for s-expressions. These queries never fail. *)
 
   val fold : atom:'a t -> list:'a t -> 'a t
   (** [fold ~atom ~list] queries atoms with [atom] and lists with [list]. *)
 
   val sexp : Sexp.t t
-  (** [sexp] queries any s-expression and returns its generic
-      representation. *)
+  (** [sexp] queries any s-expression and returns its generic representation. *)
+
+  val sexp_with_path : (Sexp.t * path) t
+  (** [sexp_with_path] is like {!sexp} but also returns the path to
+      s-expression. *)
 
   (** {1:qatom Atom queries}
 
-      All these queries fail on lists. *)
+      Queries for atoms. These queries fail on lists. *)
 
   val atom : string t
   (** [atom] queries an atom as a string. *)
 
-  val parsed_atom : kind:string -> (string -> ('a, string) result) -> 'a t
-  (** [parsed_atom ~kind p] queries and atom and parses it with [p]. In
-      case of [Error m] fails with message [m]. [kind] is the kind
-      of value parsed, used for the error in case a list is found. *)
+  val atom_to : kind:string -> (string -> ('a, string) result) -> 'a t
+  (** [atom_to ~kind p] queries an atom and parses it with [p]. In
+      case of [Error m] fails with message [m]. [kind] is the kind of
+      value parsed, used for the error in case a list is found. *)
 
-  val enum : kind:string ->  Set.Make(String).t -> string t
+  (**  {b TODO.} Maybe combinators to devise an approriate parse
+       function for {!atom_to} are a better idea than the following
+       two combinators. *)
+
+  val enum : kind:string -> Set.Make(String).t -> string t
   (** [enum ~kind ss] queries an atom for one of the element of [ss]
       and fails otherwise. [kind] is for the kind of elements in [ss],
       it used for error reporting. *)
 
   val enum_map : kind:string -> 'a Map.Make(String).t -> 'a t
-  (** [enum_map ~kind sm] queries an atom for it's map in [sm] and
-      fails if the atom is not bound in [sm]. [kind] is for the kind
-      of elements in [sm], it used for error reporting. *)
+  (** [enum_map ~pp_elt ~kind sm] queries an atom for it's map in [sm]
+      and fails if the atom is not bound in [sm]. [kind] is for the
+      kind of elements in [sm], it used for error reporting. *)
 
   val bool : bool t
   (** [bool] queries an atom for one of [true] or [false]. *)
@@ -369,7 +472,7 @@ module Sexpq : sig
 
   (** {1:qlist List queries}
 
-      All these queries fail on atoms. *)
+      Queries for s-expression lists. These queries fail on atoms. *)
 
   val is_empty : bool t
   (** [is_empty] queries a list for emptyness. *)
@@ -409,9 +512,9 @@ module Sexpq : sig
       fail on atoms. *)
 
   val key : ?absent:'a -> string -> 'a t -> 'a t
-  (** [key ?absent k q] queries the value of key [k] of a dictionary with [q].
-      If [k] is not bound this fails if [absent] is [None] and
-      succeeds with [v] if [absent] is [Some v]. *)
+  (** [key ?absent k q] queries the value of key [k] of a dictionary
+      with [q].  If [k] is not bound this fails if [absent] is [None]
+      and succeeds with [v] if [absent] is [Some v]. *)
 
   val delete_key : must_exist:bool -> string -> Sexp.t t
   (** [delete_key ~must_exist k] deletes key [k] from the dictionary.
@@ -423,12 +526,15 @@ module Sexpq : sig
   (** [key_dom validate] queries the key domain of a list of bindings.
       If [validate] is [Some dom], the query fails if a key is not in
       [dom]. The query also fails if a binding is not well-formed.
+      [pp_key] is used to format keys.
 
-      {b XXX} Would be nice to provide support for deprecation. *)
+      {b TODO.} Not really happy about this function, we lose the key
+      locations which is useful for further deconstruction. Also maybe
+      we rather want binding folds. *)
 
-  val lone_atom : 'a t -> 'a t
-  (** [lone_atom q] queries an atom or the atom of a singleton list
-      with [q]. It fails on empty lists or non-singleton lists.
+  val atomic : 'a t -> 'a t
+  (** [atomic q] queries an atom or the atom of a singleton list with
+      [q]. It fails on empty lists or non-singleton lists.
 
       This is useful for singleton {{!sexp_dict}dictionary}
       bindings. In error reporting treats the list as if it doesn't
@@ -446,8 +552,8 @@ module Sexpq : sig
 
   (** {1:path_caret Path and caret queries}
 
-      These queries fail on indexing errors, that is if an atom
-      gets indexed. *)
+      These queries fail on indexing errors, that is if an atom gets
+      indexed. *)
 
   val path : ?absent:'a -> Sexp.path -> 'a t -> 'a t
   (** [path p q] queries the s-expression found by [p] using [q]. If
@@ -476,15 +582,15 @@ module Sexpq : sig
       found at [p] by splicing [rep]. If the path does not exist this fails
       if [must_exist] is [true] and the non-existing part of
       the path is created if [must_exist] is [false]. If elements need
-      to be created [stub] (defaults to [Sexp.atom ""] is used. *)
+      to be created [stub] (defaults to [Sexp.atom ""]) is used. *)
 
   val splice_at_caret :
     ?stub:Sexp.t -> must_exist:bool -> Sexp.caret -> rep:Sexp.t -> Sexp.t t
   (** [splice_caret ?stub ~must_exist p rep] splices the s-expression [rep]
       at the caret [p] of the s-expression. If path of the caret does not
       exist this fails if [must_exist] is [true] and the non-existing part of
-      the path is created if [must_exist] is [false]. If elements
-      need to be create [stub] (defaults to [Sexp.atom ""] is used. *)
+      the path is created if [must_exist] is [false]. If atoms
+      need to be create [stub] (defaults to [Sexp.atom ""]) is used. *)
 
   (** {1:ocaml OCaml datatype encoding queries} *)
 
@@ -528,32 +634,33 @@ v}
     after a path. There's no distinction between a path an over caret.
 
 {v
-ocaml.deps        # value of key 'deps' of dictionary 'ocaml'
-ocaml.v[deps]     # before the key binding (if any)
-ocaml.[deps]v     # after the key binding (if any)
+Ocaml.libs        # value of key 'libs' of dictionary 'ocaml'
+ocaml.v[libs]     # before the key binding (if any)
+ocaml.[libs]v     # after the key binding (if any)
 
-ocaml.deps.[0]    # first element of key 'deps' of dictionary 'ocaml'
-ocaml.deps.v[0]   # before first element (if any)
-ocaml.deps.[0]v   # after first element (if any)
+ocaml.libs.[0]    # first element of key 'libs' of dictionary 'ocaml'
+ocaml.libs.v[0]   # before first element (if any)
+ocaml.libs.[0]v   # after first element (if any)
 
-ocaml.deps.[-1]   # last element of key 'deps' of dictionary 'ocaml'
-ocaml.deps.v[-1]  # before last element (if any)
-ocaml.deps.[-1]v  # after last element (if any)
+ocaml.libs.[-1]   # last element of key 'libs' of dictionary 'ocaml'
+ocaml.libs.v[-1]  # before last element (if any)
+ocaml.libs.[-1]v  # after last element (if any)
 v}
 
     More formally a {e path} is a [.] seperated list of indices.
 
-    An {e index} is written [[i]] with [i] either a zero-based list
-    index (with negative indices counting from the end of the list,
-    [-1] is the last element) or a dictionary key [key]. If there is
-    no ambiguity, the surrounding brackets can be dropped.
+    An {e index} is written [[i]]. [i] can a zero-based list index
+    with negative indices counting from the end of the list ([-1] is
+    the last element). Or [i] can be a dictionary key [key]. If there
+    is no ambiguity, the surrounding brackets can be dropped.
 
-    A caret is a path whose last index brackets can be prefixed or suffixed
-    by the character ['v'] to respectively denote the void before or after
-    the s-expression found by the path.
+    A caret is a path whose last index brackets can be prefixed or
+    suffixed by an insertion point, represented by the character
+    ['v'].  This respectively denote the void before or after the
+    s-expression found by the path.
 
     {b Note.} The syntax has no form of quoting at the moment this
-    means key names can't contain, [\[], [\]], or be numbers.
+    means key names can't contain, [\[], [\]], or start with a number.
 
     {1:sexp_syntax S-expression syntax}
 

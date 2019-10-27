@@ -19,6 +19,8 @@ module Sexp = struct
   (* Meta information *)
 
   type loc = Tloc.t
+  let pp_loc = Tloc.pp
+
   type a_meta =
     { a_loc : loc; a_quoted : string option; a_before : string;
       a_after : string }
@@ -66,6 +68,20 @@ module Sexp = struct
                       the first and last element of the list (?) *)
 
   (* Decode *)
+
+  type error_kind = string (* FIXME eventually move to a variant *)
+  let pp_error_kind () = Format.pp_print_string
+
+  type error = error_kind * loc
+  let pp_prefix ppf () = Format.pp_print_string ppf "Error: "
+  let pp_error
+      ?(pp_loc = Tloc.pp) ?(pp_error_kind = pp_error_kind ())
+      ?(pp_prefix = pp_prefix) () ppf (k, l)
+    =
+    Format.fprintf ppf "@[<v>%a:@,%a%a@]" pp_loc l pp_prefix () pp_error_kind k
+
+  let error_to_string ?(pp_error = pp_error ()) = function
+  | Ok _ as v -> v | Error e -> Error (Format.asprintf "%a" pp_error e)
 
   let curr_char d = (* TODO better escaping (this is for error reports) *)
     Tdec.tok_reset d; Tdec.tok_accept_uchar d; Tdec.tok_pop d
@@ -197,10 +213,16 @@ module Sexp = struct
   | (sbyte, sline, sws, _) :: [] ->
       begin match acc with
       | [] ->
+          (* There's a tricky bit here. If sws is a comment followed
+             by end of file then an s-expression update followed by
+             a pp layout might comment the update. There are various
+             ways of going around this. But we'd like to avoid a
+             pp layout without update changing anything so we simply
+             put the comment in l_after. This means that edits
+             will occur before the comment. *)
           let l_loc = Tdec.loc d ~sbyte:0 ~ebyte:0 ~sline:(1,0) ~eline:(1,0) in
-          let m =
-            { l_loc; l_before = sws; l_start = ""; l_end = ""; l_after = ews }
-          in
+          let l_after = String.concat "" [sws; ews] in
+          let m = { l_loc; l_before = ""; l_start = ""; l_end = ""; l_after } in
           `L ([], m)
       | acc ->
           let eloc = loc (List.hd acc) in
@@ -242,8 +264,10 @@ module Sexp = struct
       let d = Tdec.create ~file s in
       let before = (dec_skip_as_tok d; Tdec.tok_pop d) in
       Ok (dec_sexp_seq d [(0, (1, 0), before, [])] [])
-    with Tdec.Err (loc, msg) ->
-      Error (Format.asprintf "@[<v>%a:@,%s@]" Tloc.pp loc msg)
+    with Tdec.Err (loc, msg) -> Error (msg, loc)
+
+  let seq_of_string' ?pp_error ?file s =
+    error_to_string ?pp_error (seq_of_string ?file s)
 
   (* s-expression generation. *)
 
@@ -361,6 +385,8 @@ module Sexp = struct
      Also maybe do layout entirely by hand to avoid Format suprises.
      Also it would be nice to pp what has no ws. *)
 
+  type 'a fmt = Format.formatter -> 'a -> unit
+
   let pp_atom b ~sp ppf a =
     if sp then Format.pp_print_space ppf ();
     Format.pp_print_string ppf (quote b a)
@@ -433,13 +459,14 @@ module Sexp = struct
 
   type index = Nth of int | Key of string
 
-  let pp_index ppf = function
+  let pp_key = Format.pp_print_string
+  let pp_index ?(pp_key = pp_key) () ppf = function
   | Nth n -> Format.fprintf ppf "[%d]" n
-  | Key k -> Format.pp_print_string ppf k
+  | Key k -> pp_key ppf k
 
-  let pp_bracketed_index ppf = function
+  let pp_bracketed_index ?(pp_key = pp_key) () ppf = function
   | Nth n -> Format.fprintf ppf "[%d]" n
-  | Key k -> Format.fprintf ppf "[%s]" k
+  | Key k -> Format.fprintf ppf "[%a]" pp_key k
 
   (* Paths *)
 
@@ -450,7 +477,7 @@ module Sexp = struct
   let path_err_unexp_char i s = path_err i "unexpected character: %C" s.[i]
   let path_err_illegal_char i s = path_err i "illegal character here: %C" s.[i]
   let err_unexp i s =
-    path_err i "unexpected input: %S" (Tloc.string_with_index_range ~first:i s)
+    path_err i "unexpected input: %S" (Tloc.string_subrange ~first:i s)
 
   let path_parse_eoi s i max = if i > max then () else err_unexp i s
   let path_parse_index p s i max =
@@ -466,7 +493,7 @@ module Sexp = struct
       in
       loop stop s first max
     in
-    let idx = Tloc.string_with_index_range ~first ~last s in
+    let idx = Tloc.string_subrange ~first ~last s in
     if idx = "" then path_err first "illegal empty index" else
     match int_of_string idx with
     | exception Failure _ -> next, (Key idx) :: p
@@ -487,9 +514,9 @@ module Sexp = struct
       Ok (loop [] s start (String.length s - 1))
     with Failure e -> Error e
 
-  let pp_path ppf is =
+  let pp_path ?pp_key () ppf is =
     let pp_sep ppf () = Format.pp_print_char ppf '.' in
-    Format.pp_print_list ~pp_sep pp_index ppf (List.rev is)
+    Format.pp_print_list ~pp_sep (pp_index ?pp_key ()) ppf (List.rev is)
 
   (* Carets *)
 
@@ -520,14 +547,16 @@ module Sexp = struct
       Ok (loop [] s start (String.length s - 1))
     with Failure e -> Error e
 
-  let pp_caret ppf = function
-  | Over, p -> pp_path ppf p
+  let pp_caret ?pp_key () ppf = function
+  | Over, p -> (pp_path ?pp_key ()) ppf p
   | Before, (c :: p) ->
-      pp_path ppf p; (if p <> [] then Format.pp_print_char ppf '.');
-      Format.pp_print_char ppf 'v'; pp_bracketed_index ppf c
+      (pp_path ?pp_key ()) ppf p;
+      (if p <> [] then Format.pp_print_char ppf '.');
+      Format.pp_print_char ppf 'v'; (pp_bracketed_index ?pp_key ()) ppf c
   | After, (c :: p) ->
-      pp_path ppf p; (if p <> [] then Format.pp_print_char ppf '.');
-      pp_bracketed_index ppf c; Format.pp_print_char ppf 'v'
+      (pp_path ?pp_key ()) ppf p;
+      (if p <> [] then Format.pp_print_char ppf '.');
+      (pp_bracketed_index ?pp_key ()) ppf c; Format.pp_print_char ppf 'v'
   | _ -> ()
 end
 
@@ -536,71 +565,119 @@ module Sexpq = struct
   module Sset = Set.Make (String)
   module Smap = Map.Make (String)
 
+  let pf = Format.fprintf
+  let pp_lines ppf s =
+    let lines = String.split_on_char '\n' s in
+    pf ppf "@[<v>%a@]" Format.(pp_print_list pp_print_string) lines
+
+  (* Result paths *)
+
   type path = (Sexp.index * Sexp.loc) list (* reversed *)
   let push_nth n v p = (Sexp.Nth n, Sexp.loc v) :: p
   let push_key k b p = (Sexp.Key k, Sexp.loc b) :: p
 
-  let pp_quote ppf s = Format.fprintf ppf "'%s'" s
-  let pp_key = pp_quote
-  let pp_path ?(pp_key = pp_key) ppf p =
+  let pp_path ?(pp_loc = Sexp.pp_loc) ?(pp_key = Sexp.pp_key) () ppf p =
     let pp_index pp_key ppf = function
-    | Sexp.Key k, l -> Format.fprintf ppf "%a: in key %a" Tloc.pp l pp_key k
-    | Sexp.Nth i, l ->
-        Format.fprintf ppf "%a: in element %d of sequence" Tloc.pp l i
+    | Sexp.Key k, l -> pf ppf "%a: in key %a" pp_loc l pp_key k
+    | Sexp.Nth i, l -> pf ppf "%a: at index %d" pp_loc l i
     in
-    Format.fprintf ppf "@[<v>%a@]" (Format.pp_print_list (pp_index pp_key)) p
+    pf ppf "@[<v>%a@]" (Format.pp_print_list (pp_index pp_key)) p
 
-  (* Errors *)
+  (* Query errors *)
 
-  exception Err of path * Tloc.t * string
+  type error_kind =
+  [ `Key_unbound of string * string list
+  | `Msg of string
+  | `Nth_unbound of int * int
+  | `Out_of_dom of string * string * string list ]
 
-  let err p l msg = raise_notrace (Err (p, l, msg))
-  let errf p l fmt = Format.kasprintf (err p l) fmt
+  let pp_error_kind
+      ?(pp_em = Format.pp_print_string) ?(pp_key = Sexp.pp_key) () ppf
+    = function
+    | `Key_unbound (k, ks) ->
+        let binds pp_v ppf l =
+          pf ppf "This@ dictionary@ only@ binds@ %a." (Tdec.pp_and_enum pp_v) l
+        in
+        let hint, ks = match Tdec.err_suggest ks k with
+        | [] -> binds, ks
+        | ks -> Tdec.pp_did_you_mean, ks
+        in
+        pf ppf "@[Key %a unbound@].@ %a" pp_key k (hint pp_key) ks
+    | `Msg m -> pp_lines ppf m
+    | `Nth_unbound (n, len) ->
+        let pp_idx ppf i = pp_em ppf (string_of_int i) in
+        begin match len with
+        | 0 -> pf ppf "No@ index@ %a.@ This@ list@ is@ empty." pp_idx n
+        | n ->
+            pf ppf "No@ index@ %a.@ This@ list@ only@ has@ indices@ \
+                    in@ range@ [%a;%a]."
+              pp_idx n pp_idx (-len) pp_idx (len - 1)
+        end
+    | `Out_of_dom (kind, s, ss) ->
+        let kind ppf () = Format.pp_print_string ppf kind in
+        let hint, ss = match Tdec.err_suggest ss s with
+        | [] -> Tdec.pp_must_be, ss
+        | ss -> Tdec.pp_did_you_mean, ss
+        in
+        pf ppf "@[%a@]" (Tdec.pp_unknown' ~kind pp_em ~hint) (s, ss)
+
+  type error = error_kind * (path * Sexp.loc)
+  let pp_prefix ppf () = Format.pp_print_string ppf "Error: "
+  let pp_error
+      ?(pp_loc = Sexp.pp_loc) ?(pp_path = pp_path ~pp_loc ())
+      ?(pp_error_kind = pp_error_kind ()) ?(pp_prefix = pp_prefix) ()
+      ppf (k, (p, loc))
+    =
+    match p with
+    | [] ->
+        pf ppf "@[<v>@[%a@]@[%a@]@,%a:@]"
+          pp_prefix () pp_error_kind k pp_loc loc
+    | p ->
+        pf ppf "@[<v>@[%a@]@[%a@]@,%a:@,%a@]"
+          pp_prefix () pp_error_kind k pp_loc loc pp_path p
+
+  let error_to_string ?(pp_error = pp_error ()) = function
+  | Ok _ as v -> v
+  | Error error -> Error (Format.asprintf "%a" pp_error error)
+
+  exception Err of error
+  let err p l k = raise_notrace (Err (k, (p, l)))
+  let errf p l fmt = Format.kasprintf (fun m -> (err p l (`Msg m))) fmt
+  let err_key_unbound p l k ks = err p l (`Key_unbound (k, ks))
+  let err_nth_unbound p l n len = err p l (`Nth_unbound (n, len))
+  let err_out_of_dom p l kind v dom = err p l (`Out_of_dom (kind, v, dom))
+  let err_empty_list p l = err p l (`Msg "unexpected empty list")
   let err_exp_fnd_raw exp p l fnd = errf p l "found %s but expected %s" fnd exp
   let err_exp exp p fnd =
     errf p (Sexp.loc fnd) "found %s but expected %s" (Sexp.kind fnd) exp
 
   let err_exp_atom = err_exp "atom"
   let err_exp_list = err_exp "list"
-  let err_empty_list p l = errf p l "unexpected empty list"
-  let err_to_string p loc msg =
-    let pp_lines ppf s =
-      Format.fprintf ppf "@[<v>%a@]"
-        (Format.pp_print_list Format.pp_print_string)
-        (String.split_on_char '\n' s)
-    in
-    match p with
-    | [] -> Format.asprintf "%a:@\n%a" Tloc.pp loc pp_lines msg
-    | p ->
-        Format.asprintf "%a:@\n%a@\n  @[%a@]"
-          Tloc.pp loc pp_lines msg (pp_path ?pp_key:None) p
-
+  let err_exp_dict = err_exp "dictionary"
   let esc_atom a = a (* TODO (for error report) *)
 
   (* Queries *)
 
   type 'a t = path -> Sexp.t -> 'a
+  let query_at_path q (s, p) = try Ok (q p s) with Err (k, pl) -> Error (k, pl)
+  let query q s = query_at_path q (s, [])
+  let query' ?pp_error q s = error_to_string ?pp_error (query q s)
 
-  let query q s = try Ok (q [] s) with
-  | Err (p, l, m) -> Error (err_to_string p l m)
-
-  let query' q s = try Ok (q [] s) with
-  | Err (p, l, m) -> Error (p, l, m)
-
-  (* Succeeding and failing queries *)
+  (* Success and failure *)
 
   let succeed v p s = v
-  let fail msg p s = err p (Sexp.loc s) msg
-  let failf fmt = Format.kasprintf fail fmt
+  let fail kind p s = err p (Sexp.loc s) kind
+  let failf fmt = Format.kasprintf (fun m -> fail (`Msg m)) fmt
 
   (* Query combinators *)
 
   let app fq q p s = fq p s (q p s)
   let ( $ ) = app
+  let pair q0 q1 p s = let r0 = q0 p s in r0, q1 p s
   let bind q f p s = f (q p s) p s
   let map f q p s = f (q p s)
   let some q p s = Some (q p s)
-  let with_path q p s = (q p s), (p, Sexp.loc s)
+  let loc q p s = (q p s), (p, Sexp.loc s)
 
   (* S-expression queries *)
 
@@ -609,23 +686,19 @@ module Sexpq = struct
   | `L _ as s -> list p s
 
   let sexp p s = s
+  let sexp_with_path p s = s, p
 
   (* Atom queries *)
 
   let atom p = function `A (a, _) -> a | `L (_, _) as s -> err_exp_atom p s
-  let parsed_atom ~kind parse p = function
-  | `A (a, _) as s -> (match parse a with Ok v -> v | Error m -> fail m p s)
+  let atom_to ~kind parse p = function
   | `L (_, _) as s -> err_exp kind p s
+  | `A (a, _) as s ->
+      (match parse a with Ok v -> v | Error m -> fail (`Msg m) p s)
 
-  let enum ~kind ss p = function
-  | `A (a, _) when Sset.mem a ss -> a
-  | `A (a, m) ->
-      let ss = Sset.elements ss in
-      let did_you_mean = Tdec.err_did_you_mean ~kind pp_quote in
-      let suggestions = match Tdec.err_suggest ss a with
-      | [] -> ss | ss -> ss
-      in
-      errf p m.Sexp.a_loc "%a" did_you_mean (a, suggestions)
+  let enum ~kind dom p = function
+  | `A (a, _) when Sset.mem a dom -> a
+  | `A (a, m) -> err_out_of_dom p m.Sexp.a_loc kind a (Sset.elements dom)
   | `L (_, _) as s -> err_exp kind p s
 
   let enum_map ~kind sm p = function
@@ -634,12 +707,10 @@ module Sexpq = struct
       match Smap.find a sm with
       | v -> v
       | exception Not_found ->
-          let ss = Smap.fold (fun k _ acc -> k :: acc) sm [] in
-          let did_you_mean = Tdec.err_did_you_mean ~kind pp_quote in
-          let suggs = match Tdec.err_suggest ss a with [] -> ss | ss -> ss in
-          errf p m.Sexp.a_loc "%a" did_you_mean (a, suggs)
+          let dom = Smap.fold (fun k _ acc -> k :: acc) sm [] in
+          err_out_of_dom p m.Sexp.a_loc kind a dom
 
-  let parsed_exn_atom ~kind parse p = function
+  let exn_atom_to ~kind parse p = function
   | `L (_, _) as s -> err_exp kind p s
   | `A (a, m) ->
       try parse a with
@@ -653,10 +724,10 @@ module Sexpq = struct
   | `A (a, m) -> err_exp_fnd_raw _tf p m.Sexp.a_loc (esc_atom a)
   | `L (_, _) as s -> err_exp _tf p s
 
-  let int = parsed_exn_atom ~kind:"integer" int_of_string
-  let int32 = parsed_exn_atom ~kind:"int32" Int32.of_string
-  let int64 = parsed_exn_atom ~kind:"int64" Int64.of_string
-  let float = parsed_exn_atom ~kind:"float" float_of_string
+  let int = exn_atom_to ~kind:"int" int_of_string
+  let int32 = exn_atom_to ~kind:"int32" Int32.of_string
+  let int64 = exn_atom_to ~kind:"int64" Int64.of_string
+  let float = exn_atom_to ~kind:"float" float_of_string
 
   (* List queries *)
 
@@ -688,7 +759,7 @@ module Sexpq = struct
 
   let list q = map List.rev (fold_list List.cons q [])
 
-  (* List indexing *)
+  (* List index queries *)
 
   let list_find n p = function
   | `A (_, _) as s -> err_exp_list p s
@@ -710,24 +781,20 @@ module Sexpq = struct
       in
       loop [] k vs'
 
-  let nth_unbound_error n p m =
-    errf p m.Sexp.l_loc "%d: no such index in list" n
-
   let nth ?absent n q p s = match list_find n p s with
   | Ok v -> q (push_nth n v p) v
-  | Error (_, m) ->
+  | Error (vs, m) ->
       match absent with
-      | None -> nth_unbound_error n p m
+      | None -> err_nth_unbound p m.Sexp.l_loc n (List.length vs)
       | Some absent -> absent
 
   let delete_nth ~must_exist n p s = match list_find_split n p s with
   | Ok (left, _, right, lmeta) -> `L (List.rev_append left right, lmeta)
-  | Error (_, _, m) when must_exist -> nth_unbound_error n p m
+  | Error (rvs, _, m) when must_exist ->
+      err_nth_unbound p m.Sexp.l_loc n (List.length rvs)
   | Error _ -> s
 
-  (* Dictionaries *)
-
-  let err_exp_dict = err_exp "dictionary"
+  (* Dictionary queries *)
 
   let dict_dom bs =
     let rec loop dom = function
@@ -771,23 +838,20 @@ module Sexpq = struct
       in
       loop (Error ([], dmeta)) [] bs
 
-  let key_unbound_error k p bs m =
-    let dom = dict_dom bs in
-    let keys = Sset.elements dom in
-    let pre ppf () = Format.pp_print_string ppf "Unbound" in
-    let did_you_mean = Tdec.err_did_you_mean ~pre ~kind:"key" pp_key in
-    errf p m.Sexp.l_loc "%a" did_you_mean (k, Tdec.err_suggest keys k)
+  let err_key_unbound p m k bs =
+    let dom = Sset.elements (dict_dom bs) in
+    err_key_unbound p m.Sexp.l_loc k dom
 
   let key ?absent k q p s = match dict_find k p s with
   | Ok (b, _, vs, bmeta) -> q (push_key k b p) (key_value_fake_list vs bmeta)
   | Error (bs, dmeta) ->
       match absent with
-      | None -> key_unbound_error k p bs dmeta
+      | None -> err_key_unbound p dmeta k bs
       | Some absent -> absent
 
   let delete_key ~must_exist k p s = match dict_find_split k p s with
   | Ok (left, _, right, dmeta) -> `L (List.rev_append left right, dmeta)
-  | Error (bs, m) when must_exist -> key_unbound_error k p bs m
+  | Error (bs, m) when must_exist -> err_key_unbound p m k bs
   | Error _ -> s
 
   let key_dom ~validate p = function
@@ -799,9 +863,8 @@ module Sexpq = struct
           fun p m k acc -> match Sset.mem k dom with
           | true -> Sset.add k acc
           | false ->
-              let keys = Sset.elements dom in
-              let did_you_mean = Tdec.err_did_you_mean ~kind:"key" pp_key in
-              errf p m.Sexp.a_loc "%a" did_you_mean (k, Tdec.err_suggest keys k)
+              (* FIXME Out_of_key_dom ? *)
+              err_out_of_dom p m.Sexp.a_loc "key" k (Sset.elements dom)
       in
       let add_key validate acc = function
       | `L (`A (k, m) :: v, _) -> add_key p m k acc
@@ -813,7 +876,7 @@ module Sexpq = struct
       in
       List.fold_left (add_key validate) Sset.empty bs
 
-  let lone_atom q p = function
+  let atomic q p = function
   | `A (_, _)  as a -> q p a
   | `L ([`A _ as a], _) -> q p a
   | `L ([], m) -> err_exp_fnd_raw "atom" p m.Sexp.l_loc "nothing"
@@ -829,7 +892,7 @@ module Sexpq = struct
   | Sexp.Nth n -> delete_nth ~must_exist n
   | Sexp.Key k -> delete_key ~must_exist k
 
-  (* Path queries *)
+  (* Path and caret queries *)
 
   let path ?absent p q = List.fold_left (fun acc i -> index ?absent i acc) q p
   let probe_path is p s =
@@ -858,7 +921,8 @@ module Sexpq = struct
         | Ok (left, v, right, lmeta) ->
             let v' = loop (push_nth n v p) v is in
             `L (List.rev_append left (v' :: right), lmeta)
-        | Error (_, _, m) when must_exist -> nth_unbound_error n p m
+        | Error (rvs, _, m) when must_exist ->
+            err_nth_unbound p m.Sexp.l_loc n (List.length rvs)
         | Error _ -> raise Exit
         end
     | Sexp.Key k :: is ->
@@ -868,7 +932,7 @@ module Sexpq = struct
             let v = key_value_fake_list vs bmeta in
             let b = `L (key :: Sexp.get_list (loop p v is), bmeta) in
             `L (List.rev_append left (b :: right), dmeta)
-        | Error (bs, m) when must_exist -> key_unbound_error k p bs m
+        | Error (bs, m) when must_exist -> err_key_unbound p m k bs
         | Error _ -> raise Exit
         end
     in
@@ -927,7 +991,8 @@ module Sexpq = struct
         | Sexp.After -> List.rev (v :: Sexp.to_splice rep)
         in
         `L (List.rev_append left (List.rev_append rev_rep right), lmeta)
-    | Error (_, _, m) when must_exist -> nth_unbound_error n p m
+    | Error (rvs, _, m) when must_exist ->
+        err_nth_unbound p m.Sexp.l_loc n (List.length rvs)
     | Error (left, k, lmeta) ->
         `L (pave_splice_caret_nth ?stub caret_loc k ~rep left, lmeta)
 
@@ -940,7 +1005,7 @@ module Sexpq = struct
         | Sexp.After -> List.rev (b :: (Sexp.to_splice rep))
         in
         `L (List.rev_append left (List.rev_append rev_rep right), dmeta)
-    | Error (bs, m) when must_exist -> key_unbound_error k p bs m
+    | Error (bs, m) when must_exist -> err_key_unbound p m k bs
     | Error (left, dmeta) ->
         (* Just put it at the end regardless. *)
         `L (pave_splice_caret_key caret_loc k ~rep left, dmeta)
@@ -958,7 +1023,8 @@ module Sexpq = struct
         | Ok (left, v, right, lmeta) ->
             let v' = loop caret_loc (push_nth n v p) v is in
             `L (List.rev_append left (v' :: right), lmeta)
-        | Error (_, _, m) when must_exist -> nth_unbound_error n p m
+        | Error (rvs, _, m) when must_exist ->
+            err_nth_unbound p m.Sexp.l_loc n (List.length rvs)
         | Error (left, k, lmeta) ->
             let rem = List.rev is in
             let v = pave_splice_caret_path ?stub caret_loc rem ~rep in
@@ -972,7 +1038,7 @@ module Sexpq = struct
             let v = key_value_fake_list vs bmeta in
             let b = `L (key :: Sexp.get_list (loop caret_loc p v is), bmeta) in
             `L (List.rev_append left (b :: right), dmeta)
-        | Error (bs, m) when must_exist -> key_unbound_error k p bs m
+        | Error (bs, m) when must_exist -> err_key_unbound p m k bs
         | Error (left, dmeta) ->
             let rem = List.rev missing in
             let b = match pave_splice_caret_path ?stub caret_loc rem ~rep with
@@ -988,7 +1054,7 @@ module Sexpq = struct
 
   (* OCaml encoding queries *)
 
-  let option q p = function (* TODO improve *)
+  let option q p = function (* TODO improve or remove *)
   | `A ("none", m) -> None
   | `L ((`A ("some", _) :: v), m) ->
       Some (q ((Sexp.Key "some", m.Sexp.l_loc) (* ? *) :: p) (`L (v, m)))

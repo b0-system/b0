@@ -503,9 +503,13 @@ module Jsonq = struct
   | `String (s, _) when Sset.mem s ss -> s
   | `String (s, l) ->
       let ss = Sset.elements ss in
-      let did_you_mean = Tdec.err_did_you_mean ~kind pp_quote in
-      let suggs = match Tdec.err_suggest ss s with [] -> ss | ss -> ss in
-      errf p l "%a" did_you_mean (s, suggs)
+      let hint, ss = match Tdec.err_suggest ss s with
+      | [] -> Tdec.pp_must_be, ss
+      | ss -> Tdec.pp_did_you_mean, ss
+      in
+      let kind ppf () = Format.pp_print_string ppf kind in
+      let pp_v = Format.pp_print_string in
+      errf p l "%a" (Tdec.pp_unknown' ~kind pp_v ~hint) (s, ss)
   | j -> err_exp kind p j
 
   let enum_map ~kind sm p = function
@@ -514,9 +518,13 @@ module Jsonq = struct
       | v -> v
       | exception Not_found ->
           let ss = Smap.fold (fun k _ acc -> k :: acc) sm [] in
-          let did_you_mean = Tdec.err_did_you_mean ~kind pp_quote in
-          let suggs = match Tdec.err_suggest ss s with [] -> ss | ss -> ss in
-          errf p l "%a" did_you_mean (s, suggs)
+          let hint, ss = match Tdec.err_suggest ss s with
+          | [] -> Tdec.pp_must_be, ss
+          | ss -> Tdec.pp_did_you_mean, ss
+          in
+          let kind ppf () = Format.pp_print_string ppf kind in
+          let pp_v = Format.pp_print_string in
+          errf p l "%a" (Tdec.pp_unknown' ~kind pp_v ~hint) (s, ss)
       end
   | j -> err_exp kind p j
 
@@ -589,8 +597,13 @@ module Jsonq = struct
           | true -> Sset.add n acc
           | false ->
               let ns = Sset.elements dom in
-              let did_you_mean = Tdec.err_did_you_mean ~kind:"member" pp_mem in
-              errf p l "%a" did_you_mean (n, Tdec.err_suggest ns n)
+              let hint, ss = match Tdec.err_suggest ns n with
+              | [] -> Tdec.pp_must_be, ns
+              | ss -> Tdec.pp_did_you_mean, ss
+              in
+              let kind ppf () = Format.pp_print_string ppf "member" in
+              let pp_v = Format.pp_print_string in
+              errf p l "%a" (Tdec.pp_unknown' ~kind pp_v ~hint) (n, ss)
       in
       List.fold_left add_mem Sset.empty ms
   | j -> err_exp_obj p j

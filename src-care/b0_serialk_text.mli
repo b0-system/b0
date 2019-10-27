@@ -94,8 +94,8 @@ module Tloc : sig
 
       Strictly speaking this doesn't belong here but here you go. *)
 
-  val string_with_index_range : ?first:int -> ?last:int -> string -> string
-  (** [string with_index_range ~first ~last s] are the consecutive bytes of [s]
+  val string_subrange : ?first:int -> ?last:int -> string -> string
+  (** [string_subrange ~first ~last s] are the consecutive bytes of [s]
       whose indices exist in the range \[[first];[last]\].
 
       [first] defaults to [0] and last to [String.length s - 1].
@@ -182,19 +182,36 @@ module Tdec : sig
       multiple results are returned the order of [candidates] is
       preserved. *)
 
-  val err_did_you_mean :
-    ?pre:(Format.formatter -> unit -> unit) ->
-    ?post:(Format.formatter -> unit -> unit) ->
-    kind:string -> (Format.formatter -> 'a -> unit) ->
-    Format.formatter -> 'a * 'a list -> unit
-  (** [did_you_mean ~pre kind ~post pp_v] formats a faulty value [v] of
-      kind [kind] and a list of [hints] that [v] could have been
-      mistaken for.
+  type 'a fmt = Format.formatter -> 'a -> unit
+  (** The type for formatters. *)
 
-      [pre] defaults to [unit "Unknown"], [post] to {!nop} they surround
-      the faulty value before the "did you mean" part as follows ["%a %s
-      %a%a." pre () kind pp_v v post ()]. If [hints] is empty no "did
-      you mean" part is printed. *)
+  val pp_and_enum : ?empty:unit fmt -> 'a fmt -> 'a list fmt
+  (** [and_enum ~empty pp_v ppf l] formats [l] according to its length.
+      {ul
+      {- [0], formats {!empty} (defaults to {!nop}).}
+      {- [1], formats the element with [pp_v].}
+      {- [2], formats ["%a and %a"] with the list elements}
+      {- [n], formats ["%a, ... and %a"] with the list elements}} *)
+
+  val pp_or_enum : ?empty:unit fmt -> 'a fmt -> 'a list fmt
+  (** [or_enum] is like {!and_enum} but uses "or" instead of "and". *)
+
+  val pp_did_you_mean : 'a fmt -> 'a list fmt
+  (** [did_you_mean pp_v] formats ["Did you mean %a ?"] with {!or_enum}
+      if the list is non-empty and {!nop} otherwise. *)
+
+  val pp_must_be : 'a fmt -> 'a list fmt
+  (** [must_be pp_v] formats ["Must be %a."] with {!or_enum} if the list
+      is non-empty and {!nop} otherwise. *)
+
+  val pp_unknown : kind:unit fmt -> 'a fmt -> 'a fmt
+  (** [unknown ~kind pp_v] formats ["Unknown %a %a." kind () pp_v]. *)
+
+  val pp_unknown' :
+    kind:unit fmt -> 'a fmt -> hint:('a fmt -> 'a list fmt) ->
+    ('a * 'a list) fmt
+  (** [unknown ~kind pp_v ~hint (v, hints)] formats {!unknown} followed
+      by a space and [hint pp_v hints] if [hints] is non-empty. *)
 
   (** {1:dec Decoding} *)
 

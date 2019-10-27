@@ -6,28 +6,34 @@
 (* Error message helpers. *)
 
 module Err_msg = struct
+  let pf = Format.fprintf
+  let pp_sp = Format.pp_print_space
   let pp_nop _ () = ()
-  let pp_any fmt ppf _ = Format.fprintf ppf fmt
-  let pp_one_of ?(empty = pp_nop) pp_v ppf = function
+  let pp_any fmt ppf _ = pf ppf fmt
+
+  let pp_op_enum op ?(empty = pp_nop) pp_v ppf = function
   | [] -> empty ppf ()
   | [v] -> pp_v ppf v
-  | [v0; v1] -> Format.fprintf ppf "@[either %a or@ %a@]" pp_v v0 pp_v v1
-  | _ :: _ as vs ->
+  | _ as vs ->
       let rec loop ppf = function
-      | [v] -> Format.fprintf ppf "or@ %a" pp_v v
-      | v :: vs -> Format.fprintf ppf "%a,@ " pp_v v; loop ppf vs
+      | [v0; v1] -> pf ppf "%a@ %s@ %a" pp_v v0 op pp_v v1
+      | v :: vs -> pf ppf "%a,@ " pp_v v; loop ppf vs
       | [] -> assert false
       in
-      Format.fprintf ppf "@[one@ of@ %a@]" loop vs
+      loop ppf vs
 
-  let pp_did_you_mean
-      ?(pre = pp_any "Unknown") ?(post = pp_nop) ~kind pp_v ppf (v, hints)
-    =
-    match hints with
-    | [] -> Format.fprintf ppf "@[%a %s %a%a.@]" pre () kind pp_v v post ()
-    | hints ->
-        Format.fprintf ppf "@[%a %s %a%a.@ Did you mean %a ?@]"
-          pre () kind pp_v v post () (pp_one_of pp_v) hints
+  let pp_and_enum ?empty pp_v ppf vs = pp_op_enum "and" ?empty pp_v ppf vs
+  let pp_or_enum ?empty pp_v ppf vs = pp_op_enum "or" ?empty pp_v ppf vs
+  let pp_did_you_mean pp_v ppf = function
+  | [] -> () | vs -> pf ppf "Did@ you@ mean %a ?" (pp_or_enum pp_v) vs
+
+  let pp_must_be pp_v ppf = function
+  | [] -> () | vs -> pf ppf "Must be %a." (pp_or_enum pp_v) vs
+
+  let pp_unknown ~kind pp_v ppf v = pf ppf "Unknown %a %a." kind () pp_v v
+  let pp_unknown' ~kind pp_v ~hint ppf (v, hints) = match hints with
+  | [] -> pp_unknown ~kind pp_v ppf v
+  | hints -> pp_unknown ~kind pp_v ppf v; pp_sp ppf (); (hint pp_v) ppf hints
 
   let min_by f a b = if f a <= f b then a else b
   let max_by f a b = if f a <= f b then b else a
@@ -146,7 +152,7 @@ module Tloc = struct
 
   (* Insertions and substitutions *)
 
-  let string_with_index_range ?(first = 0) ?last s =
+  let string_subrange ?(first = 0) ?last s =
     let max = String.length s - 1 in
     let last = match last with
     | None -> max
@@ -217,6 +223,14 @@ end
 (* UTF-8 text decoder *)
 
 module Tdec = struct
+  type 'a fmt = Format.formatter -> 'a -> unit
+  let pp_did_you_mean = Err_msg.pp_did_you_mean
+  let pp_and_enum = Err_msg.pp_and_enum
+  let pp_or_enum = Err_msg.pp_or_enum
+  let pp_did_you_mean = Err_msg.pp_did_you_mean
+  let pp_must_be = Err_msg.pp_must_be
+  let pp_unknown = Err_msg.pp_unknown
+  let pp_unknown' = Err_msg.pp_unknown'
 
   (* Decoders *)
 
@@ -251,7 +265,6 @@ module Tdec = struct
 
   let err_here d fmt = Format.kasprintf (err (loc_here d)) fmt
   let err_suggest = Err_msg.suggest
-  let err_did_you_mean = Err_msg.pp_did_you_mean
 
   (* Lexing *)
 
