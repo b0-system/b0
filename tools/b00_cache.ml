@@ -48,7 +48,8 @@ let keys_exist c keys =
   | [] ->
       Result.bind (File_cache.keys c) @@ fun dom ->
       let add_error acc n =
-        Fmt.(str "%a" (did_you_mean text ~kind:"key") (n, String.suggest dom n))
+        (Fmt.str "%a" Fmt.(unknown' ~kind:(any "key") string ~hint:did_you_mean)
+           (n, String.suggest dom n))
         :: acc
       in
       Error (String.concat "\n" (List.fold_left add_error [] miss))

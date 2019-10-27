@@ -448,26 +448,29 @@ module Fmt = struct
 
   (* HCI fragments *)
 
-  let one_of ?(empty = nop) pp_v ppf = function
+  let op_enum op ?(empty = nop) pp_v ppf = function
   | [] -> empty ppf ()
   | [v] -> pp_v ppf v
-  | [v0; v1] -> pf ppf "@[either %a or@ %a@]" pp_v v0 pp_v v1
-  | _ :: _ as vs ->
+  | vs ->
       let rec loop ppf = function
-      | [v] -> pf ppf "or@ %a" pp_v v
+      | [v0; v1] -> pf ppf "%a@ %s@ %a" pp_v v0 op pp_v v1
       | v :: vs -> pf ppf "%a,@ " pp_v v; loop ppf vs
       | [] -> assert false
       in
-      pf ppf "@[one@ of@ %a@]" loop vs
+      loop ppf vs
 
-  let did_you_mean
-      ?(pre = any "Unknown") ?(post = nop) ~kind pp_v ppf (v, hints)
-    =
-    match hints with
-    | [] -> pf ppf "@[%a %s %a%a.@]" pre () kind pp_v v post ()
-    | hints ->
-        pf ppf "@[%a %s %a%a.@ Did you mean %a ?@]"
-          pre () kind pp_v v post () (one_of pp_v) hints
+  let and_enum ?empty pp_v ppf vs = op_enum "and" ?empty pp_v ppf vs
+  let or_enum ?empty pp_v ppf vs = op_enum "or" ?empty pp_v ppf vs
+  let did_you_mean pp_v ppf = function
+  | [] -> () | vs -> pf ppf "Did@ you@ mean %a ?" (or_enum pp_v) vs
+
+  let must_be pp_v ppf = function
+  | [] -> () | vs -> pf ppf "Must be %a." (or_enum pp_v) vs
+
+  let unknown ~kind pp_v ppf v = pf ppf "Unknown %a %a." kind () pp_v v
+  let unknown' ~kind pp_v ~hint ppf (v, hints) = match hints with
+  | [] -> unknown ~kind pp_v ppf v
+  | hints -> unknown ~kind pp_v ppf v; sp ppf (); (hint pp_v) ppf hints
 
   (* ANSI TTY styling
 
@@ -493,6 +496,8 @@ module Fmt = struct
       let reset ppf = Format.fprintf ppf "@<0>%s" "\027[m" in
       Format.kfprintf reset ppf "@<0>%s%a"
         (Printf.sprintf "\027[%sm" @@ Tty.sgrs_of_styles styles) pp_v v
+
+  let bold pp_v ppf v = tty [`Bold] pp_v ppf v
 
   (* Records *)
 
@@ -3805,9 +3810,10 @@ module Log = struct
   | "info" ->  Ok Info
   | "debug" ->  Ok Debug
   | e ->
-      let one_of = Fmt.one_of (Fmt.tty_string [`Bold]) in
-      let exps = ["quiet"; "app"; "error"; "warning"; "info"; "debug"] in
-      Fmt.error "%S: unknown log level expected %a" e one_of exps
+      let pp_level = Fmt.(bold string) in
+      let kind = Fmt.any "log level" in
+      let dom = ["quiet"; "app"; "error"; "warning"; "info"; "debug"] in
+      Fmt.error "%a" Fmt.(unknown' ~kind pp_level ~hint:must_be) (e, dom)
 
   (* Reporting *)
 

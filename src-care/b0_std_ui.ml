@@ -46,9 +46,10 @@ let tty_cap_of_string s = match String.trim s with
 | "always" -> Ok (Some `Ansi)
 | "never" -> Ok (Some `None)
 | e ->
-    let one_of = Fmt.one_of (Fmt.tty_string [`Bold]) in
-    let exps = ["auto"; "always"; "never"] in
-    Fmt.error "%S: invalid color behaviour expected %a" e one_of exps
+    let pp_cap = Fmt.(bold string) in
+    let kind = Fmt.any "color behaviour" in
+    let dom = ["auto"; "always"; "never"] in
+    Fmt.error "%a" Fmt.(unknown' ~kind pp_cap ~hint:must_be) (e, dom)
 
 let tty_cap ?(docs = Manpage.s_common_options) ?env () =
   let parse s = Result.map_error (fun e -> `Msg e) (tty_cap_of_string s) in
@@ -57,8 +58,7 @@ let tty_cap ?(docs = Manpage.s_common_options) ?env () =
   in
   let color = Arg.conv ~docv:"WHEN" (parse, pp) in
   let doc =
-    "Colorize the output. $(docv) must be one of $(b,auto), $(b,always) or
-       $(b,never)."
+    "Colorize the output. $(docv) must be $(b,auto), $(b,always) or $(b,never)."
   in
   let docv = "WHEN" in
   Arg.(value & opt (some color) None & info ["color"] ?env ~doc ~docv ~docs)
@@ -82,8 +82,8 @@ let log_level
     let parse s = Result.map_error (fun e -> `Msg e) (Log.level_of_string s)in
     let level = Arg.conv ~docv:"LEVEL" (parse, Log.pp_level) in
     let doc =
-      "Be more or less verbose. $(docv) must be one of $(b,quiet), \
-       $(b,app), $(b,error), $(b,warning), $(b,info) or $(b,debug)."
+      "Be more or less verbose. $(docv) must be $(b,quiet), $(b,app), \
+       $(b,error), $(b,warning), $(b,info) or $(b,debug)."
     in
     let none = Log.level_to_string none in
     Arg.(value & opt (some ~none level) None &

@@ -354,24 +354,32 @@ module Fmt : sig
 
   (** {1:hci HCI fragments} *)
 
-  val one_of : ?empty:unit t -> 'a t -> 'a list t
-  (** [one_of ~empty pp_v ppf l] formats according to the length of [l]
+  val and_enum : ?empty:unit t -> 'a t -> 'a list t
+  (** [and_enum ~empty pp_v ppf l] formats [l] according to its length.
       {ul
       {- [0], formats {!empty} (defaults to {!nop}).}
       {- [1], formats the element with [pp_v].}
-      {- [2], formats ["either %a or %a"] with the list elements}
-      {- [n], formats ["one of %a, ... or %a"] with the list elements}} *)
+      {- [2], formats ["%a and %a"] with the list elements}
+      {- [n], formats ["%a, ... and %a"] with the list elements}} *)
 
-  val did_you_mean :
-    ?pre:unit t -> ?post:unit t -> kind:string -> 'a t -> ('a * 'a list) t
-  (** [did_you_mean ~pre kind ~post pp_v] formats a faulty value [v] of
-    kind [kind] and a list of [hints] that [v] could have been
-    mistaken for.
+  val or_enum : ?empty:unit t -> 'a t -> 'a list t
+  (** [or_enum] is like {!and_enum} but uses "or" instead of "and". *)
 
-    [pre] defaults to [unit "Unknown"], [post] to {!nop} they surround
-    the faulty value before the "did you mean" part as follows ["%a %s
-    %a%a." pre () kind pp_v v post ()]. If [hints] is empty no "did
-    you mean" part is printed. *)
+  val did_you_mean : 'a t -> 'a list t
+  (** [did_you_mean pp_v] formats ["Did you mean %a ?"] with {!or_enum}
+      if the list is non-empty and {!nop} otherwise. *)
+
+  val must_be : 'a t -> 'a list t
+  (** [must_be pp_v] formats ["Must be %a."] with {!or_enum} if the list
+      is non-empty and {!nop} otherwise. *)
+
+  val unknown : kind:unit t -> 'a t -> 'a t
+  (** [unknown ~kind pp_v] formats ["Unknown %a %a." kind () pp_v]. *)
+
+  val unknown' :
+    kind:unit t -> 'a t -> hint:('a t -> 'a list t) -> ('a * 'a list) t
+  (** [unknown ~kind pp_v ~hint (v, hints)] formats {!unknown} followed
+      by a space and [hint pp_v hints] if [hints] is non-empty. *)
 
   (** {1:tty ANSI TTY styling} *)
 
@@ -389,6 +397,9 @@ module Fmt : sig
   val tty : Tty.style list -> 'a t -> 'a t
   (** [tty styles pp_v ppf v] prints [v] with [pp_v] on [ppf]
       according to [styles] and the value of {!tty_styling_cap}. *)
+
+  val bold : 'a t -> 'a t
+  (** [bold] is [tty `Bold]. *)
 end
 
 (** Option values (as in [4.08)]. *)

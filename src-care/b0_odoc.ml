@@ -234,9 +234,10 @@ module Theme = struct
   let find n ts = match List.find (fun t -> name t = n) ts with
   | t -> Ok t
   | exception Not_found ->
+      let pp_theme = Fmt.(bold string) in
       let ss = String.suggest (List.rev_map name ts) n in
-      let post ppf () = Fmt.pf ppf " using %s instead" default in
-      Fmt.error "%a" (Fmt.did_you_mean ~kind:"theme" ~post Fmt.string) (n, ss)
+      Fmt.error "Unknown theme %a using %a instead.@ %a"
+        pp_theme n pp_theme default (Fmt.did_you_mean pp_theme) ss
 end
 
 (*---------------------------------------------------------------------------
