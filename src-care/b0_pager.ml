@@ -69,18 +69,23 @@ let page_stdout = function
             Os.Fd.apply ~close:Unix.close parent_write @@ fun parent_write ->
             Result.bind (Os.Cmd.spawn ?env ~stdin pager) @@ fun pid ->
             Result.bind (dup2 parent_write Unix.stdout) @@ fun () ->
-            let on_exit () =
-              (* Before closing Unix.stdout it's better to flush
-                 formatter and channels. Otherwise it's done later
-                 by OCaml's standard shutdown procedure and it
-                 raises Sys_error as the fd is no longer valid. *)
-              (try Fmt.flush Fmt.stdout () with Sys_error _ -> ());
-              (try flush stdout with Sys_error _ -> ());
-              (try Unix.close Unix.stdout with Unix.Unix_error _ -> ());
-              (Result.map (fun st -> ()) (Os.Cmd.spawn_wait_status pid)
-               |> Log.if_error ~use:())
+            let parent_pid = Unix.getpid () in
+            let on_parent_exit () =
+              (* We need to be careful here, forked processes will also
+                 get execute to this. *)
+              if parent_pid = Unix.getpid () then begin
+                (* Before closing Unix.stdout it's better to flush
+                   formatter and channels. Otherwise it's done later
+                   by OCaml's standard shutdown procedure and it
+                   raises Sys_error as the fd is no longer valid. *)
+                (try Fmt.flush Fmt.stdout () with Sys_error _ -> ());
+                (try flush stdout with Sys_error _ -> ());
+                (try Unix.close Unix.stdout with Unix.Unix_error _ -> ());
+                Log.if_error ~use:() @@ Result.map ignore @@
+                Os.Cmd.spawn_wait_status pid
+              end
             in
-            at_exit on_exit;
+            at_exit on_parent_exit;
             Ok ()
 
 let page_files pager files = match pager with
