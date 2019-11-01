@@ -132,31 +132,6 @@ module Cobj = struct
   let archive_ext_of_code = function Byte -> ".cma" | Native -> ".cmxa"
   let object_ext_of_code = function Byte -> ".cmo" | Native -> ".cmx"
 
-  module Cmi = struct
-    type t =
-      { file : Fpath.t;
-        mod_ref : Mod_ref.t;
-        mod_names : Mod_name.Set.t;
-        deps : Mod_ref.Set.t }
-
-    let read m file k =
-      Memo.wait_files m [file] @@ fun () ->
-      let name, digest, mod_names, deps =
-        B0_ocaml_cmi.read file |> Memo.fail_if_error m
-      in
-      let mod_ref = Mod_ref.v name digest in
-      let add_dep acc (n, d) = Mod_ref.Set.add (Mod_ref.v n d) acc in
-      let deps = List.fold_left add_dep Mod_ref.Set.empty deps in
-      k { file; mod_ref; mod_names; deps }
-
-    let file cmi = cmi.file
-    let mod_ref cmi = cmi.mod_ref
-    let mod_names cmi = cmi.mod_names
-    let deps cmi = cmi.deps
-    let pp ppf cmi =
-      Fmt.pf ppf "%a %a" Mod_ref.pp cmi.mod_ref Fpath.pp_quoted cmi.file
-  end
-
   type t =
     { file : Fpath.t;
       defs : Mod_ref.Set.t;

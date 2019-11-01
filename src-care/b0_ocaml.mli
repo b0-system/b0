@@ -198,32 +198,6 @@ module Cobj : sig
 
   (** {1:cobjs Compilation objects} *)
 
-  (** Compiled interfaces. *)
-  module Cmi : sig
-    type t
-    (** The type for compiled interfaces. *)
-
-    val read : B00.Memo.t -> Fpath.t -> t Memo.fiber
-    (** [read f] reads an object file from [f]. *)
-
-    val file : t -> Fpath.t
-    (** [file cmi] is the file path of [cmi]. *)
-
-    val mod_ref : t -> Mod_ref.t
-    (** [mod_ref cmi] is the module reference of [cmi]. *)
-
-    val deps : t -> Mod_ref.Set.t
-    (** [deps cmi] is the set of modules interfaces imported by [cmi]. *)
-
-    val mod_names : t -> Mod_name.Set.t
-    (** [mod_names cmi] are the unqualified module names defined by
-        [cmi] (including its name). Sligthly wrong because stops at module
-        aliases, these are not resolved to further cmis. *)
-
-    val pp : t Fmt.t
-    (** [pp] formats a compiled interface. *)
-  end
-
   type t
   (** The type for compilation objects. This can represent one
       of a [cmi], [cmti], [cmo], [cmx], [cmt], [cma] or [cmxa] file. *)
