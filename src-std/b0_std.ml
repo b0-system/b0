@@ -2046,7 +2046,7 @@ module Cmd = struct
 
   type t =
   | A of string
-  | Shield of t
+  | Unstamp of t
   | Rseq of t list (* Sequence is reversed; only empty at toplevel *)
 
   let empty = Rseq []
@@ -2062,9 +2062,9 @@ module Cmd = struct
   | Rseq ls, l  -> Rseq (l :: ls)
   | l1, l2 -> Rseq ([l2; l1])
 
-  let shield = function
+  let unstamp = function
   | Rseq [] -> empty
-  | l -> Shield l
+  | l -> Unstamp l
 
   let ( % ) l a = append l (arg a)
   let ( %% ) = append
@@ -2073,7 +2073,6 @@ module Cmd = struct
 
   let if' cond l = if cond then l else empty
   let path p = A (Fpath.to_string p)
-  let spath p = Shield (A (Fpath.to_string p))
 
   let args ?slip l = match slip with
   | None -> Rseq (List.rev_map arg l)
@@ -2104,22 +2103,22 @@ module Cmd = struct
     let rec loop acc = function
     | A a -> a :: acc
     | Rseq ls -> List.fold_left loop acc ls
-    | Shield l -> loop acc l
+    | Unstamp l -> loop acc l
     in
     loop [] l
 
   let to_list_and_stamp l =
-    let rec loop shielded acc sg = function
-    | A a -> (a :: acc), (if shielded then sg else a :: sg)
+    let rec loop unstamped acc sg = function
+    | A a -> (a :: acc), (if unstamped then sg else a :: sg)
     | Rseq ls ->
-        let rec sub shielded acc sg = function
+        let rec sub unstamped acc sg = function
         | [] -> acc, sg
         | l :: ls ->
-            let acc, sg = loop shielded acc sg l in
-            sub shielded acc sg ls
+            let acc, sg = loop unstamped acc sg l in
+            sub unstamped acc sg ls
         in
-        sub shielded acc sg ls
-    | Shield l -> loop true acc sg l
+        sub unstamped acc sg ls
+    | Unstamp l -> loop true acc sg l
     in
     loop false [] [] l
 
@@ -2127,7 +2126,7 @@ module Cmd = struct
     let rec loop acc = function
     | A a -> (a :: acc)
     | Rseq ls ->  List.fold_left loop acc ls
-    | Shield l -> acc
+    | Unstamp l -> acc
     in
     loop [] l
 
@@ -2209,18 +2208,18 @@ module Cmd = struct
     let pp_arg ppf a = Fmt.string ppf (Filename.quote a) in
     Fmt.pf ppf "@[<h>%a@]" Fmt.(list ~sep:sp pp_arg) (to_list l)
 
-  let rec fold ~arg ~shield ~append ~empty = function
+  let rec fold ~arg ~unstamp ~append ~empty = function
   | A a -> arg a
-  | Shield c -> shield (fold ~arg ~shield ~append ~empty c)
+  | Unstamp c -> unstamp (fold ~arg ~unstamp ~append ~empty c)
   | Rseq l ->
-      let append acc v = append (fold ~arg ~shield ~append ~empty v) acc in
+      let append acc v = append (fold ~arg ~unstamp ~append ~empty v) acc in
       List.fold_left append empty l
 
-  let rec iter_enc ~arg ~shield ~append ~empty e = function
+  let rec iter_enc ~arg ~unstamp ~append ~empty e = function
   | A a -> arg e a
-  | Shield c -> shield e; iter_enc ~arg ~shield ~append ~empty e c
+  | Unstamp c -> unstamp e; iter_enc ~arg ~unstamp ~append ~empty e c
   | Rseq l ->
-      let append e v = append e; iter_enc ~arg ~shield ~append ~empty e v; e in
+      let append e v = append e; iter_enc ~arg ~unstamp ~append ~empty e v; e in
       ignore (List.fold_left append e l); empty e
 
   (* Tools *)
@@ -2229,7 +2228,7 @@ module Cmd = struct
 
   let rec tool = function
   | A a -> Result.to_option (Fpath.of_string a)
-  | Shield l -> tool l
+  | Unstamp l -> tool l
   | Rseq ls ->
       let rec loop = function
       | [l] -> tool l
@@ -2243,7 +2242,7 @@ module Cmd = struct
   | l ->
       let rec loop = function
       | A a -> A (Fpath.to_string tool)
-      | Shield l -> Shield (loop l)
+      | Unstamp l -> Unstamp (loop l)
       | Rseq ls ->
           match List.rev ls with
           | arg :: args -> Rseq (List.rev @@ (loop arg) :: args)
@@ -2263,7 +2262,7 @@ module Cmd = struct
 
   let rec is_singleton = function
   | A a -> true
-  | Shield l -> is_singleton l
+  | Unstamp l -> is_singleton l
   | Rseq _ -> false
 end
 
@@ -4630,19 +4629,19 @@ module Conv = struct
     let rec bin_enc b = function
     | Cmd.A a -> Bin.enc_byte b 0x0; Bin.enc_bytes b a
     | Cmd.Rseq l -> Bin.enc_byte b 0x1; Bin.enc_list bin_enc b l
-    | Cmd.Shield c -> Bin.enc_byte b 0x2; bin_enc b c
+    | Cmd.Unstamp c -> Bin.enc_byte b 0x2; bin_enc b c
     in
     let rec bin_dec s ~start = match Bin.dec_byte ~kind s ~start with
     | start, 0x0 -> let i, a = Bin.dec_bytes ~kind s ~start in i, Cmd.A a
     | start, 0x1 ->
         let i, l = Bin.dec_list bin_dec ~kind s ~start in i, Cmd.Rseq l
-    | start, 0x2 -> let i, c = bin_dec s ~start in i, Cmd.Shield c
+    | start, 0x2 -> let i, c = bin_dec s ~start in i, Cmd.Unstamp c
     | _, byte -> Bin.dec_err_exceed ~kind start byte ~max:0x2
     in
     let rec txt_enc ppf = function
     | Cmd.A a -> Txt.enc_atom ppf a
     | Cmd.Rseq l -> Txt.enc_list txt_enc ppf (Cmd.A "rseq" :: l)
-    | Cmd.Shield c -> Txt.enc_list txt_enc ppf (Cmd.A "shield" :: c :: [])
+    | Cmd.Unstamp c -> Txt.enc_list txt_enc ppf (Cmd.A "unstamp" :: c :: [])
     in
     let rec txt_dec s ~start = match Txt.dec_lexeme ~kind s ~start with
     | i, (_, `Atom a) -> i, Cmd.A a
@@ -4652,12 +4651,12 @@ module Conv = struct
         | "rseq" ->
             let i, l = Txt.dec_list_tail txt_dec ~kind ~ls s ~start:i in
             start, Cmd.Rseq l
-        | "shield" ->
+        | "unstamp" ->
             let i, c = txt_dec s ~start:i in
             let i = Txt.dec_le ~kind s ~start:i in
-            i, Cmd.Shield c
+            i, Cmd.Unstamp c
         | a ->
-            Txt.dec_err_atom ~kind i a ~exp:["rseq"; "shield"]
+            Txt.dec_err_atom ~kind i a ~exp:["rseq"; "unstamp"]
         end
     | _, (j, l) ->
         Txt.dec_err_lexeme ~kind j l ~exp:[`Ls; `Atom "atom" (* bof *)]

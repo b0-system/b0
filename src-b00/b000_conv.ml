@@ -444,17 +444,17 @@ module Op = struct
 
   let enc_cmd b cmd =
     let arg b a = Binc.enc_byte b 0; Binc.enc_string b a in
-    let shield b = Binc.enc_byte b 1 in
+    let unstamp b = Binc.enc_byte b 1 in
     let append b = Binc.enc_byte b 2 in
     let empty b = Binc.enc_byte b 3 in
-    Cmd.iter_enc ~arg ~shield ~append ~empty b cmd
+    Cmd.iter_enc ~arg ~unstamp ~append ~empty b cmd
 
   let rec dec_cmd s i =
     let kind = "Cmd.t" in
     let next, b = Binc.dec_byte ~kind s i in
     match b with
     | 0 -> let i, s = Binc.dec_string s next in i, Cmd.arg s
-    | 1 -> let i, cmd = dec_cmd s next in i, Cmd.shield cmd
+    | 1 -> let i, cmd = dec_cmd s next in i, Cmd.unstamp cmd
     | 2 ->
         let i, cmd0 = dec_cmd s next in
         let i, cmd1 = dec_cmd s i in

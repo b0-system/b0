@@ -47,7 +47,6 @@ B0_trace}
 {!modules:
 B0_cmark
 B0_machine
-B0_ocaml_cmi
 B0_ocaml
 B0_odoc}
 

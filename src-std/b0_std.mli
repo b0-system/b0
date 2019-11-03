@@ -1745,17 +1745,17 @@ end
 
     {!examples}.
 
-    {b B0 artefact.}
-    This module allows to {!shield} command arguments. Shielded
-    arguments have no special semantics as far as the command line is
-    concerned they simply indicate that the argument value itself does
-    not influence the file outputs of the tool. As such shielded
-    arguments do not appear in the command line
+    {b B0 artefact.}  This module allows to {!unstamp} command
+    arguments. Unstamped arguments have no special semantics as far as
+    the command line is concerned they simply indicate that the
+    argument value itself does not influence the outputs of the
+    tool. Unstamped arguments do not appear in the command line
     {{!to_list_and_stamp}stamp} which is used to memoize tool
-    spawns. A typical example of shielded argument are file paths to
+    spawns. A typical example of unstamped arguments are file paths to
     inputs: it's often the file contents not the actual file path that
     determines the tool output; beware though that some tool use both
-    the file path contents and the actual file path in their outputs. *)
+    the file path contents and the actual file path in their
+    outputs. *)
 module Cmd : sig
 
   (** {1:cl Command lines} *)
@@ -1776,10 +1776,10 @@ module Cmd : sig
   val append : t -> t -> t
   (** [append l1 l2] appends arguments [l2] to [l1]. *)
 
-  val shield : t -> t
-  (** [shield l] indicates that arguments [l] do not influence the
+  val unstamp : t -> t
+  (** [unstamp l] indicates that arguments [l] do not influence the
       tool's invocation outputs. These arguments are omitted from
-      the command line's {{!to_list_and_sig}signature}. *)
+      the command line's {{!to_list_and_stamp}stamp}. *)
 
   (** {1:derived Derived combinators} *)
 
@@ -1794,9 +1794,6 @@ module Cmd : sig
 
   val path : Fpath.t -> t
   (** [path p] is [arg (Fpath.to_string p)]. *)
-
-  val spath : Fpath.t -> t
-  (** [spath p] is [shield (path p)]. *)
 
   val args : ?slip:string -> string list -> t
   (** [args ?slip l] is a command line from the list of arguments [l].
@@ -1853,13 +1850,13 @@ module Cmd : sig
   (** {1:converting Converting} *)
 
   val fold :
-    arg:(string -> 'a) -> shield:('a -> 'a) -> append:('a -> 'a -> 'a) ->
+    arg:(string -> 'a) -> unstamp:('a -> 'a) -> append:('a -> 'a -> 'a) ->
     empty:'a -> t -> 'a
-  (** [fold ~arg ~shield ~append ~empty l] folds over [l]'s structure. *)
+  (** [fold ~arg ~unstamp ~append ~empty l] folds over [l]'s structure. *)
 
   val iter_enc :
     arg:('a -> string -> unit) ->
-    shield:('a -> unit) ->
+    unstamp:('a -> unit) ->
     append:('a -> unit) ->
     empty:('a -> unit) -> 'a -> t -> unit
 
@@ -1867,11 +1864,11 @@ module Cmd : sig
   (** [to_list l] converts [l] to a list of strings. *)
 
   val to_stamp : t -> string list
-  (** [to_stamp l] is the sequence of unshielded arguments. *)
+  (** [to_stamp l] is the sequence of stamped arguments. *)
 
   val to_list_and_stamp : t -> string list * string list
   (** [to_list_and_stamp l] is a [l] as a list of strings tuppled with
-      its stamp: the sequence of unshielded arguments. *)
+      its stamp: the sequence of stamped arguments. *)
 
   val to_string : t -> string
   (** [to_string l] converts [l] to a string that can be passed
@@ -1911,7 +1908,7 @@ v}
 {[
 let ls p = Cmd.(arg "ls" % "-a" % path p)
 let tar archive dir =
-  Cmd.(arg "tar" % "-cvf" %% shield (path archive) %% path dir)
+  Cmd.(arg "tar" % "-cvf" %% unstamp (path archive) %% path dir)
 
 let opam cmd = Cmd.(arg "opam" % cmd)
 let opam_install pkgs = Cmd.(opam "install" %% args pkgs)
@@ -1922,8 +1919,8 @@ let ocamlc ?(debug = false) file =
 let ocamlopt ?(profile = false) ?(debug = false) incs file =
   let profile = Cmd.(if' profile (arg "-p")) in
   let debug = Cmd.(if' debug (arg "-g")) in
-  let incs = Cmd.(shield (paths ~slip:"-I" incs)) in
-  Cmd.(arg "ocamlopt" % "-c" %% debug %% profile %% incs %% shield (path file))
+  let incs = Cmd.(unstamp (paths ~slip:"-I" incs)) in
+  Cmd.(arg "ocamlopt" % "-c" %% debug %% profile %% incs %% unstamp (path file))
 ]} *)
 end
 

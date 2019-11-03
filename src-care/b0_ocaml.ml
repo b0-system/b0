@@ -279,7 +279,7 @@ module Cobj = struct
     try Ok (parse_files [] 1 (B0_lines.of_string data)) with
     | Failure e -> B0_lines.err_file file e
 
-  (* FIXME add [src_root] so that we can properly shield. *)
+  (* FIXME add [src_root] so that we can properly unstamp. *)
 
   let write m ~cobjs ~o =
     let ocamlobjinfo = Memo.tool m Tool.ocamlobjinfo in
@@ -399,9 +399,8 @@ module Mod_src = struct
       | exception Not_found -> Mod_name.Map.add mname f acc
       | f' ->
           Memo.notify m `Warn
-            "@[<v>%a:@,File ignored, %s for %a already defined by:@,%a@]@]"
-            Fpath.pp_quoted f kind Mod_name.pp mname
-            Fpath.pp_quoted f';
+            "@[<v>%a:@,File ignored. %a's module %s defined by file:@,%a:@]"
+            Fpath.pp_unquoted f Mod_name.pp mname kind Fpath.pp_unquoted f';
           acc
     in
     List.fold_left add Mod_name.Map.empty files
@@ -461,7 +460,7 @@ module Compile = struct
     let incs = Fpath.uniquify @@ List.map Fpath.parent hs in
     let incs = Cmd.paths ~slip:"-I" incs in
     Memo.spawn m ?post_exec ?k ~reads:(c :: hs) ~writes:[o] ~cwd @@
-    ocamlc Cmd.(debug % "-c" %% shield (incs %% path c))
+    ocamlc Cmd.(debug % "-c" %% unstamp (incs %% path c))
 
   let mli_to_cmi
       ?post_exec ?k ?args:(more_args = Cmd.empty) ?(with_cmti = true) m
@@ -476,7 +475,7 @@ module Compile = struct
     let writes = o :: if with_cmti then [Fpath.(o -+ ".cmti")] else [] in
     Memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
     ocamlc Cmd.(debug %% bin_annot % "-c" % "-o" %%
-                shield (path o %% incs) %% more_args %% shield (path mli))
+                unstamp (path o %% incs) %% more_args %% unstamp (path mli))
 
   let ml_to_cmo
       ?post_exec ?k ?args:(more_args = Cmd.empty) ?(with_cmt = true) m
@@ -493,8 +492,8 @@ module Compile = struct
             add_if (not has_cmi) Fpath.(o -+ ".cmi") [])
     in
     Memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
-    ocamlc Cmd.(debug %% bin_annot % "-c" % "-o" %% shield (path o) %%
-                shield incs %% more_args %% shield (path ml))
+    ocamlc Cmd.(debug %% bin_annot % "-c" % "-o" %% unstamp (path o) %%
+                unstamp incs %% more_args %% unstamp (path ml))
 
   let ml_to_cmx
       ?post_exec ?k ?args:(more_args = Cmd.empty) ?(with_cmt = true) m ~has_cmi
@@ -511,8 +510,8 @@ module Compile = struct
     let writes = add_if with_cmt Fpath.(base + ".cmt") writes in
     let writes = add_if (not has_cmi) Fpath.(base + ".cmi") writes in
     Memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
-    ocamlopt Cmd.(debug %% bin_annot % "-c" % "-o" %% shield (path o) %%
-                  shield incs %% more_args %% shield (path ml))
+    ocamlopt Cmd.(debug %% bin_annot % "-c" % "-o" %% unstamp (path o) %%
+                  unstamp incs %% more_args %% unstamp (path ml))
 
   let ml_to_impl
       ?post_exec ?k ?args ?with_cmt m ~code ~has_cmi ~reads ~ml ~o
@@ -535,7 +534,7 @@ module Compile = struct
         Fpath.(odir / cstubs_dll oname dll_ext)] (* FIXME dynlink cond. *)
     in
     Memo.spawn ?post_exec ?k m ~reads:c_objs ~writes @@
-    ocamlmklib Cmd.(debug % "-o" %% shield (path o) %% shield (paths c_objs))
+    ocamlmklib Cmd.(debug % "-o" %% unstamp (path o) %% unstamp (paths c_objs))
 
   let byte_archive
       ?post_exec ?k ?args:(more_args = Cmd.empty) m ~has_cstubs ~cobjs ~odir
@@ -552,8 +551,8 @@ module Compile = struct
     in
     let cma = Fpath.(odir / Fmt.str "%s.cma" oname) in
     Memo.spawn m ~reads:cobjs ~writes:[cma] @@
-    ocamlc Cmd.(debug % "-a" % "-o" %% shield (path cma) %% cstubs_opts %%
-                shield (paths cobjs))
+    ocamlc Cmd.(debug % "-a" % "-o" %% unstamp (path cma) %% cstubs_opts %%
+                unstamp (paths cobjs))
 
   let native_archive
       ?post_exec ?k ?args:(more_args = Cmd.empty) m ~has_cstubs ~cobjs ~odir
@@ -568,8 +567,8 @@ module Compile = struct
     let cmxa = Fpath.(odir / Fmt.str "%s.cmxa" oname) in
     let cmxa_clib = Fpath.(odir / Fmt.str "%s%s" oname ext_lib) in
     Memo.spawn m ?post_exec ?k ~reads:cobjs ~writes:[cmxa; cmxa_clib] @@
-    ocamlopt Cmd.(debug % "-a" % "-o" %% shield (path cmxa) %% cstubs_opts %%
-                  shield (paths cobjs))
+    ocamlopt Cmd.(debug % "-a" % "-o" %% unstamp (path cmxa) %% cstubs_opts %%
+                  unstamp (paths cobjs))
 
   let archive ?post_exec ?k ?args m ~code ~has_cstubs ~cobjs ~odir ~oname =
     (match code with Cobj.Byte -> byte_archive | Cobj.Native -> native_archive)
@@ -588,12 +587,12 @@ module Compile = struct
         let oname = Fpath.basename ~no_ext:true cmxa in
         let cstubs_dir = Fpath.(parent cmxa) in
         let cstubs = Fpath.(cstubs_dir / cstubs_clib oname lib_ext) in
-        let inc = Cmd.(arg "-I" %% shield (path cstubs_dir)) in
-        Cmd.(inc %% shield (path cstubs)), [cstubs; cmxa; cmxa_clib]
+        let inc = Cmd.(arg "-I" %% unstamp (path cstubs_dir)) in
+        Cmd.(inc %% unstamp (path cstubs)), [cstubs; cmxa; cmxa_clib]
     in
     Memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
-    ocamlopt Cmd.(debug % "-shared" % "-linkall" % "-o" %% shield (path o) %%
-                  cstubs_opts %% shield (path cmxa))
+    ocamlopt Cmd.(debug % "-shared" % "-linkall" % "-o" %% unstamp (path o) %%
+                  cstubs_opts %% unstamp (path cmxa))
 end
 
 module Link = struct
@@ -616,7 +615,7 @@ module Link = struct
     let incs = cstubs_incs cobjs in
     Memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
     ocamlc Cmd.(Compile.debug % "-custom" % "-o" %%
-                shield (path o %% incs %% paths c_objs %% paths cobjs))
+                unstamp (path o %% incs %% paths c_objs %% paths cobjs))
 
   let native_exe
       ?post_exec ?k ?args:(more_args = Cmd.empty) m ~c_objs ~cobjs ~o
@@ -635,7 +634,7 @@ module Link = struct
     in
     Memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
     ocamlopt Cmd.(Compile.debug % "-o" %%
-                  shield (path o %% incs %% paths c_objs %% paths cobjs))
+                  unstamp (path o %% incs %% paths c_objs %% paths cobjs))
 
   let exe ?post_exec ?k ?args m ~code ~c_objs ~cobjs ~o =
     (match code with Cobj.Byte -> byte_exe | Cobj.Native -> native_exe)

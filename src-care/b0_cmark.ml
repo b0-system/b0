@@ -14,7 +14,8 @@ let cmd
   let cmark = Memo.tool m tool in
   let validate = Cmd.if' validate_utf_8 (Cmd.arg "--validate-utf8") in
   Memo.spawn m ~reads:mds ~writes:[o] ~stdout:(`File o) @@
-  cmark Cmd.(arg "--to" % format %% validate %% more_args %% shield (paths mds))
+  cmark Cmd.(arg "--to" % format %% validate %% more_args %%
+             unstamp (paths mds))
 
 let to_html
     ?generator ?lang ?scripts ?styles ?title m ~mds ~o_frag:frag ~o
