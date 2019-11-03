@@ -518,7 +518,7 @@ module Op = struct
   type spawn_success_exits = int list
   type spawn =
     { env : Os.Env.assignments;
-      relevant_env : Os.Env.assignments;
+      stamped_env : Os.Env.assignments;
       cwd : Fpath.t;
       stdin : Fpath.t option;
       stdout : spawn_stdo;
@@ -715,15 +715,15 @@ module Op = struct
     type success_exits = spawn_success_exits
     type t = spawn
     let v
-        ~env ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits tool
+        ~env ~stamped_env ~cwd ~stdin ~stdout ~stderr ~success_exits tool
         args ~stamp ~stdo_ui ~exit
       =
-      { env; relevant_env; cwd; stdin; stdout; stderr; success_exits; tool;
+      { env; stamped_env; cwd; stdin; stdout; stderr; success_exits; tool;
         args; spawn_stamp = stamp; stdo_ui; spawn_exit = exit }
 
     let get o = match o.kind with Spawn s -> s | _ -> assert false
     let env s = s.env
-    let relevant_env s = s.relevant_env
+    let stamped_env s = s.stamped_env
     let cwd s = s.cwd
     let stdin s = s.stdin
     let stdout s = s.stdout
@@ -748,10 +748,10 @@ module Op = struct
 
     let v_op
         ~id ~group ~created ~reads ~writes ?post_exec ?k ~stamp ~env
-        ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits tool args
+        ~stamped_env ~cwd ~stdin ~stdout ~stderr ~success_exits tool args
       =
       let spawn =
-        { env; relevant_env; cwd; stdin; stdout; stderr; success_exits;
+        { env; stamped_env; cwd; stdin; stdout; stderr; success_exits;
           tool; args; spawn_stamp = stamp; stdo_ui = None; spawn_exit = None }
       in
       v_kind ~id ~group ~created ~reads ~writes ?post_exec ?k (Spawn spawn)
@@ -936,7 +936,7 @@ module Reviver = struct
     let acc = stdin_stamp (Op.Spawn.stdin s) :: acc in
     let acc = stdo_stamp (Op.Spawn.stdout s) :: acc in
     let acc = stdo_stamp (Op.Spawn.stderr s) :: acc in
-    let env = Op.Spawn.relevant_env s in
+    let env = Op.Spawn.stamped_env s in
     let acc = List.fold_left (fun acc v -> v :: acc) acc env in
     let acc = List.rev_append (Cmd.to_stamp @@ Op.Spawn.args s) acc in
     H.string (String.concat "" acc)

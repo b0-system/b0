@@ -61,18 +61,16 @@ end
 
     A tool is specified either by name, to be looked up via an
     unspecified mecanism, or by a file path to an executable file. It
-    also declares the environment variables it accesses in the process
+    declares the environment variables it accesses in the process
     environment and whether and how it supports response files.
 
-    Declared environment variables are split into relevant and
-    shielded variables. A relevant variable is a variable whose value
-    influences the tool's output. A shielded variable is a variable
-    whose value does not influence the tool's output but is
-    nonetheless essential to its operation. Shielded environment
-    variables do not appear are not part of the stamp used to memoize
-    tool spawns. Variables specifying the location of
+    By default declared environment variables are assumed to influence
+    the tool's output and are part of the stamp used to memoize tool
+    spawns. If an environment variable is accessed by the tool but
+    does not influence its output it should be declared as
+    unstamped. Variables specifying the location of
     {{!tmp_vars}temporary file directories} are good examples of
-    shielded variables.
+    unstamped variables.
 
     {b Portability.} In order to maximize portability no [.exe]
     suffix should be added to executable names on Windows, the
@@ -112,21 +110,21 @@ module Tool : sig
   (** The type for tools. *)
 
   val v :
-    ?response_file:response_file -> ?shielded_vars:env_vars ->
+    ?response_file:response_file -> ?unstamped_vars:env_vars ->
     ?vars:env_vars -> Cmd.tool -> t
-  (** [v ~response_file ~shielded_vars ~vars cmd] is a tool specified
-      by [cmd]. [vars] are the relevant variables accessed by the
-      tool (defaults to [[]]). [shielded_vars] are the shielded
+  (** [v ~response_file ~unstamped_vars ~vars cmd] is a tool specified
+      by [cmd]. [vars] are the stamped variables accessed by the
+      tool (defaults to [[]]). [unstamped_vars] are the unstamped
       variables accessed by the tool (defaults to {!tmp_vars}).
       [response_file] defines the reponse file support for the tool
       (if any). *)
 
   val by_name :
-    ?response_file:response_file -> ?shielded_vars:env_vars ->
+    ?response_file:response_file -> ?unstamped_vars:env_vars ->
     ?vars:env_vars -> string -> t
   (** [by_name] is like {!v} but reference the tool directly via a name.
 
-      @raise Invalid_argument if {!Fpath.is_seg} [name] is [false]. *)
+      @raise Invalid_argument if {!B0_std.Fpath.is_seg} [name] is [false]. *)
 
   val name : t -> Cmd.tool
   (** [name t] is [t]'s tool name. If this is a relative file path
@@ -134,19 +132,19 @@ module Tool : sig
       external mecanism. *)
 
   val vars : t -> env_vars
-  (** [vars t] are the relevant environment variables accessed by [t]. *)
+  (** [vars t] are the stamped environment variables accessed by [t]. *)
 
-  val shielded_vars : t -> env_vars
-  (** [shieled_vars t] are the shielded environment variables
+  val unstamped_vars : t -> env_vars
+  (** [unstamped_vars t] are the unstamped environment variables
       accessed by [t]. *)
 
   val response_file : t -> response_file option
   (** [response_file t] is [t]'s response file specification (if any). *)
 
   val read_env : t -> Os.Env.t -> Os.Env.t * Os.Env.t
-  (** [read_env t env] is (all, relevant) with [all] the
+  (** [read_env t env] is (all, stamped) with [all] the
       environment with the variables of [env] that are in [vars t]
-      and [shielded_vars t] and [relevant] those of [vars t] only. *)
+      and [unstamped_vars t] and [stamped] those of [vars t] only. *)
 end
 
 (** Build memoizer.

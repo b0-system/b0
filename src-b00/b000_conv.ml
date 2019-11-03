@@ -42,38 +42,47 @@ module Op = struct
   | Some (`Signaled c) -> (Fmt.brackets Fmt.(any "signaled:" ++ Fmt.int)) ppf c
   | None -> ()
 
-  let pp_spawn_and_exit =
-    let pp_spawn_cmd ppf s =
-      let args = Cmd.to_list (Op.Spawn.args s) in
-      let quote = Filename.quote in
-      let pquote p = Filename.quote (Fpath.to_string p) in
-      let pp_brack = Fmt.tty_string style_cmd_brackets in
-      let pp_tool ppf t = Fmt.tty_string style_cmd_tool ppf (pquote t) in
-      let pp_arg ppf a = Fmt.pf ppf "%s" (quote a) in
-      let pp_o_arg ppf a = Fmt.tty_string style_file_write ppf (quote a) in
-      let rec pp_args last_was_o ppf = function
-      | [] -> ()
-      | a :: args ->
-          Fmt.char ppf ' ';
-          if last_was_o then pp_o_arg ppf a else pp_arg ppf a;
-          pp_args (String.equal a "-o") ppf args
-      in
-      let pp_stdin ppf = function
-      | None -> () | Some file -> Fmt.pf ppf "< %s" (pquote file)
-      in
-      let pp_stdo redir ppf = function
-      | `Ui -> ()
-      | `Tee f | `File f ->
-          Fmt.pf ppf " %s %a" redir pp_o_arg (Fpath.to_string f)
-      in
-      Fmt.pf ppf "@[<h>"; pp_brack ppf "[";
-      pp_tool ppf (Op.Spawn.tool s); pp_args false ppf args;
-      pp_stdin ppf (Op.Spawn.stdin s);
-      pp_stdo ">" ppf (Op.Spawn.stdout s);
-      pp_stdo "2>" ppf (Op.Spawn.stderr s);
-      pp_brack ppf "]"; Fmt.pf ppf "@]"
+  let pp_spawn_cmd ~single_line ppf s =
+    let args = Cmd.to_list (Op.Spawn.args s) in
+    let quote = Filename.quote in
+    let pquote p = Filename.quote (Fpath.to_string p) in
+    let pp_brack = Fmt.tty_string style_cmd_brackets in
+    let pp_tool ppf t = Fmt.tty_string style_cmd_tool ppf (pquote t) in
+    let pp_arg ppf a = Fmt.pf ppf "%s" (quote a) in
+    let pp_o_arg ppf a = Fmt.tty_string style_file_write ppf (quote a) in
+    let pp_sep ppf ~last = match last with
+    | "-I" | "-L" | "-o" | "-f" | "-d" -> Fmt.char ppf ' '
+    | _ -> Fmt.sp ppf ()
     in
-    Fmt.(pp_spawn_cmd ++ using Op.Spawn.exit pp_spawn_exit)
+    let rec pp_args ~last ppf = function
+    | [] -> ()
+    | a :: args ->
+        pp_sep ppf ~last;
+        if String.equal last "-o" then pp_o_arg ppf a else pp_arg ppf a;
+        pp_args a ppf args
+    in
+    let pp_stdin ppf = function
+    | None -> () | Some file -> Fmt.pf ppf "< %s" (pquote file)
+    in
+    let pp_stdo redir ppf = function
+    | `Ui -> ()
+    | `Tee f | `File f ->
+        Fmt.pf ppf "@ %s %a" redir pp_o_arg (Fpath.to_string f)
+    in
+    (if single_line then Fmt.pf ppf "@[<h>" else Fmt.pf ppf "@[<1>");
+    pp_brack ppf "[";
+    pp_tool ppf (Op.Spawn.tool s); pp_args ~last:"" ppf args;
+    pp_stdin ppf (Op.Spawn.stdin s);
+    pp_stdo ">" ppf (Op.Spawn.stdout s);
+    pp_stdo "2>" ppf (Op.Spawn.stderr s);
+    pp_brack ppf "]";
+    Fmt.pf ppf "@]"
+
+  let pp_spawn_and_exit =
+    Fmt.(pp_spawn_cmd ~single_line:true ++ using Op.Spawn.exit pp_spawn_exit)
+
+  let pp_spawn_multi_line_and_exit =
+    Fmt.(pp_spawn_cmd ~single_line:false ++ using Op.Spawn.exit pp_spawn_exit)
 
   let pp_notify ppf n =
     let label, s = match Op.Notify.kind n with
@@ -257,9 +266,13 @@ module Op = struct
       [ maybe_failure_and @@ Fmt.using Op.Read.get pp_path; pp_timings ]
 
   let pp_spawn_full =
-    (* FIXME add Cmd stamp env stamp *)
+    let stamped_vars s =
+      let add_var acc ass = match String.cut_left ~sep:"=" ass with
+      | None -> acc | Some (var, _) -> var :: acc
+      in
+      List.fold_left add_var [] (Op.Spawn.stamped_env s)
+    in
     let pp_env = Fmt.(vbox @@ list string) in
-    let pp_relevant_env = Fmt.using Op.Spawn.relevant_env pp_env in
     let pp_env = Fmt.using Op.Spawn.env pp_env in
     let pp_cwd = Fmt.using Op.Spawn.cwd Fpath.pp_quoted in
     let pp_success_exits =
@@ -271,12 +284,17 @@ module Op = struct
     in
     let pp_stamps =
       let cmd_stamp s = Cmd.to_stamp (Op.Spawn.args s) in
+      let pp_stamp ppf s = match Op.Spawn.stamp s with
+      | "" -> ()
+      | stamp -> pp_subfield "stamp" Op.Spawn.stamp Fmt.string ppf s
+      in
       Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
-      [ pp_subfield "stamp" Op.Spawn.stamp Fmt.string;
-          pp_subfield "args" cmd_stamp Fmt.(list ~sep:sp string) ]
+      [ pp_stamp;
+        pp_subfield "env" stamped_vars Fmt.(list ~sep:sp Fmt.string);
+        pp_subfield "args" cmd_stamp Fmt.(list ~sep:sp string) ]
     in
     let pp_spawn_base ppf o =
-      pp_spawn_and_exit ppf (Op.Spawn.get o); pp_op_extra ppf o;
+      pp_spawn_multi_line_and_exit ppf (Op.Spawn.get o); pp_op_extra ppf o;
     in
     let pp_spawn_stdio =
       let pp_spawn_stdo ppf = function
@@ -298,7 +316,6 @@ module Op = struct
       Fmt.field "stdio" Op.Spawn.get pp_spawn_stdio;
       Fmt.field "cwd" Op.Spawn.get pp_cwd;
       Fmt.field "env" Op.Spawn.get pp_env;
-      Fmt.field "relevant-env" Op.Spawn.get pp_relevant_env;
       Fmt.field "stamps" Op.Spawn.get pp_stamps;
       pp_timings ]
 
@@ -476,7 +493,7 @@ module Op = struct
 
   let enc_spawn b s =
     Binc.enc_list Binc.enc_string b (Op.Spawn.env s);
-    Binc.enc_list Binc.enc_string b (Op.Spawn.relevant_env s);
+    Binc.enc_list Binc.enc_string b (Op.Spawn.stamped_env s);
     Binc.enc_fpath b (Op.Spawn.cwd s);
     Binc.enc_option Binc.enc_fpath b (Op.Spawn.stdin s);
     enc_spawn_stdo b (Op.Spawn.stdout s);
@@ -491,7 +508,7 @@ module Op = struct
 
   let dec_spawn s i =
     let i, env = Binc.dec_list Binc.dec_string s i in
-    let i, relevant_env = Binc.dec_list Binc.dec_string s i in
+    let i, stamped_env = Binc.dec_list Binc.dec_string s i in
     let i, cwd = Binc.dec_fpath s i in
     let i, stdin = Binc.dec_option Binc.dec_fpath s i in
     let i, stdout = dec_spawn_stdo s i in
@@ -505,7 +522,7 @@ module Op = struct
       Binc.dec_option (Binc.dec_result ~ok ~error) s i
     in
     let i, exit = Binc.dec_option dec_os_cmd_status s i in
-    i, Op.Spawn.v ~env ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits
+    i, Op.Spawn.v ~env ~stamped_env ~cwd ~stdin ~stdout ~stderr ~success_exits
       tool args ~stamp ~stdo_ui ~exit
 
   let enc_wait_files b wait = Binc.enc_unit b ()

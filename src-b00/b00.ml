@@ -55,29 +55,29 @@ module Tool = struct
   type t =
     { name : Fpath.t;
       vars : env_vars;
-      shielded_vars : env_vars;
+      unstamped_vars : env_vars;
       response_file : response_file option; }
 
-  let v ?response_file ?(shielded_vars = tmp_vars) ?(vars = []) name =
-    { name; vars; shielded_vars; response_file }
+  let v ?response_file ?(unstamped_vars = tmp_vars) ?(vars = []) name =
+    { name; vars; unstamped_vars; response_file }
 
-  let by_name ?response_file ?shielded_vars ?vars name =
+  let by_name ?response_file ?unstamped_vars ?vars name =
     match Fpath.is_seg name with
     | false -> Fmt.invalid_arg "%S: tool is not a path segment" name
-    | true -> v ?shielded_vars ?vars (Fpath.v name)
+    | true -> v ?unstamped_vars ?vars (Fpath.v name)
 
   let name t = t.name
   let vars t = t.vars
-  let shielded_vars t = t.shielded_vars
+  let unstamped_vars t = t.unstamped_vars
   let response_file t = t.response_file
   let read_env t env =
     let add_var acc var = match String.Map.find var env with
     | v -> String.Map.add var v acc
     | exception Not_found -> acc
     in
-    let relevant = List.fold_left add_var String.Map.empty t.vars in
-    let all = List.fold_left add_var relevant t.shielded_vars in
-    all, relevant
+    let stamped = List.fold_left add_var String.Map.empty t.vars in
+    let all = List.fold_left add_var stamped t.unstamped_vars in
+    all, stamped
 end
 
 module Memo = struct
@@ -408,7 +408,7 @@ module Memo = struct
   { tool : Tool.t;
     tool_file : Fpath.t;
     tool_env : Os.Env.assignments;
-    tool_relevant_env : Os.Env.assignments; }
+    tool_stamped_env : Os.Env.assignments; }
 
   type tool =
   | Miss of Tool.t * string
@@ -418,32 +418,32 @@ module Memo = struct
 
   let tool_env m t =
     let env = Env.env m.m.env in
-    let tool_env, relevant = Tool.read_env t env in
+    let tool_env, stamped = Tool.read_env t env in
     let forced_env = Env.forced_env m.m.env in
     let tool_env = Os.Env.override tool_env ~by:forced_env in
-    let relevant = Os.Env.override relevant ~by:forced_env in
-    tool_env, relevant
+    let stamped = Os.Env.override stamped ~by:forced_env in
+    tool_env, stamped
 
   let spawn_env m cmd_tool = function
-  | None -> cmd_tool.tool_env, cmd_tool.tool_relevant_env
+  | None -> cmd_tool.tool_env, cmd_tool.tool_stamped_env
   | Some spawn_env ->
       let env = Env.env m.m.env in
-      let tool_env, relevant = Tool.read_env cmd_tool.tool env in
+      let tool_env, stamped = Tool.read_env cmd_tool.tool env in
       let forced_env = Env.forced_env m.m.env in
       let tool_env = Os.Env.override tool_env ~by:spawn_env in
       let tool_env = Os.Env.override tool_env ~by:forced_env in
-      let relevant = Os.Env.override relevant ~by:spawn_env in
-      let relevant = Os.Env.override relevant ~by:forced_env in
-      Os.Env.to_assignments tool_env, Os.Env.to_assignments relevant
+      let stamped = Os.Env.override stamped ~by:spawn_env in
+      let stamped = Os.Env.override stamped ~by:forced_env in
+      Os.Env.to_assignments tool_env, Os.Env.to_assignments stamped
 
   let tool m tool =
     let cmd_tool = match Env.tool m.m.env (Tool.name tool) with
     | Error e -> Miss (tool, e)
     | Ok tool_file ->
-        let tool_env, tool_relevant_env = tool_env m tool in
+        let tool_env, tool_stamped_env = tool_env m tool in
         let tool_env = Os.Env.to_assignments tool_env in
-        let tool_relevant_env = Os.Env.to_assignments tool_relevant_env in
-        Tool { tool; tool_file; tool_env; tool_relevant_env }
+        let tool_stamped_env = Os.Env.to_assignments tool_stamped_env in
+        Tool { tool; tool_file; tool_env; tool_stamped_env }
     in
     fun cmd_args -> { cmd_tool; cmd_args }
 
@@ -459,7 +459,7 @@ module Memo = struct
     | Miss (tool, e) -> m.m.feedback (`Miss_tool (tool, e))
     | Tool tool ->
         let id = new_op_id m and created = timestamp m in
-        let env, relevant_env = spawn_env m tool env in
+        let env, stamped_env = spawn_env m tool env in
         let cwd = match cwd with None -> m.m.cwd | Some d -> d in
         let k = match k with
         | None -> fun o -> ()
@@ -471,7 +471,7 @@ module Memo = struct
         let o =
           Op.Spawn.v_op
             ~id ~group:m.c.group ~created ~reads ~writes ?post_exec ~k ~stamp
-            ~env ~relevant_env ~cwd ~stdin ~stdout ~stderr ~success_exits
+            ~env ~stamped_env ~cwd ~stdin ~stdout ~stderr ~success_exits
             tool.tool_file cmd.cmd_args
         in
         add_op_and_stir m o

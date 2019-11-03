@@ -463,14 +463,14 @@ module Op : sig
       id:id -> group:group -> created:Time.span -> reads:Fpath.t list ->
       writes:Fpath.t list -> ?post_exec:(op -> unit) -> ?k:(op -> unit) ->
       stamp:string -> env:Os.Env.assignments ->
-      relevant_env:Os.Env.assignments -> cwd:Fpath.t ->
+      stamped_env:Os.Env.assignments -> cwd:Fpath.t ->
       stdin:Fpath.t option -> stdout:stdo -> stderr:stdo ->
       success_exits:success_exits -> Cmd.tool -> Cmd.t -> op
     (** [v_op] declares a spawn build operation, see the corresponding
         accessors in {!Spawn} for the semantics of the various arguments. *)
 
     val v :
-      env:Os.Env.assignments -> relevant_env:Os.Env.assignments ->
+      env:Os.Env.assignments -> stamped_env:Os.Env.assignments ->
       cwd:Fpath.t -> stdin:Fpath.t option -> stdout:stdo ->
       stderr:stdo -> success_exits:success_exits -> Cmd.tool ->
       Cmd.t -> stamp:string -> stdo_ui:(string, string) result option ->
@@ -484,8 +484,8 @@ module Op : sig
     val env : t -> Os.Env.assignments
     (** [env s] is the environment in which [s] runs. *)
 
-    val relevant_env : t -> Os.Env.assignments
-    (** [relevant_env s] are the assignements of [env s] that may
+    val stamped_env : t -> Os.Env.assignments
+    (** [stamped_env s] are the assignements of [env s] that may
         influence the tool outputs. *)
 
     val cwd : t -> Fpath.t
