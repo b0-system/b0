@@ -319,17 +319,29 @@ module File_cache = struct
   let find c k = try Ok (key_dir_files (key_dir c k)) with
   | Failure e -> Error (err_key "find" k e)
 
+  let inode_eq f0 f1 = match (Unix.stat f0).Unix.st_ino with
+  | exception Unix.Unix_error (_, _, _) -> false
+  | i0 ->
+      match (Unix.stat f1).Unix.st_ino with
+      | exception Unix.Unix_error (_, _, _) -> false
+      | i1 -> i0 = i1
+
   let revive c k fs =
     let rec exists f = try Unix.access f [Unix.F_OK]; true with
     | Unix.Unix_error (Unix.EINTR, _, _) -> exists f
     | Unix.Unix_error (_, _, _) -> false
     in
     let rec revive_file ~did_path cfile ~dst =
+      let dst_str = Fpath.to_string dst in
       try match c.need_copy <> None with
-      | true -> copy cfile (Fpath.to_string dst); true
-      | false -> Unix.link cfile (Fpath.to_string dst); true
+      | true -> copy cfile dst_str; true
+      | false -> Unix.link cfile dst_str; true
       with
-      | Unix.Unix_error (Unix.EEXIST, _, _) -> false
+      | Unix.Unix_error (Unix.EEXIST, _, _) ->
+          (* N.B. this check is useful for non-clean rebuilds like in odig. *)
+          if inode_eq cfile dst_str
+          then true
+          else (unlink_noerr dst_str; revive_file ~did_path cfile ~dst)
       | Unix.Unix_error (Unix.ENOENT, _, _) when not did_path ->
           make_path dst; revive_file ~did_path:true cfile ~dst
       | Unix.Unix_error (Unix.EINTR, _, _) ->
