@@ -76,7 +76,7 @@ module Op : sig
 
   val is_selected :
     reads:Fpath.t list -> writes:Fpath.t list -> ids:B000.Op.id list ->
-    hashes:string list -> groups:string list -> B000.Op.t -> bool
+    hashes:Hash.t list -> groups:string list -> B000.Op.t -> bool
   (** [is_selected ~reads ~writes ~ids ~hashes ~groups o] is [true]
       iff [o] reads a file in [reads] or writes a file in [writes]
       or has its id in [ids], or has its hash in [hashes] or has
@@ -121,7 +121,7 @@ module Op : sig
 
   val select :
     reads:Fpath.t list -> writes:Fpath.t list -> ids:B000.Op.id list ->
-    hashes:string list -> groups:string list -> needs:bool -> enables:bool ->
+    hashes:Hash.t list -> groups:string list -> needs:bool -> enables:bool ->
     recursive:bool -> revived:bool option ->
     statuses:[`Aborted | `Done | `Failed | `Waiting ] list ->
     kinds:[ `Copy | `Delete | `Notify | `Mkdir | `Read | `Spawn | `Wait_files

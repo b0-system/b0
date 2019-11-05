@@ -108,13 +108,7 @@ module Op = struct
     let mem_reads f = Fpath.Set.mem f reads in
     let writes = Fpath.Set.of_list writes in
     let mem_writes f = Fpath.Set.mem f writes in
-    let hashes =
-      let to_bytes s = match Hash.of_hex s with
-      | Ok b -> Hash.to_bytes b
-      | Error _ (* todo *) -> Hash.to_bytes Hash.nil
-      in
-      String.Set.of_list (List.rev_map to_bytes hashes)
-    in
+    let hashes = String.Set.of_list (List.rev_map Hash.to_bytes hashes) in
     let mem_hash h = String.Set.mem h hashes in
     let groups = String.Set.of_list groups in
     let mem_group g = String.Set.mem g groups in
@@ -229,6 +223,13 @@ module Op = struct
 
   let select_cli ?docs () =
     let open Cmdliner in
+    let hash =
+      let of_string s =
+        let err = Fmt.str "Could not parse hash from %S" in
+        Result.map_error (fun _ -> `Msg (err s)) @@ Hash.of_hex s
+      in
+      Arg.conv ~docv:"HASH" (of_string, Hash.pp)
+    in
     let order_by =
       let order =
         [ "create", `Create; "start", `Start; "wait", `Wait; "dur", `Dur; ]
@@ -255,9 +256,8 @@ module Op = struct
       Arg.(value & opt_all int [] & info ["o"; "id"] ~doc ?docs ~docv:"ID")
     in
     let hashes =
-      (* XXX Could be properly parsed *)
       let doc = "Select operation with hash $(docv). Repeatable." in
-      Arg.(value & opt_all string [] & info ["hash"] ~doc ?docs ~docv:"HASH")
+      Arg.(value & opt_all hash [] & info ["hash"] ~doc ?docs ~docv:"HASH")
     in
     let groups =
       let doc = "Select operations with group $(docv). Repeatable." in
