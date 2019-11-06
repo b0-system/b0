@@ -2671,14 +2671,6 @@ module Os = struct
     let copy_symlink ~force ~make_path ~src dst =
       Result.bind (symlink_link src) @@ fun src ->
       symlink ~force ~make_path ~src dst
-
-    let rec try_hardlink src dst =
-      try Unix.link (Fpath.to_string src) (Fpath.to_string dst); true with
-      | Unix.Unix_error (Unix.EINTR, _, _) -> try_hardlink src dst
-      | Unix.Unix_error (Unix.EXDEV, _, _)
-      | Unix.Unix_error (Unix.EOPNOTSUPP, _, _)
-      | Unix.Unix_error (Unix.ENOSYS, _, _)
-      | Unix.Unix_error (Unix.EMLINK, _, _) -> false
   end
 
   module Tmp = struct
@@ -3166,16 +3158,15 @@ module Os = struct
     (* copy *)
 
     let copy
-        ?(rel = true) ?(atomic = true) ?(allow_hardlinks = true)
-        ?(follow_symlinks = true) ?(prune = fun _ _ _ -> false)
-        ~make_path ~recurse ~src dst
+        ?(rel = true) ?(atomic = true) ?(follow_symlinks = true)
+        ?(prune = fun _ _ _ -> false) ~make_path ~recurse ~src dst
       =
       let err e = Fmt.str "copy %a to %a: %s" Fpath.pp src Fpath.pp dst e in
       let prune = match rel with (* we invoke [_fold] with [rel:true] *)
       | true -> prune
       | false -> fun st name p -> prune st name (Fpath.(src // p))
       in
-      let copy dst st name p (hard, chmods as acc) = match st.Unix.st_kind with
+      let copy dst st name p (chmods as acc) = match st.Unix.st_kind with
       | Unix.S_DIR (* prune was already called on it *) ->
           let dst = Fpath.(dst // p) in
           let mode = st.Unix.st_perm in
@@ -3185,7 +3176,7 @@ module Os = struct
           | false ->
               (* We need to be able to write to the directory, we remember
                  the mode and the dir and set it at the end *)
-              0o700, (hard, (dst, mode) :: chmods)
+              0o700, ((dst, mode) :: chmods)
           in
           ignore (Fs_base.dir_create ~mode ~make_path:false dst |>
                   Result.to_failure);
@@ -3203,9 +3194,7 @@ module Os = struct
           let mode = st.Unix.st_perm in
           let src = Fpath.(src // p) in
           let dst = Fpath.(dst // p) in
-          if not hard then ((cp ~mode src dst |> Result.to_failure); acc) else
-          if Fs_base.try_hardlink src dst then acc else
-          (cp ~mode src dst |> Result.to_failure; (false, chmods))
+          (cp ~mode src dst |> Result.to_failure); acc
       | Unix.S_LNK ->
           if prune st name p then acc else
           let dst = Fpath.(dst // p) in
@@ -3236,10 +3225,9 @@ module Os = struct
           Result.bind tdst @@ fun tdst ->
           try
             let src_mode = Fs_base.path_get_mode src |> Result.to_failure in
-            let _, chmods =
+            let chmods =
               _fold ~filter:`Any ~rel:true ~dotfiles:true ~follow_symlinks
-                ~prune ~recurse (copy tdst) src
-                (allow_hardlinks, [src, src_mode])
+                ~prune ~recurse (copy tdst) src ([src, src_mode])
               |> Result.to_failure
             in
             chmod_dirs chmods;
@@ -3384,9 +3372,8 @@ module Os = struct
     (* Copying *)
 
     let copy
-        ?(rel = true) ?(atomic = true) ?(allow_hardlinks = true)
-        ?(follow_symlinks = true) ?(prune = fun _ _ _ -> false)
-        ~make_path ~recurse ~src dst
+        ?(rel = true) ?(atomic = true) ?(follow_symlinks = true)
+        ?(prune = fun _ _ _ -> false) ~make_path ~recurse ~src dst
       =
       let err e = Fmt.str "copy %a to %a: %s" Fpath.pp src Fpath.pp dst e in
       let stat = match follow_symlinks with
@@ -3398,20 +3385,13 @@ module Os = struct
       | Ok stat ->
           match stat.Unix.st_kind with
           | Unix.S_DIR ->
-              Dir.copy
-                ~rel ~atomic ~allow_hardlinks ~follow_symlinks ~prune
-                ~make_path ~recurse ~src dst
+              Dir.copy ~rel ~atomic ~follow_symlinks ~prune ~make_path
+                ~recurse ~src dst
           | Unix.S_LNK ->
               Result.map_error err @@
               Fs_base.copy_symlink ~force:false ~make_path ~src dst
           | _  ->
-              match allow_hardlinks with
-              | false -> File.copy ~atomic ~force:false ~make_path ~src dst
-              | true ->
-                  match File.link ~force:false ~make_path ~src dst with
-                  | Ok _ -> Ok ()
-                  | Error _ ->
-                      File.copy ~atomic ~force:false ~make_path ~src dst
+              File.copy ~atomic ~force:false ~make_path ~src dst
 
     (* File modes and stat *)
 

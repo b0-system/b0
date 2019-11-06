@@ -2029,15 +2029,14 @@ module Os : sig
     (** {1:resolving Resolving} *)
 
     val realpath : Fpath.t -> (Fpath.t, string) result
-    (** [realpath p] expands all symbolic links and resolves all references
-        to [.] and [..] segments. The function errors if [p] does not
-        exist. *)
+    (** [realpath p] expands all symbolic links and resolves all
+        references to [.] and [..] segments. The function errors if
+        [p] does not exist. *)
 
     (** {1:copy Copying} *)
 
     val copy :
-      ?rel:bool -> ?atomic:bool -> ?allow_hardlinks:bool ->
-      ?follow_symlinks:bool ->
+      ?rel:bool -> ?atomic:bool -> ?follow_symlinks:bool ->
       ?prune:(Unix.stats -> string -> Fpath.t -> bool) -> make_path:bool ->
       recurse:bool -> src:Fpath.t -> Fpath.t -> (unit, string) result
     (** [copy ~make_path ~recurse ~src dst] copies the file or file
@@ -2393,8 +2392,7 @@ module Os : sig
     (** {1:copy Copying} *)
 
     val copy :
-      ?rel:bool -> ?atomic:bool -> ?allow_hardlinks:bool ->
-      ?follow_symlinks:bool ->
+      ?rel:bool -> ?atomic:bool -> ?follow_symlinks:bool ->
       ?prune:(Unix.stats -> string -> Fpath.t -> bool) -> make_path:bool ->
       recurse:bool -> src:Fpath.t -> Fpath.t -> (unit, string) result
     (** [copy ~rel ~atomic ~prune ~follow_symlinks ~make_path ~recurse
@@ -2418,9 +2416,6 @@ module Os : sig
            If [false] symbolic links are not followed, the actual
            symlinks are copied and the stat information given to [prune]
            is given by {!Os.Path.symlink_stat}.}
-        {- [allow_hardlinks] if [true], tries to hard link files from [src]
-           at the destination, falling back to copying if that's not possible.
-           Defaults to [false].}
         {- [atomic] if atomic is [true] and the function errors then
            [dst] should not exist. To write atomically, a temporary
            directory [t] in the parent directory of [dst] is created.

@@ -199,9 +199,8 @@ module Pages : sig
       for GitHub pages. *)
 
   val commit_updates :
-    ?allow_hardlinks:bool -> ?log:Log.level ->
-    ?branch:B0_vcs.Git.branch -> B0_vcs.t -> amend:bool -> force:bool ->
-    remote:B0_vcs.Git.remote -> msg:string -> update list ->
+    ?log:Log.level -> ?branch:B0_vcs.Git.branch -> B0_vcs.t -> amend:bool ->
+    force:bool -> remote:B0_vcs.Git.remote -> msg:string -> update list ->
     (bool, string) result
   (** [commit_updates vcs ~log ~remote ~branch ~msg us] updates [branch]
       (defaults to [gh-pages]) on [remote] according to updates [us]
@@ -212,9 +211,7 @@ module Pages : sig
          exists) and the author reset rather than a new commit added}
       {- If [force] is [true], the various git operations are forced.}
       {- [log] indicates a logging level used to
-         monitor progress (defaults to {!Log.app}).}
-      {- If [allow_hardlinks] is [true] (default), updates are, if
-         possible hard linked to the working directory rather than copied}}
+         monitor progress (defaults to {!Log.app}).}}
       More precisely this:
       {ol
       {- Fetches [remote/branch] if it exists.}

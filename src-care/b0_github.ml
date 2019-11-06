@@ -274,16 +274,15 @@ module Pages = struct
         Log.msg log (fun m -> m ~header "No changes to commit.");
         Ok false
 
-  let perform_updates ~allow_hardlinks ~log ~amend ~msg us r =
+  let perform_updates ~log ~amend ~msg us r =
     Log.msg log (fun m -> m ~header "Copying updates.");
     let rm p = (* This makes sure [p] is in the repo *)
       let stdout = Os.Cmd.out_null in
       B0_vcs.Git.rm r ~stdout ~force:true ~recurse:true ~ignore_unmatch:true [p]
     in
-    let cp r ~allow_hardlinks ~follow_symlinks src dst =
+    let cp r ~follow_symlinks src dst =
       let dst = Fpath.(B0_vcs.(work_dir r) // dst) in
-      Os.Path.copy ~allow_hardlinks ~follow_symlinks ~make_path:true
-        ~recurse:true ~src dst
+      Os.Path.copy ~follow_symlinks ~make_path:true ~recurse:true ~src dst
     in
     let rec loop r = function
     | [] -> do_commit r ~log ~amend ~msg
@@ -292,7 +291,7 @@ module Pages = struct
         | None -> (rm u.dst |> Result.to_failure); loop r us
         | Some src ->
             (rm u.dst |> Result.to_failure);
-            (cp r ~allow_hardlinks ~follow_symlinks:u.follow_symlinks src u.dst
+            (cp r ~follow_symlinks:u.follow_symlinks src u.dst
              |> Result.to_failure);
             (B0_vcs.Git.add r ~force:false [u.dst] |> Result.to_failure);
             loop r us
@@ -300,18 +299,16 @@ module Pages = struct
     try loop r us with
     | Failure e -> Error e
 
-  let update_in_branch
-      r ~allow_hardlinks ~log ~amend ~force ~branch cish ~msg us
-    =
+  let update_in_branch r ~log ~amend ~force ~branch cish ~msg us =
     Result.join @@
     B0_vcs.Git.with_transient_checkout r ~force ~branch cish
-      (perform_updates ~allow_hardlinks ~log ~amend ~msg us)
+      (perform_updates ~log ~amend ~msg us)
 
   let default_branch = "gh-pages"
   let ubr = "_b0-gh-pages-update"
   let commit_updates
-      ?(allow_hardlinks = true) ?(log = Log.App) ?branch:(br = default_branch)
-      r ~amend ~force ~remote ~msg us
+      ?(log = Log.App) ?branch:(br = default_branch) r ~amend ~force ~remote
+      ~msg us
     =
     let cleanup ~commited r =
       let stdout = Os.Cmd.out_null in
@@ -321,8 +318,7 @@ module Pages = struct
     Result.bind (B0_vcs.Git.check_kind r) @@ fun () ->
     Result.bind (fetch_branch r ~log ~remote ~branch:br) @@ fun cish ->
     match
-      update_in_branch
-        r ~allow_hardlinks ~log ~amend ~force ~branch:ubr cish ~msg us
+      update_in_branch r ~log ~amend ~force ~branch:ubr cish ~msg us
     with
     | Error _ as e-> ignore (cleanup ~commited:false r) (* Could be better *); e
     | Ok false -> cleanup ~commited:false r

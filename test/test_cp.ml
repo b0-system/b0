@@ -5,19 +5,15 @@
 
 open B0_std
 
-let cp_cmd allow_hardlinks follow_symlinks recurse src dst =
+let cp_cmd follow_symlinks recurse src dst =
   let error e = Fmt.epr "%s: %s" (Filename.basename Sys.argv.(0)) e; 1 in
   let make_path = true in
   Result.fold ~ok:(fun () -> 0) ~error @@
-  Os.Path.copy ~allow_hardlinks ~follow_symlinks ~make_path ~recurse ~src dst
+  Os.Path.copy ~follow_symlinks ~make_path ~recurse ~src dst
 
 let main () =
   let open Cmdliner in
   let cmd =
-    let allow_hardlinks =
-      let doc = "If possible use hard links instead of copying." in
-      Arg.(value & flag & info ["h"; "allow-hard-links"] ~doc)
-    in
     let follow_symlinks =
       let doc = "Preserve symbolic links rather than following them." in
       let p = Arg.(value & flag & info ["s"; "preserve-symbolic-links"] ~doc) in
@@ -39,8 +35,7 @@ let main () =
       Arg.(required & pos 1 (some B0_std_ui.fpath) None &
            info [] ~doc ~docv:"DST")
     in
-    Term.(const cp_cmd $ allow_hardlinks $ follow_symlinks $ recurse $
-          src $ dst),
+    Term.(const cp_cmd $ follow_symlinks $ recurse $ src $ dst),
     Term.info "test-cp" ~sdocs:Manpage.s_common_options
   in
   Term.exit_status (Term.eval cmd)
