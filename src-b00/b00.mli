@@ -173,7 +173,7 @@ module Memo : sig
   val memo :
     ?hash_fun:(module Hash.T) -> ?env:Os.Env.t -> ?cwd:Fpath.t ->
     ?cache_dir:Fpath.t -> ?trash_dir:Fpath.t -> ?jobs:int ->
-    ?feedback:([feedback | B000.File_cache.feedback | B000.Exec.feedback] ->
+    ?feedback:([feedback | B000.Exec.feedback] ->
                unit) -> unit -> (t, string) result
   (** [memo] is a simpler {!create}
       {ul

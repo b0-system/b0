@@ -143,7 +143,7 @@ module Memo : sig
   val pp_leveled_feedback :
     ?sep:unit Fmt.t -> ?op_howto:B000.Op.t Fmt.t -> show_op:Log.level ->
     show_ui:Log.level -> level:Log.level ->
-    [B00.Memo.feedback | B000.File_cache.feedback | B000.Exec.feedback] Fmt.t
+    [B00.Memo.feedback | B000.Exec.feedback] Fmt.t
   (** [pp_leveled_feedback ~sep ~op_howto ~show_spawn_ui ~show_success ~level
       ppf] formats memo feedback on [ppf] followed by [sep] iff something
       is printed (defaults to {!Fmt.flush_nl}).

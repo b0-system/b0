@@ -374,8 +374,6 @@ module Memo = struct
         Fmt.pf ppf "@[<v>Missing tool:@,%s@]%a" e sep ()
     | `Op_cache_error (op, e) when level >= Log.Error ->
         Fmt.pf ppf "@[op %d: cache error: %s@]%a" (B000.Op.id op) e sep ()
-    | `File_cache_need_copy p when level >= Log.Warning ->
-        Fmt.pf ppf "@[Warning: cache need copy: %a@]%a" Fpath.pp_quoted p sep ()
     | _ ->  ()
 
   let pp_failed ppf () = Fmt.(tty [`Fg `Red] string) ppf  "FAILED"

@@ -71,9 +71,6 @@ module File_cache : sig
 
   (** {1:file_cache File caches} *)
 
-  type feedback = [ `File_cache_need_copy of Fpath.t ]
-  (** The type for file cache feedback. See {!create}. *)
-
   type key = string
   (** The type for keys. A key maps to a metadata hunk and an ordered
       list of file contents. The module treats keys as sequence of
@@ -84,31 +81,13 @@ module File_cache : sig
   type t
   (** The type for file caches. *)
 
-  val create : ?feedback:(feedback -> unit) -> Fpath.t -> (t, string) result
-  (** [create ~feedback dir] is a file cache using directory [dir] for
+  val create : Fpath.t -> (t, string) result
+  (** [create dir] is a file cache using directory [dir] for
       data storage. The full path to [dir] is created by the call if
-      it doesn't exist. [feedback] is invoked {e once} if the cache
-      switches to copying mode, see {!need_copy} for details (defaults
-      is a nop). *)
+      it doesn't exist. *)
 
   val dir : t -> Fpath.t
   (** [dir c] is [c]'s storage directory. *)
-
-  val need_copy : t -> Fpath.t option
-  (** [need_copy c] is [Some file] iff the cache switched to copying
-      mode because of an operation that involved the file path [file],
-      external to the cache. This can happen due to one of the
-      following conditions:
-      {ul
-      {- The cache directory {!dir} and [file] live on different file
-         system devices.}
-      {- The underlying file system does not support hard links.}
-      {- Too many hard links exist on a file.}}
-      [file] is also given to the [notify_need_copy] callback provided
-      on {!create} as soon as the condition is detected (and before
-      the actual copy occurs). Note that once a file did copy, all the
-      remaining transfers from or to the cache do copy aswell, which
-      may be slow. *)
 
   (** {1:ops Cache operations}
 

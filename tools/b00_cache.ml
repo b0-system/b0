@@ -24,18 +24,8 @@ let handle_unknown_error = function
 (* Commonalities *)
 
 let with_cache dir f =
-  let feedback = function
-  | `File_cache_need_copy file ->
-      (* FIXME move that to B0_log.ui *)
-      Log.warn begin fun m ->
-          m "@[<v>Using slow copying cache due to:@,%a@,@[%a@]@]"
-          Fpath.pp_quoted file Fmt.text
-          "The cache may be on a different file system or hard links \
-           are not supported, or the maximal number of links was reached."
-      end
-  in
   Result.bind (Os.Dir.exists dir) @@ function
-  | true -> Result.bind (File_cache.create ~feedback dir) f
+  | true -> Result.bind (File_cache.create dir) f
   | false ->
       Log.err (fun m -> m "%a: Not a directory cache" Fpath.pp_quoted dir);
       Ok err_no_cache

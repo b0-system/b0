@@ -118,7 +118,6 @@ module Memo = struct
       ?trash_dir ?(jobs = 4) ?feedback ()
     =
     let feedback = match feedback with | Some f -> f | None -> fun _ -> () in
-    let fb_cache = (feedback :> File_cache.feedback -> unit) in
     let fb_exec = (feedback :> Exec.feedback -> unit) in
     let fb_memo = (feedback :> feedback -> unit) in
     let clock = Time.counter () in
@@ -132,7 +131,7 @@ module Memo = struct
     let trash_dir = match trash_dir with
     | None -> Fpath.(cwd / "_b0" / ".trash") | Some d -> d
     in
-    Result.bind (File_cache.create ~feedback:fb_cache cache_dir) @@ fun cache ->
+    Result.bind (File_cache.create cache_dir) @@ fun cache ->
     let env = Env.v env in
     let guard = Guard.create () in
     let reviver = Reviver.create clock hash_fun cache in

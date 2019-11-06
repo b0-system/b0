@@ -65,20 +65,15 @@ module File_cache = struct
      3. XXX should we put keys in prefix subdirs like git does ? Some
         fs get slow on many entries (NTFS ?) *)
 
-  type feedback = [ `File_cache_need_copy of Fpath.t ]
   type key = string
-  type t =
-    { feedback : feedback -> unit;
-      dir : string;
-      mutable need_copy : Fpath.t option; (* path of first Unix.EXDEV error *) }
+  type t = { dir : string; }
 
-  let create ?(feedback = fun _ -> ()) dir =
+  let create dir =
     Result.bind (Os.Dir.create ~make_path:true dir) @@ fun _ ->
     let dir = Fpath.to_dir_path dir (* assumed e.g. by key_dir *) in
-    Ok { feedback; dir = Fpath.to_string dir; need_copy = None }
+    Ok { dir = Fpath.to_string dir }
 
   let dir c = Fpath.v c.dir
-  let need_copy c = c.need_copy
 
   (* Contructing file paths into the cache *)
 
@@ -271,20 +266,9 @@ module File_cache = struct
     | Unix.Unix_error (Unix.EINTR, _, _) -> mkdir d
     | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" d (uerr e)
     in
-    let rec cache_file c ~src cfile = try match Option.is_none c.need_copy with
-    | true -> Unix.link src cfile; true
-    | false -> copy src cfile; true
-    with
+    let rec cache_file ~src cfile = try copy src cfile; true with
     | Unix.Unix_error (Unix.ENOENT, _, _) -> false
-    | Unix.Unix_error (Unix.EINTR, _, _) -> cache_file c ~src cfile
-    | Unix.Unix_error (Unix.EXDEV, _, _)
-    | Unix.Unix_error (Unix.EOPNOTSUPP, _, _)
-    | Unix.Unix_error (Unix.ENOSYS, _, _)
-    | Unix.Unix_error (Unix.EMLINK, _, _) ->
-        let src_file = Fpath.v src in
-        c.need_copy <- Some src_file;
-        c.feedback (`File_cache_need_copy src_file);
-        cache_file c ~src cfile
+    | Unix.Unix_error (Unix.EINTR, _, _) -> cache_file ~src cfile
     | Unix.Unix_error (e, _, arg) ->
         Fmt.failwith_notrace "%s: %s: %s" src arg (uerr e)
     in
@@ -301,7 +285,7 @@ module File_cache = struct
           | [] -> true
           | f :: fs ->
               let cfile = key_file c k ~filenum_width ~is_last:(fs = []) i in
-              match cache_file c ~src:(Fpath.to_string f) cfile with
+              match cache_file ~src:(Fpath.to_string f) cfile with
               | true -> loop (i + 1) fs
               | false -> ignore (key_dir_delete kdir); false
           in
@@ -333,25 +317,13 @@ module File_cache = struct
     in
     let rec revive_file ~did_path cfile ~dst =
       let dst_str = Fpath.to_string dst in
-      try match c.need_copy <> None with
-      | true -> copy cfile dst_str; true
-      | false -> Unix.link cfile dst_str; true
-      with
+      try copy cfile dst_str; true with
       | Unix.Unix_error (Unix.EEXIST, _, _) ->
-          (* N.B. this check is useful for non-clean rebuilds like in odig. *)
-          if inode_eq cfile dst_str
-          then true
-          else (unlink_noerr dst_str; revive_file ~did_path cfile ~dst)
+          (* FIXME should we compare the files for non-clean builds ?  *)
+          (unlink_noerr dst_str; revive_file ~did_path cfile ~dst)
       | Unix.Unix_error (Unix.ENOENT, _, _) when not did_path ->
           make_path dst; revive_file ~did_path:true cfile ~dst
       | Unix.Unix_error (Unix.EINTR, _, _) ->
-          revive_file ~did_path cfile ~dst
-      | Unix.Unix_error (Unix.EXDEV, _, _)
-      | Unix.Unix_error (Unix.EOPNOTSUPP, _, _)
-      | Unix.Unix_error (Unix.ENOSYS, _, _)
-      | Unix.Unix_error (Unix.EMLINK, _, _) ->
-          c.need_copy <- Some dst;
-          c.feedback (`File_cache_need_copy dst);
           revive_file ~did_path cfile ~dst
       | Unix.Unix_error (e, _, arg) ->
           Fmt.failwith_notrace "%a: %s: %s" Fpath.pp_quoted dst arg (uerr e)
