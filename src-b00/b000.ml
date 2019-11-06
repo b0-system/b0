@@ -49,6 +49,119 @@ module File_cache = struct
   let err op err = Fmt.str "cache %s: %s" op err
   let err_key op key err = Fmt.str "cache %s %s: %s" op key err
 
+  module Fs = struct
+    (* File system interaction. The following function handle Unix
+       errors in the way the cache deems convenient. Most of them
+       raise in case of error. *)
+
+    let rec exists f = try Unix.access f [Unix.F_OK]; true with
+    | Unix.Unix_error (Unix.EINTR, _, _) -> exists f
+    | Unix.Unix_error (_, _, _) -> false
+
+    let rec unlink_noerr p = try Unix.unlink p with
+    | Unix.Unix_error (Unix.EINTR, _, _) -> unlink_noerr p
+    | Unix.Unix_error (_, _, _) -> ()
+
+    let read_flags = Unix.[O_RDONLY; O_CLOEXEC]
+    let read_file file =
+      let fd = Unix.openfile file read_flags 0 in
+      Os.Fd.apply ~close:Unix.close fd (Os.Fd.read_file file)
+
+    let write_flags =
+      Unix.[O_WRONLY; O_CREAT; O_SHARE_DELETE; O_CLOEXEC; O_TRUNC; O_EXCL]
+
+    let write_file dst s =
+      let fd = Unix.openfile dst write_flags 0o644 in
+      try
+        let write fd = ignore (Unix.write_substring fd s 0 (String.length s)) in
+        Os.Fd.apply ~close:Unix.close fd write
+      with
+      | e -> unlink_noerr dst; raise e
+
+    let rec copy_file src dst =
+      (* Like link(2) if [src] doesn't exist raises ENOENT. If [dst]
+         exists raises [EEXIST]. If a path segment is missing raises
+         [ENOENT]. If the copy fails unlinks [dst]. *)
+      match (Unix.stat src).Unix.st_perm with
+      | exception Unix.Unix_error (Unix.EINTR, _, _) -> copy_file src dst
+      | mode ->
+          let fdi = Unix.openfile src read_flags 0 in
+          Os.Fd.apply ~close:Unix.close fdi @@ fun fdi ->
+          let fdo = Unix.openfile dst write_flags mode in
+          try
+            Os.Fd.apply ~close:Unix.close fdo @@ fun fdo ->
+            Os.Fd.copy ~src:fdi fdo;
+          with
+          | e -> unlink_noerr dst; raise e
+
+    let rec make_path p =
+      let mkdir dir = Unix.mkdir (Fpath.to_string dir) 0o755 in
+      let dir = Fpath.parent p in
+      try mkdir dir with
+      | Unix.Unix_error (Unix.ENOENT, _, _) ->
+          let rec down = function
+          | [] -> ()
+          | d :: ds as arg ->
+              match mkdir d with
+              | () -> down ds
+              | exception Unix.Unix_error (Unix.EEXIST, _, _) -> down ds
+              | exception Unix.Unix_error (Unix.EINTR, _, _) -> down arg
+          in
+          let rec up todo d = match mkdir d with
+          | () -> down todo
+          | exception Unix.Unix_error (Unix.ENOENT, _, _) ->
+              up (d :: todo) (Fpath.parent d)
+          | exception Unix.Unix_error (Unix.EEXIST, _, _) -> down todo
+          | exception Unix.Unix_error (Unix.EINTR, _, _) -> up todo d
+          in
+          up [dir] (Fpath.parent dir)
+      | Unix.Unix_error (Unix.EEXIST, _, _) -> ()
+      | Unix.Unix_error (Unix.EINTR, _, _) -> make_path p
+
+    let fold_dir_filenames dir f acc =
+      let rec closedir dh = try Unix.closedir dh with
+      | Unix.Unix_error (Unix.EINTR, _, _) -> closedir dh
+      | Unix.Unix_error (_, _, _) -> (* not really interested *) ()
+      in
+      let rec filenames dh f acc = match Unix.readdir dh with
+      | ".." | "." -> filenames dh f acc
+      | n -> filenames dh f (f acc n)
+      | exception End_of_file -> acc
+      | exception Unix.Unix_error (e, _, _) ->
+          Fmt.failwith_notrace "%s: %s" dir (uerr e)
+      in
+      match Unix.opendir dir with
+      | dh ->
+          begin match filenames dh f acc with
+          | fs -> closedir dh; Some fs
+          | exception e -> closedir dh; raise e
+          end
+      | exception Unix.Unix_error (Unix.ENOENT, _, _) -> None
+      | exception Unix.Unix_error (e, _, _) ->
+          Fmt.failwith_notrace "%s: %s" dir (uerr e)
+
+    let dir_filenames dir = fold_dir_filenames dir (fun acc n -> n :: acc) []
+    let dir_delete_files dir =
+      let rec delete_file dir () fname =
+        let p = dir ^ fname in
+        try Unix.unlink p with
+        | Unix.Unix_error (Unix.ENOENT, _, _) -> ()
+        | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ()
+        | Unix.Unix_error (Unix.EINTR, _, _) -> delete_file dir () fname
+        | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" p (uerr e)
+      in
+      ignore @@ fold_dir_filenames dir (delete_file dir) ()
+
+    let dir_delete dir = (* returns [true] if a deletion occured *)
+      let rec dir_delete d = try Unix.rmdir d; true with
+      | Unix.Unix_error (Unix.ENOENT, _, _) -> false
+      | Unix.Unix_error (Unix.ENOTDIR, _, _) -> false
+      | Unix.Unix_error (Unix.EINTR, _, _) -> dir_delete d
+      | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" d (uerr e)
+      in
+      dir_delete_files dir; dir_delete dir
+  end
+
   (* Caches
 
      Given a cache directory [dir] and a key [KEY]:
@@ -73,13 +186,10 @@ module File_cache = struct
     let dir = Fpath.to_dir_path dir (* assumed e.g. by key_dir *) in
     Ok { dir = Fpath.to_string dir }
 
-  let dir c = Fpath.v c.dir
-
-  (* Contructing file paths into the cache *)
+  (* Constructing file paths into the cache *)
 
   let key_ext = ".k"
   let key_meta_filename = "zm"
-
   let filename_is_key_dir dir = String.is_suffix ~affix:key_ext dir
   let key_dir c k = String.concat "" [c.dir; k; key_ext; Fpath.dir_sep]
   let key_of_filename fname = String.drop_right (String.length key_ext) fname
@@ -106,113 +216,16 @@ module File_cache = struct
 
   let key_file c key ~filenum_width ~is_last i =
     (* XXX we could blit directly rather than constructing these lists *)
-    String.concat "" @@ match is_last with
-    | false ->
-        [c.dir; key; key_ext; Fpath.dir_sep; filenum_str ~filenum_width i ]
-    | true ->
-        [c.dir; key; key_ext; Fpath.dir_sep; "z"; filenum_str ~filenum_width i ]
-
-  (* File system interaction. The following function handle Unix
-     errors in the way the cache deems convenient. *)
-
-  let read_file file =
-    let fd = Unix.openfile file Unix.[O_RDONLY] 0 in
-    Os.Fd.apply ~close:Unix.close fd (Os.Fd.read_file file)
-
-  let write_flags =
-    Unix.[O_WRONLY; O_CREAT; O_SHARE_DELETE; O_CLOEXEC; O_TRUNC; O_EXCL]
-
-  let rec unlink_noerr p = try Unix.unlink p with
-  | Unix.Unix_error (Unix.EINTR, _, _) -> unlink_noerr p
-  | Unix.Unix_error (_, _, _) -> ()
-
-  let write_file dst s =
-    let fd = Unix.openfile dst write_flags 0o644 in
-    try
-      let write fd = ignore @@ Unix.write_substring fd s 0 (String.length s) in
-      Os.Fd.apply ~close:Unix.close fd write
-    with
-    | e -> unlink_noerr dst; raise e
-
-  let rec copy src dst =
-    (* Like link(2) if [src] doesn't exist raises ENOENT. If [dst]
-       exists raises [EEXIST]. If the copy fails unlinks [dst]. *)
-    match (Unix.stat src).Unix.st_perm with
-    | exception Unix.Unix_error (Unix.EINTR, _, _) -> copy src dst
-    | mode ->
-        let fdi = Unix.openfile src Unix.[O_RDONLY; O_CLOEXEC] 0 in
-        try
-          Os.Fd.apply ~close:Unix.close fdi @@ fun fdi ->
-          let fdo = Unix.openfile dst write_flags mode in
-          Os.Fd.apply ~close:Unix.close fdo @@ fun fdo ->
-          Os.Fd.copy ~src:fdi fdo;
-        with
-        | e -> unlink_noerr dst; raise e
-
-  let rec make_path p =
-    let mkdir dir = Unix.mkdir (Fpath.to_string dir) 0o755 in
-    let dir = Fpath.parent p in
-    try mkdir dir with
-    | Unix.Unix_error (Unix.ENOENT, _, _) ->
-        let rec down = function
-        | [] -> ()
-        | d :: ds as arg ->
-            match mkdir d with
-            | () -> down ds
-            | exception Unix.Unix_error (Unix.EEXIST, _, _) -> down ds
-            | exception Unix.Unix_error (Unix.EINTR, _, _) -> down arg
-        in
-        let rec up todo d = match mkdir d with
-        | () -> down todo
-        | exception Unix.Unix_error (Unix.ENOENT, _, _) ->
-            up (d :: todo) (Fpath.parent d)
-        | exception Unix.Unix_error (Unix.EEXIST, _, _) -> down todo
-        | exception Unix.Unix_error (Unix.EINTR, _, _) -> up todo d
-        in
-        up [dir] (Fpath.parent dir)
-    | Unix.Unix_error (Unix.EEXIST, _, _) -> ()
-    | Unix.Unix_error (Unix.EINTR, _, _) -> make_path p
-
-  let fold_dir_filenames dir f acc =
-    let rec closedir dh = try Unix.closedir dh with
-    | Unix.Unix_error (Unix.EINTR, _, _) -> closedir dh
-    | Unix.Unix_error (_, _, _) -> (* not really interested *) ()
-    in
-    let rec filenames dh f acc = match Unix.readdir dh with
-    | ".." | "." -> filenames dh f acc
-    | n -> filenames dh f (f acc n)
-    | exception End_of_file -> acc
-    | exception Unix.Unix_error (e, _, _) ->
-        Fmt.failwith_notrace "%s: %s" dir (uerr e)
-    in
-    match Unix.opendir dir with
-    | dh ->
-        begin match filenames dh f acc with
-        | fs -> closedir dh; Some fs
-        | exception e -> closedir dh; raise e
-        end
-    | exception Unix.Unix_error (Unix.ENOENT, _, _) -> None
-    | exception Unix.Unix_error (e, _, _) ->
-        Fmt.failwith_notrace "%s: %s" dir (uerr e)
-
-  let dir_filenames dir = fold_dir_filenames dir (fun acc n -> n :: acc) []
-  let dir_delete_files dir =
-    let rec delete_file dir () fname =
-      let p = dir ^ fname in
-      try Unix.unlink p with
-      | Unix.Unix_error (Unix.ENOENT, _, _) -> ()
-      | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ()
-      | Unix.Unix_error (Unix.EINTR, _, _) -> delete_file dir () fname
-      | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" p (uerr e)
-    in
-    ignore @@ fold_dir_filenames dir (delete_file dir) ()
+    let last = if is_last then "z" else "" in
+    String.concat ""
+      [c.dir; key; key_ext; Fpath.dir_sep; last; filenum_str ~filenum_width i ]
 
   (* Functions on key directories *)
 
   let key_dir_files kdir =
     let string_rev_compare f0 f1 = String.compare f1 f0 in
     let file_path f = Fpath.v (kdir ^ f) in
-    match dir_filenames kdir with
+    match Fs.dir_filenames kdir with
     | None -> None
     | Some fs ->
         match List.sort string_rev_compare @@ fs with
@@ -220,64 +233,57 @@ module File_cache = struct
             Some (file_path key_meta_filename, List.rev_map file_path fs)
         | _ -> Fmt.failwith_notrace "%s: corrupted key" kdir
 
-  let key_dir_delete kdir =
-    let rec dir_delete d = try Unix.rmdir d; true with
-    | Unix.Unix_error (Unix.ENOENT, _, _) -> false
-    | Unix.Unix_error (Unix.ENOTDIR, _, _) -> false
-    | Unix.Unix_error (Unix.EINTR, _, _) -> dir_delete d
-    | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" d (uerr e)
-    in
-    dir_delete_files kdir; dir_delete kdir
-
-  let key_dir_exit_if_used kdir =
-    let rec stat p = try Unix.stat p with
-    | Unix.Unix_error (Unix.EINTR, _, _) -> stat p
-    | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" p (uerr e)
-    in
-    let file_used f = (stat f).Unix.st_nlink <> 1 in
-    let used () f = if file_used (kdir ^ f) then raise_notrace Exit else () in
-    ignore @@ fold_dir_filenames kdir used ()
-
   let key_dir_stats kdir =
     let rec stat p = try Unix.stat p with
     | Unix.Unix_error (Unix.EINTR, _, _) -> stat p
     | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" p (uerr e)
     in
-    let rec loop fc bc unused atime = function
-    | [] -> fc, bc, unused, atime
+    let rec loop fc bc atime = function
+    | [] -> fc, bc, atime
     | f :: fs ->
         let s = stat (kdir ^ f) in
-        let unused = unused && s.Unix.st_nlink = 1 in
         let atime = (max : float -> float -> float) atime s.Unix.st_atime in
-        loop (fc + 1) (bc + s.Unix.st_size) unused atime fs
+        loop (fc + 1) (bc + s.Unix.st_size) atime fs
     in
-    let fs = match dir_filenames kdir with None -> [] | Some fs -> fs in
-    loop 0 0 true 0. fs
+    let fs = match Fs.dir_filenames kdir with None -> [] | Some fs -> fs in
+    loop 0 0 0. fs
+
+  let fold_key_dir_names c f acc =
+    let if_key f acc fn = if filename_is_key_dir fn then f acc fn else acc in
+    match Fs.fold_dir_filenames c.dir (if_key f) acc with
+    | None -> acc | Some acc -> acc
 
   (* Cache operations *)
 
-  let rec mem c k = try Unix.access (key_dir c k) [Unix.F_OK]; true with
-  | Unix.Unix_error (Unix.EINTR, _, _) -> mem c k
-  | Unix.Unix_error (e, _, _) -> false
+  let dir c = Fpath.v c.dir
 
+  let keys c =
+    let add_name acc fname = key_of_filename fname :: acc in
+    try Ok (fold_key_dir_names c add_name []) with
+    | Failure e -> Error (err "keys" e)
+
+  let key_stats c key = try Ok (key_dir_stats (key_dir c key)) with
+  | Failure e -> Error (err_key key "stats" e)
+
+  let mem c k = Fs.exists (key_dir c k)
   let add c k meta fs =
     let rec mkdir d = try Unix.mkdir d 0o755; true with
     | Unix.Unix_error (Unix.EEXIST, _, _) -> false
     | Unix.Unix_error (Unix.EINTR, _, _) -> mkdir d
     | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" d (uerr e)
     in
-    let rec cache_file ~src cfile = try copy src cfile; true with
+    let rec cache_file ~src cfile = try Fs.copy_file src cfile; true with
     | Unix.Unix_error (Unix.ENOENT, _, _) -> false
     | Unix.Unix_error (Unix.EINTR, _, _) -> cache_file ~src cfile
     | Unix.Unix_error (e, _, arg) ->
         Fmt.failwith_notrace "%s: %s: %s" src arg (uerr e)
     in
-    let write_file file data = try write_file file data with
+    let write_file file data = try Fs.write_file file data with
     | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" file (uerr e)
     in
     try
       let kdir = key_dir c k in
-      if not (mkdir kdir) then dir_delete_files kdir;
+      if not (mkdir kdir) then Fs.dir_delete_files kdir;
       let success = match filenum_width (List.length fs) with
       | 0 -> true
       | filenum_width ->
@@ -287,7 +293,7 @@ module File_cache = struct
               let cfile = key_file c k ~filenum_width ~is_last:(fs = []) i in
               match cache_file ~src:(Fpath.to_string f) cfile with
               | true -> loop (i + 1) fs
-              | false -> ignore (key_dir_delete kdir); false
+              | false -> ignore (Fs.dir_delete kdir); false
           in
           loop 0 fs
       in
@@ -297,91 +303,43 @@ module File_cache = struct
     with
     | Failure e -> Error (err_key "add" k e)
 
-  let rem c k = try Ok (key_dir_delete (key_dir c k)) with
+  let rem c k = try Ok (Fs.dir_delete (key_dir c k)) with
   | Failure e -> Error (err_key "delete" k e)
 
   let find c k = try Ok (key_dir_files (key_dir c k)) with
   | Failure e -> Error (err_key "find" k e)
 
-  let inode_eq f0 f1 = match (Unix.stat f0).Unix.st_ino with
-  | exception Unix.Unix_error (_, _, _) -> false
-  | i0 ->
-      match (Unix.stat f1).Unix.st_ino with
-      | exception Unix.Unix_error (_, _, _) -> false
-      | i1 -> i0 = i1
+  let rec revive_file ~did_path cfile ~dst =
+    let dst_str = Fpath.to_string dst in
+    try Fs.copy_file cfile dst_str with
+    | Unix.Unix_error (Unix.EEXIST, _, _) ->
+        (* XXX should we compare the files for non-clean builds ?  *)
+        (Fs.unlink_noerr dst_str; revive_file ~did_path cfile ~dst)
+    | Unix.Unix_error (Unix.ENOENT, _, _) when not did_path ->
+        Fs.make_path dst; revive_file ~did_path:true cfile ~dst
+    | Unix.Unix_error (Unix.EINTR, _, _) ->
+        revive_file ~did_path cfile ~dst
+    | Unix.Unix_error (e, _, arg) ->
+        Fmt.failwith_notrace "%a: %s: %s" Fpath.pp_quoted dst arg (uerr e)
 
   let revive c k fs =
-    let rec exists f = try Unix.access f [Unix.F_OK]; true with
-    | Unix.Unix_error (Unix.EINTR, _, _) -> exists f
-    | Unix.Unix_error (_, _, _) -> false
-    in
-    let rec revive_file ~did_path cfile ~dst =
-      let dst_str = Fpath.to_string dst in
-      try copy cfile dst_str; true with
-      | Unix.Unix_error (Unix.EEXIST, _, _) ->
-          (* FIXME should we compare the files for non-clean builds ?  *)
-          (unlink_noerr dst_str; revive_file ~did_path cfile ~dst)
-      | Unix.Unix_error (Unix.ENOENT, _, _) when not did_path ->
-          make_path dst; revive_file ~did_path:true cfile ~dst
-      | Unix.Unix_error (Unix.EINTR, _, _) ->
-          revive_file ~did_path cfile ~dst
-      | Unix.Unix_error (e, _, arg) ->
-          Fmt.failwith_notrace "%a: %s: %s" Fpath.pp_quoted dst arg (uerr e)
-    in
     try
       let fs_len = List.length fs in
       let filenum_width = filenum_width fs_len in
       let last = key_file c k ~filenum_width ~is_last:true (fs_len - 1) in
-      if not (exists last) (* Tests existence and arity *) then Ok None else
-      let rec loop i existed = function
-      | [] -> Ok (Some (read_file (key_meta_file c k), existed))
+      if not (Fs.exists last) (* Test existence and arity *) then Ok None else
+      let rec loop i = function
+      | [] -> Ok (Some (Fs.read_file (key_meta_file c k)))
       | f :: fs ->
           let cfile = key_file c k ~filenum_width ~is_last:(fs = []) i in
-          match revive_file ~did_path:false cfile ~dst:f with
-          | true -> loop (i + 1) existed fs
-          | false -> loop (i + 1) (f :: existed) fs
+          revive_file ~did_path:false cfile ~dst:f;
+          loop (i + 1) fs
       in
-      loop 0 [] fs
+      loop 0 fs
     with
     | Failure e -> Error (err_key "revive" k e)
 
-  (* Functions on cache directories *)
-
-  let cache_fold_key_dir_names c f acc =
-    let if_key f acc fn = if filename_is_key_dir fn then f acc fn else acc in
-    match fold_dir_filenames c.dir (if_key f) acc with
-    | None -> acc | Some acc -> acc
-
-  let fold c f acc =
-    let fold_key f acc fname =
-      let key = key_of_filename fname in
-      let key_dir = key_dir_of_filename c fname in
-      match key_dir_files key_dir with
-      | None -> acc (* That would be a race *)
-      | Some (meta, fs) -> f key meta fs acc
-    in
-    try Ok (cache_fold_key_dir_names c (fold_key f) acc)
-    with Failure e -> Error (err "fold" e)
-
-  let keys c =
-    let add_name acc fname = key_of_filename fname :: acc in
-    try Ok (cache_fold_key_dir_names c add_name [])
-    with Failure e -> Error (err "keys" e)
-
-  let is_unused c k = try key_dir_exit_if_used (key_dir c k); Ok true with
-  | Exit -> Ok false
-  | Failure e -> Error (err_key "unused check" k e)
-
-  let delete_unused c =
-    let delete_unused_key () fname =
-      let kdir = key_dir_of_filename c fname in
-      try key_dir_exit_if_used kdir; ignore (key_dir_delete kdir) with
-      | Exit -> ()
-    in
-    try Ok (cache_fold_key_dir_names c delete_unused_key ())
-    with Failure e -> Error (err "delete unused" e)
-
-  let trim_size c ~max_byte_size ~pct =
+  let trim_size ?(is_unused = fun _ -> false) c ~max_byte_size ~pct =
     try
       let order ((u0, a0, s0), _) ((u1, a1, s1), _) = match u0, u1 with
       | true, false -> -1 (* unused first *)
@@ -392,76 +350,23 @@ module File_cache = struct
           | cmp -> cmp
       in
       let add_key (total_size, ks) fname =
+        let key = key_of_filename fname in
         let kdir = key_dir_of_filename c fname in
-        let _, ksize, unused, atime = key_dir_stats kdir in
-        (total_size + ksize), ((unused, atime, ksize), kdir) :: ks
+        let _, ksize, atime = key_dir_stats kdir in
+        (total_size + ksize), ((is_unused key, atime, ksize), kdir) :: ks
       in
-      let total_size, ks = cache_fold_key_dir_names c add_key (0, []) in
+      let total_size, ks = fold_key_dir_names c add_key (0, []) in
       let pct_size = truncate @@ (float total_size /. 100.) *. float pct in
       let budget = (min : int -> int -> int) max_byte_size pct_size in
       let rec delete_keys current budget = function
       | [] -> ()
       | _ when current <= budget -> ()
       | ((_, _, size), kdir) :: kdirs ->
-          ignore (key_dir_delete kdir);
+          ignore (Fs.dir_delete kdir);
           delete_keys (current - size) budget kdirs
       in
       Ok (delete_keys total_size budget @@ List.sort order ks)
     with Failure e -> Error (err "trim size" e)
-
-  module Stats = struct
-    type keys = {keys_count : int; keys_file_count : int; keys_byte_size : int}
-    let keys_count s = s.keys_count
-    let keys_byte_size s = s.keys_byte_size
-    let keys_file_count s = s.keys_file_count
-    let keys_zero = { keys_count = 0; keys_file_count = 0; keys_byte_size = 0 }
-    let keys_sub s0 s1 =
-      { keys_count = s0.keys_count - s1.keys_count;
-        keys_file_count = s0.keys_file_count - s1.keys_file_count;
-        keys_byte_size = s0.keys_byte_size - s1.keys_byte_size }
-
-    let pp_keys ppf s =
-      Fmt.pf ppf "keys: %4d files: %4d size: %6a"
-        s.keys_count s.keys_file_count Fmt.byte_size s.keys_byte_size
-
-    let of_keys c ns =
-      let rec loop k f b = function
-      | [] -> { keys_count = k; keys_file_count = f; keys_byte_size = b }
-      | n :: ns ->
-          let kf, kb, _, _ = key_dir_stats (key_dir c n) in
-          loop (k + 1) (f + kf) (b + kb) ns
-      in
-      try Ok (loop 0 0 0 ns) with
-      | Failure e -> Error (err "keys stats" e)
-
-    type cache = { all_keys : keys; unused_keys : keys }
-    let zero = { all_keys = keys_zero; unused_keys = keys_zero }
-    let all_keys s = s.all_keys
-    let unused_keys s = s.unused_keys
-    let pp =
-      Fmt.record @@
-      [ Fmt.field "unused" unused_keys pp_keys;
-        Fmt.field " total" all_keys pp_keys ]
-
-    let of_cache c =
-      let rec loop k f b uk uf ub = function
-      | [] ->
-          let a = {keys_count=k; keys_file_count=f; keys_byte_size=b} in
-          let u = {keys_count=uk; keys_file_count=uf; keys_byte_size=ub} in
-          { all_keys = a; unused_keys = u }
-      | n :: ns ->
-          let kdir = key_dir_of_filename c n in
-          let kf, kb, key_unused, _ = key_dir_stats kdir in
-          match key_unused with
-          | true -> loop (k+1) (f+kf) (b+kb) (uk+1) (uf+kf) (ub+kb) ns
-          | false -> loop (k+1) (f+kf) (b+kb) uk uf ub ns
-      in
-      try
-        let names = cache_fold_key_dir_names c (fun acc n -> n :: acc) [] in
-        Ok (loop 0 0 0 0 0 0 names)
-      with
-      | Failure e -> Error (err "stats" e)
-  end
 end
 
 module Op = struct
@@ -968,8 +873,8 @@ module Reviver = struct
     let key = file_cache_key o in
     let writes = Op.writes o in
     Result.bind (File_cache.revive r.cache key writes) @@ function
-    | None -> Ok None
-    | Some (m, existed) ->
+    | None -> Ok false
+    | Some m ->
         Result.bind (Conv.of_bin spawn_meta_conv m) @@ fun (stdo_ui, exit) ->
         Op.set_revived o true;
         Op.Spawn.set_stdo_ui s stdo_ui;
@@ -977,20 +882,20 @@ module Reviver = struct
         Op.set_status o (Op.Spawn.exit_to_status s);
         Op.invoke_post_exec o;
         Op.set_time_ended o (timestamp r);
-        Ok (Some existed)
+        Ok true
 
   let revive_op r o kind op_kind =
     let key = file_cache_key o in
     let writes = Op.writes o in
     Result.bind (File_cache.revive r.cache key writes) @@ function
-    | None -> Ok None
-    | Some (_, existed) ->
+    | None -> Ok false
+    | Some _ ->
         op_kind kind;
         Op.set_revived o true;
         Op.set_status o Op.Done;
         Op.invoke_post_exec o;
         Op.set_time_ended o (timestamp r);
-        Ok (Some existed)
+        Ok true
 
   let op_write w = Op.Write.discard_data w (* get rid of data closure. *)
   let op_nop _ = ()
@@ -1002,7 +907,7 @@ module Reviver = struct
     | Op.Write w -> revive_op r o w op_write
     | Op.Copy c -> revive_op r o c op_nop
     | Op.Delete _ | Op.Read _ | Op.Notify _ | Op.Mkdir _ | Op.Wait_files _ ->
-        Ok None
+        Ok false
 
   let record_spawn r o s =
     let spawn_meta = Op.Spawn.stdo_ui s, Op.Spawn.exit s in

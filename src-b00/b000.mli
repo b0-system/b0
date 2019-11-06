@@ -49,24 +49,16 @@ end
     A file cache maps a key to a metadata hunk and an ordered list of
     file {e contents} (filenames are irrelevant).
 
-    File caches are used to capture the contents of files written by
-    build operations and store their additional output in the
-    metadata. This allows to recreate the effect of a build operation
-    without having to rerun it.
+    Cache bindings are used to recreate the effect of build operations
+    without having to rerun them. The key identifies the operation
+    (usually via a hash), the ordered files are those written by the
+    operation and the metadata has additional output information
+    (e.g. exit codes, standard outputs, etc.).
 
-    {b Warning.} The following notions use the file system information
-    and can be inaccurate. It's a bit unclear whether it's a good idea
-    to rely on them but they are only used for cache {{!trim_size}trimming}.
-    {ul
-    {- The {e access time} of a key is the greatest access time to the
-       file contents or metadata hunk it maps to.}
-    {- A key is {e unused} if all its file contents are not referenced
-       outside the cache. Key usage cannot be determined if the key file
-       contents and their references do not live on the same file system
-       device or if the file system does not support hard links, see
-       {!need_copy}. {b FIXME.} Now that we allow keys to map to empty list
-       of file contents, unused might not make much sense for trimming.
-       Maybe refine the notion to {e unused content}.}} *)
+    {b Note.} In general, whenever a cache operation modifies the
+    file system and errors with [Error _] the resulting file system
+    state is undefined. *)
+
 module File_cache : sig
 
   (** {1:file_cache File caches} *)
@@ -82,18 +74,22 @@ module File_cache : sig
   (** The type for file caches. *)
 
   val create : Fpath.t -> (t, string) result
-  (** [create dir] is a file cache using directory [dir] for
-      data storage. The full path to [dir] is created by the call if
-      it doesn't exist. *)
+  (** [create dir] is a file cache using directory [dir] for data
+      storage. The full path to [dir] is created by the call if [dir]
+      doesn't exist. *)
 
   val dir : t -> Fpath.t
   (** [dir c] is [c]'s storage directory. *)
 
-  (** {1:ops Cache operations}
+  val keys : t -> (key list, string) result
+  (** [keys c] are the keys of cache [c]. *)
 
-      {b Note.} In general, whenever a cache operation modifies the
-      file system and errors with [Error _] the resulting file system
-      state is undefined. *)
+  val key_stats : t -> key -> (int * int * float, string) result
+  (** [key_stats c key] is statistical information about key [key].
+      Namely the number of files (without the metadata file), the key
+      size in bytes and the access time of the key – this is the
+      latest access time of one of its consituents the relevance of
+      which depends on your file system. *)
 
   val mem : t -> key -> bool
   (** [mem c k] is [true] iff [k] is bound in [c]. *)
@@ -120,101 +116,31 @@ module File_cache : sig
       {!add}. The result is [None] if [k] is unbound in [c]. *)
 
   val revive :
-    t -> key -> Fpath.t list -> ((string * Fpath.t list) option, string) result
-  (** [revive c k fs] binds the file contents of key [k] to the inexistent
-      file {e path}s (directories are created) of [fs]. The function returns:
+    t -> key -> Fpath.t list -> (string option, string) result
+  (** [revive c k fs] binds the file contents of key [k] to the file
+      {e path}s [fs]. These file paths are overwritten if they exist
+      and intermediate directories are created if needed (with
+      permissions [0o755]). The function returns:
       {ul
-      {- [Ok (Some (m, existed)] in case of success, with [m] the
-         metadata of the key and [existed] the files that already
-         existed and were left untouched by the operation. Assuming no
-         other process fiddles with [fs] all these file paths now
-         exist (but those of [existed] might differ from the
-         corresponding one in the cache).}
+      {- [Ok (Some m] in case of success, with [m] the metadata of the key.
+         In this case the files [fs] are guaranteed to exist and to match
+         those of the key files in the order given on {!add}.}
       {- [Ok None] if the length of [fs] does not match the
          sequence of files of [k] or if [k] is unbound in [c].
          In this case the file paths [fs] are left untouched.}
-      {- [Error _] if an unexpected error occurs. In that case the resulting
-         state of the file system for paths [fs] is undefined.}} *)
+      {- [Error _] if an unexpected error occurs. In that case the
+         resulting state of the file system for paths [fs] is
+         undefined.}} *)
 
-  val fold :
-    t -> (key -> Fpath.t -> Fpath.t list -> 'a -> 'a) -> 'a ->
-    ('a, string) result
-  (** [fold c f acc] folds [f] over the contents of each key of [c]
-      starting with [acc]. *)
-
-  val keys : t -> (key list, string) result
-  (** [keys c] are the keys of cache [c]. *)
-
-  val is_unused : t -> key -> (bool, string) result
-  (** [is_unused c k] is [true] iff [k] is bound in [c] and its
-      content is being unused. {b Warning} For caches which are
-      referenced across file system device or on file systems that do
-      not support hard links this may return [true] even though the
-      key is actually in use. *)
-
-  val delete_unused : t -> (unit, string) result
-  (** [delete_unused c] deletes {{!is_unused}unused} keys of [c]. *)
-
-  val trim_size : t -> max_byte_size:int -> pct:int -> (unit, string) result
-  (** [trim_size c max_byte_size ~pct] delete keys of [c] until they
-      either weight at most [max_byte_size] or are [pct] of their
-      current size; whichever is the smaller. The function deletes by
-      order of increasing access time but unused keys are deleted
-      first. *)
-
-  (** {1:stats Cache statistics} *)
-
-  (** Cache statistics. *)
-  module Stats : sig
-
-    (** {1:keys Key statistics} *)
-
-    type keys
-    (** The type for statistics about a set of keys *)
-
-    val keys_count : keys -> int
-    (** [keys_count s] is the number of keys in the set of keys. *)
-
-    val keys_file_count : keys -> int
-    (** [keys_file_count s] is the nubmer of files in the set of keys. *)
-
-    val keys_byte_size : keys -> int
-    (** [keys_count s] is the total byte size of the files in the set
-        of keys. *)
-
-    val keys_zero : keys
-    (** [keys_zero] are zeros. *)
-
-    val keys_sub : keys -> keys -> keys
-    (** [keys_sub s0 s1] is he field-wise substraction [s0 - s1]. *)
-
-    val pp_keys : keys Fmt.t
-    (** [pp_keys] formats key statistics. *)
-
-    val of_keys : t -> key list -> (keys, string) result
-    (** [of_keys ks] are statistics for [ks]. *)
-
-    (** {1:cache Cache statistics} *)
-
-    type cache
-    (** The type for cache statistics *)
-
-    val zero : cache
-    (** [zero] are zeros. *)
-
-    val all_keys : cache -> keys
-    (** [all_keys s] are statistics about all keys in the cache. *)
-
-    val unused_keys : cache -> keys
-    (** [unused_keys s] are statistics about unused keys in the cache.
-        {b Warning} Only relevant if {!is_unused} is. *)
-
-    val pp : cache Fmt.t
-    (** [pp] formats cache statistics. *)
-
-    val of_cache : t -> (cache, string) result
-    (** [of_cache c] are satistics of [c]. *)
-  end
+  val trim_size :
+    ?is_unused:(key -> bool) -> t -> max_byte_size:int -> pct:int ->
+    (unit, string) result
+  (** [trim_size c ~is_unused max_byte_size ~pct] deletes keys of [c]
+      until the cache either weights at most [max_byte_size] or is
+      [pct] of its current size; whichever is the smaller. The
+      function deletes by order of increasing key access time (see
+      {!key_stats}) but unused keys determined by {!is_unused} are deleted
+      first (defaults to [fun _ -> false]). *)
 end
 
 (** Build operations.
@@ -799,7 +725,7 @@ module Reviver : sig
       some file in the set of writes do not exist and is likely an
       error. *)
 
-  val revive : t -> Op.t -> (Fpath.t list option, string) result
+  val revive : t -> Op.t -> (bool, string) result
   (** [revive r o] tries to revive operation [o] from [r] using the key
       [Op.hash o] (i.e. this function assume [o] has gone through
       {!set_op_hash} before). In particular:
@@ -810,12 +736,13 @@ module Reviver : sig
          {{!Op.Spawn.exit}exit status} code and
          {{!Op.Spawn.stdo_ui}standard output redirection contents} into
          [o].}}
-      The semantics of the result is like
-      {!File_cache.revive}; in particular in case of [Ok None] the key
-      nothing was revived.
+      If [Ok true] is returned the operation was revived. If [Ok false]
+      is returned then nothing was revived and the file system is
+      kept unchanged. Nothing is guaranteed in case of [Error _].
 
-      {b Warning.} In any case the fields {!Op.exec_start_time},
-      {!Op.exec_end_time} of [o] get set. *)
+      {b Warning.} The fields {!Op.exec_start_time},
+      {!Op.exec_end_time} of [o] get set regardless of the result.
+      This may be overwritten later by {!Exec}. *)
 end
 
 (** Build operation guards.

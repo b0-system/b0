@@ -28,6 +28,62 @@ end
 module File_cache = struct
   open B000
 
+  module Stats = struct
+    let err op err = Fmt.str "cache %s: %s" op err
+
+    type keys = {keys_count : int; keys_file_count : int; keys_byte_size : int}
+    let keys_count s = s.keys_count
+    let keys_byte_size s = s.keys_byte_size
+    let keys_file_count s = s.keys_file_count
+    let keys_zero = { keys_count = 0; keys_file_count = 0; keys_byte_size = 0 }
+    let keys_sub s0 s1 =
+      { keys_count = s0.keys_count - s1.keys_count;
+        keys_file_count = s0.keys_file_count - s1.keys_file_count;
+        keys_byte_size = s0.keys_byte_size - s1.keys_byte_size }
+
+    let pp_keys ppf s =
+      Fmt.pf ppf "keys: %4d files: %4d size: %6a"
+        s.keys_count s.keys_file_count Fmt.byte_size s.keys_byte_size
+
+    let of_keys c ns =
+      let rec loop k f b = function
+      | [] -> { keys_count = k; keys_file_count = f; keys_byte_size = b }
+      | n :: ns ->
+          let kf, kb, _ = B000.File_cache.key_stats c n |> Result.to_failure in
+          loop (k + 1) (f + kf) (b + kb) ns
+      in
+      try Ok (loop 0 0 0 ns) with
+      | Failure e -> Error (err "keys stats" e)
+
+    type cache = { all_keys : keys; unused_keys : keys }
+    let zero = { all_keys = keys_zero; unused_keys = keys_zero }
+    let all_keys s = s.all_keys
+    let unused_keys s = s.unused_keys
+    let pp =
+      Fmt.record @@
+      [ Fmt.field "unused" unused_keys pp_keys;
+        Fmt.field " total" all_keys pp_keys ]
+
+    let of_cache c =
+      let rec loop k f b uk uf ub = function
+      | [] ->
+          let a = {keys_count=k; keys_file_count=f; keys_byte_size=b} in
+          let u = {keys_count=uk; keys_file_count=uf; keys_byte_size=ub} in
+          { all_keys = a; unused_keys = u }
+      | n :: ks ->
+          let kf, kb, _ = B000.File_cache.key_stats c n |> Result.to_failure in
+          let key_unused = false in
+          match key_unused with
+          | true -> loop (k+1) (f+kf) (b+kb) (uk+1) (uf+kf) (ub+kb) ks
+          | false -> loop (k+1) (f+kf) (b+kb) uk uf ub ks
+      in
+      try
+        let keys = B000.File_cache.keys c |> Result.to_failure in
+        Ok (loop 0 0 0 0 0 0 keys)
+      with
+      | Failure e -> Error (err "stats" e)
+  end
+
   (* High-level commands *)
 
   let delete ~dir keys = Result.bind (Os.Dir.exists dir) @@ function
@@ -55,18 +111,19 @@ module File_cache = struct
   let gc ~dir = Result.bind (Os.Dir.exists dir) @@ function
   | false -> Ok ()
   | true ->
+      (* TODO redo with a log *)
       Result.bind (File_cache.create dir) @@ fun c ->
-      Result.bind (File_cache.delete_unused c) @@ fun () -> Ok ()
+      Error "This operation is no longer implemented (TODO again)."
 
   let size ~dir =
     let stats = Result.bind (Os.Dir.exists dir) @@ function
-    | false -> Ok File_cache.Stats.zero
+    | false -> Ok Stats.zero
     | true ->
         Result.bind (File_cache.create dir) @@ fun c ->
-        File_cache.Stats.of_cache c
+        Stats.of_cache c
     in
     Result.bind stats @@ fun stats ->
-    Log.app (fun m -> m "@[<v>%a@]" File_cache.Stats.pp stats); Ok ()
+    Log.app (fun m -> m "@[<v>%a@]" Stats.pp stats); Ok ()
 
   let trim ~dir ~max_byte_size ~pct =
     Result.bind (Os.Dir.exists dir) @@ function

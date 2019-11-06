@@ -249,8 +249,8 @@ module Memo = struct
       | Ok hash ->
           Op.set_hash o hash;
           begin match Reviver.revive m.m.reviver o with
-          | Ok None -> Exec.schedule m.m.exec o
-          | Ok (Some _) -> finish_op m o
+          | Ok false -> Exec.schedule m.m.exec o
+          | Ok true -> finish_op m o
           | Error e ->
               m.m.feedback (`Op_cache_error (o, e));
               Exec.schedule m.m.exec o

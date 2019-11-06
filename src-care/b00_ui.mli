@@ -33,6 +33,61 @@ end
 (** {!B000.File_cache} interaction. *)
 module File_cache : sig
 
+  (** {1:stats Statistics about the file cache} *)
+
+  module Stats : sig
+
+    (** {1:keys Key statistics} *)
+
+    type keys
+    (** The type for statistics about a set of keys *)
+
+    val keys_count : keys -> int
+    (** [keys_count s] is the number of keys in the set of keys. *)
+
+    val keys_file_count : keys -> int
+    (** [keys_file_count s] is the number of files in the set of keys. *)
+
+    val keys_byte_size : keys -> int
+    (** [keys_count s] is the total byte size of the files in the set
+        of keys. *)
+
+    val keys_zero : keys
+    (** [keys_zero] are zeros. *)
+
+    val keys_sub : keys -> keys -> keys
+    (** [keys_sub s0 s1] is he field-wise substraction [s0 - s1]. *)
+
+    val pp_keys : keys Fmt.t
+    (** [pp_keys] formats key statistics. *)
+
+    val of_keys :
+      B000.File_cache.t -> B000.File_cache.key list -> (keys, string) result
+    (** [of_keys ks] are statistics for [ks]. *)
+
+    (** {1:cache Cache statistics} *)
+
+    type cache
+    (** The type for cache statistics *)
+
+    val zero : cache
+    (** [zero] are zeros. *)
+
+    val all_keys : cache -> keys
+    (** [all_keys s] are statistics about all keys in the cache. *)
+
+    val unused_keys : cache -> keys
+    (** [unused_keys s] are statistics about unused keys in the cache.
+        {b Warning} Only relevant if {!is_unused} is. *)
+
+    val pp : cache Fmt.t
+    (** [pp] formats cache statistics. *)
+
+    val of_cache : B000.File_cache.t -> (cache, string) result
+    (** [of_cache c] are satistics of [c]. *)
+  end
+
+
   (** {1:high-level High-level commands.}
 
       These commands act on a cache directory. They avoid to create

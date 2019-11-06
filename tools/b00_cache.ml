@@ -50,8 +50,10 @@ let with_key_selection c ~only_unused keys f =
   let filter c ~only_unused keys = match only_unused with
   | false -> keys
   | true ->
-      let is_unused k =
-        Result.value ~default:false @@ File_cache.is_unused c k
+      let is_unused k = false
+        (* TODO redo
+        Result.value ~default:false @@
+        File_cache.is_unused c k *)
       in
       List.filter is_unused keys
   in
@@ -109,11 +111,13 @@ let add_cmd () dir force key recurse paths =
             key (Fmt.list Fpath.pp_quoted) (List.filter miss files));
           Ok err_unknown
 
+let delete_unused c = Error ("This operation needs to be redone")
+
 let delete_cmd () dir only_unused keys =
   handle_unknown_error @@
   with_cache dir @@ fun c ->
   match only_unused && keys = `All with
-  | true -> Result.bind (File_cache.delete_unused c) @@ fun () -> Ok 0
+  | true -> Result.bind (delete_unused c) @@ fun () -> Ok 0
   | false ->
       with_key_selection c ~only_unused keys @@ fun keys ->
       let rec loop = function
@@ -154,22 +158,23 @@ let files_cmd () dir only_unused keys out_fmt =
 let gc_cmd () dir =
   handle_unknown_error @@
   with_cache dir @@ fun c ->
-  Result.bind (File_cache.Stats.of_cache c) @@ fun s ->
-  Result.bind (File_cache.delete_unused c) @@ fun () ->
+  Result.bind (B00_ui.File_cache.Stats.of_cache c) @@ fun s ->
+  Result.bind (delete_unused c) @@ fun () ->
   Log.app (fun m ->
       m "deleted: %a"
-        File_cache.Stats.pp_keys (File_cache.Stats.unused_keys s));
+        B00_ui.File_cache.Stats.pp_keys
+        (B00_ui.File_cache.Stats.unused_keys s));
   Ok 0
 
 let pp_key c byte_size = function
 | `Short -> Fmt.string
 | `Normal | `Long ->
     let pp_byte_size = if byte_size then Fmt.int else Fmt.byte_size in
-    fun ppf k -> match File_cache.Stats.of_keys c [k] with
+    fun ppf k -> match B00_ui.File_cache.Stats.of_keys c [k] with
     | Error _ -> Fmt.string ppf k
     | Ok s ->
-        let fc = File_cache.Stats.keys_file_count s in
-        let bs = File_cache.Stats.keys_byte_size s in
+        let fc = B00_ui.File_cache.Stats.keys_file_count s in
+        let bs = B00_ui.File_cache.Stats.keys_byte_size s in
         Fmt.pr "%d %a %s" fc pp_byte_size bs k
 
 let keys_cmd () dir only_unused keys out_fmt byte_size =
@@ -187,25 +192,30 @@ let size_cmd () dir only_unused keys =
   with_cache dir @@ fun c ->
   match keys with
   | `All ->
-      Result.bind (File_cache.Stats.of_cache c) @@ fun s ->
+      Result.bind (B00_ui.File_cache.Stats.of_cache c) @@ fun s ->
       if only_unused
       then
         Fmt.pr "@[<v>%a@]@."
-          File_cache.Stats.pp_keys (File_cache.Stats.unused_keys s)
-      else Fmt.pr "@[<v>%a@]@." File_cache.Stats.pp s;
+          B00_ui.File_cache.Stats.pp_keys
+          (B00_ui.File_cache.Stats.unused_keys s)
+      else Fmt.pr "@[<v>%a@]@." B00_ui.File_cache.Stats.pp s;
       Ok 0
   | keys ->
       with_key_selection c ~only_unused keys @@ function
       | [] ->
           Fmt.pr "@[<v>%a@]@."
-            File_cache.Stats.pp_keys File_cache.Stats.keys_zero;
+            B00_ui.File_cache.Stats.pp_keys B00_ui.File_cache.Stats.keys_zero;
           Ok 0
       | keys ->
-          Result.bind (File_cache.Stats.of_keys c keys) @@ fun s ->
-          Fmt.pr "@[<v>%a@]@." File_cache.Stats.pp_keys s; Ok 0
+          Result.bind (B00_ui.File_cache.Stats.of_keys c keys) @@ fun s ->
+          Fmt.pr "@[<v>%a@]@." B00_ui.File_cache.Stats.pp_keys s; Ok 0
 
 let revive_cmd () dir key paths =
   handle_unknown_error @@
+  Error "This operation needs to be redone"
+    (* Need to check if the files already exist ourserleves to
+       avoid disaster. *)
+(*
   with_cache dir @@ fun c ->
   with_key_selection c ~only_unused:false (`Keys [key]) @@ fun _ ->
   let paths = match paths with
@@ -237,18 +247,21 @@ let revive_cmd () dir key paths =
           m "%s: key has %d cached file(s) but %d file path(s) to bind \
             specified" key ccount pcount);
       Ok err_unknown
+*)
 
 let trim_cmd () dir (max_byte_size, pct) =
   handle_unknown_error @@
   with_cache dir @@ fun c ->
   let stats c =
-    Result.map File_cache.Stats.all_keys (File_cache.Stats.of_cache c)
+    Result.map B00_ui.File_cache.Stats.all_keys
+      B00_ui.File_cache.Stats.(of_cache c)
   in
   Result.bind (stats c) @@ fun stats_before ->
   Result.bind (File_cache.trim_size c ~max_byte_size ~pct) @@ fun () ->
   Result.bind (stats c) @@ fun stats_after ->
-  let deleted = File_cache.Stats.keys_sub stats_before stats_after in
-  Log.app (fun m -> m "deleted: %a" File_cache.Stats.pp_keys deleted);
+  let deleted = B00_ui.File_cache.Stats.keys_sub stats_before stats_after in
+  Log.app (fun m -> m "deleted: %a"
+              B00_ui.File_cache.Stats.pp_keys deleted);
   Ok 0
 
 (* Command line interface *)
