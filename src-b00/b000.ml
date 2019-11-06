@@ -145,12 +145,12 @@ module File_cache = struct
     match (Unix.stat src).Unix.st_perm with
     | exception Unix.Unix_error (Unix.EINTR, _, _) -> copy src dst
     | mode ->
-        let fdi = Unix.openfile src Unix.[O_RDONLY] 0 in
-        let fdo = Unix.openfile dst write_flags mode in
+        let fdi = Unix.openfile src Unix.[O_RDONLY; O_CLOEXEC] 0 in
         try
           Os.Fd.apply ~close:Unix.close fdi @@ fun fdi ->
+          let fdo = Unix.openfile dst write_flags mode in
           Os.Fd.apply ~close:Unix.close fdo @@ fun fdo ->
-          Os.Fd.copy ~src:fdi fdo
+          Os.Fd.copy ~src:fdi fdo;
         with
         | e -> unlink_noerr dst; raise e
 
