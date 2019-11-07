@@ -1021,48 +1021,6 @@ module Guard = struct
   let allowed g = match Queue.take g.allowed with
   | exception Queue.Empty -> None
   | o -> Some o
-
-  (* Stuck build anaylsis *)
-
-  let rec add_guarded_ops acc = function
-  | [] -> acc
-  | gop :: gops when Op.status gop.op = Op.Aborted -> add_guarded_ops acc gops
-  | gop :: gops -> add_guarded_ops (Op.Set.add gop.op acc) gops
-
-  let guarded_ops g =
-    let add f st acc = match st with
-    | Blocks gops -> add_guarded_ops acc gops
-    | _ -> acc
-    in
-    Op.Set.elements (Fpath.Map.fold add g.files Op.Set.empty)
-
-  let ready_files g =
-    let add f st acc = match st with Ready -> Fpath.Set.add f acc | _ -> acc in
-    Fpath.Map.fold add g.files Fpath.Set.empty
-
-  let never_files g =
-    let add f st acc = match st with Never -> Fpath.Set.add f acc | _ -> acc in
-    Fpath.Map.fold add g.files Fpath.Set.empty
-
-  let undecided_files g =
-    let add f st acc = match st with Blocks _ -> Fpath.Set.add f acc | _ -> acc
-    in
-    Fpath.Map.fold add g.files Fpath.Set.empty
-
-  let root_undecided_files g =
-    (* We gather ops in a set rather than their writes directly
-       it might be more efficient if ops write many files *)
-    let add_undecided f st (us, gops as acc) = match st with
-    | Blocks ops -> (Fpath.Set.add f us, add_guarded_ops gops ops)
-    | _ -> acc
-    in
-    let add_write acc p = Fpath.Set.add p acc in
-    let add_writes o acc = List.fold_left add_write acc (Op.writes o) in
-    let ops_writes gops = Op.Set.fold add_writes gops Fpath.Set.empty in
-    let init = (Fpath.Set.empty, Op.Set.empty) in
-    let undecided, gops = Fpath.Map.fold add_undecided g.files init in
-    let ops_writes = ops_writes gops in
-    Fpath.Set.diff undecided ops_writes
 end
 
 module Exec = struct

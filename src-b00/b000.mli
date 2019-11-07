@@ -754,7 +754,11 @@ end
        happens once all the files the operation {{!Op.reads}reads} are
        {{!set_file_ready}ready}: they exist and are up-to-date.}
     {- It is {e aborted}. This happens if a file it needs to
-       read {{!set_file_never}never} becomes ready.}} *)
+       read {{!set_file_never}never} becomes ready.}}
+
+    {b Note.} This module does not access the file system it trusts
+    clients that call {!set_file_ready} not to lie about its existence
+    on the file system. *)
 module Guard : sig
 
   (** {1:guards Guards} *)
@@ -791,31 +795,6 @@ module Guard : sig
   (** [allowed g] is an operation that is either ready or aborted
       in [g] (if any). In the second case the {!Op.status} is
       {!Op.Aborted}. *)
-
-  (** {1:stuck Stuck build analysis}
-
-      The following functions are not efficient, only use for stuck
-      build anaylsis or debugging. *)
-
-  val guarded_ops : t -> Op.t list
-  (** [guarded_opts g] is the list of operations that are not ready in [g]. *)
-
-  val ready_files : t -> Fpath.Set.t
-  (** [ready_files g] are the files that got ready in [g]. *)
-
-  val never_files : t -> Fpath.Set.t
-  (** [never_files g] are the files that never got ready in [g]. *)
-
-  val undecided_files : t -> Fpath.Set.t
-  (** [undecided_files g] are the files that neither got ready nor
-      never got ready in [g]. Any file in this set is read by some
-      operation but not yet written by another or made ready. *)
-
-  val root_undecided_files : t -> Fpath.Set.t
-  (** [root_undecided_file g] is like {!undecided_files} but has only
-      the files that are not written by a {!guarded_op} of [g]. If a
-      build is stuck these are files that are not undecided as the result
-      of a guarded operation. *)
 end
 
 (** Build operation executors.
