@@ -763,22 +763,11 @@ module Guard : sig
 
   (** {1:guards Guards} *)
 
-  type feedback =
-  [ `File_status_repeat of Fpath.t
-  | `File_status_unstable of Fpath.t ]
-  (** The type for guard feedbacks:
-      {ul
-      {- [`File_status_repeat f] indicates that the file status of [f]
-         was set more than once.}
-      {- [`File_status_unstable f] indicates that the file status of [f]
-         was set more than once and in an inconsistent manner.}} *)
-
   type t
   (** The type for build operations guards. *)
 
-  val create : ?feedback:(feedback -> unit) -> unit -> t
-  (** [create ~feedback ()] is a new guard, using [feedback] to
-      report inconsistencies (default is a nop.). *)
+  val create : unit -> t
+  (** [create ()] is a new guard. *)
 
   val set_file_ready : t -> Fpath.t -> unit
   (** [set_file_ready g f] indicates to [g] that file [f] is ready,

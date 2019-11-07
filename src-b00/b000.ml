@@ -930,10 +930,6 @@ module Reviver = struct
 end
 
 module Guard = struct
-
-  type feedback =
-    [ `File_status_repeat of Fpath.t | `File_status_unstable of Fpath.t ]
-
   (* The type [gop] holds a guarded operation. It keeps in [awaits]
      the files that need to become ready before the operation [op] can
      be added to the [allowed] queue of the type [t].
@@ -961,17 +957,13 @@ module Guard = struct
   type gop = { op : Op.t; mutable awaits : Fpath.Set.t; }
   type file_status = Ready | Never | Blocks of gop list
   type t =
-    { feedback : feedback -> unit;
-      allowed : Op.t Queue.t;
+    { allowed : Op.t Queue.t;
       mutable files : file_status Fpath.Map.t }
 
-  let create ?(feedback = fun _ -> ()) () =
-    { feedback; allowed = Queue.create (); files = Fpath.Map.empty; }
+  let create () = { allowed = Queue.create (); files = Fpath.Map.empty; }
 
   let set_file_ready g f = match Fpath.Map.find f g.files with
   | exception Not_found -> g.files <- Fpath.Map.add f Ready g.files
-  | Ready -> g.feedback (`File_status_repeat f)
-  | Never -> g.feedback (`File_status_unstable f)
   | Blocks gops ->
       let rem_await g f gop = match Op.status gop.op with
       | Op.Aborted -> ()
@@ -983,11 +975,10 @@ module Guard = struct
       in
       g.files <- Fpath.Map.add f Ready g.files;
       List.iter (rem_await g f) gops
+  | Ready | Never (* weird but ignore *) -> ()
 
   let set_file_never g f = match Fpath.Map.find f g.files with
   | exception Not_found -> g.files <- Fpath.Map.add f Never g.files
-  | Ready -> g.feedback (`File_status_unstable f)
-  | Never -> g.feedback (`File_status_repeat f)
   | Blocks gops ->
       let rem_await g f gop = match Op.status gop.op with
       | Op.Aborted -> ()
@@ -995,6 +986,7 @@ module Guard = struct
       in
       g.files <- Fpath.Map.add f Never g.files;
       List.iter (rem_await g f) gops
+  | Ready (* weird but ignore *) | Never -> ()
 
   let add g o =
     let rec loop g gop awaits files = function
