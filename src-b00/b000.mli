@@ -58,7 +58,6 @@ end
     {b Note.} In general, whenever a cache operation modifies the
     file system and errors with [Error _] the resulting file system
     state is undefined. *)
-
 module File_cache : sig
 
   (** {1:file_cache File caches} *)
@@ -570,10 +569,6 @@ module Op : sig
   val writes : t -> Fpath.t list
   (** [writes o] are the file paths written by [o]. *)
 
-  val did_not_write : t -> Fpath.t list
-  (** [did_not_write o] compares {!writes} with the current state
-      of the file system and reports those files that do not exist on it.  *)
-
   val hash : t -> Hash.t
   (** [hash o] is the operation's hash. This is {!Hash.nil} before the
       operation hash has been effectively computed and set via
@@ -640,6 +635,10 @@ module Op : sig
   module Map : Map.S with type key = t
 
   (** {1:analyze Analyzing operations} *)
+
+  val did_not_write : t -> Fpath.t list
+  (** [did_not_write o] compares {!writes} with the current state
+      of the file system and reports those files that do not exist.  *)
 
   val unwritten_reads : t list -> Fpath.Set.t
   (** [unwritten_reads os] are the file read by [os] that are not written
