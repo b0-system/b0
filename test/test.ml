@@ -8,7 +8,6 @@ open B00
 
 let () =
   Test_fmt.test ();
-  Test_conv.test ();
   Test_fpath.test ();
   Test_cmd.test ();
   Test_base64.test ();
