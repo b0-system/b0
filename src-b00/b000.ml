@@ -857,12 +857,31 @@ module Reviver = struct
 
   (* Recording and reviving operations *)
 
-  let spawn_meta_conv :
-    ((string, string) result option * Os.Cmd.status option) Conv.t
-    =
-    Conv.(pair ~kind:"spawn-meta" ~docvar:"SPAWN"
-            (option (result string_bytes string_bytes))
-            (option os_cmd_status))
+  let encode_spawn_meta b s =
+    let enc_status b = function
+    | `Exited c -> Binc.enc_byte b 0; Binc.enc_int b c
+    | `Signaled c -> Binc.enc_byte b 1; Binc.enc_int b c
+    in
+    let enc_result = Binc.(enc_result ~ok:enc_string ~error:enc_string) in
+    Buffer.reset b;
+    Binc.enc_option enc_result b (Op.Spawn.stdo_ui s);
+    Binc.enc_option enc_status b (Op.Spawn.exit s);
+    Buffer.contents b
+
+  let decode_spawn_meta s = (* raises Failure in case of error *)
+    let dec_status s i =
+      let kind = "Os.Cmd.status" in
+      let next, b = Binc.dec_byte ~kind s i in
+      match b with
+      | 0 -> let i, c = Binc.dec_int s next in i, `Exited c
+      | 1 -> let i, c = Binc.dec_int s next in i, `Signaled c
+      | b -> Binc.err_byte ~kind i b
+    in
+    let dec_result = Binc.(dec_result ~ok:dec_string ~error:dec_string) in
+    let next, stdo_ui = Binc.dec_option dec_result s 0 in
+    let next, status = Binc.dec_option dec_status s next in
+    Binc.dec_eoi s next;
+    (stdo_ui, status)
 
   let file_cache_key o = Hash.to_hex (Op.hash o)
 
@@ -872,14 +891,17 @@ module Reviver = struct
     Result.bind (File_cache.revive r.cache key writes) @@ function
     | None -> Ok false
     | Some m ->
-        Result.bind (Conv.of_bin spawn_meta_conv m) @@ fun (stdo_ui, exit) ->
-        Op.set_revived o true;
-        Op.Spawn.set_stdo_ui s stdo_ui;
-        Op.Spawn.set_exit s exit;
-        Op.set_status o (Op.Spawn.exit_to_status s);
-        Op.invoke_post_exec o;
-        Op.set_time_ended o (timestamp r);
-        Ok true
+        try
+          let stdo_ui, exit = decode_spawn_meta m in
+          Op.set_revived o true;
+          Op.Spawn.set_stdo_ui s stdo_ui;
+          Op.Spawn.set_exit s exit;
+          Op.set_status o (Op.Spawn.exit_to_status s);
+          Op.invoke_post_exec o;
+          Op.set_time_ended o (timestamp r);
+          Ok true
+        with
+        | Failure e -> Fmt.error "revive meta:%s" e
 
   let revive_op r o kind op_kind =
     let key = file_cache_key o in
@@ -907,10 +929,8 @@ module Reviver = struct
         Ok false
 
   let record_spawn r o s =
-    let spawn_meta = Op.Spawn.stdo_ui s, Op.Spawn.exit s in
-    match Conv.to_bin ~buf:r.buffer spawn_meta_conv spawn_meta with
-    | Error _ as e -> e
-    | Ok m -> File_cache.add r.cache (file_cache_key o) m (Op.writes o)
+    let m = encode_spawn_meta r.buffer s in
+    File_cache.add r.cache (file_cache_key o) m (Op.writes o)
 
   let record_write r o w =
     File_cache.add r.cache (file_cache_key o) "" (Op.writes o)

@@ -167,8 +167,8 @@ module Memo = struct
     let o = Op.Notify.v_op ~id ~group:m.c.group ~created ?k kind msg in
     add_op m o
 
-  let warn_reviver_error m o e =
-    notify_op m `Warn (Fmt.str "@[op %d: cache error: %s@]" (Op.id o) e)
+  let notify_reviver_error m kind o e =
+    notify_op m kind (Fmt.str "@[cache error: op %d: %s@]" (Op.id o) e)
 
   let fail m fmt =
     let k msg = notify_op m `Fail msg; raise Fail in
@@ -228,7 +228,7 @@ module Memo = struct
               discontinue_op m o
           | Error e ->
               begin match Op.did_not_write o with
-              | [] -> warn_reviver_error m o e; continue_op m o
+              | [] -> notify_reviver_error m `Warn o e; continue_op m o
               | miss ->
                   Op.set_status o (Op.Failed (Op.Missing_writes miss));
                   discontinue_op m o
@@ -254,7 +254,10 @@ module Memo = struct
           begin match Reviver.revive m.m.reviver o with
           | Ok false -> Exec.schedule m.m.exec o
           | Ok true -> finish_op m o
-          | Error e -> warn_reviver_error m o e; Exec.schedule m.m.exec o
+          | Error e ->
+              (* It's not really interesting to warn here. Also entails
+                 that cache format changes trips out people a bit less. *)
+              notify_reviver_error m `Info o e; Exec.schedule m.m.exec o
           end
       end
   | Op.Done | Op.Failed _ -> assert false
