@@ -157,7 +157,6 @@ module Memo : sig
 
   type feedback =
   [ `Miss_tool of Tool.t * string
-  | `Op_cache_error of B000.Op.t * string
   | `Op_complete of B000.Op.t ]
   (** The type for memoizer feedback. *)
 

@@ -83,7 +83,6 @@ end
 module Memo = struct
   type feedback =
   [ `Miss_tool of Tool.t * string
-  | `Op_cache_error of Op.t * string
   | `Op_complete of Op.t ]
 
   type t = { c : ctx; m : memo }
@@ -168,6 +167,9 @@ module Memo = struct
     let o = Op.Notify.v_op ~id ~group:m.c.group ~created ?k kind msg in
     add_op m o
 
+  let warn_reviver_error m o e =
+    notify_op m `Warn (Fmt.str "@[op %d: cache error: %s@]" (Op.id o) e)
+
   let fail m fmt =
     let k msg = notify_op m `Fail msg; raise Fail in
     Fmt.kstr k fmt
@@ -225,9 +227,8 @@ module Memo = struct
               Op.set_status o (Op.Failed (Op.Missing_writes miss));
               discontinue_op m o
           | Error e ->
-              m.m.feedback (`Op_cache_error (o, e));
               begin match Op.did_not_write o with
-              | [] -> continue_op m o
+              | [] -> warn_reviver_error m o e; continue_op m o
               | miss ->
                   Op.set_status o (Op.Failed (Op.Missing_writes miss));
                   discontinue_op m o
@@ -241,23 +242,19 @@ module Memo = struct
   | Op.Waiting ->
       begin match Reviver.hash_op m.m.reviver o with
       | Error e ->
-          begin match Op.cannot_read o with
-          | [] ->
-              m.m.feedback (`Op_cache_error (o, e));
-              Op.set_status o Op.Aborted;
-              discontinue_op m o
-          | reads ->
-              Op.set_status o (Op.Failed (Op.Missing_reads reads));
-              discontinue_op m o
-          end
+          (* XXX Add Op.Failed_hash failure instead of abusing Op.Exec ? *)
+          let status = match Op.cannot_read o with
+          | [] -> Op.Failed (Op.Exec (Some (Fmt.str "op hash error: %s" e)))
+          | reads -> Op.Failed (Op.Missing_reads reads)
+          in
+          Op.set_status o status;
+          discontinue_op m o
       | Ok hash ->
           Op.set_hash o hash;
           begin match Reviver.revive m.m.reviver o with
           | Ok false -> Exec.schedule m.m.exec o
           | Ok true -> finish_op m o
-          | Error e ->
-              m.m.feedback (`Op_cache_error (o, e));
-              Exec.schedule m.m.exec o
+          | Error e -> warn_reviver_error m o e; Exec.schedule m.m.exec o
           end
       end
   | Op.Done | Op.Failed _ -> assert false

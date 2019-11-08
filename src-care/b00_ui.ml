@@ -429,8 +429,6 @@ module Memo = struct
         then (B000_conv.Op.pp_ui ~sep ~op_howto ppf o)
     | `Miss_tool (t, e) when level >= Log.Error ->
         Fmt.pf ppf "@[<v>Missing tool:@,%s@]%a" e sep ()
-    | `Op_cache_error (op, e) when level >= Log.Error ->
-        Fmt.pf ppf "@[op %d: cache error: %s@]%a" (B000.Op.id op) e sep ()
     | _ ->  ()
 
   let pp_failed ppf () = Fmt.(tty [`Fg `Red] string) ppf  "FAILED"
