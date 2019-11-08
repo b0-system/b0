@@ -369,7 +369,6 @@ module Memo = struct
        introduce a stat cache and propagate it everywhere in B000 *)
     Guard.set_file_ready m.m.guard p
 
-
   let read m file k =
     let id = new_op_id m and created = timestamp m in
     let k o =

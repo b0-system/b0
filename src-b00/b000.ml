@@ -295,7 +295,7 @@ module File_cache = struct
     try
       let kdir = key_dir c k in
       if not (Fs.mkdir kdir) then Fs.dir_delete_files kdir;
-      let filenum_width = List.length fs in
+      let filenum_width = filenum_width (List.length fs) in
       let rec loop i = function
       | [] -> Fs.write_file (kdir ^ key_meta_filename) meta; true
       | f :: fs ->
