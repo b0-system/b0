@@ -37,6 +37,9 @@ module Op = struct
   let pp_did_not_write ppf fs =
     Fmt.pf ppf "@[<v>Did not write:@,%a@]" (Fmt.list pp_file_write) fs
 
+  let pp_cannot_read ppf fs =
+    Fmt.pf ppf "@[<v>Cannot read:@,%a@]" (Fmt.list pp_file_write) fs
+
   let pp_spawn_exit ppf = function
   | Some (`Exited c) -> (Fmt.brackets Fmt.int) ppf c
   | Some (`Signaled c) -> (Fmt.brackets Fmt.(any "signaled:" ++ Fmt.int)) ppf c
@@ -144,6 +147,7 @@ module Op = struct
         | Op.Exec None -> ()
         | Op.Exec (Some m) -> Fmt.cut ppf (); Fmt.lines ppf m
         | Op.Missing_writes fs -> Fmt.cut ppf (); pp_did_not_write ppf fs
+        | Op.Missing_reads fs -> Fmt.cut ppf (); pp_cannot_read ppf fs
         end
     | _ -> ()
 
@@ -230,6 +234,7 @@ module Op = struct
           Fmt.pf ppf "@[%a: @[%a@]@]@,"
             (Fmt.tty_string style_err) "error" Fmt.lines e;
       | Op.Missing_writes fs -> pp_did_not_write ppf fs; Fmt.cut ppf ()
+      | Op.Missing_reads fs -> pp_cannot_read ppf fs; Fmt.cut ppf ()
       end;
       pp ppf o
   | _ -> pp ppf o
@@ -357,6 +362,7 @@ module Op = struct
   let enc_failure b = function
   | Op.Exec msg -> Binc.enc_byte b 0; (Binc.enc_option Binc.enc_string) b msg
   | Op.Missing_writes fs -> Binc.enc_byte b 1; Binc.enc_list Binc.enc_fpath b fs
+  | Op.Missing_reads fs -> Binc.enc_byte b 2; Binc.enc_list Binc.enc_fpath b fs
 
   let dec_failure s i =
     let kind = "Op.failure" in
@@ -368,6 +374,9 @@ module Op = struct
     | 1 ->
         let i, fs = Binc.dec_list Binc.dec_fpath s next in
         i, Op.Missing_writes fs
+    | 2 ->
+        let i, fs = Binc.dec_list Binc.dec_fpath s next in
+        i, Op.Missing_reads fs
     | b -> Binc.err_byte ~kind i b
 
   let enc_status b = function

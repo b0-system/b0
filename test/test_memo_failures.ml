@@ -13,11 +13,27 @@ let echo m ~reads ~writes f msg =
   let echo = Memo.tool m echo in
   Memo.spawn m ~reads ~writes ~stdout:(`File f) @@ echo (Cmd.arg msg)
 
+let cannot_read build_dir m =
+  let cat = Memo.tool m cat in
+  let f file = Fpath.(build_dir / file) in
+  let r = f "nosuchfile" in
+  let w = f "out" in
+  Memo.file_ready m r;
+  Memo.spawn m ~reads:[r] ~writes:[w] ~stdout:(`File w) @@
+  cat Cmd.(path r)
+
+let did_not_write build_dir m =
+  let f p = Fpath.(build_dir // p) in
+  echo m ~reads:[] ~writes:[f (Fpath.v "heyho/bla"); f (Fpath.v "bli")]
+    Os.File.null "echoooo"
+
 let failures build_dir m =
   let f file = Fpath.(build_dir / file) in
   let cat = Memo.tool m cat in
   let r = f "doesnotexist" and o = f "o" in
   Memo.spawn m ~reads:[] ~writes:[o] ~stdout:(`File o) @@ cat (Cmd.path r)
+
+(* Test stuck builds *)
 
 let never_ready build_dir m =
   let f file = Fpath.(build_dir / file) in
@@ -47,6 +63,8 @@ let cycle2 build_dir m =
   echo m ~reads:[c1] ~writes:[c2] c2 "c2"
 
 let test_failures () =
+  with_memo did_not_write;
+  with_memo cannot_read;
   with_memo failures;
   with_memo never_ready;
   with_memo cycle0;

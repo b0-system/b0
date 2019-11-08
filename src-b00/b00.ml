@@ -241,11 +241,15 @@ module Memo = struct
   | Op.Waiting ->
       begin match Reviver.hash_op m.m.reviver o with
       | Error e ->
-          (* FIXME Does this report errors cleanly ? We really want to
-             be able to say which reads were supposed to be there and are not *)
-          m.m.feedback (`Op_cache_error (o, e));
-          Op.set_status o Op.Aborted; (* FIXME add a case *)
-          finish_op m o
+          begin match Op.cannot_read o with
+          | [] ->
+              m.m.feedback (`Op_cache_error (o, e));
+              Op.set_status o Op.Aborted;
+              discontinue_op m o
+          | reads ->
+              Op.set_status o (Op.Failed (Op.Missing_reads reads));
+              discontinue_op m o
+          end
       | Ok hash ->
           Op.set_hash o hash;
           begin match Reviver.revive m.m.reviver o with
@@ -362,7 +366,13 @@ module Memo = struct
 
   (* Files *)
 
-  let file_ready m p = Guard.set_file_ready m.m.guard p
+  let file_ready m p =
+    (* XXX Maybe we should really test for file existence here and notify
+       a failure if it doesn't exist. But also maybe we should
+       introduce a stat cache and propagate it everywhere in B000 *)
+    Guard.set_file_ready m.m.guard p
+
+
   let read m file k =
     let id = new_op_id m and created = timestamp m in
     let k o =

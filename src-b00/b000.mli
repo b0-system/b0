@@ -154,6 +154,7 @@ module Op : sig
   type failure =
   | Exec of string option (** Execution failure with a potential error msg. *)
   | Missing_writes of Fpath.t list (** Write specification failure. *)
+  | Missing_reads of Fpath.t list (** Read synchronisation failure. *)
   (** The type for operation failures. *)
 
   type status =
@@ -640,6 +641,10 @@ module Op : sig
   (** [did_not_write o] compares {!writes} with the current state
       of the file system and reports those files that do not exist.  *)
 
+  val cannot_read : t -> Fpath.t list
+  (** [cannot_read o] compares {!reads} with the current state
+      of the file system and reports those files that cannot be read. *)
+
   val unwritten_reads : t list -> Fpath.Set.t
   (** [unwritten_reads os] are the file read by [os] that are not written
       by those. *)
@@ -704,7 +709,8 @@ module Reviver : sig
 
   val hash_op : t -> Op.t -> (Hash.t, string) result
   (** [hash_op r o] hashes the operation [o]. Errors if an input
-      file of the build operation can't be hashed. *)
+      file of the build operation can't be hashed, this is most
+      likely because an input file does not exist. *)
 
   val file_hashes : t -> Hash.t Fpath.Map.t
   (** [file_hashes r] is a map of the files that were hashed. *)

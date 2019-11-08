@@ -310,7 +310,7 @@ module Op = struct
     in
     let ids =
       let doc = "Select operation with identifier $(docv). Repeatable." in
-      Arg.(value & opt_all int [] & info ["o"; "id"] ~doc ?docs ~docv:"ID")
+      Arg.(value & opt_all int [] & info ["id"] ~doc ?docs ~docv:"ID")
     in
     let hashes =
       let doc = "Select operation with hash $(docv). Repeatable." in
@@ -412,7 +412,7 @@ module Memo = struct
   let pp_faint pp = Fmt.tty [`Faint] pp
   let read_howto = Fmt.any "b00-log -r "
   let write_howto = Fmt.any "b00-log -w "
-  let op_howto ppf o = Fmt.pf ppf "b00-log -o %d" (B000.Op.id o)
+  let op_howto ppf o = Fmt.pf ppf "b00-log --id %d" (B000.Op.id o)
   let pp_howto_file howto = Fmt.(pp_faint howto ++ B000_conv.Op.pp_file_write)
   let pp_leveled_feedback
       ?(sep = Fmt.flush_nl) ?(op_howto = op_howto) ~show_op ~show_ui ~level

@@ -380,7 +380,11 @@ module Op = struct
 
   (* Operation status *)
 
-  type failure = Exec of string option | Missing_writes of Fpath.t list
+  type failure =
+  | Exec of string option
+  | Missing_writes of Fpath.t list
+  | Missing_reads of Fpath.t list
+
   type status = Aborted | Done | Failed of failure | Waiting
   let status_to_string = function
   | Aborted -> "aborted" | Done -> "done" | Waiting -> "waiting"
@@ -390,7 +394,10 @@ module Op = struct
       | Exec (Some msg) -> Fmt.str "failed: %s" msg
       | Missing_writes fs ->
           Fmt.str "@[<v>failed: Did not write:@,%a@]"
-            (Fmt.list (Fmt.bold Fpath.pp_unquoted)) fs
+            (Fmt.list Fpath.pp_quoted) fs
+      | Missing_reads fs ->
+          Fmt.str "@[<v>failed: Could not read:@,%a@]"
+            (Fmt.list Fpath.pp_quoted) fs
 
   (* Operation kinds *)
 
@@ -695,15 +702,17 @@ module Op = struct
 
   (* Operation analyses *)
 
+  let rec access f acc = try Unix.access (Fpath.to_string f) acc; true with
+  | Unix.Unix_error (Unix.EINTR, _, _) -> access f acc
+  | _ -> false
+
+  let cannot_read o =
+    let add acc f = if access f Unix.[F_OK; R_OK] then acc else f :: acc in
+    List.sort Fpath.compare @@ List.fold_left add [] o.reads
+
   let did_not_write o =
-    let rec loop acc = function
-    | [] -> List.sort Fpath.compare acc
-    | f :: fs ->
-        match Unix.access (Fpath.to_string f) [Unix.F_OK] with
-        | exception Unix.Unix_error _ -> loop (f :: acc) fs
-        | () -> loop acc fs
-    in
-    loop [] o.writes
+    let add acc f = if access f [Unix.F_OK] then acc else f :: acc in
+    List.sort Fpath.compare @@ List.fold_left add [] o.writes
 
   let unwritten_reads os =
     let add_path acc p = Fpath.Set.add p acc in
