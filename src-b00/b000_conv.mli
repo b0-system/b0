@@ -11,6 +11,14 @@ open B000
 (** {!B000.Op} converters *)
 module Op : sig
 
+  (** {1:to_string Stringifiers} *)
+
+  val status_to_string : Op.status -> string
+  (** [status_to_string s] is [s] as a string. *)
+
+  val notify_kind_to_string : Op.Notify.kind -> string
+  (** [notify_kind_to_string k] is [k] as a string. *)
+
   (** {1:fmt Formatters} *)
 
   val pp_file_read : Fpath.t Fmt.t

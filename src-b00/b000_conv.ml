@@ -8,6 +8,22 @@ open B000
 
 module Op = struct
 
+  let failure_to_string = function
+  | Op.Exec None -> "failed"
+  | Op.Exec (Some msg) -> Fmt.str "failed: %s" msg
+  | Op.Missing_writes fs ->
+      Fmt.str "@[<v>failed: Did not write:@,%a@]" (Fmt.list Fpath.pp_quoted) fs
+  | Op.Missing_reads fs ->
+      Fmt.str "@[<v>failed: Could not read:@,%a@]" (Fmt.list Fpath.pp_quoted) fs
+
+  let status_to_string = function
+  | Op.Aborted -> "aborted" | Op.Done -> "done" | Op.Waiting -> "waiting"
+  | Op.Failed f -> failure_to_string f
+
+  let notify_kind_to_string = function
+  | `End -> "end" | `Fail -> "fail" | `Info -> "info" | `Start -> "start"
+  | `Warn -> "warn"
+
   (* Formatting *)
 
   let style_op_id = [ `Bold ]

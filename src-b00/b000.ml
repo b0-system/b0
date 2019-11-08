@@ -386,18 +386,6 @@ module Op = struct
   | Missing_reads of Fpath.t list
 
   type status = Aborted | Done | Failed of failure | Waiting
-  let status_to_string = function
-  | Aborted -> "aborted" | Done -> "done" | Waiting -> "waiting"
-  | Failed f ->
-      match f with
-      | Exec None -> "failed"
-      | Exec (Some msg) -> Fmt.str "failed: %s" msg
-      | Missing_writes fs ->
-          Fmt.str "@[<v>failed: Did not write:@,%a@]"
-            (Fmt.list Fpath.pp_quoted) fs
-      | Missing_reads fs ->
-          Fmt.str "@[<v>failed: Could not read:@,%a@]"
-            (Fmt.list Fpath.pp_quoted) fs
 
   (* Operation kinds *)
 
@@ -572,10 +560,6 @@ module Op = struct
 
   module Notify = struct
     type kind = notify_kind
-    let kind_to_string = function
-    | `End -> "end" | `Fail -> "fail" | `Info -> "info" | `Start -> "start"
-    | `Warn -> "warn"
-
     type t = notify
     let v ~kind ~msg = { notify_kind = kind; notify_msg = msg }
     let get o = match o.kind with Notify n -> n | _ -> assert false

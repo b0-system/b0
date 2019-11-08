@@ -164,9 +164,6 @@ module Op : sig
   | Waiting  (** Waiting for execution. *)
   (** The type for operation statuses. *)
 
-  val status_to_string : status -> string
-  (** [status_to_string s] is [s] as a string. *)
-
   (** {1:op Operations} *)
 
   type id = int
@@ -281,9 +278,6 @@ module Op : sig
 
     type kind = [ `End | `Fail | `Info | `Start | `Warn ]
     (** The type for kinds of notifications. *)
-
-    val kind_to_string : kind -> string
-    (** [kind_to_string k] is [k] as a string. *)
 
     val v_op :
       id:id -> group:group -> created:Time.span -> ?post_exec:(op -> unit) ->

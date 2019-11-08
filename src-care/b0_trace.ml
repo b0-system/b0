@@ -46,7 +46,9 @@ module Trace_event = struct
         obj |> Jsong.mem "dir" (fpath (Op.Mkdir.dir m))
     | Op.Notify n ->
         obj
-        |> Jsong.mem "kind" (Jsong.string Op.Notify.(kind_to_string (kind n)))
+        |> Jsong.mem "kind"
+          (Jsong.string
+             (B000_conv.Op.notify_kind_to_string (B000.Op.Notify.kind n)))
         |> Jsong.mem "msg" (Jsong.string (Op.Notify.msg n))
     | Op.Read r ->
         obj |> Jsong.mem "file" (fpath (Op.Read.file r))
@@ -71,7 +73,8 @@ module Trace_event = struct
     Jsong.obj
     |> Jsong.mem "kind" (Jsong.string (Op.kind_name (Op.kind o)))
     |> Jsong.mem "group" (Jsong.string (Op.group o))
-    |> Jsong.mem "status" (Jsong.string (Op.status_to_string (Op.status o)))
+    |> Jsong.mem "status"
+      (Jsong.string (B000_conv.Op.status_to_string (Op.status o)))
     |> Jsong.mem "revived" (Jsong.bool (Op.revived o))
     |> Jsong.mem "writes" (Jsong.(list fpath) (Op.writes o))
     |> Jsong.mem "time-created" (span_us (Op.time_created o))
