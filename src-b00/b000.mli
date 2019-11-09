@@ -647,17 +647,40 @@ module Op : sig
   (** [write_map os] are the file written by [os] mapped to the
       operation that writes them. If one of the operation sets is not
       a singleton the operations should likely not be run
-      toghether, see {!single_writes}. *)
-
-  val single_writes : t list -> bool
-  (** [single_writes os] is [true] iff for each couple in [os] their
-      {!writes} do not intersect. *)
+      toghether. *)
 
   val find_read_write_cycle : t list -> t list option
   (** [find_read_write_cycle os] is [Some cs] if there exists a
       read/write cycle among the operations [os]. This means each each
       element of [cs] writes a file read by its successor in the list
       with the successor of the last element being the first. *)
+
+  type aggregate_error =
+  | Failures (** Some operations failed. *)
+  | Cycle of t list (** Dependency cycle. *)
+  | Never_became_ready of Fpath.Set.t (** Some files never became ready. *)
+  (** The type for errors related to a {e list} of operations. This is:
+      {ul
+      {- [Failures], if there is one or more operations in the list that
+         {!Failed} (and hence for a {!B00.Memo} also if a fiber failed,
+         see {{!B00.Memo.fiber}here}).}
+      {- [Cycle ops], if there is a set of {!Waiting} operations
+         in the list whose individual reads and writes leads to a dependency
+         cycle. See also {!find_read_write_cycle}.}
+      {- [Never_became_ready fs], with [fs] files that are in
+         the reads of {!Waiting} operations but are written
+         by no operation from the list.}}
+      Note that formally more than one of these conditions can be true
+      at the same time. But [Never_became_ready] is only reported once
+      the first two kind of errors have been ruled out. The reason is
+      that those files that never became ready may be created by
+      continuations of the failed or cyclic operations and reporting
+      them would not lead the user to focus on the right cause. *)
+
+  val find_aggregate_error : t list -> (unit, aggregate_error) result
+  (** [find_aggregate_error os] finds an aggregate error among the list of
+      operation [os]. This is [Ok ()] if all operations [os]
+      {!Executed}. *)
 end
 
 (** Build operation revivers.

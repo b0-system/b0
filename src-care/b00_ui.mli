@@ -215,7 +215,7 @@ module Memo : sig
 
   val pp_error :
     ?sep:unit Fmt.t -> ?read_howto:Fpath.t Fmt.t ->
-    ?write_howto:Fpath.t Fmt.t -> unit ->  B00.Memo.error Fmt.t
+    ?write_howto:Fpath.t Fmt.t -> unit ->  B000.Op.aggregate_error Fmt.t
   (** [pp_error ~read_howto ~write_howto] formats a memo
       error followed by [sep] iff somethings is printed (defaults
       to {!Fmt.flush_nl}). The errors are formatted as follows:

@@ -277,40 +277,7 @@ module Memo = struct
 
   let add_op_and_stir m o = add_op m o; stir ~block:false m
 
-  (* Memo status
-
-     XXX Formally the analysis depends only on an list of ops maybe we
-     could move this to B000.Op. *)
-
-  type error =
-  | Failures
-  | Cycle of B000.Op.t list
-  | Never_became_ready of Fpath.Set.t
-  (* More than one of these condition may be true at the same time. It
-     is however important not to try to detect and report
-     [Never_became_ready] when [Failures] happens as those files that
-     never became ready may be created by continuations of the
-     failures and that would not lead the user to focus on the right
-     thing. It's also better to report [Cycle]s before for this
-     reason. *)
-
-  let ops_status os =
-    let rec loop ws = function
-    | [] ->
-        if ws = [] then Ok () else
-        begin match Op.find_read_write_cycle ws with
-        | Some os -> Error (Cycle os)
-        | None -> Error (Never_became_ready (Op.unwritten_reads ws))
-        end
-    | o :: os ->
-        match Op.status o with
-        | Op.Done -> loop ws os
-        | Op.Waiting -> loop (o :: ws) os
-        | Op.Aborted | Op.Failed _ -> Error Failures
-    in
-    loop [] os
-
-  let status m = ops_status m.m.ops
+  let status m = B000.Op.find_aggregate_error (ops m)
 
   (* Futures *)
 

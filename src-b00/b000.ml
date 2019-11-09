@@ -709,18 +709,13 @@ module Op = struct
     in
     loop Fpath.Set.empty Fpath.Set.empty os
 
-  let _write_map ~check_single os =
+  let write_map os =
     let add_write o acc w = match Fpath.Map.find w acc with
     | exception Not_found -> Fpath.Map.add w (Set.singleton o) acc
-    | os when check_single -> raise Exit
     | os -> Fpath.Map.add w (Set.add o os) acc
     in
     let add_writes acc o = List.fold_left (add_write o) acc (writes o) in
     List.fold_left add_writes Fpath.Map.empty os
-
-  let write_map = _write_map ~check_single:false
-  let single_writes os =
-    try ignore (_write_map ~check_single:true os); true with Exit -> false
 
   let op_deps ~write_map o =
       let add_read_deps acc r = match Fpath.Map.find r write_map with
@@ -763,6 +758,28 @@ module Op = struct
         | `No_cycle visited -> loop write_map visited os
     in
     loop (write_map os) Set.empty os
+
+
+  type aggregate_error =
+  | Failures
+  | Cycle of t list
+  | Never_became_ready of Fpath.Set.t
+
+  let find_aggregate_error os =
+    let rec loop ws = function
+    | [] ->
+        if ws = [] then Ok () else
+        begin match find_read_write_cycle ws with
+        | Some os -> Error (Cycle os)
+        | None -> Error (Never_became_ready (unwritten_reads ws))
+        end
+    | o :: os ->
+        match status o with
+        | Done -> loop ws os
+        | Waiting -> loop (o :: ws) os
+        | Aborted | Failed _ -> Error Failures
+    in
+    loop [] os
 end
 
 module Reviver = struct

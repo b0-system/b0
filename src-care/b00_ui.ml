@@ -493,9 +493,9 @@ module Memo = struct
 
   let pp_error ?(sep = Fmt.flush_nl) ?read_howto ?write_howto () ppf =
     function
-    | B00.Memo.Failures -> ()
-    | B00.Memo.Cycle ops -> pp_ops_cycle ?write_howto ppf ops; sep ppf ()
-    | B00.Memo.Never_became_ready fs ->
+    | B000.Op.Failures -> ()
+    | B000.Op.Cycle ops -> pp_ops_cycle ?write_howto ppf ops; sep ppf ()
+    | B000.Op.Never_became_ready fs ->
         pp_never_ready ?read_howto ppf fs; sep ppf ()
 
   (* Cli *)

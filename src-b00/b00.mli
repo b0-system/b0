@@ -221,29 +221,14 @@ module Memo : sig
       blocks until the memoizer is stuck with no operation and fibers to
       execute. *)
 
-  type error =
-  | Failures (** Some operations failed. *)
-  | Cycle of B000.Op.t list (** Cyclic dependency. *)
-  | Never_became_ready of Fpath.Set.t (** Some files never became ready. *)
-  (** The type for memo finish errors.  *)
-
-  val status : t -> (unit, error) result
-  (** [status m] looks [ops m] and returns:
-      {ul
-      {- [Ok ()], if all operations in [m] {!B000.Op.Executed}.}
-      {- [Error Failures], if there exists an operation that {!B000.Op.Failed}
-         (and hence also if a fiber failed, see {{!fiber}here}).}
-      {- [Error (Cycle ops)], if there is a set of {!B000.Op.Waiting}
-         operations whose individual reads and writes leads to a dependency
-         cycle.}
-      {- [Error (Never_became_ready fs)], with [fs] files that are in
-         the reads of {!B000.Op.Waiting} operations but are written
-         by no known operation.}}
+  val status : t -> (unit, B000.Op.aggregate_error) result
+  (** [status m] looks for aggregate errors in [m] in [ops m], see
+      {!B000.Op.aggregate_error} for details.
 
       Usually called after a blocking {!stir} to check everything
-      executed as expected. The function itself has no effect more and
-      can be added on [m] afterwards. If you are only interested in
-      checking if a failure occured in the memo {!has_failures} is
+      executed as expected. The function itself has no effect more
+      operations can be on [m] afterwards. If you are only interested
+      in checking if a failure occured in the memo {!has_failures} is
       faster. *)
 
   val delete_trash : block:bool -> t -> (unit, string) result
