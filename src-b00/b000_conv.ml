@@ -620,6 +620,8 @@ module Op = struct
     let i, kind = dec_kind s i in
     i, Op.v id ~group ~time_created ~time_started ~duration ~revived
       ~status ~reads ~writes ~hash ~k kind
+
+  let binc = Binc.v enc dec
 end
 
 (*---------------------------------------------------------------------------

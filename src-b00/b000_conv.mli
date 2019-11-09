@@ -43,13 +43,8 @@ module Op : sig
   val pp : Op.t Fmt.t
   (** [pp] formats a build operation with full details. *)
 
-  (** {1:bin_serial Binary serialization} *)
-
-  val enc : Op.t Binc.enc
-  (** [enc] binary encodes an operation. *)
-
-  val dec : Op.t Binc.dec
-  (** [dec] binary decodes an operation. *)
+  val binc : Op.t Binc.t
+  (** [binc] binary codecs an operation. *)
 end
 
 (*---------------------------------------------------------------------------

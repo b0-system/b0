@@ -618,16 +618,16 @@ module Memo = struct
 
     let log_to_string info ops =
       let b = Buffer.create (1024 * 1024) in
-      Binc.enc_magic b magic;
+      Binc.enc_magic magic b ();
       enc_info b info;
-      Binc.enc_list B000_conv.Op.enc b ops;
+      Binc.enc_list (Binc.enc B000_conv.Op.binc) b ops;
       Buffer.contents b
 
     let log_of_string ?(file = Os.File.dash) s =
       try
-        let i = Binc.dec_magic s 0 magic in
+        let i, () = Binc.dec_magic magic s 0 in
         let i, info = dec_info s i in
-        let i, ops = Binc.dec_list B000_conv.Op.dec s i in
+        let i, ops = Binc.dec_list (Binc.dec (B000_conv.Op.binc)) s i in
         Binc.dec_eoi s i;
         Ok (info, ops)
       with

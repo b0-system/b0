@@ -3960,7 +3960,13 @@ end
 (* Binary encoding *)
 
 module Binc = struct
+
+  (* Encoders *)
+
   type 'a enc = Buffer.t -> 'a -> unit
+
+  (* Decoders *)
+
   type 'a dec = string -> int -> int * 'a
 
   let err i fmt = Fmt.failwith_notrace ("%d: " ^^ fmt) i
@@ -3977,13 +3983,26 @@ module Binc = struct
     if i = String.length s then () else
     err i "expected end of input (len: %d)" (String.length s)
 
-  let enc_magic b magic = Buffer.add_string b magic
-  let dec_magic s i magic =
+  (* Codecs *)
+
+  type 'a t = { enc : 'a enc; dec : 'a dec }
+  let v enc dec = { enc; dec }
+  let enc c = c.enc
+  let dec c = c.dec
+
+  (* Magic numbers *)
+
+  let enc_magic magic b () = Buffer.add_string b magic
+  let dec_magic magic s i =
     let next = i + String.length magic in
     check_next ~kind:magic s i next;
     let magic' = String.subrange ~first:i ~last:(next - 1) s in
-    if String.equal magic magic' then next else
+    if String.equal magic magic' then next, () else
     err i "magic mismatch: %S but expected %S" magic' magic
+
+  let magic magic = v (enc_magic magic) (dec_magic magic)
+
+  (* Bytes *)
 
   let enc_byte b n =
     Buffer.add_char b (Char.chr (n land 0xFF)) [@@ocaml.inline]
@@ -3995,6 +4014,10 @@ module Binc = struct
     next, b
   [@@ocaml.inline]
 
+  let byte ~kind = v enc_byte (dec_byte ~kind)
+
+  (* unit *)
+
   let enc_unit b () = enc_byte b 0
   let dec_unit s i =
     let kind = "unit" in
@@ -4002,6 +4025,10 @@ module Binc = struct
     match b with
     | 0 -> next, ()
     | b -> err_byte ~kind i b
+
+  let unit = v enc_unit dec_unit
+
+  (* bool *)
 
   let enc_bool b bool = enc_byte b (if bool then 1 else 0)
   let dec_bool s i =
@@ -4011,6 +4038,10 @@ module Binc = struct
     | 0 -> next, false
     | 1 -> next, true
     | b -> err_byte ~kind i b
+
+  let bool = v enc_bool dec_bool
+
+  (* int *)
 
   let enc_int b n =
     let w = enc_byte in
@@ -4029,6 +4060,10 @@ module Binc = struct
     let b4 = r s (i + 4) and b5 = r s (i + 5)
     and b6 = r s (i + 6) and b7 = r s (i + 7) in
     next, (b7 lsl 56) lor (b6 lsl 48) lor (b5 lsl 40) lor (b4 lsl 32) lor n
+
+  let int = v enc_int dec_int
+
+  (* int64 *)
 
   let enc_int64 b i =
     (* XXX From 4.08 on use Buffer.add_int64_le *)
@@ -4053,15 +4088,20 @@ module Binc = struct
     check_next ~kind:"int64" s i next;
     next, unsafe_get_int64_le s i
 
-  let enc_string b s =
-    enc_int b (String.length s);
-    Buffer.add_string b s
+  let int64 = v enc_int64 dec_int64
 
+  (* string *)
+
+  let enc_string b s = enc_int b (String.length s); Buffer.add_string b s
   let dec_string s i =
     let i, len = dec_int s i in
     let next = i + len in
     check_next ~kind:"string" s i next;
     next, String.sub s i len
+
+  let string = v enc_string dec_string
+
+  (* fpath *)
 
   let enc_fpath b p = enc_string b (Fpath.to_string p)
   let dec_fpath s i =
@@ -4069,6 +4109,10 @@ module Binc = struct
     match Fpath.of_string s with
     | Error e -> err i "corrupted file path value: %s" e
     | Ok p -> next, p
+
+  let fpath = v enc_fpath dec_fpath
+
+  (* list *)
 
   let enc_list el b l =
     let rec loop len acc = function
@@ -4089,9 +4133,13 @@ module Binc = struct
     in
     loop el s i count []
 
-  let enc_option w b = function
+  let list c = v (enc_list c.enc) (dec_list c.dec)
+
+  (* option *)
+
+  let enc_option some b = function
   | None -> enc_byte b 0
-  | Some v -> enc_byte b 1; w b v
+  | Some v -> enc_byte b 1; some b v
 
   let dec_option some s i =
     let kind = "option" in
@@ -4100,6 +4148,10 @@ module Binc = struct
     | 0 -> next, None
     | 1 -> let i, v = some s next in i, Some v
     | b -> err_byte ~kind i b
+
+  let option c = v (enc_option c.enc) (dec_option c.dec)
+
+  (* result *)
 
   let enc_result ~ok ~error b = function
   | Ok v -> enc_byte b 0; ok b v
@@ -4112,6 +4164,10 @@ module Binc = struct
     | 0 -> let i, v = ok s next in i, Ok v
     | 1 -> let i, e = error s next in i, Error e
     | b -> err_byte ~kind i b
+
+  let result ~ok ~error =
+    v (enc_result ~ok:ok.enc ~error:error.enc)
+      (dec_result ~ok:ok.dec ~error:error.dec)
 end
 
 (*---------------------------------------------------------------------------
