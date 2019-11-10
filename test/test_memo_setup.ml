@@ -29,7 +29,7 @@ let with_memo ?jobs f =
   | Ok () -> ()
   | Error e -> (B00_ui.Memo.pp_error ()) Fmt.stderr e
   end;
-  Log.if_error ~use:() (B00_ui.Memo.Log.write_file log_file m);
+  Log.if_error ~use:() (B00_ui.Memo.Log.(write log_file (of_memo m)));
   Ok ()
 
 (*---------------------------------------------------------------------------

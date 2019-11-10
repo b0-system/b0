@@ -3051,6 +3051,15 @@ module Binc : sig
   val dec : 'a t -> 'a dec
   (** [dec c] is [c]'s decoder. *)
 
+  val to_string : ?buf:Buffer.t -> 'a t -> 'a -> string
+  (** [encode c v] encodes [v] using [c] (and [buf] if provided, it is
+      the client's duty to reset it before an encoding). *)
+
+  val of_string : ?file:Fpath.t -> 'a t -> string -> ('a, string) result
+  (** [of_string ~file c s] decodes a value from [s] using [c] and
+      {!dec_eoi}. In case of error [file] is mentioned in the error
+      message (defaults to {!Os.File.dash}). *)
+
   (** {1:base Base codecs} *)
 
   (** {2:magics Magic numbers} *)

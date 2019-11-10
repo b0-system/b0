@@ -27,7 +27,7 @@ module Cli : sig
       to specify short and long output format, without options this is
       [`Normal]. [short_opts] defaults to [["s"; "short"]] and
       [long_opts] default to [["l"; "long"]]. [docs] is the manual section
-      in which options are documtend. *)
+      in which options are documented. *)
 end
 
 (** {!B000.File_cache} interaction. *)
@@ -174,6 +174,10 @@ module Op : sig
     by:[`Create | `Dur | `Wait | `Start] -> B000.Op.t list -> B000.Op.t list
   (** [order ~by ops] orders [ops] by [by] time. *)
 
+
+  type selector = B000.Op.t list -> B000.Op.t list
+  (** The type for build operation selectors. *)
+
   val select :
     reads:Fpath.t list -> writes:Fpath.t list -> ids:B000.Op.id list ->
     hashes:Hash.t list -> groups:string list -> needs:bool -> enables:bool ->
@@ -181,12 +185,9 @@ module Op : sig
     statuses:[`Aborted | `Done | `Failed | `Waiting ] list ->
     kinds:[ `Copy | `Delete | `Notify | `Mkdir | `Read | `Spawn | `Wait_files
           | `Write ] list ->
-    order_by:[ `Create | `Dur | `Wait | `Start ] -> B000.Op.t list ->
-    B000.Op.t list
+    order_by:[ `Create | `Dur | `Wait | `Start ] -> selector
 
-  val select_cli :
-    ?docs:string -> unit -> (B000.Op.t list -> B000.Op.t list) Cmdliner.Term.t
-
+  val select_cli : ?docs:string -> unit -> selector Cmdliner.Term.t
   val select_man : Cmdliner.Manpage.block list
 end
 
@@ -330,22 +331,54 @@ module Memo : sig
       either, in order, [jobs] or {!B0_machine.logical_cpu_count} or
       [1]. *)
 
-  (** {1:build_log Build log} *)
+  (** {1:logs Logs} *)
 
+  (** {!Memo} log.
+
+      A {!Memo} log has all the build operations and a few
+      global statistics about the memo. *)
   module Log : sig
 
-    type info
-    val write_file : Fpath.t -> B00.Memo.t -> (unit, string) result
-    val read_file : Fpath.t -> (info * B000.Op.t list, string) result
+    (** {1:logs Logs} *)
 
-    type out_fmt = [`Long | `Normal | `Short | `Trace_event | `Stats ]
-    val out : out_fmt -> (out_fmt * (info * B000.Op.t list -> unit))
-    val out_fmt_cli :
-      ?docs:string -> unit ->
-      (out_fmt * (info * B000.Op.t list -> unit)) Cmdliner.Term.t
+    type t
+    (** The type for {!B00.Memo} logs. *)
 
-    val pp_stats : (info * B000.Op.t list) Fmt.t
-    (** [pp_stats] formats statistics about the memoizer. *)
+    val ops : t -> B000.Op.t list
+    (** [ops l] are the operations of the log. *)
+
+    val of_memo : B00.Memo.t -> t
+    (** [of_memo m] is a log for memo [m]. *)
+
+    (** {1:io IO} *)
+
+    val binc : t Binc.t
+    (** [binc] is a binary codec for logs. *)
+
+    val write : Fpath.t -> t -> (unit, string) result
+    (** [write f l] writes log [l] to file [f]. *)
+
+    val read : Fpath.t -> (t, string) result
+    (** [read f] read a log from file [f]. *)
+
+    (** {1:fmt Log formatters} *)
+
+    val pp_stats : Op.selector -> t Fmt.t
+    (** [pp_stats sel] formats statistics stored in the log using
+        [sel] to select operations that are part of the statistics. *)
+
+    type out_kind = [`Normal | `Trace_event | `Stats ]
+    (** The type for output kinds. *)
+
+    val out :
+      Format.formatter -> Cli.out_fmt -> out_kind -> Op.selector -> t -> unit
+    (** [out] formats a log on the given formatter. *)
+
+    (** {1:cli Command line interface} *)
+
+    val out_kind_cli : ?docs:string -> unit -> out_kind Cmdliner.Term.t
+    (** [out_kind_cli ~docs ()] are mutually exclusive options to specify
+        alternate output information. *)
   end
 end
 

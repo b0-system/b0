@@ -23,7 +23,7 @@ let find_root_b0 ~cwd =
   loop cwd
 
 let log_cmd
-    tty_cap log_level no_pager b0_dir log_file (out_fmt, log_output) log_filter
+    tty_cap log_level no_pager b0_dir log_file out_fmt out_kind op_sel
   =
   let tty_cap = B0_std_ui.get_tty_cap tty_cap in
   let log_level = B0_std_ui.get_log_level log_level in
@@ -32,7 +32,7 @@ let log_cmd
   Result.bind (Os.Dir.cwd ()) @@ fun cwd ->
   let b0_dir = B00_ui.Memo.get_b0_dir ~cwd ~root:(find_root_b0 cwd) ~b0_dir in
   let log_file = B00_ui.Memo.get_log_file ~cwd ~b0_dir ~log_file in
-  let don't = no_pager || out_fmt = `Trace_event in
+  let don't = no_pager || out_kind = `Trace_event in
   Result.bind (B0_pager.find ~don't ()) @@ fun pager ->
   Result.bind (B0_pager.page_stdout pager) @@ fun () ->
   match Os.File.exists log_file with
@@ -41,8 +41,9 @@ let log_cmd
       Log.err (fun m -> m "%a: No such file." Fpath.pp_unquoted log_file);
       Ok err_no_log_file
   | Ok true ->
-      Result.bind (B00_ui.Memo.Log.read_file log_file) @@
-      fun (info, ops) -> log_output (info, log_filter ops); Ok 0
+      Result.bind (B00_ui.Memo.Log.read log_file) @@ fun l ->
+      B00_ui.Memo.Log.out Fmt.stdout out_fmt out_kind op_sel l; Ok 0
+
 
 (* Command line interface *)
 
@@ -73,11 +74,18 @@ let b00_log =
   let tty_cap = B0_std_ui.tty_cap () in
   let log_level = B0_std_ui.log_level () in
   let b0_dir = B00_ui.Memo.b0_dir () in
-  let b0_log_file = B00_ui.Memo.log_file () in
+  let b0_log_file =
+    let doc_none = "$(b,.log) in b0 directory" in
+    let env = Cmdliner.Arg.env_var B00_ui.Memo.log_file_env in
+    let doc = "Log file to read." in
+    Arg.(value & pos 0 (some ~none:doc_none B0_std_ui.fpath) None &
+         info [] ~env ~doc ~docv:"LOG_FILE")
+  in
   let version = "%%VERSION%%" in
-  Term.(const log_cmd $ tty_cap $ log_level $ B0_pager.don't () $
+  Term.(const log_cmd $ tty_cap $ log_level $ B0_pager.don't ~docs:sdocs () $
         b0_dir $ b0_log_file $
-        B00_ui.Memo.Log.out_fmt_cli ~docs:docs_out_fmt () $
+        B00_ui.Cli.out_fmt ~docs:docs_out_fmt () $
+        B00_ui.Memo.Log.out_kind_cli ~docs:docs_out_fmt () $
         B00_ui.Op.select_cli ~docs:docs_selection ()),
   Term.info "b00-log" ~version ~doc ~sdocs ~envs ~exits ~man ~man_xrefs
 

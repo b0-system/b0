@@ -3990,6 +3990,13 @@ module Binc = struct
   let enc c = c.enc
   let dec c = c.dec
 
+  let to_string ?(buf = Buffer.create 1024) c v =
+    c.enc buf v; Buffer.contents buf
+
+  let of_string ?(file = Os.File.dash) c s =
+    try let i, v = c.dec s 0 in dec_eoi s i; Ok v with
+    | Failure e -> Fmt.error "%a:%s" Fpath.pp_unquoted file e
+
   (* Magic numbers *)
 
   let enc_magic magic b () = Buffer.add_string b magic
