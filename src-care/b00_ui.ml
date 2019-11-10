@@ -154,11 +154,40 @@ end
 module Op = struct
   open B000
 
-  (* Selecting *)
+  (* Finding dependencies *)
 
-  type selector = B000.Op.t list -> B000.Op.t list
+  let find_deps ?(acc = Op.Set.empty) ~recursive index deps ops =
+    let add_direct index o acc =
+      let add_index_ops index acc p = match Fpath.Map.find p index with
+      | exception Not_found -> acc
+      | ops -> Op.Set.union ops acc
+      in
+      List.fold_left (add_index_ops index) acc (deps o)
+    in
+    if not recursive then (Op.Set.fold (add_direct index) ops acc) else
+    let rec loop index acc seen todo = match Op.Set.choose todo with
+    | exception Not_found -> acc
+    | o ->
+        let seen = Op.Set.add o seen in
+        let todo = Op.Set.remove o todo in
+        let deps = add_direct index o Op.Set.empty in
+        let todo = Op.Set.(union todo (diff deps seen)) in
+        let acc = Op.Set.union acc deps in
+        loop index acc seen todo
+    in
+    loop index acc Op.Set.empty ops
 
-  let is_selected ~reads ~writes ~ids ~hashes ~groups =
+  let find_needs ?acc ~recursive ~writes ops =
+    find_deps ?acc ~recursive writes Op.reads ops
+
+  let find_enables ?acc ~recursive ~reads ops =
+    find_deps ?acc ~recursive reads Op.writes ops
+
+  (* Queries *)
+
+  type query = B000.Op.t list -> B000.Op.t list
+
+  let select ~reads ~writes ~ids ~hashes ~groups =
     let all =
       reads = [] && writes = [] && ids = [] && hashes = [] && groups = []
     in
@@ -178,47 +207,15 @@ module Op = struct
       List.exists mem_writes (Op.writes o) ||
       mem_group (Op.group o)
 
-  let read_write_indexes ops =
-    let rec loop reads writes = function
-    | o :: os ->
-        let add acc p = Fpath.Map.add_to_set (module Op.Set) p o acc in
-        let reads = List.fold_left add reads (Op.reads o) in
-        let writes = List.fold_left add writes (Op.writes o) in
-        loop reads writes os
-    | [] -> reads, writes
+  let select_deps ~needs ~enables ~recursive ~dom ops =
+    if not needs && not enables then ops else
+    let reads, writes = B000.Op.read_write_maps dom in
+    let ops = Op.Set.of_list ops in
+    let acc = Op.Set.empty in
+    let acc = if needs then find_needs ~recursive ~writes ~acc ops else acc in
+    let acc = if enables then find_enables ~recursive ~reads ~acc ops else acc
     in
-    loop Fpath.Map.empty Fpath.Map.empty ops
-
-  let find_deps ?(acc = Op.Set.empty) ~recursive index deps ops =
-    let add_direct index o acc =
-      let add_index_ops index acc p = match Fpath.Map.find p index with
-      | exception Not_found -> acc
-      | ops -> Op.Set.union ops acc
-      in
-      List.fold_left (add_index_ops index) acc (deps o)
-    in
-    match recursive with
-    | false -> Op.Set.fold (add_direct index) ops acc
-    | true ->
-        let rec loop index acc seen todo = match Op.Set.choose todo with
-        | exception Not_found -> acc
-        | o ->
-            let seen = Op.Set.add o seen in
-            let todo = Op.Set.remove o todo in
-            let deps = add_direct index o Op.Set.empty in
-            let todo = Op.Set.(union todo (diff deps seen)) in
-            let acc = Op.Set.union acc deps in
-            loop index acc seen todo
-        in
-        loop index acc Op.Set.empty ops
-
-  let find_needs ?acc ~recursive ~writes ops =
-    find_deps ?acc ~recursive writes Op.reads ops
-
-  let find_enables ?acc ~recursive ~reads ops =
-    find_deps ?acc ~recursive reads Op.writes ops
-
-  (* Filtering *)
+    Op.Set.elements acc
 
   let op_kind_enum o = match Op.kind o with
   | Op.Copy _ -> `Copy | Op.Delete _ -> `Delete | Op.Notify _ -> `Notify
@@ -231,7 +228,9 @@ module Op = struct
 
   let filter ~revived ~statuses ~kinds =
     let revived_filter = match revived with
-    | None -> fun _ -> true | Some revived -> fun o -> Op.revived o = revived
+    | None -> fun _ -> true
+    | Some revived -> fun o ->
+      Op.revived o = revived && not (Hash.equal Hash.nil (Op.hash o))
     in
     let status_filter = match statuses with
     | [] -> fun _ -> true
@@ -242,8 +241,6 @@ module Op = struct
     | kinds -> fun o -> List.mem (op_kind_enum o) kinds
     in
     fun o -> revived_filter o && status_filter o && kind_filter o
-
-  (* Ordering *)
 
   let order ~by ops =
     let order_by_field cmp f o0 o1 = cmp (f o0) (f o1) in
@@ -257,49 +254,33 @@ module Op = struct
     in
     List.sort order ops
 
-  (* Combine selection, filtering and ordering *)
-
-  let select
-      ~reads ~writes ~ids ~hashes ~groups ~needs ~enables ~recursive
-      ~revived ~statuses ~kinds ~order_by ops
-    =
-    let is_selected = is_selected ~reads ~writes ~ids ~hashes ~groups in
-    let sel = List.filter is_selected ops in
-    let sel = Op.Set.of_list sel in
-    let sel = match not needs && not enables with
-    | true -> sel
-    | false ->
-        let reads, writes = read_write_indexes ops in
-        let acc = Op.Set.empty in
-        let acc = if needs then find_needs ~recursive ~writes ~acc sel else acc
-        in
-        if enables then find_enables ~recursive ~reads ~acc sel else acc
-    in
-    let sel = Op.Set.elements sel in
-    let filter = filter ~revived ~statuses ~kinds in
+  let query ~select ~select_deps ~filter ~order ops =
+    let sel = List.filter select ops in
+    let sel = select_deps ~dom:ops sel in
     let sel = List.filter filter sel in
-    order ~by:order_by sel
+    order sel
 
-  let select_cli ?docs () =
-    let open Cmdliner in
-    let hash =
-      let of_string s =
-        let err = Fmt.str "Could not parse hash from %S" in
-        Result.map_error (fun _ -> `Msg (err s)) @@ Hash.of_hex s
-      in
-      Arg.conv ~docv:"HASH" (of_string, Hash.pp)
+  (* Command line *)
+
+  open Cmdliner
+
+  let hash =
+    let of_string s =
+      let err = Fmt.str "Could not parse hash from %S" in
+      Result.map_error (fun _ -> `Msg (err s)) @@ Hash.of_hex s
     in
-    let order_by =
-      let order =
-        [ "create", `Create; "start", `Start; "wait", `Wait; "dur", `Dur; ]
-      in
-      let doc =
-        Fmt.str "Order by $(docv). $(docv) must be %s time."
-          (Arg.doc_alts_enum order)
-      in
-      let order = Arg.enum order and docv = "ORDER" in
-      Arg.(value & opt order `Start & info ["order-by"] ~doc ?docs ~docv)
-    in
+    Arg.conv ~docv:"HASH" (of_string, Hash.pp)
+
+  let groups
+      ?(opts = ["g"; "group"])
+      ?docs
+      ?(doc = "Select operations with group $(docv). Repeatable.")
+      ()
+    =
+    let docv = "GROUP" in
+    Arg.(value & opt_all string [] & info ["g"; "group"] ~doc ?docs ~docv)
+
+  let select_cli ?docs ?(groups = groups () ?docs) () =
     let reads =
       let doc = "Select operations that read file $(docv). Repeatable." in
       Arg.(value & opt_all B0_std_ui.fpath [] &
@@ -318,24 +299,25 @@ module Op = struct
       let doc = "Select operation with hash $(docv). Repeatable." in
       Arg.(value & opt_all hash [] & info ["hash"] ~doc ?docs ~docv:"HASH")
     in
-    let groups =
-      let doc = "Select operations with group $(docv). Repeatable." in
-      let docv = "GROUP" in
-      Arg.(value & opt_all string [] & info ["g"; "group"] ~doc ?docs ~docv)
+    let select reads writes ids hashes groups =
+      select ~reads ~writes ~ids ~hashes ~groups
     in
+    Term.(const select $ reads $ writes $ ids $ hashes $ groups)
+
+  let select_deps_cli ?docs () =
     let needs =
       let doc =
-        "Once operations have been selected, also add all direct operations \
-         needed by these before filtering. Use with option $(b,--rec) to \
-         get the recursive operations."
+        "Once operations have been selected, replace them with all direct \
+         operations needed by these before filtering. Use with option \
+         $(b,--rec) to get the recursive operations."
       in
       Arg.(value & flag & info ["needs"] ~doc ?docs)
     in
     let enables =
       let doc =
-        "Once operations have been selected, also add all direct operations \
-         enabled by these before filtering. Use with option $(b,--rec) to \
-         get the recursive operations."
+        "Once operations have been selected, replace them with all direct \
+         operations enabled by these before filtering. Use with option \
+         $(b,--rec) to get the recursive operations."
       in
       Arg.(value & flag & info ["enables"] ~doc ?docs)
     in
@@ -343,14 +325,20 @@ module Op = struct
       let doc = "Make $(b,--needs) or $(b,--enables) recursive." in
       Arg.(value & flag & info ["rec"] ~doc ?docs)
     in
+    let select_deps needs enables recursive =
+      select_deps ~needs ~enables ~recursive
+    in
+    Term.(const select_deps $ needs $ enables $ recursive)
+
+  let filter_cli ?docs () =
     let revived =
       let revived =
-        let doc = "Keep only revived operations." in
+        let doc = "Keep only revivable operations that were revived." in
         Some true, Arg.info ["revived"] ~doc ?docs
       in
       let executed =
-        let doc = "Keep only truly executed (non revived) operations." in
-        Some false, Arg.info ["executed"] ~doc ?docs
+        let doc = "Keep only revivable operations that were not revived." in
+        Some false, Arg.info ["u"; "unrevived"] ~doc ?docs
       in
       Arg.(value & vflag None [revived; executed])
     in
@@ -363,14 +351,14 @@ module Op = struct
         let status = Arg.enum status_enum in
         let statuses = Arg.list status and docv = "STATUS,..." in
         let doc =
-          Fmt.str "Keep only operations that have their status in $(docv). \
+          Fmt.str "Keep only operations that have their status in $(i,STATUS). \
                    $(i,STATUS) must be %s" (Arg.doc_alts_enum status_enum)
         in
         Arg.(value & opt statuses [] & info ["status"] ~doc ?docs ~docv)
       in
       let errors =
         let doc = "Keep only failed operations (errors). Equivalent
-                   to add 'failed' to the $(b,--status) option."
+                   to add $(b,failed) to the $(b,--status) option."
         in
         Arg.(value & flag & info ["e"; "errors"] ~doc ?docs)
       in
@@ -385,22 +373,46 @@ module Op = struct
       let kind = Arg.enum kind_enum in
       let kinds = Arg.list kind in
       let doc =
-        Fmt.str "Keep only operations that have their kind in $(docv). \
+        Fmt.str "Keep only operations that have their kind in $(i,KIND). \
                  $(i,KIND) must be %s."
           (Arg.doc_alts_enum kind_enum)
       in
       Arg.(value & opt kinds [] & info ["kind"] ~doc ?docs ~docv:"KIND,...")
     in
-    let select
-        reads writes ids hashes groups needs enables recursive revived statuses
-        kinds order_by =
-      select ~reads ~writes ~ids ~hashes ~groups ~needs ~enables ~recursive
-        ~revived ~statuses ~kinds ~order_by
-    in
-    Term.(const select $ reads $ writes $ ids $ hashes $ groups $ needs $
-          enables $ recursive $ revived $ statuses $ kinds $ order_by)
+    let filter revived statuses kinds = filter ~revived ~statuses ~kinds in
+    Term.(const filter $ revived $ statuses $ kinds)
 
-  let select_man =
+  let order_cli ?docs () =
+    let order_by =
+      let order =
+        [ "create", `Create; "start", `Start; "wait", `Wait; "dur", `Dur; ]
+      in
+      let doc =
+        Fmt.str "Order by $(docv). $(docv) must be %s time."
+          (Arg.doc_alts_enum order)
+      in
+      let order = Arg.enum order and docv = "ORDER" in
+      Arg.(value & opt order `Start & info ["order-by"] ~doc ?docs ~docv)
+    in
+    let by_dur =
+      let doc = "Order by decreasing duration. Takes over $(b,--order-by)." in
+      Arg.(value & flag & info ["d"] ~doc ?docs)
+    in
+    let order order_by by_dur =
+      let by = if by_dur then `Dur else order_by in
+      order ~by
+    in
+    Term.(const order $ order_by $ by_dur)
+
+  let query_cli ?docs () =
+    let open Cmdliner in
+    let query select select_deps filter order =
+      query ~select ~select_deps ~filter ~order
+    in
+    Term.(const query $ select_cli ?docs () $ select_deps_cli ?docs () $
+          filter_cli ?docs () $ order_cli ?docs ())
+
+  let query_man =
     [ `P "Options are provided to select and filter operations. \
           Any operation that satifies one of the selectors and all of the \
           filters is included in the result. If no selector is specified all \
@@ -411,11 +423,10 @@ module Op = struct
 end
 
 module Memo = struct
-  let pp_faint pp = Fmt.tty [`Faint] pp
-  let read_howto = Fmt.any "b00-log -r "
-  let write_howto = Fmt.any "b00-log -w "
+
+  (* Memo feedback *)
+
   let op_howto ppf o = Fmt.pf ppf "b00-log --id %d" (B000.Op.id o)
-  let pp_howto_file howto = Fmt.(pp_faint howto ++ B000_conv.Op.pp_file_write)
   let pp_leveled_feedback
       ?(sep = Fmt.flush_nl) ?(op_howto = op_howto) ~show_op ~show_ui ~level
       ppf f
@@ -433,94 +444,34 @@ module Memo = struct
         Fmt.pf ppf "@[<v>Missing tool:@,%s@]%a" e sep ()
     | _ ->  ()
 
-  let pp_failed ppf () = Fmt.(tty [`Fg `Red] string) ppf  "FAILED"
-  let pp_never_ready ?(read_howto = read_howto) ppf fs =
-    let err = match Fpath.Set.cardinal fs with
-    | 1 -> "This file never became ready"
-    | _ -> "These files never became ready"
-    in
-    Fmt.pf ppf "@[<v>[%a] %s:@,\
-               \ @[<v>%a@,See operations reading them for details.@]@]"
-      pp_failed () err (Fpath.Set.pp (pp_howto_file read_howto)) fs
-
-  let writes_cycle os =
-    let deps prev next =
-      let prev_writes = Fpath.Set.of_list (B000.Op.writes prev) in
-      let next_reads = Fpath.Set.of_list (B000.Op.reads next) in
-      Fpath.Set.inter prev_writes next_reads
-    in
-    match os with
-    | [] -> []
-    | [o] -> [deps o o]
-    | first :: _ ->
-        let rec loop first acc = function
-        | prev :: (next :: _ as os) -> loop first (deps prev next :: acc) os
-        | prev :: [] -> List.rev (deps prev first :: acc)
-        | [] -> assert false
-        in
-        loop first [] os
-
-  let pp_ops_cycle ?(write_howto = write_howto) ppf os =
-    let pp_self_cycle ~write_howto ppf writes =
-      let these_file, them = match Fpath.Set.cardinal writes with
-      | 1 -> "This file is", "it"
-      | _ -> "These files are", "them"
-      in
-      Fmt.pf ppf
-        "%s read and written by the same operation:@,\
-        \ @[<v>%a@,See the operation writing %s for details.@]@]"
-        these_file (Fpath.Set.pp (pp_howto_file write_howto)) writes them
-    in
-    let pp_cycle ~write_howto ppf ws =
-      Fmt.pf ppf
-        "Operations writing these files form \
-         a cycle:@, @[<v>%a@,\
-         The last written file is read by the operation writing the first \
-         one.@,\
-         See operations writing them for details.@]"
-        (Fmt.list (pp_howto_file write_howto)) ws
-    in
-    let pp_ops ppf os =
-      let writes = writes_cycle os in
-      match os with
-      | [] -> assert false
-      | [o] -> pp_self_cycle ~write_howto ppf (List.hd writes)
-      | os ->
-          let writes = try List.(rev @@ rev_map Fpath.Set.choose writes) with
-          | Not_found -> assert false
-          in
-          pp_cycle ~write_howto ppf writes
-    in
-    Fmt.pf ppf "@[<v>[%a] %a@]" pp_failed () pp_ops os
-
-  let pp_error ?(sep = Fmt.flush_nl) ?read_howto ?write_howto () ppf =
-    function
-    | B000.Op.Failures -> ()
-    | B000.Op.Cycle ops -> pp_ops_cycle ?write_howto ppf ops; sep ppf ()
-    | B000.Op.Never_became_ready fs ->
-        pp_never_ready ?read_howto ppf fs; sep ppf ()
-
-  (* Cli *)
-
   open Cmdliner
 
-  let b0_dir_name = "_b0"
-  let cache_dir_name = ".cache"
-  let trash_dir_name = ".trash"
-  let log_file_name = ".log"
-  let b0_dir_env = "B0_DIR"
-  let cache_dir_env = "B0_CACHE_DIR"
-  let log_file_env = "B0_LOG_FILE"
+  (* B0 directory *)
 
+  let b0_dir_env = "B0_DIR"
+  let b0_dir_name = "_b0"
   let b0_dir
+      ?(opts = ["b0-dir"])
       ?(docs = Manpage.s_common_options)
       ?(doc = "Use $(docv) for the b0 directory.")
       ?(doc_none = "$(b,_b0) in root directory")
       ?(env = Cmdliner.Arg.env_var b0_dir_env) ()
     =
     Arg.(value & opt (some ~none:doc_none B0_std_ui.fpath) None &
-         info ["b0-dir"] ~env ~doc ~docs ~docv:"DIR")
+         info opts ~env ~doc ~docs ~docv:"DIR")
 
+  let get_b0_dir ~cwd ~root ~b0_dir = match b0_dir with
+  | None -> Fpath.(root / b0_dir_name)
+  | Some d -> Fpath.(cwd // d)
+
+  let get_b0_dir_path ~cwd ~b0_dir default p = match p with
+  | None -> Fpath.(b0_dir / default)
+  | Some p -> Fpath.(cwd // p)
+
+  (* File cache directory *)
+
+  let cache_dir_env = "B0_CACHE_DIR"
+  let cache_dir_name = ".cache"
   let cache_dir
       ?(opts = ["cache-dir"])
       ?(docs = Manpage.s_common_options)
@@ -531,42 +482,78 @@ module Memo = struct
     Arg.(value & opt (some ~none:doc_none B0_std_ui.fpath) None &
          info opts ~env ~doc ~docs ~docv:"DIR")
 
+  let get_cache_dir ~cwd ~b0_dir ~cache_dir =
+    get_b0_dir_path ~cwd ~b0_dir cache_dir_name cache_dir
+
+  (* Trash directory *)
+
+  let trash_dir_name = ".trash"
+  let get_trash_dir ~cwd ~b0_dir ~trash_dir =
+    get_b0_dir_path ~cwd ~b0_dir trash_dir_name trash_dir
+
+  (* Log file *)
+
+  let log_file_name = ".log"
+  let log_file_env = "B0_LOG_FILE"
   let log_file
       ?(opts = ["log-file"])
       ?(docs = Manpage.s_common_options)
       ?(doc = "Output (binary) build log to $(docv).")
       ?(doc_none = "$(b,.log) in b0 directory")
-      ?(env = Cmdliner.Arg.env_var log_file_env) () =
+      ?(env = Cmdliner.Arg.env_var log_file_env) ()
+    =
     let doc = "Output (binary) build log to $(docv)." in
     Arg.(value & opt (some ~none:doc_none B0_std_ui.fpath) None &
          info opts ~env ~doc ~docs ~docv:"FILE")
 
-  let get_b0_dir ~cwd ~root ~b0_dir = match b0_dir with
-  | None -> Fpath.(root / b0_dir_name)
-  | Some d -> Fpath.(cwd // d)
-
-  let get_path ~cwd ~b0_dir default p = match p with
-  | None -> Fpath.(b0_dir / default)
-  | Some p -> Fpath.(cwd // p)
-
-  let get_cache_dir ~cwd ~b0_dir ~cache_dir =
-    get_path ~cwd ~b0_dir cache_dir_name cache_dir
-
-  let get_trash_dir ~cwd ~b0_dir ~trash_dir =
-    get_path ~cwd ~b0_dir trash_dir_name trash_dir
-
   let get_log_file ~cwd ~b0_dir ~log_file =
-    get_path ~cwd ~b0_dir log_file_name log_file
+    get_b0_dir_path ~cwd ~b0_dir log_file_name log_file
 
-  (* Build parameters *)
+  (* Jobs *)
 
-  let jobs ?docs ?env () =
-    let doc = "Maximal number of commands to spawn concurrently." in
+  let jobs_env = "B0_JOBS"
+  let jobs
+      ?(opts = ["j"; "jobs"])
+      ?(docs = Manpage.s_common_options)
+      ?(doc = "Maximal number of commands to spawn concurrently.")
+      ?(doc_none = "Number of CPUs available")
+      ?(env = Cmdliner.Arg.env_var log_file_env) ()
+    =
     let docv = "COUNT" in
-    Arg.(value & opt (some int) None & info ["j"; "jobs"] ?env ~doc ?docs ~docv)
+    Arg.(value & opt (some ~none:doc_none int) None &
+         info opts ~env ~doc ~docs ~docv)
 
   let get_jobs ~jobs = match jobs with
   | Some max -> max | None -> Os.Cpu.logical_count ()
+
+  (* Hash fun *)
+
+  let hash_fun =
+    let of_string = function s -> Ok (module Hash.Xxh_64 : Hash.T) in
+    let pp ppf (module H : Hash.T) = Fmt.string ppf H.id in
+    Arg.conv ~docv:"HASHFUN" (of_string, pp)
+
+  let hash_fun_env = "B0_HASH_FUN"
+  let hash_fun
+      ?(opts = ["hash-fun"])
+      ?(docs = Manpage.s_common_options)
+      ?doc
+      ?(doc_none = "xxh64")
+      ?(env = Cmdliner.Arg.env_var hash_fun_env) () =
+    let docv = "HASHFUN" in
+    let doc = match doc with
+    | Some doc -> doc
+    | None ->
+        let ids = List.map (fun (module H : Hash.T) -> H.id) (Hash.funs ()) in
+        Fmt.str "Hash function to use for caching. %a"
+          Fmt.(must_be (Fmt.bold string)) ids
+    in
+    Arg.(value & opt (some ~none:doc_none hash_fun) None &
+         info opts ~env ~doc ~docs ~docv)
+
+  let get_hash_fun ~hash_fun = match hash_fun with
+  | Some m -> m
+  | None -> (module Hash.Xxh_64 : Hash.T)
 
   (* Logs *)
 
@@ -701,11 +688,11 @@ module Memo = struct
          Fmt.field "stime" Fmt.id pp_stime;
          Fmt.field "real" (fun _ -> l.total_dur) Time.Span.pp ]) ppf l
 
-    type out_kind = [ `Normal | `Trace_event | `Stats ]
+    type out_kind = [ `Normal | `Trace_event | `Stats | `Hashes ]
 
-    let out ppf out_fmt out_kind sel l = match out_kind with
+    let out ppf out_fmt out_kind query l = match out_kind with
     | `Normal ->
-        let pp_ops pp_op ppf l = match sel l.ops with
+        let pp_ops pp_op ppf l = match query l.ops with
         | [] -> ()
         | ops -> Fmt.pf ppf "@[<v>%a@]" (Fmt.list pp_op) ops
         in
@@ -716,10 +703,13 @@ module Memo = struct
         end;
         Fmt.flush ppf ()
     | `Stats ->
-        Fmt.pf ppf "@[%a]@." (pp_stats sel) l
+        Fmt.pf ppf "@[%a]@." (pp_stats query) l
     | `Trace_event ->
-        let t = B0_trace.Trace_event.of_ops (sel l.ops) in
-        Fmt.pr "%s@." (B0_serialk_json.Jsong.to_string t)
+        let t = B0_trace.Trace_event.of_ops (query l.ops) in
+        Fmt.pf ppf "%s@." (B0_serialk_json.Jsong.to_string t)
+    | `Hashes ->
+        let pp_hash ppf o = Hash.pp ppf (B000.Op.hash o) in
+        Fmt.pf ppf "@[<v>%a@]" (Fmt.list pp_hash) (query l.ops)
 
     let out_kind_cli ?docs () =
       let trace_event =
@@ -730,7 +720,11 @@ module Memo = struct
         let doc = "Output statistics about the returned operations." in
         Cmdliner.Arg.info ["stats"] ~doc ?docs
       in
-      let fmts = [`Trace_event, trace_event; `Stats, stats] in
+      let hashes =
+        let doc = "Output only operation hashes." in
+        Cmdliner.Arg.info ["hashes"] ~doc ?docs
+      in
+      let fmts = [`Trace_event, trace_event; `Stats, stats; `Hashes, hashes] in
       Cmdliner.Arg.(value & vflag `Normal fmts)
   end
 end

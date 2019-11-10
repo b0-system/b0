@@ -172,17 +172,17 @@ module Memo : sig
   val memo :
     ?hash_fun:(module Hash.T) -> ?env:Os.Env.t -> ?cwd:Fpath.t ->
     ?cache_dir:Fpath.t -> ?trash_dir:Fpath.t -> ?jobs:int ->
-    ?feedback:([feedback | B000.Exec.feedback] ->
-               unit) -> unit -> (t, string) result
+    ?feedback:([feedback | B000.Exec.feedback] -> unit) -> unit ->
+    (t, string) result
   (** [memo] is a simpler {!create}
       {ul
-      {- [hash_fun] defaults to {!B000.Op_cache.create}'s default.}
-      {- [jobs] defaults to {!B00.Exec.create}'s default.}
+      {- [hash_fun] defaults to {!B0_std.Hash.Xxh_64}.}
+      {- [jobs] defaults to {!B0_std.Os.Cpu.logical_count}.}
       {- [env] defaults to {!B0_std.Os.Env.current}}
       {- [cwd] defaults to {!B0_std.Os.Dir.cwd}}
       {- [cache_dir] defaults to [Fpath.(cwd / "_b0" / ".cache")]}
       {- [trash_dir] defaults to [Fpath.(cwd / "_b0" / ".trash")]}
-      {- [feedback] defaults formats feedback on stdout.}} *)
+      {- [feedback] defaults to a nop.}} *)
 
   val clock : t -> Time.counter
   (** [clock m] is [m]'s clock. *)

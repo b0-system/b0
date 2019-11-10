@@ -114,7 +114,7 @@ module Memo = struct
 
   let memo
       ?(hash_fun = (module Hash.Xxh_64 : Hash.T)) ?env ?cwd ?cache_dir
-      ?trash_dir ?(jobs = 4) ?feedback ()
+      ?trash_dir ?(jobs = B0_std.Os.Cpu.logical_count ()) ?feedback ()
     =
     let feedback = match feedback with | Some f -> f | None -> fun _ -> () in
     let fb_exec = (feedback :> Exec.feedback -> unit) in

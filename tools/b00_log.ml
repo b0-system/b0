@@ -22,9 +22,7 @@ let find_root_b0 ~cwd =
   in
   loop cwd
 
-let log_cmd
-    tty_cap log_level no_pager b0_dir log_file out_fmt out_kind op_sel
-  =
+let log_cmd tty_cap log_level no_pager b0_dir log_file out_fmt out_kind query =
   let tty_cap = B0_std_ui.get_tty_cap tty_cap in
   let log_level = B0_std_ui.get_log_level log_level in
   B0_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
@@ -38,11 +36,12 @@ let log_cmd
   match Os.File.exists log_file with
   | Error _ as e -> e
   | Ok false ->
-      Log.err (fun m -> m "%a: No such file." Fpath.pp_unquoted log_file);
+      Log.err (fun m -> m "%a: No such file. Specify one explicitly."
+                  Fpath.pp_unquoted log_file);
       Ok err_no_log_file
   | Ok true ->
       Result.bind (B00_ui.Memo.Log.read log_file) @@ fun l ->
-      B00_ui.Memo.Log.out Fmt.stdout out_fmt out_kind op_sel l;
+      B00_ui.Memo.Log.out Fmt.stdout out_fmt out_kind query l;
       Ok 0
 
 (* Command line interface *)
@@ -57,26 +56,31 @@ let exits =
 (* Main command *)
 
 let b00_log =
-  let doc = "Show B0 log files" in
-  let sdocs = Manpage.s_common_options in
-  let man_xrefs = [`Tool "b0"; `Tool "b00-cache"] in
+  let doc = "Show b0 log files" in
+  let sdocs = Manpage.s_options in
   let docs_out_fmt = "OUTPUT FORMATS" in
   let docs_selection = "OPTIONS FOR SELECTING OPERATIONS" in
   let envs = B0_pager.envs () in
+  let man_xrefs = [`Tool "b0"; `Tool "b00-cache"] in
   let man = [
     `S Manpage.s_description;
-    `P "The $(tname) command shows operations stored in binary B0 log files.";
-    `Blocks B00_ui.Op.select_man;
+    `P "The $(tname) command shows operations stored in binary b0 log files.";
+    `Blocks B00_ui.Op.query_man;
+    `S Manpage.s_arguments;
     `S docs_out_fmt;
+    `S docs_selection;
     `S Manpage.s_bugs;
     `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ];
   in
-  let tty_cap = B0_std_ui.tty_cap () in
-  let log_level = B0_std_ui.log_level () in
-  let b0_dir = B00_ui.Memo.b0_dir () in
+  let tty_cap = B0_std_ui.tty_cap ~docs:sdocs () in
+  let log_level = B0_std_ui.log_level ~docs:sdocs () in
+  let b0_dir = B00_ui.Memo.b0_dir ~docs:sdocs () in
   let b0_log_file =
-    let doc_none = "$(b,.log) in b0 directory" in
-    let env = Cmdliner.Arg.env_var B00_ui.Memo.log_file_env in
+    let doc_none = "$(b,.log) in a b0 directory in cwd or upwards" in
+    let env =
+      let doc = "See argument $(i,LOG_FILE)." in
+      Cmdliner.Arg.env_var ~doc B00_ui.Memo.log_file_env
+    in
     let doc = "Log file to read." in
     Arg.(value & pos 0 (some ~none:doc_none B0_std_ui.fpath) None &
          info [] ~env ~doc ~docv:"LOG_FILE")
@@ -86,7 +90,7 @@ let b00_log =
         b0_dir $ b0_log_file $
         B00_ui.Cli.out_fmt ~docs:docs_out_fmt () $
         B00_ui.Memo.Log.out_kind_cli ~docs:docs_out_fmt () $
-        B00_ui.Op.select_cli ~docs:docs_selection ()),
+        B00_ui.Op.query_cli ~docs:docs_selection ()),
   Term.info "b00-log" ~version ~doc ~sdocs ~envs ~exits ~man ~man_xrefs
 
 let () = Term.(exit_status @@ eval b00_log)

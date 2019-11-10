@@ -1967,6 +1967,20 @@ module Hash = struct
   let funs = ref [(module Murmur3_128 : T); (module Xxh_64 : T);]
   let add_fun m = funs := m :: !funs
   let funs () = !funs
+  let get_fun id =
+    let has_id id (module H : T) = String.equal H.id id in
+    let funs = funs () in
+    match List.find (has_id id) funs with
+    | m -> Ok m
+    | exception Not_found ->
+        let kind = Fmt.any "hash" in
+        let pp_id = Fmt.(bold string) in
+        let ids = List.map (fun (module H : T) -> H.id) funs in
+        let hint, ids = match String.suggest ids id with
+        | [] -> Fmt.must_be, ids
+        | ids -> Fmt.did_you_mean, ids
+        in
+        Fmt.error "@[%a@]" (Fmt.unknown' ~kind pp_id ~hint) (id, ids)
 end
 
 (* Measuring time *)

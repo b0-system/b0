@@ -147,10 +147,10 @@ let files_cmd () dir only_unused keys out_fmt =
       begin match out_fmt with
       | `Short ->
           let files = List.sort Fpath.compare @@ List.rev_map snd files in
-          Fmt.pr "@[<v>%a@]@." Fmt.(list Fpath.pp_quoted) files
+          Fmt.pr "@[<v>%a@]@." Fmt.(list Fpath.pp_unquoted) files
       | `Normal | `Long ->
           let files = List.sort compare files in
-          let pp_file = Fmt.(hbox @@ pair ~sep:sp string Fpath.pp_quoted) in
+          let pp_file = Fmt.(hbox @@ pair ~sep:sp string Fpath.pp_unquoted) in
           Fmt.pr "@[<v>%a@]@." Fmt.(list pp_file) files
       end;
       Ok 0

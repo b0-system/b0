@@ -87,11 +87,10 @@ module File_cache : sig
     (** [of_cache c] are satistics of [c]. *)
   end
 
-
   (** {1:high-level High-level commands.}
 
       These commands act on a cache directory. They avoid to create
-      it via {!B00.File_cache.create} if it doesn't exists and mostly
+      it via {!B000.File_cache.create} if it doesn't exists and mostly
       return [Ok ()] in these cases. *)
 
   val delete :
@@ -129,19 +128,7 @@ end
 (** {!B000.Op} interaction. *)
 module Op : sig
 
-  val is_selected :
-    reads:Fpath.t list -> writes:Fpath.t list -> ids:B000.Op.id list ->
-    hashes:Hash.t list -> groups:string list -> B000.Op.t -> bool
-  (** [is_selected ~reads ~writes ~ids ~hashes ~groups o] is [true]
-      iff [o] reads a file in [reads] or writes a file in [writes]
-      or has its id in [ids], or has its hash in [hashes] or has
-      is [group] in [groups] or if all these lists are empty. *)
-
-  val read_write_indexes :
-    B000.Op.t list -> B000.Op.Set.t Fpath.Map.t * B000.Op.Set.t Fpath.Map.t
-  (** [read_write_indexes ops] is [reads, writes] with [reads] mapping
-      file path to operations that reads them and [writes] mapping file
-      paths to operations that write them. *)
+  (** {1:deps Finding dependencies} *)
 
   val find_needs :
     ?acc:B000.Op.Set.t -> recursive:bool -> writes:B000.Op.Set.t Fpath.Map.t ->
@@ -153,13 +140,34 @@ module Op : sig
       dependencies are reported. *)
 
   val find_enables :
-    ?acc:B000.Op.Set.t -> recursive:bool ->
-    reads:B000.Op.Set.t Fpath.Map.t -> B000.Op.Set.t -> B000.Op.Set.t
-    (** [find_enables ~recursive ~writes ~acc ops] add to [acc]
+    ?acc:B000.Op.Set.t -> recursive:bool -> reads:B000.Op.Set.t Fpath.Map.t ->
+    B000.Op.Set.t -> B000.Op.Set.t
+  (** [find_enables ~recursive ~writes ~acc ops] add to [acc]
       (defaults to {!B00.Op.Set.empty}) the set of operations in the
       read index [reads] that are enabled by the set of operations
       [ops]. If [recursive] is [false] only direct dependencies are
-        reported. *)
+      reported. *)
+
+  (** {1:query Operation query} *)
+
+  type query = B000.Op.t list -> B000.Op.t list
+  (** The type for build operation queries. This is not simply predicate
+      because of dependency selection. *)
+
+  val select :
+    reads:Fpath.t list -> writes:Fpath.t list -> ids:B000.Op.id list ->
+    hashes:Hash.t list -> groups:string list -> B000.Op.t -> bool
+  (** [select ~reads ~writes ~ids ~hashes ~groups o] is [true]
+      iff [o] reads a file in [reads] or writes a file in [writes]
+      or has its id in [ids], or has its hash in [hashes] or has
+      its [group] in [groups] or if all these selector lists are empty. *)
+
+  val select_deps :
+    needs:bool -> enables:bool -> recursive:bool -> dom:B000.Op.t list ->
+    B000.Op.t list -> B000.Op.t list
+  (** [select_deps ~needs ~enables ~recusrive  ~dom ops] select the operation
+      [needs] and/or [enables] of [ops] [recursive]ly in [dom]. This is [ops]
+      if both [needs] and [enables] are [false]. *)
 
   val filter :
     revived:bool option ->
@@ -174,21 +182,35 @@ module Op : sig
     by:[`Create | `Dur | `Wait | `Start] -> B000.Op.t list -> B000.Op.t list
   (** [order ~by ops] orders [ops] by [by] time. *)
 
+  val query :
+    select:(B000.Op.t -> bool) ->
+    select_deps: (dom:B000.Op.t list -> B000.Op.t list -> B000.Op.t list) ->
+    filter:(B000.Op.t -> bool) ->
+    order:(B000.Op.t list -> B000.Op.t list) -> query
+  (** [query ~select ~select_deps ~filer ~order] is an operation
+      query that [select]s operations, their dependencies (or not)
+      according to [select_deps], filters the result with [filter]
+      and orders them by [order]. *)
 
-  type selector = B000.Op.t list -> B000.Op.t list
-  (** The type for build operation selectors. *)
+  (** {1:cli Command line interface} *)
 
-  val select :
-    reads:Fpath.t list -> writes:Fpath.t list -> ids:B000.Op.id list ->
-    hashes:Hash.t list -> groups:string list -> needs:bool -> enables:bool ->
-    recursive:bool -> revived:bool option ->
-    statuses:[`Aborted | `Done | `Failed | `Waiting ] list ->
-    kinds:[ `Copy | `Delete | `Notify | `Mkdir | `Read | `Spawn | `Wait_files
-          | `Write ] list ->
-    order_by:[ `Create | `Dur | `Wait | `Start ] -> selector
+  val groups :
+    ?opts:string list -> ?docs:string -> ?doc:string -> unit ->
+    string list Cmdliner.Term.t
 
-  val select_cli : ?docs:string -> unit -> selector Cmdliner.Term.t
-  val select_man : Cmdliner.Manpage.block list
+  val select_cli :
+    ?docs:string ->
+    ?groups:string list Cmdliner.Term.t ->
+    unit -> (B000.Op.t -> bool) Cmdliner.Term.t
+
+  val select_deps_cli :
+    ?docs:string -> unit ->
+    (dom:B000.Op.t list -> B000.Op.t list -> B000.Op.t list) Cmdliner.Term.t
+  val filter_cli : ?docs:string -> unit -> (B000.Op.t -> bool) Cmdliner.Term.t
+  val order_cli :
+    ?docs:string -> unit -> (B000.Op.t list -> B000.Op.t list) Cmdliner.Term.t
+  val query_cli : ?docs:string -> unit -> query Cmdliner.Term.t
+  val query_man : Cmdliner.Manpage.block list
 end
 
 (** {!B00.Memo} interaction. *)
@@ -202,10 +224,11 @@ module Memo : sig
     [B00.Memo.feedback | B000.Exec.feedback] Fmt.t
   (** [pp_leveled_feedback ~sep ~op_howto ~show_spawn_ui ~show_success ~level
       ppf] formats memo feedback on [ppf] followed by [sep] iff something
-      is printed (defaults to {!Fmt.flush_nl}).
+      is printed (defaults to {!B0_std.Fmt.flush_nl}).
       {ul
-      {- {!Log.Quiet} formats nothing}
-      {- {!Log.Debug} report all operations with {!B000_conv.Op.pp_short_ui}.}}
+      {- {!B0_std.Log.Quiet} formats nothing}
+      {- {!B0_std.Log.Debug} report all operations with
+         {!B000_conv.Op.pp_short_ui}.}}
       {ul
       {- [show_ui] is the level at which any completed operation
          gets logged with {!B000_conv.Op.pp_ui}.}
@@ -214,87 +237,30 @@ module Memo : sig
       The formatter [op_howto] should format a way to got more information
       about an operation, default to {!nop}. *)
 
-  val pp_error :
-    ?sep:unit Fmt.t -> ?read_howto:Fpath.t Fmt.t ->
-    ?write_howto:Fpath.t Fmt.t -> unit ->  B000.Op.aggregate_error Fmt.t
-  (** [pp_error ~read_howto ~write_howto] formats a memo
-      error followed by [sep] iff somethings is printed (defaults
-      to {!Fmt.flush_nl}). The errors are formatted as follows:
-      {ul
-      {- {!B00.Memo.Failures} formats {!Fmt.nop}.}
-      {- {!B00.Memo.Never_became_ready} formats each file
-         prefixing it with [op_reading_howto].}
-      {- {!B00.Memo.Cycle}, formats the operations of the cycle.}} *)
+  (** {1:dirs_files Directories and files} *)
 
-  (** {1:dirs_files Specifying directories and files} *)
-
-  val b0_dir_name : string
-  (** [b0_dir_name] is ["_b0"] the default b0 directory name. *)
-
-  val cache_dir_name : string
-  (** [cache_dir_name] is [".cache"] the default cache directory name
-      in the [b0] directory. *)
-
-  val trash_dir_name : string
-  (** [trash_dir_name] is [".trash"] the default trash directoy name
-      in the [b0] directory. *)
-
-  val log_file_name : string
-  (** [log_file_name] is [".log"] the default log file name in
-      the [b0] directory. *)
+  (** {2:b0_dir B0 directory} *)
 
   val b0_dir_env : string
   (** [b0_dir_env] is ["B0_DIR"]. *)
 
-  val cache_dir_env : string
-  (** [b0_dir_env] is ["B0_CACHE_DIR"]. *)
-
-  val log_file_env : string
-  (** [b0_dir_env] is ["B0_LOG_FILE"]. *)
+  val b0_dir_name : string
+  (** [b0_dir_name] is ["_b0"] the default b0 directory name. *)
 
   val b0_dir :
-    ?docs:string -> ?doc:string -> ?doc_none:string -> ?env:Cmdliner.Arg.env ->
-    unit -> Fpath.t option Term.t
+    ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
+    ?env:Cmdliner.Arg.env -> unit -> Fpath.t option Term.t
   (** [b0_dir ~doc_none ~docs ~doc ~env] is a cli interface for specifying
       a b0 directory.
       {ul
+      {- [opts] are the cli options to specify it, defaults to [["b0-dir"]].}
       {- [docs] is where the option is documented, defaults to
-         {!Manpage.s_common_options}}
+         {!Cmdliner.Manpage.s_common_options}}
       {- [doc] is a doc string.}
       {- [doc_none] describes how the value is determined if the term is
          evaluates to [None].}
       {- [env] is a variable that can be used to override the default
          value, defaults to {!b0_dir_env}.}} *)
-
-  val cache_dir :
-    ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
-    ?env:Cmdliner.Arg.env -> unit -> Fpath.t option Term.t
-  (** [cache_dir ~doc_none ~docs ~doc ~env] is a cli interface for specifying
-      a b0 cache directory.
-      {ul
-      {- [opts] are the cli options to specify it.}
-      {- [docs] is where the option is documented, defaults to
-         {!Manpage.s_common_options}}
-      {- [doc] is a doc string.}
-      {- [doc_none] describes how the value is determined if the term is
-         evaluates to [None].}
-      {- [env] is a variable that can be used to override the default
-         value, defaults to {!cache_dir_env}.}} *)
-
-  val log_file :
-    ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
-    ?env:Cmdliner.Arg.env -> unit -> Fpath.t option Term.t
-  (** [log_file ~doc_none ~docs ~doc ~env] is a cli interface for
-      specifing a b0 log file.
-      {ul
-      {- [opts] are the cli options to specify it.}
-      {- [docs] is where the option is documented, defaults to
-         {!Manpage.s_common_options}}
-      {- [doc] is a doc string.}
-      {- [doc_none] describes how the value is determined if the term is
-         evaluates to [None].}
-      {- [env] is a variable that can be used to override the default
-         value, defaults to {!cache_dir_env}.}} *)
 
   val get_b0_dir :
     cwd:Fpath.t -> root:Fpath.t -> b0_dir:Fpath.t option -> Fpath.t
@@ -302,11 +268,42 @@ module Memo : sig
       [b0_dir] is [Some d] then this is [Fpath.(cwd // d)]. If [None]
       then this is [Fpath.(root / b0_dir_name)]. *)
 
+  (** {2:cache_dir File cache directory} *)
+
+  val cache_dir_env : string
+  (** [b0_dir_env] is ["B0_CACHE_DIR"]. *)
+
+  val cache_dir_name : string
+  (** [cache_dir_name] is [".cache"] the default cache directory name
+      in the [b0] directory. *)
+
+  val cache_dir :
+    ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
+    ?env:Cmdliner.Arg.env -> unit -> Fpath.t option Term.t
+  (** [cache_dir ~doc_none ~docs ~doc ~env] is a cli interface for specifying
+      a b0 cache directory.
+      {ul
+      {- [opts] are the cli options to specify it, default to
+         [["cache-dir"]].}
+      {- [docs] is where the option is documented, defaults to
+         {!Cmdliner.Manpage.s_common_options}}
+      {- [doc] is a doc string.}
+      {- [doc_none] describes how the value is determined if the term is
+         evaluates to [None].}
+      {- [env] is a variable that can be used to override the default
+         value, defaults to {!cache_dir_env}.}} *)
+
   val get_cache_dir :
     cwd:Fpath.t -> b0_dir:Fpath.t -> cache_dir:Fpath.t option -> Fpath.t
   (** [get_cache_dir ~cwd ~b0_dir ~cache_dir] determines a cache directory.
       If [cache_dir] is [Some d] then this is [Fpath.(cwd // d)]. If [None]
       then this is [Fpath.(b0_dir / cache_dir)]. *)
+
+  (** {2:trash_dir Trash directory} *)
+
+  val trash_dir_name : string
+  (** [trash_dir_name] is [".trash"] the default trash directoy name
+      in the [b0] directory. *)
 
   val get_trash_dir :
     cwd:Fpath.t -> b0_dir:Fpath.t -> trash_dir:Fpath.t option -> Fpath.t
@@ -314,27 +311,91 @@ module Memo : sig
       If [trash_dir] is [Some d] then this is [Fpath.(cwd // d]. If
       [None] then this is [Fpath.(b0_dir /trash_dir)]. *)
 
+  (** {2:log_file Log file} *)
+
+  val log_file_env : string
+  (** [b0_dir_env] is ["B0_LOG_FILE"]. *)
+
+  val log_file_name : string
+  (** [log_file_name] is [".log"] the default log file name in
+      the [b0] directory. *)
+
+  val log_file :
+    ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
+    ?env:Cmdliner.Arg.env -> unit -> Fpath.t option Term.t
+  (** [log_file ~doc_none ~docs ~doc ~env] is a cli interface for
+      specifing a b0 log file.
+      {ul
+      {- [opts] are the cli options to specify it, defaults to [["log-file"]].}
+      {- [docs] is where the option is documented, defaults to
+         {!Cmdliner.Manpage.s_common_options}}
+      {- [doc] is a doc string.}
+      {- [doc_none] describes how the value is determined if the term is
+         evaluates to [None].}
+      {- [env] is a variable that can be used to override the default
+         value, defaults to {!cache_dir_env}.}} *)
+
   val get_log_file :
     cwd:Fpath.t -> b0_dir:Fpath.t -> log_file:Fpath.t option -> Fpath.t
   (** [get_log_file ~cwd ~b0_dir ~log_file] determines a log file.
       If [log_file] is [Some f] then this is [Fpath.(cwd // f)]. If [None]
       then this is [Fpath.(b0_dir /log_file)]. *)
 
-  (** {1:build Build parameters} *)
+  (** {1:memo Memo parameters} *)
 
-  val jobs : ?docs:string -> ?env:Arg.env -> unit -> int option Term.t
+  (** {2:jobs Jobs} *)
+
+  val jobs_env : string
+  (** [jobs_env] is ["B0_JOBS"]. *)
+
+  val jobs :
+    ?opts:string list ->  ?docs:string -> ?doc:string -> ?doc_none:string ->
+    ?env:Arg.env -> unit -> int option Term.t
   (** [jobs] is a cli interface for specifying the maximal number of
-      commands to spawn concurrently. *)
+      commands to spawn concurrently.
+      {ul
+      {- [opts] are the cli options to specify it, defaults to [["j";"jobs"]].}
+      {- [docs] is where the option is documented, defaults to
+         {!Cmdliner.Manpage.s_common_options}}
+      {- [doc] is a doc string.}
+      {- [doc_none] describes how the value is determined if the term is
+         evaluates to [None].}
+      {- [env] is a variable that can be used to override the default
+         value, defaults to {!jobs_env}.}} *)
 
   val get_jobs : jobs:int option -> int
-  (** [get_jobs jobs] determines a maximal number of spawns. If jobs
-      is [None], {!B0_std.Os.Cpu.logical_count} is used. *)
+  (** [get_jobs ~jobs] determines a maximal number of spawns. If jobs
+      is [None] then {!B0_std.Os.Cpu.logical_count} is used. *)
+
+  (** {2:hash_fun Hash function} *)
+
+  val hash_fun_env : string
+  (** [hash_fun_env] is ["B0_HASH_FUN"]. *)
+
+  val hash_fun :
+    ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
+    ?env:Arg.env -> unit -> (module Hash.T) option Term.t
+  (** [hash_fun] is a cli interface for specfiying hash function
+      used for caching.
+      {ul
+      {- [opts] are the cli options to specify it, defaults to [["hash-fun"]].}
+      {- [docs] is where the option is documented, defaults to
+         {!Manpage.s_common_options}}
+      {- [doc] is a doc string.}
+      {- [doc_none] describes how the value is determined if the term is
+         evaluates to [None].}
+      {- [env] is a variable that can be used to override the default
+         value, defaults to {!hash_fun_env}.}} *)
+
+  val get_hash_fun : hash_fun:(module Hash.T) option -> (module Hash.T)
+  (** [get_hash_fun ~hash_fun] determines a hash function. If [hash_fun]
+      is [None] then {!B0_std.Hash.Xxh_64} is used. *)
 
   (** {1:logs Logs} *)
 
-  (** {!Memo} log.
+  (** {!B00.Memo} log.
 
-      A {!Memo} log has all the build operations and a few
+      A {!B00.Memo} log has all the build operations and a few
       global statistics about the memo. *)
   module Log : sig
 
@@ -362,15 +423,15 @@ module Memo : sig
 
     (** {1:fmt Log formatters} *)
 
-    val pp_stats : Op.selector -> t Fmt.t
+    val pp_stats : Op.query -> t Fmt.t
     (** [pp_stats sel] formats statistics stored in the log using
-        [sel] to select operations that are part of the statistics. *)
+        [query] to select operations that are part of the statistics. *)
 
-    type out_kind = [`Normal | `Trace_event | `Stats ]
+    type out_kind = [`Normal | `Trace_event | `Stats | `Hashes ]
     (** The type for output kinds. *)
 
     val out :
-      Format.formatter -> Cli.out_fmt -> out_kind -> Op.selector -> t -> unit
+      Format.formatter -> Cli.out_fmt -> out_kind -> Op.query -> t -> unit
     (** [out] formats a log on the given formatter. *)
 
     (** {1:cli Command line interface} *)

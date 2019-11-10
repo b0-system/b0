@@ -553,7 +553,8 @@ module Op : sig
   (** [duration] is [o]'s execution duration time. *)
 
   val revived : t -> bool
-  (** [revived o] is [true] iff [o] was revived from a cache. *)
+  (** [revived o] is [true] iff [o] was revived from a cache. Only
+      relevant if {!hash} is not {!Hash.nil}. *)
 
   val status : t -> status
   (** [status o] is [o] execution status. *)
@@ -567,7 +568,8 @@ module Op : sig
   val hash : t -> Hash.t
   (** [hash o] is the operation's hash. This is {!Hash.nil} before the
       operation hash has been effectively computed and set via
-      {!set_hash}. *)
+      {!set_hash}. This remains {!Hash.nil} for operations that
+      are not revivable. *)
 
   (** {1:upd Updating the build operation} *)
 
@@ -643,11 +645,15 @@ module Op : sig
   (** [unwritten_reads os] are the file read by [os] that are not written
       by those. *)
 
+  val read_write_maps : t list -> Set.t Fpath.Map.t * Set.t Fpath.Map.t
+  (** [read_write_maps ops] is [reads, writes] with [reads] mapping
+      file paths to operations that reads them and [writes] mapping
+      file paths to operations that write them. *)
+
   val write_map : t list -> Set.t Fpath.Map.t
-  (** [write_map os] are the file written by [os] mapped to the
-      operation that writes them. If one of the operation sets is not
-      a singleton the operations should likely not be run
-      toghether. *)
+  (** [write_map os] is [snd (read_write_maps os)]. If one of the
+      operation sets in the map is not a singleton the operations
+      should likely not be run toghether. *)
 
   val find_read_write_cycle : t list -> t list option
   (** [find_read_write_cycle os] is [Some cs] if there exists a

@@ -709,20 +709,28 @@ module Op = struct
     in
     loop Fpath.Set.empty Fpath.Set.empty os
 
-  let write_map os =
-    let add_write o acc w = match Fpath.Map.find w acc with
-    | exception Not_found -> Fpath.Map.add w (Set.singleton o) acc
-    | os -> Fpath.Map.add w (Set.add o os) acc
+  let read_write_maps os =
+    let rec loop rm wm = function
+    | [] -> rm, wm
+    | o :: os ->
+        let add acc p = Fpath.Map.add_to_set (module Set) p o acc in
+        let rm = List.fold_left add rm (reads o) in
+        let wm = List.fold_left add wm (writes o) in
+        loop rm wm os
     in
+    loop Fpath.Map.empty Fpath.Map.empty os
+
+  let write_map os =
+    let add_write o acc p = Fpath.Map.add_to_set (module Set) p o acc in
     let add_writes acc o = List.fold_left (add_write o) acc (writes o) in
     List.fold_left add_writes Fpath.Map.empty os
 
   let op_deps ~write_map o =
-      let add_read_deps acc r = match Fpath.Map.find r write_map with
-      | exception Not_found -> acc
-      | os -> Set.union os acc
-      in
-      List.fold_left add_read_deps Set.empty (reads o)
+    let add_read_deps acc r = match Fpath.Map.find r write_map with
+    | exception Not_found -> acc
+    | os -> Set.union os acc
+    in
+    List.fold_left add_read_deps Set.empty (reads o)
 
   let find_read_write_cycle os =
     let path_to_start ~start path =
@@ -758,7 +766,6 @@ module Op = struct
         | `No_cycle visited -> loop write_map visited os
     in
     loop (write_map os) Set.empty os
-
 
   type aggregate_error =
   | Failures

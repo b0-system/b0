@@ -625,6 +625,76 @@ module Op = struct
       ~status ~reads ~writes ~hash ~k kind
 
   let bincode = Bincode.v enc dec
+
+  (* Aggregate errors *)
+
+  let howto_file howto = Fmt.(tty style_op_howto howto ++ pp_file_write)
+  let writes_cycle os =
+    let deps prev next =
+      let prev_writes = Fpath.Set.of_list (B000.Op.writes prev) in
+      let next_reads = Fpath.Set.of_list (B000.Op.reads next) in
+      Fpath.Set.inter prev_writes next_reads
+    in
+    match os with
+    | [] -> []
+    | [o] -> [deps o o]
+    | first :: _ ->
+        let rec loop first acc = function
+        | prev :: (next :: _ as os) -> loop first (deps prev next :: acc) os
+        | prev :: [] -> List.rev (deps prev first :: acc)
+        | [] -> assert false
+        in
+        loop first [] os
+
+  let pp_failed ppf () = Fmt.(tty style_err string) ppf  "FAILED"
+  let pp_ops_cycle ?(write_howto = Fmt.any "") ppf os =
+    let pp_self_cycle ~write_howto ppf writes =
+      let these_file, them = match Fpath.Set.cardinal writes with
+      | 1 -> "This file is", "it"
+      | _ -> "These files are", "them"
+      in
+      Fmt.pf ppf
+        "%s read and written by the same operation:@,\
+        \ @[<v>%a@,See the operation writing %s for details.@]@]"
+        these_file (Fpath.Set.pp (howto_file write_howto)) writes them
+    in
+    let pp_cycle ~write_howto ppf ws =
+      Fmt.pf ppf
+        "Operations writing these files form \
+         a cycle:@, @[<v>%a@,\
+         The last written file is read by the operation writing the first \
+         one.@,\
+         See operations writing them for details.@]"
+        (Fmt.list (howto_file write_howto)) ws
+    in
+    let pp_ops ppf os =
+      let writes = writes_cycle os in
+      match os with
+      | [] -> assert false
+      | [o] -> pp_self_cycle ~write_howto ppf (List.hd writes)
+      | os ->
+          let writes = try List.(rev @@ rev_map Fpath.Set.choose writes) with
+          | Not_found -> assert false
+          in
+          pp_cycle ~write_howto ppf writes
+    in
+    Fmt.pf ppf "@[<v>[%a] %a@]" pp_failed () pp_ops os
+
+  let pp_never_ready ?(read_howto = Fmt.any "") ppf fs =
+    let err = match Fpath.Set.cardinal fs with
+    | 1 -> "This file never became ready"
+    | _ -> "These files never became ready"
+    in
+    Fmt.pf ppf "@[<v>[%a] %s:@,\
+               \ @[<v>%a@,See operations reading them for details.@]@]"
+      pp_failed () err (Fpath.Set.pp (howto_file read_howto)) fs
+
+  let pp_aggregate_error ?(sep = Fmt.flush_nl) ?read_howto ?write_howto () ppf =
+    function
+    | B000.Op.Failures -> ()
+    | B000.Op.Cycle ops -> pp_ops_cycle ?write_howto ppf ops; sep ppf ()
+    | B000.Op.Never_became_ready fs ->
+        pp_never_ready ?read_howto ppf fs; sep ppf ()
 end
 
 (*---------------------------------------------------------------------------

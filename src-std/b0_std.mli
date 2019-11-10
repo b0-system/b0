@@ -1626,6 +1626,10 @@ module Hash : sig
 
   val add_fun : (module T) -> unit
   (** [add_fun m] adds [m] to the list returned by [funs]. *)
+
+  val get_fun : string -> ((module T), string) result
+  (** [get_fun id] is the hash function with identifier [id] or an
+      error message. *)
 end
 
 (** Measuring time.

@@ -45,6 +45,22 @@ module Op : sig
 
   val bincode : Op.t Bincode.t
   (** [bincode] binary codes an operation. *)
+
+  (** {1:errors Aggregate errors} *)
+
+  val pp_aggregate_error :
+    ?sep:unit Fmt.t -> ?read_howto:Fpath.t Fmt.t ->
+    ?write_howto:Fpath.t Fmt.t -> unit ->  B000.Op.aggregate_error Fmt.t
+    (** [pp_aggregate_error ~read_howto ~write_howto] formats a memo
+        error followed by [sep] iff somethings is printed (defaults
+        to {!Fmt.flush_nl}). The errors are formatted as follows:
+        {ul
+        {- {!B000.Op.Failures} formats {!Fmt.nop}.}
+        {- {!B000.Op.Never_became_ready} formats each file
+         prefixing it with [read_howto].}
+        {- {!B000.Op.Cycle}, formats the operations of the cycle.
+         by writing the files that form the cycle and prefixing
+         them with {!write_howto}.}} *)
 end
 
 (*---------------------------------------------------------------------------
