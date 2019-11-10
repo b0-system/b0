@@ -3978,7 +3978,7 @@ end
 
 (* Binary encoding *)
 
-module Binc = struct
+module Bincode = struct
 
   (* Encoders *)
 

@@ -351,8 +351,8 @@ module Memo : sig
 
     (** {1:io IO} *)
 
-    val binc : t Binc.t
-    (** [binc] is a binary codec for logs. *)
+    val bincode : t Bincode.t
+    (** [bincode] is a binary codec for logs. *)
 
     val write : Fpath.t -> t -> (unit, string) result
     (** [write f l] writes log [l] to file [f]. *)

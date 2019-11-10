@@ -3017,8 +3017,8 @@ module Rqueue : sig
   (** [length q] is the number of elements in [q]. *)
 end
 
-(** Binary coding *)
-module Binc : sig
+(** Binary coding of values. *)
+module Bincode : sig
 
   (** {1:enc Encoders} *)
 

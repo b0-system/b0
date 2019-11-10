@@ -367,219 +367,222 @@ module Op = struct
 
   (* Binary serialization *)
 
-  let enc_time_span b s = Binc.enc_int64 b (Time.Span.to_uint64_ns s)
+  let enc_time_span b s = Bincode.enc_int64 b (Time.Span.to_uint64_ns s)
   let dec_time_span s i =
-    let i, u = Binc.dec_int64 s i in
+    let i, u = Bincode.dec_int64 s i in
     i, Time.Span.of_uint64_ns u
 
-  let enc_hash b h = Binc.enc_string b (Hash.to_bytes h)
-  let dec_hash s i = let i, s = Binc.dec_string s i in i, Hash.of_bytes s
+  let enc_hash b h = Bincode.enc_string b (Hash.to_bytes h)
+  let dec_hash s i = let i, s = Bincode.dec_string s i in i, Hash.of_bytes s
 
   let enc_failure b = function
-  | Op.Exec msg -> Binc.enc_byte b 0; (Binc.enc_option Binc.enc_string) b msg
-  | Op.Missing_writes fs -> Binc.enc_byte b 1; Binc.enc_list Binc.enc_fpath b fs
-  | Op.Missing_reads fs -> Binc.enc_byte b 2; Binc.enc_list Binc.enc_fpath b fs
+  | Op.Exec msg -> Bincode.enc_byte b 0; Bincode.(enc_option enc_string) b msg
+  | Op.Missing_writes fs ->
+      Bincode.enc_byte b 1; Bincode.(enc_list enc_fpath) b fs
+  | Op.Missing_reads fs ->
+      Bincode.enc_byte b 2; Bincode.(enc_list enc_fpath) b fs
 
   let dec_failure s i =
     let kind = "Op.failure" in
-    let next, b = Binc.dec_byte ~kind s i in
+    let next, b = Bincode.dec_byte ~kind s i in
     match b with
     | 0 ->
-        let i, msg = (Binc.dec_option Binc.dec_string) s next in
+        let i, msg = (Bincode.dec_option Bincode.dec_string) s next in
         i, Op.Exec msg
     | 1 ->
-        let i, fs = Binc.dec_list Binc.dec_fpath s next in
+        let i, fs = Bincode.dec_list Bincode.dec_fpath s next in
         i, Op.Missing_writes fs
     | 2 ->
-        let i, fs = Binc.dec_list Binc.dec_fpath s next in
+        let i, fs = Bincode.dec_list Bincode.dec_fpath s next in
         i, Op.Missing_reads fs
-    | b -> Binc.err_byte ~kind i b
+    | b -> Bincode.err_byte ~kind i b
 
   let enc_status b = function
-  | Op.Aborted -> Binc.enc_byte b 0
-  | Op.Done -> Binc.enc_byte b 1
-  | Op.Failed f -> Binc.enc_byte b 2; enc_failure b f
-  | Op.Waiting -> Binc.enc_byte b 3
+  | Op.Aborted -> Bincode.enc_byte b 0
+  | Op.Done -> Bincode.enc_byte b 1
+  | Op.Failed f -> Bincode.enc_byte b 2; enc_failure b f
+  | Op.Waiting -> Bincode.enc_byte b 3
 
   let dec_status s i =
     let kind = "Op.status" in
-    let next, b = Binc.dec_byte ~kind s i in
+    let next, b = Bincode.dec_byte ~kind s i in
     match b with
     | 0 -> next, Op.Aborted
     | 1 -> next, Op.Done
     | 2 -> let i, f = dec_failure s next in i, Op.Failed f
     | 3 -> next, Op.Waiting
-    | b -> Binc.err_byte ~kind i b
+    | b -> Bincode.err_byte ~kind i b
 
   let enc_copy b c =
-    Binc.enc_fpath b (Op.Copy.src c);
-    Binc.enc_fpath b (Op.Copy.dst c);
-    Binc.enc_int b (Op.Copy.mode c);
-    Binc.enc_option Binc.enc_int b (Op.Copy.linenum c)
+    Bincode.enc_fpath b (Op.Copy.src c);
+    Bincode.enc_fpath b (Op.Copy.dst c);
+    Bincode.enc_int b (Op.Copy.mode c);
+    Bincode.enc_option Bincode.enc_int b (Op.Copy.linenum c)
 
   let dec_copy s i =
-    let i, src = Binc.dec_fpath s i in
-    let i, dst = Binc.dec_fpath s i in
-    let i, mode = Binc.dec_int s i in
-    let i, linenum = Binc.dec_option Binc.dec_int s i in
+    let i, src = Bincode.dec_fpath s i in
+    let i, dst = Bincode.dec_fpath s i in
+    let i, mode = Bincode.dec_int s i in
+    let i, linenum = Bincode.dec_option Bincode.dec_int s i in
     i, Op.Copy.v ~src ~dst ~mode ~linenum
 
-  let enc_delete b d = Binc.enc_fpath b (Op.Delete.path d)
+  let enc_delete b d = Bincode.enc_fpath b (Op.Delete.path d)
   let dec_delete s i =
-    let i, path = Binc.dec_fpath s i in
+    let i, path = Bincode.dec_fpath s i in
     i, Op.Delete.v ~path
 
   let enc_mkdir b m =
-    Binc.enc_fpath b (Op.Mkdir.dir m);
-    Binc.enc_int b (Op.Mkdir.mode m)
+    Bincode.enc_fpath b (Op.Mkdir.dir m);
+    Bincode.enc_int b (Op.Mkdir.mode m)
 
   let dec_mkdir s i =
-    let i, dir = Binc.dec_fpath s i in
-    let i, mode = Binc.dec_int s i in
+    let i, dir = Bincode.dec_fpath s i in
+    let i, mode = Bincode.dec_int s i in
     i, Op.Mkdir.v ~mode ~dir
 
   let enc_notify_kind b = function
-  | `End -> Binc.enc_byte b 0
-  | `Fail -> Binc.enc_byte b 1
-  | `Info -> Binc.enc_byte b 2
-  | `Start -> Binc.enc_byte b 3
-  | `Warn -> Binc.enc_byte b 4
+  | `End -> Bincode.enc_byte b 0
+  | `Fail -> Bincode.enc_byte b 1
+  | `Info -> Bincode.enc_byte b 2
+  | `Start -> Bincode.enc_byte b 3
+  | `Warn -> Bincode.enc_byte b 4
 
   let dec_notify_kind s i =
     let kind = "Op.Notify.kind" in
-    let next, b = Binc.dec_byte ~kind s i in
+    let next, b = Bincode.dec_byte ~kind s i in
     match b with
     | 0 -> next, `End
     | 1 -> next, `Fail
     | 2 -> next, `Info
     | 3 -> next, `Start
     | 4 -> next, `Warn
-    | b -> Binc.err_byte ~kind i b
+    | b -> Bincode.err_byte ~kind i b
 
   let enc_notify b n =
     enc_notify_kind b (Op.Notify.kind n);
-    Binc.enc_string b (Op.Notify.msg n)
+    Bincode.enc_string b (Op.Notify.msg n)
 
   let dec_notify s i =
     let i, kind = dec_notify_kind s i in
-    let i, msg = Binc.dec_string s i in
+    let i, msg = Bincode.dec_string s i in
     i, Op.Notify.v ~kind ~msg
 
-  let enc_read b r = Binc.enc_fpath b (Op.Read.file r)
+  let enc_read b r = Bincode.enc_fpath b (Op.Read.file r)
   let dec_read s i =
-    let i, file = Binc.dec_fpath s i in
+    let i, file = Bincode.dec_fpath s i in
     i, Op.Read.v ~file ~data:""
 
   let enc_spawn_stdo b = function
-  | `Ui -> Binc.enc_byte b 0
-  | `File p -> Binc.enc_byte b 1; Binc.enc_fpath b p
-  | `Tee p -> Binc.enc_byte b 2; Binc.enc_fpath b p
+  | `Ui -> Bincode.enc_byte b 0
+  | `File p -> Bincode.enc_byte b 1; Bincode.enc_fpath b p
+  | `Tee p -> Bincode.enc_byte b 2; Bincode.enc_fpath b p
 
   let dec_spawn_stdo s i =
     let kind = "Op.spawn_stdo" in
-    let next, b = Binc.dec_byte ~kind s i in
+    let next, b = Bincode.dec_byte ~kind s i in
     match b with
     | 0 -> next, `Ui
-    | 1 -> let i, p = Binc.dec_fpath s next in i, `File p
-    | 2 -> let i, p = Binc.dec_fpath s next in i, `Tee p
-    | b -> Binc.err_byte ~kind i b
+    | 1 -> let i, p = Bincode.dec_fpath s next in i, `File p
+    | 2 -> let i, p = Bincode.dec_fpath s next in i, `Tee p
+    | b -> Bincode.err_byte ~kind i b
 
   let enc_cmd b cmd =
-    let arg b a = Binc.enc_byte b 0; Binc.enc_string b a in
-    let unstamp b = Binc.enc_byte b 1 in
-    let append b = Binc.enc_byte b 2 in
-    let empty b = Binc.enc_byte b 3 in
+    let arg b a = Bincode.enc_byte b 0; Bincode.enc_string b a in
+    let unstamp b = Bincode.enc_byte b 1 in
+    let append b = Bincode.enc_byte b 2 in
+    let empty b = Bincode.enc_byte b 3 in
     Cmd.iter_enc ~arg ~unstamp ~append ~empty b cmd
 
   let rec dec_cmd s i =
     let kind = "Cmd.t" in
-    let next, b = Binc.dec_byte ~kind s i in
+    let next, b = Bincode.dec_byte ~kind s i in
     match b with
-    | 0 -> let i, s = Binc.dec_string s next in i, Cmd.arg s
+    | 0 -> let i, s = Bincode.dec_string s next in i, Cmd.arg s
     | 1 -> let i, cmd = dec_cmd s next in i, Cmd.unstamp cmd
     | 2 ->
         let i, cmd0 = dec_cmd s next in
         let i, cmd1 = dec_cmd s i in
         i, Cmd.append cmd1 cmd0
     | 3 -> next, Cmd.empty
-    | b -> Binc.err_byte ~kind i b
+    | b -> Bincode.err_byte ~kind i b
 
   let enc_os_cmd_status b = function
-  | `Exited c -> Binc.enc_byte b 0; Binc.enc_int b c
-  | `Signaled c -> Binc.enc_byte b 1; Binc.enc_int b c
+  | `Exited c -> Bincode.enc_byte b 0; Bincode.enc_int b c
+  | `Signaled c -> Bincode.enc_byte b 1; Bincode.enc_int b c
 
   let dec_os_cmd_status s i =
     let kind = "Os.Cmd.status" in
-    let next, b = Binc.dec_byte ~kind s i in
+    let next, b = Bincode.dec_byte ~kind s i in
     match b with
-    | 0 -> let i, c = Binc.dec_int s next in i, `Exited c
-    | 1 -> let i, c = Binc.dec_int s next in i, `Signaled c
-    | b -> Binc.err_byte ~kind i b
+    | 0 -> let i, c = Bincode.dec_int s next in i, `Exited c
+    | 1 -> let i, c = Bincode.dec_int s next in i, `Signaled c
+    | b -> Bincode.err_byte ~kind i b
 
   let enc_spawn b s =
-    Binc.enc_list Binc.enc_string b (Op.Spawn.env s);
-    Binc.enc_list Binc.enc_string b (Op.Spawn.stamped_env s);
-    Binc.enc_fpath b (Op.Spawn.cwd s);
-    Binc.enc_option Binc.enc_fpath b (Op.Spawn.stdin s);
+    Bincode.enc_list Bincode.enc_string b (Op.Spawn.env s);
+    Bincode.enc_list Bincode.enc_string b (Op.Spawn.stamped_env s);
+    Bincode.enc_fpath b (Op.Spawn.cwd s);
+    Bincode.enc_option Bincode.enc_fpath b (Op.Spawn.stdin s);
     enc_spawn_stdo b (Op.Spawn.stdout s);
     enc_spawn_stdo b (Op.Spawn.stderr s);
-    Binc.enc_list Binc.enc_int b (Op.Spawn.success_exits s);
-    Binc.enc_fpath b (Op.Spawn.tool s);
+    Bincode.enc_list Bincode.enc_int b (Op.Spawn.success_exits s);
+    Bincode.enc_fpath b (Op.Spawn.tool s);
     enc_cmd b (Op.Spawn.args s);
-    Binc.enc_string b (Op.Spawn.stamp s);
-    Binc.enc_option (Binc.enc_result ~ok:Binc.enc_string ~error:Binc.enc_string)
+    Bincode.enc_string b (Op.Spawn.stamp s);
+    Bincode.enc_option
+      (Bincode.enc_result ~ok:Bincode.enc_string ~error:Bincode.enc_string)
       b (Op.Spawn.stdo_ui s);
-    Binc.enc_option enc_os_cmd_status b (Op.Spawn.exit s)
+    Bincode.enc_option enc_os_cmd_status b (Op.Spawn.exit s)
 
   let dec_spawn s i =
-    let i, env = Binc.dec_list Binc.dec_string s i in
-    let i, stamped_env = Binc.dec_list Binc.dec_string s i in
-    let i, cwd = Binc.dec_fpath s i in
-    let i, stdin = Binc.dec_option Binc.dec_fpath s i in
+    let i, env = Bincode.dec_list Bincode.dec_string s i in
+    let i, stamped_env = Bincode.dec_list Bincode.dec_string s i in
+    let i, cwd = Bincode.dec_fpath s i in
+    let i, stdin = Bincode.dec_option Bincode.dec_fpath s i in
     let i, stdout = dec_spawn_stdo s i in
     let i, stderr = dec_spawn_stdo s i in
-    let i, success_exits = Binc.dec_list Binc.dec_int s i in
-    let i, tool = Binc.dec_fpath s i in
+    let i, success_exits = Bincode.dec_list Bincode.dec_int s i in
+    let i, tool = Bincode.dec_fpath s i in
     let i, args = dec_cmd s i in
-    let i, stamp = Binc.dec_string s i in
+    let i, stamp = Bincode.dec_string s i in
     let i, stdo_ui =
-      let ok = Binc.dec_string and error = Binc.dec_string in
-      Binc.dec_option (Binc.dec_result ~ok ~error) s i
+      let ok = Bincode.dec_string and error = Bincode.dec_string in
+      Bincode.dec_option (Bincode.dec_result ~ok ~error) s i
     in
-    let i, exit = Binc.dec_option dec_os_cmd_status s i in
+    let i, exit = Bincode.dec_option dec_os_cmd_status s i in
     i, Op.Spawn.v ~env ~stamped_env ~cwd ~stdin ~stdout ~stderr ~success_exits
       tool args ~stamp ~stdo_ui ~exit
 
-  let enc_wait_files b wait = Binc.enc_unit b ()
+  let enc_wait_files b wait = Bincode.enc_unit b ()
   let dec_wait_files s i =
-    let i, () = Binc.dec_unit s i in
+    let i, () = Bincode.dec_unit s i in
     i, Op.Wait_files.v ()
 
   let enc_write b w =
-    Binc.enc_string b (Op.Write.stamp w);
-    Binc.enc_int b (Op.Write.mode w);
-    Binc.enc_fpath b (Op.Write.file w)
+    Bincode.enc_string b (Op.Write.stamp w);
+    Bincode.enc_int b (Op.Write.mode w);
+    Bincode.enc_fpath b (Op.Write.file w)
 
   let dec_write s i =
-    let i, stamp = Binc.dec_string s i in
-    let i, mode = Binc.dec_int s i in
-    let i, file = Binc.dec_fpath s i in
+    let i, stamp = Bincode.dec_string s i in
+    let i, mode = Bincode.dec_int s i in
+    let i, file = Bincode.dec_fpath s i in
     let data () = Error "deserialized op, data fun not available" in
     i, Op.Write.v ~stamp ~mode ~file ~data
 
   let enc_kind b = function
-  | Op.Copy c -> Binc.enc_byte b 0; enc_copy b c
-  | Op.Delete d -> Binc.enc_byte b 1; enc_delete b d
-  | Op.Mkdir m -> Binc.enc_byte b 2; enc_mkdir b m
-  | Op.Notify n -> Binc.enc_byte b 3; enc_notify b n
-  | Op.Read r -> Binc.enc_byte b 4; enc_read b r
-  | Op.Spawn s -> Binc.enc_byte b 5; enc_spawn b s
-  | Op.Wait_files w -> Binc.enc_byte b 6; enc_wait_files b w
-  | Op.Write w -> Binc.enc_byte b 7; enc_write b w
+  | Op.Copy c -> Bincode.enc_byte b 0; enc_copy b c
+  | Op.Delete d -> Bincode.enc_byte b 1; enc_delete b d
+  | Op.Mkdir m -> Bincode.enc_byte b 2; enc_mkdir b m
+  | Op.Notify n -> Bincode.enc_byte b 3; enc_notify b n
+  | Op.Read r -> Bincode.enc_byte b 4; enc_read b r
+  | Op.Spawn s -> Bincode.enc_byte b 5; enc_spawn b s
+  | Op.Wait_files w -> Bincode.enc_byte b 6; enc_wait_files b w
+  | Op.Write w -> Bincode.enc_byte b 7; enc_write b w
 
   let dec_kind s i =
     let kind = "Op.kind" in
-    let next, b = Binc.dec_byte ~kind s i in
+    let next, b = Bincode.dec_byte ~kind s i in
     match b with
     | 0 -> let i, c = dec_copy s next in i, Op.Copy c
     | 1 -> let i, d = dec_delete s next in i, Op.Delete d
@@ -589,39 +592,39 @@ module Op = struct
     | 5 -> let i, s = dec_spawn s next in i, Op.Spawn s
     | 6 -> let i, w = dec_wait_files s next in i, Op.Wait_files w
     | 7 -> let i, w = dec_write s next in i, Op.Write w
-    | b -> Binc.err_byte ~kind i b
+    | b -> Bincode.err_byte ~kind i b
 
   let enc b o =
-    Binc.enc_int b (Op.id o);
-    Binc.enc_string b (Op.group o);
+    Bincode.enc_int b (Op.id o);
+    Bincode.enc_string b (Op.group o);
     enc_time_span b (Op.time_created o);
     enc_time_span b (Op.time_started o);
     enc_time_span b (Op.duration o);
-    Binc.enc_bool b (Op.revived o);
+    Bincode.enc_bool b (Op.revived o);
     enc_status b (Op.status o);
-    Binc.enc_list Binc.enc_fpath b (Op.reads o);
-    Binc.enc_list Binc.enc_fpath b (Op.writes o);
+    Bincode.enc_list Bincode.enc_fpath b (Op.reads o);
+    Bincode.enc_list Bincode.enc_fpath b (Op.writes o);
     enc_hash b (Op.hash o);
     enc_kind b (Op.kind o);
     ()
 
   let dec s i =
     let k o = invalid_arg "deserialized op, no kontinuation" in
-    let i, id = Binc.dec_int s i in
-    let i, group = Binc.dec_string s i in
+    let i, id = Bincode.dec_int s i in
+    let i, group = Bincode.dec_string s i in
     let i, time_created = dec_time_span s i in
     let i, time_started = dec_time_span s i in
     let i, duration = dec_time_span s i in
-    let i, revived = Binc.dec_bool s i in
+    let i, revived = Bincode.dec_bool s i in
     let i, status = dec_status s i in
-    let i, reads = Binc.dec_list Binc.dec_fpath s i in
-    let i, writes = Binc.dec_list Binc.dec_fpath s i in
+    let i, reads = Bincode.dec_list Bincode.dec_fpath s i in
+    let i, writes = Bincode.dec_list Bincode.dec_fpath s i in
     let i, hash = dec_hash s i in
     let i, kind = dec_kind s i in
     i, Op.v id ~group ~time_created ~time_started ~duration ~revived
       ~status ~reads ~writes ~hash ~k kind
 
-  let binc = Binc.v enc dec
+  let bincode = Bincode.v enc dec
 end
 
 (*---------------------------------------------------------------------------

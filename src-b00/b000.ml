@@ -876,28 +876,28 @@ module Reviver = struct
 
   let encode_spawn_meta b s =
     let enc_status b = function
-    | `Exited c -> Binc.enc_byte b 0; Binc.enc_int b c
-    | `Signaled c -> Binc.enc_byte b 1; Binc.enc_int b c
+    | `Exited c -> Bincode.enc_byte b 0; Bincode.enc_int b c
+    | `Signaled c -> Bincode.enc_byte b 1; Bincode.enc_int b c
     in
-    let enc_result = Binc.(enc_result ~ok:enc_string ~error:enc_string) in
+    let enc_result = Bincode.(enc_result ~ok:enc_string ~error:enc_string) in
     Buffer.reset b;
-    Binc.enc_option enc_result b (Op.Spawn.stdo_ui s);
-    Binc.enc_option enc_status b (Op.Spawn.exit s);
+    Bincode.enc_option enc_result b (Op.Spawn.stdo_ui s);
+    Bincode.enc_option enc_status b (Op.Spawn.exit s);
     Buffer.contents b
 
   let decode_spawn_meta s = (* raises Failure in case of error *)
     let dec_status s i =
       let kind = "Os.Cmd.status" in
-      let next, b = Binc.dec_byte ~kind s i in
+      let next, b = Bincode.dec_byte ~kind s i in
       match b with
-      | 0 -> let i, c = Binc.dec_int s next in i, `Exited c
-      | 1 -> let i, c = Binc.dec_int s next in i, `Signaled c
-      | b -> Binc.err_byte ~kind i b
+      | 0 -> let i, c = Bincode.dec_int s next in i, `Exited c
+      | 1 -> let i, c = Bincode.dec_int s next in i, `Signaled c
+      | b -> Bincode.err_byte ~kind i b
     in
-    let dec_result = Binc.(dec_result ~ok:dec_string ~error:dec_string) in
-    let next, stdo_ui = Binc.dec_option dec_result s 0 in
-    let next, status = Binc.dec_option dec_status s next in
-    Binc.dec_eoi s next;
+    let dec_result = Bincode.(dec_result ~ok:dec_string ~error:dec_string) in
+    let next, stdo_ui = Bincode.dec_option dec_result s 0 in
+    let next, status = Bincode.dec_option dec_status s next in
+    Bincode.dec_eoi s next;
     (stdo_ui, status)
 
   let file_cache_key o = Hash.to_hex (Op.hash o)

@@ -43,8 +43,8 @@ module Op : sig
   val pp : Op.t Fmt.t
   (** [pp] formats a build operation with full details. *)
 
-  val binc : Op.t Binc.t
-  (** [binc] binary codecs an operation. *)
+  val bincode : Op.t Bincode.t
+  (** [bincode] binary codes an operation. *)
 end
 
 (*---------------------------------------------------------------------------

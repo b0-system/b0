@@ -600,51 +600,51 @@ module Memo = struct
 
     (* IO *)
 
-    let enc_time_span b s = Binc.enc_int64 b (Time.Span.to_uint64_ns s)
+    let enc_time_span b s = Bincode.enc_int64 b (Time.Span.to_uint64_ns s)
     let dec_time_span s i =
-      let i, s = Binc.dec_int64 s i in
+      let i, s = Bincode.dec_int64 s i in
       i, Time.Span.of_uint64_ns s
 
     let magic = "b\x00\x00\x00log"
 
     let enc b l =
-      Binc.enc_magic magic b ();
-      Binc.enc_int b l.hash_count;
+      Bincode.enc_magic magic b ();
+      Bincode.enc_int b l.hash_count;
       enc_time_span b l.hash_dur;
       enc_time_span b l.total_dur;
       enc_time_span b l.cpu_utime;
       enc_time_span b l.cpu_stime;
       enc_time_span b l.cpu_children_utime;
       enc_time_span b l.cpu_children_stime;
-      Binc.enc_list (Binc.enc B000_conv.Op.binc) b l.ops
+      Bincode.enc_list (Bincode.enc B000_conv.Op.bincode) b l.ops
 
     let dec s i =
-      let i, () = Binc.dec_magic magic s 0 in
-      let i, hash_count = Binc.dec_int s i in
+      let i, () = Bincode.dec_magic magic s 0 in
+      let i, hash_count = Bincode.dec_int s i in
       let i, hash_dur = dec_time_span s i in
       let i, total_dur = dec_time_span s i in
       let i, cpu_utime = dec_time_span s i in
       let i, cpu_stime = dec_time_span s i in
       let i, cpu_children_utime = dec_time_span s i in
       let i, cpu_children_stime = dec_time_span s i in
-      let i, ops = Binc.dec_list (Binc.dec (B000_conv.Op.binc)) s i in
+      let i, ops = Bincode.dec_list (Bincode.dec (B000_conv.Op.bincode)) s i in
       i, { hash_count; hash_dur; total_dur; cpu_utime; cpu_stime;
            cpu_children_utime; cpu_children_stime; ops }
 
-    let binc = Binc.v enc dec
+    let bincode = Bincode.v enc dec
 
     let write file l =
       let data =
         Log.time (fun _ msg -> msg "generating log") @@ fun () ->
         let buf = Buffer.create (1024 * 1024) in
-        Binc.to_string ~buf binc l
+        Bincode.to_string ~buf bincode l
       in
       Log.time (fun _ msg -> msg "writing log") @@ fun () ->
       Os.File.write ~force:true ~make_path:true file data
 
     let read file =
       Result.bind (Os.File.read file) @@ fun data ->
-      Binc.of_string ~file binc data
+      Bincode.of_string ~file bincode data
 
     let pp_stats sel ppf l =
       let sc, st, sd, wc, wt, wd, cc, ct, cd, rt, rd, ot, od =
