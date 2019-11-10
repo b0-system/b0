@@ -23,17 +23,13 @@ val get_log_level : Log.level option -> Log.level
 (** [get_log_level level] determines [level] with {!Log.Warning} if
     [level] is [None]. *)
 
-val log_spawn_tracer : Log.level -> Os.Cmd.spawn_tracer
-(** [log_spawn_tracer level] is a spawn tracer that logs on {!Log}
-    with level [level]. If [level] is {!Log.Quiet} this is
-    {!B0_std.Os.Cmd.spawn_tracer_nop}. *)
-
 val setup : Tty.cap -> Log.level -> log_spawns:Log.level -> unit
 (** [setup tty_cap log_level ~log_spawns] sets:
     {ul
       {- {!B0_std.Fmt.set_tty_styling_cap} with [tty_cap].}
       {- {!B0_std.Log.set_level} with [log_level].}
-      {- {!B0_std.Os.Cmd.set_spawn_tracer} with {!log_spawn_tracer}[ log_spawns]
+      {- {!B0_std.Os.Cmd.set_spawn_tracer} with
+        {!B0_std.Log.spawn_tracer}[ log_spawns]
          iff [level >= log_spawn].}}
       {b Warning.} If [level < log_spawn] but {!Log.level} is
       increased after this call, the spawns won't be traced (most cli

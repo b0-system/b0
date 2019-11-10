@@ -12,24 +12,11 @@ let get_tty_cap c = match Option.join c with
 
 let get_log_level level = Option.value ~default:Log.Warning level
 
-let log_spawn_tracer level =
-  if level = Log.Quiet then B0_std.Os.Cmd.spawn_tracer_nop else
-  let header = function
-  | None -> "EXECV"
-  | Some pid -> "EXEC:" ^ string_of_int (Os.Cmd.pid_to_int pid)
-  in
-  let pp_env ppf = function
-  | None -> () | Some env -> Fmt.pf ppf "%a@," (Fmt.list String.pp_dump) env
-  in
-  fun pid env ~cwd cmd ->
-    Log.msg level (fun m ->
-        m ~header:(header pid) "@[<v>%a%a@]" pp_env env Cmd.pp_dump cmd)
-
 let setup cap level ~log_spawns =
   Fmt.set_tty_styling_cap cap;
   Log.set_level level;
   if level >= log_spawns
-  then Os.Cmd.set_spawn_tracer (log_spawn_tracer log_spawns)
+  then Os.Cmd.set_spawn_tracer (Log.spawn_tracer log_spawns)
 
 (* Argument converters *)
 
@@ -63,18 +50,16 @@ let tty_cap ?(docs = Manpage.s_common_options) ?env () =
   let docv = "WHEN" in
   Arg.(value & opt (some color) None & info ["color"] ?env ~doc ~docv ~docs)
 
-let log_level
-    ?(none = Log.Warning) ?(docs = Manpage.s_common_options) ?env ()
-  =
+let log_level ?(none = Log.Warning) ?(docs = Manpage.s_common_options) ?env () =
   let vopts =
     let doc =
       "Increase verbosity. Repeatable, but more than twice does not bring \
        more. Takes over $(b,--verbosity)."
       (* The reason for taking over verbosity is due to cmdliner
          limitation: we cannot distinguish in choose below if verbosity
-           was set via an env var. And cli args should always take over env
-           var. So verbosity set through the env var would take over -v
-           otherwise. *)
+         was set via an env var. And cli args should always take over env
+         var. So verbosity set through the env var would take over -v
+         otherwise. *)
     in
     Arg.(value & flag_all & info ["v"; "verbose"] ~doc ~docs)
   in

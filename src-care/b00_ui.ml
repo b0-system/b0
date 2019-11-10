@@ -402,9 +402,9 @@ module Op = struct
 
   let select_man =
     [ `P "Options are provided to select and filter operations. \
-          Any operation that satifies one of the selectors and all of the
-          filters is included the result. If no selector is specified all
-          operations are selected. If no filter is specified all selected
+          Any operation that satifies one of the selectors and all of the \
+          filters is included in the result. If no selector is specified all \
+          operations are selected. If no filter is specified all selected \
           operations are returned.";
       `P "The result is sorted by execution start time, this can
           be changed with the $(b,--order-by) option." ]

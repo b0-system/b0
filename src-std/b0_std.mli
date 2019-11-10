@@ -2945,7 +2945,7 @@ module Log : sig
     ('a, 'b) result
   (** [if_error_pp'] is {!if_error_pp'} wrapped by {!Result.ok} *)
 
-  (** {2:timing Logging timings} *)
+  (** {2:timings Timings logging} *)
 
   val time :
     ?level:level ->
@@ -2958,6 +2958,13 @@ module Log : sig
       called this means [f] can change it to affect the log
       operation. This allows [f] to be the main function of your
       program and let it set the log level. *)
+
+  (** {2:spawns Spawn logging} *)
+
+  val spawn_tracer : level -> Os.Cmd.spawn_tracer
+  (** [spawn_tracer level] is a {{!B0_std.Os.Cmd.tracing}spawn tracer}
+      that logs with level [level]. If [level] is {!Log.Quiet} this is
+      {!B0_std.Os.Cmd.spawn_tracer_nop}. *)
 
   (** {1:monitoring Log monitoring} *)
 

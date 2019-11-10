@@ -3916,7 +3916,7 @@ module Log = struct
   | Error e ->
       !_kmsg.kmsg (fun _ -> Ok use) level @@ fun m -> m ?header "@[%a@]" pp e
 
-  (* Logging timings *)
+  (* Timing logging *)
 
   let time ?(level = Info) m f =
     let time = Time.counter () in
@@ -3926,6 +3926,21 @@ module Log = struct
       (fun w ->
          let header = Format.asprintf "%a" Time.Span.pp span in
          m r (w ~header))
+
+  (* Spawn logging *)
+
+  let spawn_tracer level =
+    if level = Quiet then Os.Cmd.spawn_tracer_nop else
+    let header = function
+    | None -> "EXECV"
+    | Some pid -> "EXEC:" ^ string_of_int (Os.Cmd.pid_to_int pid)
+    in
+    let pp_env ppf = function
+    | None -> () | Some env -> Fmt.pf ppf "%a@," (Fmt.list String.pp_dump) env
+    in
+    fun pid env ~cwd cmd ->
+      msg level (fun m ->
+          m ~header:(header pid) "@[<v>%a%a@]" pp_env env Cmd.pp_dump cmd)
 end
 
 module Rqueue = struct
