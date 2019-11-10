@@ -2282,6 +2282,10 @@ module Os = struct
   let ffail file e = Fmt.failwith "%a: %s" Fpath.pp file e
   let ffail_notrace file e = Fmt.failwith_notrace "%a: %s" Fpath.pp file e
 
+  module Cpu = struct
+    external logical_count : unit -> int = "ocaml_b0_cpu_logical_count"
+  end
+
   module Env = struct
 
     (* Variables *)

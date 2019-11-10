@@ -1927,6 +1927,13 @@ end
 (** OS interaction. *)
 module Os : sig
 
+  (** CPU information. *)
+  module Cpu : sig
+    val logical_count : unit -> int
+    (** [logical_count ()] is the number of logical CPUs available
+        on the running machine. *)
+  end
+
   (** Environment variables. *)
   module Env : sig
 

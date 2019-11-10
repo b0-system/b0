@@ -565,12 +565,8 @@ module Memo = struct
     let docv = "COUNT" in
     Arg.(value & opt (some int) None & info ["j"; "jobs"] ?env ~doc ?docs ~docv)
 
-  let find_jobs ~jobs () = match jobs with
-  | Some max -> max
-  | None ->
-      let cpu_count = B0_machine.logical_cpu_count () in
-      let cpu_count = Log.if_error ~level:Log.Warning ~use:None cpu_count in
-      Option.value ~default:1 cpu_count
+  let get_jobs ~jobs = match jobs with
+  | Some max -> max | None -> Os.Cpu.logical_count ()
 
   (* Logs *)
 

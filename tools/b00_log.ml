@@ -44,7 +44,6 @@ let log_cmd
       Result.bind (B00_ui.Memo.Log.read log_file) @@ fun l ->
       B00_ui.Memo.Log.out Fmt.stdout out_fmt out_kind op_sel l; Ok 0
 
-
 (* Command line interface *)
 
 open Cmdliner

@@ -326,10 +326,9 @@ module Memo : sig
   (** [jobs] is a cli interface for specifying the maximal number of
       commands to spawn concurrently. *)
 
-  val find_jobs : jobs:int option -> unit -> int
-  (** [fin_jobs jobs] determines a maximal number of spans. This is
-      either, in order, [jobs] or {!B0_machine.logical_cpu_count} or
-      [1]. *)
+  val get_jobs : jobs:int option -> int
+  (** [get_jobs jobs] determines a maximal number of spawns. If jobs
+      is [None], {!B0_std.Os.Cpu.logical_count} is used. *)
 
   (** {1:logs Logs} *)
 

@@ -7,12 +7,6 @@
 
     To expand once we get the configuration story in. *)
 
-open B0_std
-
-val logical_cpu_count :
-  ?search:Fpath.t list -> unit -> (int option, string) result
-(** [logical_cpu_count ()] is the number of logical CPUs on the build
-    machine. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2019 The b0 programmers

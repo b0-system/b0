@@ -5,23 +5,6 @@
 
 open B0_std
 
-let logical_cpu_count ?search () =
-  Result.map_error (fun e -> Fmt.str "cpu count determination: %s" e) @@
-  let int v = try Ok (int_of_string v) with
-  | Failure _ -> Fmt.error "%S: not an integer" v
-  in
-  let win32 () = Os.Env.find' ~empty_is_none:true int "NUMBER_OF_PROCESSORS" in
-  if Sys.win32 then win32 () else
-  let try_cmd cmd otherwise = Result.bind (Os.Cmd.find cmd) @@ function
-  | None -> otherwise ()
-  | Some cmd ->
-      Result.bind (Os.Cmd.run_out ~trim:true cmd) @@ fun s ->
-      Result.map Option.some (int s)
-  in
-  try_cmd Cmd.(arg "getconf" % "_NPROCESSORS_ONLN") @@ fun () ->
-  try_cmd Cmd.(arg "sysctl" % "-n" % "hw.ncpu") @@ fun () ->
-  Ok None
-
 (*---------------------------------------------------------------------------
    Copyright (c) 2019 The b0 programmers
 
