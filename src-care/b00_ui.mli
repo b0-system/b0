@@ -427,7 +427,7 @@ module Memo : sig
     (** [pp_stats sel] formats statistics stored in the log using
         [query] to select operations that are part of the statistics. *)
 
-    type out_kind = [`Normal | `Trace_event | `Stats | `Hashes ]
+    type out_kind = [`Hashed_files | `Op_hashes | `Ops | `Stats | `Trace_event]
     (** The type for output kinds. *)
 
     val out :

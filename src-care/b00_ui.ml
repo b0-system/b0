@@ -419,7 +419,7 @@ module Op = struct
           operations are selected. If no filter is specified all selected \
           operations are returned.";
       `P "The result is sorted by execution start time, this can
-          be changed with the $(b,--order-by) option." ]
+          be changed with the $(b,--order-by) or $(b,-d) option." ]
 end
 
 module Memo = struct
@@ -564,12 +564,14 @@ module Memo = struct
     type t =
       { hash_count : int;
         hash_dur : Time.span;
+        file_hashes : Hash.t Fpath.Map.t;
         total_dur : Time.span;
         cpu_utime : Time.span;
         cpu_stime : Time.span;
         cpu_children_utime : Time.span;
         cpu_children_stime : Time.span;
-        ops : B000.Op.t list; }
+        ops : B000.Op.t list;
+      }
 
     let ops l = l.ops
     let of_memo m =
@@ -577,9 +579,10 @@ module Memo = struct
       let c = Memo.reviver m in
       let hash_count = Fpath.Map.cardinal (B000.Reviver.file_hashes c) in
       let hash_dur = B000.Reviver.file_hash_dur c in
+      let file_hashes = B000.Reviver.file_hashes (Memo.reviver m) in
       let total_dur = Time.count (Memo.clock m) in
       let cpu = Time.cpu_count (Memo.cpu_clock m) in
-      { hash_count; hash_dur; total_dur;
+      { hash_count; hash_dur; file_hashes; total_dur;
         cpu_utime = Time.cpu_utime cpu; cpu_stime = Time.cpu_stime cpu;
         cpu_children_utime = Time.cpu_children_utime cpu;
         cpu_children_stime = Time.cpu_children_stime cpu;
@@ -592,12 +595,31 @@ module Memo = struct
       let i, s = Bincode.dec_int64 s i in
       i, Time.Span.of_uint64_ns s
 
+    let enc_file_hashes b hs =
+      let enc_file_hash b f h =
+        Bincode.enc_fpath b f; Bincode.enc_string b (Hash.to_bytes h);
+      in
+      let count = Fpath.Map.cardinal hs in
+      Bincode.enc_int b count;
+      Fpath.Map.iter (enc_file_hash b) hs
+
+    let dec_file_hashes s i =
+      let rec loop acc count s i =
+        if count = 0 then i, acc else
+        let i, file = Bincode.dec_fpath s i in
+        let i, hash = Bincode.dec_string  s i in
+        loop (Fpath.Map.add file (Hash.of_bytes hash) acc) (count - 1) s i
+      in
+      let i, count = Bincode.dec_int s i in
+      loop Fpath.Map.empty count s i
+
     let magic = "b\x00\x00\x00log"
 
     let enc b l =
       Bincode.enc_magic magic b ();
       Bincode.enc_int b l.hash_count;
       enc_time_span b l.hash_dur;
+      enc_file_hashes b l.file_hashes;
       enc_time_span b l.total_dur;
       enc_time_span b l.cpu_utime;
       enc_time_span b l.cpu_stime;
@@ -609,13 +631,14 @@ module Memo = struct
       let i, () = Bincode.dec_magic magic s 0 in
       let i, hash_count = Bincode.dec_int s i in
       let i, hash_dur = dec_time_span s i in
+      let i, file_hashes = dec_file_hashes s i in
       let i, total_dur = dec_time_span s i in
       let i, cpu_utime = dec_time_span s i in
       let i, cpu_stime = dec_time_span s i in
       let i, cpu_children_utime = dec_time_span s i in
       let i, cpu_children_stime = dec_time_span s i in
       let i, ops = Bincode.dec_list (Bincode.dec (B000_conv.Op.bincode)) s i in
-      i, { hash_count; hash_dur; total_dur; cpu_utime; cpu_stime;
+      i, { hash_count; hash_dur; file_hashes; total_dur; cpu_utime; cpu_stime;
            cpu_children_utime; cpu_children_stime; ops }
 
     let bincode = Bincode.v enc dec
@@ -688,44 +711,69 @@ module Memo = struct
          Fmt.field "stime" Fmt.id pp_stime;
          Fmt.field "real" (fun _ -> l.total_dur) Time.Span.pp ]) ppf l
 
-    type out_kind = [ `Normal | `Trace_event | `Stats | `Hashes ]
+    type out_kind = [`Hashed_files | `Op_hashes | `Ops | `Stats | `Trace_event]
 
     let out ppf out_fmt out_kind query l = match out_kind with
-    | `Normal ->
-        let pp_ops pp_op ppf l = match query l.ops with
-        | [] -> ()
-        | ops -> Fmt.pf ppf "@[<v>%a@]" (Fmt.list pp_op) ops
+    | `Ops ->
+        let ops = query l.ops in
+        if ops = [] then () else
+        let pp_op = match out_fmt with
+        | `Short -> B000_conv.Op.pp_line
+        | `Normal -> B000_conv.Op.pp_line_and_ui
+        | `Long -> B000_conv.Op.pp
         in
-        begin match out_fmt with
-        | `Short -> pp_ops B000_conv.Op.pp_line ppf l
-        | `Normal -> pp_ops B000_conv.Op.pp_line_and_ui ppf l
-        | `Long -> pp_ops B000_conv.Op.pp ppf l
-        end;
-        Fmt.flush ppf ()
+        Fmt.pf ppf "@[<v>%a@]@." (Fmt.list pp_op) ops
     | `Stats ->
         Fmt.pf ppf "@[%a]@." (pp_stats query) l
     | `Trace_event ->
-        let t = B0_trace.Trace_event.of_ops (query l.ops) in
-        Fmt.pf ppf "%s@." (B0_serialk_json.Jsong.to_string t)
-    | `Hashes ->
+        let ops = query l.ops in
+        if ops = [] then () else
+        let t = B0_trace.Trace_event.of_ops ops in
+        Fmt.pf ppf "@[%s@]@." (B0_serialk_json.Jsong.to_string t)
+    | `Op_hashes ->
+        let ops = query l.ops in
+        if ops = [] then () else
         let pp_hash ppf o = Hash.pp ppf (B000.Op.hash o) in
-        Fmt.pf ppf "@[<v>%a@]" (Fmt.list pp_hash) (query l.ops)
+        Fmt.pf ppf "@[<v>%a@]@." (Fmt.list pp_hash) (query l.ops)
+    | `Hashed_files ->
+        let pp_file_hash = match out_fmt with
+        | `Short -> fun ppf (file, _) -> Fpath.pp_unquoted ppf file
+        | `Normal | `Long ->
+            fun ppf (file, hash) ->
+              Hash.pp ppf hash; Fmt.sp ppf (); Fpath.pp_unquoted ppf file
+        in
+        let pp_file_hashes =
+          Fmt.iter_bindings Fpath.Map.iter (Fmt.hbox pp_file_hash)
+        in
+        if Fpath.Map.is_empty l.file_hashes then () else
+        Fmt.pf ppf "@[<v>%a@]@." pp_file_hashes l.file_hashes
 
     let out_kind_cli ?docs () =
-      let trace_event =
-        let doc = "Output build operations in Trace Event format." in
-        Cmdliner.Arg.info ["trace-event"] ~doc ?docs
+      let hashed_files =
+        let doc = "Output hashed file paths." in
+        Cmdliner.Arg.info ["hashed-files"] ~doc ?docs
+      in
+      let op_hashes =
+        let doc = "Output only operation hashes." in
+        Cmdliner.Arg.info ["op-hashes"] ~doc ?docs
+      in
+      let ops =
+        let doc = "Output build operations (default)." in
+        Cmdliner.Arg.info ["ops"] ~doc ?docs
       in
       let stats =
         let doc = "Output statistics about the returned operations." in
         Cmdliner.Arg.info ["stats"] ~doc ?docs
       in
-      let hashes =
-        let doc = "Output only operation hashes." in
-        Cmdliner.Arg.info ["hashes"] ~doc ?docs
+      let trace_event =
+        let doc = "Output build operations in Trace Event format." in
+        Cmdliner.Arg.info ["trace-event"] ~doc ?docs
       in
-      let fmts = [`Trace_event, trace_event; `Stats, stats; `Hashes, hashes] in
-      Cmdliner.Arg.(value & vflag `Normal fmts)
+      let fmts =
+        [ `Hashed_files, hashed_files; `Op_hashes, op_hashes; `Ops, ops;
+          `Stats, stats; `Trace_event, trace_event; ]
+      in
+      Cmdliner.Arg.(value & vflag `Ops fmts)
   end
 end
 
