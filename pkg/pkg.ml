@@ -18,6 +18,7 @@ let () =
        Pkg.test "test/test_ocaml_cobj_defs";
        Pkg.bin "tools/b00_cache" ~dst:"b00-cache";
        Pkg.bin "tools/b00_log" ~dst:"b00-log";
+       Pkg.bin "tools/b00_hash" ~dst:"b00-hash";
        Pkg.bin "tools/show_uri" ~dst:"show-uri";
        Pkg.doc "doc/index.mld" ~dst:"odoc-pages/index.mld";
        Pkg.doc "doc/b00_manual.mld" ~dst:"odoc-pages/b00_manual.mld";

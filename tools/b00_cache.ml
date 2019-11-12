@@ -6,505 +6,166 @@
 open B0_std
 open B000
 
-(* FIXME redo in light of B0_ui improvements.
-   FIXME we are not using B0_ui.File_cache.* because this
-   errors on missing caches. Unclear whether the behaviour
-   here should be changed. *)
-
 (* Exit codes and errors *)
 
 let err_no_cache = 1
-let err_key_unknown = 2
-let err_key_exists = 3
+let err_no_log_file = 2
 let err_unknown = 123
 
-let handle_unknown_error = function
-| Ok i -> i | Error e -> Log.err (fun m -> m "%s" e); err_unknown
+let with_cache_dir cache_dir k = match Os.Dir.exists cache_dir with
+| Ok true -> k cache_dir
+| Ok false ->
+    Log.err begin fun m ->
+      m "@[<v>%a:@,No such cache directory.@]" Fpath.pp_unquoted cache_dir
+    end;
+    Ok err_no_cache
+| Error _ as e -> e
 
-(* Commonalities *)
-
-let with_cache dir f =
-  Result.bind (Os.Dir.exists dir) @@ function
-  | true -> Result.bind (File_cache.create dir) f
-  | false ->
-      Log.err (fun m -> m "%a: Not a directory cache" Fpath.pp_quoted dir);
-      Ok err_no_cache
-
-let keys_exist c keys =
-  let rec loop c miss = function
-  | k :: ks when File_cache.mem c k -> loop c miss ks
-  | k :: ks -> loop c (k :: miss) ks
-  | [] when miss = [] -> Ok ()
-  | [] ->
-      Result.bind (File_cache.keys c) @@ fun dom ->
-      let add_error acc n =
-        (Fmt.str "%a" Fmt.(unknown' ~kind:(any "key") string ~hint:did_you_mean)
-           (n, String.suggest dom n))
-        :: acc
-      in
-      Error (String.concat "\n" (List.fold_left add_error [] miss))
-  in
-  loop c [] keys
-
-let with_key_selection c ~only_unused keys f =
-  let filter c ~only_unused keys = match only_unused with
-  | false -> keys
-  | true ->
-      let is_unused k = false
-        (* TODO redo
-        Result.value ~default:false @@
-        File_cache.is_unused c k *)
-      in
-      List.filter is_unused keys
-  in
-  match keys with
-  | `All ->
-      Result.bind (File_cache.keys c) @@ fun ks -> f (filter c ~only_unused ks)
-  | `Keys [] ->
-      Log.err (fun m -> m "No key specified");
-      Ok Cmdliner.Term.exit_status_cli_error
-  | `Keys keys ->
-      match keys_exist c keys with
-      | Ok () -> f (filter c ~only_unused keys)
-      | Error e -> Log.err (fun m -> m  "%s" e); Ok err_key_unknown
-
-(* Commands *)
-
-let files_to_bind ~recurse paths f =
-  let rec loop acc = function
-  | [] ->
-      if acc <> [] then f (List.rev acc) else
-      (Log.err (fun m -> m "No file to store");
-       (Ok Cmdliner.Term.exit_status_cli_error))
-  | p :: ps ->
-      match Os.Dir.exists p with
-      | Error _ as e -> e
-      | Ok false -> loop (p :: acc) ps
-      | Ok true ->
-          let dotfiles = true in
-          Result.bind Os.Dir.(fold_files ~recurse ~dotfiles path_list p []) @@
-          fun files ->
-          let rev_sort p0 p1 = Fpath.compare p1 p0 in
-          let files = List.sort rev_sort files in
-          let acc = List.fold_left (fun acc f -> f :: acc) files acc in
-          loop acc ps
-  in
-  loop [] paths
-
-let add_cmd () dir force key recurse paths =
-  handle_unknown_error @@
-  with_cache dir @@ fun c ->
-  match File_cache.mem c key && not force with
-  | true ->
-      Log.err
-        (fun m -> m "%s: key already bound in cache, use -f to force" key);
-      Ok err_key_exists
-  | false ->
-      files_to_bind ~recurse paths @@ fun files ->
-      Result.bind (File_cache.add c key "" files) @@ function
-      | true -> Ok 0
-      | false ->
-          let miss f = not @@ Result.value ~default:false @@ Os.File.exists f in
-          Log.err
-            (fun m ->
-               m "@[<v>%s: key not bound, can't access these files:@,%a@]"
-            key (Fmt.list Fpath.pp_quoted) (List.filter miss files));
-          Ok err_unknown
-
-let delete_unused c = Error ("This operation needs to be redone")
-
-let delete_cmd () dir only_unused keys =
-  handle_unknown_error @@
-  with_cache dir @@ fun c ->
-  match only_unused && keys = `All with
-  | true -> Result.bind (delete_unused c) @@ fun () -> Ok 0
-  | false ->
-      with_key_selection c ~only_unused keys @@ fun keys ->
-      let rec loop = function
-      | [] -> Ok 0
-      | k :: ks ->
-          match File_cache.rem c k with Error _ as e -> e | Ok _ -> loop ks
-      in
-      loop keys
-
-let files_cmd () dir only_unused keys out_fmt =
-  handle_unknown_error @@
-  with_cache dir @@ fun c ->
-  with_key_selection c ~only_unused keys @@ fun keys ->
-  let rec add_key_files files = function
-  | [] -> Ok files
-  | k :: ks ->
-      match File_cache.find c k with
-      | Error _ as e -> e
-      | Ok None -> add_key_files files ks
-      | Ok (Some (_, fs)) ->
-          let add_file acc f = (k, f) :: acc in
-          add_key_files (List.fold_left add_file files fs) ks
-  in
-  Result.bind (add_key_files [] keys) @@ function
-  | [] -> Ok 0
-  | files ->
-      begin match out_fmt with
-      | `Short ->
-          let files = List.sort Fpath.compare @@ List.rev_map snd files in
-          Fmt.pr "@[<v>%a@]@." Fmt.(list Fpath.pp_unquoted) files
-      | `Normal | `Long ->
-          let files = List.sort compare files in
-          let pp_file = Fmt.(hbox @@ pair ~sep:sp string Fpath.pp_unquoted) in
-          Fmt.pr "@[<v>%a@]@." Fmt.(list pp_file) files
+let find_used_keys ~err ~cwd ~b0_dir ~log_file k =
+  let implicit_file = log_file = None in
+  let file = B00_ui.Memo.get_log_file ~cwd ~b0_dir ~log_file in
+  Result.bind (Os.File.exists file) @@ function
+  | false when implicit_file && err ->
+      Log.err begin fun m ->
+        m "@[<v>%a:@,No such log file, specify one explicity.@]"
+          Fpath.pp_unquoted file
       end;
+      Ok err_no_log_file
+  | false when implicit_file && not err -> k String.Set.empty
+  | _ ->
+      Log.if_error' ~use:err_no_log_file @@
+      Result.map_error (Fmt.str "Cannot determine used keys: %s") @@
+      Result.bind (B00_ui.Memo.Log.read file) @@ fun l ->
+      k (B00_ui.File_cache.keys_of_done_ops (B00_ui.Memo.Log.ops l))
+
+let cache_cmd
+    tty_cap log_level no_pager b0_dir cache_dir
+    (max_byte_size, pct) (action, log_file, args)
+  =
+  let tty_cap = B0_std_ui.get_tty_cap tty_cap in
+  let log_level = B0_std_ui.get_log_level log_level in
+  B0_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
+  Log.if_error ~use:err_unknown @@
+  Result.bind (Os.Dir.cwd ()) @@ fun cwd ->
+  let root = B00_ui.Memo.find_dir_with_b0_dir ~start:cwd in
+  let root = Option.value root ~default:cwd in
+  let b0_dir = B00_ui.Memo.get_b0_dir ~cwd ~root ~b0_dir in
+  let cache_dir = B00_ui.Memo.get_cache_dir ~cwd ~b0_dir ~cache_dir in
+  let action = match action with
+  | `Delete ->
+      with_cache_dir cache_dir @@ fun dir ->
+      let args = match args with [] -> `All | keys -> `Keys keys in
+      Result.bind (B00_ui.File_cache.delete ~dir args) @@ fun _ -> Ok 0
+  | `Gc ->
+      with_cache_dir cache_dir @@ fun dir ->
+      find_used_keys ~err:true ~cwd ~b0_dir ~log_file @@ fun used ->
+      Result.bind (B00_ui.File_cache.gc ~dir ~used) @@ fun _ -> Ok 0
+  | `Keys ->
+      with_cache_dir cache_dir @@ fun dir ->
+      Result.bind (B00_ui.File_cache.keys ~dir) @@ fun _ -> Ok 0
+  | `Path ->
+      Log.app (fun m -> m "%a" Fpath.pp_unquoted cache_dir);
       Ok 0
-
-let gc_cmd () dir =
-  handle_unknown_error @@
-  with_cache dir @@ fun c ->
-  Result.bind (B00_ui.File_cache.Stats.of_cache c) @@ fun s ->
-  Result.bind (delete_unused c) @@ fun () ->
-  Log.app (fun m ->
-      m "deleted: %a"
-        B00_ui.File_cache.Stats.pp_keys
-        (B00_ui.File_cache.Stats.unused_keys s));
-  Ok 0
-
-let pp_key c byte_size = function
-| `Short -> Fmt.string
-| `Normal | `Long ->
-    let pp_byte_size = if byte_size then Fmt.int else Fmt.byte_size in
-    fun ppf k -> match B00_ui.File_cache.Stats.of_keys c [k] with
-    | Error _ -> Fmt.string ppf k
-    | Ok s ->
-        let fc = B00_ui.File_cache.Stats.keys_file_count s in
-        let bs = B00_ui.File_cache.Stats.keys_byte_size s in
-        Fmt.pr "%d %a %s" fc pp_byte_size bs k
-
-let keys_cmd () dir only_unused keys out_fmt byte_size =
-  handle_unknown_error @@
-  with_cache dir @@ fun c ->
-  with_key_selection c ~only_unused keys @@ function
-  | [] -> Ok 0
-  | keys ->
-      Fmt.pr "@[<v>%a@]@." (Fmt.list (pp_key c byte_size out_fmt)) keys; Ok 0
-
-let path_cmd () dir = Fmt.pr "%a@." Fpath.pp_quoted dir; 0
-
-let size_cmd () dir only_unused keys =
-  handle_unknown_error @@
-  with_cache dir @@ fun c ->
-  match keys with
-  | `All ->
-      Result.bind (B00_ui.File_cache.Stats.of_cache c) @@ fun s ->
-      if only_unused
-      then
-        Fmt.pr "@[<v>%a@]@."
-          B00_ui.File_cache.Stats.pp_keys
-          (B00_ui.File_cache.Stats.unused_keys s)
-      else Fmt.pr "@[<v>%a@]@." B00_ui.File_cache.Stats.pp s;
-      Ok 0
-  | keys ->
-      with_key_selection c ~only_unused keys @@ function
-      | [] ->
-          Fmt.pr "@[<v>%a@]@."
-            B00_ui.File_cache.Stats.pp_keys B00_ui.File_cache.Stats.keys_zero;
-          Ok 0
-      | keys ->
-          Result.bind (B00_ui.File_cache.Stats.of_keys c keys) @@ fun s ->
-          Fmt.pr "@[<v>%a@]@." B00_ui.File_cache.Stats.pp_keys s; Ok 0
-
-let revive_cmd () dir key paths =
-  handle_unknown_error @@
-  Error "This operation needs to be redone"
-    (* Need to check if the files already exist ourserleves to
-       avoid disaster. *)
-(*
-  with_cache dir @@ fun c ->
-  with_key_selection c ~only_unused:false (`Keys [key]) @@ fun _ ->
-  let paths = match paths with
-  | `Explicit paths -> Ok paths
-  | `Prefix pre ->
-      let pre = Fpath.to_string pre in
-      Result.bind (File_cache.find c key) @@ function
-      | None -> Ok []
-      | Some (_, files) ->
-          Ok (List.map (fun f -> Fpath.v (pre ^ (Fpath.basename f))) files)
+  | `Stats ->
+      with_cache_dir cache_dir @@ fun dir ->
+      find_used_keys ~err:false ~cwd ~b0_dir ~log_file @@ fun used ->
+      Result.bind (B00_ui.File_cache.stats ~dir ~used) @@ fun _ -> Ok 0
+  | `Trim ->
+      with_cache_dir cache_dir @@ fun dir ->
+      find_used_keys ~err:false ~cwd ~b0_dir ~log_file @@ fun used ->
+      Result.bind (B00_ui.File_cache.trim ~dir ~used ~max_byte_size ~pct)
+      @@ fun _ -> Ok 0
   in
-  Result.bind paths @@ fun paths ->
-  Result.bind (File_cache.revive c key paths) @@ function
-  | Some (_, existed) ->
-      let log_exist f =
-        Log.err (fun m -> m "%a: Not bound, file exists." Fpath.pp_quoted f)
-      in
-      List.iter log_exist existed;
-      Ok 0
-  | None ->
-      Result.bind (File_cache.find c key) @@ fun r ->
-      let cfiles = match r with
-      | None -> []
-      | Some (_, files) -> files
-      in
-      let ccount = List.length cfiles in
-      let pcount = List.length paths in
-      Log.err (fun m ->
-          m "%s: key has %d cached file(s) but %d file path(s) to bind \
-            specified" key ccount pcount);
-      Ok err_unknown
-*)
-
-let trim_cmd () dir (max_byte_size, pct) =
-  handle_unknown_error @@
-  with_cache dir @@ fun c ->
-  let stats c =
-    Result.map B00_ui.File_cache.Stats.all_keys
-      B00_ui.File_cache.Stats.(of_cache c)
-  in
-  Result.bind (stats c) @@ fun stats_before ->
-  Result.bind (File_cache.trim_size c ~max_byte_size ~pct) @@ fun () ->
-  Result.bind (stats c) @@ fun stats_after ->
-  let deleted = B00_ui.File_cache.Stats.keys_sub stats_before stats_after in
-  Log.app (fun m -> m "deleted: %a"
-              B00_ui.File_cache.Stats.pp_keys deleted);
-  Ok 0
+  Log.if_error' ~use:err_unknown @@ action
 
 (* Command line interface *)
 
 open Cmdliner
 
+let version = "%%VERSION%%"
+let doc = "Operate on b0 caches"
+let sdocs = Manpage.s_common_options
 let exits =
-  Term.exit_info err_no_cache ~doc:"the cache does not exist." ::
-  Term.exit_info err_key_unknown ~doc:"the key does not exist." ::
+  Term.exit_info err_no_cache ~doc:"no cache directory found." ::
+  Term.exit_info err_no_log_file ~doc:"no log file found." ::
   Term.exit_info err_unknown ~doc:"unknown error reported on stderr." ::
   Term.default_exits
 
-let set_conf =
-  let tty_cap = B0_std_ui.tty_cap () in
-  let log_level = B0_std_ui.log_level () in
-  let conf tty_cap log_level =
-    let tty_cap = B0_std_ui.get_tty_cap tty_cap in
-    let log_level = B0_std_ui.get_log_level log_level in
-    B0_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug
-  in
-  Term.(pure conf $ tty_cap $ log_level)
+let man_xrefs = [`Tool "b0"; `Tool "b00-log"; `Tool "b00-hash"]
+let man = [
+  `S Manpage.s_description;
+  `P "The $(tname) tool operate on b0 caches.";
+  `S "ACTIONS";
+  `P "Below the $(i,LOG_FILE) argument can also be specified with \
+      the $(b,--log-file) option and the $(b,B0_LOG_FILE) environment \
+      variable.";
+  `I ("$(b,delete) [$(i,KEY)]...",
+      "Delete the cache or only the given keys.");
+  `I ("$(b,gc) [$(i,LOG_FILE)]",
+      "Only keep keys used by the build described by $(i,LOG_FILE). \
+       Errors if no log file can be found.");
+  `I ("$(b,keys)", "List cache keys.");
+  `I ("$(b,path)", "Display the path to the cache (may not exist).");
+  `I ("$(b,stats) [$(i,LOG_FILE)]",
+      "Show cache statistics. $(i,LOG_FILE) is used to determine used keys.");
+  `I ("$(b,trim) [$(b,--to-pct) $(i,PCT)] [$(b,--to-mb) $(i,MB)] \
+       [$(i,LOG_FILE)]",
+      "Trim the cache to the minimal budget specified. Without options \
+       trim to 50% of the current size. Keys used by the build described \
+       by $(i,LOG_FILE) are preserved if possible.");
+  `S Manpage.s_bugs;
+  `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ]
 
-let only_unused =
-  let doc = "Keep only unused keys from the selection. $(b,WARNING) Unused key
-             determination is only reliable if your file system supports
-             hard links and the cache is located on the same file system
-             as the files that reference it. If not $(b,all) keys appear
-             unused."
+let action =
+  let action =
+    [ "delete", `Delete; "gc", `Gc; "keys", `Keys; "path", `Path;
+      "stats", `Stats; "trim", `Trim ]
   in
-  Arg.(value & flag & info ["u"; "unused"] ~doc)
+  let doc =
+    Fmt.str "The action to perform. $(docv) must be one of %s."
+      (Arg.doc_alts_enum action)
+  in
+  let action = Arg.enum action in
+  Arg.(required & pos 0 (some action) None & info [] ~doc ~docv:"ACTION")
 
-let out_fmt = B00_ui.Cli.out_fmt ()
-let key_arg = B00_ui.File_cache.key_arg
-let req_key =
-  let doc = "The key." in
-  Arg.(required & pos 0 (some key_arg) None & info [] ~doc ~docv:"KEY")
+let parse_cli =
+  let args = Arg.(value & pos_right 0 string [] & info []) in
+  let log_file_opt = B00_ui.Memo.log_file ~docs:sdocs () in
+  let parse action log_file_opt args = match action with
+  | `Gc | `Stats | `Trim ->
+      begin match args with
+      | [v] ->
+          begin match log_file_opt with
+          | None ->
+              begin match Fpath.of_string v with
+              | Error e -> `Error (false, e)
+              | Ok log_file -> `Ok (action, Some log_file, [])
+              end
+          | Some _ ->
+              let e =
+                "--log-file option and positional argument cannot be used \
+                 together."
+              in
+              `Error (false, e)
+          end
+      | [] -> `Ok (action, log_file_opt, args)
+      | _ -> `Error (true, "too many positional arguments for this action.")
+      end
+  | `Keys | `Delete | `Path -> `Ok (action, log_file_opt, args)
+  in
+  Term.(ret (pure parse $ action $ log_file_opt $ args))
 
-let keys_none_is_all = B00_ui.File_cache.keys_none_is_all ()
+let tool =
+  Term.(const cache_cmd $ B0_std_ui.tty_cap ~docs:sdocs () $
+        B0_std_ui.log_level ~docs:sdocs () $ B0_pager.don't ~docs:sdocs () $
+        B00_ui.Memo.b0_dir ~docs:sdocs () $
+        B00_ui.Memo.cache_dir ~docs:sdocs () $
+        B00_ui.File_cache.trim_cli () $
+        parse_cli),
+  Term.info "b00-cache" ~version ~doc ~sdocs ~exits ~man ~man_xrefs
 
-(* Command clis *)
-
-let fpath = B0_std_ui.fpath
-let dir =
-  let get_dir cache_dir = match Os.Dir.cwd () with
-  | Error e -> `Error (false, e)
-  | Ok cwd ->
-      let b0_dir = Fpath.(cwd / B00_ui.Memo.b0_dir_name) in
-      `Ok (B00_ui.Memo.get_cache_dir ~cwd ~b0_dir ~cache_dir)
-  in
-  let cache_dir = B00_ui.Memo.cache_dir ~doc_none:"$(b,_b0/.cache)" () in
-  Term.(ret (const get_dir $ cache_dir))
-
-let sdocs = Manpage.s_common_options
-let add_cmd =
-  let doc = "Bind a key to files" and man_xrefs = [ `Main ] in
-  let man = [
-    `S Manpage.s_description;
-    `P "$(tname) stores an ordered sequence of files in the cache under
-        a key."; ]
-  in
-  let force =
-    let doc = "Proceed even if the key already exists." in
-    Arg.(value & flag & info ["f"; "force"] ~doc)
-  in
-  let paths =
-    let doc = "The ordered file(s) to store. If a directory is specified
-               its direct regular files (including dot files) are added, sorted
-               by binary lexicographic order; use the $(b,--rec) option to
-               add the file hierarchies rooted at directory arguments."
-    in
-    Arg.(non_empty & pos_right 0 fpath [] & info [] ~doc ~docv:"PATH")
-  in
-  let recurse =
-    let doc = "Add file hierarchies rooted at directory $(b,PATH) arguments. \
-               Without this option only direct regular files of directories are
-               added."
-    in
-    Arg.(value & flag & info ["r"; "rec"] ~doc)
-  in
-  Term.(const add_cmd $ set_conf $ dir $ force $ req_key $ recurse $ paths),
-  Term.info "add" ~doc ~sdocs ~exits ~man ~man_xrefs
-
-let delete_cmd =
-  let doc = "Delete keys" and man_xrefs = [ `Main ] in
-  let man = [
-    `S Manpage.s_description; `P "$(tname) deletes keys."] in
-  Term.(const delete_cmd $ set_conf $ dir $ only_unused $ keys_none_is_all),
-  Term.info "delete" ~doc ~sdocs ~exits ~man ~man_xrefs
-
-let files_cmd =
-  let doc = "List key files" and man_xrefs = [ `Main ] in
-  let man = [
-    `S Manpage.s_description;
-    `P "$(tname) lists key files. By default outputs one file path per line
-        preceeded by the key name to which it belongs." ]
-  in
-  Term.(const files_cmd $ set_conf $ dir $ only_unused $ keys_none_is_all $
-        out_fmt),
-  Term.info "files" ~doc ~sdocs ~exits ~man ~man_xrefs
-
-let gc_cmd =
-  let doc ="Delete unused keys" and man_xrefs = [ `Main ] in
-  let man = [
-    `S Manpage.s_description;
-    `P "$(tname) is $(mname) $(b,delete --unused) put also prints on standard
-        output information about the deletion.";
-    `P "$(b,WARNING) Unused key determination is only reliable if your
-        file system supports hard links and the cache is located on the
-        same file system as the files that reference it. If not $(b,all)
-        keys appear unused and this command deletes all the cache,
-        i.e. is equivalent to $(mname) $(b,delete).";]
-  in
-  Term.(const gc_cmd $ set_conf $ dir),
-  Term.info "gc" ~doc ~sdocs ~exits ~man ~man_xrefs
-
-let keys_cmd =
-  let doc = "List keys" and man_xrefs = [ `Main ] in
-  let man = [
-    `S Manpage.s_description;
-    `P "$(tname) lists keys. By default outputs one key per line
-        preceeded by the number of files bound to the key and its size."; ]
-  in
-  let byte_size =
-    let doc = "Output the size in bytes (rather than human friendly units)." in
-    Arg.(value & flag & info ["byte-size"] ~doc)
-  in
-  Term.(const keys_cmd $ set_conf $ dir $ only_unused $ keys_none_is_all $
-        out_fmt $ byte_size),
-  Term.info "keys" ~doc ~sdocs ~exits ~man ~man_xrefs
-
-let path_cmd =
-  let doc = "Show path to cache directory" and man_xrefs = [ `Main ] in
-  let man = [
-    `S Manpage.s_description;
-    `P "$(tname) prints on standard output the path to the cache directory \
-        (which may not exist)."];
-  in
-  Term.(const path_cmd $ set_conf $ dir),
-  Term.info "path" ~doc ~sdocs ~exits ~man ~man_xrefs
-
-let revive_cmd =
-  let doc = "Use a cache key" and man_xrefs = [ `Main ] in
-  let man = [
-    `S Manpage.s_description;
-    `P "$(tname) binds file paths to the cached files of a key."];
-  in
-  let paths =
-    let explicit =
-      let doc = "The file path to bind. If intermediate directories of $(docv)
-                 do not exist they are created. If the file exists it is not
-                 bound but kept intact. The number of files specified must match
-                 the length of the file list stored by $(b,KEY)."
-      in
-      Arg.(value & pos_right 0 fpath [] & info [] ~doc ~docv:"PATH")
-    in
-    let prefix =
-      let doc = "Bind cache files to prefix path $(docv). This results
-                 in the creation of files of the form $(docv)[z]X, with X the
-                 hexadecimal index of the file in the list and 'z' present
-                 if this is the last file of the list. If such a file
-                 already exists it is left untouched. If intermediate
-                 directories of $(docv) do not exist they are created."
-      in
-      Arg.(value & opt (some fpath) None & info ["p"; "prefix"]
-             ~doc ~docv:"PATH")
-    in
-    let either explicit prefix = match explicit, prefix with
-    | [], None -> Error (`Msg ("No file to bind specified"))
-    | [], Some p -> Ok (`Prefix p)
-    | fs, None -> Ok (`Explicit fs)
-    | fs, Some _ ->
-        Error (`Msg ("--prefix is incompatible with path positional arguments"))
-    in
-    Term.(term_result (const either $ explicit $ prefix))
-  in
-  Term.(const revive_cmd $ set_conf $ dir $ req_key $ paths),
-  Term.info "revive" ~doc ~sdocs ~exits ~man ~man_xrefs
-
-let size_cmd =
-  let doc = "Print cache or key size (default command)" in
-  let man_xrefs = [ `Main ] in
-  let man = [
-    `S Manpage.s_description;
-    `P "$(tname) prints on standard output statistics about the size of the
-        cache." ]
-  in
-  Term.(const size_cmd $ set_conf $ dir $ only_unused $ keys_none_is_all),
-  Term.info "size" ~doc ~sdocs ~exits ~man ~man_xrefs
-
-let trim_cmd =
-  let doc = "Reduce cache size" and man_xrefs = [ `Main ] in
-  let man = [
-    `S Manpage.s_description;
-    `P "$(tname) trims the cache to a specific size. Without options
-        this is equivalent to $(b,--to-% 50).
-        If more than one trim option is specified the smallest requested
-        size is met.";
-    `P "Keys are deleted by order of increasing access time but unused keys,
-        if they can be determined, are deleted first." ]
-  in
-  let trim_to_mb =
-    let doc = "Trim the cache to at most $(docv) megabytes." in
-    let docv = "MB" in
-    Arg.(value & opt (some int) None & info ["m"; "to-mb"] ~doc ~docv)
-  in
-  let trim_to_pct =
-    let doc = "Trim the cache to at most $(docv)% of the current size." in
-    let docv = "PCT" in
-    Arg.(value & opt (some int) None & info ["p";"to-%";"to-pct"] ~doc ~docv)
-  in
-  let trim_spec  =
-    let combine trim_to_mb trim_to_pct = match trim_to_mb, trim_to_pct with
-    | None, None -> max_int, 50
-    | None, Some pct -> max_int, pct
-    | Some mb, None -> mb * 1000 * 1000, 100
-    | Some mb, Some pct -> mb * 1000 * 1000, pct
-    in
-    Term.(const combine $ trim_to_mb $ trim_to_pct)
-  in
-  Term.(const trim_cmd $ set_conf $ dir $ trim_spec),
-  Term.info "trim" ~doc ~sdocs ~exits ~man ~man_xrefs
-
-(* Main command *)
-
-let b00_cache =
-  let doc = "Low-level operations on b0 caches" and man_xrefs = [`Tool "b0"] in
-  let man = [
-    `S Manpage.s_description;
-    `P "$(mname) is a low-level tool to operates on b0 caches. Not for the
-        casual user.";
-    `S Manpage.s_bugs;
-    `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ];
-  in
-  fst size_cmd,
-  Term.info "b00-cache" ~version:"%%VERSION%%" ~doc ~sdocs ~exits ~man
-    ~man_xrefs
-
-let () =
-  let cmds =
-    [ add_cmd; delete_cmd; files_cmd; gc_cmd; keys_cmd; path_cmd;
-      revive_cmd; size_cmd; trim_cmd; ]
-  in
-  Term.(exit_status @@ eval_choice b00_cache cmds)
+let main () = Term.(exit_status @@ eval tool)
+let () = if !Sys.interactive then () else main ()
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 The b0 programmers

@@ -30,14 +30,9 @@ let show_uris tty_cap log_level background prefix browser uris =
 
 open Cmdliner
 
-let uris =
-  let doc =
-    "URI to show. If URI is an existing file path a corresponding file:// \
-     URI is opened."
-  in
-  Arg.(non_empty & pos_all string [] & info [] ~doc ~docv:"URI")
-
-let cmd =
+let show_uri =
+  let version = "%%VERSION%%" in
+  let sdocs = Manpage.s_common_options in
   let doc = "Show URIs in web browsers" in
   let man = [
     `S Manpage.s_description;
@@ -50,15 +45,22 @@ let cmd =
     Term.exit_info 1 ~doc:"if the URI failed to load in some way" ::
     Term.default_exits
   in
+  let uris =
+    let doc =
+      "URI to show. If URI is an existing file path a corresponding file:// \
+       URI is opened."
+    in
+    Arg.(non_empty & pos_all string [] & info [] ~doc ~docv:"URI")
+  in
   Term.(const show_uris $
-        B0_std_ui.tty_cap () $
-        B0_std_ui.log_level () $
+        B0_std_ui.tty_cap ~docs:sdocs () $
+        B0_std_ui.log_level ~docs:sdocs () $
         B0_www_browser.background ~opts:["g"; "background"] () $
         B0_www_browser.prefix ~opts:["p"; "prefix"] () $
         B0_www_browser.browser ~opts:["b"; "browser"] () $ uris),
-  Term.info "show-uri" ~doc ~sdocs:Manpage.s_common_options ~man ~exits
+  Term.info "show-uri" ~version ~doc ~sdocs ~exits ~man
 
-let main () = Term.(exit_status @@ eval cmd)
+let main () = Term.(exit_status @@ eval show_uri)
 let () = if !Sys.interactive then () else main ()
 
 (*---------------------------------------------------------------------------

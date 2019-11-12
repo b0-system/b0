@@ -85,7 +85,7 @@ module File_cache : sig
 
   val key_stats : t -> key -> (int * int * float, string) result
   (** [key_stats c key] is statistical information about key [key].
-      Namely the number of files (without the metadata file), the key
+      Namely the number of files (including the metadata), the key
       size in bytes and the access time of the key – this is the
       latest access time of one of its consituents the relevance of
       which depends on your file system. *)

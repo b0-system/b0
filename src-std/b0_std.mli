@@ -1710,6 +1710,13 @@ module Time : sig
   type cpu_span
   (** The type for CPU execution time spans. *)
 
+  val cpu_span :
+    cpu_utime:span -> cpu_stime:span -> cpu_children_utime:span ->
+    cpu_children_stime:span -> cpu_span
+  (** [cpu_span ~cpu_utime ~cpu_stime ~cpu_children_utime
+      ~cpu_children_stime] is a cpu span with the given fields. See
+      accessors for semantics. *)
+
   val cpu_zero : cpu_span
   (** [cpu_zero] is zero CPU times. *)
 
@@ -3213,6 +3220,56 @@ module Bincode : sig
   val result : ok:'a t -> error:'b t -> ('a, 'b) result t
   (** [result] is a codec for results with [Ok] elements coded with [ok]
       and [Error] elements coded with [error]. *)
+
+  (** {2:set [Set.t]} *)
+
+  val enc_set :
+    (module Set.S with type elt = 'a and type t = 'set) -> 'a enc -> 'set enc
+  (** [enc_set (module S) enc] encodes [S.t] sets using [enc] for its
+      elements. *)
+
+  val dec_set :
+    (module Set.S with type elt = 'a and type t = 'set) -> 'a dec -> 'set dec
+  (** [dec_set (module S) dec] decodes [S.t] sets with [dec] for its
+      elements. *)
+
+  val set :
+    (module Set.S with type elt = 'a and type t = 'set) -> 'a t -> 'set t
+  (** [set (module S) c] is a codec for [S.t] sets using [c] for its
+      elements. *)
+
+  (** {2:hash [Hash.t]} *)
+
+  val enc_hash : Hash.t enc
+  (** [enc_hash] encodes a {!Hash.t}. *)
+
+  val dec_hash : Hash.t dec
+  (** [dec_hash] decodes a {!Hash.t}. *)
+
+  val hash : Hash.t t
+  (** [hash] is a codec for {!Hash.t} *)
+
+  (** {2:time_span [Time.span]} *)
+
+  val enc_time_span : Time.span enc
+  (** [enc_time_span] encodes a {!type:Time.span}. *)
+
+  val dec_time_span : Time.span dec
+  (** [dec_time_span] decodes a {!type:Time.span}. *)
+
+  val time_span : Time.span t
+  (** [time_span] is a codec for {!type:Time.span}. *)
+
+  (** {2:time_span [Time.cpu_span]} *)
+
+  val enc_time_cpu_span : Time.cpu_span enc
+  (** [enc_time_cpu_span] encodes a {!type:Time.cpu_span}. *)
+
+  val dec_time_cpu_span : Time.cpu_span dec
+  (** [dec_time_cpu_span] decodes a {!type:Time.cpu_span}. *)
+
+  val time_cpu_span : Time.cpu_span t
+  (** [time_span] is a codec for {!type:Time.cpu_span}. *)
 end
 
 (*---------------------------------------------------------------------------

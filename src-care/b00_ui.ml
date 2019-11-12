@@ -8,10 +8,10 @@ open B0_std
 module Cli = struct
   open Cmdliner
 
-  (* Specifying output formats *)
+  (* Specifying output detail *)
 
-  type out_fmt = [ `Normal | `Short | `Long ]
-  let out_fmt
+  type out_details = [ `Normal | `Short | `Long ]
+  let out_details
       ?docs ?(short_opts = ["s"; "short"]) ?(long_opts = ["l"; "long"]) ()
     =
     let short =
@@ -28,109 +28,124 @@ end
 module File_cache = struct
   open B000
 
-  module Stats = struct
-    let err op err = Fmt.str "cache %s: %s" op err
+  (* Cache stats *)
 
-    type keys = {keys_count : int; keys_file_count : int; keys_byte_size : int}
-    let keys_count s = s.keys_count
-    let keys_byte_size s = s.keys_byte_size
-    let keys_file_count s = s.keys_file_count
-    let keys_zero = { keys_count = 0; keys_file_count = 0; keys_byte_size = 0 }
-    let keys_sub s0 s1 =
-      { keys_count = s0.keys_count - s1.keys_count;
-        keys_file_count = s0.keys_file_count - s1.keys_file_count;
-        keys_byte_size = s0.keys_byte_size - s1.keys_byte_size }
+  type key_stats =
+    { keys_count : int; keys_file_count : int; keys_byte_size : int}
 
-    let pp_keys ppf s =
-      Fmt.pf ppf "keys: %4d files: %4d size: %6a"
-        s.keys_count s.keys_file_count Fmt.byte_size s.keys_byte_size
+  let pp_key_stats ppf s =
+    Fmt.pf ppf " %5d  %5d  %a"
+      s.keys_count s.keys_file_count (Fmt.bold Fmt.byte_size) s.keys_byte_size
 
-    let of_keys c ns =
-      let rec loop k f b = function
-      | [] -> { keys_count = k; keys_file_count = f; keys_byte_size = b }
-      | n :: ns ->
-          let kf, kb, _ = B000.File_cache.key_stats c n |> Result.to_failure in
-          loop (k + 1) (f + kf) (b + kb) ns
-      in
-      try Ok (loop 0 0 0 ns) with
-      | Failure e -> Error (err "keys stats" e)
+  let pp_stats ppf (total, used) =
+    let row = Fmt.tty_string [`Fg `Yellow] in
+    let col = Fmt.tty_string [`Italic] in
+    let pp_cols ppf () = Fmt.pf ppf "       %a  %a" col "keys" col "files" in
+    Fmt.pf ppf "@[<v>%a%a@,%a%a@,%a@]"
+      row "total" pp_key_stats total
+      row "used " pp_key_stats used
+      pp_cols ()
 
-    type cache = { all_keys : keys; unused_keys : keys }
-    let zero = { all_keys = keys_zero; unused_keys = keys_zero }
-    let all_keys s = s.all_keys
-    let unused_keys s = s.unused_keys
-    let pp =
-      Fmt.record @@
-      [ Fmt.field "unused" unused_keys pp_keys;
-        Fmt.field " total" all_keys pp_keys ]
 
-    let of_cache c =
-      let rec loop k f b uk uf ub = function
-      | [] ->
-          let a = {keys_count=k; keys_file_count=f; keys_byte_size=b} in
-          let u = {keys_count=uk; keys_file_count=uf; keys_byte_size=ub} in
-          { all_keys = a; unused_keys = u }
-      | n :: ks ->
-          let kf, kb, _ = B000.File_cache.key_stats c n |> Result.to_failure in
-          let key_unused = false in
-          match key_unused with
-          | true -> loop (k+1) (f+kf) (b+kb) (uk+1) (uf+kf) (ub+kb) ks
-          | false -> loop (k+1) (f+kf) (b+kb) uk uf ub ks
-      in
-      try
-        let keys = B000.File_cache.keys c |> Result.to_failure in
-        Ok (loop 0 0 0 0 0 0 keys)
-      with
-      | Failure e -> Error (err "stats" e)
-  end
+  let pp_stats ppf (total, used) =
+    let row = Fmt.tty_string [`Fg `Yellow] in
+    let col = Fmt.tty_string [`Italic] in
+    let pp_size ppf s = Fmt.pf ppf "% 6s" (Fmt.str "%a" Fmt.byte_size s) in
+    let pp_cols ppf () = Fmt.pf ppf "       %a    %a" col "total" col "used" in
+    Fmt.pf ppf "@[<v>%a@,%a %6d  %6d@,%a %6d  %6d@,%a %a  %a@]"
+      pp_cols ()
+      row "keys " total.keys_count used.keys_count
+      row "files" total.keys_file_count used.keys_file_count
+      row "size "
+      (Fmt.bold pp_size) total.keys_byte_size
+      (Fmt.bold pp_size) used.keys_byte_size
+
+  let stats_of_cache c ~used =
+    let rec loop tk tf tb uk uf ub = function
+    | [] ->
+        let t = {keys_count=tk; keys_file_count=tf; keys_byte_size=tb} in
+        let u = {keys_count=uk; keys_file_count=uf; keys_byte_size=ub} in
+        t, u
+    | k :: ks ->
+        let kf, kb, _ = B000.File_cache.key_stats c k |> Result.to_failure in
+        match String.Set.mem k used with
+        | true -> loop (tk+1) (tf+kf) (tb+kb) (uk+1) (uf+kf) (ub+kb) ks
+        | false -> loop (tk+1) (tf+kf) (tb+kb) uk uf ub ks
+    in
+    try
+      let keys = B000.File_cache.keys c |> Result.to_failure in
+      Ok (loop 0 0 0 0 0 0 keys)
+    with
+    | Failure e -> Error (Fmt.str "cache stats: %s" e)
 
   (* High-level commands *)
 
+  let keys_of_done_ops ops =
+    let add_op acc o =
+      let h = B000.Op.hash o in
+      match not (Hash.is_nil h) && B000.Op.status o = B000.Op.Done with
+      | true -> String.Set.add (Hash.to_hex h) acc
+      | false -> acc
+    in
+    List.fold_left add_op String.Set.empty ops
+
   let delete ~dir keys = Result.bind (Os.Dir.exists dir) @@ function
-  | false -> Ok ()
+  | false -> Ok false
   | true ->
       match keys with
       | `All ->
+          (* Delete and recreate dir *)
           Result.bind (Os.Path.delete ~recurse:true dir) @@ fun _ ->
-          Result.bind (Os.Dir.create ~make_path:true dir) @@ (* recreate dir *)
-          fun _ -> Ok ()
+          Result.bind (Os.Dir.create ~make_path:true dir) @@ fun _ -> Ok true
       | `Keys keys ->
           Result.bind (File_cache.create dir) @@ fun c ->
-          let rec loop = function
-          | [] -> Ok ()
-          | k :: ks ->
-              match File_cache.rem c k with
-              | Error _ as e -> e
-              | Ok true -> loop ks
-              | Ok false ->
-                  Log.warn (fun m -> m "%s: no such key in cache, ignored" k);
-                  loop ks
+          let delete c k =
+            Log.if_error ~use:() @@
+            Result.bind (File_cache.rem c k) @@ function
+            | true -> Ok ()
+            | false ->
+                Log.warn begin fun m ->
+                  m "No key %a in cache, ignored." Fmt.(bold string) k
+                end;
+                Ok ()
           in
-          loop keys
+          List.iter (delete c) keys; Ok true
 
-  let gc ~dir = Result.bind (Os.Dir.exists dir) @@ function
-  | false -> Ok ()
+  let gc ~dir ~used = Result.bind (Os.Dir.exists dir) @@ function
+  | false -> Ok false
   | true ->
-      (* TODO redo with a log *)
       Result.bind (File_cache.create dir) @@ fun c ->
-      Error "This operation is no longer implemented (TODO again)."
+      Result.bind (File_cache.keys c) @@ fun keys ->
+      let unused k = not (String.Set.mem k used) in
+      let unused = List.filter unused keys in
+      let delete c k = ignore (File_cache.rem c k |> Log.if_error ~use:false) in
+      List.iter (delete c) unused;
+      Ok true
 
-  let size ~dir =
-    let stats = Result.bind (Os.Dir.exists dir) @@ function
-    | false -> Ok Stats.zero
-    | true ->
-        Result.bind (File_cache.create dir) @@ fun c ->
-        Stats.of_cache c
-    in
-    Result.bind stats @@ fun stats ->
-    Log.app (fun m -> m "@[<v>%a@]" Stats.pp stats); Ok ()
+  let keys ~dir = Result.bind (Os.Dir.exists dir) @@ function
+  | false -> Ok false
+  | true ->
+      Result.bind (File_cache.create dir) @@ fun c ->
+      Result.bind (File_cache.keys c) @@ fun keys ->
+      Log.app (fun m -> m "@[<v>%a@]" Fmt.(list string) keys);
+      Ok true
 
-  let trim ~dir ~max_byte_size ~pct =
+  let stats ~dir ~used = Result.bind (Os.Dir.exists dir) @@ function
+  | false -> Ok false
+  | true ->
+      Result.bind (File_cache.create dir) @@ fun c ->
+      Result.bind (stats_of_cache c ~used) @@ fun stats ->
+      Log.app (fun m -> m "@[<v>%a@]" pp_stats stats);
+      Ok true
+
+  let trim ~dir ~used ~max_byte_size ~pct =
     Result.bind (Os.Dir.exists dir) @@ function
-    | false -> Ok ()
+    | false -> Ok false
     | true ->
+        let is_unused k = not (String.Set.mem k used) in
         Result.bind (File_cache.create dir) @@ fun c ->
-        File_cache.trim_size c ~max_byte_size ~pct
+        Result.bind (File_cache.trim_size c ~is_unused ~max_byte_size ~pct)
+        @@ fun c -> Ok true
 
   (* Cli fragments *)
 
@@ -149,6 +164,25 @@ module File_cache = struct
     in
     let keys = Arg.(value & pos_right 0 key_arg [] & info [] ~doc ~docv:"KEY")in
     Term.(const (function [] -> `All | ks -> `Keys ks) $ keys)
+
+  let trim_cli ?(mb_opts = ["to-mb"]) ?(pct_opts = ["to-pct"]) ?docs () =
+    let trim_to_mb =
+      let doc = "Trim the cache to at most $(docv) megabytes." in
+      let docv = "MB" in
+      Arg.(value & opt (some int) None & info mb_opts ~doc ?docs ~docv)
+    in
+    let trim_to_pct =
+      let doc = "Trim the cache to at most $(docv)% of the current size." in
+      let docv = "PCT" in
+      Arg.(value & opt (some int) None & info ["to-pct"] ~doc ~docv)
+    in
+    let trim trim_to_mb trim_to_pct = match trim_to_mb, trim_to_pct with
+    | None, None -> max_int, 50
+    | None, Some pct -> max_int, pct
+    | Some mb, None -> mb * 1000 * 1000, 100
+    | Some mb, Some pct -> mb * 1000 * 1000, pct
+    in
+    Term.(const trim $ trim_to_mb $ trim_to_pct)
 end
 
 module Op = struct
@@ -336,11 +370,11 @@ module Op = struct
         let doc = "Keep only revivable operations that were revived." in
         Some true, Arg.info ["revived"] ~doc ?docs
       in
-      let executed =
+      let unrevived =
         let doc = "Keep only revivable operations that were not revived." in
         Some false, Arg.info ["u"; "unrevived"] ~doc ?docs
       in
-      Arg.(value & vflag None [revived; executed])
+      Arg.(value & vflag None [revived; unrevived])
     in
     let statuses =
       let statuses =
@@ -417,9 +451,9 @@ module Op = struct
           Any operation that satifies one of the selectors and all of the \
           filters is included in the result. If no selector is specified all \
           operations are selected. If no filter is specified all selected \
-          operations are returned.";
-      `P "The result is sorted by execution start time, this can
-          be changed with the $(b,--order-by) or $(b,-d) option." ]
+          operations are returned. By default the result is sorted by \
+          execution start time, this can be changed with the $(b,--order-by) \
+          or $(b,-d) option." ]
 end
 
 module Memo = struct
@@ -468,6 +502,16 @@ module Memo = struct
   | None -> Fpath.(b0_dir / default)
   | Some p -> Fpath.(cwd // p)
 
+  let find_dir_with_b0_dir ~start =
+    let rec loop p = match Fpath.is_root p with
+    | true -> None
+    | false ->
+        match Os.Dir.exists Fpath.(p / b0_dir_name) with
+        | Error _ | Ok false -> loop (Fpath.parent p)
+        | Ok true -> Some p
+    in
+    if Fpath.is_rel start then None else (loop start)
+
   (* File cache directory *)
 
   let cache_dir_env = "B0_CACHE_DIR"
@@ -496,15 +540,13 @@ module Memo = struct
   let log_file_name = ".log"
   let log_file_env = "B0_LOG_FILE"
   let log_file
-      ?(opts = ["log-file"])
-      ?(docs = Manpage.s_common_options)
-      ?(doc = "Output (binary) build log to $(docv).")
+      ?(opts = ["log-file"]) ?docs
+      ?(doc = "Use $(docv) for the build log file.")
       ?(doc_none = "$(b,.log) in b0 directory")
       ?(env = Cmdliner.Arg.env_var log_file_env) ()
     =
-    let doc = "Output (binary) build log to $(docv)." in
     Arg.(value & opt (some ~none:doc_none B0_std_ui.fpath) None &
-         info opts ~env ~doc ~docs ~docv:"FILE")
+         info opts ~env ~doc ?docs ~docv:"FILE")
 
   let get_log_file ~cwd ~b0_dir ~log_file =
     get_b0_dir_path ~cwd ~b0_dir log_file_name log_file
@@ -513,15 +555,13 @@ module Memo = struct
 
   let jobs_env = "B0_JOBS"
   let jobs
-      ?(opts = ["j"; "jobs"])
-      ?(docs = Manpage.s_common_options)
+      ?(opts = ["j"; "jobs"]) ?docs
       ?(doc = "Maximal number of commands to spawn concurrently.")
       ?(doc_none = "Number of CPUs available")
       ?(env = Cmdliner.Arg.env_var log_file_env) ()
     =
-    let docv = "COUNT" in
     Arg.(value & opt (some ~none:doc_none int) None &
-         info opts ~env ~doc ~docs ~docv)
+         info opts ~env ~doc ?docs ~docv:"COUNT")
 
   let get_jobs ~jobs = match jobs with
   | Some max -> max | None -> Os.Cpu.logical_count ()
@@ -529,18 +569,15 @@ module Memo = struct
   (* Hash fun *)
 
   let hash_fun =
-    let of_string = function s -> Ok (module Hash.Xxh_64 : Hash.T) in
+    let of_string s = Result.map_error (fun m -> `Msg m) @@ Hash.get_fun s in
     let pp ppf (module H : Hash.T) = Fmt.string ppf H.id in
     Arg.conv ~docv:"HASHFUN" (of_string, pp)
 
   let hash_fun_env = "B0_HASH_FUN"
   let hash_fun
-      ?(opts = ["hash-fun"])
-      ?(docs = Manpage.s_common_options)
-      ?doc
-      ?(doc_none = "xxh64")
-      ?(env = Cmdliner.Arg.env_var hash_fun_env) () =
-    let docv = "HASHFUN" in
+      ?(opts = ["hash-fun"]) ?docs ?doc ?(doc_none = "xxh64")
+      ?(env = Cmdliner.Arg.env_var hash_fun_env) ()
+    =
     let doc = match doc with
     | Some doc -> doc
     | None ->
@@ -549,7 +586,7 @@ module Memo = struct
           Fmt.(must_be (Fmt.bold string)) ids
     in
     Arg.(value & opt (some ~none:doc_none hash_fun) None &
-         info opts ~env ~doc ~docs ~docv)
+         info opts ~env ~doc ?docs ~docv:"HASHFUN")
 
   let get_hash_fun ~hash_fun = match hash_fun with
   | Some m -> m
@@ -562,43 +599,34 @@ module Memo = struct
     (* Logs *)
 
     type t =
-      { hash_count : int;
-        hash_dur : Time.span;
+      { hash_fun : string;
         file_hashes : Hash.t Fpath.Map.t;
+        hash_dur : Time.span;
         total_dur : Time.span;
-        cpu_utime : Time.span;
-        cpu_stime : Time.span;
-        cpu_children_utime : Time.span;
-        cpu_children_stime : Time.span;
-        ops : B000.Op.t list;
-      }
+        cpu_dur : Time.cpu_span;
+        ops : B000.Op.t list; }
 
-    let ops l = l.ops
     let of_memo m =
-      let open B00 in
-      let c = Memo.reviver m in
-      let hash_count = Fpath.Map.cardinal (B000.Reviver.file_hashes c) in
-      let hash_dur = B000.Reviver.file_hash_dur c in
-      let file_hashes = B000.Reviver.file_hashes (Memo.reviver m) in
-      let total_dur = Time.count (Memo.clock m) in
-      let cpu = Time.cpu_count (Memo.cpu_clock m) in
-      { hash_count; hash_dur; file_hashes; total_dur;
-        cpu_utime = Time.cpu_utime cpu; cpu_stime = Time.cpu_stime cpu;
-        cpu_children_utime = Time.cpu_children_utime cpu;
-        cpu_children_stime = Time.cpu_children_stime cpu;
-        ops = B00.Memo.ops m; }
+      let r = B00.Memo.reviver m in
+      let module H = (val (B000.Reviver.hash_fun r)) in
+      let file_hashes = B000.Reviver.file_hashes r in
+      let hash_dur = B000.Reviver.file_hash_dur r in
+      let total_dur = Time.count (B00.Memo.clock m) in
+      let cpu_dur = Time.cpu_count (B00.Memo.cpu_clock m) in
+      let ops = B00.Memo.ops m in
+      { hash_fun = H.id; hash_dur; file_hashes; total_dur; cpu_dur; ops }
+
+    let hash_fun l = l.hash_fun
+    let file_hashes l = l.file_hashes
+    let hash_dur l = l.hash_dur
+    let total_dur l = l.total_dur
+    let cpu_dur l = l.cpu_dur
+    let ops l = l.ops
 
     (* IO *)
 
-    let enc_time_span b s = Bincode.enc_int64 b (Time.Span.to_uint64_ns s)
-    let dec_time_span s i =
-      let i, s = Bincode.dec_int64 s i in
-      i, Time.Span.of_uint64_ns s
-
     let enc_file_hashes b hs =
-      let enc_file_hash b f h =
-        Bincode.enc_fpath b f; Bincode.enc_string b (Hash.to_bytes h);
-      in
+      let enc_file_hash b f h = Bincode.enc_fpath b f; Bincode.enc_hash b h in
       let count = Fpath.Map.cardinal hs in
       Bincode.enc_int b count;
       Fpath.Map.iter (enc_file_hash b) hs
@@ -607,8 +635,8 @@ module Memo = struct
       let rec loop acc count s i =
         if count = 0 then i, acc else
         let i, file = Bincode.dec_fpath s i in
-        let i, hash = Bincode.dec_string  s i in
-        loop (Fpath.Map.add file (Hash.of_bytes hash) acc) (count - 1) s i
+        let i, hash = Bincode.dec_hash s i in
+        loop (Fpath.Map.add file hash acc) (count - 1) s i
       in
       let i, count = Bincode.dec_int s i in
       loop Fpath.Map.empty count s i
@@ -617,36 +645,30 @@ module Memo = struct
 
     let enc b l =
       Bincode.enc_magic magic b ();
-      Bincode.enc_int b l.hash_count;
-      enc_time_span b l.hash_dur;
+      Bincode.enc_string b l.hash_fun;
       enc_file_hashes b l.file_hashes;
-      enc_time_span b l.total_dur;
-      enc_time_span b l.cpu_utime;
-      enc_time_span b l.cpu_stime;
-      enc_time_span b l.cpu_children_utime;
-      enc_time_span b l.cpu_children_stime;
+      Bincode.enc_time_span b l.hash_dur;
+      Bincode.enc_time_span b l.total_dur;
+      Bincode.enc_time_cpu_span b l.cpu_dur;
       Bincode.enc_list (Bincode.enc B000_conv.Op.bincode) b l.ops
 
     let dec s i =
-      let i, () = Bincode.dec_magic magic s 0 in
-      let i, hash_count = Bincode.dec_int s i in
-      let i, hash_dur = dec_time_span s i in
+      let i, () = Bincode.dec_magic magic s i in
+      let i, hash_fun = Bincode.dec_string s i in
+      let i, file_hashes = i, Fpath.Map.empty in
       let i, file_hashes = dec_file_hashes s i in
-      let i, total_dur = dec_time_span s i in
-      let i, cpu_utime = dec_time_span s i in
-      let i, cpu_stime = dec_time_span s i in
-      let i, cpu_children_utime = dec_time_span s i in
-      let i, cpu_children_stime = dec_time_span s i in
+      let i, hash_dur = Bincode.dec_time_span s i in
+      let i, total_dur = Bincode.dec_time_span s i in
+      let i, cpu_dur = Bincode.dec_time_cpu_span s i in
       let i, ops = Bincode.dec_list (Bincode.dec (B000_conv.Op.bincode)) s i in
-      i, { hash_count; hash_dur; file_hashes; total_dur; cpu_utime; cpu_stime;
-           cpu_children_utime; cpu_children_stime; ops }
+      i, { hash_fun; file_hashes; hash_dur; total_dur; cpu_dur; ops }
 
     let bincode = Bincode.v enc dec
 
     let write file l =
       let data =
         Log.time (fun _ msg -> msg "generating log") @@ fun () ->
-        let buf = Buffer.create (1024 * 1024) in
+        let buf = Buffer.create (1024 * 1024 * 1024) in
         Bincode.to_string ~buf bincode l
       in
       Log.time (fun _ msg -> msg "writing log") @@ fun () ->
@@ -656,7 +678,16 @@ module Memo = struct
       Result.bind (Os.File.read file) @@ fun data ->
       Bincode.of_string ~file bincode data
 
-    let pp_stats sel ppf l =
+    (* Log formatters *)
+
+    let hashed_byte_size file_hashes =
+      let add_file f _ acc = match Unix.stat (Fpath.to_string f) with
+      | exception Unix.Unix_error (_, _, _) -> 0
+      | s -> acc + s.Unix.st_size
+      in
+      Fpath.Map.fold add_file file_hashes 0
+
+    let pp_stats ~hashed_size sel ppf l =
       let sc, st, sd, wc, wt, wd, cc, ct, cd, rt, rd, ot, od =
         let ( ++ ) = Time.Span.add in
         let rec loop sc st sd wc wt wd cc ct cd rt rd ot od = function
@@ -683,20 +714,37 @@ module Memo = struct
           0 0 Time.Span.zero 0 0 Time.Span.zero 0 0 Time.Span.zero
           0 Time.Span.zero 0 Time.Span.zero (sel l.ops)
       in
-      let hc, hd = l.hash_count, l.hash_dur in
+      let pp_totals ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
+      let pp_hashes ppf l =
+        let hc, hd = Fpath.Map.cardinal l.file_hashes, l.hash_dur in
+        let hs = if not hashed_size then 0 else hashed_byte_size l.file_hashes
+        in
+        let pp_hashed_size ppf s =
+          let label = Fmt.tty_string [`Italic] in
+          match hashed_size with
+          | true -> Fmt.field ~label "size" (fun c -> c) Fmt.byte_size ppf s
+          | false -> ()
+        in
+        Fmt.pf ppf "%a %a" pp_totals (hc, hd) pp_hashed_size hs
+      in
       let pp_xtime ppf (self, children) =
         let label = Fmt.tty_string [`Italic] in
         Fmt.pf ppf "%a %a" Time.Span.pp self
           (Fmt.field ~label "children" (fun c -> c) Time.Span.pp)
           children
       in
-      let pp_stime ppf l = pp_xtime ppf (l.cpu_stime, l.cpu_children_stime) in
-      let pp_utime ppf l = pp_xtime ppf (l.cpu_utime, l.cpu_children_utime) in
+      let pp_stime ppf l =
+        let t = Time.(cpu_stime l.cpu_dur, cpu_children_stime l.cpu_dur) in
+        pp_xtime ppf t
+      in
+      let pp_utime ppf l =
+        let t = Time.(cpu_utime l.cpu_dur, cpu_children_utime l.cpu_dur) in
+        pp_xtime ppf t
+      in
       let pp_op ppf (oc, ot, od) =
         Fmt.pf ppf "%a %d (%d revived)" Time.Span.pp od ot oc
       in
       let pp_op_no_cache ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
-      let pp_totals ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
       let pp_sec s ppf _ = Fmt.tty_string [`Bold] ppf s in
       (Fmt.record @@
        [ pp_sec "selected operations";
@@ -706,72 +754,90 @@ module Memo = struct
          Fmt.field "reads" (fun _ -> (rt, rd)) pp_op_no_cache;
          Fmt.field "all" (fun _ -> (ot, od)) pp_totals;
          pp_sec "global timings";
-         Fmt.field "hashes" (fun _ -> (hc, hd)) pp_totals;
+         Fmt.field "hashes" Fmt.id pp_hashes;
          Fmt.field "utime" Fmt.id pp_utime;
          Fmt.field "stime" Fmt.id pp_stime;
          Fmt.field "real" (fun _ -> l.total_dur) Time.Span.pp ]) ppf l
 
-    type out_kind = [`Hashed_files | `Op_hashes | `Ops | `Stats | `Trace_event]
+    type out_format =
+    [ `Hashed_files | `Op_hashes | `Ops | `Path | `Stats | `Root_hashed_files
+    | `Trace_event ]
 
-    let out ppf out_fmt out_kind query l = match out_kind with
+    let pp_op = function
+    | `Short -> B000_conv.Op.pp_line
+    | `Normal -> B000_conv.Op.pp_line_and_ui
+    | `Long -> B000_conv.Op.pp
+
+    let pp_op_hash = function
+    | `Short | `Normal -> Fmt.using B000.Op.hash Hash.pp
+    | `Long ->
+        fun ppf o ->
+          Fmt.int ppf (B000.Op.id o); Fmt.sp ppf ();
+          Hash.pp ppf (B000.Op.hash o)
+
+    let pp_hashed_file = function
+    | `Short -> Fmt.using fst Fpath.pp_unquoted
+    | `Normal | `Long ->
+        fun ppf (f, h) ->
+          Hash.pp ppf h; Fmt.char ppf ' '; Fpath.pp_unquoted ppf f
+
+    let out ppf format details query ~path l = match format with
+    | `Path ->
+        Fmt.pf ppf "@[%a@]@." Fpath.pp_unquoted path
     | `Ops ->
         let ops = query l.ops in
         if ops = [] then () else
-        let pp_op = match out_fmt with
-        | `Short -> B000_conv.Op.pp_line
-        | `Normal -> B000_conv.Op.pp_line_and_ui
-        | `Long -> B000_conv.Op.pp
-        in
-        Fmt.pf ppf "@[<v>%a@]@." (Fmt.list pp_op) ops
+        Fmt.pf ppf "@[<v>%a@]@." (Fmt.list (pp_op details)) ops
     | `Stats ->
-        Fmt.pf ppf "@[%a]@." (pp_stats query) l
+        let hashed_size = details <> `Short (* do it by default for now *) in
+        Fmt.pf ppf "@[%a@]@." (pp_stats ~hashed_size query) l
     | `Trace_event ->
         let ops = query l.ops in
         if ops = [] then () else
         let t = B0_trace.Trace_event.of_ops ops in
         Fmt.pf ppf "@[%s@]@." (B0_serialk_json.Jsong.to_string t)
     | `Op_hashes ->
-        let ops = query l.ops in
+        let has_hash o = not (Hash.is_nil (B000.Op.hash o)) in
+        let ops = List.filter has_hash (query l.ops) in
         if ops = [] then () else
-        let pp_hash ppf o = Hash.pp ppf (B000.Op.hash o) in
-        Fmt.pf ppf "@[<v>%a@]@." (Fmt.list pp_hash) (query l.ops)
-    | `Hashed_files ->
-        let pp_file_hash = match out_fmt with
-        | `Short -> fun ppf (file, _) -> Fpath.pp_unquoted ppf file
-        | `Normal | `Long ->
-            fun ppf (file, hash) ->
-              Hash.pp ppf hash; Fmt.sp ppf (); Fpath.pp_unquoted ppf file
+        Fmt.pf ppf "@[<v>%a@]@." (Fmt.list (pp_op_hash details)) ops
+    | `Root_hashed_files ->
+        let writes =
+          let add_write acc f = Fpath.Set.add f acc in
+          let add_op acc o = List.fold_left add_write acc (B000.Op.writes o) in
+          List.fold_left add_op Fpath.Set.empty l.ops
         in
-        let pp_file_hashes =
-          Fmt.iter_bindings Fpath.Map.iter (Fmt.hbox pp_file_hash)
+        let add_file writes f h acc =
+          if Fpath.Set.mem f writes then acc else (f, h) :: acc
+        in
+        let roots = Fpath.Map.fold (add_file writes) l.file_hashes [] in
+        if roots = [] then () else
+        Fmt.pf ppf "@[<v>%a@]@." (Fmt.list (pp_hashed_file details)) roots
+    | `Hashed_files ->
+        let pp_hashed_files =
+          Fmt.iter_bindings Fpath.Map.iter (pp_hashed_file details)
         in
         if Fpath.Map.is_empty l.file_hashes then () else
-        Fmt.pf ppf "@[<v>%a@]@." pp_file_hashes l.file_hashes
+        Fmt.pf ppf "@[<v>%a@]@." pp_hashed_files l.file_hashes
 
-    let out_kind_cli ?docs () =
-      let hashed_files =
-        let doc = "Output hashed file paths." in
-        Cmdliner.Arg.info ["hashed-files"] ~doc ?docs
-      in
-      let op_hashes =
-        let doc = "Output only operation hashes." in
-        Cmdliner.Arg.info ["op-hashes"] ~doc ?docs
-      in
-      let ops =
-        let doc = "Output build operations (default)." in
-        Cmdliner.Arg.info ["ops"] ~doc ?docs
-      in
-      let stats =
-        let doc = "Output statistics about the returned operations." in
-        Cmdliner.Arg.info ["stats"] ~doc ?docs
-      in
-      let trace_event =
-        let doc = "Output build operations in Trace Event format." in
-        Cmdliner.Arg.info ["trace-event"] ~doc ?docs
-      in
+    let out_format_cli ?docs () =
+      let a opt doc = Cmdliner.Arg.info [opt] ~doc ?docs in
       let fmts =
-        [ `Hashed_files, hashed_files; `Op_hashes, op_hashes; `Ops, ops;
-          `Stats, stats; `Trace_event, trace_event; ]
+        [ `Hashed_files, a "hashed-files"
+            "Output the path of every hashed file.";
+          `Op_hashes, a "op-hashes"
+            "Output the hashes (cache keys) of selected operations.";
+          `Ops, a "ops"
+            "Output selected operations (default).";
+          `Path, a "path"
+            "Output the path to the log file.";
+          `Root_hashed_files, a "root-hashed-files"
+            "Output the path of hashed files that are not written by any \
+             of the build operations in the log.";
+          `Stats, a "stats"
+            "Output statistics about the build and selected operations.";
+          `Trace_event, a "trace-event"
+            "Output selected operations in Trace Event format." ]
       in
       Cmdliner.Arg.(value & vflag `Ops fmts)
   end

@@ -2030,26 +2030,39 @@ module Time = struct
 
   (* CPU time spans *)
 
-  type cpu_span = Unix.process_times
-  let cpu_zero =
-    Unix.{ tms_utime = 0.; tms_stime = 0.; tms_cutime = 0.; tms_cstime = 0. }
-
   let sec_to_span sec = Int64.of_float (sec *. 1e9)
-  let cpu_utime c = sec_to_span c.Unix.tms_utime
-  let cpu_stime c = sec_to_span c.Unix.tms_stime
-  let cpu_children_utime c = sec_to_span c.Unix.tms_cutime
-  let cpu_children_stime c = sec_to_span c.Unix.tms_cstime
+
+  type cpu_span =
+    { cpu_utime : span; cpu_stime : span;
+      cpu_children_utime : span; cpu_children_stime : span; }
+
+  let cpu_span ~cpu_utime ~cpu_stime ~cpu_children_utime ~cpu_children_stime =
+    { cpu_utime; cpu_stime; cpu_children_utime; cpu_children_stime }
+
+  let cpu_zero = cpu_span 0L 0L 0L 0L
+  let cpu_utime c = c.cpu_utime
+  let cpu_stime c = c.cpu_stime
+  let cpu_children_utime c = c.cpu_children_utime
+  let cpu_children_stime c = c.cpu_children_stime
 
   (* CPU counters *)
 
   type cpu_counter = cpu_span
-  let cpu_counter () = Unix.times ()
+  let cpu_counter () =
+    let now = Unix.times () in
+    { cpu_utime = sec_to_span now.Unix.tms_utime;
+      cpu_stime = sec_to_span now.Unix.tms_stime;
+      cpu_children_utime = sec_to_span now.Unix.tms_cutime;
+      cpu_children_stime = sec_to_span now.Unix.tms_cstime; }
+
   let cpu_count c =
     let now = Unix.times () in
-    Unix.{ tms_utime = now.tms_utime -. c.tms_utime;
-           tms_stime = now.tms_stime -. c.tms_stime;
-           tms_cutime = now.tms_cutime -. c.tms_cutime;
-           tms_cstime = now.tms_cstime -. c.tms_cstime; }
+    { cpu_utime = Int64.sub (sec_to_span now.Unix.tms_utime) c.cpu_utime;
+      cpu_stime = Int64.sub (sec_to_span now.Unix.tms_stime) c.cpu_stime;
+      cpu_children_utime =
+        Int64.sub (sec_to_span now.Unix.tms_cutime) c.cpu_children_utime;
+      cpu_children_stime =
+        Int64.sub (sec_to_span now.Unix.tms_cstime) c.cpu_children_stime; }
 end
 
 (* Command lines *)
@@ -4208,6 +4221,60 @@ module Bincode = struct
   let result ~ok ~error =
     v (enc_result ~ok:ok.enc ~error:error.enc)
       (dec_result ~ok:ok.dec ~error:error.dec)
+
+  (* set *)
+
+  let enc_set
+      (type a) (type t)
+      (module S : Set.S with type elt = a and type t = t) enc_elt b v
+    =
+    let count = S.cardinal v in enc_int b count; S.iter (enc_elt b) v
+
+  let dec_set
+      (type a) (type t)
+      (module S : Set.S with type elt = a and type t = t) dec_elt s i
+    =
+    let rec loop acc count s i =
+      if count <= 0 then i, acc else
+      let i, elt = dec_elt s i in
+      loop (S.add elt acc) (count - 1) s i
+    in
+    let i, count = dec_int s i in
+    loop S.empty count s i
+
+  let set s c = v (enc_set s c.enc) (dec_set s c.dec)
+
+  (* Hash.t *)
+
+  let enc_hash b h = enc_string b (Hash.to_bytes h)
+  let dec_hash s i = let i, h = dec_string s i in i, (Hash.of_bytes h)
+  let hash = v enc_hash dec_hash
+
+  (* Time.span *)
+
+  let enc_time_span b s = enc_int64 b (Time.Span.to_uint64_ns s)
+  let dec_time_span s i =
+    let i, s = dec_int64 s i in i, Time.Span.of_uint64_ns s
+
+  let time_span = v enc_time_span dec_time_span
+
+  (* Time.cpu_span *)
+
+  let enc_time_cpu_span b c =
+    enc_time_span b (Time.cpu_utime c);
+    enc_time_span b (Time.cpu_stime c);
+    enc_time_span b (Time.cpu_children_utime c);
+    enc_time_span b (Time.cpu_children_stime c)
+
+  let dec_time_cpu_span s i  =
+    let i, cpu_utime = dec_time_span s i in
+    let i, cpu_stime = dec_time_span s i in
+    let i, cpu_children_utime = dec_time_span s i in
+    let i, cpu_children_stime = dec_time_span s i in
+    i,
+    Time.cpu_span ~cpu_utime ~cpu_stime ~cpu_children_utime ~cpu_children_stime
+
+  let time_cpu_span = v enc_time_cpu_span dec_time_cpu_span
 end
 
 (*---------------------------------------------------------------------------

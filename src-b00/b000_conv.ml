@@ -367,14 +367,6 @@ module Op = struct
 
   (* Binary serialization *)
 
-  let enc_time_span b s = Bincode.enc_int64 b (Time.Span.to_uint64_ns s)
-  let dec_time_span s i =
-    let i, u = Bincode.dec_int64 s i in
-    i, Time.Span.of_uint64_ns u
-
-  let enc_hash b h = Bincode.enc_string b (Hash.to_bytes h)
-  let dec_hash s i = let i, s = Bincode.dec_string s i in i, Hash.of_bytes s
-
   let enc_failure b = function
   | Op.Exec msg -> Bincode.enc_byte b 0; Bincode.(enc_option enc_string) b msg
   | Op.Missing_writes fs ->
@@ -597,14 +589,14 @@ module Op = struct
   let enc b o =
     Bincode.enc_int b (Op.id o);
     Bincode.enc_string b (Op.group o);
-    enc_time_span b (Op.time_created o);
-    enc_time_span b (Op.time_started o);
-    enc_time_span b (Op.duration o);
+    Bincode.enc_time_span b (Op.time_created o);
+    Bincode.enc_time_span b (Op.time_started o);
+    Bincode.enc_time_span b (Op.duration o);
     Bincode.enc_bool b (Op.revived o);
     enc_status b (Op.status o);
     Bincode.enc_list Bincode.enc_fpath b (Op.reads o);
     Bincode.enc_list Bincode.enc_fpath b (Op.writes o);
-    enc_hash b (Op.hash o);
+    Bincode.enc_hash b (Op.hash o);
     enc_kind b (Op.kind o);
     ()
 
@@ -612,14 +604,14 @@ module Op = struct
     let k o = invalid_arg "deserialized op, no kontinuation" in
     let i, id = Bincode.dec_int s i in
     let i, group = Bincode.dec_string s i in
-    let i, time_created = dec_time_span s i in
-    let i, time_started = dec_time_span s i in
-    let i, duration = dec_time_span s i in
+    let i, time_created = Bincode.dec_time_span s i in
+    let i, time_started = Bincode.dec_time_span s i in
+    let i, duration = Bincode.dec_time_span s i in
     let i, revived = Bincode.dec_bool s i in
     let i, status = dec_status s i in
     let i, reads = Bincode.dec_list Bincode.dec_fpath s i in
     let i, writes = Bincode.dec_list Bincode.dec_fpath s i in
-    let i, hash = dec_hash s i in
+    let i, hash = Bincode.dec_hash s i in
     let i, kind = dec_kind s i in
     i, Op.v id ~group ~time_created ~time_started ~duration ~revived
       ~status ~reads ~writes ~hash ~k kind

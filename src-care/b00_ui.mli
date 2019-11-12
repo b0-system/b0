@@ -7,24 +7,22 @@
 
     User interaction fragments for devising build tools. *)
 
-(** {1:ui User interaction fragments} *)
-
 open B0_std
 open Cmdliner
 
 (** {!Cmdliner} fragments. *)
 module Cli : sig
 
-  (** {1:out_fmt Specifying output formats} *)
+  (** {1:out_fmt Specifying output detail} *)
 
-  type out_fmt = [ `Normal | `Short | `Long ]
-  (** The type for specifying output format details. *)
+  type out_details = [ `Normal | `Short | `Long ]
+  (** The type for specifying output detail level. *)
 
-  val out_fmt :
+  val out_details :
     ?docs:string -> ?short_opts:string list -> ?long_opts:string list ->
-    unit -> out_fmt Term.t
-  (** [out_fmt ~short_opts ~long_opts ()] are mutually exclusive options
-      to specify short and long output format, without options this is
+    unit -> out_details Term.t
+  (** [out_details ~short_opts ~long_opts ()] are mutually exclusive options
+      to specify short and long output details, without options this is
       [`Normal]. [short_opts] defaults to [["s"; "short"]] and
       [long_opts] default to [["l"; "long"]]. [docs] is the manual section
       in which options are documented. *)
@@ -33,84 +31,39 @@ end
 (** {!B000.File_cache} interaction. *)
 module File_cache : sig
 
-  (** {1:stats Statistics about the file cache} *)
-
-  module Stats : sig
-
-    (** {1:keys Key statistics} *)
-
-    type keys
-    (** The type for statistics about a set of keys *)
-
-    val keys_count : keys -> int
-    (** [keys_count s] is the number of keys in the set of keys. *)
-
-    val keys_file_count : keys -> int
-    (** [keys_file_count s] is the number of files in the set of keys. *)
-
-    val keys_byte_size : keys -> int
-    (** [keys_count s] is the total byte size of the files in the set
-        of keys. *)
-
-    val keys_zero : keys
-    (** [keys_zero] are zeros. *)
-
-    val keys_sub : keys -> keys -> keys
-    (** [keys_sub s0 s1] is he field-wise substraction [s0 - s1]. *)
-
-    val pp_keys : keys Fmt.t
-    (** [pp_keys] formats key statistics. *)
-
-    val of_keys :
-      B000.File_cache.t -> B000.File_cache.key list -> (keys, string) result
-    (** [of_keys ks] are statistics for [ks]. *)
-
-    (** {1:cache Cache statistics} *)
-
-    type cache
-    (** The type for cache statistics *)
-
-    val zero : cache
-    (** [zero] are zeros. *)
-
-    val all_keys : cache -> keys
-    (** [all_keys s] are statistics about all keys in the cache. *)
-
-    val unused_keys : cache -> keys
-    (** [unused_keys s] are statistics about unused keys in the cache.
-        {b Warning} Only relevant if {!is_unused} is. *)
-
-    val pp : cache Fmt.t
-    (** [pp] formats cache statistics. *)
-
-    val of_cache : B000.File_cache.t -> (cache, string) result
-    (** [of_cache c] are satistics of [c]. *)
-  end
-
   (** {1:high-level High-level commands.}
 
       These commands act on a cache directory. They avoid to create
-      it via {!B000.File_cache.create} if it doesn't exists and mostly
-      return [Ok ()] in these cases. *)
+      it via {!B000.File_cache.create} if it doesn't exists and return
+      [Ok false] in that case. *)
+
+  val keys_of_done_ops : B000.Op.t list -> String.Set.t
+  (** [keys_of_done_ops ops] are the non-nil hashes of the operations of
+      [ops] that are {!B000.Op.Done}. *)
 
   val delete :
     dir:Fpath.t -> [ `All | `Keys of B000.File_cache.key list ] ->
-    (unit, string) result
+    (bool, string) result
   (** [delete dir keys] deletes [keys] in [dirs] if an explicit key
       does not exist in [dir] a {!Log.warn} is issued. If [`All] is
       specified [dir] is deleted and recreated. *)
 
-  val gc : dir:Fpath.t -> (unit, string) result
-  (** [gc dir] deletes unused keys via {!B00.File_cache.delete_unused}. *)
+  val gc : dir:Fpath.t -> used:String.Set.t -> (bool, string) result
+  (** [gc ~dir ~used] deletes keys that are not in [used]. *)
 
-  val size : dir:Fpath.t -> (unit, string) result
-  (** [size dir] shows statistics about the file cache on stdout
-      via {!B00.File_cache.Stats.pp}. *)
+  val keys : dir:Fpath.t -> (bool, string) result
+  (** [keys dir] lists the file cache keys on stdout. *)
+
+  val stats : dir:Fpath.t -> used:String.Set.t -> (bool, string) result
+  (** [status ~dir ~used] shows statistics about the file cache on stdout.
+      [used] determines keys that are in use. *)
 
   val trim :
-    dir:Fpath.t -> max_byte_size:int -> pct:int -> (unit, string) result
-    (** [trim dir ~max_byte_size ~pct] trims the cache using
-        {!B00.File_cache.trim_size}. *)
+    dir:Fpath.t -> used:String.Set.t -> max_byte_size:int -> pct:int ->
+    (bool, string) result
+  (** [trim dir ~used ~max_byte_size ~pct] trims the cache using
+      {!B000.File_cache.trim_size}. [used] determines keys that
+      are assumed to be used. *)
 
   (** {1:cli Cli fragments} *)
 
@@ -123,6 +76,13 @@ module File_cache : sig
    (** [keys_none_is_all ~pos_right ()] are the keys at the right
        of position [pos_right] (defaults is all positional arguments).
        If none is specified this is [`All]. *)
+
+  val trim_cli :
+    ?mb_opts:string list ->
+    ?pct_opts:string list ->
+    ?docs:string -> unit -> (int * int) Cmdliner.Term.t
+  (** [trim_cli ~docs ()] are command line options to specify a maximal
+      byte size and percentage to give to {!trim}. *)
 end
 
 (** {!B000.Op} interaction. *)
@@ -255,7 +215,7 @@ module Memo : sig
       {ul
       {- [opts] are the cli options to specify it, defaults to [["b0-dir"]].}
       {- [docs] is where the option is documented, defaults to
-         {!Cmdliner.Manpage.s_common_options}}
+         {!Cmdliner.Manpage.s_options}}
       {- [doc] is a doc string.}
       {- [doc_none] describes how the value is determined if the term is
          evaluates to [None].}
@@ -267,6 +227,11 @@ module Memo : sig
   (** [get_b0_dir ~cwd ~root ~b0_dir] determines a b0 directory. If
       [b0_dir] is [Some d] then this is [Fpath.(cwd // d)]. If [None]
       then this is [Fpath.(root / b0_dir_name)]. *)
+
+  val find_dir_with_b0_dir : start:Fpath.t -> Fpath.t option
+  (** [find_dir_with_b0_dir ~start] finds the first directory starting
+      with [start] that has a {!b0_dir_name} directory. [None] is
+      returned if none could found or if [start] is relative. *)
 
   (** {2:cache_dir File cache directory} *)
 
@@ -286,7 +251,7 @@ module Memo : sig
       {- [opts] are the cli options to specify it, default to
          [["cache-dir"]].}
       {- [docs] is where the option is documented, defaults to
-         {!Cmdliner.Manpage.s_common_options}}
+         {!Cmdliner.Manpage.s_options}}
       {- [doc] is a doc string.}
       {- [doc_none] describes how the value is determined if the term is
          evaluates to [None].}
@@ -328,7 +293,7 @@ module Memo : sig
       {ul
       {- [opts] are the cli options to specify it, defaults to [["log-file"]].}
       {- [docs] is where the option is documented, defaults to
-         {!Cmdliner.Manpage.s_common_options}}
+         {!Cmdliner.Manpage.s_options}}
       {- [doc] is a doc string.}
       {- [doc_none] describes how the value is determined if the term is
          evaluates to [None].}
@@ -356,7 +321,7 @@ module Memo : sig
       {ul
       {- [opts] are the cli options to specify it, defaults to [["j";"jobs"]].}
       {- [docs] is where the option is documented, defaults to
-         {!Cmdliner.Manpage.s_common_options}}
+         {!Cmdliner.Manpage.s_options}}
       {- [doc] is a doc string.}
       {- [doc_none] describes how the value is determined if the term is
          evaluates to [None].}
@@ -395,8 +360,8 @@ module Memo : sig
 
   (** {!B00.Memo} log.
 
-      A {!B00.Memo} log has all the build operations and a few
-      global statistics about the memo. *)
+      A {!B00.Memo} log has all the build operations, the hashed
+      file paths and a few global timings. *)
   module Log : sig
 
     (** {1:logs Logs} *)
@@ -404,11 +369,28 @@ module Memo : sig
     type t
     (** The type for {!B00.Memo} logs. *)
 
-    val ops : t -> B000.Op.t list
-    (** [ops l] are the operations of the log. *)
-
     val of_memo : B00.Memo.t -> t
     (** [of_memo m] is a log for memo [m]. *)
+
+    val hash_fun : t -> string
+    (** [hash_fun] is the identifier of the hash function that was used. *)
+
+    val file_hashes : t -> Hash.t Fpath.Map.t
+    (** [file_hashes l] has all the files that were hashed through the memo. *)
+
+    val hash_dur : t -> Time.span
+    (** [hash_dur l] is the time span spent hashing. *)
+
+    val total_dur : t -> Time.span
+    (** [total_dur l] is the time spanning from {!B00.Memo.create} to
+        {!of_memo}. *)
+
+    val cpu_dur : t -> Time.cpu_span
+    (** [cpu_dur l] is the CPU time spanning from {!B00.Memo.create} to
+        {!of_memo}. *)
+
+    val ops : t -> B000.Op.t list
+    (** [ops l] are the operations of the log. *)
 
     (** {1:io IO} *)
 
@@ -423,22 +405,28 @@ module Memo : sig
 
     (** {1:fmt Log formatters} *)
 
-    val pp_stats : Op.query -> t Fmt.t
+    val pp_stats : hashed_size:bool -> Op.query -> t Fmt.t
     (** [pp_stats sel] formats statistics stored in the log using
-        [query] to select operations that are part of the statistics. *)
+        [query] to select operations that are part of the statistics.
+        If [hashed_size] the sum of the size of the files in {!file_hashes}
+        is computed. *)
 
-    type out_kind = [`Hashed_files | `Op_hashes | `Ops | `Stats | `Trace_event]
-    (** The type for output kinds. *)
+    type out_format =
+    [ `Hashed_files | `Op_hashes | `Ops | `Path | `Stats | `Root_hashed_files
+    | `Trace_event ]
+    (** The type for output format. *)
 
     val out :
-      Format.formatter -> Cli.out_fmt -> out_kind -> Op.query -> t -> unit
-    (** [out] formats a log on the given formatter. *)
+      Format.formatter -> out_format -> Cli.out_details -> Op.query ->
+      path:Fpath.t -> t -> unit
+    (** [out] formats a log on the given formatter. [path] is used when
+        [`Path] is requested. *)
 
     (** {1:cli Command line interface} *)
 
-    val out_kind_cli : ?docs:string -> unit -> out_kind Cmdliner.Term.t
-    (** [out_kind_cli ~docs ()] are mutually exclusive options to specify
-        alternate output information. *)
+    val out_format_cli : ?docs:string -> unit -> out_format Cmdliner.Term.t
+    (** [out_format_cli ~docs ()] are mutually exclusive options to specify
+        alternate output formats. *)
   end
 end
 
