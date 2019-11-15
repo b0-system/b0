@@ -176,7 +176,8 @@ module Op = struct
   | Op.Notify n -> pp_notify ppf n
   | Op.Read r -> pp_file_read ppf (Op.Read.file r)
   | Op.Spawn s -> pp_spawn_and_exit ppf s
-  | Op.Wait_files _ -> (Fmt.vbox @@ Fmt.list Fpath.pp_quoted) ppf (Op.reads o)
+  | Op.Wait_files _ ->
+      (Fmt.vbox @@ Fmt.list Fpath.pp_quoted) ppf (fst (Op.reads o))
   | Op.Write w -> pp_file_write ppf (Op.Write.file w)
 
   (* Line formatting *)
@@ -230,8 +231,13 @@ module Op = struct
   (* Full formatting *)
 
   let pp_file_mode ppf m = Fmt.pf ppf "%o" m
-  let pp_reads = Fmt.list pp_file_read
-  let pp_writes = Fmt.list pp_file_write
+
+  let pp_files pp_file ppf (ready, unready) =
+    if ready = [] then () else (Fmt.list pp_file) ppf ready;
+    if unready = [] then () else Fmt.(list (any "(U) " ++ pp_file)) ppf unready
+
+  let pp_reads = pp_files pp_file_read
+  let pp_writes = pp_files pp_file_write
   let pp_timings =
     let pp_span = Time.Span.pp in
     let wait o = Time.Span.abs_diff (Op.time_created o) (Op.time_started o) in
@@ -594,8 +600,10 @@ module Op = struct
     Bincode.enc_time_span b (Op.duration o);
     Bincode.enc_bool b (Op.revived o);
     enc_status b (Op.status o);
-    Bincode.enc_list Bincode.enc_fpath b (Op.reads o);
-    Bincode.enc_list Bincode.enc_fpath b (Op.writes o);
+    Bincode.enc_list Bincode.enc_fpath b (fst (Op.reads o));
+    Bincode.enc_list Bincode.enc_fpath b (snd (Op.reads o));
+    Bincode.enc_list Bincode.enc_fpath b (fst (Op.writes o));
+    Bincode.enc_list Bincode.enc_fpath b (snd (Op.writes o));
     Bincode.enc_hash b (Op.hash o);
     enc_kind b (Op.kind o);
     ()
@@ -609,12 +617,14 @@ module Op = struct
     let i, duration = Bincode.dec_time_span s i in
     let i, revived = Bincode.dec_bool s i in
     let i, status = dec_status s i in
-    let i, reads = Bincode.dec_list Bincode.dec_fpath s i in
-    let i, writes = Bincode.dec_list Bincode.dec_fpath s i in
+    let i, rreads = Bincode.dec_list Bincode.dec_fpath s i in
+    let i, ureads = Bincode.dec_list Bincode.dec_fpath s i in
+    let i, rwrites = Bincode.dec_list Bincode.dec_fpath s i in
+    let i, uwrites = Bincode.dec_list Bincode.dec_fpath s i in
     let i, hash = Bincode.dec_hash s i in
     let i, kind = dec_kind s i in
     i, Op.v id ~group ~time_created ~time_started ~duration ~revived
-      ~status ~reads ~writes ~hash ~k kind
+      ~status ~reads:(rreads, ureads) ~writes:(rwrites, uwrites) ~hash ~k kind
 
   let bincode = Bincode.v enc dec
 
@@ -623,8 +633,8 @@ module Op = struct
   let howto_file howto = Fmt.(tty style_op_howto howto ++ pp_file_write)
   let writes_cycle os =
     let deps prev next =
-      let prev_writes = Fpath.Set.of_list (B000.Op.writes prev) in
-      let next_reads = Fpath.Set.of_list (B000.Op.reads next) in
+      let prev_writes = Fpath.Set.of_list (fst (B000.Op.writes prev)) in
+      let next_reads = Fpath.Set.of_list (fst (B000.Op.reads next)) in
       Fpath.Set.inter prev_writes next_reads
     in
     match os with

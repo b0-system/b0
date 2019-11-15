@@ -188,8 +188,8 @@ module Op : sig
 
     val v_op :
       id:id -> group:group -> created:Time.span -> ?post_exec:(op -> unit) ->
-      ?k:(op -> unit) -> mode:int -> linenum:int option -> src:Fpath.t ->
-      Fpath.t -> op
+      ?k:(op -> unit) -> mode:int -> linenum:int option -> unready_src:bool ->
+      src:Fpath.t -> unready_dst:bool -> Fpath.t -> op
     (** [v] declares a file copy operation, see the corresponding
         accessors for the semantics of various arguments. *)
 
@@ -310,7 +310,7 @@ module Op : sig
 
     val v_op :
       id:id -> group:group -> created:Time.span -> ?post_exec:(op -> unit) ->
-      ?k:(op -> unit) -> Fpath.t -> op
+      ?k:(op -> unit) -> unready_read:bool -> Fpath.t -> op
     (** [v_op] declares a file read operation, see the corresponding
         accessors in {!Read} for the semantics of the various
         arguments. *)
@@ -359,10 +359,10 @@ module Op : sig
     (** The type for process spawn operations. *)
 
     val v_op :
-      id:id -> group:group -> created:Time.span -> reads:Fpath.t list ->
-      writes:Fpath.t list -> ?post_exec:(op -> unit) -> ?k:(op -> unit) ->
-      stamp:string -> env:Os.Env.assignments ->
-      stamped_env:Os.Env.assignments -> cwd:Fpath.t ->
+      id:id -> group:group -> created:Time.span ->
+      reads:Fpath.t list * Fpath.t list -> writes:Fpath.t list * Fpath.t list ->
+      ?post_exec:(op -> unit) -> ?k:(op -> unit) -> stamp:string ->
+      env:Os.Env.assignments -> stamped_env:Os.Env.assignments -> cwd:Fpath.t ->
       stdin:Fpath.t option -> stdout:stdo -> stderr:stdo ->
       success_exits:success_exits -> Cmd.tool -> Cmd.t -> op
     (** [v_op] declares a spawn build operation, see the corresponding
@@ -465,8 +465,9 @@ module Op : sig
 
     val v_op :
       id:id -> group:group -> created:Time.span -> ?post_exec:(op -> unit) ->
-      ?k:(op -> unit) -> stamp:string -> reads:Fpath.t list -> mode:int ->
-      write:Fpath.t -> (unit -> (string, string) result) -> op
+      ?k:(op -> unit) -> stamp:string -> reads:(Fpath.t list * Fpath.t list) ->
+      mode:int -> unready_write:bool -> write:Fpath.t ->
+      (unit -> (string, string) result) -> op
     (** [write] declares a file write operations, see the corresponding
         accessors in {!Write} for the semantics of the various arguments. *)
 
@@ -513,8 +514,8 @@ module Op : sig
   val v :
     id -> group:group -> time_created:Time.span -> time_started:Time.span ->
     duration:Time.span -> revived:bool -> status:status ->
-    reads:Fpath.t list -> writes:Fpath.t list -> hash:Hash.t ->
-    ?post_exec:(op -> unit) -> ?k:(op -> unit) -> kind -> t
+    reads:Fpath.t list * Fpath.t list -> writes:Fpath.t list * Fpath.t list ->
+    hash:Hash.t -> ?post_exec:(op -> unit) -> ?k:(op -> unit) -> kind -> t
   (** [v] constructs an operation. See the corresponding accessors
       for the semantics of various arguments. *)
 
@@ -559,11 +560,21 @@ module Op : sig
   val status : t -> status
   (** [status o] is [o] execution status. *)
 
-  val reads : t -> Fpath.t list
-  (** [reads o] are the file paths read by the operation. *)
+  val reads : t -> Fpath.t list * Fpath.t list
+  (** [reads o] are the file paths read by the operation. Paths on the
+      left are those that need to be ready. Those on the right must
+      exist but may not be ready as far as the {!Guard} is concerned. *)
 
-  val writes : t -> Fpath.t list
-  (** [writes o] are the file paths written by [o]. *)
+  val reads_to_list : t -> Fpath.t list
+  (** [reads_to_list o] concatenates [reads o]. *)
+
+  val writes : t -> Fpath.t list * Fpath.t list
+  (** [writes o] are the file paths written by [o]. Paths on the left
+      are path that are made ready. Those on the right must also
+      be written but they are not made ready in the {!Guard}. *)
+
+  val writes_to_list : t -> Fpath.t list
+  (** [writes_to_list o] concatenates [writes o]. *)
 
   val hash : t -> Hash.t
   (** [hash o] is the operation's hash. This is {!Hash.nil} before the
@@ -574,9 +585,8 @@ module Op : sig
   (** {1:upd Updating the build operation} *)
 
   val invoke_k : t -> unit
-  (** [exec_k o ()] invokes and discards [o]'s continuation.
-      Note that this does {b not} protect against the continuation
-      raising. *)
+  (** [exec_k o ()] invokes and discards [o]'s continuation. Note
+      that this does {b not} protect against the continuation raising. *)
 
   val discard_k : t -> unit
   (** [discard o] discards [o]'s continuation. *)
@@ -613,11 +623,11 @@ module Op : sig
       to [Executed] if [r] is [Ok _] and [Failed (Exec e)] if [r]
       is [Error e]. *)
 
-  val set_reads : t -> Fpath.t list -> unit
+  val set_reads : t -> Fpath.t list * Fpath.t list -> unit
   (** [set_reads t fs] sets the file paths read by [o] to [fs].
       Note that this resets the {!hash}. *)
 
-  val set_writes : t -> Fpath.t list -> unit
+  val set_writes : t -> Fpath.t list * Fpath.t list -> unit
   (** [set_writes t fs] sets the file paths written by [o] to [fs]. *)
 
   val set_hash : t -> Hash.t -> unit
@@ -645,21 +655,22 @@ module Op : sig
   (** [unwritten_reads os] are the file read by [os] that are not written
       by those. *)
 
-  val read_write_maps : t list -> Set.t Fpath.Map.t * Set.t Fpath.Map.t
-  (** [read_write_maps ops] is [reads, writes] with [reads] mapping
+  val ready_read_write_maps : t list -> Set.t Fpath.Map.t * Set.t Fpath.Map.t
+  (** [ready_read_write_maps ops] is [reads, writes] with [reads] mapping
       file paths to operations that reads them and [writes] mapping
-      file paths to operations that write them. *)
+      file paths to operations that write them. Unready reads and writes
+      are excluded for these maps. *)
 
-  val write_map : t list -> Set.t Fpath.Map.t
-  (** [write_map os] is [snd (read_write_maps os)]. If one of the
+  val ready_write_map : t list -> Set.t Fpath.Map.t
+  (** [ready_write_map os] is [snd (read_write_maps os)]. If one of the
       operation sets in the map is not a singleton the operations
       should likely not be run toghether. *)
 
-  val find_read_write_cycle : t list -> t list option
-  (** [find_read_write_cycle os] is [Some cs] if there exists a
-      read/write cycle among the operations [os]. This means each each
-      element of [cs] writes a file read by its successor in the list
-      with the successor of the last element being the first. *)
+  val find_ready_read_write_cycle : t list -> t list option
+  (** [find_ready_read_write_cycle os] is [Some cs] if there exists a
+      ready read/write cycle among the operations [os]. This means each each
+      element of [cs] ready writes a file ready read by its successor in the
+      list with the successor of the last element being the first. *)
 
   type aggregate_error =
   | Failures (** Some operations failed. *)
