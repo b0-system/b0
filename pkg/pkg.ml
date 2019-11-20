@@ -15,6 +15,7 @@ let () =
        Pkg.test "test/test_rm";
        Pkg.test "test/test_memo_failures";
        Pkg.test "test/test_memo_fix";
+       Pkg.test "test/test_memo_no_write";
        Pkg.test "test/test_findex";
        Pkg.test "test/test_ocaml_cobj_defs";
        Pkg.bin "tools/b00_cache" ~dst:"b00-cache";

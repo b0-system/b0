@@ -331,7 +331,11 @@ module File_cache = struct
     try
       let fs_len = List.length fs in
       let filenum_width = filenum_width fs_len in
-      let last = key_file c k ~filenum_width ~is_last:true (fs_len - 1) in
+      let last =
+        if fs_len = 0
+        then key_meta_file c k
+        else key_file c k ~filenum_width ~is_last:true (fs_len - 1)
+      in
       match Fs.exists_noerr last (* Tests existence and arity *) with
       | false -> Ok None
       | true ->
