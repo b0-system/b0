@@ -55,6 +55,11 @@ end
     operation and the metadata has additional output information
     (e.g. exit codes, standard outputs, etc.).
 
+    For some scenarios it may still be useful to store relative
+    not only file contents but also relative file paths associated
+    to them. Thus for certain keys these are stored along side
+    the file contents.
+
     {b Note.} In general, whenever a cache operation modifies the
     file system and errors with [Error _] the resulting file system
     state is undefined. *)
@@ -85,10 +90,10 @@ module File_cache : sig
 
   val key_stats : t -> key -> (int * int * float, string) result
   (** [key_stats c key] is statistical information about key [key].
-      Namely the number of files (including the metadata), the key
-      size in bytes and the access time of the key – this is the
-      latest access time of one of its consituents the relevance of
-      which depends on your file system. *)
+      Namely the number of files (including the metadata and
+      manifest), the key size in bytes and the access time of the key
+      – this is the latest access time of one of its consituents the
+      relevance of which depends on your file system. *)
 
   val mem : t -> key -> bool
   (** [mem c k] is [true] iff [k] is bound in [c]. *)
@@ -104,15 +109,26 @@ module File_cache : sig
       {- [Error _] if an unexpected error occurs. In that case the
          resulting state of the cache for key [k] is undefined.}} *)
 
+  val manifest_add :
+    t -> key -> string -> root:Fpath.t -> Fpath.t list -> (bool, string) result
+  (** [manifest_add c k m ~root fs] is like {!add} except it also
+      stores the file paths [fs] relativized with respect to
+      [root]. This means the actual file paths need not to be provided
+      to revive the operation see {!manifest_revive}. This errors
+      if one of the files in [fs] is not prefixed by [root]. *)
+
   val rem : t -> key -> (bool, string) result
   (** [rem c k] removes the binding of [k] in [c]. [Ok true] is
       returned if [k] was bound in [c] and [Ok false] otherwise. *)
 
-  val find : t -> key -> ((Fpath.t * Fpath.t list) option, string) result
-  (** [find c k] is [Some (mf, fs)] if [k] is bound in [c] with [mf]
-      the file that holds the key metadata and [fs] the files that
-      hold the file contents of the key in the order given on
-      {!add}. The result is [None] if [k] is unbound in [c]. *)
+  val find : t -> key ->
+    ((Fpath.t option * Fpath.t * Fpath.t list) option, string) result
+  (** [find c k] is [Some (mf, m, fs)] if [k] is bound in [c] with
+      [mf] the file that holds the file manifest (if any), [m] the
+      file that holds the key metadata and [fs] the files that hold
+      the file contents of the key in the order given on {!add} (or in
+      the order of the manifest). The result is [None] if [k] is
+      unbound in [c]. *)
 
   val revive :
     t -> key -> Fpath.t list -> (string option, string) result
@@ -130,6 +146,14 @@ module File_cache : sig
       {- [Error _] if an unexpected error occurs. In that case the
          resulting state of the file system for paths [fs] is
          undefined.}} *)
+
+  val manifest_revive :
+    t -> key -> root:Fpath.t -> ((Fpath.t list * string) option, string) result
+  (** [manifest_revive] is like {!revive} however the file paths
+      that are written to are determined by the cache's file manifest
+      whose path are made absolute using [root] and returned in
+      the result. [None] is returned if the key existed but
+      had no manifest. *)
 
   val trim_size :
     ?is_unused:(key -> bool) -> t -> max_byte_size:int -> pct:int ->

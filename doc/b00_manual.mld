@@ -61,6 +61,9 @@ hampers correctness.
    the info). This may however lead to incorrect builds (`-I` problems)
    where tool may pickup stale artefacts}}
 
+{b Note.} Now that we do longer use hard links we would have
+to hash. So what follows below likely becomes impractical.
+
 A middle ground between the two could be the following. Currently we
 trash paths in a dedicated directory and delete it asynchronously at
 the end of the build as this may be slow. However we could track
@@ -74,6 +77,116 @@ in the trash exactly the things that really need to be deleted, rather
 than delete all the build all of the time (note that this is still
 more than say a `make` based build system because those overwrites paths).
 
+{2:unpredictable_writes Dealing with unpredictable written file paths}
+
+The system supports well tool with predictable file path writes. These
+tools either write to statically known file paths or allow to
+determine them by invoking another tool (e.g. [odoc
+{compile,html}-targets]). However the system should also be made to
+support tools with unpredictable file path writes because those are
+not uncommon.
+
+A tool with predictable writes is invoked as follows:
+
+{[
+Memo.spawn ~reads ~writes @@ tool cmd
+]}
+
+That is we know the written file paths before the tool gets to execute
+and we indicate them in [writes]. This serves two purposes:
+
+{ol
+{- If the spawn is uncached, [writes] indicates the ordered list of file paths
+   whose {e contents} (output) is captured after the operation executed
+   and ends up being associated to the spawn's hash (input).}
+{- If the spawn is cached, we use the spawn's hash (input) to retrieve
+   the list of ordered file contents (outputs) and copy these to
+   the given file paths, in order.}}
+
+This means that in the first case we don't really need the information
+beforehand and we can determine it after the spawn occured, just
+before caching, for example by scanning the file system
+(a {{!val:B00.Memo.spawn}[post_exec] hook} -- that
+executes after the build operation execution but before cache
+recording -- can be used for that).
+
+However in the second case, when we want to revive the spawn, armed
+with the hash of the operation we can only retrieve file contents, but
+we do not know which file paths need to be bound to the contents,
+since the only thing the file cache stores is an association [hash ->
+contents list]. For tools with predictable file path writes, not
+mandating an actual path to bind to in the cache itself allows to
+revive build operations to different build paths (assuming their
+contents do not depend on their actual path location). This is used
+e.g. to share [.cmi]/[.cmti] file compilation between the doc and exec
+outcomes of [brzo] which happen in different build dirs or for caching
+in larger and larger contexts).
+
+Now this problem could be easily solved by simply producing an
+operation manifest. e.g. by writing some kind of [manifest] file in
+the [post_exec] hook with all the files that have been produced. The
+logic could then become something along these lines:
+
+{[
+Memo.read manifest @@ function
+| Some writes -> Memo.spawn ~reads ~writes @@ tool cmd
+| None ->
+   let post_exec o = ... (* set writes of op [o] and write [manifest] *) in
+   Memo.spawn ~reads ~post_exec @@ tool cmd
+]}
+
+However this somehow assumes that [manifest] can be persisted across
+builds. That is not impossible to do but it is made difficult by the
+way {{!rems}removals} are handled (clean builds), if we generate that
+file in the post execution hook it will be deleted when we come back
+later to rebuild, so we also need to either cache this file or store
+it in a build dir that is not deleted (but then we might
+lose the manifest info while the operation is still cached which is
+problematic).  Another problem is that a name needs to be generated
+for the [manifest] file, a natural name would of course be the
+operation hash itself but in the above logic we need the name before
+the operation is specified and thus before the hash can be computed so
+it's a bit unfit given the way the API is currently designed.
+
+These considerations seem to indicate that a good solution for the
+problem is to extend the {!B000.File_cache} model to allow in some
+cases to also store the relative file paths associated to the file
+contents. That is we conceptually move from a file cache as:
+{[
+key -> contents list
+]}
+to
+{[
+key -> contents list * (Fpath.t list) option
+]}
+This leaves the current support for predictable writes ({!B000.File_cache.add},
+{!B000.File_cache.revive}) unchanged but allows to add the new operations:
+{[
+manifest_add :
+t -> key -> string -> root:Fpath.t -> Fpath.t list -> (bool, string) result
+]}
+which stores the file contents and their corresponding paths relativised
+w.r.t to [root].
+{[
+manifest_revive :
+t -> key -> root:Fpath.t -> ((string * Fpath.t list) option, string) result
+]}
+which revives the relativised file paths by making them absolute with
+respect to [root].
+
+It is even quite simple to devise the system so that a [manifest_add]
+can be {!B000.File_cache.revive}d. But in general these tools with
+unpredictable writes the actual file names hierarchy is meanigful
+(e.g. hyperlinked HTML files) so it may not be that useful.
+
+In any case these two low-level operations should make it easy to add
+support for build operations with unpredicable writes at the higher
+level. Basically the support can happen at the generic {!B000.Op} by
+adding a field to store an optional manifest [root]. If that field is
+specified the operation is handled using the new
+{!B000.File_cache.manifest_add} or {!B000.File_cache.manifest_revive}
+functions above, if not we proceed as is currently the case using
+{!B000.File_cache.revive} and {!B000.File_cache.add}.
 
 {1:design_answers Design answers}
 

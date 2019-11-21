@@ -194,8 +194,12 @@ module File_cache = struct
         match the number of files to bind without having to [readdir] the
         key directory.
      2. Its metadata is stored in the file [dir/KEY.k/zm] so that it's
-        the last file in the binary sort.
-     3. XXX should we put keys in prefix subdirs like git does ? Some
+        sorted after the file contents.
+     3. If the key has a file path manifest it is stored in the file
+        [dir/KEY.k/zmf] so that it is sorted after the file contents.
+        The manifest is a list of '\n' separated file paths, one
+        for each file contents, in reverse order.
+     4. XXX should we put keys in prefix subdirs like git does ? Some
         fs get slow on many entries (NTFS ?) *)
 
   type key = string
@@ -210,6 +214,7 @@ module File_cache = struct
 
   let key_ext = ".k"
   let key_meta_filename = "zm"
+  let key_manifest_filename = "zmf"
   let key_dir c k = String.concat "" [c.dir; k; key_ext; Fpath.dir_sep]
   let key_of_filename n = String.drop_right (String.length key_ext) n
   let key_dir_of_filename c n = String.concat "" [c.dir; n; Fpath.dir_sep]
@@ -233,11 +238,33 @@ module File_cache = struct
   let key_meta_file c key =
     String.concat "" [c.dir; key; key_ext; Fpath.dir_sep; key_meta_filename ]
 
+  let key_manifest_file c key =
+    String.concat "" [c.dir; key; key_ext; Fpath.dir_sep; key_manifest_filename]
+
   let key_file c key ~filenum_width ~is_last i =
     (* XXX we could blit directly rather than constructing these lists *)
     let last = if is_last then "z" else "" in
     String.concat ""
       [c.dir; key; key_ext; Fpath.dir_sep; last; filenum_str ~filenum_width i ]
+
+  (* Manifest files *)
+
+  let key_manifest_to_string ~root fs =
+    let rel root f = match Fpath.rem_prefix root f with
+    | Some rel -> Fpath.to_string rel
+    | None ->
+        Fmt.failwith_notrace "%a: not a prefix of %a"
+          Fpath.pp_unquoted f Fpath.pp_unquoted root
+    in
+    String.concat "\n" (List.rev_map (rel root) fs)
+
+  let key_manifest_of_string ~root s =
+    let path root rel =
+      let p = Fpath.of_string rel |> Result.to_failure in
+      if Fpath.is_rel p then Fpath.(root // p) else
+      Fmt.failwith_notrace "%a: path is not relative" Fpath.pp_unquoted p
+    in
+    List.rev_map (path root) (String.split_on_char '\n' s)
 
   (* Functions on key directories *)
 
@@ -248,8 +275,12 @@ module File_cache = struct
     | None -> None
     | Some fs ->
         match List.sort string_rev_compare @@ fs with
-        | f :: fs when String.equal f key_meta_filename ->
-            Some (file_path key_meta_filename, List.rev_map file_path fs)
+        | mf :: m :: fs when String.equal mf key_manifest_filename &&
+                             String.equal m key_meta_filename ->
+            Some (Some (file_path key_manifest_filename),
+                  file_path key_meta_filename, List.rev_map file_path fs)
+        | m :: fs when String.equal m key_meta_filename ->
+            Some (None, file_path key_meta_filename, List.rev_map file_path fs)
         | _ -> Fmt.failwith_notrace "%s: corrupted key" kdir
 
   let key_dir_stats kdir =
@@ -285,28 +316,42 @@ module File_cache = struct
   | Failure e -> Error (err_key key "stats" e)
 
   let mem c k = Fs.exists_noerr (key_dir c k)
-  let add c k meta fs =
+
+  let _add c k kdir meta fs =
     let rec add_file ~src cfile = try Fs.copy_file src cfile; true with
     | Unix.Unix_error (Unix.ENOENT, _, _) -> false
     | Unix.Unix_error (Unix.EINTR, _, _) -> add_file ~src cfile
     | Unix.Unix_error (e, _, arg) ->
         Fmt.failwith_notrace "%s: %s: %s" src arg (uerr e)
     in
+    if not (Fs.mkdir kdir) then Fs.dir_delete_files kdir;
+    let filenum_width = filenum_width (List.length fs) in
+    let rec loop i = function
+    | [] -> Fs.write_file (kdir ^ key_meta_filename) meta; true
+    | f :: fs ->
+        let cfile = key_file c k ~filenum_width ~is_last:(fs = []) i in
+        if (add_file ~src:(Fpath.to_string f) cfile)
+        then loop (i + 1) fs
+        else (ignore (Fs.dir_delete kdir); false)
+    in
+    loop 0 fs
+
+  let add c k meta fs =
     try
       let kdir = key_dir c k in
-      if not (Fs.mkdir kdir) then Fs.dir_delete_files kdir;
-      let filenum_width = filenum_width (List.length fs) in
-      let rec loop i = function
-      | [] -> Fs.write_file (kdir ^ key_meta_filename) meta; true
-      | f :: fs ->
-          let cfile = key_file c k ~filenum_width ~is_last:(fs = []) i in
-          if (add_file ~src:(Fpath.to_string f) cfile)
-          then loop (i + 1) fs
-          else (ignore (Fs.dir_delete kdir); false)
-      in
-      Ok (loop 0 fs)
+      Ok (_add c k kdir meta fs)
     with
     | Failure e -> Error (err_key "add" k e)
+
+  let manifest_add c k meta ~root fs =
+    try
+      let kdir = key_dir c k in
+      let manifest = key_manifest_to_string ~root fs in
+      match _add c k kdir meta fs with
+      | false -> Ok false
+      | true -> Fs.write_file (kdir ^ key_manifest_filename) manifest; Ok true
+    with
+    | Failure e -> Error (err_key "manifest_add" k e)
 
   let rem c k = try Ok (Fs.dir_delete (key_dir c k)) with
   | Failure e -> Error (err_key "delete" k e)
@@ -314,7 +359,8 @@ module File_cache = struct
   let find c k = try Ok (key_dir_files (key_dir c k)) with
   | Failure e -> Error (err_key "find" k e)
 
-  let revive c k fs =
+
+  let _revive c k fs =
     let rec revive_file ~did_path cfile ~dst =
       let dst_str = Fpath.to_string dst in
       try Fs.copy_file cfile dst_str with
@@ -328,27 +374,41 @@ module File_cache = struct
       | Unix.Unix_error (e, _, arg) ->
           Fmt.failwith_notrace "%a: %s: %s" Fpath.pp_unquoted dst arg (uerr e)
     in
+    let fs_len = List.length fs in
+    let filenum_width = filenum_width fs_len in
+    let last =
+      if fs_len = 0
+      then key_meta_file c k
+      else key_file c k ~filenum_width ~is_last:true (fs_len - 1)
+    in
+    match Fs.exists_noerr last (* Tests existence and arity *) with
+    | false -> None
+    | true ->
+        let rec loop i = function
+        | [] -> Some (Fs.read_file (key_meta_file c k))
+        | f :: fs ->
+            let cfile = key_file c k ~filenum_width ~is_last:(fs = []) i in
+            revive_file ~did_path:false cfile ~dst:f;
+            loop (i + 1) fs
+        in
+        loop 0 fs
+
+  let revive c k fs = try Ok (_revive c k fs) with
+  | Failure e -> Error (err_key "revive" k e)
+
+  let manifest_revive c k ~root =
     try
-      let fs_len = List.length fs in
-      let filenum_width = filenum_width fs_len in
-      let last =
-        if fs_len = 0
-        then key_meta_file c k
-        else key_file c k ~filenum_width ~is_last:true (fs_len - 1)
-      in
-      match Fs.exists_noerr last (* Tests existence and arity *) with
+      let key_manifest = key_manifest_file c k in
+      match Fs.exists_noerr key_manifest with
       | false -> Ok None
       | true ->
-          let rec loop i = function
-          | [] -> Some (Fs.read_file (key_meta_file c k))
-          | f :: fs ->
-              let cfile = key_file c k ~filenum_width ~is_last:(fs = []) i in
-              revive_file ~did_path:false cfile ~dst:f;
-              loop (i + 1) fs
-          in
-          Ok (loop 0 fs)
+          let manifest = Fs.read_file key_manifest in
+          let fs = key_manifest_of_string ~root manifest in
+          match _revive c k fs with
+          | None -> Ok None
+          | Some meta -> Ok (Some (fs, meta))
     with
-    | Failure e -> Error (err_key "revive" k e)
+    | Failure e -> Error (err_key "manifest_revive" k e)
 
   let trim_size ?(is_unused = fun _ -> false) c ~max_byte_size ~pct =
     try
