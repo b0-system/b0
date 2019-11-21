@@ -448,6 +448,21 @@ module Memo : sig
       (e.g. a source file) it should be specified as the first element
       of [reads], this is interpreted specially by certain build
       tracer. *)
+
+  val spawn' :
+    t -> ?stamp:string -> ?reads:Fpath.t list -> writes_root:Fpath.t ->
+    ?writes:(B000.Op.t -> Fpath.t list) ->
+    ?env:Os.Env.t -> ?cwd:Fpath.t -> ?stdin:Fpath.t ->
+    ?stdout:B000.Op.Spawn.stdo -> ?stderr:B000.Op.Spawn.stdo ->
+    ?success_exits:B000.Op.Spawn.success_exits ->
+    ?k:(int -> unit) -> cmd -> unit
+  (** [spawn'] is like {!spawn} except the actual file paths written
+      by the spawn need not be determined before the spawn. Only the
+      root directory of writes need to be specified via [writes_root].
+      After the spawn executes the writes can be determined via the
+      [writes] function, the returned paths must be absolute and be
+      prefixed by [writes_root] (defaults to recursively list all the files
+      rootet in [writes_root]). *)
 end
 
 (*---------------------------------------------------------------------------

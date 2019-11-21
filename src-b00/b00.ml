@@ -426,9 +426,11 @@ module Memo = struct
   | Error e (* FIXME distinguish no lookup from errors *) -> None
   | Ok _ -> Some (tool m t)
 
-  let spawn
-      m ?(stamp = "") ?(reads = []) ?(writes = []) ?env ?cwd ?stdin
-      ?(stdout = `Ui) ?(stderr = `Ui) ?(success_exits = [0]) ?post_exec ?k cmd
+
+  let _spawn
+      m ?(stamp = "") ?(reads = []) ?(writes = []) ?writes_manifest_root ?env
+      ?cwd ?stdin ?(stdout = `Ui) ?(stderr = `Ui) ?(success_exits = [0])
+      ?post_exec ?k cmd
     =
     match cmd.cmd_tool with
     | Miss (tool, e) -> m.m.feedback (`Miss_tool (tool, e))
@@ -445,11 +447,37 @@ module Memo = struct
         in
         let o =
           Op.Spawn.v_op
-            ~id ~group:m.c.group ~created ~reads ~writes ?post_exec ~k ~stamp
-            ~env ~stamped_env ~cwd ~stdin ~stdout ~stderr ~success_exits
-            tool.tool_file cmd.cmd_args
+            ~id ~group:m.c.group ~created ~reads ~writes ?writes_manifest_root
+            ?post_exec ~k ~stamp ~env ~stamped_env ~cwd ~stdin ~stdout ~stderr
+            ~success_exits tool.tool_file cmd.cmd_args
         in
         add_op_and_stir m o
+
+  let spawn
+      m ?stamp ?reads ?writes ?env ?cwd ?stdin ?stdout ?stderr ?success_exits
+      ?post_exec ?k cmd
+    =
+    _spawn m ?stamp ?reads ?writes ?env ?cwd ?stdin ?stdout ?stderr
+      ?success_exits ?post_exec ?k cmd
+
+  let spawn'
+      m ?stamp ?reads ~writes_root ?writes ?env ?cwd ?stdin ?stdout ?stderr
+      ?success_exits ?k cmd
+    =
+    let writes = match writes with
+    | Some writes -> writes
+    | None ->
+        fun o ->
+          let dotfiles = true and recurse = true in
+          fail_if_error m
+            Os.Dir.(fold_files ~dotfiles ~recurse path_list writes_root [])
+    in
+    let post_exec o =
+      if B000.Op.revived o || B000.Op.status o <> B000.Op.Done then () else
+      Op.set_writes o (writes o)
+    in
+    _spawn m ?stamp ?reads ~writes_manifest_root:writes_root ?env ?cwd ?stdin
+      ?stdout ?stderr ?success_exits ~post_exec ?k cmd
 end
 
 (*---------------------------------------------------------------------------
