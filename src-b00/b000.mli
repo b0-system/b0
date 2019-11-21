@@ -384,7 +384,8 @@ module Op : sig
 
     val v_op :
       id:id -> group:group -> created:Time.span -> reads:Fpath.t list ->
-      writes:Fpath.t list -> ?post_exec:(op -> unit) -> ?k:(op -> unit) ->
+      writes:Fpath.t list -> ?writes_manifest_root:Fpath.t ->
+      ?post_exec:(op -> unit) -> ?k:(op -> unit) ->
       stamp:string -> env:Os.Env.assignments ->
       stamped_env:Os.Env.assignments -> cwd:Fpath.t ->
       stdin:Fpath.t option -> stdout:stdo -> stderr:stdo ->
@@ -537,7 +538,8 @@ module Op : sig
   val v :
     id -> group:group -> time_created:Time.span -> time_started:Time.span ->
     duration:Time.span -> revived:bool -> status:status ->
-    reads:Fpath.t list -> writes:Fpath.t list -> hash:Hash.t ->
+    reads:Fpath.t list -> writes:Fpath.t list ->
+    writes_manifest_root:Fpath.t option -> hash:Hash.t ->
     ?post_exec:(op -> unit) -> ?k:(op -> unit) -> kind -> t
   (** [v] constructs an operation. See the corresponding accessors
       for the semantics of various arguments. *)
@@ -589,11 +591,16 @@ module Op : sig
   val writes : t -> Fpath.t list
   (** [writes o] are the file paths written by [o]. *)
 
+  val writes_manifest_root : t -> Fpath.t option
+  (** [writes_manifest_root o] if [Some root], the operation is cached
+      using a manifest key. This means the {!writes} made relative to
+      [root] are stored along-side the cache key. *)
+
   val hash : t -> Hash.t
   (** [hash o] is the operation's hash. This is {!Hash.nil} before the
       operation hash has been effectively computed and set via
-      {!set_hash}. This remains {!Hash.nil} for operations that
-      are not revivable. *)
+      {!set_hash}. This remains {!Hash.nil} for operations that are
+      not revivable. *)
 
   (** {1:upd Updating the build operation} *)
 
@@ -643,6 +650,10 @@ module Op : sig
 
   val set_writes : t -> Fpath.t list -> unit
   (** [set_writes t fs] sets the file paths written by [o] to [fs]. *)
+
+  val set_writes_manifest_root : t -> Fpath.t option -> unit
+  (** [set_writes_manifest_root t r] sets the writes manifest root
+      to [r]. *)
 
   val set_hash : t -> Hash.t -> unit
   (** [set_hash o h] sets the operation hash to [h]. *)

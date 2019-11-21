@@ -517,6 +517,7 @@ module Op = struct
       mutable status : status;
       mutable reads : Fpath.t list;
       mutable writes : Fpath.t list;
+      mutable writes_manifest_root : Fpath.t option;
       mutable hash : Hash.t;
       mutable post_exec : (t -> unit) option;
       mutable k : (t -> unit) option;
@@ -525,16 +526,19 @@ module Op = struct
   type op = t
   let v
       id ~group ~time_created ~time_started ~duration ~revived ~status ~reads
-      ~writes ~hash ?post_exec ?k kind
+      ~writes ~writes_manifest_root ~hash ?post_exec ?k kind
     =
     { id; group; time_created; time_started; duration; revived; status; reads;
-      writes; hash; post_exec; k; kind; }
+      writes; writes_manifest_root; hash; post_exec; k; kind; }
 
-  let v_kind ~id ~group ~created ~reads ~writes ?post_exec ?k kind =
+  let v_kind
+      ~id ~group ~created ~reads ~writes ?writes_manifest_root ?post_exec ?k
+      kind
+    =
     let time_started = Time.Span.max and duration = Time.Span.zero in
     let revived = false and status = Waiting and hash = Hash.nil in
     { id; group; time_created = created; time_started; duration; revived;
-      status; reads; writes; hash; post_exec; k; kind }
+      status; reads; writes; writes_manifest_root; hash; post_exec; k; kind }
 
   let id o = o.id
   let group o = o.group
@@ -548,6 +552,7 @@ module Op = struct
   let status o = o.status
   let reads o = o.reads
   let writes o = o.writes
+  let writes_manifest_root o = o.writes_manifest_root
   let hash o = o.hash
   let discard_k o = o.k <- None
   let invoke_k o = match o.k with None -> () | Some k -> discard_k o; k o
@@ -576,6 +581,7 @@ module Op = struct
   let set_status o s = o.status <- s
   let set_reads o fs = o.hash <- Hash.nil; o.reads <- fs
   let set_writes o fs = o.writes <- fs
+  let set_writes_manifest_root o m = o.writes_manifest_root <- m
   let set_hash o h = o.hash <- h
   let set_status_from_result o r =
     let st = match r with Ok _ -> Done | Error e -> Failed (Exec (Some e))in
@@ -685,14 +691,18 @@ module Op = struct
         | cs -> Failed (Exec None)
 
     let v_op
-        ~id ~group ~created ~reads ~writes ?post_exec ?k ~stamp ~env
-        ~stamped_env ~cwd ~stdin ~stdout ~stderr ~success_exits tool args
+        ~id ~group ~created ~reads ~writes ?writes_manifest_root ?post_exec
+        ?k ~stamp ~env ~stamped_env ~cwd ~stdin ~stdout ~stderr ~success_exits
+        tool args
       =
       let spawn =
-        { env; stamped_env; cwd; stdin; stdout; stderr; success_exits;
-          tool; args; spawn_stamp = stamp; stdo_ui = None; spawn_exit = None }
+        Spawn { env; stamped_env; cwd; stdin; stdout; stderr; success_exits;
+                tool; args; spawn_stamp = stamp; stdo_ui = None;
+                spawn_exit = None }
       in
-      v_kind ~id ~group ~created ~reads ~writes ?post_exec ?k (Spawn spawn)
+      v_kind
+        ~id ~group ~created ~reads ~writes ?writes_manifest_root ?post_exec ?k
+        spawn
   end
 
   module Wait_files = struct

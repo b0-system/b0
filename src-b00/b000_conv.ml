@@ -44,9 +44,10 @@ module Op = struct
   let style_err = [`Fg `Red]
   let style_op_howto = [`Faint]
 
-  let pp_file_read = Fpath.pp_quoted
-  let pp_file_write = Fmt.tty style_file_write Fpath.pp_quoted
-  let pp_file_delete = Fmt.tty style_file_delete Fpath.pp_quoted
+  let pp_file = Fpath.pp_quoted
+  let pp_file_read = pp_file
+  let pp_file_write = Fmt.tty style_file_write pp_file
+  let pp_file_delete = Fmt.tty style_file_delete pp_file
   let pp_hash = Fmt.tty style_hash Hash.pp
   let pp_subfield_label = Fmt.tty_string style_subfield
   let pp_subfield s f pp = Fmt.field ~label:pp_subfield_label ~sep:Fmt.sp s f pp
@@ -230,8 +231,8 @@ module Op = struct
   (* Full formatting *)
 
   let pp_file_mode ppf m = Fmt.pf ppf "%o" m
-  let pp_reads = Fmt.list pp_file_read
-  let pp_writes = Fmt.list pp_file_write
+  let pp_reads = Fmt.vbox (Fmt.list pp_file_read)
+  let pp_writes = Fmt.vbox (Fmt.list pp_file_write)
   let pp_timings =
     let pp_span = Time.Span.pp in
     let wait o = Time.Span.abs_diff (Op.time_created o) (Op.time_started o) in
@@ -329,9 +330,15 @@ module Op = struct
         pp_subfield "stderr" Op.Spawn.stderr pp_spawn_stdo;
         pp_subfield "stdout" Op.Spawn.stdout pp_spawn_stdo; ]
     in
+    let pp_writes ppf o = match Op.writes_manifest_root o with
+    | None -> pp_writes ppf (Op.writes o)
+    | Some root ->
+        Fmt.pf ppf "@[<v>@[%a %a@]@,%a@]"
+          pp_subfield_label "manifest root" pp_file root pp_writes (Op.writes o)
+    in
     Fmt.record [
       Fmt.using Fmt.id pp_spawn_base;
-      Fmt.field "writes" Op.writes pp_writes;
+      Fmt.field "writes" Fmt.id pp_writes;
       Fmt.field "reads" Op.reads pp_reads;
       Fmt.field "success-exits" Op.Spawn.get pp_success_exits;
       Fmt.field "stdio" Op.Spawn.get pp_spawn_stdio;
@@ -596,6 +603,7 @@ module Op = struct
     enc_status b (Op.status o);
     Bincode.enc_list Bincode.enc_fpath b (Op.reads o);
     Bincode.enc_list Bincode.enc_fpath b (Op.writes o);
+    Bincode.enc_option Bincode.enc_fpath b (Op.writes_manifest_root o);
     Bincode.enc_hash b (Op.hash o);
     enc_kind b (Op.kind o);
     ()
@@ -611,10 +619,11 @@ module Op = struct
     let i, status = dec_status s i in
     let i, reads = Bincode.dec_list Bincode.dec_fpath s i in
     let i, writes = Bincode.dec_list Bincode.dec_fpath s i in
+    let i, writes_manifest_root = (Bincode.dec_option Bincode.dec_fpath) s i in
     let i, hash = Bincode.dec_hash s i in
     let i, kind = dec_kind s i in
     i, Op.v id ~group ~time_created ~time_started ~duration ~revived
-      ~status ~reads ~writes ~hash ~k kind
+      ~status ~reads ~writes ~writes_manifest_root ~hash ~k kind
 
   let bincode = Bincode.v enc dec
 
@@ -638,7 +647,7 @@ module Op = struct
         in
         loop first [] os
 
-  let pp_failed ppf () = Fmt.(tty style_err string) ppf  "FAILED"
+  let pp_failed ppf () = Fmt.(tty style_err string) ppf "FAILED"
   let pp_ops_cycle ?(write_howto = Fmt.any "") ppf os =
     let pp_self_cycle ~write_howto ppf writes =
       let these_file, them = match Fpath.Set.cardinal writes with

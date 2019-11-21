@@ -32,6 +32,10 @@ module Trace_event = struct
   | Some (Ok d) -> d
   | Some (Error e) -> Fmt.str "error: %s" e
 
+  let writes_manifest_root o obj = match Op.writes_manifest_root o with
+  | None -> obj
+  | Some root -> Jsong.mem "writes-manifest-root" (fpath root) obj
+
   let args o =
     let kind_mems obj = match Op.kind o with
     | Op.Copy c ->
@@ -77,6 +81,7 @@ module Trace_event = struct
       (Jsong.string (B000_conv.Op.status_to_string (Op.status o)))
     |> Jsong.mem "revived" (Jsong.bool (Op.revived o))
     |> Jsong.mem "writes" (Jsong.(list fpath) (Op.writes o))
+    |> writes_manifest_root o
     |> Jsong.mem "time-created" (span_us (Op.time_created o))
     |> kind_mems
     |> Jsong.mem "reads" (Jsong.(list fpath) (Op.reads o))
