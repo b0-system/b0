@@ -191,7 +191,6 @@ module Op = struct
   (* Finding dependencies *)
 
   let find_deps ?(acc = Op.Set.empty) ~recursive index deps ops =
-    let deps o = fst (deps o) in (* consider only ready files *)
     let add_direct index o acc =
       let add_index_ops index acc p = match Fpath.Map.find p index with
       | exception Not_found -> acc
@@ -238,15 +237,13 @@ module Op = struct
     fun o ->
       List.exists (( = ) (Op.id o)) ids ||
       mem_hash (Hash.to_bytes (Op.hash o)) ||
-      List.exists mem_reads (fst (Op.reads o)) ||
-      List.exists mem_reads (snd (Op.reads o)) ||
-      List.exists mem_writes (fst (Op.writes o)) ||
-      List.exists mem_writes (snd (Op.writes o)) ||
+      List.exists mem_reads (Op.reads o) ||
+      List.exists mem_writes (Op.writes o) ||
       mem_group (Op.group o)
 
   let select_deps ~needs ~enables ~recursive ~dom ops =
     if not needs && not enables then ops else
-    let reads, writes = B000.Op.ready_read_write_maps dom in
+    let reads, writes = B000.Op.read_write_maps dom in
     let ops = Op.Set.of_list ops in
     let acc = Op.Set.empty in
     let acc = if needs then find_needs ~recursive ~writes ~acc ops else acc in
@@ -807,9 +804,7 @@ module Memo = struct
     | `Root_hashed_files ->
         let writes =
           let add_write acc f = Fpath.Set.add f acc in
-          let add_op acc o =
-            List.fold_left add_write acc (B000.Op.writes_to_list o)
-          in
+          let add_op acc o = List.fold_left add_write acc (B000.Op.writes o) in
           List.fold_left add_op Fpath.Set.empty l.ops
         in
         let add_file writes f h acc =

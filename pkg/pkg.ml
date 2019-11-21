@@ -14,7 +14,6 @@ let () =
        Pkg.test "test/test_cp";
        Pkg.test "test/test_rm";
        Pkg.test "test/test_memo_failures";
-       Pkg.test "test/test_memo_fix";
        Pkg.test "test/test_memo_no_write";
        Pkg.test "test/test_findex";
        Pkg.test "test/test_ocaml_cobj_defs";

@@ -196,8 +196,7 @@ module Memo = struct
 
   let continue_op m o =
     let pp_kind ppf o = Fmt.pf ppf "Continuation of operation %d" (Op.id o) in
-    let ready, _unready = Op.writes o in
-    List.iter (Guard.set_file_ready m.m.guard) ready;
+    List.iter (Guard.set_file_ready m.m.guard) (Op.writes o);
     m.m.feedback (`Op_complete o);
     invoke_k m ~pp_kind Op.invoke_k o
 
@@ -206,8 +205,7 @@ module Memo = struct
        or fiber means this function eventually gets called, hereby giving
        [has_failure] its appropriate semantics. *)
     m.m.has_failures <- true;
-    let ready, _unready = Op.writes o in
-    List.iter (Guard.set_file_never m.m.guard) ready;
+    List.iter (Guard.set_file_never m.m.guard) (Op.writes o);
     Op.discard_k o; m.m.feedback (`Op_complete o)
 
   let finish_op m o = match Op.status o with
@@ -341,14 +339,14 @@ module Memo = struct
        introduce a stat cache and propagate it everywhere in B000 *)
     Guard.set_file_ready m.m.guard p
 
-  let read m ?(unready_read = false) file k =
+  let read m file k =
     let id = new_op_id m and created = timestamp m in
     let k o =
       let r = Op.Read.get o in
       let data = Op.Read.data r in
       Op.Read.discard_data r; k data
     in
-    let o = Op.Read.v_op ~id ~group:m.c.group ~created ~k ~unready_read file in
+    let o = Op.Read.v_op ~id ~group:m.c.group ~created ~k file in
     add_op_and_stir m o
 
   let wait_files m files k =
@@ -356,28 +354,14 @@ module Memo = struct
     let o = Op.Wait_files.v_op ~id ~group:m.c.group ~created ~k files in
     add_op_and_stir m o
 
-  let write
-      m ?(stamp = "") ?(unready_reads = []) ?(reads = []) ?(mode = 0o644)
-      ?(unready_write = false) ?k write d
-    =
+  let write m ?(stamp = "") ?(reads = []) ?(mode = 0o644) write d =
     let id = new_op_id m and group = m.c.group and created = timestamp m in
-    let reads = reads, unready_reads in
-    let k = match k with None -> None | Some k -> Some (fun o -> k ()) in
-    let o =
-      Op.Write.v_op ~id ~group ~created ~stamp ~reads ~mode ~unready_write
-        ~write ?k d
-    in
+    let o = Op.Write.v_op ~id ~group ~created ~stamp ~reads ~mode ~write d in
     add_op_and_stir m o
 
-  let copy m
-      ?(mode = 0o644) ?linenum ?(unready_src = false) ~src
-      ?(unready_dst = false) dst
-    =
+  let copy m ?(mode = 0o644) ?linenum ~src dst =
     let id = new_op_id m and group = m.c.group and created = timestamp m in
-    let o =
-      Op.Copy.v_op ~id ~group ~created ~mode ~linenum ~unready_src ~src
-        ~unready_dst dst
-    in
+    let o = Op.Copy.v_op ~id ~group ~created ~mode ~linenum ~src dst in
     add_op_and_stir m o
 
   let mkdir m ?(mode = 0o755) dir k =
@@ -443,10 +427,8 @@ module Memo = struct
   | Ok _ -> Some (tool m t)
 
   let spawn
-      m ?(stamp = "") ?(unready_reads = []) ?(reads = [])
-      ?(unready_writes = []) ?(writes = []) ?env
-      ?cwd ?stdin ?(stdout = `Ui) ?(stderr = `Ui) ?(success_exits = [0])
-      ?post_exec ?k cmd
+      m ?(stamp = "") ?(reads = []) ?(writes = []) ?env ?cwd ?stdin
+      ?(stdout = `Ui) ?(stderr = `Ui) ?(success_exits = [0]) ?post_exec ?k cmd
     =
     match cmd.cmd_tool with
     | Miss (tool, e) -> m.m.feedback (`Miss_tool (tool, e))
@@ -461,7 +443,6 @@ module Memo = struct
             | Some (`Exited code) -> k code
             | _ -> assert false
         in
-        let reads = reads, unready_reads and writes = writes, unready_writes in
         let o =
           Op.Spawn.v_op
             ~id ~group:m.c.group ~created ~reads ~writes ?post_exec ~k ~stamp

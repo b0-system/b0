@@ -346,22 +346,20 @@ module Memo : sig
       up-to-date in [b]. This is typically used with source files
       and files external to the build (e.g. installed libraries). *)
 
-  val read : t -> ?unready_read:bool -> Fpath.t -> string fiber
+  val read : t -> Fpath.t -> string fiber
   (** [read m file k] reads the contents of file [file] as [s] when it
       becomes ready and continues with [k s]. *)
 
   val write :
-    t -> ?stamp:string -> ?unready_reads:Fpath.t list -> ?reads:Fpath.t list ->
-    ?mode:int -> ?unready_write:bool -> ?k:(unit -> unit) -> Fpath.t ->
-    (unit -> (string, string) result) -> unit
+    t -> ?stamp:string -> ?reads:Fpath.t list -> ?mode:int ->
+    Fpath.t -> (unit -> (string, string) result) -> unit
   (** [write m ~reads file w] writes [file] with data [w ()] and mode
       [mode] (defaults to [0o644]) when [reads] are ready. [w]'s
       result must only depend on [reads] and [stamp] (defaults to
       [""]). *)
 
   val copy :
-    t -> ?mode:int -> ?linenum:int -> ?unready_src:bool -> src:Fpath.t ->
-    ?unready_dst:bool -> Fpath.t -> unit
+    t -> ?mode:int -> ?linenum:int -> src:Fpath.t -> Fpath.t -> unit
   (** [copy m ~mode ?linenum ~src dst] copies file [src] to [dst] with
       mode [mode] (defaults to [0o644]) when [src] is ready. If [linenum]
       is specified, the following line number directive is prependend
@@ -401,12 +399,12 @@ module Memo : sig
       if the tool cannot be found. *)
 
   val spawn :
-    t -> ?stamp:string -> ?unready_reads:Fpath.t list ->
-    ?reads:Fpath.t list -> ?unready_writes:Fpath.t list ->
-    ?writes:Fpath.t list -> ?env:Os.Env.t -> ?cwd:Fpath.t ->
-    ?stdin:Fpath.t -> ?stdout:B000.Op.Spawn.stdo ->
-    ?stderr:B000.Op.Spawn.stdo -> ?success_exits:B000.Op.Spawn.success_exits ->
-    ?post_exec:(B000.Op.t -> unit) -> ?k:(int -> unit) -> cmd -> unit
+    t -> ?stamp:string -> ?reads:Fpath.t list -> ?writes:Fpath.t list ->
+    ?env:Os.Env.t -> ?cwd:Fpath.t -> ?stdin:Fpath.t ->
+    ?stdout:B000.Op.Spawn.stdo -> ?stderr:B000.Op.Spawn.stdo ->
+    ?success_exits:B000.Op.Spawn.success_exits ->
+    ?post_exec:(B000.Op.t -> unit) ->
+    ?k:(int -> unit) -> cmd -> unit
   (** [spawn m ~reads ~writes ~env ~cwd ~stdin ~stdout ~stderr
       ~success_exits cmd] spawns [cmd] once [reads] files are ready
       and makes files [writes] ready if the spawn succeeds and the

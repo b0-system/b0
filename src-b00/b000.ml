@@ -455,8 +455,8 @@ module Op = struct
       mutable duration : Time.span;
       mutable revived : bool;
       mutable status : status;
-      mutable reads : Fpath.t list * Fpath.t list; (* ready * unready *)
-      mutable writes : Fpath.t list * Fpath.t list; (* ready * unready *)
+      mutable reads : Fpath.t list;
+      mutable writes : Fpath.t list;
       mutable hash : Hash.t;
       mutable post_exec : (t -> unit) option;
       mutable k : (t -> unit) option;
@@ -487,15 +487,7 @@ module Op = struct
   let revived o = o.revived
   let status o = o.status
   let reads o = o.reads
-  let reads_to_list o = match o.reads with
-  | ready, [] -> ready
-  | ready, unready -> ready @ unready
-
   let writes o = o.writes
-  let writes_to_list o = match o.writes with
-  | ready, [] -> ready
-  | ready, unready -> ready @ unready
-
   let hash o = o.hash
   let discard_k o = o.k <- None
   let invoke_k o = match o.k with None -> () | Some k -> discard_k o; k o
@@ -539,17 +531,13 @@ module Op = struct
     let dst c = c.copy_dst
     let mode c = c.copy_mode
     let linenum c = c.copy_linenum
-    let v_op
-        ~id ~group ~created ?post_exec ?k ~mode ~linenum ~unready_src ~src
-        ~unready_dst dst
+    let v_op ~id ~group ~created ?post_exec ?k ~mode ~linenum ~src dst
       =
-      let reads = if unready_src then [], [src] else [src], [] in
-      let writes = if unready_dst then [], [dst] else [dst], [] in
-      let c =
-        Copy { copy_src = src; copy_dst = dst; copy_mode = mode;
-               copy_linenum = linenum }
+      let c = { copy_src = src; copy_dst = dst; copy_mode = mode;
+                copy_linenum = linenum }
       in
-      v_kind ~id ~group ~created ~reads ~writes ?post_exec ?k c
+      let reads = [src] and writes = [dst] in
+      v_kind ~id ~group ~created ~reads ~writes ?post_exec ?k (Copy c)
   end
 
   module Delete = struct
@@ -558,8 +546,8 @@ module Op = struct
     let get o = match o.kind with Delete d -> d | _ -> assert false
     let path d = d.delete_path
     let v_op ~id ~group ~created ?post_exec ?k delete_path =
-      let d = Delete { delete_path } and none = [], [] in
-      v_kind ~id ~group ~created ~reads:none ~writes:none ?post_exec ?k d
+      let d = { delete_path } in
+      v_kind ~id ~group ~created ~reads:[] ~writes:[] ?post_exec ?k (Delete d)
   end
 
   module Mkdir = struct
@@ -569,9 +557,9 @@ module Op = struct
     let dir mk = mk.mkdir_dir
     let mode mk = mk.mkdir_mode
     let v_op ~id ~group ~mode ~created ?post_exec ?k dir =
-      let m = Mkdir { mkdir_dir = dir; mkdir_mode = mode } in
-      let reads = [], [] and writes = [dir], [] in
-      v_kind ~id ~group ~created ~reads ~writes ?post_exec ?k m
+      let mkdir = { mkdir_dir = dir; mkdir_mode = mode } in
+      v_kind
+        ~id ~group ~created ~reads:[] ~writes:[dir] ?post_exec ?k (Mkdir mkdir)
   end
 
   module Notify = struct
@@ -582,8 +570,8 @@ module Op = struct
     let kind n = n.notify_kind
     let msg n = n.notify_msg
     let v_op ~id ~group ~created ?post_exec ?k notify_kind notify_msg =
-      let n = Notify { notify_kind; notify_msg } and none = [], [] in
-      v_kind ~id ~group ~created ~reads:none ~writes:none ?post_exec ?k n
+      let n = { notify_kind; notify_msg } in
+      v_kind ~id ~group ~created ~reads:[] ~writes:[] ?post_exec ?k (Notify n)
   end
 
   module Read = struct
@@ -594,10 +582,10 @@ module Op = struct
     let data r = r.read_data
     let set_data r d = r.read_data <- d
     let discard_data r = r.read_data <- ""
-    let v_op ~id ~group ~created ?post_exec ?k ~unready_read file =
-      let reads = if unready_read then [], [file] else [file], [] in
-      let r = Read { read_file = file; read_data = "" } in
-      v_kind ~id ~group ~created ~reads ~writes:([], []) ?post_exec ?k r
+    let v_op ~id ~group ~created ?post_exec ?k file =
+      let read = { read_file = file; read_data = "" } in
+      v_kind
+        ~id ~group ~created ~reads:[file] ~writes:[] ?post_exec ?k (Read read)
   end
 
   module Spawn = struct
@@ -651,8 +639,7 @@ module Op = struct
     type t = wait_files
     let v () = ()
     let v_op ~id ~group ~created ?post_exec ?k reads =
-      v_kind ~id ~group ~created ~reads:(reads, []) ~writes:([], [])
-        ?post_exec ?k (Wait_files ())
+      v_kind ~id ~group ~created ~reads ~writes:[] ?post_exec ?k (Wait_files ())
   end
 
   module Write = struct
@@ -682,11 +669,10 @@ module Op = struct
 
     let v_op
         ~id ~group ~created ?post_exec ?k ~stamp:write_stamp ~reads ~mode
-        ~unready_write ~write:f write_data
+        ~write:f write_data
       =
-      let writes = if unready_write then [], [f] else [f], [] in
       let w = { write_stamp; write_mode = mode; write_file = f; write_data } in
-      v_kind ~id ~group ~created ~reads ~writes ?post_exec ?k (Write w)
+      v_kind ~id ~group ~created ~reads ~writes:[f] ?post_exec ?k (Write w)
   end
 
   let abort o =
@@ -708,47 +694,39 @@ module Op = struct
   | Unix.Unix_error (Unix.EINTR, _, _) -> access f acc
   | _ -> false
 
-  let fold_all_files f acc (fst, snd) =
-    List.fold_left f (List.fold_left f acc fst) snd
-
-  let ready_files = fst
-  let unready_files = snd
-
   let cannot_read o =
     let add acc f = if access f Unix.[F_OK; R_OK] then acc else f :: acc in
-    List.sort Fpath.compare @@ fold_all_files add [] (writes o)
+    List.sort Fpath.compare @@ List.fold_left add [] o.reads
 
   let did_not_write o =
     let add acc f = if access f [Unix.F_OK] then acc else f :: acc in
-    List.sort Fpath.compare @@ fold_all_files add [] (writes o)
+    List.sort Fpath.compare @@ List.fold_left add [] o.writes
 
   let unwritten_reads os =
     let add_path acc p = Fpath.Set.add p acc in
     let rec loop ws rs = function
     | [] -> Fpath.Set.diff rs ws
     | o :: os ->
-        let ws = fold_all_files add_path ws (writes o) in
-        let rs = fold_all_files add_path rs (reads o) in
+        let ws = List.fold_left add_path ws (writes o) in
+        let rs = List.fold_left add_path rs (reads o) in
         loop ws rs os
     in
     loop Fpath.Set.empty Fpath.Set.empty os
 
-  let ready_read_write_maps os =
+  let read_write_maps os =
     let rec loop rm wm = function
     | [] -> rm, wm
     | o :: os ->
         let add acc p = Fpath.Map.add_to_set (module Set) p o acc in
-        let rm = List.fold_left add rm (ready_files (reads o)) in
-        let wm = List.fold_left add wm (ready_files (writes o)) in
+        let rm = List.fold_left add rm (reads o) in
+        let wm = List.fold_left add wm (writes o) in
         loop rm wm os
     in
     loop Fpath.Map.empty Fpath.Map.empty os
 
-  let ready_write_map os =
+  let write_map os =
     let add_write o acc p = Fpath.Map.add_to_set (module Set) p o acc in
-    let add_writes acc o =
-      List.fold_left (add_write o) acc (ready_files (writes o))
-    in
+    let add_writes acc o = List.fold_left (add_write o) acc (writes o) in
     List.fold_left add_writes Fpath.Map.empty os
 
   let op_deps ~write_map o =
@@ -756,9 +734,9 @@ module Op = struct
     | exception Not_found -> acc
     | os -> Set.union os acc
     in
-    List.fold_left add_read_deps Set.empty (ready_files (reads o))
+    List.fold_left add_read_deps Set.empty (reads o)
 
-  let find_ready_read_write_cycle os =
+  let find_read_write_cycle os =
     let path_to_start ~start path =
       let rec loop start acc = function
       | o :: os when (id o = id start) -> List.rev (o :: acc)
@@ -791,7 +769,7 @@ module Op = struct
         | `Cycle cycle -> Some cycle
         | `No_cycle visited -> loop write_map visited os
     in
-    loop (ready_write_map os) Set.empty os
+    loop (write_map os) Set.empty os
 
   type aggregate_error =
   | Failures
@@ -802,7 +780,7 @@ module Op = struct
     let rec loop ws = function
     | [] ->
         if ws = [] then Ok () else
-        begin match find_ready_read_write_cycle ws with
+        begin match find_read_write_cycle ws with
         | Some os -> Error (Cycle os)
         | None -> Error (Never_became_ready (unwritten_reads ws))
         end
@@ -844,39 +822,30 @@ module Reviver = struct
     let module H = (val r.hash_fun : Hash.T) in
     H.string s
 
-  let uncached_hash_file r f =
-    let module H = (val r.hash_fun : Hash.T) in
-    let t = timestamp r in
-    let h = H.file f in
-    let dur = Time.Span.abs_diff (timestamp r) t in
-    r.file_hash_dur <- Time.Span.add r.file_hash_dur dur;
-    h |> Result.to_failure
-
-  let cached_hash_file r f = match Fpath.Map.find f r.file_hashes with
+  let _hash_file r f = match Fpath.Map.find f r.file_hashes with
   | h -> h
   | exception Not_found ->
-      let h = uncached_hash_file r f in
-      r.file_hashes <- Fpath.Map.add f h r.file_hashes; h
+      let module H = (val r.hash_fun : Hash.T) in
+      let t = timestamp r in
+      let h = H.file f in
+      let dur = Time.Span.abs_diff (timestamp r) t in
+      r.file_hash_dur <- Time.Span.add r.file_hash_dur dur;
+      match h with
+      | Ok h -> r.file_hashes <- Fpath.Map.add f h r.file_hashes; h
+      | Error e -> failwith e
 
-  let hash_file r f = try Ok (cached_hash_file r f) with Failure e -> Error e
+  let hash_file r f = try Ok (_hash_file r f) with Failure e -> Error e
 
   let hash_op_reads r o acc =
-    let add_cached_file_hash acc f =
-      Hash.to_bytes (cached_hash_file r f) :: acc
-    in
-    let add_uncached_file_hash acc f =
-      Hash.to_bytes (uncached_hash_file r f) :: acc
-    in
-    let ready, unready = Op.reads o in
-    List.fold_left add_uncached_file_hash
-      (List.fold_left add_cached_file_hash acc ready) unready
+    let add_file_hash acc f = Hash.to_bytes (_hash_file r f) :: acc in
+    List.fold_left add_file_hash acc (Op.reads o)
 
   let hash_spawn r o s =
     let stdin_stamp = function None -> "0" | Some _ -> "1" in
     let stdo_stamp = function `File _ -> "0" | `Tee _ -> "1" | `Ui -> "2" in
     let module H = (val r.hash_fun : Hash.T) in
     let acc = [Op.Spawn.stamp s] in
-    let acc = (Hash.to_bytes (cached_hash_file r (Op.Spawn.tool s))) :: acc in
+    let acc = (Hash.to_bytes (_hash_file r (Op.Spawn.tool s))) :: acc in
     let acc = hash_op_reads r o acc in
     let acc = stdin_stamp (Op.Spawn.stdin s) :: acc in
     let acc = stdo_stamp (Op.Spawn.stdout s) :: acc in
@@ -946,8 +915,8 @@ module Reviver = struct
 
   let revive_spawn r o s =
     let key = file_cache_key o in
-    Result.bind (File_cache.revive r.cache key (Op.writes_to_list o)) @@
-    function
+    let writes = Op.writes o in
+    Result.bind (File_cache.revive r.cache key writes) @@ function
     | None -> Ok false
     | Some m ->
         try
@@ -964,8 +933,8 @@ module Reviver = struct
 
   let revive_op r o kind op_kind =
     let key = file_cache_key o in
-    Result.bind (File_cache.revive r.cache key (Op.writes_to_list o)) @@
-    function
+    let writes = Op.writes o in
+    Result.bind (File_cache.revive r.cache key writes) @@ function
     | None -> Ok false
     | Some _ ->
         op_kind kind;
@@ -989,13 +958,13 @@ module Reviver = struct
 
   let record_spawn r o s =
     let m = encode_spawn_meta r.buffer s in
-    File_cache.add r.cache (file_cache_key o) m (Op.writes_to_list o)
+    File_cache.add r.cache (file_cache_key o) m (Op.writes o)
 
   let record_write r o w =
-    File_cache.add r.cache (file_cache_key o) "" (Op.writes_to_list o)
+    File_cache.add r.cache (file_cache_key o) "" (Op.writes o)
 
   let record_copy r o c =
-    File_cache.add r.cache (file_cache_key o) "" (Op.writes_to_list o)
+    File_cache.add r.cache (file_cache_key o) "" (Op.writes o)
 
   let record r o = match Op.kind o with
   | Op.Spawn s -> record_spawn r o s
@@ -1084,8 +1053,7 @@ module Guard = struct
             loop g gop awaits files fs
     in
     let gop = { op = o; awaits = Fpath.Set.empty } in
-    let ready, _unready = Op.reads o in
-    loop g gop Fpath.Set.empty g.files ready
+    loop g gop Fpath.Set.empty g.files (Op.reads o)
 
   let allowed g = match Queue.take g.allowed with
   | exception Queue.Empty -> None

@@ -76,12 +76,10 @@ module Trace_event = struct
     |> Jsong.mem "status"
       (Jsong.string (B000_conv.Op.status_to_string (Op.status o)))
     |> Jsong.mem "revived" (Jsong.bool (Op.revived o))
-    |> Jsong.mem "writes" (Jsong.(list fpath) (fst (Op.writes o)))
-    |> Jsong.mem "writes-unready" (Jsong.(list fpath) (snd (Op.writes o)))
+    |> Jsong.mem "writes" (Jsong.(list fpath) (Op.writes o))
     |> Jsong.mem "time-created" (span_us (Op.time_created o))
     |> kind_mems
-    |> Jsong.mem "reads" (Jsong.(list fpath) (fst (Op.reads o)))
-    |> Jsong.mem "reads-unready" (Jsong.(list fpath) (snd (Op.reads o)))
+    |> Jsong.mem "reads" (Jsong.(list fpath) (Op.reads o))
     |> Jsong.mem "hash" (Jsong.string (Hash.to_hex (Op.hash o)))
     |> Jsong.obj_end
 
@@ -117,12 +115,8 @@ module Compilation_database = struct
 
   let add_op arr o = match Op.kind o with
   | Op.Spawn s ->
-      let src = match Op.reads o with
-      | [], [] -> Os.File.null
-      | (f :: _), _ -> f
-      | _, (f :: _) -> f
-      in
-      List.fold_left (spawn_out o s src) arr (Op.writes_to_list o)
+      let src = match Op.reads o with [] -> Os.File.null | fs -> List.hd fs in
+      List.fold_left (spawn_out o s src) arr (Op.writes o)
   | _ -> arr
 
   let of_ops os = Jsong.array_end (List.fold_left add_op Jsong.array os)
