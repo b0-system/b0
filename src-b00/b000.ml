@@ -985,8 +985,14 @@ module Reviver = struct
 
   let revive_spawn r o s =
     let key = file_cache_key o in
-    let writes = Op.writes o in
-    Result.bind (File_cache.revive r.cache key writes) @@ function
+    let m = match Op.writes_manifest_root o with
+    | None -> File_cache.revive r.cache key (Op.writes o)
+    | Some root ->
+        Result.bind (File_cache.manifest_revive r.cache key ~root) @@ function
+        | None -> Ok None
+        | Some (writes, m) -> Op.set_writes o writes; Ok (Some m)
+    in
+    Result.bind m @@ function
     | None -> Ok false
     | Some m ->
         try
@@ -1028,7 +1034,11 @@ module Reviver = struct
 
   let record_spawn r o s =
     let m = encode_spawn_meta r.buffer s in
-    File_cache.add r.cache (file_cache_key o) m (Op.writes o)
+    let writes = Op.writes o in
+    let key = file_cache_key o in
+    match Op.writes_manifest_root o with
+    | None -> File_cache.add r.cache key m writes
+    | Some root -> File_cache.manifest_add r.cache key m ~root writes
 
   let record_write r o w =
     File_cache.add r.cache (file_cache_key o) "" (Op.writes o)
