@@ -35,7 +35,7 @@ module File_cache = struct
 
   let pp_key_stats ppf s =
     Fmt.pf ppf " %5d  %5d  %a"
-      s.keys_count s.keys_file_count (Fmt.bold Fmt.byte_size) s.keys_byte_size
+      s.keys_count s.keys_file_count (Fmt.code Fmt.byte_size) s.keys_byte_size
 
   let pp_stats ppf (total, used) =
     let row = Fmt.tty_string [`Fg `Yellow] in
@@ -45,7 +45,6 @@ module File_cache = struct
       row "total" pp_key_stats total
       row "used " pp_key_stats used
       pp_cols ()
-
 
   let pp_stats ppf (total, used) =
     let row = Fmt.tty_string [`Fg `Yellow] in
@@ -57,8 +56,8 @@ module File_cache = struct
       row "keys " total.keys_count used.keys_count
       row "files" total.keys_file_count used.keys_file_count
       row "size "
-      (Fmt.bold pp_size) total.keys_byte_size
-      (Fmt.bold pp_size) used.keys_byte_size
+      (Fmt.code pp_size) total.keys_byte_size
+      (Fmt.code pp_size) used.keys_byte_size
 
   let stats_of_cache c ~used =
     let rec loop tk tf tb uk uf ub = function
@@ -105,7 +104,7 @@ module File_cache = struct
             | true -> Ok ()
             | false ->
                 Log.warn begin fun m ->
-                  m "No key %a in cache, ignored." Fmt.(bold string) k
+                  m "No key %a in cache, ignored." Fmt.(code string) k
                 end;
                 Ok ()
           in
@@ -583,7 +582,7 @@ module Memo = struct
     | None ->
         let ids = List.map (fun (module H : Hash.T) -> H.id) (Hash.funs ()) in
         Fmt.str "Hash function to use for caching. %a"
-          Fmt.(must_be (Fmt.bold string)) ids
+          Fmt.(must_be (Fmt.code string)) ids
     in
     Arg.(value & opt (some ~none:doc_none hash_fun) None &
          info opts ~env ~doc ?docs ~docv:"HASHFUN")

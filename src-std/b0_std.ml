@@ -497,7 +497,7 @@ module Fmt = struct
       Format.kfprintf reset ppf "@<0>%s%a"
         (Printf.sprintf "\027[%sm" @@ Tty.sgrs_of_styles styles) pp_v v
 
-  let bold pp_v ppf v = tty [`Bold] pp_v ppf v
+  let code pp_v ppf v = tty [`Bold] pp_v ppf v
 
   (* Records *)
 
@@ -1974,7 +1974,7 @@ module Hash = struct
     | m -> Ok m
     | exception Not_found ->
         let kind = Fmt.any "hash" in
-        let pp_id = Fmt.(bold string) in
+        let pp_id = Fmt.(code string) in
         let ids = List.map (fun (module H : T) -> H.id) funs in
         let hint, ids = match String.suggest ids id with
         | [] -> Fmt.must_be, ids
@@ -3820,7 +3820,7 @@ module Log = struct
   | "info" ->  Ok Info
   | "debug" ->  Ok Debug
   | e ->
-      let pp_level = Fmt.(bold string) in
+      let pp_level = Fmt.(code string) in
       let kind = Fmt.any "log level" in
       let dom = ["quiet"; "app"; "error"; "warning"; "info"; "debug"] in
       Fmt.error "%a" Fmt.(unknown' ~kind pp_level ~hint:must_be) (e, dom)

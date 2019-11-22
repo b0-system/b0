@@ -398,8 +398,8 @@ module Fmt : sig
   (** [tty styles pp_v ppf v] prints [v] with [pp_v] on [ppf]
       according to [styles] and the value of {!tty_styling_cap}. *)
 
-  val bold : 'a t -> 'a t
-  (** [bold] is [tty `Bold]. *)
+  val code : 'a t -> 'a t
+  (** [code] is [tty `Bold]. *)
 end
 
 (** Option values (as in [4.08)]. *)

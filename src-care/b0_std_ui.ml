@@ -33,7 +33,7 @@ let tty_cap_of_string s = match String.trim s with
 | "always" -> Ok (Some `Ansi)
 | "never" -> Ok (Some `None)
 | e ->
-    let pp_cap = Fmt.(bold string) in
+    let pp_cap = Fmt.(code string) in
     let kind = Fmt.any "color behaviour" in
     let dom = ["auto"; "always"; "never"] in
     Fmt.error "%a" Fmt.(unknown' ~kind pp_cap ~hint:must_be) (e, dom)
