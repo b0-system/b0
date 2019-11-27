@@ -129,14 +129,27 @@ end
 module Httpr = struct
 
   let redirect_resp visited req resp =
-    let find_location resp =
-      try Ok (List.assoc "location" (Http.resp_headers resp)) with
+    let find_location req resp =
+      try
+        let loc = List.assoc "location" (Http.resp_headers resp) in
+        if String.length loc > 0 && loc.[0] <> '/' then Ok loc else
+        let uri = Http.req_uri req in
+        try
+          match Uri.parse_scheme uri with
+          | None -> raise Exit
+          | Some s ->
+              match Uri.parse_authority uri with
+              | None -> raise Exit
+              | Some a -> Ok (String.concat "" [s; "://"; a; loc])
+        with Exit ->
+          Fmt.error "Could not construct redirect from %s to %s" uri loc
+      with
       | Not_found -> Error "No 'location' header found in 3XX response"
     in
     match Http.resp_status resp with
     | 301 | 302 | 303 | 305 | 307 ->
         begin
-          Result.bind (find_location resp) @@ fun uri ->
+          Result.bind (find_location req resp) @@ fun uri ->
           match List.mem uri visited with
           | true -> Error "Infinite redirection loop"
           | false -> Ok (Some { req with Http.req_uri = uri })
