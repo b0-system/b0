@@ -456,17 +456,18 @@ module Jsonq = struct
 
   (* Succeeding and failing queries *)
 
-  let succeed v p s = v
-  let fail msg p s = err p (Json.loc s) msg
+  let succeed v p j = v
+  let fail msg p j = err p (Json.loc j) msg
   let failf fmt = Format.kasprintf fail fmt
 
-  (* Query combinatores *)
+  (* Query combinators *)
 
-  let app fq q p s = fq p s (q p s)
+  let app fq q p j = fq p j (q p j)
   let ( $ ) = app
-  let bind q f p s = f (q p s) p s
-  let map f q p s = f (q p s)
-  let some q p s = Some (q p s)
+  let pair q0 q1 p j = let v0 = q0 p j in v0, q1 p j
+  let bind q f p j = f (q p j) p j
+  let map f q p j = f (q p j)
+  let some q p j = Some (q p j)
 
   (* JSON queries *)
 
@@ -477,6 +478,29 @@ module Jsonq = struct
   | `String _ as j -> string p j
   | `A _ as j -> array p j
   | `O _ as j -> obj p j
+
+  let partial_fold ?null ?bool ?float ?string ?array ?obj () p j =
+    let with_q q p j = match q with
+    | None ->
+        let kind k = function None -> "" | Some _ -> k  in
+        let kinds = [ kind "null" null; kind "bool" bool;
+                      kind "number" float; kind "string" string;
+                      kind "array" array; kind "obj" obj ]
+        in
+        let kinds = List.filter (fun s -> s <> "") kinds in
+        let kinds = String.concat ", " kinds in
+        (* FIXME use error messages from Err_msg *)
+        let kinds = if kinds = "" then "nothing" else "one of " ^ kinds in
+        err_exp kinds p j
+    | Some q -> q p j
+    in
+    match j with
+    | `Null _ as j -> with_q null p j
+    | `Bool _ as j -> with_q bool p j
+    | `Float _ as j -> with_q float p j
+    | `String _ as j -> with_q string p j
+    | `A _ as j -> with_q array p j
+    | `O _ as j -> with_q obj p j
 
   let json p s = s
   let loc p s = Json.loc s
@@ -492,9 +516,10 @@ module Jsonq = struct
 
   let bool p = function `Bool (b, _) -> b | j -> err_exp_bool p j
   let float p = function `Float (f, _) -> f | j -> err_exp_float p j
+  let int = map truncate float
   let string p = function `String (s, _) -> s | j -> err_exp_string p j
 
-  let parsed_string ~kind parse p = function
+  let string_to ~kind parse p = function
   | `String (s, _) as j ->
       (match parse s with Ok v -> v | Error m -> fail m p j)
   | j -> err_exp kind p j
@@ -544,14 +569,17 @@ module Jsonq = struct
       q p (`A (a, l))
   | j -> err_exp_array p j
 
-  let nth n q p = function
+  let nth ?absent n q p = function
   | `A (vs, l) ->
       let p = (`A, l) :: p in
       let k, vs = if n < 0 then - n - 1, List.rev vs else n, vs in
       let rec loop k = function
       | v :: vs when k = 0 -> q p v
       | _ :: vs -> loop (k - 1) vs
-      | [] -> errf p l "%d: no such index in array" n
+      | [] ->
+          match absent with
+          | None -> errf p l "%d: no such index in array" n
+          | Some absent -> absent
       in
       loop k vs
   | j -> err_exp_array p j

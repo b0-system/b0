@@ -233,7 +233,8 @@ end
 
     {b TODO} maybe we could expose a bit more options for error
     reporting. In particular the internal [path] type and a combinator
-    in the vein of {!loc} to report back the path trace. *)
+    in the vein of {!loc} to report back the path trace. Basically
+    see {!Serialk_sexp}. *)
 module Jsonq : sig
 
   (** {1:query Queries} *)
@@ -270,6 +271,10 @@ module Jsonq : sig
   val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
   (** [f $ v] is [app f v]. *)
 
+  val pair : 'a t -> 'b t -> ('a * 'b) t
+  (** [pair q0 q1] queries first with [q0] and then with [q1] and returns
+      the pair of their result. *)
+
   val bind : 'a t -> ('a -> 'b t) -> 'b t
   (** [bind q f] queries a s-expression with [q], applies the result to
       [f] and re-queries the s-expression with the result. *)
@@ -287,6 +292,12 @@ module Jsonq : sig
     obj:'a t -> 'a t
   (** [fold] queries JSON values according to their kind using the
       provided queries. *)
+
+  val partial_fold :
+    ?null:'a t -> ?bool:'a t -> ?float:'a t -> ?string:'a t -> ?array:'a t ->
+    ?obj:'a t -> unit -> 'a t
+  (** [partial_fold] is like {!fold} but only queries the kinds that
+      are explicitely specified. It errors on other kinds. *)
 
   val json : Json.t t
   (** [json] queries any JSON value and returns it. *)
@@ -307,7 +318,8 @@ module Jsonq : sig
   (** [null] queries JSON null as unit and fails otherwise. *)
 
   val nullable : 'a t -> 'a option t
-  (** [nullable q] queries either a JSON null value or with [q]. *)
+  (** [nullable q] is None on JSON null and otherwise queries the value
+      with [q]. *)
 
   (** {1:atoms Atomic values} *)
 
@@ -315,18 +327,21 @@ module Jsonq : sig
   (** [bool] queries JSON bool values as a [bool] value and fails otherwise. *)
 
   val float : float t
-  (** [float] queries JSON number values as a [float] value and
-      fails otherwise. *)
+  (** [float] queries JSON number values as a [float] value and fails
+      otherwise. *)
+
+  val int : int t
+  (** [int] is [map truncate float]. *)
 
   val string : string t
   (** [string] queries JSON string values as a [string] value and
       fails otherwise. *)
 
-  val parsed_string : kind:string -> (string -> ('a, string) result) -> 'a t
-  (** [parsed_string ~kind parse] queries a JSON string and parses it
+  val string_to : kind:string -> (string -> ('a, string) result) -> 'a t
+  (** [string_to ~kind parse] queries a JSON string and parses it
       with [p]. In case of [Error m] error {!fail}s with [m]. [kind]
-      is the kind of value parsed, it is used if the value is not a
-      JSON string. *)
+      is the kind of value parsed, it is used for the error in case no
+      JSON string is found. *)
 
   val enum : kind:string -> Set.Make(String).t -> string t
   (** [enum ~kind ss] queries a JSON string for one of the elements of [ss]
@@ -353,17 +368,20 @@ module Jsonq : sig
   (** [tail q] queries the tail of an array with [q]. Fails on empty
       arrays. *)
 
-  val nth : int -> 'a t -> 'a t
-  (** [nth n q] queries the [n]th element of an array with [q]. If
-      [n] is negative counts from the end of the array, so [-1] is the
-      last list element. *)
-
   val fold_array : ('a -> 'b -> 'b) -> 'a t -> 'b -> 'b t
   (** [fold_array f q acc] queries the elements of an array from left to
       right with [q] and folds the result with [f] starting with [acc]. *)
 
   val array : 'a t -> 'a list t
   (** [array q] queries the elements of an array with [q]. *)
+
+  (** {2:array_index Array index queries} *)
+
+  val nth : ?absent:'a -> int -> 'a t -> 'a t
+  (** [nth ?absent n q] queries the [n]th element of an array with [q]. If
+      [n] is negative counts from the end of the array, so [-1] is the
+      last array element. If the element does not exist this fails if
+      [absent] is [None] and succeeds with [v] if [absent] is [Some v]. *)
 
   (** {1:objects Objects}
 
