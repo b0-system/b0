@@ -14,7 +14,7 @@
 open B0_std
 
 (** Attributes. *)
-module Att : sig
+module At : sig
 
   (** {1:atts Attributes} *)
 
@@ -77,10 +77,10 @@ module El : sig
   (** The type for HTML fragments. Either textual data or an element
       or a sequence thereof. *)
 
-  val v : name -> ?a:Att.t list -> frag list -> frag
+  val v : name -> ?a:At.t list -> frag list -> frag
   (** [v n ~a cs] is an element with name [n], attributes [a]
       (defaults to [[]]) and children [cs]. It is illegal to specify
-      an attribute name more than once in [a] except for {!Att.class'}
+      an attribute name more than once in [a] except for {!At.class'}
       which is treated specially: multiple specifications are gathered
       to form a single space seperated attribute value for the class
       attribute. *)
@@ -155,11 +155,11 @@ module El : sig
       {b Convention.} Whenever an element name conflicts with an OCaml
       keyword we prime it, see for example {!object'}. *)
 
-  type cons = ?a:Att.t list -> frag list -> frag
+  type cons = ?a:At.t list -> frag list -> frag
   (** The type for element constructors. This is simply {!v} with a
       pre-applied element name. *)
 
-  type void_cons = a:Att.t list -> frag
+  type void_cons = a:At.t list -> frag
   (** The type for void element constructors. This is simply {!el}
       with a pre-applied element name and without children. *)
 

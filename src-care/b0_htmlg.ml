@@ -5,7 +5,7 @@
 
 open B0_std
 
-module Att = struct
+module At = struct
   type name = string
   type t = name * string
   let v n v = (n, v)
@@ -41,7 +41,7 @@ end
 module El = struct
   type name = string
   type frag =
-  | El of name * Att.t list * frag list
+  | El of name * At.t list * frag list
   | Txt of string
   | Splice of frag list
   | Raw of string
@@ -110,8 +110,8 @@ module El = struct
 
   (* Predefined element constructors *)
 
-  type cons = ?a:Att.t list -> frag list -> frag
-  type void_cons = a:Att.t list -> frag
+  type cons = ?a:At.t list -> frag list -> frag
+  type void_cons = a:At.t list -> frag
   let v_void e ~a = v e ~a []
   let a = v "a"
   let abbr = v "abbr"
@@ -239,25 +239,25 @@ module El = struct
     let viewport = "width=device-width, initial-scale=1.0" in
     let generator = match generator with
     | "" -> void
-    | g -> meta ~a:Att.[name "generator"; content g]
+    | g -> meta ~a:At.[name "generator"; content g]
     in
     let style uri =
-      link ~a:Att.[rel "stylesheet"; type' "text/css"; href uri]
+      link ~a:At.[rel "stylesheet"; type' "text/css"; href uri]
     in
     let script uri =
-      script ~a:Att.[type' "text/javascript"; v "defer" "defer"; src uri][]
+      script ~a:At.[type' "text/javascript"; v "defer" "defer"; src uri][]
     in
     let title = if t = "" then void else title [txt t] in
     let head = head [
-        meta ~a:Att.[charset "utf-8"];
+        meta ~a:At.[charset "utf-8"];
         generator;
-        meta ~a:Att.[name "viewport"; content viewport];
+        meta ~a:At.[name "viewport"; content viewport];
         splice (List.map style styles);
         splice (List.map script scripts);
         more_head;
         title; ]
     in
-    let a = if lang = "" then [] else [Att.v "lang" lang] in
+    let a = if lang = "" then [] else [At.v "lang" lang] in
     html ~a [head; body]
 
   let write_page
