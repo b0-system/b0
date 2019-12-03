@@ -88,9 +88,10 @@ module El : sig
   val txt : string -> frag
   (** [txt d] is character data [d]. *)
 
-  val splice : frag list -> frag
-  (** [splice cs] when added to the list of children in {!v} splices
-      [cs] into the list. *)
+  val splice : ?sep:frag -> frag list -> frag
+  (** [splice ?sep cs] when added to the list of children in {!v} splices
+      [cs] into the list, separating each fragment by [sep] (defaults
+      to {!void}). *)
 
   val raw : string -> frag
   (** [raw s] is the raw string [s] without escaping markup delimiters.

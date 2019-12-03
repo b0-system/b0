@@ -43,14 +43,14 @@ module El = struct
   type frag =
   | El of name * At.t list * frag list
   | Txt of string
-  | Splice of frag list
+  | Splice of frag option * frag list
   | Raw of string
 
   let v n ?(a = []) cs = El (n, a, cs)
   let txt v = Txt v
-  let splice cs = Splice cs
+  let splice ?sep cs = Splice (sep, cs)
   let raw f = Raw f
-  let void = Splice []
+  let void = Splice (None, [])
 
   (* Output *)
 
@@ -92,7 +92,17 @@ module El = struct
   let rec add_child b = function (* not T.R. *)
   | Raw r -> adds b r
   | Txt txt -> adds_esc b txt
-  | Splice cs -> List.iter (add_child b) cs;
+  | Splice (sep, cs) ->
+      begin match sep with
+      | None -> List.iter (add_child b) cs
+      | Some sep ->
+          begin match cs with
+          | [] -> ()
+          | c :: cs ->
+              let add b c = add_child b sep; add_child b c in
+              add_child b c; List.iter (add b) cs
+          end
+      end
   | El (n, atts, cs) ->
       addc b '<'; adds b n; add_atts b [] atts; addc b '>';
       if not (String.Set.mem n void_els) then begin
