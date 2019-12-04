@@ -3258,7 +3258,7 @@ module Os = struct
             let src_mode = Fs_base.path_get_mode src |> Result.to_failure in
             let chmods =
               _fold ~filter:`Any ~rel:true ~dotfiles:true ~follow_symlinks
-                ~prune ~recurse (copy tdst) src ([src, src_mode])
+                ~prune ~recurse (copy tdst) src ([tdst, src_mode])
               |> Result.to_failure
             in
             chmod_dirs chmods;
