@@ -177,7 +177,7 @@ module Html : sig
       {- [writes] specifies the writes of the command, they can be obtained
          via {!Writes}.}
       {- [theme_uri] and [hidden] are the corresponding [odoc]
-         options. See [odoc compile --help].}} *)
+         options. See [odoc html --help].}} *)
 
   (** {1:conv Convenience} *)
 
@@ -253,6 +253,11 @@ module Theme : sig
   val default : name
   (** [default] is the default odoc theme (["odoc.default"]). *)
 
+  val default_uri : string
+  (** [default_uri] is a default uri to give to {!Html.cmd}, this
+      is ["_odoc-theme"]. This will use that directory in the html
+      directory. *)
+
   (** {2:user User preference} *)
 
   val config_file : Fpath.t
@@ -293,6 +298,12 @@ module Theme : sig
 
   val find : name -> t list -> (t, string) result
   (** [find n themes] finds the theme named [n] in [themes]. *)
+
+  (** {1:writes Writing} *)
+
+  val write : Memo.t -> t -> to_dir:Fpath.t -> unit
+  (** [write m t ~to_dir] writes theme to directory [to_dir]. This simply
+      copies {!path} to [to_dir]. *)
 end
 
 (*---------------------------------------------------------------------------

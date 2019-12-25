@@ -178,6 +178,8 @@ end
 
 module Theme = struct
 
+  let default_uri = "_odoc-theme"
+
   (* Theme names *)
 
   type name = string
@@ -238,6 +240,19 @@ module Theme = struct
       let ss = String.suggest (List.rev_map name ts) n in
       Fmt.error "Unknown theme %a using %a instead.@ %a"
         pp_theme n pp_theme default (Fmt.did_you_mean pp_theme) ss
+
+  let write m theme ~to_dir =
+    (* XXX this is basically a copy dir we likely want to provide
+       that in the API somewhere  *)
+    let copy_file m ~src_root ~dst_root src =
+      let dst = Fpath.reroot ~root:src_root ~dst:dst_root src in
+      B00.Memo.file_ready m src;
+      B00.Memo.copy m ~src dst
+    in
+    let src_root = path theme in
+    let files = Os.Dir.fold_files ~recurse:true Os.Dir.path_list src_root [] in
+    let files = Memo.fail_if_error m files in
+    List.iter (copy_file m ~src_root ~dst_root:to_dir) files
 end
 
 (*---------------------------------------------------------------------------
