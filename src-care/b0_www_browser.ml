@@ -60,7 +60,8 @@ let find_with_macos_jxa ?search ~browser jxa = match browser with
     | _ -> find_browser_cmd ?search cmd
     end
 | None ->
-    Result.bind (macos_jxa_default_browser_appid jxa) @@ function
+    Result.bind (macos_jxa_default_browser_appid jxa) @@ fun appid ->
+    match String.Ascii.lowercase appid with
     | "" -> find_macos_open ?search ~appid:None
     | "com.apple.safari" -> Ok (Some (Macos_safari jxa))
     | "com.google.chrome" -> Ok (Some (Macos_chrome jxa))
