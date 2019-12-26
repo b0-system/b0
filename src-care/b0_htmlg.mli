@@ -27,6 +27,13 @@ module At : sig
   val v : name -> string -> t
   (** [v n value] is an attribute named [n] with value [value]. *)
 
+  val v_true : name -> t
+  (** [v_true n] is [v n ""], the {{:https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#boolean-attributes}boolean attribute} [n] set to true
+      (the attribute must be omitted to be false). *)
+
+  val v_int : name -> int -> t
+  (** [v_int n i] is [v n (string_of_int i)]. *)
+
   val add_if : bool -> t -> t list -> t list
   (** [add_if c att atts] is [att :: atts] if [c] is [true] and [atts]
         otherwise. *)
@@ -37,35 +44,106 @@ module At : sig
 
   (** {1:predef Predefined attribute constructors}
 
-        {b Convention.} Whenever an attribute name conflicts with
-        an OCaml keyword we prime it, see for example {!class'}. *)
+      See the
+      {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes}MDN
+      HTML attribute reference}.
+
+      {b Convention.} Whenever an attribute name conflicts with
+      an OCaml keyword we prime it, see for example {!class'}. *)
 
   type 'a cons = 'a -> t
   (** The type for attribute constructors with value of type ['a]. *)
 
   val autofocus : t
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/autofocus}
+      autofocus} *)
+
   val charset : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/charset}
+      charset} *)
+
   val checked : t
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/checked}
+      checked} *)
+
   val class' : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/class}
+      class} *)
+
   val content : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/content}
+      content} *)
+
+  val defer : t
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/defer}
+      defer} *)
+
   val disabled : t
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/disabled}
+      disabled} *)
+
   val for' : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/for'}
+      for'} *)
+
   val height : int cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/height}
+      height} *)
+
   val href : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/href}
+      href} *)
+
   val id : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/id}
+      id} *)
+
+  val lang : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/lang}
+      lang} *)
+
   val media : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/media}
+      media} *)
+
   val name : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/name}
+      name} *)
+
   val placeholder : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/placeholder}
+      placeholder} *)
+
   val rel : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/rel}
+      rel} *)
+
   val src : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/src}
+      src} *)
+
   val tabindex : int cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/tabindex}
+      tabindex} *)
+
   val title : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/title}
+      title} *)
+
   val type' : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/type}
+      type} *)
+
   val value : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/value}
+      value} *)
+
   val width : int cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/width}
+      width} *)
 end
 
-(** Elements. *)
+(** Elements and HTML fragments. *)
 module El : sig
 
   (** {1:els Elements} *)
@@ -74,31 +152,34 @@ module El : sig
   (** The type for element names. *)
 
   type frag
-  (** The type for HTML fragments. Either textual data or an element
-      or a sequence thereof. *)
+  (** The type for HTML fragments. A fragment is either character data or
+      a single element or a sequence of elements. *)
 
-  val v : name -> ?a:At.t list -> frag list -> frag
-  (** [v n ~a cs] is an element with name [n], attributes [a]
-      (defaults to [[]]) and children [cs]. It is illegal to specify
-      an attribute name more than once in [a] except for {!At.class'}
-      which is treated specially: multiple specifications are gathered
-      to form a single space seperated attribute value for the class
-      attribute. *)
+  val v : name -> ?at:At.t list -> frag list -> frag
+  (** [v n ~at cs] is an element with name [n], attributes [at]
+      (defaults to [[]]) and children [cs].
+
+      Except for {!At.class'} the list [at] must not define an
+      attribute more than once; this is not checked by the module.
+      The {!At.class'} is treated specially: multiple specifications
+      are gathered to form a single, space seperated, attribute value
+      the the class attribute. *)
 
   val txt : string -> frag
   (** [txt d] is character data [d]. *)
 
   val splice : ?sep:frag -> frag list -> frag
-  (** [splice ?sep cs] when added to the list of children in {!v} splices
-      [cs] into the list, separating each fragment by [sep] (defaults
-      to {!void}). *)
-
-  val raw : string -> frag
-  (** [raw s] is the raw string [s] without escaping markup delimiters.
-      This can be used to include foreign markup. *)
+  (** [splice ?sep fs] when added to a list of children in {!v} splices
+      fragments [fs] into the list, separating each fragment by
+      [sep] (if any). *)
 
   val void : frag
   (** [void] is [splice []]. *)
+
+  val raw : string -> frag
+  (** [raw s] is the raw string [s] without escaping markup delimiters.
+      This can be used to include foreign markup. [s] must be well-formed
+      HTML otherwise invalid markup will be generated. *)
 
   (** {1:output Output} *)
 
@@ -120,47 +201,52 @@ module El : sig
       ["Untitled"]. *)
 
   val basic_page :
-    ?generator:string -> ?lang:string -> ?scripts:string list ->
-    ?styles:string list -> ?more_head:frag -> ?title:string ->
-    frag -> frag
-  (** [basic_page ~generator ~lang ~scripts ~styles ~more_head ~title body]
-      is an {!El.html} element containing a {!El.head} element followed
-      by [body]. The parameters are used to define a [head] as follows.
-      {ul
-      {- The page has a charset of UTF-8 (unconditional).}
-      {- The page has a viewport with [width=device-width, initial-scale=1]
+    ?lang:string -> ?generator:string -> ?styles:string list ->
+    ?scripts:string list -> ?more_head:frag -> title:string -> frag -> frag
+  (** [basic_page ~lang ~generator ~styles ~scripts ~more_head ~title body]
+      is an {!El.html} element with a {!At.lang} attribute of [lang] (if
+      specified and non-empty) containing a {!El.head} element (see below)
+      followed by [body] which must be a {!El.body} element.
+
+      The other arguments are used to define the children of the page's
+      {!El.head} which are in order:
+      {ol
+      {- A charset {!El.meta} of UTF-8 (unconditional).}
+      {- A generator {!El.meta} of [generator], if specified an non-empty.}
+      {- A viewport {!El.meta} with [width=device-width, initial-scale=1]
          (unconditional).}
-      {- The page has a generator {!El.meta} tag of [generator], if
-         specified and non-empty.}
-      {- The page has language [lang], if specified and non-empty.}
-      {- The page has a defered script of type [text/javascript] for
-         each element of [scripts], in order (defaults to [[]]).}
-      {- The page has a stylesheet link of type [text/css] for each element
+      {- A stylesheet {!El.link} of type [text/css] for each element
          of [styles], in order (defaults to [[]]).}
-      {- The page has [more_head] in the {!El.head} element
-         (defaults to {!void}).}
-      {- The page has a title [title], if specified and non-empty.}} *)
+      {- A deferred {!El.script} of type [text/javascript] for
+         each element of [scripts], in order (defaults to [[]]).}
+      {- [more_head] (defaults to {!El.void}).}
+      {- The page has a title [title], which must be non-white and
+         and non-empty (falls back to ["Untitled"] in any of
+         these cases).}} *)
 
   val write_page :
-    ?generator:string -> ?lang:string -> ?scripts:string list ->
-    ?styles:string list -> ?title:string -> ?more_head:frag -> B00.Memo.t ->
-    frag:Fpath.t -> o:Fpath.t -> unit
-  (** [write_page m ~title ~frag ~o] writes to [o] a full HTML
-      document whose {!body} contains the contents of file [frag]
-      (inserted using {!raw}). If title is [""] or unspecified it is
-      {!page_title}[ o], for the other arguments and more information
-      see {!basic_page}. *)
+    ?lang:string -> ?generator:string -> ?styles:string list ->
+    ?scripts:string list -> ?more_head:frag -> ?title:string ->
+    B00.Memo.t -> frag:Fpath.t -> o:Fpath.t -> unit
+  (** [write_page m ~frag ~o] reads [frag] and inserts it
+      in an {!El.body} using {!raw} and writes a full HTML document
+      to [o] using {!basic_page} (see doc of the corresponding arguments).
+      If [title] is [""] or unspecified {!page_title}[ o] is used. *)
 
   (** {1:predef Predefined element constructors}
+
+      See the
+      {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element}MDN
+      HTML element reference}.
 
       {b Convention.} Whenever an element name conflicts with an OCaml
       keyword we prime it, see for example {!object'}. *)
 
-  type cons = ?a:At.t list -> frag list -> frag
+  type cons = ?at:At.t list -> frag list -> frag
   (** The type for element constructors. This is simply {!v} with a
       pre-applied element name. *)
 
-  type void_cons = a:At.t list -> frag
+  type void_cons = at:At.t list -> frag
   (** The type for void element constructors. This is simply {!el}
       with a pre-applied element name and without children. *)
 

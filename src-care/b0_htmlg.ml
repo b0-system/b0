@@ -3,29 +3,29 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B0_std
-
 module At = struct
   type name = string
   type t = name * string
   let v n v = (n, v)
+  let v_true n = v n ""
+  let v_int n i = v n (string_of_int i)
   let add_if c att atts = if c then att :: atts else atts
   let add_some n o atts = match o with
   | None -> atts | Some value -> (v n value) :: atts
 
   type 'a cons = 'a -> t
-  let v_bool n = v n ""
-  let v_int n i = v n (string_of_int i)
-  let autofocus = v_bool "autofocus"
+  let autofocus = v_true "autofocus"
   let charset = v "charset"
-  let checked = v_bool "checked"
+  let checked = v_true "checked"
   let class' = v "class"
   let content = v "content"
-  let disabled = v_bool "disabled"
+  let defer = v_true "defer"
+  let disabled = v_true "disabled"
   let for' = v "for"
   let height = v_int "height"
   let href = v "href"
   let id = v "id"
+  let lang = v "lang"
   let media = v "media"
   let name = v "name"
   let placeholder = v "placeholder"
@@ -46,11 +46,11 @@ module El = struct
   | Splice of frag option * frag list
   | Raw of string
 
-  let v n ?(a = []) cs = El (n, a, cs)
+  let v n ?(at = []) cs = El (n, at, cs)
   let txt v = Txt v
   let splice ?sep cs = Splice (sep, cs)
-  let raw f = Raw f
   let void = Splice (None, [])
+  let raw f = Raw f
 
   (* Output *)
 
@@ -77,17 +77,17 @@ module El = struct
     in
     loop 0 0
 
-  let void_els = String.Set.of_list
+  let void_els = B0_std.String.Set.of_list
       [ "area"; "base"; "br"; "col"; "embed"; "hr"; "img"; "input"; "link";
         "meta"; "param"; "source"; "track"; "wbr" ]
 
-  let rec add_atts b cs atts =
-    let add_att b n v = adds b n; adds b "=\""; adds_esc b v; addc b '\"' in
+  let rec add_ats b cs atts =
+    let add_at b n v = adds b n; adds b "=\""; adds_esc b v; addc b '\"' in
     match atts with
-    | ("class", c) :: atts -> add_atts b (c :: cs) atts
-    | (n, v) :: atts -> addc b ' '; add_att b n v; add_atts b cs atts
+    | ("class", c) :: atts -> add_ats b (c :: cs) atts
+    | (n, v) :: atts -> addc b ' '; add_at b n v; add_ats b cs atts
     | [] when cs = [] -> ()
-    | [] -> addc b ' '; add_att b "class" (String.concat " " (List.rev cs))
+    | [] -> addc b ' '; add_at b "class" (String.concat " " (List.rev cs))
 
   let rec add_child b = function (* not T.R. *)
   | Raw r -> adds b r
@@ -104,11 +104,9 @@ module El = struct
           end
       end
   | El (n, atts, cs) ->
-      addc b '<'; adds b n; add_atts b [] atts; addc b '>';
-      if not (String.Set.mem n void_els) then begin
-        List.iter (add_child b) cs;
-        adds b "</"; adds b n; addc b '>';
-      end
+      addc b '<'; adds b n; add_ats b [] atts; addc b '>';
+      if not (B0_std.String.Set.mem n void_els)
+      then (List.iter (add_child b) cs; adds b "</"; adds b n; addc b '>')
 
   let add_doc_type b = adds b "<!DOCTYPE html>\n"
   let buffer_add ~doc_type b cs =
@@ -120,9 +118,9 @@ module El = struct
 
   (* Predefined element constructors *)
 
-  type cons = ?a:At.t list -> frag list -> frag
-  type void_cons = a:At.t list -> frag
-  let v_void e ~a = v e ~a []
+  type cons = ?at:At.t list -> frag list -> frag
+  type void_cons = at:At.t list -> frag
+  let v_void e ~at = v e ~at []
   let a = v "a"
   let abbr = v "abbr"
   let address = v "address"
@@ -234,55 +232,61 @@ module El = struct
 
   (* Convenience *)
 
-  let title_of_fpath file = match Fpath.basename ~no_ext:true file with
+  let title_of_fpath file = match B0_std.Fpath.basename ~no_ext:true file with
   | "index" | "" ->
-      begin match Fpath.(basename ~no_ext:true (parent file)) with
-      | "" -> "Untitled"
-      | title -> title
-      end
+      let title = B0_std.Fpath.(basename ~no_ext:true (parent file)) in
+      if title = "" then "Untitled" else title
   | title -> title
 
   let basic_page
-      ?(generator = "") ?(lang = "") ?(scripts = []) ?(styles = [])
-      ?(more_head = void) ?title:(t = "") body
+      ?(lang = "") ?(generator = "") ?(styles = []) ?(scripts = [])
+      ?(more_head = void) ~title:t body
     =
     let viewport = "width=device-width, initial-scale=1.0" in
     let generator = match generator with
     | "" -> void
-    | g -> meta ~a:At.[name "generator"; content g]
+    | g -> meta ~at:At.[name "generator"; content g]
     in
     let style uri =
-      link ~a:At.[rel "stylesheet"; type' "text/css"; href uri]
+      link ~at:At.[rel "stylesheet"; type' "text/css"; href uri]
     in
     let script uri =
-      script ~a:At.[type' "text/javascript"; v "defer" "defer"; src uri][]
+      script ~at:At.[type' "text/javascript"; defer; src uri] []
     in
-    let title = if t = "" then void else title [txt t] in
     let head = head [
-        meta ~a:At.[charset "utf-8"];
+        meta ~at:At.[charset "utf-8"];
         generator;
-        meta ~a:At.[name "viewport"; content viewport];
+        meta ~at:At.[name "viewport"; content viewport];
         splice (List.map style styles);
         splice (List.map script scripts);
         more_head;
-        title; ]
+        title [txt (if String.trim t = "" then "Untilted" else t)]]
     in
-    let a = if lang = "" then [] else [At.v "lang" lang] in
-    html ~a [head; body]
+    let at = if lang = "" then [] else [At.lang lang] in
+    html ~at [head; body]
 
   let write_page
-      ?(generator = "") ?(lang = "") ?(scripts = []) ?(styles = [])
-      ?(title = "") ?more_head m ~frag ~o
+      ?(lang = "") ?(generator = "") ?(styles = []) ?(scripts = [])
+      ?more_head ?(title = "") m ~frag ~o
     =
+    (* FIXME Ideally we would like the read to be in write.
+       The write fun should be a fiber but this has other impacts. *)
     B00.Memo.read m frag @@ fun contents ->
     let title = if title = "" then title_of_fpath o else title in
-    let stamp =
-      let data = generator :: lang :: title :: List.rev_append styles scripts in
-      String.concat "" data
+    let more_head = match more_head with
+    | None -> ""
+    | Some more_head -> to_string ~doc_type:false more_head
     in
+    let stamp = lang :: generator :: more_head :: title :: [] in
+    let stamp = List.rev_append styles stamp in
+    let stamp = List.rev_append scripts stamp in
+    let stamp = String.concat "" stamp in
     B00.Memo.write m ~stamp ~reads:[frag] o @@ fun () ->
+    let more_head = raw more_head in
     let body = body [raw contents] in
-    let page = basic_page ~generator ~lang ~scripts ~styles ~title body in
+    let page =
+      basic_page ~lang ~generator ~styles ~scripts ~more_head ~title body
+    in
     Ok (to_string ~doc_type:true page)
 end
 
