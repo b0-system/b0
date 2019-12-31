@@ -10,6 +10,7 @@ B0_http
 B0_lines
 B0_machine
 B0_ocaml
+B0_ocaml_lib
 B0_odoc
 B0_pager
 B0_pdf_viewer

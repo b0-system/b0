@@ -72,6 +72,37 @@ module Mod_name = struct
   let pp = Fmt.tty_string [`Bold]
   module Set = String.Set
   module Map = String.Map
+
+  (* Filename mangling *)
+
+  let of_mangled_filename s =
+    let rem_ocaml_ext s = match String.cut_right ~sep:"." s with
+    | None -> s | Some (s, ("ml" | ".mli")) -> s | Some _ -> s
+    in
+    let mangle s =
+      let char_len = function
+      | '-' | '.' | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '\'' -> 1
+      | _ -> 2
+      in
+      let set_char b i c = match c with
+      | '.' | '-' -> Bytes.set b i '_'; i + 1
+      | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '\'' as c ->
+          Bytes.set b i c; i + 1
+      | c ->
+          let c = Char.code c in
+          Bytes.set b (i    ) (Char.Ascii.upper_hex_digit (c lsr 4));
+          Bytes.set b (i + 1) (Char.Ascii.upper_hex_digit (c      ));
+          i + 2
+      in
+      String.byte_replacer char_len set_char s
+    in
+    let s = mangle (rem_ocaml_ext s) in
+    let s = match String.head s with
+    | Some c when Char.Ascii.is_letter c -> s
+    | None | Some _ -> "M" ^ s
+    in
+    String.Ascii.capitalize s
+
 end
 
 module Mod_ref = struct

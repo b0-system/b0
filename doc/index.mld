@@ -2,21 +2,56 @@
 
 {b WARNING.} This package is unstable, do not depend on it.
 
-{{!page-manual}Old manual fragments} and
-{{!page-b00_manual}b00 discussion}.
+B0 describes and execute software construction workflows using modular
+definitions written in OCaml.
+
+This package also provides the B00 build library which provides
+support for arbitrary build abstraction and reliable, efficient
+incremental rebuilds.
+
+{1:manuals Manuals}
+
+{ul
+{- The {{!page-manual}B0 manual} is a conceptual overview of the
+   B0 system and B0 files. It is recommended reading.}
+{- The {{!page-b00_manual}B00 manual} describes the B00 build library.}
+{- The {{!page-b0_driver_dev}B0 driver development manual} describes
+   how to make your own drivers to operate on B0 files.}
+{- {{!page-old_manual}Old manual fragments} which will eventually
+   disapear.}}
 
 {1:b0_std B0 std}
 
-A few modules that should be in the stdlib. A few others that
-shouldn't but are useful for B0 based programs.
+A few modules or additions that should be in the stdlib. A few others
+that shouldn't but are useful for B0 and B00 based programs.
 
 {!modules: B0_std}
 
 {1:b00 B00}
 
-The core [b0] build library.
+The core build library.
 
 {!modules: B000 B000_conv B00}
+
+{1:b0_defs Definitions}
+
+{!modules: B0_def B0_meta B0_build B0_unit B0_pack}
+
+{1:b0_file B0 file API}
+
+The versioned API to use in [B0.ml] files. Use this to describe your
+software.
+
+{!modules: B0_file}
+
+{2:driver Driver API}
+
+The driver API provides programmatic access to the definitions of B0
+files. Only needed if you want to process B0 files your own own way.
+
+{!modules:
+  B0_file_src
+  B0_driver}
 
 {1:b0_care B0 care}
 
@@ -48,9 +83,10 @@ B0_trace}
 B0_cmark
 B0_machine
 B0_ocaml
+B0_ocaml_lib
 B0_odoc}
 
-{2:dev Dev tool interaction}
+{2:dev Dev tools}
 
 {!modules:
 B0_github

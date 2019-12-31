@@ -1,8 +1,12 @@
 PKG unix cmdliner
+S src-b0
 S src-b00
+S src-care
+S src-defs
+S src-driver
+S src-file
 S src-std
 S src-ui
-S src-care
 S examples/*
 B _b0/**
 B _build/**

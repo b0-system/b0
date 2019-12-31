@@ -6,9 +6,7 @@
 (** Standard library needs.
 
     Open this module to use it, this only introduces and redefine
-    a few standard modules.
-
-    {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
+    a few standard modules. *)
 
 (** {1:std Std} *)
 
@@ -272,6 +270,9 @@ module Fmt : sig
   (** [sys_signal] formats an OCaml {{!Sys.sigabrt}signal number} as
       a C POSIX {{:http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/signal.h.html}constant}
       or ["SIG(%d)"] if the signal number is unknown. *)
+
+  val backtrace : Printexc.raw_backtrace t
+  (** [backtrace] formats a backtrace. *)
 
   val exn : exn t
   (** [exn] formats an exception. *)

@@ -557,7 +557,7 @@ module Memo = struct
       ?(opts = ["j"; "jobs"]) ?docs
       ?(doc = "Maximal number of commands to spawn concurrently.")
       ?(doc_none = "Number of CPUs available")
-      ?(env = Cmdliner.Arg.env_var log_file_env) ()
+      ?(env = Cmdliner.Arg.env_var jobs_env) ()
     =
     Arg.(value & opt (some ~none:doc_none int) None &
          info opts ~env ~doc ?docs ~docv:"COUNT")
@@ -608,6 +608,7 @@ module Memo = struct
         hash_dur : Time.span;
         total_dur : Time.span;
         cpu_dur : Time.cpu_span;
+        jobs : int;
         ops : B000.Op.t list; }
 
     let of_memo m =
@@ -617,14 +618,16 @@ module Memo = struct
       let hash_dur = B000.Reviver.file_hash_dur r in
       let total_dur = Time.count (B00.Memo.clock m) in
       let cpu_dur = Time.cpu_count (B00.Memo.cpu_clock m) in
+      let jobs = B000.Exec.jobs (B00.Memo.exec m) in
       let ops = B00.Memo.ops m in
-      { hash_fun = H.id; hash_dur; file_hashes; total_dur; cpu_dur; ops }
+      { hash_fun = H.id; hash_dur; file_hashes; total_dur; cpu_dur; jobs; ops }
 
     let hash_fun l = l.hash_fun
     let file_hashes l = l.file_hashes
     let hash_dur l = l.hash_dur
     let total_dur l = l.total_dur
     let cpu_dur l = l.cpu_dur
+    let jobs l = l.jobs
     let ops l = l.ops
 
     (* IO *)
@@ -654,6 +657,7 @@ module Memo = struct
       Bincode.enc_time_span b l.hash_dur;
       Bincode.enc_time_span b l.total_dur;
       Bincode.enc_time_cpu_span b l.cpu_dur;
+      Bincode.enc_int b l.jobs;
       Bincode.enc_list (Bincode.enc B000_conv.Op.bincode) b l.ops
 
     let dec s i =
@@ -664,8 +668,9 @@ module Memo = struct
       let i, hash_dur = Bincode.dec_time_span s i in
       let i, total_dur = Bincode.dec_time_span s i in
       let i, cpu_dur = Bincode.dec_time_cpu_span s i in
+      let i, jobs = Bincode.dec_int s i in
       let i, ops = Bincode.dec_list (Bincode.dec (B000_conv.Op.bincode)) s i in
-      i, { hash_fun; file_hashes; hash_dur; total_dur; cpu_dur; ops }
+      i, { hash_fun; file_hashes; hash_dur; total_dur; cpu_dur; jobs; ops; }
 
     let bincode = Bincode.v enc dec
 
@@ -758,6 +763,7 @@ module Memo = struct
          Fmt.field "reads" (fun _ -> (rt, rd)) pp_op_no_cache;
          Fmt.field "all" (fun _ -> (ot, od)) pp_totals;
          pp_sec "global timings";
+         Fmt.field "jobs" jobs Fmt.int;
          Fmt.field "hashes" Fmt.id pp_hashes;
          Fmt.field "utime" Fmt.id pp_utime;
          Fmt.field "stime" Fmt.id pp_stime;

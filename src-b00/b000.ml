@@ -359,7 +359,6 @@ module File_cache = struct
   let find c k = try Ok (key_dir_files (key_dir c k)) with
   | Failure e -> Error (err_key "find" k e)
 
-
   let _revive c k fs =
     let rec revive_file ~did_path cfile ~dst =
       let dst_str = Fpath.to_string dst in

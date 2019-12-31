@@ -389,6 +389,10 @@ module Memo : sig
     (** [cpu_dur l] is the CPU time spanning from {!B00.Memo.create} to
         {!of_memo}. *)
 
+    val jobs : t -> int
+    (** [jobs l] is the maximal number of concurent spawns given to
+        the build operation executor. *)
+
     val ops : t -> B000.Op.t list
     (** [ops l] are the operations of the log. *)
 
@@ -409,7 +413,8 @@ module Memo : sig
     (** [pp_stats sel] formats statistics stored in the log using
         [query] to select operations that are part of the statistics.
         If [hashed_size] the sum of the size of the files in {!file_hashes}
-        is computed. *)
+        is computed (this accesses the file system in a non-fatal way
+        in case of errors). *)
 
     type out_format =
     [ `Hashed_files | `Op_hashes | `Ops | `Path | `Stats | `Root_hashed_files

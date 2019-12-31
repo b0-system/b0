@@ -1,11 +1,12 @@
 # Why b0 ?
 
+**Note** This was Written in 2017 and is history by now, but it has
+aged well and reflects B0's vision well.
+
 A few high-level motivating arguments. To see how b0 supports these
-points see the [manual][manual]. For a short summary of b0's features,
-see the [propaganda][propaganda].
+points see the [manual][manual].
 
 [manual]: http://erratique.ch/software/b0/doc
-[propaganda]: README.md#propaganda
 
 ## Goals
 
