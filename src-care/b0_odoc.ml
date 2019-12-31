@@ -183,7 +183,8 @@ module Theme = struct
   (* Theme names *)
 
   type name = string
-  let default = "odoc.default"
+  let odoc_default = "odoc.default"
+  let odig_default = "odig.default"
 
   (* User preference *)
 
@@ -192,7 +193,11 @@ module Theme = struct
     try
       let config = Os.Dir.config () |> Result.to_failure in
       let config_file = Fpath.(config // config_file) in
-      Os.File.write ~force:true ~make_path:true config_file name
+      match name with
+      | None ->
+          Result.bind (Os.File.delete config_file) @@ fun _ -> Ok ()
+      | Some name ->
+          Os.File.write ~force:true ~make_path:true config_file name
     with Failure e -> Error e
 
   let get_user_preference () =
@@ -200,8 +205,10 @@ module Theme = struct
       let config = Os.Dir.config () |> Result.to_failure in
       let file = Fpath.(config // config_file) in
       match Os.File.exists file |> Result.to_failure with
-      | false -> Ok default
-      | true -> Ok (String.trim (Os.File.read file |> Result.to_failure))
+      | false -> Ok None
+      | true ->
+          let name = String.trim (Os.File.read file |> Result.to_failure) in
+          Ok (Some name)
     with Failure e -> Error e
 
   (* Theme *)
@@ -233,13 +240,19 @@ module Theme = struct
       List.sort compare (Result.to_failure ts)
     with Failure e -> Log.err (fun m -> m "theme list: %s" e); []
 
-  let find n ts = match List.find (fun t -> name t = n) ts with
+  let find ~fallback n ts = match List.find (fun t -> name t = n) ts with
   | t -> Ok t
   | exception Not_found ->
-      let pp_theme = Fmt.(code string) in
+      let pp_name = Fmt.(code string) in
       let ss = String.suggest (List.rev_map name ts) n in
-      Fmt.error "Unknown theme %a using %a instead.@ %a"
-        pp_theme n pp_theme default (Fmt.did_you_mean pp_theme) ss
+      let pp_fallback ppf = function
+      | None -> ()
+      | Some f -> Fmt.pf ppf "@ using %a instead" pp_name f
+      in
+      Fmt.error "@[Unknown theme %a%a.@ %a@]"
+        pp_name n pp_fallback fallback (Fmt.did_you_mean pp_name) ss
+
+  (* Writing *)
 
   let write m theme ~to_dir =
     (* XXX this is basically a copy dir we likely want to provide

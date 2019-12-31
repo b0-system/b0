@@ -162,8 +162,8 @@ module El : sig
       Except for {!At.class'} the list [at] must not define an
       attribute more than once; this is not checked by the module.
       The {!At.class'} is treated specially: multiple specifications
-      are gathered to form a single, space seperated, attribute value
-      the the class attribute. *)
+      are gathered to form a single, space separated, attribute value
+      for the [class] HTML attribute. *)
 
   val txt : string -> frag
   (** [txt d] is character data [d]. *)
