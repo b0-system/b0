@@ -2351,12 +2351,13 @@ module Os : sig
 
     val fold :
       ?rel:bool -> ?dotfiles:bool -> ?follow_symlinks:bool ->
-      ?prune:(Unix.stats -> string -> Fpath.t -> bool) -> recurse:bool ->
+      ?prune:(Unix.stats -> string -> Fpath.t -> 'a -> bool) -> recurse:bool ->
       (Unix.stats -> string -> Fpath.t -> 'a -> 'a) -> Fpath.t -> 'a ->
       ('a, string) result
     (** [fold ~rel ~dotfiles ~follow_symlinks ~prune ~recurse f dir
         acc] folds [f] over the contents of [dir] starting with
         [acc]. If [dir] does not exist the function errors.
+        Paths given to [prune] and [f] do not have a trailing [/].
         {ul
         {- [f st name p acc] is called with each path [p] folded over
            with [st] its stat information, [name] its filename and [acc]
@@ -2367,7 +2368,7 @@ module Os : sig
         {- [prune] is called only when [recurse] is [true] as [prune st d]
            with [d] any sub-directory to be folded over and [st] its stat
            information. If the result is [true] [d] and its contents
-           are not folded over. Defaults to [fun _ _ _ -> false]}
+           are not folded over. Defaults to [fun _ _ _ _ -> false]}
         {- [follow_symlinks] if [true] (default), symbolic links
            are followed. If [false] symbolic links are not followed
            and the stat information given to [prune] and [f] is
@@ -2387,7 +2388,7 @@ module Os : sig
 
     val fold_files :
       ?rel:bool -> ?dotfiles:bool -> ?follow_symlinks:bool ->
-      ?prune:(Unix.stats -> string -> Fpath.t -> bool) -> recurse:bool ->
+      ?prune:(Unix.stats -> string -> Fpath.t -> 'a -> bool) -> recurse:bool ->
       (Unix.stats -> string -> Fpath.t -> 'a -> 'a) -> Fpath.t -> 'a ->
       ('a, string) result
     (** [fold_files] is like {!fold} but [f] is only applied to
@@ -2395,7 +2396,7 @@ module Os : sig
 
     val fold_dirs :
       ?rel:bool -> ?dotfiles:bool -> ?follow_symlinks:bool ->
-      ?prune:(Unix.stats -> string -> Fpath.t -> bool) -> recurse:bool ->
+      ?prune:(Unix.stats -> string -> Fpath.t -> 'a -> bool) -> recurse:bool ->
       (Unix.stats -> string -> Fpath.t -> 'a -> 'a) -> Fpath.t -> 'a ->
       ('a, string) result
     (** [fold_dirs] is like {!fold} but [f] is only applied
@@ -2404,7 +2405,7 @@ module Os : sig
     val path_list :
       Unix.stats -> string -> Fpath.t -> Fpath.t list -> Fpath.t list
     (** [path_list] is a {{!fold}folding} function to get a (reverse w.r.t.
-        list of paths. Paths which are directories satisfy
+        list of paths). Paths which are directories satisfy
         {!Fpath.is_dir_path}. *)
 
     (** {1:copy Copying} *)

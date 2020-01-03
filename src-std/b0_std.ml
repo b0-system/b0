@@ -3131,7 +3131,7 @@ module Os = struct
                   | None -> Fpath.v n | Some rdir -> Fpath.(rdir / n)
                   in
                   let p = if not rel then full else rp in
-                  if prune st n p
+                  if prune st n p acc
                   then loop stat todo adir rdir f acc ns else
                   let acc = if filter = `Non_dir then acc else f st n p acc in
                   let todo = (adir, rdir, ns) :: todo in
@@ -3155,7 +3155,7 @@ module Os = struct
 
     let _fold
         ~(filter : [`Any | `Non_dir | `Dir]) ?(rel = false) ?(dotfiles = false)
-        ?(follow_symlinks = true) ?(prune = fun _ _ _ -> false) ~recurse
+        ?(follow_symlinks = true) ?(prune = fun _ _ _ _ -> false) ~recurse
         f dir acc
       =
       let listing_op = "Listing" in
@@ -3194,8 +3194,8 @@ module Os = struct
       =
       let err e = Fmt.str "copy %a to %a: %s" Fpath.pp src Fpath.pp dst e in
       let prune = match rel with (* we invoke [_fold] with [rel:true] *)
-      | true -> prune
-      | false -> fun st name p -> prune st name (Fpath.(src // p))
+      | true -> fun st name p _ -> prune st name p
+      | false -> fun st name p _ -> prune st name (Fpath.(src // p))
       in
       let copy dst st name p (chmods as acc) = match st.Unix.st_kind with
       | Unix.S_DIR (* prune was already called on it *) ->
@@ -3221,19 +3221,19 @@ module Os = struct
               ~atomic:true ~mode ~force:false ~make_path:false dst @@
             fun fdo -> Ok (Fd.copy fdi fdo)
           in
-          if prune st name p then acc else
+          if prune st name p () then acc else
           let mode = st.Unix.st_perm in
           let src = Fpath.(src // p) in
           let dst = Fpath.(dst // p) in
           (cp ~mode src dst |> Result.to_failure); acc
       | Unix.S_LNK ->
-          if prune st name p then acc else
+          if prune st name p () then acc else
           let dst = Fpath.(dst // p) in
           let src = Fpath.(src // p) in
           let force = false and make_path = false in
           Fs_base.copy_symlink ~force ~make_path ~src dst |> Result.to_failure;
           acc
-      | _ when prune st name p (* why not *) -> acc
+      | _ when prune st name p () (* why not *) -> acc
       | _ ->
           Fmt.failwith "%a: Not a regular file, directory or symlink"
             Fpath.pp Fpath.(src // p)

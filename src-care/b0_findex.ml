@@ -63,6 +63,10 @@ let of_dirs ?dotfiles ?follow_symlinks ?prune root_dirs =
       Fpath.Set.empty Fpath.Map.empty String.Map.empty files
   in
   let dir_paths acc dir =
+    let prune = match prune with
+    | None -> None
+    | Some prune -> Some (fun st n f _ -> prune st n f)
+    in
     Result.to_failure @@ Os.Dir.fold
       ?dotfiles ?follow_symlinks ?prune ~recurse:true Os.Dir.path_list dir acc
   in
