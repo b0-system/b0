@@ -99,7 +99,8 @@ module Memo = struct
       fiber_ready : (unit -> unit) Rqueue.t;
       mutable has_failures : bool;
       mutable op_id : int;
-      mutable ops : Op.t list; }
+      mutable ops : Op.t list;
+      mutable ready_roots : Fpath.Set.t; }
 
   let create ?clock ?cpu_clock:cc ~feedback ~cwd env guard reviver exec =
     let clock = match clock with None -> Time.counter () | Some c -> c in
@@ -108,7 +109,7 @@ module Memo = struct
     let c = { group = "" } in
     let m =
       { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec; fiber_ready;
-        has_failures = false; op_id; ops; }
+        has_failures = false; op_id; ops; ready_roots = Fpath.Set.empty }
     in
     { c; m }
 
@@ -277,7 +278,8 @@ module Memo = struct
 
   let add_op_and_stir m o = add_op m o; stir ~block:false m
 
-  let status m = B000.Op.find_aggregate_error (ops m)
+  let status m =
+    B000.Op.find_aggregate_error ~ready_roots:m.m.ready_roots (ops m)
 
   (* Futures *)
 
@@ -336,8 +338,14 @@ module Memo = struct
   let file_ready m p =
     (* XXX Maybe we should really test for file existence here and notify
        a failure if it doesn't exist. But also maybe we should
-       introduce a stat cache and propagate it everywhere in B000 *)
-    Guard.set_file_ready m.m.guard p
+       introduce a stat cache and propagate it everywhere in B000.
+
+       XXX maybe it would be better to have this as a build op but then
+       we might not be that interested in repeated file_ready, e.g.
+       done by multiple resolvers. Fundamentally ready_roots had
+       to be added for correct "never became ready" error reports. *)
+    Guard.set_file_ready m.m.guard p;
+    m.m.ready_roots <- Fpath.Set.add p m.m.ready_roots
 
   let read m file k =
     let id = new_op_id m and created = timestamp m in
@@ -425,7 +433,6 @@ module Memo = struct
   let tool_opt m t = match Env.tool m.m.env (Tool.name t) with
   | Error e (* FIXME distinguish no lookup from errors *) -> None
   | Ok _ -> Some (tool m t)
-
 
   let _spawn
       m ?(stamp = "") ?(reads = []) ?(writes = []) ?writes_manifest_root ?env

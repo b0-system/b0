@@ -676,9 +676,9 @@ module Op : sig
   (** [cannot_read o] compares {!reads} with the current state
       of the file system and reports those files that cannot be read. *)
 
-  val unwritten_reads : t list -> Fpath.Set.t
-  (** [unwritten_reads os] are the file read by [os] that are not written
-      by those. *)
+  val unready_reads : ready_roots:Fpath.Set.t -> t list -> Fpath.Set.t
+  (** [unready_reads os] are the file read by [os] that are not written
+      by those and not in [ready_roots]. *)
 
   val read_write_maps : t list -> Set.t Fpath.Map.t * Set.t Fpath.Map.t
   (** [read_write_maps ops] is [reads, writes] with [reads] mapping
@@ -710,7 +710,7 @@ module Op : sig
          cycle. See also {!find_read_write_cycle}.}
       {- [Never_became_ready fs], with [fs] files that are in
          the reads of {!Waiting} operations but are written
-         by no operation from the list.}}
+         by no operation from the list and were not made ready.}}
       Note that formally more than one of these conditions can be true
       at the same time. But [Never_became_ready] is only reported once
       the first two kind of errors have been ruled out. The reason is
@@ -718,10 +718,11 @@ module Op : sig
       continuations of the failed or cyclic operations and reporting
       them would not lead the user to focus on the right cause. *)
 
-  val find_aggregate_error : t list -> (unit, aggregate_error) result
-  (** [find_aggregate_error os] finds an aggregate error among the list of
-      operation [os]. This is [Ok ()] if all operations [os]
-      {!Executed}. *)
+  val find_aggregate_error :
+    ready_roots:Fpath.Set.t -> t list -> (unit, aggregate_error) result
+  (** [find_aggregate_error ~ready_roots os] finds an aggregate error among
+      the list of operation [os], assuming files [ready_roots] were made
+      ready. This is [Ok ()] if all operations [os] {!Executed}. *)
 end
 
 (** Build operation revivers.

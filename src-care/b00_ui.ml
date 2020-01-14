@@ -595,6 +595,11 @@ module Memo = struct
 
   module Log = struct
 
+    (* XXX at the moment we are not serializing Memo.t.ready_roots.
+       This means we can't use the log with [B000.Op.find_aggregate_error]
+       we might want to change this but it seems log writing is already
+       not so fast. *)
+
     (* Logs *)
 
     type t =

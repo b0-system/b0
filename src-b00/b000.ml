@@ -772,10 +772,10 @@ module Op = struct
     let add acc f = if access f [Unix.F_OK] then acc else f :: acc in
     List.sort Fpath.compare @@ List.fold_left add [] o.writes
 
-  let unwritten_reads os =
+  let unready_reads ~ready_roots os =
     let add_path acc p = Fpath.Set.add p acc in
     let rec loop ws rs = function
-    | [] -> Fpath.Set.diff rs ws
+    | [] -> Fpath.Set.diff (Fpath.Set.diff rs ws) ready_roots
     | o :: os ->
         let ws = List.fold_left add_path ws (writes o) in
         let rs = List.fold_left add_path rs (reads o) in
@@ -846,13 +846,13 @@ module Op = struct
   | Cycle of t list
   | Never_became_ready of Fpath.Set.t
 
-  let find_aggregate_error os =
+  let find_aggregate_error ~ready_roots os =
     let rec loop ws = function
     | [] ->
         if ws = [] then Ok () else
         begin match find_read_write_cycle ws with
         | Some os -> Error (Cycle os)
-        | None -> Error (Never_became_ready (unwritten_reads ws))
+        | None -> Error (Never_became_ready (unready_reads ~ready_roots ws))
         end
     | o :: os ->
         match status o with
