@@ -38,8 +38,8 @@ module Op = struct
   let style_status_exec_revived = []
   let style_status_exec = [`Fg (`Hi `Green)]
   let style_status_failed = [`Fg (`Hi `Red)]
-  let style_status_aborted = []
-  let style_status_waiting = []
+  let style_status_aborted = [`Fg `Cyan]
+  let style_status_waiting = [`Fg `Cyan]
   let style_kind_name = [`Bold]
   let style_err = [`Fg `Red]
   let style_op_howto = [`Faint]
@@ -137,10 +137,15 @@ module Op = struct
       let h = Op.hash o in if Hash.is_nil h then () else
       (Fmt.sp ppf (); pp_revived ppf o; Fmt.char ppf ':'; pp_hash ppf h)
     in
-    Fmt.pf ppf "[%a%a:%a %a %s%a]"
-      pp_status o pp_id o pp_kind_name o
-      Time.Span.pp (Op.duration o) (Op.group o)
-      pp_op_hash o
+    let pp_group ppf o = match Op.group o with
+    | "" -> () | g -> Fmt.sp ppf (); Fmt.string ppf g
+    in
+    let pp_dur ppf o = match Op.status o with
+    | Op.Failed _ | Op.Done -> Fmt.sp ppf (); Time.Span.pp ppf (Op.duration o)
+    | _ -> ()
+    in
+    Fmt.pf ppf "[%a%a:%a%a%a%a]"
+      pp_status o pp_id o pp_kind_name o pp_dur o pp_group o pp_op_hash o
 
   let pp_op_extra ppf o =
     let pp_spawn_stdo_ui ppf s = match (Op.Spawn.stdo_ui s) with
@@ -242,6 +247,15 @@ module Op = struct
       pp_subfield "created" Op.time_created pp_span;
       pp_subfield "started" Op.time_started pp_span;
       pp_subfield "waited" wait pp_span; ]
+
+  let pp_timing_created =
+    Fmt.field "timings" Fmt.id @@
+    Fmt.box @@ pp_subfield "created" Op.time_created Time.Span.pp
+
+  let pp_timings ppf o =
+    match Time.Span.equal (Op.time_started o) Time.Span.max with
+    | true -> pp_timing_created ppf o
+    | false -> pp_timings ppf o
 
   let maybe_failure_and pp ppf o = match Op.status o with
   | Failed f ->
