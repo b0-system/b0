@@ -672,7 +672,7 @@ module Memo = struct
     let write file l =
       let data =
         Log.time (fun _ msg -> msg "generating log") @@ fun () ->
-        let buf = Buffer.create (1024 * 1024 * 1024) in
+        let buf = Buffer.create (1024 * 1024) in
         Bincode.to_string ~buf bincode l
       in
       Log.time (fun _ msg -> msg "writing log") @@ fun () ->
