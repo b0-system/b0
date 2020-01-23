@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B0_std
+open B00_std
 
 let urify u = (* Detects if u is simply a file path and urifies it *)
   let file_uri p = Fmt.str "file://%s" (Fpath.to_string p) in
@@ -16,12 +16,12 @@ let urify u = (* Detects if u is simply a file path and urifies it *)
       Result.bind (Os.Dir.cwd ()) @@ fun cwd -> Ok (file_uri Fpath.(cwd // p))
 
 let show_uris tty_cap log_level background prefix browser uris =
-  let tty_cap = B0_std_ui.get_tty_cap tty_cap in
-  let log_level = B0_std_ui.get_log_level log_level in
-  B0_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
+  let tty_cap = B00_std_ui.get_tty_cap tty_cap in
+  let log_level = B00_std_ui.get_log_level log_level in
+  B00_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
   Log.if_error ~use:1 @@
-  Result.bind (B0_www_browser.find ~browser ()) @@ fun browser ->
-  let open_uri u = B0_www_browser.show ~background ~prefix browser (urify u) in
+  Result.bind (B00_www_browser.find ~browser ()) @@ fun browser ->
+  let open_uri u = B00_www_browser.show ~background ~prefix browser (urify u) in
   let rec loop = function
   | [] -> Ok 0
   | u :: us -> match open_uri u with Ok () -> loop us | Error _ as e -> e
@@ -53,11 +53,11 @@ let show_uri =
     Arg.(non_empty & pos_all string [] & info [] ~doc ~docv:"URI")
   in
   Term.(const show_uris $
-        B0_std_ui.tty_cap ~docs:sdocs () $
-        B0_std_ui.log_level ~docs:sdocs () $
-        B0_www_browser.background ~opts:["g"; "background"] () $
-        B0_www_browser.prefix ~opts:["p"; "prefix"] () $
-        B0_www_browser.browser ~opts:["b"; "browser"] () $ uris),
+        B00_std_ui.tty_cap ~docs:sdocs () $
+        B00_std_ui.log_level ~docs:sdocs () $
+        B00_www_browser.background ~opts:["g"; "background"] () $
+        B00_www_browser.prefix ~opts:["p"; "prefix"] () $
+        B00_www_browser.browser ~opts:["b"; "browser"] () $ uris),
   Term.info "show-uri" ~version ~doc ~sdocs ~exits ~man
 
 let main () = Term.(exit_status @@ eval show_uri)

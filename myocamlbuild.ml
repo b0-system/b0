@@ -16,27 +16,27 @@ let () =
   | After_rules ->
 
       dep ["compile";"c"]
-          ["src-std/b0_stubs.h";
-           "src-std/vendor/xxhash.h";
-           "src-std/vendor/MurmurHash3.h"];
+          ["src-b00-std/b00_stubs.h";
+           "src-b00-std/vendor/xxhash.h";
+           "src-b00-std/vendor/MurmurHash3.h"];
 
-      dep ["record_b0_stubs"] [lib "src-std/libb0_stubs"];
+      dep ["record_b00_stubs"] [lib "src-b00-std/libb00_stubs"];
 
       flag_and_dep
-        ["link"; "ocaml"; "link_b0_stubs"]
-        (P (lib "src-std/libb0_stubs"));
+        ["link"; "ocaml"; "link_b00_stubs"]
+        (P (lib "src-b00-std/libb00_stubs"));
 
-      flag ["library"; "ocaml"; "byte"; "record_b0_stubs"]
-        (S ([A "-dllib"; A "-lb0_stubs"] @ system_support_lib));
+      flag ["library"; "ocaml"; "byte"; "record_b00_stubs"]
+        (S ([A "-dllib"; A "-lb00_stubs"] @ system_support_lib));
 
       flag ["library"; "ocaml"; (* byte and native *)
-            "record_b0_stubs"]
-        (S ([A "-cclib"; A "-lb0_stubs"] @ system_support_lib));
+            "record_b00_stubs"]
+        (S ([A "-cclib"; A "-lb00_stubs"] @ system_support_lib));
 
-      ocaml_lib ~tag_name:"use_b0_stubs"
-        ~dir:"src-std" "src-std/b0_std";
+      ocaml_lib ~tag_name:"use_b00_stubs"
+        ~dir:"src-b00-std" "src-b00-std/b00_std";
 
-      flag ["link"; "ocaml"; "use_b0_stubs"]
-        (S [A "-ccopt"; A "-Lsrc-std"]);
+      flag ["link"; "ocaml"; "use_b00_stubs"]
+        (S [A "-ccopt"; A "-Lsrc-b00-std"]);
   | _ -> ()
   end

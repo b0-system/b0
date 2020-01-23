@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B0_std
+open B00_std
 
 module Exit = struct
   type t = Code of int | Exec of Fpath.t * Cmd.t
@@ -46,7 +46,7 @@ module Conf = struct
       b0_file : Fpath.t option;
       cache_dir : Fpath.t;
       cwd : Fpath.t;
-      code : B0_ocaml.Cobj.code option;
+      code : B00_ocaml.Cobj.code option;
       hash_fun : (module Hash.T);
       jobs : int;
       log_level : Log.level;
@@ -113,9 +113,9 @@ module Conf = struct
       ~b0_dir ~b0_file ~cache_dir ~code ~hash_fun ~jobs
       ~log_level ~no_pager ~tty_cap ()
     =
-    let tty_cap = B0_std_ui.get_tty_cap tty_cap in
-    let log_level = B0_std_ui.get_log_level log_level in
-    B0_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
+    let tty_cap = B00_std_ui.get_tty_cap tty_cap in
+    let log_level = B00_std_ui.get_log_level log_level in
+    B00_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
     Result.bind (Os.Dir.cwd ()) @@ fun cwd ->
     let b0_file = find_b0_file ~cwd ~b0_file in
     let root = match b0_file with Some f -> Fpath.parent f | None -> cwd  in
@@ -136,14 +136,14 @@ module Cli = struct
     let env = Arg.env_var Env.b0_file in
     let doc = "Use $(docv) as the B0 file." and docv = "PATH" in
     let none = "B0.ml file in cwd or first upwards" in
-    Arg.(value & opt (Arg.some ~none B0_std_ui.fpath) None &
+    Arg.(value & opt (Arg.some ~none B00_std_ui.fpath) None &
          info ["b0-file"] ~doc ~docv ~docs ~env)
 
   let cache_dir = B00_ui.Memo.cache_dir ~docs ()
   let code =
     let env = Arg.env_var Env.code in
-    let code_enum = [ "byte", Some B0_ocaml.Cobj.Byte;
-                      "native", Some B0_ocaml.Cobj.Native;
+    let code_enum = [ "byte", Some B00_ocaml.Cobj.Byte;
+                      "native", Some B00_ocaml.Cobj.Native;
                       "auto", None ]
     in
     let code = Arg.enum code_enum in
@@ -156,9 +156,9 @@ module Cli = struct
 
   let hash_fun = B00_ui.Memo.hash_fun ~docs ()
   let jobs = B00_ui.Memo.jobs ~docs ()
-  let log_level = B0_std_ui.log_level ~docs ~env:(Arg.env_var Env.verbosity) ()
-  let tty_cap = B0_std_ui.tty_cap ~docs ~env:(Arg.env_var Env.color) ()
-  let no_pager = B0_pager.don't ~docs ()
+  let log_level = B00_std_ui.log_level ~docs ~env:(Arg.env_var Env.verbosity) ()
+  let tty_cap = B00_std_ui.tty_cap ~docs ~env:(Arg.env_var Env.color) ()
+  let no_pager = B00_pager.don't ~docs ()
   let conf =
     let conf
         b0_dir b0_file cache_dir code hash_fun jobs log_level no_pager tty_cap
@@ -179,7 +179,7 @@ type main = unit -> Exit.t Cmdliner.Term.result
 type t =
   { name : string;
     version : string;
-    libs : B0_ocaml_lib.Name.t list }
+    libs : B00_ocaml_lib.Name.t list }
 
 let create ~name ~version ~libs = { name; version; libs }
 let name d = d.name
@@ -230,50 +230,50 @@ module Compile = struct
     Fpath.(Conf.b0_dir c / Conf.drivers_dir_name / name driver / "exe")
 
   let write_src m c src ~src_file  =
-    let esrc = B00.Memo.fail_if_error m (B0_file_src.expand src) in
-    let reads = B0_file_src.expanded_file_manifest esrc in
+    let esrc = B00.Memo.fail_if_error m (B0_file.expand src) in
+    let reads = B0_file.expanded_file_manifest esrc in
     List.iter (B00.Memo.file_ready m) reads;
     B00.Memo.write m ~reads src_file @@ fun () ->
-    Ok (B0_file_src.expanded_src esrc)
+    Ok (B0_file.expanded_src esrc)
 
   let find_compiler c m =
     (* XXX something like this should be moved to B0 care. *)
     let comp t code m = B00.Memo.tool m t, code in
-    let byte m = comp B0_ocaml.Tool.ocamlc B0_ocaml.Cobj.Byte m in
-    let native m = comp B0_ocaml.Tool.ocamlopt B0_ocaml.Cobj.Native m in
+    let byte m = comp B00_ocaml.Tool.ocamlc B00_ocaml.Cobj.Byte m in
+    let native m = comp B00_ocaml.Tool.ocamlopt B00_ocaml.Cobj.Native m in
     match Conf.code c with
-    | Some B0_ocaml.Cobj.Byte -> byte m
-    | Some B0_ocaml.Cobj.Native -> native m
+    | Some B00_ocaml.Cobj.Byte -> byte m
+    | Some B00_ocaml.Cobj.Native -> native m
     | None ->
-        match B00.Memo.tool_opt m B0_ocaml.Tool.ocamlopt with
+        match B00.Memo.tool_opt m B00_ocaml.Tool.ocamlopt with
         | None -> byte m
-        | Some comp -> comp, B0_ocaml.Cobj.Native
+        | Some comp -> comp, B00_ocaml.Cobj.Native
 
   let base_libs =
-    [ B0_ocaml_lib.Name.v "cmdliner/cmdliner";
-      B0_ocaml_lib.Name.v "ocaml/unix"; (* FIXME system switches *)
-      B0_ocaml_lib.Name.v "b0.std/b0_std";
-      B0_ocaml_lib.Name.v "b0.b00/b00";
-      B0_ocaml_lib.Name.v "b0.care/b0_care"; (* FIXME b00 care ! *)
-      B0_ocaml_lib.Name.v "b0.defs/b0_defs";
-      B0_ocaml_lib.Name.v "b0.file/b0_file";
-      B0_ocaml_lib.Name.v "b0.driver/b0_driver"; ]
+    [ B00_ocaml_lib.Name.v "cmdliner/cmdliner";
+      B00_ocaml_lib.Name.v "ocaml/unix"; (* FIXME system switches *)
+      B00_ocaml_lib.Name.v "b0.b00.std/b00_std";
+      B00_ocaml_lib.Name.v "b0.b00/b00";
+      B00_ocaml_lib.Name.v "b0.b00.kit/b00_kit";
+      B00_ocaml_lib.Name.v "b0.b0/b0";
+      B00_ocaml_lib.Name.v "b0.kit/b0_kit";
+      B00_ocaml_lib.Name.v "b0.driver/b0_driver"; ]
 
   let find_libs libs r k =
     let rec loop acc = function
     | [] -> k (List.rev acc)
     | l :: libs ->
-        B0_ocaml_lib.Resolver.find r l @@ fun lib -> loop (lib :: acc) libs
+        B00_ocaml_lib.Resolver.find r l @@ fun lib -> loop (lib :: acc) libs
     in
     loop [] libs
 
   let find_libs m ~build_dir ~driver f k =
-    B0_ocaml_lib.Ocamlpath.get m None @@ fun ocamlpath ->
+    B00_ocaml_lib.Ocamlpath.get m None @@ fun ocamlpath ->
     let memo_dir = Fpath.(build_dir / "ocaml-lib-resolve") in
-    let r = B0_ocaml_lib.Resolver.create m ~memo_dir ~ocamlpath in
+    let r = B00_ocaml_lib.Resolver.create m ~memo_dir ~ocamlpath in
     (* FIXME we are loosing locations here would be nice to
        have them to report errors. *)
-    let requires = List.map fst (B0_file_src.requires f) in
+    let requires = List.map fst (B0_file.requires f) in
     find_libs requires r @@ fun requires ->
     find_libs (libs driver) r @@ fun driver_libs ->
     find_libs base_libs r @@ fun base_libs ->
@@ -286,13 +286,13 @@ module Compile = struct
     =
     let base = Fpath.rem_ext src_file in
     let writes = match code with
-    | B0_ocaml.Cobj.Byte -> [ Fpath.(base + ".cmo"); exe ]
-    | B0_ocaml.Cobj.Native ->
+    | B00_ocaml.Cobj.Byte -> [ Fpath.(base + ".cmo"); exe ]
+    | B00_ocaml.Cobj.Native ->
         [ Fpath.(base + ".cmx"); Fpath.(base + ".o"); exe ]
     in
-    let dirs = List.map B0_ocaml_lib.dir seen_libs in
+    let dirs = List.map B00_ocaml_lib.dir seen_libs in
     let incs = Cmd.unstamp @@ Cmd.paths ~slip:"-I" dirs in
-    let archives = List.map (B0_ocaml_lib.archive ~code) all_libs in
+    let archives = List.map (B00_ocaml_lib.archive ~code) all_libs in
     let c_archives = List.map (fun p -> Fpath.(p -+ clib_ext)) archives in
     let ars = List.rev_append archives c_archives in
     (* FIXME this should be done b the resolver *)
@@ -321,7 +321,7 @@ module Compile = struct
       B00.Memo.mkdir m build_dir @@ fun () ->
       write_src m c src ~src_file;
       find_libs m ~build_dir ~driver src @@ fun (all_libs, seen_libs) ->
-      B0_ocaml.Conf.lib_ext m @@ fun clib_ext ->
+      B00_ocaml.Conf.lib_ext m @@ fun clib_ext ->
       compile_src m comp
         ~build_dir ~all_libs ~seen_libs ~clib_ext ~src_file ~exe;
     end;
@@ -337,7 +337,7 @@ module Compile = struct
         B000_conv.Op.pp_aggregate_error
           ~read_howto ~write_howto () Fmt.stderr e;
         Fmt.error "Could not compile B0 file %a"
-          Fmt.(code Fpath.pp_unquoted) (B0_file_src.file src)
+          Fmt.(code Fpath.pp_unquoted) (B0_file.file src)
 end
 
 let with_b0_file ~driver cmd =
@@ -348,7 +348,7 @@ let with_b0_file ~driver cmd =
       Result.bind (Conf.get_b0_file conf) @@ fun b0_file ->
       Log.if_error' ~use:Exit.b0_file_error @@
       Result.bind (Os.File.read b0_file) @@ fun s ->
-      Result.bind (B0_file_src.of_string ~file:b0_file s) @@ fun src ->
+      Result.bind (B0_file.of_string ~file:b0_file s) @@ fun src ->
       Result.bind (Compile.compile conf ~driver src) @@ fun exe ->
       let argv = Cmd.of_list (fun x -> x) (Array.to_list Sys.argv) in
       Ok (Exit.Exec (exe, argv))

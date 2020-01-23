@@ -3,14 +3,14 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B0_std
+open B00_std
 
 let b0_file_read file =
   Log.if_error ~header:"" ~use:1 @@
   Result.bind (Os.File.read file) @@ fun c ->
-  Result.bind (B0_file_src.of_string ~file c) @@ fun f ->
-  Fmt.pr "%a@." B0_file_src.pp_dump f;
-  Fmt.pr "%a@." B0_file_src.pp_locs f;
+  Result.bind (B0_file.of_string ~file c) @@ fun f ->
+  Fmt.pr "%a@." B0_file.pp_dump f;
+  Fmt.pr "%a@." B0_file.pp_locs f;
   Ok 0
 
 let main () =
@@ -18,7 +18,7 @@ let main () =
   let cmd =
     let path =
       let doc = "$(docv) is the b0 file to read" in
-      Arg.(required & pos 0 (some B0_std_ui.fpath) None &
+      Arg.(required & pos 0 (some B00_std_ui.fpath) None &
            info [] ~doc ~docv:"PATH")
     in
     Term.(const b0_file_read $ path),

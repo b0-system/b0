@@ -3,12 +3,12 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B0_std
+open B00_std
 
 
 let test_trip d e =
-  let e' = B0_base64.encode d in
-  let d' = B0_base64.decode e |> Result.get_ok in
+  let e' = B00_base64.encode d in
+  let d' = B00_base64.decode e |> Result.get_ok in
   assert (String.equal e e'); assert (String.equal d' d)
 
 let test_trips () =

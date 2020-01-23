@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B0_std
+open B00_std
 open B000
 
 module Env = struct
@@ -115,7 +115,7 @@ module Memo = struct
 
   let memo
       ?(hash_fun = (module Hash.Xxh_64 : Hash.T)) ?env ?cwd ?cache_dir
-      ?trash_dir ?(jobs = B0_std.Os.Cpu.logical_count ()) ?feedback ()
+      ?trash_dir ?(jobs = B00_std.Os.Cpu.logical_count ()) ?feedback ()
     =
     let feedback = match feedback with | Some f -> f | None -> fun _ -> () in
     let fb_exec = (feedback :> Exec.feedback -> unit) in

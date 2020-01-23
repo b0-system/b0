@@ -9,7 +9,7 @@
     See {{!page-manual.defining_drivers}this manual section} for an
     overview and a minimal example. *)
 
-open B0_std
+open B00_std
 
 (** {1:commonalities Commonalities} *)
 
@@ -96,9 +96,9 @@ module Conf : sig
 
   val v :
     b0_dir:Fpath.t -> b0_file:Fpath.t option -> cache_dir:Fpath.t ->
-    cwd:Fpath.t -> code:B0_ocaml.Cobj.code option -> hash_fun:(module Hash.T) ->
-    jobs:int -> log_level:Log.level -> no_pager:bool -> tty_cap:Tty.cap ->
-    unit -> t
+    cwd:Fpath.t -> code:B00_ocaml.Cobj.code option ->
+    hash_fun:(module Hash.T) -> jobs:int -> log_level:Log.level ->
+    no_pager:bool -> tty_cap:Tty.cap -> unit -> t
   (** [v] constructs a configuration with given attributes. See the
       accessors for semantics. *)
 
@@ -114,7 +114,7 @@ module Conf : sig
   val cwd : t -> Fpath.t
   (** [cwd] is the absolute path to the current working directory. *)
 
-  val code : t -> B0_ocaml.Cobj.code option
+  val code : t -> B00_ocaml.Cobj.code option
   (** [code] is the code to which the driver is compiled. *)
 
   val hash_fun : t -> (module Hash.T)
@@ -144,7 +144,7 @@ module Conf : sig
 
   val setup_with_cli :
     b0_dir:Fpath.t option -> b0_file:Fpath.t option ->
-    cache_dir:Fpath.t option -> code:B0_ocaml.Cobj.code option ->
+    cache_dir:Fpath.t option -> code:B00_ocaml.Cobj.code option ->
     hash_fun:(module Hash.T) option -> jobs:int option ->
     log_level:Log.level option -> no_pager:bool ->
     tty_cap:Tty.cap option option -> unit -> (t, string) result
@@ -170,7 +170,8 @@ type main = unit -> Exit.t Cmdliner.Term.result
 type t
 (** The type for drivers. *)
 
-val create : name:string -> version:string -> libs:B0_ocaml_lib.Name.t list -> t
+val create :
+  name:string -> version:string -> libs:B00_ocaml_lib.Name.t list -> t
 (** [create ~name ~version] is a new driver named [name] which has
     version [version] and uses library [libs] to link the B0 file. Note
     that these libraries are not added during the compilation phase.
@@ -185,7 +186,7 @@ val name : t -> string
 val version : t -> string
 (** [version d] is the version of [d]. *)
 
-val libs : t -> B0_ocaml_lib.Name.t list
+val libs : t -> B00_ocaml_lib.Name.t list
 (** [libs d] are the libraries that need to be added for linking. *)
 
 val set : driver:t -> main:main -> unit
@@ -228,7 +229,7 @@ module Compile : sig
       in configuration [c]. *)
 
   val compile :
-    Conf.t -> driver:t -> B0_file_src.t -> (Fpath.t, string) result
+    Conf.t -> driver:t -> B0_file.t -> (Fpath.t, string) result
   (** [compile c ~driver b0_file] compiles [b0_file] with driver [driver]
       in configuration [c]. If all is well the executable file path is
       returned. *)

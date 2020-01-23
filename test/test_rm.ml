@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B0_std
+open B00_std
 
 let rm_cmd recurse p  = match Os.Path.delete ~recurse p with
 | Ok _ -> 0
@@ -20,7 +20,7 @@ let main () =
     in
     let path =
       let doc = "$(docv) is file path to delete" in
-      Arg.(required & pos 0 (some B0_std_ui.fpath) None &
+      Arg.(required & pos 0 (some B00_std_ui.fpath) None &
            info [] ~doc ~docv:"PATH")
     in
     Term.(const rm_cmd $ recurse $ path),

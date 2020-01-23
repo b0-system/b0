@@ -1,31 +1,27 @@
-B0 — Software construction care
+B0 — Software construction and deployment kit
 -------------------------------------------------------------------------------
 %%VERSION%%
 
 WARNING this package is unstable and work in progress, do not depend on it. 
 
-B0 describes and executes software construction workflows using
-modular definitions written in OCaml. It provides a fully integrated
-and customizable software construction experience from development to
-deployment.
+B0 describes software construction and deployments using modular and
+customizable definitions written in OCaml.
 
 B0 describes:
 
 * The build environment.
-* The configuration, build and testing.
+* The software configuration, build and testing.
 * Source or binary artefacts deployments.
-* Custom workflow actions.
+* Development life-cycle procedures and actions.
 
-B0 is built on top of a simple and powerful build model that treats
-build tools as deterministic memoizable functions.
+B0 is built on top of the simple and powerful B00 build library that
+treats build tools as deterministic memoizable functions.
 
-This model is implemented in the B00 library which provides arbitrary
-build abstraction and reliable, efficient incremental rebuilds. The
-B00 library can be (and has been) used on its own to devise domain
-specific build systems.
+The B00 build model provides arbitrary build abstraction and reliable,
+efficient incremental rebuilds. The B00 library can be (and has been)
+used on its own to devise domain specific build systems.
 
-B0 is distributed under the ISC license. It depends on
-[cmdliner][cmdliner]
+B0 is distributed under the ISC license. It depends on [cmdliner][cmdliner].
 
 [cmdliner]: https://erratique.ch/software/cmdliner
 

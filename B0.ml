@@ -1,34 +1,40 @@
 
-open B0_std
+open B00_std
 
 (* Units *)
 
+let b00_std =
+  B0_unit.v "b00-std" ~doc:"B00 stdlib extensions" B0_unit.nop
+
 let b00 =
-  B0_unit.v "b00" ~doc:"The B00 build library" B0_unit.nop
+  B0_unit.v "b00" ~doc:"B00 build abstraction" B0_unit.nop
 
-let care =
-  B0_unit.v "care" ~doc:"B0 & B00 convenience APIs" B0_unit.nop
+let b00_kit =
+  B0_unit.v "b00-kit" ~doc:"B00 toolkit" B0_unit.nop
 
-let defs =
-  B0_unit.v "defs" ~doc:"B0 description API" B0_unit.nop
+let b0 =
+  B0_unit.v "b0" ~doc:"B0 description API" B0_unit.nop
+
+let b0_kit =
+  B0_unit.v "b0-kit" ~doc:"B0 toolkit" B0_unit.nop
 
 let driver =
   B0_unit.v "driver" ~doc:"B0 driver API" B0_unit.nop
 
-let b0 =
-  B0_unit.v "b0" ~doc:"The b0 tool" B0_unit.nop
+let driver_b0 =
+  B0_unit.v "driver-b0" ~doc:"The b0 tool" B0_unit.nop
 
 let tools =
-  B0_unit.v "tools" ~doc:"B0 & B00 convenience tools" B0_unit.nop
+  B0_unit.v "tools" ~doc:"B00 convenience tools" B0_unit.nop
 
 (* Packs *)
 
 let b00_pack =
-  let units = [std; b00] in
+  let units = [b00_std; b00; b00_kit] in
   B0_pack.v "b00" ~doc:"The B00 subsystem" ~locked:true units
 
 let default =
-  let units = [std; b00; care; defs; driver; tools] in
+  let units = [b00_std; b00; b00_kit; b0; b0_kit; driver; driver_b0; tools] in
   let meta =
     let open B0_meta in
     add authors ["The B0 programmers"] @@

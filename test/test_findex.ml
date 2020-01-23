@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B0_std
+open B00_std
 
 let () =
   try
@@ -11,7 +11,7 @@ let () =
     let dirs = List.map Fpath.of_string dirs in
     let dirs = List.map Result.to_failure dirs in
     let c = Time.counter () in
-    let _index = B0_findex.of_dirs dirs |> Result.to_failure in
+    let _index = B00_findex.of_dirs dirs |> Result.to_failure in
     Fmt.pr "@[%a@]@." Time.Span.pp (Time.count c);
     exit 0;
   with

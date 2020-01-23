@@ -2,26 +2,31 @@ true : bin_annot, safe_string, keep_locs
 true : package(unix)
 # true : package(landmarks.ppx,landmarks)
 
-<src-b0> : include
-<src-b0/**> : package(cmdliner)
-<src-b0/b0_main_run.*> : use_b0_stubs
-
-<src-file> : include
-<src-defs> : include
+# B00
+<src-b00-std> : include
+<src-b00-std/b00_std.{cma,cmxa}> : record_b00_stubs
+<src-b00-std/b00_std.cmxs> : link_b00_stubs
 <src-b00> : include
+<src-b00-kit> : include
+<src-b00-kit/**> : package(cmdliner)
+
+# B0
+<src-b0> : include
+<src-kit> : include
+<src-kit/**> : package(cmdliner)
 <src-driver> : include
 <src-driver/**> : package(cmdliner)
-<examples> : include
-<test> : include
-<tools> : include
-<src-std> : include
-<src-std/b0_std.{cma,cmxa}> : record_b0_stubs
-<src-std/b0_std.cmxs> : link_b0_stubs
-<src-care> : include
-<src-care/**> : package(cmdliner)
+<src-driver-b0> : include
+<src-driver-b0/**> : package(cmdliner)
+<src-driver-b0/b0_main_run.*> : use_b00_stubs
 
-<test/**> : use_b0_stubs, package(cmdliner)
-<examples/**> : use_b0_stubs, not_hygienic
-<tools/**> : use_b0_stubs, package(cmdliner)
+<examples> : include
+<examples/**> : use_b00_stubs, not_hygienic
+
+<test> : include
+<test/**> : use_b00_stubs, package(cmdliner)
+
+<tools> : include
+<tools/**> : use_b00_stubs, package(cmdliner)
 
 <_b0> : -traverse

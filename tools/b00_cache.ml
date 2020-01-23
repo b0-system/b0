@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B0_std
+open B00_std
 open B000
 
 (* Exit codes and errors *)
@@ -42,9 +42,9 @@ let cache_cmd
     tty_cap log_level no_pager b0_dir cache_dir
     (max_byte_size, pct) (action, log_file, args)
   =
-  let tty_cap = B0_std_ui.get_tty_cap tty_cap in
-  let log_level = B0_std_ui.get_log_level log_level in
-  B0_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
+  let tty_cap = B00_std_ui.get_tty_cap tty_cap in
+  let log_level = B00_std_ui.get_log_level log_level in
+  B00_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
   Log.if_error ~use:err_unknown @@
   Result.bind (Os.Dir.cwd ()) @@ fun cwd ->
   let root = B00_ui.Memo.find_dir_with_b0_dir ~start:cwd in
@@ -156,8 +156,8 @@ let parse_cli =
   Term.(ret (pure parse $ action $ log_file_opt $ args))
 
 let tool =
-  Term.(const cache_cmd $ B0_std_ui.tty_cap ~docs:sdocs () $
-        B0_std_ui.log_level ~docs:sdocs () $ B0_pager.don't ~docs:sdocs () $
+  Term.(const cache_cmd $ B00_std_ui.tty_cap ~docs:sdocs () $
+        B00_std_ui.log_level ~docs:sdocs () $ B00_pager.don't ~docs:sdocs () $
         B00_ui.Memo.b0_dir ~docs:sdocs () $
         B00_ui.Memo.cache_dir ~docs:sdocs () $
         B00_ui.File_cache.trim_cli () $

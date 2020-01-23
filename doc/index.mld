@@ -2,12 +2,12 @@
 
 {b WARNING.} This package is unstable, do not depend on it.
 
-B0 describes and execute software construction workflows using modular
-definitions written in OCaml.
+B0 describes software construction and deployments using modular and
+customizable definitions written in OCaml.
 
-This package also provides the B00 build library which provides
-support for arbitrary build abstraction and reliable, efficient
-incremental rebuilds.
+This package also provides the B00 build library which has support for
+arbitrary build abstraction with reliable, efficient incremental
+rebuilds.
 
 {1:manuals Manuals}
 
@@ -20,82 +20,96 @@ incremental rebuilds.
 {- {{!page-old_manual}Old manual fragments} which will eventually
    disapear.}}
 
-{1:b0_std B0 std}
+{1:b00_libs B00}
 
-A few modules or additions that should be in the stdlib. A few others
-that shouldn't but are useful for B0 and B00 based programs.
+B00 is the build model used by B0. It can be used for its own good to
+devise domain specific build system – see for example the [brzo] or
+[odig] tools.
 
-{!modules: B0_std}
+The [b0.b00.std] and [b0.b00.kit] libraries also provide sharp tools
+for quick "scripts" and command line tools even if you are not using
+B00.
 
-{1:b00 B00}
+{2:b00_std Library [b0.b00.std]}
 
-The core build library.
+The [b0.b00.std] library has a few things that should be in the stdlib
+and a few others that should not be but are useful for B0 and B00
+based programs.
+
+{!modules: B00_std}
+
+{2:b00 Library [b0.b00]}
+
+The build library.
 
 {!modules: B000 B000_conv B00}
 
-{1:b0_defs Definitions}
+{2:b00_kit Library [b0.b00.kit]}
 
-{!modules: B0_def B0_meta B0_build B0_unit B0_pack}
+Toolkit for working with B00 and B0. Quite a few things do not depend
+on {!B00} itself but are useful to have under your hand.
 
-{1:b0_file B0 file API}
-
-The versioned API to use in [B0.ml] files. Use this to describe your
-software.
-
-{!modules: B0_file}
-
-{2:driver Driver API}
-
-The driver API provides programmatic access to the definitions of B0
-files. Only needed if you want to process B0 files your own own way.
+{3:io IO}
 
 {!modules:
-  B0_file_src
-  B0_driver}
+B00_base64
+B00_fexts
+B00_findex
+B00_htmlg
+B00_http
+B00_lines
+B00_serialk_json
+B00_serialk_sexp
+B00_serialk_text}
 
-{1:b0_care B0 care}
-
-Tools for software construction care.
-
-{2:io IO}
+{3:build_dev Dev tools}
 
 {!modules:
-B0_base64
-B0_fexts
-B0_findex
-B0_htmlg
-B0_http
-B0_lines
-B0_serialk_json
-B0_serialk_sexp
-B0_serialk_text}
+B00_cmark
+B00_github
+B00_machine
+B00_ocaml
+B00_ocaml_lib
+B00_odoc
+B00_vcs
+}
 
-{2:ui B0 UI fragments}
+{3:ui UI fragments}
+
+Mostly {!Cmdliner} user interface fragments.
 
 {!modules:
 B00_ui
-B0_std_ui
-B0_trace}
+B00_std_ui
+B00_trace}
 
-{2:build_logic Build logics}
-
-{!modules:
-B0_cmark
-B0_machine
-B0_ocaml
-B0_ocaml_lib
-B0_odoc}
-
-{2:dev Dev tools}
+{3:viewers_editors Viewers and editors}
 
 {!modules:
-B0_github
-B0_vcs}
+B00_editor
+B00_pager
+B00_pdf_viewer
+B00_www_browser}
 
-{2:viewers_editors Viewers and editors}
+{1:b0 B0}
+
+B0 is the system for describing software construction and deployments
+via {{!page-manual.b0_file}B0 files}.
+
+{2:b0 Library [b0.b0]}
+
+{!modules: B0_def B0_meta B0_build B0_unit B0_pack}
+
+{2:b0_kit Library [b0.kit]}
+
+Toolkit for B0 files descriptions.
+
+{2:b0_driver Library [b0.driver]}
+
+The driver library provides programmatic access to the definitions of
+B0 files. Only needed if you want to process B0 files your own own
+way.
 
 {!modules:
-B0_editor
-B0_pager
-B0_pdf_viewer
-B0_www_browser}
+  B0_file
+  B0_driver}

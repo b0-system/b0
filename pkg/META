@@ -1,68 +1,81 @@
-description = "Software construction care"
+description = "Software construction and deployment kit"
 version = "%%VERSION_NUM%%"
 requires = ""
 
-package "std" (
-  directory = "std"
-  description = "B0's std library"
-  version = "%%VERSION_NUM%%"
-  requires = "unix"
-  archive(byte) = "b0_std.cma"
-  archive(native) = "b0_std.cmxa"
-  plugin(byte) = "b0_std.cma"
-  plugin(native) = "b0_std.cmxs"
-)
-
 package "b00" (
- directory = "b00"
- description = "B0's build kernel"
- version = "%%VERSION_NUM%%"
- requires = "b0.std"
- archive(byte) = "b00.cma"
- archive(native) = "b00.cmxa"
- plugin(byte) = "b00.cma"
- plugin(native) = "b00.cmxs"
-)
-
-package "care" (
-  directory = "care"
-  description = "B0's system library"
+  directory = "b00"
+  description = "B00 build abstraction"
   version = "%%VERSION_NUM%%"
-  requires = "unix cmdliner b0.std b0.b00"
-  archive(byte) = "b0_care.cma"
-  archive(native) = "b0_care.cmxa"
-  plugin(byte) = "b0_care.cma"
-  plugin(native) = "b0_care.cmxs"
-)
+  requires = "unix b0.b00.std"
+  archive(byte) = "b00.cma"
+  archive(native) = "b00.cmxa"
+  plugin(byte) = "b00.cma"
+  plugin(native) = "b00.cmxs"
 
-package "driver" (
-  directory = "driver"
-  description = "B0's driver library"
-  version = "%%VERSION_NUM%%"
-  requires = "unix cmdliner b0.std b0.b00"
-  archive(byte) = "b0_driver.cma"
-  archive(native) = "b0_driver.cmxa"
-  plugin(byte) = "b0_driver.cma"
-  plugin(native) = "b0_driver.cmxs"
-)
+  package "std" (
+    directory = "std"
+    description = "B00 stdlib extensions"
+    version = "%%VERSION_NUM%%"
+    requires = "unix"
+    archive(byte) = "b00_std.cma"
+    archive(native) = "b00_std.cmxa"
+    plugin(byte) = "b00_std.cma"
+    plugin(native) = "b00_std.cmxs"
+  )
 
-package "file" (
-  directory = "file"
-  description = "B0 API for B0 files"
-  version = "%%VERSION_NUM%%"
-  requires = "unix cmdliner b0.std b0.b00 b0.care"
-  archive(byte) = "b0_file.cma"
-  archive(native) = "b0_file.cmxa"
-  plugin(byte) = "b0_file.cma"
-  plugin(native) = "b0_file.cmxs"
+  package "kit" (
+    directory = "kit"
+    description = "B00 toolkit"
+    version = "%%VERSION_NUM%%"
+    requires = "unix cmdliner b0.b00.std b0.b00"
+    archive(byte) = "b00_kit.cma"
+    archive(native) = "b00_kit.cmxa"
+    plugin(byte) = "b00_kit.cma"
+    plugin(native) = "b00_kit.cmxs"
+  )
 )
 
 package "b0" (
   directory = "b0"
-  description = "b0 tool driver"
+  description = "B0 description API"
   version = "%%VERSION_NUM%%"
-  requires = "unix cmdliner b0.std b0.b00 b0.care b0.file b0.driver"
+  requires = "unix cmdliner b0.b00.std b0.b00 b0.b00.kit"
   archive(byte) = "b0.cma"
   archive(native) = "b0.cmxa"
   plugin(byte) = "b0.cma"
-  plugin(native) = "b0.cmxs")
+  plugin(native) = "b0.cmxs"
+)
+
+package "kit" (
+  directory = "kit"
+  description = "B0 toolkit"
+  version = "%%VERSION_NUM%%"
+  requires = "unix cmdliner b0.b00.std b0.b00 b0.b00.kit b0.b0"
+  archive(byte) = "b0_kit.cma"
+  archive(native) = "b0_kit.cmxa"
+  plugin(byte) = "b0_kit.cma"
+  plugin(native) = "b0_kit.cmxs"
+)
+
+package "driver" (
+  directory = "driver"
+  description = "B0 driver API"
+  version = "%%VERSION_NUM%%"
+  requires = "unix cmdliner b0.b00.std b0.b00 b0.b00.kit b0.b0"
+  archive(byte) = "b0_driver.cma"
+  archive(native) = "b0_driver.cmxa"
+  plugin(byte) = "b0_driver.cma"
+  plugin(native) = "b0_driver.cmxs"
+
+ package "b0" (
+   directory = "driver/b0"
+   description = "b0 tool driver"
+   version = "%%VERSION_NUM%%"
+   requires =
+    "unix cmdliner b0.b00.std b0.b00 b0.b00.kit b0 b0.kit b0.driver"
+   archive(byte) = "b0_driver_b0.cma"
+   archive(native) = "b0_driver_b0.cmxa"
+   plugin(byte) = "b0_driver_b0.cma"
+   plugin(native) = "b0_driver_b0.cmxs"
+ )
+)

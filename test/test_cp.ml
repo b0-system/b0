@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B0_std
+open B00_std
 
 let cp_cmd follow_symlinks recurse src dst =
   let error e = Fmt.epr "%s: %s" (Filename.basename Sys.argv.(0)) e; 1 in
@@ -27,12 +27,12 @@ let main () =
     in
     let src =
       let doc = "$(docv) is the source file or directory" in
-      Arg.(required & pos 0 (some B0_std_ui.fpath) None &
+      Arg.(required & pos 0 (some B00_std_ui.fpath) None &
            info [] ~doc ~docv:"SRC")
     in
     let dst =
       let doc = "$(docv) is the destination path; which must not exist." in
-      Arg.(required & pos 1 (some B0_std_ui.fpath) None &
+      Arg.(required & pos 1 (some B00_std_ui.fpath) None &
            info [] ~doc ~docv:"DST")
     in
     Term.(const cp_cmd $ follow_symlinks $ recurse $ src $ dst),

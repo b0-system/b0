@@ -10,7 +10,7 @@
 
 (** {1:b000 B000} *)
 
-open B0_std
+open B00_std
 
 (** Delete file hierarchies.
 
@@ -71,7 +71,7 @@ module File_cache : sig
   (** The type for keys. A key maps to a metadata hunk and an ordered
       list of file contents. The module treats keys as sequence of
       bytes however since they are used as file names they should
-      satisfy the {!B0_std.Fpath.is_seg} predicate; this is not
+      satisfy the {!B00_std.Fpath.is_seg} predicate; this is not
       checked by the module. *)
 
   type t
@@ -564,12 +564,12 @@ module Op : sig
 
   val time_started : t -> Time.span
   (** [time_started o] is [o]'s execution start time. This is
-      different from {!B0_std.Time.Span.max} once the operation has
+      different from {!B00_std.Time.Span.max} once the operation has
       been submitted for execution. *)
 
   val time_ended : t -> Time.span
   (** [exec_end_time o] is [o]'s execution end time. This is different
-      from {!B0_std.Time.Span.max} once the operation has been completed
+      from {!B00_std.Time.Span.max} once the operation has been completed
       and collected. *)
 
   val waited : t -> Time.span
@@ -728,7 +728,7 @@ end
 (** Build operation revivers.
 
     An operation reviver combines a {{!File_cache}file cache} and a
-    {{!B0_std.Hash.T}hash function} to record and revive the effect of
+    {{!B00_std.Hash.T}hash function} to record and revive the effect of
     {{!Op}build operations}.
 
     {b Note.} Hashes performed on files by this module are
@@ -873,11 +873,11 @@ module Exec : sig
   (** [create ~clock ~rand ~tmp_dir ~feedback ~trash ~jobs] with:
       {ul
       {- [clock], the clock used to timestamp build operations;
-         defaults to {!B0_std.Time.counter}[ ()].}
+         defaults to {!B00_std.Time.counter}[ ()].}
       {- [rand] random state used for internal queues; defaults to
          {!Random.State.make_self_init}.}
       {- [tmp_dir] is a directory for temporary files, it must exist;
-          defaults to {!B0_std.Os.Dir.default_tmp}[ ()].}
+          defaults to {!B00_std.Os.Dir.default_tmp}[ ()].}
       {- [feedback] a function called with each {{!schedule}scheduled}
          operation when it starts executing. Default is a nop.}
       {- [trash], the trash used to execute {!Op.Delete} build

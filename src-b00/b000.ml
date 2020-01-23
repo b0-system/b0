@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B0_std
+open B00_std
 
 module Trash = struct
   type t = { dir : Fpath.t }
@@ -1310,7 +1310,7 @@ module Exec = struct
     match e.spawn_count = 0 with
     | true -> ()
     | false ->
-        (* We don't (and can't through B0_std.Os.Cmd API constraints)
+        (* We don't (and can't through B00_std.Os.Cmd API constraints)
            collect with -1 or 0 because library-wise we might collect
            things we did not spawn. On Windows there wouldn't be the
            choice anyways. This means that on a blocking collection

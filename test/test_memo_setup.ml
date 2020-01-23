@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B0_std
+open B00_std
 open B00
 
 let feedback =
@@ -12,7 +12,7 @@ let feedback =
     Fmt.stderr
 
 let with_memo ?jobs f =
-  let () = B0_std.Fmt.set_tty_styling_cap `Ansi in
+  let () = B00_std.Fmt.set_tty_styling_cap `Ansi in
   Result.to_failure @@
   Result.bind (Os.Dir.cwd ()) @@ fun cwd ->
   let tmp_dir = (* Os.Dir.default_tmp () *) Fpath.v "/tmp" in

@@ -1,16 +1,16 @@
 {0 B0 manual}
 
 This manual provides a conceptual overview of the B0 system and
-explains the mechanics of B0 files. Other manuals are described and
-available {{!page-index.manuals}here}.
+explains the basic mechanics of B0 files. See
+{{!page-index.manuals}here} for other topics.
 
 {1:intro Introduction}
 
-B0 seeks at liberating the programmer from the tedious but essential
-bureaucratic tasks that {e surround} the programming activity. It
-provides a shell in which software construction and deployment
-problems can be solved, reused and customized, using a decent
-description language.
+B0 aims at liberating the programmer from the tedious but essential
+bureaucracy that {e surround} the programming activity. It provides a
+framework and a decent description language in which software
+construction and deployment problems can be solved, reused and
+customized.
 
 B0 describes:
 
@@ -18,7 +18,7 @@ B0 describes:
 {- The build environment.}
 {- The software configuration, build and testing.}
 {- Source or binary artefact deployments.}
-{- Custom workflow actions.}}
+{- Development life-cycle procedures and actions.}}
 
 These descriptions are made in a {e B0 file} which we describe
 next.
@@ -27,7 +27,7 @@ next.
 
 The B0 file is a syntactically valid OCaml file possibly prefixed by a
 few {{!directives}directives}. The OCaml code creates definitions to
-describe the software by using the versioned {!B0_file} API and
+describe the software by using the versioned {!B0_kit} API and
 possibly other third-party OCaml {{!libs}libraries}.
 
 The B0 file is named [B0.ml]. It is usually located at the root of a
@@ -36,10 +36,10 @@ the software.
 
 {2:drivers B0 file drivers}
 
-The B0 file definitions are consulted and executed by {e drivers}. The
-[b0] and [d0] tools distributed with B0 are examples of drivers. An
-API is provided to create custom driver, see the {{!page-b0_driver_dev}
-B0 driver development manual}.
+The definitions in B0 files are consulted and executed by {e
+drivers}. The [b0] and [d0] tools distributed with B0 are examples of
+drivers. An API is provided to create custom driver, see the
+{{!page-b0_driver_dev} B0 driver development manual}.
 
 {2:root_b0_file Root B0 file}
 
@@ -80,7 +80,7 @@ The {{!directive_include}[@@@B0.include]} directive provides a
 mecanism to compose B0 files. The intent of B0 file inclusion is to be
 able to aggregate independent software (sub)projects or to vendor
 dependencies. Include directives must be specified {e at the
-start} of a B0 file, before any comment or OCaml code.
+start} of a B0 file, before comments or OCaml code.
 
 For example the following [B0.ml] file includes the definitions of two
 other B0 files:
@@ -178,8 +178,8 @@ them as libraries.
 
 Any OCaml library available in the [OCAMLPATH] can be used in a B0
 file by requiring it via the {{!directive_require}#require}
-directive. [#require] directives must be specified {e at the very
-start} of the file, before any comment or OCaml code.
+directive. [#require] directives must be specified {e at the start} of
+the file, before comments or OCaml code.
 
 For example:
 
@@ -223,18 +223,19 @@ files to describe the software.
 
 B0 definitions are named and {e static}. The latter means they need to
 be defined during the initialisation of the B0 file. This allows
-end-user to act and query them from user interfaces.
+end-user to query and act upon them from user interfaces like the
+command line.
 
 {2:meta Metadata}
 
 All definitions in B0 have a metadata dictionary of type {!B0_meta.t}
-attached. Metadata is used to drive build logics and inform custom
-actions and deployments.
+attached. Metadata is used to drive build logics and inform actions
+and deployments.
 
 The type {!B0_meta.t} is a simple type-safe heterogenous value map. A
-few {{!B0_meta.standard_keys}standard keys} are provided, consider
-using these before defining your own. Also consult libraries of build
-logic which may define more.
+few {{!B0_meta.std}standard keys} are provided, consider using these
+before defining your own. Also consult {!B0_kit} and libraries of
+build logic which may define more.
 
 {2:units Build units}
 
@@ -243,12 +244,13 @@ A build unit gathers sets of related low-level build operations
 build a library, an executable, etc.
 
 Build units structure builds in well identified fragments, they form
-the smallest unit of build that can be be requested from the command
-line.
+the smallest unit of build that can be be requested for building by
+the user.
 
 They are given a build directory in [_b0] according to the build
 environment and their name where they {e should}, but are not required
 to output their results.
+
 
 {2:packs Build packs}
 
@@ -272,11 +274,11 @@ Here are example of pack usage in the system:
 The [default] pack defines the build units that are built when a bare
 [b0 build] is invoked.
 
-{2:variants Build variants}
+{2:envs Build environments}
 
-{3:default_variant The [default] variant}
+{3:default_env The [default] environment}
+{3:user_env The [user] environment}
 
-{3:user_variant The [user] variant scheme}
 
 {2:actions Actions}
 
@@ -377,9 +379,11 @@ dependencies must be manually [#required] aswell.
    avoid problems like I do a checkout e.g. in a scratch directory in
    [_b0] to build it. On the other hand we have [--b0-file] for these cases.}
 {- Should a [@@@B0.version] be added ? Think harder about
-   it an especially with respect to [B0_file.V000] versioning. and
+   it an especially with respect to [B0_kit.V000] versioning. and
    coherence with [@@@B0.include]s. Also we could require to specify
-   say [#require "b0.care.v000"]}}
+   say [#require "b0.kit.v000"]. Write down a few properties
+   we would like to have w.r.t. opam and/or inclusion and end-user
+   support.}}
 
 {2:design_b0_tool [b0] tool}
 

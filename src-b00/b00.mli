@@ -7,7 +7,7 @@
 
 (** {1:b00 B00} *)
 
-open B0_std
+open B00_std
 
 (** Build environment.
 

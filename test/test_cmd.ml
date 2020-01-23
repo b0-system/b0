@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B0_std
+open B00_std
 
 let ls p = Cmd.(arg "ls" % "-a" %% path p)
 let tar file dir = Cmd.(arg "tar" % "-cvf" %% path file %% path dir)

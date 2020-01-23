@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B0_std
+open B00_std
 
 let test_double_sep () =
   let test p q = assert (String.equal (Fpath.to_string (Fpath.v p)) q) in

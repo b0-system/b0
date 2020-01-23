@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B0_std
+open B00_std
 
 let err_unknown = 1
 
@@ -17,9 +17,9 @@ let pp_hash = function
     fun ppf (f, h) -> Hash.pp ppf h; Fmt.char ppf ' '; Fpath.pp_unquoted ppf f
 
 let hash tty_cap log_level hash_fun details files =
-  let tty_cap = B0_std_ui.get_tty_cap tty_cap in
-  let log_level = B0_std_ui.get_log_level log_level in
-  B0_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
+  let tty_cap = B00_std_ui.get_tty_cap tty_cap in
+  let log_level = B00_std_ui.get_log_level log_level in
+  B00_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
   let hash_fun = B00_ui.Memo.get_hash_fun hash_fun in
   Log.if_error ~use:err_unknown @@ match files with
   | [] -> Ok 0
@@ -55,11 +55,11 @@ let man = [
 
 let files =
   let doc = "File to hash. Use $(b,-) for stdin." in
-  Arg.(value & pos_all B0_std_ui.fpath [] & info [] ~doc ~docv:"FILE")
+  Arg.(value & pos_all B00_std_ui.fpath [] & info [] ~doc ~docv:"FILE")
 
 let tool =
-  Term.(const hash $ B0_std_ui.tty_cap ~docs:sdocs () $
-        B0_std_ui.log_level ~docs:sdocs () $
+  Term.(const hash $ B00_std_ui.tty_cap ~docs:sdocs () $
+        B00_std_ui.log_level ~docs:sdocs () $
         B00_ui.Memo.hash_fun ~opts:["H"; "hash-fun"]~docs () $
         B00_ui.Cli.out_details ~docs () $ files),
   Term.info "b00-hash" ~version ~doc ~sdocs ~exits ~man ~man_xrefs

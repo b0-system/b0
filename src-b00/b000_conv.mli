@@ -5,7 +5,7 @@
 
 (** Serialize and format {!B000} values. *)
 
-open B0_std
+open B00_std
 open B000
 
 (** {!B000.Op} converters *)
