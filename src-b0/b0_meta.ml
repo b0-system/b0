@@ -126,6 +126,17 @@ let maintainers = str_list_key "maintainers" ~doc:"Maintainer list"
 let online_doc = str_key "online-doc" ~doc:"Online documentation URI"
 let repo = str_key "repo" ~doc:"VCS repository URI"
 
+let bench = Key.tag "bench" ~doc:"Benchmarking entity"
+let build = Key.tag "build" ~doc:"A build system entity"
+let dev = Key.tag "dev" ~doc:"Development entity"
+let doc = Key.tag "doc" ~doc:"Documentation entity"
+let exe = Key.tag "exe" ~doc:"Executable entity"
+let test = Key.tag "test" ~doc:"Testing entity"
+let lib = Key.tag "lib" ~doc:"Library entity"
+
+let exe_name = str_key "exe-name" ~doc:"Executable name"
+
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers
 

@@ -15,12 +15,12 @@ let () =
     Pkg.mllib "src-b00-kit/b00_kit.mllib" ~dst_dir:"b00/kit";
 
     (* B0 *)
-    Pkg.mllib "src-b0/b0.mllib" ~dst_dir:"b0";
-    Pkg.mllib "src-kit/b0_kit.mllib" ~dst_dir:"kit";
-    Pkg.mllib "src-driver/b0_driver.mllib" ~dst_dir:"driver";
-    Pkg.mllib "src-driver-b0/b0_driver_b0.mllib" ~dst_dir:"driver/b0";
-    Pkg.bin "src-driver-b0/b0_main_run" ~dst:"b0";
-(*    Pkg.mllib "src-driver-d0/b0_driver_d0.mllib" ~dst_dir:"driver/d0"; *)
+    Pkg.mllib "src-b0/b0.mllib";
+    Pkg.mllib "src-b0-kit/b0_kit.mllib" ~dst_dir:"kit";
+    Pkg.mllib "src-b0-driver/b0_driver.mllib" ~dst_dir:"driver";
+    Pkg.mllib "src-b0-driver-b0/b0_driver_b0.mllib" ~dst_dir:"driver/b0";
+    Pkg.bin "src-b0-driver-b0/b0_main_run" ~dst:"b0";
+(*    Pkg.mllib "src-b0-driver-d0/b0_driver_d0.mllib" ~dst_dir:"driver/d0"; *)
 
     (* Tools *)
     Pkg.bin "tools/b00_cache" ~dst:"b00-cache";
@@ -43,5 +43,5 @@ let () =
     Pkg.doc "doc/index.mld" ~dst:"odoc-pages/index.mld";
     Pkg.doc "doc/b00_manual.mld" ~dst:"odoc-pages/b00_manual.mld";
     Pkg.doc "doc/manual.mld" ~dst:"odoc-pages/manual.mld";
-    Pkg.doc "doc/b0_driver_dev.mld" ~dst:"odoc-pages/b0_driver_dev.mld";
+    Pkg.doc "doc/driver_dev.mld" ~dst:"odoc-pages/driver_dev.mld";
   ]

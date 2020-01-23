@@ -9,17 +9,15 @@ customizable definitions written in OCaml.
 
 B0 describes:
 
-* The build environment.
-* The software configuration, build and testing.
-* Source or binary artefacts deployments.
+* Build environments.
+* Software configuration, build and testing.
+* Source or built artefacts deployments.
 * Development life-cycle procedures and actions.
 
-B0 is built on top of the simple and powerful B00 build library that
-treats build tools as deterministic memoizable functions.
-
-The B00 build model provides arbitrary build abstraction and reliable,
-efficient incremental rebuilds. The B00 library can be (and has been)
-used on its own to devise domain specific build systems.
+B0 also provides the B00 build library which provides abitrary build
+abstraction with reliable and efficient incremental rebuilds. The B00
+library can be – and has been – used on its own to devise domain
+specific build systems.
 
 B0 is distributed under the ISC license. It depends on [cmdliner][cmdliner].
 

@@ -672,6 +672,162 @@ module Link = struct
     ?post_exec ?k ?args m ~c_objs ~cobjs ~o
 end
 
+(* Libraries *)
+
+
+module Ocamlpath = struct
+  let get_var parse var m =
+    let env = Env.env (Memo.env m) in
+    match String.Map.find var env with
+    | exception Not_found -> None
+    | "" -> None
+    | v ->
+        match parse v with
+        | Error e -> Memo.fail m "%s parse: %s" var v
+        | Ok v -> Some v
+
+  let get m ps k = match ps with
+  | Some ps -> k ps
+  | None ->
+      match get_var Fpath.list_of_search_path "OCAMLPATH" m with
+      | Some ps -> k ps
+      | None ->
+          match get_var Fpath.of_string "OPAM_SWITCH_PREFIX" m with
+          | Some p -> k [Fpath.(p / "lib")]
+          | None ->
+              Memo.fail m
+                "No %a determined in the build environment."
+                Fmt.(code string) "OCAMLPATH"
+end
+
+(* Library names. *)
+
+module Lib_name = struct
+  let fpath_to_name s =
+    let b = Bytes.of_string (Fpath.to_string s) in
+    for i = 0 to Bytes.length b - 1 do
+      if Bytes.get b i = Fpath.dir_sep_char then Bytes.set b i '.';
+    done;
+    Bytes.unsafe_to_string b
+
+  let name_to_fpath s =
+    let err s exp = Fmt.error "%S: not a library name, %s" s exp in
+    let err_start s = err s "expected a starting lowercase ASCII letter" in
+    let b = Bytes.of_string s in
+    let max = String.length s - 1 in
+    let rec loop i ~id_start = match i > max with
+    | true ->
+        if id_start then err_start s else
+        Ok (Fpath.v (Bytes.unsafe_to_string b))
+    | false when id_start ->
+        begin match Bytes.get b i with
+        | 'a' .. 'z' -> loop (i + 1) ~id_start:false
+        | _ -> err_start s
+        end
+    | false ->
+        begin match Bytes.get b i with
+        | 'a' .. 'z' | '0' .. '9' | '_' | '-' -> loop (i + 1) ~id_start:false
+        | '.' -> Bytes.set b i Fpath.dir_sep_char; loop (i + 1) ~id_start:true
+        | c -> err s (Fmt.str "illegal character %C" c)
+        end
+    in
+    loop 0 ~id_start:true
+
+  type t = { dir : Fpath.t; archive_name : string option }
+
+  let of_string s = match String.cut_left ~sep:"/" s with
+  | None ->
+      Result.bind (name_to_fpath s) @@ fun name ->
+      Ok { dir = name; archive_name = None }
+  | Some (n, archive) ->
+      Result.bind (name_to_fpath n) @@ fun name ->
+      Ok { dir = name; archive_name = Some archive }
+
+  let to_string ?(no_legacy = false) n = match n.archive_name with
+  | None -> fpath_to_name n.dir
+  | Some _ when no_legacy -> fpath_to_name n.dir
+  | Some aname -> String.concat Fpath.dir_sep [fpath_to_name n.dir; aname]
+
+  let v s = match of_string s with Ok v -> v | Error e -> invalid_arg e
+  let is_legacy n = Option.is_some n.archive_name
+  let equal n0 n1 = compare n0 n1 = 0
+  let compare n0 n1 = compare n0 n1
+  let pp = Fmt.using to_string (Fmt.code Fmt.string)
+
+  module T = struct
+    type nonrec t = t let compare = compare
+  end
+  module Set = Set.Make (T)
+  module Map = Map.Make (T)
+end
+
+(* Libraries *)
+
+module Lib = struct
+  type t =
+    { name : Lib_name.t;
+      dir : Fpath.t;
+      dir_files_by_ext : B00_fexts.map; }
+
+  let name l = l.name
+  let dir l = l.dir
+
+  let cmis l = match String.Map.find ".cmi" l.dir_files_by_ext with
+  | exception Not_found -> [] | cmis -> cmis
+
+  let archive_name l = match l.name.Lib_name.archive_name with
+  | None -> "lib" | Some a -> a
+
+  let archive ~code l =
+    let a = archive_name l ^ Cobj.archive_ext_of_code code in
+    Fpath.(l.dir / a)
+end
+
+(* Resolver *)
+
+module Lib_resolver = struct
+
+  type t =
+    { memo : B00.Memo.t;
+      memo_dir : Fpath.t;
+      ocamlpath : Fpath.t list;
+      mutable libs : Lib.t Lib_name.Map.t; }
+
+  let create memo ~memo_dir ~ocamlpath =
+    let memo = B00.Memo.with_group memo "b00.ocaml.lib-resolver" in
+    { memo; memo_dir; ocamlpath; libs = Lib_name.Map.empty }
+
+  let dir_files_by_ext r dir =
+    Memo.fail_if_error r.memo @@
+    let add _ _ p acc =
+      Memo.file_ready r.memo p;
+      String.Map.add_to_list (Fpath.get_ext p) p acc
+    in
+    Os.Dir.fold_files ~recurse:false add dir String.Map.empty
+
+  let find r n k = match Lib_name.Map.find n r.libs with
+  | lib -> k lib
+  | exception Not_found ->
+      let rec loop n = function
+      | d :: ds ->
+          let libdir = Fpath.(d // n.Lib_name.dir) in
+          begin match Log.if_error ~use:false (Os.Dir.exists libdir) with
+          | false -> loop n ds
+          | true ->
+              let dir_files_by_ext = dir_files_by_ext r libdir in
+              let lib = { Lib.name = n; dir = libdir; dir_files_by_ext } in
+              r.libs <- Lib_name.Map.add n lib r.libs;
+              k lib
+          end
+      | [] ->
+          Memo.fail r.memo
+            "@[<v>@[OCaml library %a not found in OCAMLPATH@]:@, \
+             @[<v>%a@]@]"
+            Lib_name.pp n (Fmt.list Fpath.pp_unquoted) r.ocamlpath
+      in
+      loop n r.ocamlpath
+end
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2019 The b0 programmers
 

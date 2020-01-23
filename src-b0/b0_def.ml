@@ -13,7 +13,7 @@ let pp_error_str ppf () = Fmt.tty_string [`Fg `Red; `Bold] ppf "Error"
 exception Err of string
 
 module Scope = struct
-  type t = Nil | Lib of string | File of (string * Fpath.t) list
+  type t = Nil | Lib of string | File of (string * Fpath.t * Fpath.t) list
   let current = ref Nil
   let sealed = ref false
 
@@ -24,8 +24,12 @@ module Scope = struct
   (* File scopes *)
 
   let file = function
-  | Nil | Lib _
-  | File [] -> None | File ((_, f) :: _) -> Some f
+  | Nil | Lib _ | File [] -> None
+  | File ((_, f, _) :: _) -> Some f
+
+  let dir = function
+  | Nil | Lib _ | File [] -> None
+  | File ((_, _, d) :: _) -> Some d
 
   let location_in_backtrace file bt = match Printexc.backtrace_slots bt with
   | None -> None
@@ -45,7 +49,7 @@ module Scope = struct
 
   let current_to_loc_str use_bt = match !current with
   | Lib lib -> Fmt.str "Library %a:" Fmt.(code string) lib
-  | File ((name, file) :: _) ->
+  | File ((name, file, _) :: _) ->
       let loc = match use_bt with
       | None -> "line 1"
       | Some bt ->
@@ -83,18 +87,18 @@ module Scope = struct
          for now, this will be set again later by B0_driver.Cli.conf. *)
       Fmt.set_tty_styling_cap `Ansi
     in
-    current := File (["", file]);
+    current := File (["", file, Fpath.parent file]);
     setup_fmt ();
     Printexc.record_backtrace true;
     Printexc.set_uncaught_exception_handler catch_exn
 
   let is_root () = match !current with
-  | File (["", _]) -> true | _ -> false
+  | File (["", _, _]) -> true | _ -> false
 
   let open' name file = match !current with
-  | File ((pre, _) :: _ as ss) ->
+  | File ((pre, _, _) :: _ as ss) ->
       let pre = String.concat "" [pre; name; "."] in
-      current := File ((pre, file) :: ss)
+      current := File ((pre, file, Fpath.parent file) :: ss)
   | _ -> invalid_arg "illegal scope context, no root"
 
   let close () = match !current with
@@ -103,7 +107,7 @@ module Scope = struct
 
   let qualify_name n =
     let prefix = match !current with
-    | Lib n -> n | File ((pre, _) :: _) -> pre
+    | Lib n -> n | File ((pre, _, _) :: _) -> pre
     | File [] | Nil -> invalid_arg "no scope"
     in
     String.concat "" [prefix; n]
@@ -121,9 +125,11 @@ end
 (* Names *)
 
 type t = { scope : Scope.t; name : string; doc : string; meta : B0_meta.t }
+
 type def = t
 let scope d = d.scope
 let file d = Scope.file d.scope
+let dir d = Scope.dir d.scope
 let name d = d.name
 let doc d = d.doc
 let meta d = d.meta
@@ -259,8 +265,9 @@ module Make (V : VALUE) = struct
   let pp_doc = Fmt.using doc (Fmt.tty_string [(* Hear DKM *) `Faint])
   let pp_synopsis ppf v = Fmt.pf ppf "%a %a" pp_name v pp_doc v
   let pp ppf v =
-    Fmt.pf ppf "@[<v>@[%a %a@]%a@]"
-      pp_name v pp_doc v B0_meta.pp_non_empty (meta v)
+    let pp_non_empty ppf m = match B0_meta.is_empty m with
+    | true -> () | false -> Fmt.pf ppf "@, %a" B0_meta.pp m in
+    Fmt.pf ppf "@[<v>@[%a %a@]%a@]" pp_name v pp_doc v pp_non_empty (meta v)
 
   module T = struct type nonrec t = t let compare = compare end
   module Set = Set.Make(T)

@@ -89,6 +89,9 @@ val file : t -> Fpath.t option
 (** [file d] is the absolute file path in which [d] is defined, if
     defined in a file. *)
 
+val dir : t -> Fpath.t option
+(** [dir] is the parent of [file d]. *)
+
 val name : t -> string
 (** [name d] is the qualified name of [d]. *)
 

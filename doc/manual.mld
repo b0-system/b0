@@ -1,45 +1,43 @@
 {0 B0 manual}
 
 This manual provides a conceptual overview of the B0 system and
-explains the basic mechanics of B0 files. See
+explains the basic mechanics of B0 files and their definitions. See
 {{!page-index.manuals}here} for other topics.
 
 {1:intro Introduction}
 
-B0 aims at liberating the programmer from the tedious but essential
-bureaucracy that {e surround} the programming activity. It provides a
-framework and a decent description language in which software
-construction and deployment problems can be solved, reused and
-customized.
+B0 aims at liberating the programmer from the essential but often
+tedious and brittle bureaucracy that surrounds the programming
+activity. It provides a framework with a decent description language
+to devise modular and custom solutions to software construction and
+deployment problems.
 
 B0 describes:
 
 {ul
-{- The build environment.}
-{- The software configuration, build and testing.}
-{- Source or binary artefact deployments.}
+{- Build environments.}
+{- Software configuration, build and testing.}
+{- Source or built artefact deployments.}
 {- Development life-cycle procedures and actions.}}
 
-These descriptions are made in a {e B0 file} which we describe
+These descriptions are made in {e B0 files} which we describe
 next.
 
-{1:b0_file The B0 file}
+{1:b0_file B0 files}
 
-The B0 file is a syntactically valid OCaml file possibly prefixed by a
+A B0 file is a syntactically valid OCaml file possibly prefixed by a
 few {{!directives}directives}. The OCaml code creates definitions to
 describe the software by using the versioned {!B0_kit} API and
 possibly other third-party OCaml {{!libs}libraries}.
 
-The B0 file is named [B0.ml]. It is usually located at the root of a
-project's source tree and centralizes the definitions that describe
+Usually B0 files are named [B0.ml] and are found at the root of a
+project's source tree. It centralizes the definitions that describe
 the software.
 
-{2:drivers B0 file drivers}
-
-The definitions in B0 files are consulted and executed by {e
+The definitions in B0 files are consulted and processed by {e
 drivers}. The [b0] and [d0] tools distributed with B0 are examples of
 drivers. An API is provided to create custom driver, see the
-{{!page-b0_driver_dev} B0 driver development manual}.
+{{!page-driver_dev} B0 driver development manual}.
 
 {2:root_b0_file Root B0 file}
 
@@ -61,7 +59,7 @@ tree. However in case a root B0 file simply gathers multiple project
 definitions by {{!inclusion}including} B0 files the root directory may
 be empty.
 
-The root directory is where the scratch {e [_b0] directory} used by
+The root directory is where the scratchable {e [_b0] directory} used by
 drivers to operate and store their results gets created by
 default. The location of the [_b0] directory can also be specified
 explicitely via the [--b0-dir] option or the [B0_DIR] environment
@@ -78,7 +76,7 @@ the directory where the B0 file lies.
 
 The {{!directive_include}[@@@B0.include]} directive provides a
 mecanism to compose B0 files. The intent of B0 file inclusion is to be
-able to aggregate independent software (sub)projects or to vendor
+able to aggregate independent software (sub)systems or to vendor
 dependencies. Include directives must be specified {e at the
 start} of a B0 file, before comments or OCaml code.
 
@@ -86,34 +84,25 @@ For example the following [B0.ml] file includes the definitions of two
 other B0 files:
 
 {[
-[@@@B0.include "../that-lib/B0.ml"]
+[@@@B0.include "that" "../that-lib/B0.ml"]
 [@@@B0.include "projects/proj/B0.ml"]
 ]}
 
 {3:scope Scopes}
 
-An included B0 file defines a named {e scope} [s] to which its
-definitions are added. From the B0 file that includes, the syntax to
-access a definition named [d] in a scope [s] is [s.d].
+An included B0 file defines a named {e scope} to which its definitions
+are added. Scope names are either specified explicitely or
+automatically derived from the directory name of the B0 file. In the
+example above the scope names are, in order, [that] and [proj].
 
-By default the name of the scope is automatically derived from the
-directory name of the B0 file. In the example above the scope names
-are, in order, [that-lib] and [proj].
-
-The scope name can also be explicitely specified on inclusion. For example in:
-
-{[
-[@@@B0.include "that" "../that-lib/B0.ml"]
-[@@@B0.include "projects/proj/B0.ml"]
-]}
-
-the scope name of the file ["../that-lib/B0.ml"] is [that] rather than
-[that-lib].
+From the B0 file that includes, the syntax to access a definition
+named [d] in a scope [s] is [s.d].
 
 Scope names must be unique in a given B0 file and must not contain
-['.']  characters. The [lib] scope name is reserved and can't be
-used. It is used as a root scope for library definitions. If these
-constraints are not satisfied the B0 file errors.
+['.']  characters. The [lib] scope name is reserved and can't be used
+(bof change that). It is used as a root scope for library
+definitions. If these constraints are not satisfied the B0 file
+errors.
 
 {3:access Access control and isolation}
 
@@ -126,7 +115,7 @@ let all_units = B0_unit.list () (* get all units defined so far *)
 ]}
 
 the value [all_units] depends only on the definitions and includes of
-the B0 file itself, however included it may be itself.
+the B0 file itself, however included it may itself be.
 
 In the example above the two included B0 files cannot refer to the
 names of the other directly at definition time. However at build time
@@ -134,9 +123,9 @@ their definitions may interact indirectly via metadata and build logic
 name resolution procedures which have access to the global scope, see
 {!vendoring}.
 
-The {e OCaml language} scope of included files is not accessible and fully
-isolated. Both includer and includee cannot access each other's
-OCaml identifiers.
+The {e OCaml language} scope of included files is not accessible and
+always fully isolated. Both includer and includee cannot access each
+other's OCaml identifiers.
 
 {3:vendoring Dependency vendoring}
 
@@ -173,7 +162,7 @@ conflicting dependencies.
 {2:libs Using libraries}
 
 B0 is a modular and extensible system. It is {e expected} for
-third-parties to define abstractions and build logics and distribute
+third-parties to define build and deployment logics and distribute
 them as libraries.
 
 Any OCaml library available in the [OCAMLPATH] can be used in a B0
@@ -368,34 +357,3 @@ The syntax of the [#require] directive is:
 The semantics is to compile and link the B0 file against library
 [LIB], looked up in the [OCAMLPATH]. At the moment library [LIB]'s
 dependencies must be manually [#required] aswell.
-
-{1:design_todo Design considerations and todo}
-
-{2:design_b0_file B0 file}
-
-{ul
-{- [B0.ml] file finding. Should we stop at the last B0.ml file upwards ?
-   This would be nice if you operate in a vendored dir. But this also
-   avoid problems like I do a checkout e.g. in a scratch directory in
-   [_b0] to build it. On the other hand we have [--b0-file] for these cases.}
-{- Should a [@@@B0.version] be added ? Think harder about
-   it an especially with respect to [B0_kit.V000] versioning. and
-   coherence with [@@@B0.include]s. Also we could require to specify
-   say [#require "b0.kit.v000"]. Write down a few properties
-   we would like to have w.r.t. opam and/or inclusion and end-user
-   support.}}
-
-{2:design_b0_tool [b0] tool}
-
-{ul
-{- What to build by default, on [b0 build] ?
-   {ul
-   {- Define explicitely a [default] pack. Good explicit and easy to
-      track on the cli. Bad, a bit annoying when starting a project, don't
-      make me type, also when I define a new unit I'll likely forget about
-      putting it in the default.}
-   {- Define an [implied] tag on units (default true) and pack (default false)
-      only implied units/packs defined in the B0 file root get built.}
-   {- Maybe something more fine grained based on tags would e.g. exclude
-      tests. See if we introduce artefact tags like [test, doc, exe, lib]
-      etc.}}}}

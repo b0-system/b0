@@ -1,23 +1,30 @@
 {0:b0 B0 {%html: <span class="version">%%VERSION%%</span>%}}
 
-{b WARNING.} This package is unstable, do not depend on it.
+{b WARNING.} This package is unstable and work in progress, do not depend on it.
 
 B0 describes software construction and deployments using modular and
 customizable definitions written in OCaml.
 
-This package also provides the B00 build library which has support for
-arbitrary build abstraction with reliable, efficient incremental
-rebuilds.
+It also provides the B00 build library which provides arbitrary build
+abstraction with reliable, efficient incremental rebuilds and is also
+provided by this package.
 
 {1:manuals Manuals}
+
+For B0 and B00 users.
 
 {ul
 {- The {{!page-manual}B0 manual} is a conceptual overview of the
    B0 system and B0 files. It is recommended reading.}
-{- The {{!page-b00_manual}B00 manual} describes the B00 build library.}
-{- The {{!page-b0_driver_dev}B0 driver development manual} describes
+{- The {{!page-b00_manual}B00 manual} describes the B00 build library.}}
+
+For B0 programmers.
+
+{ul
+{- The {{!page-driver_dev}B0 driver development manual} describes
    how to make your own drivers to operate on B0 files.}
-{- {{!page-old_manual}Old manual fragments} which will eventually
+{- The {{!page-todo}TODO} page}
+{- {{!page-old_manual}Old manual fragments} and TODO which will eventually
    disapear.}}
 
 {1:b00_libs B00}
@@ -69,10 +76,8 @@ B00_cmark
 B00_github
 B00_machine
 B00_ocaml
-B00_ocaml_lib
 B00_odoc
-B00_vcs
-}
+B00_vcs}
 
 {3:ui UI fragments}
 
@@ -102,7 +107,12 @@ via {{!page-manual.b0_file}B0 files}.
 
 {2:b0_kit Library [b0.kit]}
 
-Toolkit for B0 files descriptions.
+Toolkit for B0 files.
+
+{!modules:
+B0_kit
+B0_srcs
+B0_ocaml}
 
 {2:b0_driver Library [b0.driver]}
 

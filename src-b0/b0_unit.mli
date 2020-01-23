@@ -5,52 +5,56 @@
 
 (** Build units.
 
-    A build unit gathers a set of related build operations under a
-    name and associates metadata to it. It can be seen as a build
-    scriptlet. Build units are the smallest unit of build in B0. *)
+    A build unit is a named build procedure with metadata associated
+    to it. Build units are the smallest unit of build in B0. *)
 
 open B00_std
 
-(** {1:units Units} *)
+(** {1:proc Build procedures} *)
 
 type build
-(** The type for builds see {!B0_build} *)
+(** The type for builds, see {!B0_build}. *)
+
+type proc = build -> unit B00.Memo.fiber
+(** The type for unit build procedures. *)
+
+val nop : proc
+(** [nop] does nothing. *)
+
+(** {1:units Units} *)
 
 type t
 (** The type for build units. *)
 
-type run = t -> build -> unit B00.Memo.fiber
-(** The type definition unit build operations. *)
+val v : ?doc:string -> ?meta:B0_meta.t -> string -> proc -> t
+(** [v n ~doc ~meta] is a build unit named [n] with build operations
+    [run] and described by [doc]. *)
 
-val nop : run
-(** [nop] runs nothing. *)
-
-val v : ?doc:string -> ?meta:B0_meta.t -> string -> run -> t
-(** [v n] is a build unit named [n] with build operations [run] and
-    described by [doc]. *)
-
-val run : t -> run
-(** [run u] are the unit's build operations. *)
+val proc : t -> proc
+(** [proc u] are the unit's build operations. *)
 
 include B0_def.S with type t := t
-
 
 (**/**)
 module Build : sig
   type bunit = t
   type t = build
-  val create :
-    root_dir:Fpath.t -> b0_dir:Fpath.t -> B00.Memo.t ->
-    locked:bool -> bunit list -> t
 
-  val run : t -> (unit, string) result
   val memo : t -> B00.Memo.t
   val locked : t -> bool
-  val units : t -> bunit list
-  val require_unit : t -> bunit -> unit
-  val current_unit : t -> bunit
-  val unit_build_dir : t -> bunit -> Fpath.t
-  val unit_root_dir : t -> bunit -> Fpath.t
+
+  module Unit : sig
+    val require : t -> bunit -> unit
+    val current : t -> bunit
+    val build_dir : t -> bunit -> Fpath.t
+    val root_dir : t -> bunit -> Fpath.t
+  end
+
+  val create :
+    root_dir:Fpath.t -> b0_dir:Fpath.t -> B00.Memo.t -> locked:bool ->
+    bunit list -> t
+
+  val run : t -> (unit, unit) result
 end
 (**/**)
 

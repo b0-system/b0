@@ -61,6 +61,8 @@ hampers correctness.
    the info). This may however lead to incorrect builds (`-I` problems)
    where tool may pickup stale artefacts}}
 
+{b Note.} Somehow a good description of 1. is "nix your build runs".
+
 {b Note.} Now that we do longer use hard links we would have
 to hash. So what follows below likely becomes impractical.
 

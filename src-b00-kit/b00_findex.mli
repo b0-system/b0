@@ -3,7 +3,10 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-(** File indexes. *)
+(** File indexes.
+
+    {b TODO.} Maybe move that back to brzo. At the B0 level we are trying
+    something with {!B0_srcs}. *)
 
 open B00_std
 

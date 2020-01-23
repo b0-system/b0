@@ -133,9 +133,9 @@ val pp_non_empty : t Fmt.t
 (** [pp_non_empty] is {!Fmt.cut} followed by {!pp} if metadata is non
     empty and {!Fmt.nop} otherwise. *)
 
-(** {1:std Standard keys}
+(** {1:std Standard keys} *)
 
-    In alphabetical order. *)
+(** {2:end_user End-user information} *)
 
 val authors : string list key
 (** [authors] describes a list of persons with authorship. *)
@@ -161,6 +161,34 @@ val online_doc : string key
 
 val repo : string key
 (** [repo] is an URI to a VCS system. *)
+
+(** {2:entity Entity tags} *)
+
+val bench : unit key
+(** [bench] tags benchmarking entities. *)
+
+val build : unit key
+(** [build] tags build system entities. *)
+
+val dev : unit key
+(** [dev] tags development entities. *)
+
+val doc : unit key
+(** [doc] tags documentation entities. *)
+
+val exe : unit key
+(** [exe] tags executable entities. *)
+
+val test : unit key
+(** [test] tags testing entities. *)
+
+val lib : unit key
+(** [lib] tags library entities. *)
+
+(** {2:entity Entity properties} *)
+
+val exe_name : string key
+(** [exe_name] is an executable name. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

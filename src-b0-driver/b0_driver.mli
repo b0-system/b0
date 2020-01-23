@@ -25,8 +25,14 @@ module Exit : sig
   (** [code e] is the exit code of [e]. Raises [Invalid_argument] if
       [e] is {!Exec}. *)
 
+  val build_error : t
+  (** [build_error] indicates a build error. *)
+
   val b0_file_error : t
-  (** [b0_file_error] indicates an error with the B0 file. *)
+  (** [b0_file_error] indicates a B0 file error. *)
+
+  val deploy_error : t
+  (** [deploy_error] indicates a deploy error. *)
 
   val no_b0_file : t
   (** [no_b0_file] indicates no B0 file could be found. *)
@@ -171,7 +177,7 @@ type t
 (** The type for drivers. *)
 
 val create :
-  name:string -> version:string -> libs:B00_ocaml_lib.Name.t list -> t
+  name:string -> version:string -> libs:B00_ocaml.Lib_name.t list -> t
 (** [create ~name ~version] is a new driver named [name] which has
     version [version] and uses library [libs] to link the B0 file. Note
     that these libraries are not added during the compilation phase.
@@ -186,7 +192,7 @@ val name : t -> string
 val version : t -> string
 (** [version d] is the version of [d]. *)
 
-val libs : t -> B00_ocaml_lib.Name.t list
+val libs : t -> B00_ocaml.Lib_name.t list
 (** [libs d] are the libraries that need to be added for linking. *)
 
 val set : driver:t -> main:main -> unit

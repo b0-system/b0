@@ -6,15 +6,15 @@
 open B00_std
 
 let driver =
-  let libs = [B00_ocaml_lib.Name.v "b0.driver.b0/b0_driver_b0"] in
+  let libs = [B00_ocaml.Lib_name.v "b0.driver.b0/b0_driver_b0"] in
   B0_driver.create ~name:"b0" ~version:"%%VERSION%%" ~libs
 
 module Def = struct
   let list (module Def : B0_def.S) c format ds =
-    let pp = match format with
-    | `Short -> Def.pp_name
-    | `Normal -> Def.pp_synopsis
-    | `Long -> Def.pp
+    let pp, sep = match format with
+    | `Short -> Def.pp_name, Fmt.cut
+    | `Normal -> Def.pp_synopsis, Fmt.cut
+    | `Long -> Def.pp, Fmt.(cut ++ cut)
     in
     Log.if_error ~use:B0_driver.Exit.no_such_name @@
     Result.bind (Def.get_all ds) @@ fun ds ->
@@ -22,7 +22,7 @@ module Def = struct
     let don't = B0_driver.Conf.no_pager c in
     Result.bind (B00_pager.find ~don't ()) @@ fun pager ->
     Result.bind (B00_pager.page_stdout pager) @@ fun () ->
-    if ds <> [] then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp) ds);
+    if ds <> [] then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp) ds);
     Ok B0_driver.Exit.ok
 
   let edit (module Def : B0_def.S) c ds =

@@ -5,7 +5,7 @@
 
 (** Build packs.
 
-    A build packs gathers a set of build units. *)
+    A build pack gathers a set of build units and attaches metadata to it. *)
 
 open B00_std
 

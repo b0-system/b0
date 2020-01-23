@@ -25,6 +25,10 @@ val find_files : t -> map -> Fpath.t list
 (** [find_files exts m] selects from [m] the files that have an
     extension in [exts]. *)
 
+val all_files : map -> Fpath.t list
+(** [all_files m] is concatenation of the list of files in [m]
+    in no particular order. *)
+
 val exists_file : t -> map -> bool
 (** [exists_file exts fm s] is [true] iff [find_file fm s] is not empty. *)
 

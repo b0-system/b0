@@ -14,43 +14,47 @@ open B00_std
 type t = B0_unit.build
 (** The type for builds. *)
 
-val create :
-  root_dir:Fpath.t -> b0_dir:Fpath.t -> B00.Memo.t -> locked:bool ->
-  B0_unit.t list -> t
-
-val run : t -> (unit, string) result
-(** [run b] runs the build. *)
-
 val memo : t -> B00.Memo.t
-(** [memo b] the build memoizer. *)
+(** [memo b] the memoizer for the build. *)
 
 val locked : t -> bool
 (** [locked b] is [true] iff [b] is a locked build. In a locked build
     build units that are built are fixed before the build starts. *)
 
-(** {1:unit Units} *)
+(** Built units. *)
+module Unit : sig
 
-val units : t -> B0_unit.t list
-(** [units b] are the units that are part of the build. Unless
-    {!locked} is [true] this list may increase over time. Build units
-    should not rely on it. *)
+  (** {1:ops Unit operations} *)
 
-val require_unit : t -> B0_unit.t -> unit
-(** [require_unit b u] asks to build unit [u] in [b]. This fails the [Memo]
-    fiber if [b] is locked and not part of {!units}. *)
+  val require : t -> B0_unit.t -> unit
+  (** [require_unit b u] asks to build unit [u] in [b]. This fails the
+      fiber if [b] is {!locked} and [u] not part of the initial
+      units. *)
 
-val current_unit : t -> B0_unit.t
-(** [current_unit b] is [b]'s current unit. *)
+  val current : t -> B0_unit.t
+  (** [current b] is [b]'s current unit. In the {{!B0_unit.type-proc}procedure}
+      of build unit that is the unit itself. *)
 
-(** {1:dir Directories} *)
+  (** {1:dir Directories} *)
 
-val unit_build_dir : t -> B0_unit.t -> Fpath.t
-(** [unit_build_dir b u] is the build directory for the build unit [u].
-    This is where [u] should write is build artefacts. *)
+  val build_dir : t -> B0_unit.t -> Fpath.t
+  (** [build_dir b u] is the build directory for the build unit [u].
+      This is where [u] should write is build artefacts. *)
 
-val unit_root_dir : t -> B0_unit.t -> Fpath.t
-(** [unit_root b u] is the directory of the B0 file in which [u] was
-    defined. *)
+  val root_dir : t -> B0_unit.t -> Fpath.t
+  (** [root_dir b u] is the directory of the B0 file in which [u] was
+      defined. This is were unit relative paths like source files
+      should be resolved. *)
+end
+
+(** {1:run Creating and running} *)
+
+val create :
+  root_dir:Fpath.t -> b0_dir:Fpath.t -> B00.Memo.t -> locked:bool ->
+  B0_unit.t list -> t
+
+val run : t -> (unit, unit) result
+(** [run b] runs the build. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

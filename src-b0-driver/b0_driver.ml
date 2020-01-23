@@ -8,21 +8,25 @@ open B00_std
 module Exit = struct
   type t = Code of int | Exec of Fpath.t * Cmd.t
   let code = function Code c -> c | _ -> invalid_arg "not an exit code"
+  let ok = Code 0
+  let deploy_error = Code 118
+  let build_error = Code 119
+  let no_such_name = Code 120
   let b0_file_error = Code 121
   let no_b0_file = Code 122
-  let no_such_name = Code 119
-  let ok = Code 0
   let some_error = Code 123
 
   module Info = struct
     let e c doc = Cmdliner.Term.exit_info (code c) ~doc
+    let deploy_error = e deploy_error "on deploy error."
+    let build_error = e build_error "on build error."
+    let no_such_name = e no_such_name "a specified name does not exist."
     let b0_file_error = e b0_file_error "on B0 file error."
     let no_b0_file = e no_b0_file "no B0 file found."
-    let no_such_name = e no_such_name "a specified name does not exist."
     let some_error = e some_error "on indiscriminate errors reported on stderr."
     let base_cmd =
-      b0_file_error :: no_b0_file :: no_such_name :: some_error ::
-      Cmdliner.Term.default_exits
+      deploy_error :: build_error :: no_such_name :: b0_file_error ::
+      no_b0_file :: some_error :: Cmdliner.Term.default_exits
   end
 end
 
@@ -90,8 +94,8 @@ module Conf = struct
       let path = Fmt.(code Fpath.pp_unquoted) in
       let code = Fmt.(code string) in
       Fmt.error
-        "@[<v>No %a file found in %a or upwards.@,\
-         Use option %a to specify one or %a for help.@]"
+        "@[<v>No %a file found in %a@,\
+                 or upwards. Use option %a to specify one or %a for help.@]"
         code "B0.ml" path c.cwd Fmt.(code string) "--b0-file"
         Fmt.(code string) "--help"
 
@@ -179,7 +183,7 @@ type main = unit -> Exit.t Cmdliner.Term.result
 type t =
   { name : string;
     version : string;
-    libs : B00_ocaml_lib.Name.t list }
+    libs : B00_ocaml.Lib_name.t list }
 
 let create ~name ~version ~libs = { name; version; libs }
 let name d = d.name
@@ -250,27 +254,27 @@ module Compile = struct
         | Some comp -> comp, B00_ocaml.Cobj.Native
 
   let base_libs =
-    [ B00_ocaml_lib.Name.v "cmdliner/cmdliner";
-      B00_ocaml_lib.Name.v "ocaml/unix"; (* FIXME system switches *)
-      B00_ocaml_lib.Name.v "b0.b00.std/b00_std";
-      B00_ocaml_lib.Name.v "b0.b00/b00";
-      B00_ocaml_lib.Name.v "b0.b00.kit/b00_kit";
-      B00_ocaml_lib.Name.v "b0.b0/b0";
-      B00_ocaml_lib.Name.v "b0.kit/b0_kit";
-      B00_ocaml_lib.Name.v "b0.driver/b0_driver"; ]
+    [ B00_ocaml.Lib_name.v "cmdliner/cmdliner";
+      B00_ocaml.Lib_name.v "ocaml/unix"; (* FIXME system switches *)
+      B00_ocaml.Lib_name.v "b0.b00.std/b00_std";
+      B00_ocaml.Lib_name.v "b0.b00/b00";
+      B00_ocaml.Lib_name.v "b0.b00.kit/b00_kit";
+      B00_ocaml.Lib_name.v "b0/b0";
+      B00_ocaml.Lib_name.v "b0.kit/b0_kit";
+      B00_ocaml.Lib_name.v "b0.driver/b0_driver"; ]
 
   let find_libs libs r k =
     let rec loop acc = function
     | [] -> k (List.rev acc)
     | l :: libs ->
-        B00_ocaml_lib.Resolver.find r l @@ fun lib -> loop (lib :: acc) libs
+        B00_ocaml.Lib_resolver.find r l @@ fun lib -> loop (lib :: acc) libs
     in
     loop [] libs
 
   let find_libs m ~build_dir ~driver f k =
-    B00_ocaml_lib.Ocamlpath.get m None @@ fun ocamlpath ->
+    B00_ocaml.Ocamlpath.get m None @@ fun ocamlpath ->
     let memo_dir = Fpath.(build_dir / "ocaml-lib-resolve") in
-    let r = B00_ocaml_lib.Resolver.create m ~memo_dir ~ocamlpath in
+    let r = B00_ocaml.Lib_resolver.create m ~memo_dir ~ocamlpath in
     (* FIXME we are loosing locations here would be nice to
        have them to report errors. *)
     let requires = List.map fst (B0_file.requires f) in
@@ -290,9 +294,9 @@ module Compile = struct
     | B00_ocaml.Cobj.Native ->
         [ Fpath.(base + ".cmx"); Fpath.(base + ".o"); exe ]
     in
-    let dirs = List.map B00_ocaml_lib.dir seen_libs in
+    let dirs = List.map B00_ocaml.Lib.dir seen_libs in
     let incs = Cmd.unstamp @@ Cmd.paths ~slip:"-I" dirs in
-    let archives = List.map (B00_ocaml_lib.archive ~code) all_libs in
+    let archives = List.map (B00_ocaml.Lib.archive ~code) all_libs in
     let c_archives = List.map (fun p -> Fpath.(p -+ clib_ext)) archives in
     let ars = List.rev_append archives c_archives in
     (* FIXME this should be done b the resolver *)

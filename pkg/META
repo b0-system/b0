@@ -36,7 +36,6 @@ package "b00" (
 )
 
 package "b0" (
-  directory = "b0"
   description = "B0 description API"
   version = "%%VERSION_NUM%%"
   requires = "unix cmdliner b0.b00.std b0.b00 b0.b00.kit"

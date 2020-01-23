@@ -7,6 +7,7 @@ open B00_std
 
 type t = String.Set.t
 type map = Fpath.t list String.Map.t
+
 let v = String.Set.of_list
 let ext = String.Set.singleton
 
@@ -16,6 +17,10 @@ let find_files exts m =
   | fs -> List.rev_append fs acc
   in
   String.Set.fold add_ext exts []
+
+let all_files m =
+  let add _ files acc = List.rev_append files acc in
+  String.Map.fold add m []
 
 let exists_file exts fm =
   let check_ext ext = match String.Map.find ext fm with

@@ -104,7 +104,7 @@ let source c root =
       Ok B0_driver.Exit.ok
 
 let requires c root =
-  let pp_require = Fmt.using fst B00_ocaml_lib.Name.pp in
+  let pp_require = Fmt.using fst B00_ocaml.Lib_name.pp in
   get_b0_file_src c @@ fun src ->
   let reqs = match root with
   | true -> Ok (B0_file.requires src)
@@ -183,7 +183,8 @@ let man = [
        only shows the requires of the root B0 file.");
   `I ("$(b,source) [$(b,--root)]",
       "Show the expanded B0 file source the driver compiles. \
-       If $(b,--root) is specified shows the source of the root B0 file.");
+       If $(b,--root) is specified shows the non-expanded source of \
+       the root B0 file.");
   `S Manpage.s_arguments;
   `S Manpage.s_options;
   `S docs_format;

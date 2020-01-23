@@ -12,13 +12,13 @@ true : package(unix)
 
 # B0
 <src-b0> : include
-<src-kit> : include
-<src-kit/**> : package(cmdliner)
-<src-driver> : include
-<src-driver/**> : package(cmdliner)
-<src-driver-b0> : include
-<src-driver-b0/**> : package(cmdliner)
-<src-driver-b0/b0_main_run.*> : use_b00_stubs
+<src-b0-kit> : include
+<src-b0-kit/**> : package(cmdliner)
+<src-b0-driver> : include
+<src-b0-driver/**> : package(cmdliner)
+<src-b0-driver-b0> : include
+<src-b0-driver-b0/**> : package(cmdliner)
+<src-b0-driver-b0/b0_main_run.*> : use_b00_stubs
 
 <examples> : include
 <examples/**> : use_b00_stubs, not_hygienic
