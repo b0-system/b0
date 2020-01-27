@@ -1040,6 +1040,19 @@ module String : sig
         error in the string. *)
   end
 
+  (** {1:version Version strings} *)
+
+  val to_version : string -> (int * int * int * string option) option
+  (** [to_version] parses version strings of the form:
+      {[
+        "[v|V]major.minor[.patchlevel][+additional-info]"
+      ]}
+      into [(major, minor, patch, additional_info)] tuples. If no
+      [patchlevel] is found [0] is used. *)
+
+  val drop_initial_v : string -> string
+  (** [drop_initial_v s] drops a leading ['v'] or ['V'] from [s]. *)
+
   (** {1:setmap Sets and maps} *)
 
   (** String sets. *)

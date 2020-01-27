@@ -120,7 +120,6 @@ let select b sels k =
   let (seen, _ as acc) = select_files_in_dirs m u xs acc ds in
   Fpath.Set.iter (B00.Memo.file_ready m) seen;
   select_file_from_fibers b acc fibers @@ fun acc ->
-
   k (snd acc)
 
 (*---------------------------------------------------------------------------

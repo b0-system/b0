@@ -34,8 +34,9 @@ val err : int -> ('a, Format.formatter, unit, 'b) format4 -> 'a
 (** [err n fmt] formats an error message for line [n] as ["%d:" ^^
     fmt] and raises [Failure] with no trace. *)
 
-val err_file : Fpath.t -> string -> ('a, string) result
-(** [err_file file e] is the error message [e] for file [file]. *)
+val err_file : ?file:Fpath.t -> string -> ('a, string) result
+(** [err_file ~file e] is the error message [e] for file [file] formatted
+    as ["%a:%s" Fpath.pp_unquoted f s] *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2019 The b0 programmers

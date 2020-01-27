@@ -39,8 +39,110 @@ module Tool = struct
 end
 
 module Conf = struct
+  type t =
+    { fields : string String.Map.t;
+      version : int * int * int * string option;
+      where : Fpath.t;
+      asm_ext : string;
+      dll_ext : string;
+      exe_ext : string;
+      lib_ext : string;
+      obj_ext : string; }
 
-  (* FIXME memo conf *)
+  let find k c = match String.Map.find k c.fields with
+  | exception Not_found -> None | v -> Some v
+
+  let version c = c.version
+  let where c = c.where
+  let asm_ext c = c.asm_ext
+  let exe_ext c = c.exe_ext
+  let dll_ext c = c.dll_ext
+  let lib_ext c = c.lib_ext
+  let obj_ext c = c.obj_ext
+
+  let to_string_map c = c.fields
+  let of_string_map fields =
+    try
+      let err = Fmt.failwith in
+      let err_key k = err "key %a not found." Fmt.(code string) k in
+      let find k fs = match String.Map.find k fs with
+      | exception Not_found -> err_key k | v -> v
+      in
+      let version =
+        let v = find "version" fields in
+        match String.to_version v with
+        | None -> err "could not parse version string %S" v
+        | Some v -> v
+      in
+      let where = Fpath.of_string (find "standard_library" fields) in
+      let where = where |> Result.to_failure in
+      let asm_ext = find "ext_asm" fields in
+      let dll_ext = find "ext_dll" fields in
+      let exe_ext = find "ext_exe" fields in
+      let lib_ext = find "ext_lib" fields in
+      let obj_ext = find "ext_obj" fields in
+      Ok { fields; version; where; asm_ext; dll_ext; exe_ext; lib_ext; obj_ext }
+    with
+    | Failure e -> Error e
+
+  (* IO *)
+
+  let of_string ?file s =
+    let parse_line i l acc = match String.cut_left ~sep:":" l with
+    | None -> acc
+    | Some (k, v) -> String.Map.add (String.trim k) (String.trim v) acc
+    in
+    let s = String.trim s in
+    Result.bind (B00_lines.fold ?file s parse_line String.Map.empty) @@
+    fun fields -> match of_string_map fields with
+    | Ok v -> Ok v
+    | Error e -> B00_lines.err_file ?file (Fmt.str "OCaml config: %s" e)
+
+  let write m ~comp ~o =
+    let comp = Memo.tool m comp in
+    Memo.spawn m ~writes:[o] ~stdout:(`File o) @@
+    comp (Cmd.arg "-config")
+
+  let read m file k =
+    Memo.read m file @@ fun s ->
+    k (of_string ~file s |> Memo.fail_if_error m)
+
+  (* Build orchestration *)
+
+  type built_code = [ `Byte | `Native | `Both ]
+
+  let build_code =
+    let det _ _ k = k `Auto in
+    Store.key det
+
+  let built_code =
+    let det s m k =
+      Store.get s build_code @@ function
+      | #built_code as v -> k v
+      | `Auto when Option.is_some (Memo.tool_opt m Tool.ocamlopt) -> k `Native
+      | `Auto  -> k `Byte
+
+    in
+    Store.key det
+
+  let auto_comp s m k =
+    Store.get s built_code @@ function
+    | `Native | `Both -> k Tool.ocamlopt
+    | `Byte -> k Tool.ocamlc
+
+  let key : t B00.Store.key =
+    let mark = "b00_ocaml.conf" in
+    let det s m k =
+      auto_comp s m @@ fun comp ->
+      let file = Fpath.(Store.dir s / mark) in
+      write m ~comp ~o:file;
+      read m file k
+    in
+    Store.key ~mark det
+
+
+  (* TODO remove that *)
+
   let ocamlc_bin = Cmd.arg "ocamlc"
   let exists m k = match Os.Cmd.find ocamlc_bin |> Memo.fail_if_error m with
   | None -> k false | Some _ -> k true
@@ -56,11 +158,6 @@ module Conf = struct
     run m (Cmd.arg "-where") @@ fun r ->
     k @@ Memo.fail_if_error m @@ Result.bind r @@ fun s -> Fpath.of_string s
 
-  let asm_ext m k = k ".s"
-  let exe_ext m k = k "" (* FIXME *)
-  let dll_ext m k = k ".so" (* FIXME *)
-  let lib_ext m k = k ".a" (* FIXME *)
-  let obj_ext m k = k ".o" (* FIXME *)
 end
 
 module Mod_name = struct
@@ -306,9 +403,9 @@ module Cobj = struct
         acc file Mod_ref.Set.empty Mod_ref.Set.empty String.Set.empty (n + 1) ls
   | l :: ls -> parse_files acc (n + 1) ls
 
-  let of_string ?(file = Os.File.dash) data =
+  let of_string ?file data =
     try Ok (parse_files [] 1 (B00_lines.of_string data)) with
-    | Failure e -> B00_lines.err_file file e
+    | Failure e -> B00_lines.err_file ?file e
 
   (* FIXME add [src_root] so that we can properly unstamp. *)
 
@@ -556,8 +653,9 @@ module Compile = struct
   let cstubs_archives
       ?post_exec ?k ?args:(more_args = Cmd.empty) m ~c_objs ~odir ~oname
     =
-    Conf.lib_ext m @@ fun lib_ext ->
-    Conf.dll_ext m @@ fun dll_ext ->
+    (* FIXME Conf *)
+    let lib_ext = ".a" in
+    let dll_ext = ".so" in
     let ocamlmklib = Memo.tool m Tool.ocamlmklib in
     let o = Fpath.(odir / cstubs_name oname) in
     let writes =
@@ -589,14 +687,15 @@ module Compile = struct
       ?post_exec ?k ?args:(more_args = Cmd.empty) m ~has_cstubs ~cobjs ~odir
       ~oname
     =
-    Conf.lib_ext m @@ fun ext_lib ->
+    (* FIXME Conf *)
+    let lib_ext = ".a" in
     let ocamlopt = Memo.tool m Tool.ocamlopt in
     let cstubs_opts = match has_cstubs with
     | false -> Cmd.empty
     | true -> Cmd.(arg "-cclib" % Fmt.str "-l%s" (cstubs_name oname))
     in
     let cmxa = Fpath.(odir / Fmt.str "%s.cmxa" oname) in
-    let cmxa_clib = Fpath.(odir / Fmt.str "%s%s" oname ext_lib) in
+    let cmxa_clib = Fpath.(odir / Fmt.str "%s%s" oname lib_ext) in
     Memo.spawn m ?post_exec ?k ~reads:cobjs ~writes:[cmxa; cmxa_clib] @@
     ocamlopt Cmd.(debug % "-a" % "-o" %% unstamp (path cmxa) %% cstubs_opts %%
                   unstamp (paths cobjs))
@@ -608,7 +707,7 @@ module Compile = struct
   let native_dynlink_archive
       ?post_exec ?k ?args:(more_args = Cmd.empty) m ~has_cstubs ~cmxa ~o
     =
-    Conf.lib_ext m @@ fun lib_ext ->
+    let lib_ext = ".a" in
     let ocamlopt = Memo.tool m Tool.ocamlopt in
     let cmxa_clib = Fpath.(cmxa -+ lib_ext) in
     let cstubs_opts, reads = match has_cstubs with
@@ -652,8 +751,9 @@ module Link = struct
       ?post_exec ?k ?args:(more_args = Cmd.empty) m ~c_objs ~cobjs ~o
     =
     let ocamlopt = Memo.tool m Tool.ocamlopt in
-    Conf.obj_ext m @@ fun obj_ext ->
-    Conf.lib_ext m @@ fun lib_ext ->
+    (* FIXME lift that as args or ask for OCaml.Conf.t *)
+    let obj_ext = ".o" in
+    let lib_ext = ".a" in
     let cobj_side_obj cobj =
       let ext = if Fpath.has_ext ".cmx" cobj then obj_ext else lib_ext in
       Fpath.set_ext ext cobj

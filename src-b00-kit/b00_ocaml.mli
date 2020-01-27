@@ -45,28 +45,104 @@ module Tool : sig
       OCaml toplevel. *)
 end
 
-(** OCaml configuration. *)
+(** OCaml toolchain configuration.
+
+    Thid module provides access to the OCaml toolchain configuration
+    as output by [ocaml{c,opt} -config].
+
+    It also provides {{!build}bits} to orchestrate byte and native
+    OCaml builds. *)
 module Conf : sig
+
+  (** {1:conf Configuration} *)
+
+  type t
+  (** The type for the OCaml toolchain configuration. *)
+
+  val find : string -> t -> string option
+  (** [find f c] looks up the field [f] in configuration [c].
+      See [ocamlc -config] for the list of fields. *)
+
+  val version : t -> int * int * int * string option
+  (** [version c] is the compiler version string
+      ["major.minor[.patchlevel][+additional-info]"] parsed
+      using
+      [(major, minor, patch, additional-info)]. If [patch-level]
+      is absent it is turned into a [0]. *)
+
+  val where : t -> Fpath.t
+  (** [where c] is the location of OCaml's library directory. *)
+
+  val asm_ext : t -> Fpath.ext
+  (** [asm_ext] is the file extension for assembly files. *)
+
+  val dll_ext : t -> Fpath.ext
+  (** [dll_ext] is the file extension for C dynamic libraries. *)
+
+  val exe_ext : t -> Fpath.ext
+  (** [ext_ext] is the file extension for executable binaries. *)
+
+  val lib_ext : t -> Fpath.ext
+  (** [ext_lib] is the file extension for C static libraries. *)
+
+  val obj_ext : t -> Fpath.ext
+  (** [obj_ext] is the file extension for C object files. *)
+
+  (** {1:convert Converting} *)
+
+  val to_string_map : t -> string String.Map.t
+  (** [to_string_map c] are the fields of [c] as a string map. *)
+
+  val of_string_map : string String.Map.t -> (t, string) result
+  (** [of_string_map m] is a configuration from string map [m].
+      [m] needs at least a ["version"] key otherwise the function
+      errors. *)
+
+  (** {1:io IO} *)
+
+  val write : B00.Memo.t -> comp:B00.Tool.t -> o:Fpath.t -> unit
+  (** [write m ~o] writes the toolchain configuration to [o] by
+      running [comp] with [-config]. *)
+
+  val read : B00.Memo.t -> Fpath.t -> t Memo.fiber
+  (** [read m file] reads a toolchain configuration from [file]. *)
+
+  val of_string : ?file:Fpath.t -> string -> (t, string) result
+  (** [of_string ~file data] parses toolchain configuration from [data]
+      as output by the compiler's [-config] option assuming it was read
+      from file [file] (defaults to {!B00_std.Os.File.dash}. *)
+
+  (** {1:build Build orchestration}
+
+      {b XXX} Maybe move that to {!B0_ocaml}.
+
+      In a build it is desirable to know which code is being produced
+      because if both are produced the compilers may compete to
+      produce some of the shared build artefacts. The following store
+      keys allow to express build code {{!build_code}desires} and
+      determine the actual {{!built_code}decision}. *)
+
+  type built_code = [ `Byte | `Native | `Both ]
+  (** The type indicating which code is being built. *)
+
+  val build_code : [ built_code | `Auto ] Store.key
+  (** [build_code] indicates which code should be built, default
+      determines to [`Auto]. [`Auto] indicates [`Native] should be
+      used if [ocamlopt] can be found in the memo environment and
+      [`Byte] otherwise. *)
+
+  val built_code : built_code Store.key
+  (** [build_code] is a memo key indicating the built code. By default
+      determines by consulting [build_code]. *)
+
+  val key : t Store.key
+  (** [key] is a memo key store with the OCaml configuration. *)
+
+  (** {1:todo TODO remove that} *)
+
   val exists : Memo.t -> bool Memo.fiber
   val if_exists : Memo.t -> (unit -> 'a Memo.fiber) -> 'a option Memo.fiber
   val stdlib_dir : Memo.t -> unit -> Fpath.t Memo.fiber
-
-  (** {1:fext File extensions} *)
-
-  val asm_ext : Memo.t -> Fpath.ext Memo.fiber
-  (** [asm_ext] is the file extension for assembly files. *)
-
-  val exe_ext : Memo.t -> Fpath.ext Memo.fiber
-  (** [ext_ext] is the file extension for executable binaries. *)
-
-  val dll_ext : Memo.t -> Fpath.ext Memo.fiber
-  (** [dll_ext] is the file extension for C dynamic libraries. *)
-
-  val lib_ext : Memo.t -> Fpath.ext Memo.fiber
-  (** [ext_lib] is the file extension for C static libraries. *)
-
-  val obj_ext : Memo.t -> Fpath.ext Memo.fiber
-  (** [obj_ext] is the file extension for C object files. *)
 end
 
 (** Module names. *)

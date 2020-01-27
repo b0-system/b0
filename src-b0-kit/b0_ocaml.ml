@@ -28,7 +28,8 @@ module Unit = struct
   let compile_c_srcs m ~in_dir ~srcs k =
     (* XXX Maybe better things could be done here once we have a good C
        domain. *)
-    B00_ocaml.Conf.obj_ext m @@ fun obj_ext ->
+    (* FIXME conf *)
+    let obj_ext = ".o" in
     let rec loop os cunits hs = function
     | [] -> List.rev os
     | c :: cs ->

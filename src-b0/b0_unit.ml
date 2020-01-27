@@ -17,6 +17,7 @@ and build_state =
     b0_dir : Fpath.t;
     build_dir : Fpath.t;
     locked : bool;
+    store : B00.Store.t;
     mutable units : t String.Map.t;
     mutable waiting : t Rqueue.t; }
 
@@ -60,37 +61,40 @@ module Build = struct
   type t = build
 
   let build_dir ~b0_dir = Fpath.(b0_dir / "b" / "user")
+  let store_dir ~build_dir = Fpath.(build_dir / ".store")
   let create ~root_dir ~b0_dir m ~locked us =
     let u = { current = None; m } in
     let build_dir = build_dir ~b0_dir in
+    let store = B00.Store.create m ~dir:(store_dir ~build_dir) [] in
     let units =
       let add acc u = String.Map.add (name u) u acc in
       List.fold_left add String.Map.empty us
     in
     let waiting = Rqueue.empty () in
     let () = List.iter (Rqueue.add waiting) us in
-    let b = { root_dir; b0_dir; build_dir; locked; waiting; units } in
+    let b = { root_dir; b0_dir; build_dir; locked; store; waiting; units } in
     { u; b }
 
   let memo b = b.u.m
   let locked b = b.b.locked
+  let store b = b.b.store
 
   module Unit = struct
     let current b = match b.u.current with
     | None -> invalid_arg "Build not running" | Some u -> u
 
-    let require b u =
-      if String.Map.mem (name u) b.b.units then () else
-      match b.b.locked with
-      | false ->
-          b.b.units <- String.Map.add (name u) u b.b.units;
-          Rqueue.add b.b.waiting u
-      | true ->
+    let add b u = match b.b.locked with
+    | false ->
+        b.b.units <- String.Map.add (name u) u b.b.units;
+        Rqueue.add b.b.waiting u
+    | true ->
           B00.Memo.fail b.u.m
             "@[<v>Unit %a requested %a which is not part of the locked build.@,\
              Try with %a or add the unit %a to the build."
             pp_name (current b) pp_name u Fmt.(code string) "--unlock"
             pp_name u
+
+    let require b u = if String.Map.mem (name u) b.b.units then () else add b u
 
     let build_dir b u = Fpath.(b.b.build_dir / name u)
     let root_dir b u = match B0_def.dir (def u) with
@@ -127,6 +131,7 @@ module Build = struct
       B00.Memo.spawn_fiber b.u.m begin fun () ->
         B00.Memo.delete b.u.m b.b.build_dir @@ fun () ->
         B00.Memo.mkdir b.u.m b.b.build_dir @@ fun () ->
+        B00.Memo.mkdir b.u.m (B00.Store.dir b.b.store) @@ fun () ->
         run_units b;
       end;
       B00.Memo.stir ~block:true b.u.m;

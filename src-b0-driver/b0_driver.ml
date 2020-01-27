@@ -240,19 +240,6 @@ module Compile = struct
     B00.Memo.write m ~reads src_file @@ fun () ->
     Ok (B0_file.expanded_src esrc)
 
-  let find_compiler c m =
-    (* XXX something like this should be moved to B0 care. *)
-    let comp t code m = B00.Memo.tool m t, code in
-    let byte m = comp B00_ocaml.Tool.ocamlc B00_ocaml.Cobj.Byte m in
-    let native m = comp B00_ocaml.Tool.ocamlopt B00_ocaml.Cobj.Native m in
-    match Conf.code c with
-    | Some B00_ocaml.Cobj.Byte -> byte m
-    | Some B00_ocaml.Cobj.Native -> native m
-    | None ->
-        match B00.Memo.tool_opt m B00_ocaml.Tool.ocamlopt with
-        | None -> byte m
-        | Some comp -> comp, B00_ocaml.Cobj.Native
-
   let base_libs =
     [ B00_ocaml.Lib_name.v "cmdliner/cmdliner";
       B00_ocaml.Lib_name.v "ocaml/unix"; (* FIXME system switches *)
@@ -271,13 +258,13 @@ module Compile = struct
     in
     loop [] libs
 
-  let find_libs m ~build_dir ~driver f k =
+  let find_libs m ~build_dir ~driver ~requires k =
     B00_ocaml.Ocamlpath.get m None @@ fun ocamlpath ->
     let memo_dir = Fpath.(build_dir / "ocaml-lib-resolve") in
     let r = B00_ocaml.Lib_resolver.create m ~memo_dir ~ocamlpath in
+    let requires = List.map fst requires in
     (* FIXME we are loosing locations here would be nice to
        have them to report errors. *)
-    let requires = List.map fst (B0_file.requires f) in
     find_libs requires r @@ fun requires ->
     find_libs (libs driver) r @@ fun driver_libs ->
     find_libs base_libs r @@ fun base_libs ->
@@ -285,19 +272,37 @@ module Compile = struct
     let seen_libs = base_libs @ requires in
     k (all_libs, seen_libs)
 
-  let compile_src m
-      (comp, code) ~build_dir ~all_libs ~seen_libs ~clib_ext ~src_file ~exe
-    =
-    let base = Fpath.rem_ext src_file in
-    let writes = match code with
-    | B00_ocaml.Cobj.Byte -> [ Fpath.(base + ".cmo"); exe ]
-    | B00_ocaml.Cobj.Native ->
-        [ Fpath.(base + ".cmx"); Fpath.(base + ".o"); exe ]
+  let find_compiler c m = match Conf.code c with
+  | Some (B00_ocaml.Cobj.Byte as c) -> B00_ocaml.Tool.ocamlc, c
+  | Some (B00_ocaml.Cobj.Native as c) -> B00_ocaml.Tool.ocamlopt, c
+  | None ->
+      match B00.Memo.tool_opt m B00_ocaml.Tool.ocamlopt with
+      | None -> B00_ocaml.Tool.ocamlc, B00_ocaml.Cobj.Byte
+      | Some comp -> B00_ocaml.Tool.ocamlopt, B00_ocaml.Cobj.Native
+
+  let compile_src m c ~driver ~build_dir src ~exe =
+    let ocaml_conf = Fpath.(build_dir / "ocaml.conf") in
+    let comp, code = find_compiler c m in
+    B00_ocaml.Conf.write m ~comp ~o:ocaml_conf;
+    B00_ocaml.Conf.read m ocaml_conf @@ fun ocaml_conf ->
+    let obj_ext = B00_ocaml.Conf.obj_ext ocaml_conf in
+    let lib_ext = B00_ocaml.Conf.lib_ext ocaml_conf in
+    let comp = B00.Memo.tool m comp in
+    let requires = B0_file.requires src in
+    find_libs m ~build_dir ~driver ~requires @@ fun (all_libs, seen_libs) ->
+    let src_file = Fpath.(build_dir / "src.ml") in
+    write_src m c src ~src_file;
+    let writes =
+      let base = Fpath.rem_ext src_file in
+      let base ext = Fpath.(base + ext) in
+      match code with
+      | B00_ocaml.Cobj.Byte -> [base ".cmo"; exe ]
+      | B00_ocaml.Cobj.Native -> [base ".cmx"; base obj_ext; exe ]
     in
     let dirs = List.map B00_ocaml.Lib.dir seen_libs in
     let incs = Cmd.unstamp @@ Cmd.paths ~slip:"-I" dirs in
     let archives = List.map (B00_ocaml.Lib.archive ~code) all_libs in
-    let c_archives = List.map (fun p -> Fpath.(p -+ clib_ext)) archives in
+    let c_archives = List.map (fun p -> Fpath.(p -+ lib_ext)) archives in
     let ars = List.rev_append archives c_archives in
     (* FIXME this should be done b the resolver *)
     List.iter (B00.Memo.file_ready m) ars;
@@ -312,10 +317,8 @@ module Compile = struct
   let compile c ~driver src =
     Result.bind (Conf.memo c) @@ fun m ->
     let build_dir = build_dir c ~driver in
-    let src_file = Fpath.(build_dir / "src.ml") in
     let log_file = build_log c ~driver in
     let exe = exe c ~driver in
-    let comp = find_compiler c m in
     (* That shit should be streamlined: brzo, odig, b0caml all
        have similar setup/log/reporting bits. *)
     Os.Sig_exit.on_sigint
@@ -323,11 +326,7 @@ module Compile = struct
     B00.Memo.spawn_fiber m begin fun () ->
       B00.Memo.delete m build_dir @@ fun () ->
       B00.Memo.mkdir m build_dir @@ fun () ->
-      write_src m c src ~src_file;
-      find_libs m ~build_dir ~driver src @@ fun (all_libs, seen_libs) ->
-      B00_ocaml.Conf.lib_ext m @@ fun clib_ext ->
-      compile_src m comp
-        ~build_dir ~all_libs ~seen_libs ~clib_ext ~src_file ~exe;
+      compile_src m c ~driver ~build_dir src ~exe;
     end;
     B00.Memo.stir ~block:true m;
     write_log_file ~log_file m;

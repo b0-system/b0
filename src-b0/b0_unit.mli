@@ -41,11 +41,12 @@ module Build : sig
   type t = build
 
   val memo : t -> B00.Memo.t
+  val store : t -> B00.Store.t
   val locked : t -> bool
 
   module Unit : sig
-    val require : t -> bunit -> unit
     val current : t -> bunit
+    val require : t -> bunit -> unit
     val build_dir : t -> bunit -> Fpath.t
     val root_dir : t -> bunit -> Fpath.t
   end

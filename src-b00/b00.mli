@@ -19,7 +19,7 @@ module Env : sig
 
   type tool_lookup = Cmd.tool -> (Fpath.t, string) result
   (** The type for tool lookups. Given a command line tool
-      {{!type:B0_std.Cmd.tool}specification} returns a file path to
+      {{!type:B00_std.Cmd.tool}specification} returns a file path to
       the tool executable or an error message mentioning the tool if
       it cannot be found. *)
 
@@ -27,10 +27,10 @@ module Env : sig
     ?sep:string -> ?var:string -> Os.Env.t -> tool_lookup
   (** [env_tool_lookup ~sep ~var env] is a tool lookup that gets the
       value of the [var] variable in [env] treats it as a [sep]
-      separated {{!B0_std.Fpath.list_of_search_path}search path} and
-      uses the result to lookup with {!B0_std.Os.Cmd.must_find}.
+      separated {{!B00_std.Fpath.list_of_search_path}search path} and
+      uses the result to lookup with {!B00_std.Os.Cmd.must_find}.
       [var] defaults to [PATH] and [sep] to
-      {!B0_std.Fpath.search_path_sep}. *)
+      {!B00_std.Fpath.search_path_sep}. *)
 
   (** {1:env Environment} *)
 
@@ -124,7 +124,7 @@ module Tool : sig
     ?vars:env_vars -> string -> t
   (** [by_name] is like {!v} but reference the tool directly via a name.
 
-      @raise Invalid_argument if {!B0_std.Fpath.is_seg} [name] is [false]. *)
+      @raise Invalid_argument if {!B00_std.Fpath.is_seg} [name] is [false]. *)
 
   val name : t -> Cmd.tool
   (** [name t] is [t]'s tool name. If this is a relative file path
@@ -177,10 +177,10 @@ module Memo : sig
     (t, string) result
   (** [memo] is a simpler {!create}
       {ul
-      {- [hash_fun] defaults to {!B0_std.Hash.Xxh_64}.}
-      {- [jobs] defaults to {!B0_std.Os.Cpu.logical_count}.}
-      {- [env] defaults to {!B0_std.Os.Env.current}}
-      {- [cwd] defaults to {!B0_std.Os.Dir.cwd}}
+      {- [hash_fun] defaults to {!B00_std.Hash.Xxh_64}.}
+      {- [jobs] defaults to {!B00_std.Os.Cpu.logical_count}.}
+      {- [env] defaults to {!B00_std.Os.Env.current}}
+      {- [cwd] defaults to {!B00_std.Os.Dir.cwd}}
       {- [cache_dir] defaults to [Fpath.(cwd / "_b0" / ".cache")]}
       {- [trash_dir] defaults to [Fpath.(cwd / "_b0" / ".trash")]}
       {- [feedback] defaults to a nop.}} *)
@@ -336,45 +336,9 @@ module Memo : sig
         returns. If [f] raises then the future is set to [Never]. *)
   end
 
-  (** {1:lazy_store Lazy immutable stores} *)
+  (** {1:feedback Feedback}
 
-  (** Lazy immutable in-memory stores.
-
-      These stores provide in-memory immutable storage accessible via
-      typed locations. The values of locations is defined either directly
-      when the store is defined or lazily on first store access. *)
-  module Store : sig
-
-    (** {1:loc Locations} *)
-
-    type memo = t
-    (** See {!Memo.t} *)
-
-    type 'a loc
-    (** The type for locations storing values of type ['a]. *)
-
-    val loc : ?mark:string -> (memo -> 'a fiber) -> 'a loc
-    (** [loc det] is a new store location whose value is determined by
-        [det]. [mark] if specified makes sure the memo given to [det]
-        is {{!mark}marked} by [mark]. *)
-
-    (** {1:stores Stores} *)
-
-    type t
-    (** The type for stores. *)
-
-    type binding = B : 'a loc * 'a -> binding (** *)
-    (** A store binding. Its location and value. *)
-
-    val create : memo -> binding list -> t
-    (** [create bs] is a new store with predefined bindings [bs] using
-        [memo] to determine its locations. *)
-
-    val get : t -> 'a loc -> 'a fiber
-    (** [get m s l] is the value bound to [l] in [s]. *)
-  end
-
-  (** {1:feedback Feedback} *)
+      {b XXX} This needs a bit of reviewing. *)
 
   val notify :
     ?k:(unit -> unit) -> t -> [ `Fail | `Warn | `Start | `End | `Info ] ->
@@ -382,6 +346,14 @@ module Memo : sig
   (** [notify m kind msg] is a notification [msg] of kind [kind]. Note that
       a [`Fail] notification will entail a {!finish_error}, see also {!fail}
       and {!fail_if_error}. *)
+
+  val notify_if_error :
+    t -> [ `Fail | `Warn | `Start | `End | `Info ] -> use:'a ->
+    ('a, string) result -> 'a
+  (** [notify_if_error m kind ~use r] is [v] if [r] is [Ok v]. If [r]
+      is [Error e], a notification of kind [kind] is added to [m]
+      and [use] is returned. Note that a [`Fail] notification will entail
+      a {!finish_error}, see also {!fail} and {!fail_if_error}. *)
 
   (** {1:files Files and directories} *)
 
@@ -457,12 +429,12 @@ module Memo : sig
       {- [stdin] reads input from the given file. If unspecified reads
          from the standard input of the program running the build.  {b
          Warning.} The file is not automatically added to [reads],
-         this allows for example to use {!B0_std.Os.File.null}.}
+         this allows for example to use {!B00_std.Os.File.null}.}
       {- [stdout] and [stderr], the redirections for the standard
          outputs of the command, see {!stdo}. Path to files are
          created if needed. {b Warning.} File redirections
          are not automatically added to [writes]; this allows for example
-         to use {!B0_std.Os.File.null}.}
+         to use {!B00_std.Os.File.null}.}
       {- [success_exits] the exit codes that determine if the build operation
          is successful (defaults to [0], use [[]] to always succeed)}
       {- [env], environment variables added to the build environment.
@@ -507,6 +479,60 @@ module Memo : sig
       determined via the [writes] function, the returned paths must be
       absolute and be prefixed by [writes_root] (defaults to
       recursively list all the files rootet in [writes_root]). *)
+end
+
+(** Lazy immutable stores.
+
+    These stores provide access to immutable, lazily determined, typed
+    key-value bindings.
+
+    The value of a key in a store is defined either:
+    {ul
+    {- Explicitly when the store is {{!create}created}.}
+    {- Lazily on the first key {{!get}access} via a fiber specified
+       at {{!val-key}key creation time}.}}
+    Once determined the value of a key in the store never changes.
+
+    {b XXX.} Maybe move that at the B0 level. *)
+module Store : sig
+
+  (** {1:stores Stores} *)
+
+  type 'a key
+  (** The type for keys binding values of type ['a]. *)
+
+  type binding = B : 'a key * 'a -> binding (** *)
+  (** The type for store bindings. A key and its value. *)
+
+  type t
+  (** The type for stores. *)
+
+  val create : Memo.t -> dir:Fpath.t -> binding list -> t
+  (** [create memo ~dir bs] is a store with predefined bindings [bs].
+      If a key is mentioned more than once in [bs] the last binding
+      takes over. The store uses [memo] to determine other keys as
+      {{!get}needed}.  [dir] is a scratch directory used by key fibers to
+      write memoized file outputs. *)
+
+  val memo : t -> Memo.t
+  (** [memo s] is [s]'s memo as given on {!create}. *)
+
+  val dir : t -> Fpath.t
+  (** [dir s] is the scratch directory of [s]. Key fibers using this
+      directory to write files should do so using nice file name
+      prefixes (e.g. lowercased module or lib names) to avoid name
+      clashes. *)
+
+  val key : ?mark:string -> (t -> Memo.t -> 'a Memo.fiber) -> 'a key
+  (** [key ~mark det] is a new key whose value is determined on
+      {{!get}access} by the fiber:
+{[
+det s (Memo.with_mark mark (Store.memo s))
+]}
+      [mark] defaults to [""]. *)
+
+  val get : t -> 'a key -> 'a Memo.fiber
+  (** [get s k] is the value bound to [k] in [s]. *)
 end
 
 (*---------------------------------------------------------------------------

@@ -17,6 +17,9 @@ type t = B0_unit.build
 val memo : t -> B00.Memo.t
 (** [memo b] the memoizer for the build. *)
 
+val store : t -> B00.Store.t
+(** [store b] is the store for the build. *)
+
 val locked : t -> bool
 (** [locked b] is [true] iff [b] is a locked build. In a locked build
     build units that are built are fixed before the build starts. *)
@@ -26,14 +29,14 @@ module Unit : sig
 
   (** {1:ops Unit operations} *)
 
+  val current : t -> B0_unit.t
+  (** [current b] is [b]'s current unit. In the {{!B0_unit.type-proc}procedure}
+      of build unit that is the unit itself. *)
+
   val require : t -> B0_unit.t -> unit
   (** [require_unit b u] asks to build unit [u] in [b]. This fails the
       fiber if [b] is {!locked} and [u] not part of the initial
       units. *)
-
-  val current : t -> B0_unit.t
-  (** [current b] is [b]'s current unit. In the {{!B0_unit.type-proc}procedure}
-      of build unit that is the unit itself. *)
 
   (** {1:dir Directories} *)
 

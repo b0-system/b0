@@ -6,8 +6,7 @@ B0 describes software construction and deployments using modular and
 customizable definitions written in OCaml.
 
 It also provides the B00 build library which provides arbitrary build
-abstraction with reliable, efficient incremental rebuilds and is also
-provided by this package.
+abstraction with reliable, efficient incremental rebuilds.
 
 {1:manuals Manuals}
 
@@ -33,9 +32,9 @@ B00 is the build model used by B0. It can be used for its own good to
 devise domain specific build system – see for example the [brzo] or
 [odig] tools.
 
-The [b0.b00.std] and [b0.b00.kit] libraries also provide sharp tools
-for quick "scripts" and command line tools even if you are not using
-B00.
+The {{!b00_std}[b0.b00.std]} and {{!b00_kit}[b0.b00.kit]} libraries also
+provide sharp tools for quick "scripts" and command line tools even if you
+are not using {{!b00}[b0.b00]}.
 
 {2:b00_std Library [b0.b00.std]}
 
@@ -53,8 +52,8 @@ The build library.
 
 {2:b00_kit Library [b0.b00.kit]}
 
-Toolkit for working with B00 and B0. Quite a few things do not depend
-on {!B00} itself but are useful to have under your hand.
+Toolkit for working with B00 and B0. A few things do not depend on the
+[b0.b00] library but are useful to have under your hand.
 
 {3:io IO}
 
@@ -69,14 +68,14 @@ B00_serialk_json
 B00_serialk_sexp
 B00_serialk_text}
 
-{3:build_dev Dev tools}
+{3:build_dev Dev tools and info}
 
 {!modules:
 B00_cmark
 B00_github
-B00_machine
 B00_ocaml
 B00_odoc
+B00_os
 B00_vcs}
 
 {3:ui UI fragments}

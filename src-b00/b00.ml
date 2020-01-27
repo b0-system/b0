@@ -125,6 +125,7 @@ module Memo = struct
     let cwd = match cwd with None -> Os.Dir.cwd () | Some cwd -> Ok cwd in
     Result.bind env @@ fun env ->
     Result.bind cwd @@ fun cwd ->
+    (* FIXME remove these defaults. *)
     let cache_dir = match cache_dir with
     | None -> Fpath.(cwd / "_b0" / ".cache") | Some d -> d
     in
@@ -329,60 +330,12 @@ module Memo = struct
       Rqueue.add f.m.m.fiber_ready run; f
   end
 
-  (* Stores *)
-
-  module Store = struct
-
-    (* Locations *)
-
-    type memo = t
-    module Loc = struct
-      type t = V : 'a typed -> t
-      and 'a typed =
-        { uid : int;
-          tid : 'a Tid.t;
-          mark : string;
-          det : memo -> 'a fiber;
-          untyped : t;}
-
-      let uid = let id = ref (-1) in fun () -> incr id; !id
-      let create mark det =
-        let uid = uid () and tid = Tid.create () in
-        let rec l = { uid; tid; mark; det; untyped }
-        and untyped = V l in
-        l
-
-      let compare (V l0) (V l1) = (compare : int -> int -> int) l0.uid l1.uid
-    end
-
-    type 'a loc = 'a Loc.typed
-    let loc ?(mark = "") det = Loc.create mark det
-
-    module Lmap = Map.Make (Loc)
-    type value = V : 'a loc * 'a Fut.t -> value
-    type t = { memo : memo; mutable map : value Lmap.t; }
-
-    type binding = B : 'a loc * 'a -> binding
-    let create memo bs =
-      let add m (B (l, v)) = Lmap.add l.untyped (V (l, Fut.ret memo v)) m in
-      let map = List.fold_left add Lmap.empty bs in
-      { memo; map }
-
-    let get : type a. t -> a loc -> a fiber =
-    fun s l -> match Lmap.find l.Loc.untyped s.map with
-    | exception Not_found ->
-        let memo = with_mark s.memo l.Loc.mark in
-        let fut = Fut.of_fiber memo (l.Loc.det memo) in
-        s.map <- Lmap.add l.Loc.untyped (V (l, fut)) s.map;
-        Fut.await fut
-    | V (l', fut) ->
-        match Tid.equal l.Loc.tid l'.Loc.tid with
-        | None -> assert false
-        | Some Tid.Eq -> Fut.await fut
-  end
   (* Notifications *)
 
   let notify ?k m kind fmt = Fmt.kstr (notify_op m ?k kind) fmt
+  let notify_if_error m kind ~use = function
+  | Ok v -> v
+  | Error e -> notify_op m kind e; use
 
   (* Files *)
 
@@ -536,6 +489,65 @@ module Memo = struct
     in
     _spawn m ?stamp ?reads ~writes_manifest_root:writes_root ?env ?cwd ?stdin
       ?stdout ?stderr ?success_exits ~post_exec ?k cmd
+end
+
+(* Stores *)
+
+module Store = struct
+  module rec Key : sig
+    type t = V : 'a typed -> t
+    and 'a typed =
+      { uid : int; tid : 'a Tid.t; mark : string;
+        det : Store.t -> Memo.t -> 'a Memo.fiber; untyped : t; }
+    val compare : t -> t -> int
+  end = struct
+    type t = V : 'a typed -> t
+    and 'a typed =
+      { uid : int; tid : 'a Tid.t; mark : string;
+        det : Store.t -> Memo.t -> 'a Memo.fiber; untyped : t;}
+    let compare (V l0) (V l1) = (compare : int -> int -> int) l0.uid l1.uid
+  end
+  and Store : sig
+    module Kmap : Map.S with type key = Key.t
+    type binding = B : 'a Key.typed * 'a Memo.Fut.t -> binding
+    type t = { memo : Memo.t; mutable map : binding Kmap.t; dir : Fpath.t }
+  end = struct
+    module Kmap = Map.Make (Key)
+    type binding = B : 'a Key.typed * 'a Memo.Fut.t -> binding
+    type t = { memo : Memo.t; mutable map : binding Kmap.t; dir : Fpath.t }
+  end
+
+  type 'a key = 'a Key.typed
+  type binding = B : 'a key * 'a -> binding
+  type t = Store.t
+
+  let create memo ~dir bs =
+    let add m (B (k, v)) =
+      Store.Kmap.add k.untyped (Store.B (k, Memo.Fut.ret memo v)) m
+    in
+    let map = List.fold_left add Store.Kmap.empty bs in
+    { Store.memo; map; dir : Fpath.t; }
+
+  let memo s = s.Store.memo
+  let dir s = s.Store.dir
+
+  let key_uid = let id = ref (-1) in fun () -> incr id; !id
+  let key ?(mark = "") det =
+    let uid = key_uid () and tid = Tid.create () in
+    let rec k = { Key.uid; tid; mark; det; untyped }
+    and untyped = Key.V k in k
+
+  let get : type a. t -> a key -> a Memo.fiber =
+  fun s k -> match Store.Kmap.find k.Key.untyped s.map with
+  | exception Not_found ->
+      let memo = Memo.with_mark s.memo k.Key.mark in
+      let fut = Memo.Fut.of_fiber memo (k.Key.det s memo) in
+      s.map <- Store.Kmap.add k.Key.untyped (Store.B (k, fut)) s.map;
+      Memo.Fut.await fut
+  | Store.B (l', fut) ->
+      match Tid.equal k.Key.tid l'.Key.tid with
+      | None -> assert false
+      | Some Tid.Eq -> Memo.Fut.await fut
 end
 
 (*---------------------------------------------------------------------------

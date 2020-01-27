@@ -35,6 +35,7 @@ let () =
     Pkg.test "test/test_memo_failures";
     Pkg.test "test/test_memo_no_write";
     Pkg.test "test/test_memo_redir";
+    Pkg.test "test/test_memo_store";
     Pkg.test "test/test_findex";
     Pkg.test "test/test_ocaml_cobj_defs";
     Pkg.test "test/test_b0_file";

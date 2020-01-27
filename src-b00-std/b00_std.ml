@@ -1185,6 +1185,34 @@ module String = struct
       byte_unescaper char_len_at set_char
   end
 
+  (* Version strings *)
+
+  let drop_initial_v s =
+    if s = "" then s else match s.[0] with
+    | 'v' | 'V' -> subrange ~first:1 s
+    | _ -> s
+
+  let to_version s =
+    if s = "" then None else
+    try match cut_left ~sep:"." s with
+    | None -> None
+    | Some (maj, rest) ->
+        let maj = int_of_string (drop_initial_v maj) in
+        match cut_left ~sep:"." rest with
+        | None ->
+            begin match cut_left ~sep:"+" rest with
+            | None -> Some (maj, int_of_string rest, 0, None)
+            | Some (min, i) ->  Some (maj, int_of_string min, 0, Some i)
+            end
+        | Some (min, rest) ->
+            let min = int_of_string min in
+            begin match cut_left ~sep:"+" rest with
+            | None -> Some (maj, min, int_of_string rest, None)
+            | Some (p, i) -> Some (maj, min, int_of_string p, Some i)
+            end
+    with
+    | Failure _ -> None
+
   (* String map and sets *)
 
   module Set = struct

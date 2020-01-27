@@ -1,15 +1,39 @@
 (*---------------------------------------------------------------------------
-   Copyright (c) 2019 The b0 programmers. All rights reserved.
+   Copyright (c) 2018 The b0 programmers. All rights reserved.
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-(** Build and host machine information.
+open B00_std
+open B00
+open Test_memo_setup
 
-    To expand once we get the configuration story in. *)
+let lookup_b00_os build_dir m =
+  let store = Store.create m ~dir:build_dir [] in
+  Store.get store B00_os.name @@ fun n ->
+  Store.get store B00_os.version @@ fun v ->
+  Store.get store B00_os.distribution @@ fun d ->
+  Store.get store B00_os.family @@ fun f ->
+  Store.get store B00_os.arch @@ fun a ->
+  Store.get store B00_os.arch_normalized @@ fun an ->
+  Store.get store B00_os.arch_bits @@ fun bits ->
+  Log.app (fun m ->
+      m "@[<v>%a@,%a@,%a@,%a@,%a@,%a@,%a@]"
+        Fmt.(field "name" id string) n
+        Fmt.(field "version" id string) v
+        Fmt.(field "distribution" id string) d
+        Fmt.(field "family" id string) f
+        Fmt.(field "arch" id string) a
+        Fmt.(field "arch-normalized" id string) an
+        Fmt.(field "arch-bits" id int) bits)
 
+let test_memo_store () =
+  with_memo lookup_b00_os;
+  ()
+
+let () = test_memo_store ()
 
 (*---------------------------------------------------------------------------
-   Copyright (c) 2019 The b0 programmers
+   Copyright (c) 2018 The b0 programmers
 
    Permission to use, copy, modify, and/or distribute this software for any
    purpose with or without fee is hereby granted, provided that the above

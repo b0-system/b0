@@ -25,10 +25,11 @@ let srcs = [ `D "src-exe"; `D_rec "src"; `X "src/not.ml"; `X "src/not"]
     [src/not.ml], [src/not.ml/*], [src/not] and [src/not/*] is
     excluded from the selection. But for example [src/not.c] is not.
 
-    The relative order of selections and exclusions doesn't matter,
-    the semantics is to perform all the directory selections and then
-    apply the exclusions. Exclusions affect only directory selections,
-    not file [`F] and fiber [`Fiber] {{!sel}selections}.
+    The relative order of directory selections and exclusions doesn't
+    matter, the semantics is to select all the files via [`D] and
+    [`D_rec] and then apply the exclusion [`X] on the resulting
+    set. Exclusions affect only directory selections, not file [`F]
+    and fiber [`Fiber] {{!sel}selections}.
 
     When a directory is selected via [`D] or [`D_rec], all its files
     are, modulo exclusions.  It is expected that build units

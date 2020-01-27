@@ -17,7 +17,8 @@ let of_string s = (* adapted from the stdlib's String.split_on_char *)
   String.sub s 0 !j :: !r
 
 let err n fmt = Fmt.failwith_notrace ("%d:" ^^ fmt) n
-let err_file file e = Fmt.error "%a:%s" Fpath.pp_unquoted file e
+let err_file ?(file = Os.File.dash) e =
+  Fmt.error "%a:%s" Fpath.pp_unquoted file e
 
 let fold ?(file = Os.File.dash) data f acc =
   if String.equal data "" then Ok acc else
@@ -25,7 +26,7 @@ let fold ?(file = Os.File.dash) data f acc =
   | [] -> acc
   | l :: ls -> loop f (f n l acc) (n + 1) ls
   in
-  try Ok (loop f acc 1 (of_string data)) with Failure e -> err_file file e
+  try Ok (loop f acc 1 (of_string data)) with Failure e -> err_file ~file e
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2019 The b0 programmers
