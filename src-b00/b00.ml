@@ -329,6 +329,57 @@ module Memo = struct
       Rqueue.add f.m.m.fiber_ready run; f
   end
 
+  (* Stores *)
+
+  module Store = struct
+
+    (* Locations *)
+
+    type memo = t
+    module Loc = struct
+      type t = V : 'a typed -> t
+      and 'a typed =
+        { uid : int;
+          tid : 'a Tid.t;
+          group : string;
+          det : memo -> 'a fiber;
+          untyped : t;}
+
+      let uid = let id = ref (-1) in fun () -> incr id; !id
+      let create group det =
+        let uid = uid () and tid = Tid.create () in
+        let rec l = { uid; tid; group; det; untyped }
+        and untyped = V l in
+        l
+
+      let compare (V l0) (V l1) = (compare : int -> int -> int) l0.uid l1.uid
+    end
+
+    type 'a loc = 'a Loc.typed
+    let loc ?(group = "") det = Loc.create group det
+
+    module Lmap = Map.Make (Loc)
+    type value = V : 'a loc * 'a Fut.t -> value
+    type t = { memo : memo; mutable map : value Lmap.t; }
+
+    type binding = B : 'a loc * 'a -> binding
+    let create memo bs =
+      let add m (B (l, v)) = Lmap.add l.untyped (V (l, Fut.ret memo v)) m in
+      let map = List.fold_left add Lmap.empty bs in
+      { memo; map }
+
+    let get : type a. t -> a loc -> a fiber =
+    fun s l -> match Lmap.find l.Loc.untyped s.map with
+    | exception Not_found ->
+        let memo = with_group s.memo l.Loc.group in
+        let fut = Fut.of_fiber memo (l.Loc.det memo) in
+        s.map <- Lmap.add l.Loc.untyped (V (l, fut)) s.map;
+        Fut.await fut
+    | V (l', fut) ->
+        match Tid.equal l.Loc.tid l'.Loc.tid with
+        | None -> assert false
+        | Some Tid.Eq -> Fut.await fut
+  end
   (* Notifications *)
 
   let notify ?k m kind fmt = Fmt.kstr (notify_op m ?k kind) fmt

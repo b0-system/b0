@@ -158,7 +158,8 @@ module Memo : sig
   type feedback =
   [ `Miss_tool of Tool.t * string
   | `Op_complete of B000.Op.t ]
-  (** The type for memoizer feedback. *)
+  (** The type for memoizer feedback. FIXME remove `Miss_tool now
+      that we have notify operations. *)
 
   type t
   (** The type for memoizers. This ties together an environment, a
@@ -322,7 +323,48 @@ module Memo : sig
         returns. If [f] raises then the future is set to [Never]. *)
   end
 
-  (** {1:group Operation groups} *)
+  (** {1:lazy_store Lazy immutable stores} *)
+
+  (** Lazy immutable in-memory stores.
+
+      These stores provide in-memory immutable storage accessible via
+      typed locations. The values of locations is defined either directly
+      when the store is defined or lazily on first store access. *)
+  module Store : sig
+
+    (** {1:loc Locations} *)
+
+    type memo = t
+    (** See {!Memo.t} *)
+
+    type 'a loc
+    (** The type for locations storing values of type ['a]. *)
+
+    val loc : ?group:string -> (memo -> 'a fiber) -> 'a loc
+    (** [loc det] is a new store location whose value is determined by
+        [det]. [group] if specified makes sure the memo given to [det]
+        has that group. *)
+
+    (** {1:stores Stores} *)
+
+    type t
+    (** The type for stores. *)
+
+    type binding = B : 'a loc * 'a -> binding (** *)
+    (** A store binding. Its location and value. *)
+
+    val create : memo -> binding list -> t
+    (** [create bs] is a new store with predefined bindings [bs] using
+        [memo] to determine its locations. *)
+
+    val get : t -> 'a loc -> 'a fiber
+    (** [get m s l] is the value bound to [l] in [s]. *)
+  end
+
+  (** {1:group Operation groups}
+
+      Activity marks are just identifiers used for UI purposes to mark
+      the activity – notably build operations – occuring in the memo. *)
 
   val group : t -> string
   (** [group m] is [m]'s group. *)
