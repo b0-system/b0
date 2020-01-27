@@ -193,8 +193,9 @@ module Op : sig
   type id = int
   (** The type for build operation identifiers. *)
 
-  type group = string
-  (** The type for build operation groups. *)
+  type mark = string
+  (** The type for build operation marks. Marks have no special semantics
+      they are just used to label operations for UI purposes. *)
 
   type t
   (** The type for build operations. *)
@@ -211,7 +212,7 @@ module Op : sig
     (** The type for file copies. *)
 
     val v_op :
-      id:id -> group:group -> created:Time.span -> ?post_exec:(op -> unit) ->
+      id:id -> mark:mark -> created:Time.span -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> mode:int -> linenum:int option -> src:Fpath.t ->
       Fpath.t -> op
     (** [v] declares a file copy operation, see the corresponding
@@ -247,7 +248,7 @@ module Op : sig
     (** The type for path deletion operations. *)
 
     val v_op :
-      id:id -> group:group -> created:Time.span -> ?post_exec:(op -> unit) ->
+      id:id -> mark:mark -> created:Time.span -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> Fpath.t -> op
     (** [v_op] declares a path deletion operation, see the corresponding
         accessors for the semantics of the various arguments. *)
@@ -272,7 +273,7 @@ module Op : sig
     (** The type for directory creation operations. *)
 
     val v_op :
-      id:id -> group:group -> mode:int -> created:Time.span ->
+      id:id -> mark:mark -> mode:int -> created:Time.span ->
       ?post_exec:(op -> unit) -> ?k:(op -> unit) -> Fpath.t -> op
     (** [v_op] declares a directory creation operation, see the
         corresponding accessors for the semantics of the various
@@ -304,7 +305,7 @@ module Op : sig
     (** The type for kinds of notifications. *)
 
     val v_op :
-      id:id -> group:group -> created:Time.span -> ?post_exec:(op -> unit) ->
+      id:id -> mark:mark -> created:Time.span -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> kind -> string -> op
     (** [v_op] declares a notification operation see the corresponding
         accessors in {!Notify} for the semantics of the various
@@ -333,7 +334,7 @@ module Op : sig
     (** The type for file read operations. *)
 
     val v_op :
-      id:id -> group:group -> created:Time.span -> ?post_exec:(op -> unit) ->
+      id:id -> mark:mark -> created:Time.span -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> Fpath.t -> op
     (** [v_op] declares a file read operation, see the corresponding
         accessors in {!Read} for the semantics of the various
@@ -383,7 +384,7 @@ module Op : sig
     (** The type for process spawn operations. *)
 
     val v_op :
-      id:id -> group:group -> created:Time.span -> reads:Fpath.t list ->
+      id:id -> mark:mark -> created:Time.span -> reads:Fpath.t list ->
       writes:Fpath.t list -> ?writes_manifest_root:Fpath.t ->
       ?post_exec:(op -> unit) -> ?k:(op -> unit) ->
       stamp:string -> env:Os.Env.assignments ->
@@ -471,7 +472,7 @@ module Op : sig
     (** The type for wait files operations. *)
 
     val v_op :
-      id:id -> group:group -> created:Time.span -> ?post_exec:(op -> unit) ->
+      id:id -> mark:mark -> created:Time.span -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> Fpath.t list -> op
     (** [v] declares a wait files operation, these are stored in
           {!reads}. *)
@@ -489,7 +490,7 @@ module Op : sig
     (** The type for file write operations. *)
 
     val v_op :
-      id:id -> group:group -> created:Time.span -> ?post_exec:(op -> unit) ->
+      id:id -> mark:mark -> created:Time.span -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> stamp:string -> reads:Fpath.t list -> mode:int ->
       write:Fpath.t -> (unit -> (string, string) result) -> op
     (** [write] declares a file write operations, see the corresponding
@@ -536,7 +537,7 @@ module Op : sig
   (** [kind_name k] is an end user name for kind [k]. *)
 
   val v :
-    id -> group:group -> time_created:Time.span -> time_started:Time.span ->
+    id -> mark:mark -> time_created:Time.span -> time_started:Time.span ->
     duration:Time.span -> revived:bool -> status:status ->
     reads:Fpath.t list -> writes:Fpath.t list ->
     writes_manifest_root:Fpath.t option -> hash:Hash.t ->
@@ -556,8 +557,8 @@ module Op : sig
   val id : t -> id
   (** [id o] is the identifier of operation [o]. *)
 
-  val group : t -> string
-  (** [group o] is the group of [o]. *)
+  val mark : t -> string
+  (** [mark o] is the mark of [o]. *)
 
   val time_created : t -> Time.span
   (** [time_created o] is [o]'s creation time. *)

@@ -794,7 +794,7 @@ module Lib_resolver = struct
       mutable libs : Lib.t Lib_name.Map.t; }
 
   let create memo ~memo_dir ~ocamlpath =
-    let memo = B00.Memo.with_group memo "b00.ocaml.lib-resolver" in
+    let memo = B00.Memo.with_mark memo "b00.ocaml.lib-resolver" in
     { memo; memo_dir; ocamlpath; libs = Lib_name.Map.empty }
 
   let dir_files_by_ext r dir =

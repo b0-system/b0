@@ -86,7 +86,7 @@ module Memo = struct
   | `Op_complete of Op.t ]
 
   type t = { c : ctx; m : memo }
-  and ctx = { group : Op.group }
+  and ctx = { mark : Op.mark }
   and memo =
     { clock : Time.counter;
       cpu_clock : Time.cpu_counter;
@@ -106,7 +106,7 @@ module Memo = struct
     let clock = match clock with None -> Time.counter () | Some c -> c in
     let cpu_clock = match cc with None -> Time.cpu_counter () | Some c -> c in
     let fiber_ready = Rqueue.empty () and op_id = 0 and  ops = [] in
-    let c = { group = "" } in
+    let c = { mark = "" } in
     let m =
       { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec; fiber_ready;
         has_failures = false; op_id; ops; ready_roots = Fpath.Set.empty }
@@ -152,8 +152,8 @@ module Memo = struct
   let ops m = m.m.ops
   let timestamp m = Time.count m.m.clock
   let new_op_id m = let id = m.m.op_id in m.m.op_id <- id + 1; id
-  let group m = m.c.group
-  let with_group m group = { c = { group }; m = m.m }
+  let mark m = m.c.mark
+  let with_mark m mark = { c = { mark }; m = m.m }
   let has_failures m = m.m.has_failures
   let add_op m o = m.m.ops <- o :: m.m.ops; Guard.add m.m.guard o
 
@@ -165,7 +165,7 @@ module Memo = struct
   let notify_op m ?k kind msg =
     let k = match k with None -> None | Some k -> Some (fun o -> k ()) in
     let id = new_op_id m and created = timestamp m in
-    let o = Op.Notify.v_op ~id ~group:m.c.group ~created ?k kind msg in
+    let o = Op.Notify.v_op ~id ~mark:m.c.mark ~created ?k kind msg in
     add_op m o
 
   let notify_reviver_error m kind o e =
@@ -341,14 +341,14 @@ module Memo = struct
       and 'a typed =
         { uid : int;
           tid : 'a Tid.t;
-          group : string;
+          mark : string;
           det : memo -> 'a fiber;
           untyped : t;}
 
       let uid = let id = ref (-1) in fun () -> incr id; !id
-      let create group det =
+      let create mark det =
         let uid = uid () and tid = Tid.create () in
-        let rec l = { uid; tid; group; det; untyped }
+        let rec l = { uid; tid; mark; det; untyped }
         and untyped = V l in
         l
 
@@ -356,7 +356,7 @@ module Memo = struct
     end
 
     type 'a loc = 'a Loc.typed
-    let loc ?(group = "") det = Loc.create group det
+    let loc ?(mark = "") det = Loc.create mark det
 
     module Lmap = Map.Make (Loc)
     type value = V : 'a loc * 'a Fut.t -> value
@@ -371,7 +371,7 @@ module Memo = struct
     let get : type a. t -> a loc -> a fiber =
     fun s l -> match Lmap.find l.Loc.untyped s.map with
     | exception Not_found ->
-        let memo = with_group s.memo l.Loc.group in
+        let memo = with_mark s.memo l.Loc.mark in
         let fut = Fut.of_fiber memo (l.Loc.det memo) in
         s.map <- Lmap.add l.Loc.untyped (V (l, fut)) s.map;
         Fut.await fut
@@ -405,32 +405,32 @@ module Memo = struct
       let data = Op.Read.data r in
       Op.Read.discard_data r; k data
     in
-    let o = Op.Read.v_op ~id ~group:m.c.group ~created ~k file in
+    let o = Op.Read.v_op ~id ~mark:m.c.mark ~created ~k file in
     add_op_and_stir m o
 
   let wait_files m files k =
     let id = new_op_id m and created = timestamp m and k o = k () in
-    let o = Op.Wait_files.v_op ~id ~group:m.c.group ~created ~k files in
+    let o = Op.Wait_files.v_op ~id ~mark:m.c.mark ~created ~k files in
     add_op_and_stir m o
 
   let write m ?(stamp = "") ?(reads = []) ?(mode = 0o644) write d =
-    let id = new_op_id m and group = m.c.group and created = timestamp m in
-    let o = Op.Write.v_op ~id ~group ~created ~stamp ~reads ~mode ~write d in
+    let id = new_op_id m and mark = m.c.mark and created = timestamp m in
+    let o = Op.Write.v_op ~id ~mark ~created ~stamp ~reads ~mode ~write d in
     add_op_and_stir m o
 
   let copy m ?(mode = 0o644) ?linenum ~src dst =
-    let id = new_op_id m and group = m.c.group and created = timestamp m in
-    let o = Op.Copy.v_op ~id ~group ~created ~mode ~linenum ~src dst in
+    let id = new_op_id m and mark = m.c.mark and created = timestamp m in
+    let o = Op.Copy.v_op ~id ~mark ~created ~mode ~linenum ~src dst in
     add_op_and_stir m o
 
   let mkdir m ?(mode = 0o755) dir k =
     let id = new_op_id m and created = timestamp m and k o = k () in
-    let o = Op.Mkdir.v_op ~id ~group:m.c.group ~created ~k ~mode dir in
+    let o = Op.Mkdir.v_op ~id ~mark:m.c.mark ~created ~k ~mode dir in
     add_op_and_stir m o
 
   let delete m p k =
     let id = new_op_id m and created = timestamp m and k o = k () in
-    let o = Op.Delete.v_op ~id ~group:m.c.group ~created ~k p in
+    let o = Op.Delete.v_op ~id ~mark:m.c.mark ~created ~k p in
     add_op_and_stir m o
 
   (* FIXME better strategy to deal with builded tools. If the tool is a
@@ -505,7 +505,7 @@ module Memo = struct
         in
         let o =
           Op.Spawn.v_op
-            ~id ~group:m.c.group ~created ~reads ~writes ?writes_manifest_root
+            ~id ~mark:m.c.mark ~created ~reads ~writes ?writes_manifest_root
             ?post_exec ~k ~stamp ~env ~stamped_env ~cwd ~stdin ~stdout ~stderr
             ~success_exits tool.tool_file cmd.cmd_args
         in

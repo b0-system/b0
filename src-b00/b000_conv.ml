@@ -137,7 +137,7 @@ module Op = struct
       let h = Op.hash o in if Hash.is_nil h then () else
       (Fmt.sp ppf (); pp_revived ppf o; Fmt.char ppf ':'; pp_hash ppf h)
     in
-    let pp_group ppf o = match Op.group o with
+    let pp_mark ppf o = match Op.mark o with
     | "" -> () | g -> Fmt.sp ppf (); Fmt.string ppf g
     in
     let pp_dur ppf o = match Op.status o with
@@ -145,7 +145,7 @@ module Op = struct
     | _ -> ()
     in
     Fmt.pf ppf "[%a%a:%a%a%a%a]"
-      pp_status o pp_id o pp_kind_name o pp_dur o pp_group o pp_op_hash o
+      pp_status o pp_id o pp_kind_name o pp_dur o pp_mark o pp_op_hash o
 
   let pp_op_extra ppf o =
     let pp_spawn_stdo_ui ppf s = match (Op.Spawn.stdo_ui s) with
@@ -210,7 +210,7 @@ module Op = struct
           (Fmt.tty_string style_cmd_tool) ppf name
       | k -> pp_kind_line ppf o
       in
-      let pp_group ppf o = match Op.group o with
+      let pp_mark ppf o = match Op.mark o with
       | "" -> () | g -> Fmt.string ppf g; Fmt.sp ppf ()
       in
       let pp_status ppf o = match Op.status o with
@@ -223,7 +223,7 @@ module Op = struct
       | _ -> ()
       in
       Fmt.pf ppf "@[%a[%a%a]%a: %a@]"
-        pp_status o pp_group o pp_ui_kind o if_spawn_pp_spawn_exit o
+        pp_status o pp_mark o pp_ui_kind o if_spawn_pp_spawn_exit o
         (Fmt.tty [`Faint] (Fmt.parens op_howto)) o
     in
     match Op.kind o with
@@ -609,7 +609,7 @@ module Op = struct
 
   let enc b o =
     Bincode.enc_int b (Op.id o);
-    Bincode.enc_string b (Op.group o);
+    Bincode.enc_string b (Op.mark o);
     Bincode.enc_time_span b (Op.time_created o);
     Bincode.enc_time_span b (Op.time_started o);
     Bincode.enc_time_span b (Op.duration o);
@@ -625,7 +625,7 @@ module Op = struct
   let dec s i =
     let k o = invalid_arg "deserialized op, no kontinuation" in
     let i, id = Bincode.dec_int s i in
-    let i, group = Bincode.dec_string s i in
+    let i, mark = Bincode.dec_string s i in
     let i, time_created = Bincode.dec_time_span s i in
     let i, time_started = Bincode.dec_time_span s i in
     let i, duration = Bincode.dec_time_span s i in
@@ -636,7 +636,7 @@ module Op = struct
     let i, writes_manifest_root = (Bincode.dec_option Bincode.dec_fpath) s i in
     let i, hash = Bincode.dec_hash s i in
     let i, kind = dec_kind s i in
-    i, Op.v id ~group ~time_created ~time_started ~duration ~revived
+    i, Op.v id ~mark ~time_created ~time_started ~duration ~revived
       ~status ~reads ~writes ~writes_manifest_root ~hash ~k kind
 
   let bincode = Bincode.v enc dec

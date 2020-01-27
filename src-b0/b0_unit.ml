@@ -99,7 +99,7 @@ module Build = struct
   end
 
   let run_unit b unit =
-    let m = B00.Memo.with_group b.u.m (name unit) in
+    let m = B00.Memo.with_mark b.u.m (name unit) in
     let u = { current = Some unit; m } in
     let b = { b with u } in
     B00.Memo.mkdir b.u.m (Unit.build_dir b unit) @@ fun () ->

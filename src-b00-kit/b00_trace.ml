@@ -76,7 +76,7 @@ module Trace_event = struct
     (* The order here is for the viewer. *)
     Jsong.obj
     |> Jsong.mem "kind" (Jsong.string (Op.kind_name (Op.kind o)))
-    |> Jsong.mem "group" (Jsong.string (Op.group o))
+    |> Jsong.mem "mark" (Jsong.string (Op.mark o))
     |> Jsong.mem "status"
       (Jsong.string (B000_conv.Op.status_to_string (Op.status o)))
     |> Jsong.mem "revived" (Jsong.bool (Op.revived o))

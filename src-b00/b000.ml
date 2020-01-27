@@ -505,10 +505,10 @@ module Op = struct
   | Wait_files _ -> "wait" | Write _ -> "write"
 
   type id = int
-  type group = string
+  type mark = string
   type t =
     { id : id;
-      group : group;
+      mark : mark;
       time_created : Time.span;
       mutable time_started : Time.span;
       mutable duration : Time.span;
@@ -524,23 +524,23 @@ module Op = struct
 
   type op = t
   let v
-      id ~group ~time_created ~time_started ~duration ~revived ~status ~reads
+      id ~mark ~time_created ~time_started ~duration ~revived ~status ~reads
       ~writes ~writes_manifest_root ~hash ?post_exec ?k kind
     =
-    { id; group; time_created; time_started; duration; revived; status; reads;
+    { id; mark; time_created; time_started; duration; revived; status; reads;
       writes; writes_manifest_root; hash; post_exec; k; kind; }
 
   let v_kind
-      ~id ~group ~created ~reads ~writes ?writes_manifest_root ?post_exec ?k
+      ~id ~mark ~created ~reads ~writes ?writes_manifest_root ?post_exec ?k
       kind
     =
     let time_started = Time.Span.max and duration = Time.Span.zero in
     let revived = false and status = Waiting and hash = Hash.nil in
-    { id; group; time_created = created; time_started; duration; revived;
+    { id; mark; time_created = created; time_started; duration; revived;
       status; reads; writes; writes_manifest_root; hash; post_exec; k; kind }
 
   let id o = o.id
-  let group o = o.group
+  let mark o = o.mark
   let kind o = o.kind
   let time_created o = o.time_created
   let time_started o = o.time_started
@@ -596,13 +596,13 @@ module Op = struct
     let dst c = c.copy_dst
     let mode c = c.copy_mode
     let linenum c = c.copy_linenum
-    let v_op ~id ~group ~created ?post_exec ?k ~mode ~linenum ~src dst
+    let v_op ~id ~mark ~created ?post_exec ?k ~mode ~linenum ~src dst
       =
       let c = { copy_src = src; copy_dst = dst; copy_mode = mode;
                 copy_linenum = linenum }
       in
       let reads = [src] and writes = [dst] in
-      v_kind ~id ~group ~created ~reads ~writes ?post_exec ?k (Copy c)
+      v_kind ~id ~mark ~created ~reads ~writes ?post_exec ?k (Copy c)
   end
 
   module Delete = struct
@@ -610,9 +610,9 @@ module Op = struct
     let v ~path = { delete_path = path }
     let get o = match o.kind with Delete d -> d | _ -> assert false
     let path d = d.delete_path
-    let v_op ~id ~group ~created ?post_exec ?k delete_path =
+    let v_op ~id ~mark ~created ?post_exec ?k delete_path =
       let d = { delete_path } in
-      v_kind ~id ~group ~created ~reads:[] ~writes:[] ?post_exec ?k (Delete d)
+      v_kind ~id ~mark ~created ~reads:[] ~writes:[] ?post_exec ?k (Delete d)
   end
 
   module Mkdir = struct
@@ -621,10 +621,10 @@ module Op = struct
     let get o = match o.kind with Mkdir mk -> mk | _ -> assert false
     let dir mk = mk.mkdir_dir
     let mode mk = mk.mkdir_mode
-    let v_op ~id ~group ~mode ~created ?post_exec ?k dir =
+    let v_op ~id ~mark ~mode ~created ?post_exec ?k dir =
       let mkdir = { mkdir_dir = dir; mkdir_mode = mode } in
       v_kind
-        ~id ~group ~created ~reads:[] ~writes:[dir] ?post_exec ?k (Mkdir mkdir)
+        ~id ~mark ~created ~reads:[] ~writes:[dir] ?post_exec ?k (Mkdir mkdir)
   end
 
   module Notify = struct
@@ -634,9 +634,9 @@ module Op = struct
     let get o = match o.kind with Notify n -> n | _ -> assert false
     let kind n = n.notify_kind
     let msg n = n.notify_msg
-    let v_op ~id ~group ~created ?post_exec ?k notify_kind notify_msg =
+    let v_op ~id ~mark ~created ?post_exec ?k notify_kind notify_msg =
       let n = { notify_kind; notify_msg } in
-      v_kind ~id ~group ~created ~reads:[] ~writes:[] ?post_exec ?k (Notify n)
+      v_kind ~id ~mark ~created ~reads:[] ~writes:[] ?post_exec ?k (Notify n)
   end
 
   module Read = struct
@@ -647,10 +647,10 @@ module Op = struct
     let data r = r.read_data
     let set_data r d = r.read_data <- d
     let discard_data r = r.read_data <- ""
-    let v_op ~id ~group ~created ?post_exec ?k file =
+    let v_op ~id ~mark ~created ?post_exec ?k file =
       let read = { read_file = file; read_data = "" } in
       v_kind
-        ~id ~group ~created ~reads:[file] ~writes:[] ?post_exec ?k (Read read)
+        ~id ~mark ~created ~reads:[file] ~writes:[] ?post_exec ?k (Read read)
   end
 
   module Spawn = struct
@@ -690,7 +690,7 @@ module Op = struct
         | cs -> Failed (Exec None)
 
     let v_op
-        ~id ~group ~created ~reads ~writes ?writes_manifest_root ?post_exec
+        ~id ~mark ~created ~reads ~writes ?writes_manifest_root ?post_exec
         ?k ~stamp ~env ~stamped_env ~cwd ~stdin ~stdout ~stderr ~success_exits
         tool args
       =
@@ -700,15 +700,15 @@ module Op = struct
                 spawn_exit = None }
       in
       v_kind
-        ~id ~group ~created ~reads ~writes ?writes_manifest_root ?post_exec ?k
+        ~id ~mark ~created ~reads ~writes ?writes_manifest_root ?post_exec ?k
         spawn
   end
 
   module Wait_files = struct
     type t = wait_files
     let v () = ()
-    let v_op ~id ~group ~created ?post_exec ?k reads =
-      v_kind ~id ~group ~created ~reads ~writes:[] ?post_exec ?k (Wait_files ())
+    let v_op ~id ~mark ~created ?post_exec ?k reads =
+      v_kind ~id ~mark ~created ~reads ~writes:[] ?post_exec ?k (Wait_files ())
   end
 
   module Write = struct
@@ -737,11 +737,11 @@ module Op = struct
             Fmt.exn_backtrace (e, bt)
 
     let v_op
-        ~id ~group ~created ?post_exec ?k ~stamp:write_stamp ~reads ~mode
+        ~id ~mark ~created ?post_exec ?k ~stamp:write_stamp ~reads ~mode
         ~write:f write_data
       =
       let w = { write_stamp; write_mode = mode; write_file = f; write_data } in
-      v_kind ~id ~group ~created ~reads ~writes:[f] ?post_exec ?k (Write w)
+      v_kind ~id ~mark ~created ~reads ~writes:[f] ?post_exec ?k (Write w)
   end
 
   let abort o =

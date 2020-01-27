@@ -116,11 +116,11 @@ module Op : sig
 
   val select :
     reads:Fpath.t list -> writes:Fpath.t list -> ids:B000.Op.id list ->
-    hashes:Hash.t list -> groups:string list -> B000.Op.t -> bool
-  (** [select ~reads ~writes ~ids ~hashes ~groups o] is [true]
+    hashes:Hash.t list -> marks:string list -> B000.Op.t -> bool
+  (** [select ~reads ~writes ~ids ~hashes ~marks o] is [true]
       iff [o] reads a file in [reads] or writes a file in [writes]
       or has its id in [ids], or has its hash in [hashes] or has
-      its [group] in [groups] or if all these selector lists are empty. *)
+      its [mark] in [marks] or if all these selector lists are empty. *)
 
   val select_deps :
     needs:bool -> enables:bool -> recursive:bool -> dom:B000.Op.t list ->
@@ -154,13 +154,13 @@ module Op : sig
 
   (** {1:cli Command line interface} *)
 
-  val groups :
-    ?opts:string list -> ?docs:string -> ?doc:string -> unit ->
+  val marks :
+    ?opts:string list -> ?docs:string -> ?doc:string -> ?docv:string -> unit ->
     string list Cmdliner.Term.t
 
   val select_cli :
     ?docs:string ->
-    ?groups:string list Cmdliner.Term.t ->
+    ?marks:string list Cmdliner.Term.t ->
     unit -> (B000.Op.t -> bool) Cmdliner.Term.t
 
   val select_deps_cli :

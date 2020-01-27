@@ -239,6 +239,19 @@ module Memo : sig
   (** [ops m] is the list of operations that were submitted to the
       memoizer *)
 
+  (** {1:marks Activity marks}
+
+      Activity marks are just identifiers used for UI purposes to
+      watermark the activity – notably build operations – occuring in
+      the memo. *)
+
+  val mark : t -> string
+  (** [mark m] is [m]'s mark. *)
+
+  val with_mark : t -> string -> t
+  (** [mark m mark] is [m] but operations performed on [m] are marked by
+      [mark]. *)
+
   (** {1:fibers Futures and fibers} *)
 
   type 'a fiber = ('a -> unit) -> unit
@@ -340,10 +353,10 @@ module Memo : sig
     type 'a loc
     (** The type for locations storing values of type ['a]. *)
 
-    val loc : ?group:string -> (memo -> 'a fiber) -> 'a loc
+    val loc : ?mark:string -> (memo -> 'a fiber) -> 'a loc
     (** [loc det] is a new store location whose value is determined by
-        [det]. [group] if specified makes sure the memo given to [det]
-        has that group. *)
+        [det]. [mark] if specified makes sure the memo given to [det]
+        is {{!mark}marked} by [mark]. *)
 
     (** {1:stores Stores} *)
 
@@ -360,17 +373,6 @@ module Memo : sig
     val get : t -> 'a loc -> 'a fiber
     (** [get m s l] is the value bound to [l] in [s]. *)
   end
-
-  (** {1:group Operation groups}
-
-      Activity marks are just identifiers used for UI purposes to mark
-      the activity – notably build operations – occuring in the memo. *)
-
-  val group : t -> string
-  (** [group m] is [m]'s group. *)
-
-  val with_group : t -> string -> t
-  (** [group m g] is [m] but operations performed on [m] have group [g]. *)
 
   (** {1:feedback Feedback} *)
 

@@ -220,9 +220,9 @@ module Op = struct
 
   type query = B000.Op.t list -> B000.Op.t list
 
-  let select ~reads ~writes ~ids ~hashes ~groups =
+  let select ~reads ~writes ~ids ~hashes ~marks =
     let all =
-      reads = [] && writes = [] && ids = [] && hashes = [] && groups = []
+      reads = [] && writes = [] && ids = [] && hashes = [] && marks = []
     in
     if all then fun _ -> true else
     let reads = Fpath.Set.of_list reads in
@@ -231,14 +231,14 @@ module Op = struct
     let mem_writes f = Fpath.Set.mem f writes in
     let hashes = String.Set.of_list (List.rev_map Hash.to_bytes hashes) in
     let mem_hash h = String.Set.mem h hashes in
-    let groups = String.Set.of_list groups in
-    let mem_group g = String.Set.mem g groups in
+    let marks = String.Set.of_list marks in
+    let mem_mark m = String.Set.mem m marks in
     fun o ->
       List.exists (( = ) (Op.id o)) ids ||
       mem_hash (Hash.to_bytes (Op.hash o)) ||
       List.exists mem_reads (Op.reads o) ||
       List.exists mem_writes (Op.writes o) ||
-      mem_group (Op.group o)
+      mem_mark (Op.mark o)
 
   let select_deps ~needs ~enables ~recursive ~dom ops =
     if not needs && not enables then ops else
@@ -304,16 +304,17 @@ module Op = struct
     in
     Arg.conv ~docv:"HASH" (of_string, Hash.pp)
 
-  let groups
-      ?(opts = ["g"; "group"])
+  let marks
+      ?(opts = ["m"; "mark"])
       ?docs
-      ?(doc = "Select operations with group $(docv). Repeatable.")
+      ?(doc = "Select operations marked by $(docv). Repeatable.")
+      ?(docv = "MARK")
       ()
     =
-    let docv = "GROUP" in
-    Arg.(value & opt_all string [] & info ["g"; "group"] ~doc ?docs ~docv)
+    let docv = "MARK" in
+    Arg.(value & opt_all string [] & info ["m"; "mark"] ~doc ?docs ~docv)
 
-  let select_cli ?docs ?(groups = groups () ?docs) () =
+  let select_cli ?docs ?(marks = marks () ?docs) () =
     let reads =
       let doc = "Select operations that read file $(docv). Repeatable." in
       Arg.(value & opt_all B00_std_ui.fpath [] &
@@ -332,10 +333,10 @@ module Op = struct
       let doc = "Select operation with hash $(docv). Repeatable." in
       Arg.(value & opt_all hash [] & info ["hash"] ~doc ?docs ~docv:"HASH")
     in
-    let select reads writes ids hashes groups =
-      select ~reads ~writes ~ids ~hashes ~groups
+    let select reads writes ids hashes marks =
+      select ~reads ~writes ~ids ~hashes ~marks
     in
-    Term.(const select $ reads $ writes $ ids $ hashes $ groups)
+    Term.(const select $ reads $ writes $ ids $ hashes $ marks)
 
   let select_deps_cli ?docs () =
     let needs =
