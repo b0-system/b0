@@ -14,11 +14,11 @@ module Meta = struct
   let requires =
     let doc = "Required OCaml libraries" in
     let pp_value = Fmt.(box @@ list ~sep:sp B00_ocaml.Lib_name.pp) in
-    B0_meta.Key.create "ocaml-requires" ~doc ~pp_value
+    B0_meta.Key.v "ocaml-requires" ~doc ~pp_value
 
   let library =
     let pp_value = Fmt.using B00_ocaml.Lib_name.to_string Fmt.string in
-    B0_meta.Key.create "ocaml-library" ~doc:"Defined OCaml library" ~pp_value
+    B0_meta.Key.v "ocaml-library" ~doc:"Defined OCaml library" ~pp_value
 end
 
 module Unit = struct

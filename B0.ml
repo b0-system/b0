@@ -80,29 +80,26 @@ let show_uri_tool =
 (* Packs *)
 
 let b00_pack =
-  let units = [b00_std_lib; b00_lib; b00_kit_lib] in
-  B0_pack.v "b00" ~doc:"The B00 subsystem" ~locked:true units
+  let us = [b00_std_lib; b00_lib; b00_kit_lib] in
+  B0_pack.v "b00" ~doc:"The B00 subsystem" ~locked:true us
 
 let tool_pack =
-  let units = [ b00_cache_tool; b00_hash_tool; b00_log_tool; show_uri_tool ] in
-  B0_pack.v "b00-tools" ~doc:"The low-level B00 tools" units
+  let us = [ b00_cache_tool; b00_hash_tool; b00_log_tool; show_uri_tool ] in
+  B0_pack.v "b00-tools" ~doc:"The low-level B00 tools" us
 
 let driver_pack =
-  let units = [ b0_tool ] in
-  B0_pack.v "b0-drivers" ~doc:"The B0 drivers" units
+  let us = [ b0_tool ] in
+  B0_pack.v "b0-drivers" ~doc:"The B0 drivers" us
 
 let default =
-  let units = B0_unit.list () in
-  let meta =
-    let open B0_meta in
-    add authors ["The B0 programmers"] @@
-    add maintainers ["Daniel Bünzli <daniel.buenzl i@erratique.ch>"] @@
-    add homepage "https://erratique.ch/software/b0" @@
-    add online_doc "https://erratique.ch/software/b0/doc" @@
-    add licenses ["ISC"; "BSD2"] @@
-    add repo "git+https://erratique.ch/repos/b0.git" @@
-    add issues "https://github.com/b0-system/b0/issues" @@
-    add doc_tags ["dev"; "org:erratique"; "org:b0-system"; "build"] @@
-    empty
+  let us = B0_unit.list () in
+  let meta = B0_meta.v @@ B0_meta.[
+      authors, ["The B0 programmers"];
+      maintainers, ["Daniel Bünzli <daniel.buenzl i@erratique.ch>"];
+      homepage, "https://erratique.ch/software/b0";
+      online_doc, "https://erratique.ch/software/b0/doc";
+      licenses, ["ISC"; "BSD2"];
+      repo, "git+https://erratique.ch/repos/b0.git";
+      issues, "https://github.com/b0-system/b0/issues"]
   in
-  B0_pack.v "b0-system" ~doc:"The B0 system" ~meta ~locked:true units
+  B0_pack.v "b0-system" ~doc:"The B0 system" ~meta ~locked:true us

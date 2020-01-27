@@ -101,7 +101,7 @@ B00_www_browser}
 B0 is the system for describing software construction and deployments
 via {{!page-manual.b0_file}B0 files}.
 
-{2:b0 Library [b0.b0]}
+{2:b0 Library [b0]}
 
 {!modules: B0_def B0_meta B0_build B0_unit B0_pack}
 

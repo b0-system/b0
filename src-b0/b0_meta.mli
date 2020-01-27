@@ -5,13 +5,21 @@
 
 (** Metadata.
 
-    Typed key-value dictionaries with a few {{!standard_keys}standard keys}.
+    Typed key-value dictionaries. Values of this type are used with
+    various B0 definitions to specify metadata.
 
-    {b FIXME.} They used to be serializable, see if we don't want that again. *)
+    The module defines a few {{!std}standard keys} and a list syntax to
+    write metadata literals:
+{[
+let meta = B0_meta.v @@ B0_meta.[
+  authors, ["The project programmers"];
+  homepage, "https://example.org"]
+]}
+    {b XXX.} They used to be serializable, see if we don't want that again. *)
 
 open B00_std
 
-(** {1:meta Metadata} *)
+(** {1:keys Keys} *)
 
 type 'a key
 (** The type for keys whose lookup value is of type ['a].  *)
@@ -21,16 +29,19 @@ module Key : sig
 
   (** {1:typed Typed keys} *)
 
-  val create : ?doc:string -> pp_value:'a Fmt.t -> string -> 'a key
-  (** [create name ~doc ~pp_value] is a new metadata key. [pp] is used to
-      format the key values. [name] is used to format the key name
-      when its binding is formated; it {e should} be globally unique,
-      the module automatically renames it if that happens not to be
-      the case since it's not essential. *)
+  val v : ?doc:string -> pp_value:'a Fmt.t -> string -> 'a key
+  (** [v name ~doc ~pp_value] is a new metadata key with:
+      {ul
+      {- [name] the name used for UI interaction and to format the key name
+         when its binding is formatted . The [name] {e should} be globally
+         unique, the module automatically renames it if that happens not to
+         be the case.}
+      {- [doc] is a documentation string for the key.}
+      {- [pp_value] is used to format the key values.}}  *)
 
   val tag : ?doc:string -> string -> unit key
-  (** [tag ~doc name] is new tag key. Tags can be seen as booleans
-      whose presence in metadata means [true]. *)
+  (** [tag ~doc name] is new tag key. Tags denote booleans, presence in
+      metadata means [true], absence means [false]. *)
 
   val name : 'a key -> string
   (** [name k] is [k]'s name. *)
@@ -43,19 +54,8 @@ module Key : sig
 
   (** {1:exist Existential keys} *)
 
-  type t = V : 'a key -> t
+  type t = V : 'a key -> t (** *)
   (** The type for existential keys. *)
-
-  val find : string -> t option
-  (** [find n] is the key named [n] (if any). *)
-
-  val get : string -> t
-  (** [get n] is the key named [n]. Raises [Invalid_argument] if
-      there is no such key. *)
-
-  val get_or_suggest : string -> (t, t list) result
-  (** [get_or_suggest n] is the key named [n] or or a (possibly empty)
-      list of suggested values whose name could match [n]. *)
 
   val equal : t -> t -> bool
   (** [equal k0 k1] is [true] iff [k] and [k'] are the same key. *)
@@ -68,10 +68,46 @@ module Key : sig
 
   val pp : t Fmt.t
   (** [pp] formats the key name with {!pp_name_str} *)
+
+  (** {1:lookup Lookup keys by name}
+
+      For UI purposes a map from key names to existential keys
+      is maintained by the module. *)
+
+  val find : string -> t option
+  (** [find n] is the key named [n] (if any). *)
+
+  val get : string -> t
+  (** [get n] is the key named [n]. Raises [Invalid_argument] if
+      there is no such key. *)
+
+  val get_or_suggest : string -> (t, t list) result
+  (** [get_or_suggest n] is the key named [n] or or a (possibly empty)
+      list of suggested values whose name could match [n]. *)
 end
+
+(** {1:bind Bindings} *)
+
+type binding = B : 'a key * 'a -> binding
+(** The type for metadata bindings. *)
+
+val pp_binding : binding Fmt.t
+(** [pp_binding] formats a binding using {!B00_std.Fmt.field} and the
+    key's value print function. *)
+
+type bindings =
+| [] : bindings
+| ( :: ) : ('a key * 'a) * bindings -> bindings (** *)
+(** The type for sugared lists of bindings. Just because we can. *)
+
+(** {1:meta Metadata} *)
 
 type t
 (** The type for metadata. *)
+
+val v : bindings -> t
+(** [v bs] is metadata with bindings [vs]. If a key is defined
+    more than once in [bs] the last definition in the list takes over. *)
 
 val empty : t
 (** [empty] is the empty metadata. *)
@@ -94,24 +130,19 @@ val rem : 'a key -> t -> t
 val find : 'a key -> t -> 'a option
 (** [find k m] is the binding of [k] in [m] (if any). *)
 
+val find_binding : 'a key -> t -> binding option
+(** [find_binding k m] is the binding for [k] in [m] (if any). *)
+
+val find_binding_by_name : string -> t -> binding option
+(** [find_binding_by_name n m] is the binding named [n] in [m] (if any). *)
+
 val get : 'a key -> t -> 'a
 (** [get k m] is the binding of [k] in [m]. Raises [Invalid_argument] if
     there is no such binding. *)
 
-(** {1:bindings Bindings} *)
-
-type binding = B : 'a key * 'a -> binding
-(** The type for metadata bindings. *)
-
-val find_binding : 'a key -> t -> binding option
-(** [find_binding k m] is the binding for [k] in [m] (if any). *)
-
 val get_binding : 'a key -> t -> binding
 (** [find_binding k m] is the binding for [k] in [m]. Raises [Invalid_argument]
     if there is no such binding. *)
-
-val find_binding_by_name : string -> t -> binding option
-(** [find_binding_by_name n m] is the binding named [n] in [m] (if any). *)
 
 val get_binding_by_name : string -> t -> binding
 (** [get_binding_by_name n m] is the binding named [n] in [m]. Raises
@@ -119,10 +150,6 @@ val get_binding_by_name : string -> t -> binding
 
 val fold : (binding -> 'a -> 'a) -> t -> 'a -> 'a
 (** [fold f m acc] folds [f] over the bindings of [m] starting with [acc]. *)
-
-val pp_binding : binding Fmt.t
-(** [pp_binding] formats a binding using {!Fmt.field} and the
-    key's value print function. *)
 
 (** {1:fmt Formatting} *)
 
@@ -188,7 +215,8 @@ val lib : unit key
 (** {2:entity Entity properties} *)
 
 val exe_name : string key
-(** [exe_name] is an executable name. *)
+(** [exe_name] is an executable name without the platform specific
+    executable extension. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

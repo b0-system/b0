@@ -31,6 +31,30 @@ module Key = struct
     in
     loop n 1
 
+  (* Typed keys *)
+
+  let uid = let id = ref (-1) in fun () -> incr id; !id
+  let v ?(doc = "undocumented") ~pp_value name =
+    let uid = uid () and tid = Tid.create () and name = ensure_unique name in
+    let rec k = { uid; tid; name; doc; pp_value; untyped } and untyped = V k in
+    by_name := String.Map.add name untyped !by_name; k
+
+  let pp_tag = Fmt.any "true"
+  let tag ?doc name = v ?doc ~pp_value:pp_tag name
+
+  let name k = k.name
+  let doc k = k.doc
+  let pp_value k = k.pp_value
+
+  (* Existential keys *)
+
+  let equal (V k0) (V k1) = k0.uid = k1.uid
+  let compare (V k0) (V k1) = (compare : int -> int -> int) k0.uid k1.uid
+  let pp_name_str = Fmt.tty_string [`Fg `Yellow]
+  let pp ppf (V k) = pp_name_str ppf k.name
+
+  (* Lookup keys by name *)
+
   let find n = match String.Map.find n !by_name with
   | exception Not_found -> None | k -> Some k
 
@@ -44,34 +68,30 @@ module Key = struct
         if String.edit_distance k n <= 2 then v :: acc else acc
       in
       Error (List.rev (String.Map.fold add_sugg !by_name []))
-
-  let uid = let id = ref (-1) in fun () -> incr id; !id
-  let create ?(doc = "undocumented") ~pp_value name =
-    let uid = uid () and tid = Tid.create () and name = ensure_unique name in
-    let rec k = { uid; tid; name; doc; pp_value; untyped } and untyped = V k in
-    by_name := String.Map.add name untyped !by_name; k
-
-  let tag ?doc name =
-    let pp_value ppf () = Fmt.string ppf "true" in
-    create ?doc ~pp_value name
-
-  let name k = k.name
-  let doc k = k.doc
-  let pp_value k = k.pp_value
-
-  let pp_name_str = Fmt.tty_string [`Fg `Yellow]
-  let pp ppf (V k) = pp_name_str ppf k.name
-  let equal (V k0) (V k1) = k0.uid = k1.uid
-  let compare (V k0) (V k1) = (compare : int -> int -> int) k0.uid k1.uid
 end
 
 type 'a key = 'a Key.typed
 
+(* Bindings *)
+
+type binding = B : 'a key * 'a -> binding
+let pp_binding ppf (B (k, v)) = Fmt.field k.Key.name Fmt.id k.Key.pp_value ppf v
+
+type bindings =
+| [] : bindings
+| ( :: ) : ('a key * 'a) * bindings -> bindings
+
 (* Metadata *)
 
 module M = Map.Make (Key)
-type binding = B : 'a key * 'a -> binding
 type t = binding M.t
+
+let v bs =
+  let rec loop acc = function
+  | [] -> acc
+  | (k, v) :: bs -> M.add k.Key.untyped (B (k, v)) acc
+  in
+  loop M.empty bs
 
 let empty = M.empty
 let is_empty = M.is_empty
@@ -87,35 +107,39 @@ let find : type a. a key -> t -> a option =
       | None -> None
       | Some Tid.Eq -> Some v
 
-let err_no_such_key n = Fmt.invalid_arg "Key %s not found in map" n
-
-let get k m = match find k m with
-| Some v -> v | None -> err_no_such_key k.Key.name
-
 let find_binding k m = match M.find k.Key.untyped m with
 | exception Not_found -> None | b -> Some b
-
-let get_binding k m = match find_binding k m with
-| Some v -> v | None -> err_no_such_key k.Key.name
 
 let find_binding_by_name n m = match Key.find n with
 | None -> None
 | Some k -> match M.find k m with exception Not_found -> None | b -> Some b
 
+let err_no_such_key n = Fmt.invalid_arg "Key %s not found in map" n
+
+let get k m = match find k m with
+| Some v -> v | None -> err_no_such_key k.Key.name
+
+let get_binding k m = match find_binding k m with
+| Some v -> v | None -> err_no_such_key k.Key.name
+
 let get_binding_by_name n m = match find_binding_by_name n m with
 | None -> err_no_such_key n | Some v -> v
 
 let fold f m acc = M.fold (fun _ b acc -> f b acc) m acc
-let pp_binding ppf (B (k, v)) = Fmt.field k.Key.name Fmt.id k.Key.pp_value ppf v
+
+(* Formatting *)
+
 let pp = Fmt.vbox @@ Fmt.iter_bindings M.iter (Fmt.using snd pp_binding)
 let pp_non_empty ppf m = match M.is_empty m with
 | true -> () | false -> Fmt.cut ppf (); pp ppf m
 
 (* Standard keys *)
 
-let pp_str_list = Fmt.(list ~sep:sp string)
-let str_key k ~doc = Key.create k ~doc ~pp_value:Fmt.string
-let str_list_key k ~doc = Key.create k ~doc ~pp_value:pp_str_list
+let str_list = Fmt.(list ~sep:sp string)
+let str_list_key k ~doc = Key.v k ~doc ~pp_value:str_list
+let str_key k ~doc = Key.v k ~doc ~pp_value:Fmt.string
+
+(* End-user information. *)
 
 let authors = str_list_key "authors" ~doc:"Author list"
 let doc_tags = str_list_key "doc-tags" ~doc:"Documentation classification tags"
@@ -124,7 +148,9 @@ let issues = str_key "issues" ~doc:"Issue tracker URI"
 let licenses = str_list_key "licenses" ~doc:"License list (SPDX ids)"
 let maintainers = str_list_key "maintainers" ~doc:"Maintainer list"
 let online_doc = str_key "online-doc" ~doc:"Online documentation URI"
-let repo = str_key "repo" ~doc:"VCS repository URI"
+let repo = str_key "repo" ~doc:"VCS source repository URI"
+
+(* Entity tags *)
 
 let bench = Key.tag "bench" ~doc:"Benchmarking entity"
 let build = Key.tag "build" ~doc:"A build system entity"
@@ -134,8 +160,11 @@ let exe = Key.tag "exe" ~doc:"Executable entity"
 let test = Key.tag "test" ~doc:"Testing entity"
 let lib = Key.tag "lib" ~doc:"Library entity"
 
-let exe_name = str_key "exe-name" ~doc:"Executable name"
+(* Entity properties *)
 
+let exe_name =
+  let doc = "Executable name without platform specific extension" in
+  str_key "exe-name" ~doc
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers
