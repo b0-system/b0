@@ -76,6 +76,7 @@ module Json = struct
   let treset d = Buffer.reset d.t [@@ ocaml.inline]
   let taccept d = Buffer.add_char d.t d.i.[d.pos]; accept d; [@@ ocaml.inline]
   let taddc d c = Buffer.add_char d.t c [@@ ocaml.inline]
+  let taddu d u = Tdec.buffer_add_uchar d.t u
   let token d = Buffer.contents d.t [@@ ocaml.inline]
   let eoi d = d.pos = String.length d.i [@@ ocaml.inline]
   let byte d = match eoi d with
@@ -192,12 +193,47 @@ module Json = struct
     in
     treset d; taccept d; taccept_non_sep d
 
+  let rec parse_uescape d hi u count =
+    let pp_ucp ppf d = Format.fprintf ppf "U+%04X" d in
+    let err_not_lo d u = err d "not a low surrogate %a" pp_ucp u in
+    let err_lo d u = err d "lone low surrogate %a" pp_ucp u in
+    let err_hi d u = err d "lone high surrogate %a" pp_ucp u in
+    match count > 0 with
+    | true ->
+        begin match byte d with
+        | c when 0x30 <= c && c <= 0x39 ->
+            accept d; parse_uescape d hi (u * 16 + c - 0x30) (count - 1)
+        | c when 0x41 <= c && c <= 0x46 ->
+            accept d; parse_uescape d hi (u * 16 + c - 0x37) (count - 1)
+        | c when 0x61 <= c && c <= 0x66 ->
+            accept d; parse_uescape d hi (u * 16 + c - 0x57) (count - 1)
+        | c ->
+            err d "expected hex digit found: %C" (Char.chr c)
+        end
+    | false ->
+        match hi with
+        | Some hi -> (* combine high and low surrogate into scalar value. *)
+            if u < 0xDC00 || u > 0xDFFF then err_not_lo d u else
+            let u = ((((hi land 0x3FF) lsl 10) lor (u land 0x3FF)) + 0x10000) in
+            taddu d (Uchar.unsafe_of_int u)
+        | None ->
+            if u < 0xD800 || u > 0xDFFF then taddu d (Uchar.unsafe_of_int u)
+            else if u > 0xDBFF then err_lo d u else
+            match byte d with
+            | 0x5C ->
+                accept d;
+                begin match byte d with
+                | 0x75 -> accept d; parse_uescape d (Some u) 0 4
+                | _ -> err_hi d u
+                end
+            | _ -> err_hi d u
+
   let parse_string d =
     let parse_escape d = match byte d with
     | (0x22 | 0x5C | 0x2F | 0x62 | 0x66 | 0x6E | 0x72 | 0x74 as b) ->
         taddc d (Char.chr b); accept d;
-    | 0x75 -> (* Unicode escapes are not treated. *)
-        taddc d '\\'; taccept d;
+    | 0x75 ->
+        accept d; parse_uescape d None 0 4
     | _ -> err d "expected escape found: %a" pp_byte d
     in
     let rec loop d = match byte d with

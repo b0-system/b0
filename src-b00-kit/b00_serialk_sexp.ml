@@ -145,8 +145,8 @@ module Sexp = struct
             loop d (acc * 16 + c - 0x30) (count + 1)
         | c when 0x41 <= c && c <= 0x46 ->
             loop d (acc * 16 + c - 0x37) (count + 1)
-        | c when 0x62 <= c && c <= 0x66 ->
-            loop d (acc * 16 + c - 0x58) (count + 1)
+        | c when 0x61 <= c && c <= 0x66 ->
+            loop d (acc * 16 + c - 0x57) (count + 1)
         | 0x7D when count = 0 -> err_esc_exp_hex d ~sbyte ~sline
         | 0x7D when not (Uchar.is_valid acc) ->
             err_esc_uchar d ~sbyte ~sline acc

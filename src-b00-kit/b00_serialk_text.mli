@@ -263,6 +263,11 @@ module Tdec : sig
   val tok_add_uchar : t -> Uchar.t -> unit
   (** [tok_add_uchar t u] adds the UTF-8 encoding of character [u]
       to the token. *)
+
+  (**/**)
+  (* XXX get rid of that once serialk_json uses serialk_text *)
+  val buffer_add_uchar : Buffer.t -> Uchar.t -> unit
+  (**/**)
 end
 
 (*---------------------------------------------------------------------------
