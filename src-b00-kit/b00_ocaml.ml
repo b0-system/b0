@@ -59,7 +59,6 @@ module Conf = struct
   let dll_ext c = c.dll_ext
   let lib_ext c = c.lib_ext
   let obj_ext c = c.obj_ext
-
   let to_string_map c = c.fields
   let of_string_map fields =
     try
@@ -139,7 +138,6 @@ module Conf = struct
       read m file k
     in
     Store.key ~mark det
-
 
   (* TODO remove that *)
 

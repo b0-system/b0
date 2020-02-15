@@ -89,7 +89,7 @@ type t = binding M.t
 let v bs =
   let rec loop acc = function
   | [] -> acc
-  | (k, v) :: bs -> M.add k.Key.untyped (B (k, v)) acc
+  | (k, v) :: bs -> loop (M.add k.Key.untyped (B (k, v)) acc) bs
   in
   loop M.empty bs
 
