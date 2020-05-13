@@ -104,7 +104,7 @@ let source c root =
       Ok B0_driver.Exit.ok
 
 let requires c root =
-  let pp_require = Fmt.using fst B00_ocaml.Lib_name.pp in
+  let pp_require = Fmt.using fst B00_ocaml.Lib.Name.pp in
   get_b0_file_src c @@ fun src ->
   let reqs = match root with
   | true -> Ok (B0_file.requires src)

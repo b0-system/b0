@@ -24,7 +24,7 @@ let loc_error m fmt = loc_err_fmt Fmt.error m fmt
 
 type b0_boot = (string * smeta) list
 type b0_include = (string * smeta) * (Fpath.t * smeta)
-type require = B00_ocaml.Lib_name.t * smeta
+type require = B00_ocaml.Lib.Name.t * smeta
 type t =
   { file : Fpath.t;
     b0_boots : b0_boot list;
@@ -48,7 +48,7 @@ let pp_dump ppf s =
     in
     Fmt.(vbox @@ list pp_include)
   in
-  let pp_reqs = Fmt.(list ~sep:sp (pp_fst B00_ocaml.Lib_name.pp)) in
+  let pp_reqs = Fmt.(list ~sep:sp (pp_fst B00_ocaml.Lib.Name.pp)) in
   Fmt.record
     [ Fmt.field "file" file Fpath.pp_quoted;
       Fmt.field "b0-boots" b0_boots pp_boots;
@@ -180,7 +180,7 @@ let parse_include_directive d ~sbyte ~sline =
       | _ -> err_exp_eodir d ~sbyte ~sline
 
 let parse_require_directive d ~sbyte ~sline =
-  string_to B00_ocaml.Lib_name.of_string (parse_string d)
+  string_to B00_ocaml.Lib.Name.of_string (parse_string d)
 
 let parse_preamble d =
   let rec loop boots incs reqs d = match skip_ws d; dec_byte d with

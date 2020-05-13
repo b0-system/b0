@@ -266,6 +266,15 @@ module Memo : sig
       added to the memo to witness the fiber failure.  The status of
       this operation is like any [Fail] notify: {!B000.Op.Failed}. *)
 
+  module Fiber : sig
+    type 'a t = 'a fiber
+    (** The type for fibers. See {!Memo.fiber}. *)
+
+    val of_list : 'a fiber list -> 'a list fiber
+    (** [of_list l] continues all the fibers in [l] in the same
+        order. *)
+  end
+
   val spawn_fiber : t -> unit fiber
   (** [run m k] calls [k ()] asynchronously and handles any fiber
       {!fail}ure. This also catches non-asynchronous uncaught

@@ -183,7 +183,7 @@ type main = unit -> Exit.t Cmdliner.Term.result
 type t =
   { name : string;
     version : string;
-    libs : B00_ocaml.Lib_name.t list }
+    libs : B00_ocaml.Lib.Name.t list }
 
 let create ~name ~version ~libs = { name; version; libs }
 let name d = d.name
@@ -241,14 +241,14 @@ module Compile = struct
     Ok (B0_file.expanded_src esrc)
 
   let base_libs =
-    [ B00_ocaml.Lib_name.v "cmdliner/cmdliner";
-      B00_ocaml.Lib_name.v "ocaml/unix"; (* FIXME system switches *)
-      B00_ocaml.Lib_name.v "b0.b00.std/b00_std";
-      B00_ocaml.Lib_name.v "b0.b00/b00";
-      B00_ocaml.Lib_name.v "b0.b00.kit/b00_kit";
-      B00_ocaml.Lib_name.v "b0/b0";
-      B00_ocaml.Lib_name.v "b0.kit/b0_kit";
-      B00_ocaml.Lib_name.v "b0.driver/b0_driver"; ]
+    [ B00_ocaml.Lib.Name.v "cmdliner";
+      B00_ocaml.Lib.Name.v "unix"; (* FIXME system switches *)
+      B00_ocaml.Lib.Name.v "b0.b00.std";
+      B00_ocaml.Lib.Name.v "b0.b00";
+      B00_ocaml.Lib.Name.v "b0.b00.kit";
+      B00_ocaml.Lib.Name.v "b0.b0";
+      B00_ocaml.Lib.Name.v "b0.kit";
+      B00_ocaml.Lib.Name.v "b0.driver"; ]
 
   let find_libs libs r k =
     let rec loop acc = function

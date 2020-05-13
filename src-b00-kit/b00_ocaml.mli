@@ -630,67 +630,81 @@ module Ocamlpath : sig
       {- The fiber fails.}} *)
 end
 
-(** Library names *)
-module Lib_name : sig
+(** Libraries
 
-  (** {1:name Module names} *)
-
-  type t
-  (** The type for library names looked up in [OCAMLPATH].
-
-      This is either:
-      {ul
-      {- The name of an OCaml library that follows the OCaml library
-         convention. For example the [b0.std] names looks up
-         [b0/std/lib.cm{a,xa,xs}]. These libraries are assumed to have
-         been compiled according to the library convention and have
-         their library dependencies embedded in their objects.}
-      {- For legacy reasons, the name of an OCaml library followed by a
-         slash to indicate the name of an archive. That is for example
-         [b0.std/b0_std], which looks up [b0/std/b0_std.cm{a,xa,xs}].
-         These libraries do not have their library dependencies specified,
-         their dependencies are looked by a best-effort data-driven resolution
-         procedure.}} *)
-
-  val v : string -> t
-  (** [v s] is a library for [n]. Raises [Invalid_argument] if [s] is
-      not a valid library name. *)
-
-  val of_string : string -> (t, string) result
-  (** [of_string s] is a library name from [n]. *)
-
-  val to_string : ?no_legacy:bool -> t -> string
-  (** [to_string n] is [n] as a string. If [no_legacy] is true
-      does not show the legacy part of the lib. *)
-
-  val is_legacy : t -> bool
-  (** [legacy n] is [true] if [n] is a legacy name. *)
-
-  val equal : t -> t -> bool
-  (** [equal n0 n1] is [true] iff [n0] and [n1] are the same library name. *)
-
-  val compare : t -> t -> int
-  (** [compare n0 n1] is a total order on library names compatible with
-      {!equal}. *)
-
-  val pp : t Fmt.t
-  (** [pp] formats a library name. *)
-
-  (** Library name sets. *)
-  module Set : Set.S with type elt = t
-
-  (** Library name maps. *)
-  module Map : Map.S with type key = t
-end
-
-(** Libraries *)
+    Represents OCaml libraries. An OCaml library is a directory with
+    interface and object files. OCaml libraries are found by name
+    using a {!Lib_resolver}. *)
 module Lib : sig
+
+  (** {1:name Library names} *)
+
+  (** Library names *)
+  module Name : sig
+
+    (** {1:name Library names} *)
+
+    type t
+    (** The type for library names looked up in [OCAMLPATH].
+        For legacy reasons this may also correspond to an [ocamlfind]
+        package name. *)
+
+    val v : string -> t
+    (** [v s] is a library for [n]. Raises [Invalid_argument] if [s] is
+        not a valid library name. *)
+
+    val of_string : string -> (t, string) result
+    (** [of_string s] is a library name from [n]. *)
+
+    val to_string : t -> string
+    (** [to_string n] is [n] as a string. *)
+
+    val to_fpath : t -> Fpath.t
+    (** [to_fpath n] is [n] with dots replaced by {!Fpath.dir_sep_char}. *)
+
+    val equal : t -> t -> bool
+    (** [equal n0 n1] is [true] iff [n0] and [n1] are the same library name. *)
+
+    val compare : t -> t -> int
+    (** [compare n0 n1] is a total order on library names compatible with
+        {!equal}. *)
+
+    val pp : t Fmt.t
+    (** [pp] formats a library name. *)
+
+    (** Library name sets. *)
+    module Set : Set.S with type elt = t
+
+    (** Library name maps. *)
+    module Map : Map.S with type key = t
+  end
+
+  (** {1:libs Libraries} *)
 
   type t
   (** The type for libraries. *)
 
-  val name : t -> Lib_name.t
+  val v :
+    ?archive:string -> B00.Memo.t -> name:Name.t -> requires:Name.t list ->
+    dir:Fpath.t -> t
+  (** [v ~archive ~name ~dir ~requires] is a library named [name]
+      whose directory is [dir] and which requires libraries [requires]
+      at link time. [archive] is the base name of the library archive,
+      defaults to ["lib"]. *)
+
+  val name : t -> Name.t
   (** [name l] is the library name of [l]. *)
+
+  val requires : t -> Name.t list
+  (** [requires l] are the libraries that are required by [l]. *)
+
+  val dir : t -> Fpath.t
+  (** [dir l] is the path to the library directory. Incidentally this
+      is also the path to the library includes. *)
+
+  val archive : code:Cobj.code -> t -> Fpath.t
+  (** [archive ~code l] is the path to the library archive for code [c].
+      Not checked for existence. *)
 
   val cmis : t -> Fpath.t list
   (** [cmis l] is the list of cmis for the library. *)
@@ -700,31 +714,36 @@ module Lib : sig
   (** [find_cmi l n] is the path to a cmi file for module [n] in [l]
       (if any) *)
 *)
-
-  val dir : t -> Fpath.t
-  (** [dir l] is the path to the library directory. Incidentally this
-      is also the path to the library includes. *)
-
-  val archive : code:Cobj.code -> t -> Fpath.t
-  (** [archive ~code l] is the path to the library archive for code [c].
-      Not checked for existence. *)
 end
 
-(** Library resolvers. *)
+(** Library resolvers.
+
+    The default OCaml library resolver. This resolver looks up
+    libraries as per the OCaml library convention and falls back
+    on [ocamlfind] if that fails.
+
+    If [ocamlfind] is used  a few simplyfing
+    assumptions are made by the resolver, which basically
+    boil down to query the library name [LIB] with:
+{[
+ocamlfind query LIB -predicates byte,native -format "%m:%d:%a:%(requires)"
+]}
+   to derive a {!Lib.t} value. This may fail on certain libraries. In
+   particular it assumes a one-to-one map between [ocamlfind] package
+   names and library names, that the archives are in the library directory. *)
 module Lib_resolver : sig
 
   type t
   (** The type for library resolvers. *)
 
-  val create : Memo.t -> memo_dir:Fpath.t -> ocamlpath:Fpath.t list -> t
+  val create : B00.Memo.t -> memo_dir:Fpath.t -> ocamlpath:Fpath.t list -> t
   (** [create m ocamlpath] is a library resolver looking for
-      libraries in the OCAMLPATH [ocamlpath]. *)
+      libraries in the OCAMLPATH [ocamlpath] and caching results
+      in [memo_dir] *)
 
-  val find : t -> Lib_name.t -> Lib.t Memo.fiber
-  (** [find r l] finds library [l] using [r]. The fiber fails
-      if the library name cannot be found.
-
-      This should look a list and sort. *)
+  val find : t -> Lib.Name.t -> Lib.t B00.Memo.fiber
+  (** [find r l] finds library names [l] using [r]. The fiber fails
+      if a library cannot be found. *)
 end
 
 (*---------------------------------------------------------------------------

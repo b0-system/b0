@@ -48,6 +48,7 @@ module Build : sig
     val current : t -> bunit
     val require : t -> bunit -> unit
     val build_dir : t -> bunit -> Fpath.t
+    val shared_build_dir : t -> bunit -> Fpath.t
     val root_dir : t -> bunit -> Fpath.t
   end
 

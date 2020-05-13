@@ -4,8 +4,10 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open B00
+open B00_ocaml
 
-let lib = B00_ocaml.Lib_name.v
+let lib = Lib.Name.v
 
 module Meta = struct
   let tag =
@@ -13,16 +15,19 @@ module Meta = struct
 
   let requires =
     let doc = "Required OCaml libraries" in
-    let pp_value = Fmt.(box @@ list ~sep:sp B00_ocaml.Lib_name.pp) in
+    let pp_value = Fmt.(box @@ list ~sep:sp Lib.Name.pp) in
     B0_meta.Key.v "ocaml-requires" ~doc ~pp_value
 
   let library =
-    let pp_value = Fmt.using B00_ocaml.Lib_name.to_string Fmt.string in
-    B0_meta.Key.v "ocaml-library" ~doc:"Defined OCaml library" ~pp_value
+    let pp_value = Fmt.using Lib.Name.to_string Fmt.string in
+    B0_meta.Key.v "ocaml-library" ~doc:"Defined OCaml library name" ~pp_value
 end
 
 module Unit = struct
-
+  type lib_resolver = Lib.Name.t -> Lib.t Memo.fiber
+  let default_lib_resolver _ _ k = k (fun b lib -> failwith "TODO")
+  let lib_resolver =
+    Store.key ~mark:"ocaml-lib-resolver"  default_lib_resolver
   (* XXX brzo copy cats ! *)
 
   let compile_c_srcs m ~in_dir ~srcs k =
@@ -120,13 +125,11 @@ module Unit = struct
     String.Map.fold compile local_mods []
 
   let compile_srcs m ~in_dir ~src_root ~requires ~srcs k =
-    let _code = B00_ocaml.Cobj.Native in
+    let code = B00_ocaml.Cobj.Native in
     compile_c_srcs m ~in_dir ~srcs @@ fun c_objs ->
     local_mods m ~in_dir ~src_root ~srcs @@ fun local_mods ->
     let _cmis = compile_intfs m ~in_dir ~requires ~local_mods in
-    (*
     let _cobjs = compile_impls m ~code ~in_dir ~requires ~local_mods in
-*)
     k ()
 
   (* FIXME share resolver and resolutions between units. *)
@@ -134,13 +137,8 @@ module Unit = struct
     B00_ocaml.Ocamlpath.get m None @@ fun ocamlpath ->
     k (B00_ocaml.Lib_resolver.create m ~memo_dir:build_dir ~ocamlpath)
 
-  let get_libs r libs k =
-    let rec loop k acc = function
-    | [] -> k (List.rev acc)
-    | l :: ls ->
-        B00_ocaml.Lib_resolver.find r l @@ fun l -> loop k (l :: acc) ls
-    in
-    loop k [] libs
+  let get_libs r libs =
+    B00.Memo.Fiber.of_list @@ List.map (B00_ocaml.Lib_resolver.find r) libs
 
   let exe_proc srcs b k =
     let u = B0_build.Unit.current b in
@@ -173,7 +171,7 @@ module Unit = struct
     let meta = B0_unit.meta u in
     let requires = B0_meta.get Meta.requires meta in
     let lib_name = B0_meta.get Meta.library meta in
-    let _lib_name = B00_ocaml.Lib_name.to_string lib_name in
+    let _lib_name = B00_ocaml.Lib.Name.to_string lib_name in
     let m = B0_build.memo b in
     B0_srcs.select b srcs @@ fun srcs ->
     get_resolver m ~build_dir @@ fun r ->
@@ -185,7 +183,7 @@ module Unit = struct
     | Some n -> n
     | None ->
         let dot_to_dash = function '.' -> '-' | c -> c in
-        let lib_name = B00_ocaml.Lib_name.to_string ~no_legacy:true lib_name in
+        let lib_name = B00_ocaml.Lib.Name.to_string lib_name in
         String.map dot_to_dash lib_name
     in
     let meta =

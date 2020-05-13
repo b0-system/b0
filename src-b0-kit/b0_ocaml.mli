@@ -6,11 +6,13 @@
 (** OCaml B0 file support. *)
 
 open B00_std
+open B00
+open B00_ocaml
 
 (** {1 Convenience} *)
 
-val lib : string -> B00_ocaml.Lib_name.t
-(** [lib] is {!B00_ocaml.Lib_name}. *)
+val lib : string -> Lib.Name.t
+(** [lib] is {!B00_ocaml.Lib_name.v}. *)
 
 (** {1 Metadata keys} *)
 
@@ -20,11 +22,11 @@ module Meta : sig
   val tag : unit B0_meta.key
   (** [tag] indicates the entity deals with OCaml code. *)
 
-  val requires : B00_ocaml.Lib_name.t list B0_meta.key
+  val requires : Lib.Name.t list B0_meta.key
   (** [requires] on a build unit specifies the OCaml libraries needed to
       compile a unit. *)
 
-  val library : B00_ocaml.Lib_name.t B0_meta.key
+  val library : Lib.Name.t B0_meta.key
   (** [library] on a build unit specifies that the unit defines
       the library. *)
 end
@@ -32,12 +34,36 @@ end
 (** OCaml build units *)
 module Unit : sig
 
+  (** {1:library_resolver Library resolver} *)
+
+  type lib_resolver = Lib.Name.t -> Lib.t Memo.fiber
+  (** The type for library resolvers. FIXME maybe we want a data structure
+      with given operations. In particular we are interested in getting
+      the domain of the resolver for error correction (or we bundle
+      this into the fiber failure). *)
+
+  val lib_resolver : (B0_build.t -> lib_resolver) Store.key
+  (** [lib_resolver] is the library resolver used by OCaml build units.
+      See {!default_lib_resolver} for the default. *)
+
+  val default_lib_resolver :
+    Store.t -> Memo.t -> (B0_build.t -> lib_resolver) Memo.fiber
+  (** [default_resolver] determines the default value of {!lib_resolver}.
+      This resolver does the following:
+      {ol
+      {- It first looks if the library name is defined by a unit
+         of the build, if that is the case it creates a library out
+         of that build unit's.}
+      {- It looks into the environment for a library via
+         {!B00_ocaml.Lib_resolver}}} *)
+
   (** {1:unit Units} *)
 
   val exe :
-    ?doc:string -> ?meta:B0_meta.t -> ?requires:B00_ocaml.Lib_name.t list ->
+    ?doc:string -> ?meta:B0_meta.t -> ?requires:Lib.Name.t list ->
     ?name:string -> string -> srcs:B0_srcs.t -> B0_unit.t
-  (** [exe n] is a build unit for an executable named [n].
+  (** [exe n] is a build unit for an executable named [n] (without
+      the platform specific extension).
       {ul
       {- [doc] is the unit doc string.}
       {- [meta] is the initial metadata.}
@@ -48,9 +74,10 @@ module Unit : sig
          executable.}} *)
 
   val lib :
-    ?doc:string -> ?meta:B0_meta.t -> ?requires:B00_ocaml.Lib_name.t list ->
-    ?name:string -> B00_ocaml.Lib_name.t -> srcs:B0_srcs.t -> B0_unit.t
-  (** [lib n] is a built unit for a library named [l].
+    ?doc:string -> ?meta:B0_meta.t -> ?requires:Lib.Name.t list ->
+    ?name:string -> Lib.Name.t -> srcs:B0_srcs.t -> B0_unit.t
+  (** [lib n ~srcs] is a built unit for a library named [l] made of
+      sources [src].
       {ul
       {- [doc] is the unit doc string.}
       {- [meta] is the initial metadata.}

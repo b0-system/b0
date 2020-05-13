@@ -9,15 +9,16 @@ custom driver for B0 files.
 The B0 file needs to be compiled and made accessible to the driver
 executable. At the moment the OCaml {!Dynlink} API is not being
 used. Instead the driver executable relinks its objects with a
-compilation of the B0 file to produce an executable that is executed
-to run the driver on the definitions. With the help of the
-{!B0_driver} API this all happens transparently in the [.drivers]
-directory of the [_b0] directory.
+compilation of the B0 file to produce another executable that is
+executed to run the driver on the definitions.
+
+With the help of the {!B0_driver} API this all happens transparently
+in the [.drivers] directory of the [_b0] directory.
 
 {1:library The driver library}
 
 For your driver to access a B0 file you need to create an OCaml library
-which has all the objects of your driver and registers your main
+which has all the objects of your driver and registers its [main]
 function by calling {!B0_driver.set}.
 
 Source wise a typical driver source structure is:
@@ -29,7 +30,7 @@ src/mydriver_main_run.ml
 
 The [mydriver_main.ml] file implements and registers the driver. It's
 compiled object should be part of your driver library. Here's a
-minimal example:
+minimal example :
 
 {[
 open B0_std
@@ -37,22 +38,19 @@ open Cmdliner
 
 let driver =
   let name = "mydriver" and version = "%%VERSION%%" in
-  let libs = ["mydriver"] in
+  let libs = ["mydriver" (* other needed libraries can be added here *) ] in
   B0_driver.create ~name ~version ~libs
 
-let my_driver conf =
-  Fmt.pr "Running!@.";
-  B0_driver.Exit.ok
-
+let my_driver conf = Fmt.pr "Running %s!@."; B0_driver.Exit.ok
 let my_driver =
   let doc = "My driver" in
   let sdocs = Manpage.s_common_options in
   let exits = B0_driver.Exit.Info.base_cmd in
-  let man = [ `S Manpage.s_description; "$(mname) does bla" ] in
-  B0_driver.cmd_with_b0_file ~driver (Term.const unit_cmd),
+  let man = [ `S Manpage.s_description; "$(mname) does not much." ] in
+  B0_driver.with_b0_file ~driver (Term.const unit_cmd),
   Term.info "mydriver" ~version:"%%VERSION%%" ~doc ~sdocs ~exits ~man
 
-let main () = Term.eval mydrivery
+let main () = Term.eval mydriver
 let () = B0_driver.set driver ~main
 ]}
 

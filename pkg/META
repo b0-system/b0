@@ -67,7 +67,7 @@ package "driver" (
   plugin(native) = "b0_driver.cmxs"
 
  package "b0" (
-   directory = "driver/b0"
+   directory = "b0"
    description = "b0 tool driver"
    version = "%%VERSION_NUM%%"
    requires =

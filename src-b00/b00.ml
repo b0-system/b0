@@ -163,6 +163,16 @@ module Memo = struct
   type 'a fiber = ('a -> unit) -> unit
   exception Fail
 
+  module Fiber = struct
+    type 'a t = 'a fiber
+    let of_list l k =
+      let rec loop acc = function
+      | [] -> k (List.rev acc)
+      | f :: fs -> f (fun v -> loop (v :: acc) fs)
+      in
+      loop [] l
+  end
+
   let notify_op m ?k kind msg =
     let k = match k with None -> None | Some k -> Some (fun o -> k ()) in
     let id = new_op_id m and created = timestamp m in

@@ -16,12 +16,13 @@ and build_state =
   { root_dir : Fpath.t;
     b0_dir : Fpath.t;
     build_dir : Fpath.t;
+    shared_build_dir : Fpath.t;
     locked : bool;
     store : B00.Store.t;
     mutable units : t String.Map.t;
     mutable waiting : t Rqueue.t; }
 
-let nop _  k = k ()
+let nop _ k = k ()
 
 (* Build units *)
 
@@ -61,10 +62,13 @@ module Build = struct
   type t = build
 
   let build_dir ~b0_dir = Fpath.(b0_dir / "b" / "user")
+  let shared_build_dir ~build_dir = Fpath.(build_dir / ".shared")
   let store_dir ~build_dir = Fpath.(build_dir / ".store")
+
   let create ~root_dir ~b0_dir m ~locked us =
     let u = { current = None; m } in
     let build_dir = build_dir ~b0_dir in
+    let shared_build_dir = shared_build_dir ~build_dir in
     let store = B00.Store.create m ~dir:(store_dir ~build_dir) [] in
     let units =
       let add acc u = String.Map.add (name u) u acc in
@@ -72,7 +76,10 @@ module Build = struct
     in
     let waiting = Rqueue.empty () in
     let () = List.iter (Rqueue.add waiting) us in
-    let b = { root_dir; b0_dir; build_dir; locked; store; waiting; units } in
+    let b =
+      { root_dir; b0_dir; build_dir; shared_build_dir; locked; store; waiting;
+        units }
+    in
     { u; b }
 
   let memo b = b.u.m
@@ -97,6 +104,7 @@ module Build = struct
     let require b u = if String.Map.mem (name u) b.b.units then () else add b u
 
     let build_dir b u = Fpath.(b.b.build_dir / name u)
+    let shared_build_dir b u = b.b.shared_build_dir
     let root_dir b u = match B0_def.dir (def u) with
     | None -> b.b.root_dir
     | Some dir -> dir

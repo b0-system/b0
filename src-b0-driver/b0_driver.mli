@@ -6,7 +6,7 @@
 (** B0 file drivers.
 
     B0 file drivers access the definitions of B0 files.
-    See {{!page-manual.defining_drivers}this manual section} for an
+    See {{!page-driver_dev}this manual} for an
     overview and a minimal example. *)
 
 open B00_std
@@ -177,7 +177,7 @@ type t
 (** The type for drivers. *)
 
 val create :
-  name:string -> version:string -> libs:B00_ocaml.Lib_name.t list -> t
+  name:string -> version:string -> libs:B00_ocaml.Lib.Name.t list -> t
 (** [create ~name ~version] is a new driver named [name] which has
     version [version] and uses library [libs] to link the B0 file. Note
     that these libraries are not added during the compilation phase.
@@ -192,7 +192,7 @@ val name : t -> string
 val version : t -> string
 (** [version d] is the version of [d]. *)
 
-val libs : t -> B00_ocaml.Lib_name.t list
+val libs : t -> B00_ocaml.Lib.Name.t list
 (** [libs d] are the libraries that need to be added for linking. *)
 
 val set : driver:t -> main:main -> unit

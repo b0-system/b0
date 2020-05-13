@@ -6,7 +6,7 @@
 open B00_std
 
 let driver =
-  let libs = [B00_ocaml.Lib_name.v "b0.driver.b0/b0_driver_b0"] in
+  let libs = [B00_ocaml.Lib.Name.v "b0.driver.b0"] in
   B0_driver.create ~name:"b0" ~version:"%%VERSION%%" ~libs
 
 module Def = struct

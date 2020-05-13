@@ -5,8 +5,8 @@
 B0 describes software construction and deployments using modular and
 customizable definitions written in OCaml.
 
-It also provides the B00 build library which provides arbitrary build
-abstraction with reliable, efficient incremental rebuilds.
+B0 is built on top of the B00 build library which provides arbitrary
+build abstraction with reliable, efficient incremental rebuilds.
 
 {1:manuals Manuals}
 
