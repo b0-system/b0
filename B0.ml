@@ -2,46 +2,45 @@ open B0_kit.V000
 
 (* OCaml library names *)
 
-let stdlib = B0_ocaml.lib "ocaml/stdlib"
-let unix = B0_ocaml.lib "ocaml/unix"
+let unix = B0_ocaml.lib "ocaml.unix"
 let cmdliner = B0_ocaml.lib "cmdliner"
-let b00_std = B0_ocaml.lib "b0.b00.std/b00_std"
-let b00 = B0_ocaml.lib "b0.b00/b00"
-let b00_kit = B0_ocaml.lib "b0.b00.kit/b00_kit"
-let b0 = B0_ocaml.lib "b0/b0"
-let b0_kit = B0_ocaml.lib "b0.kit/b0_kit"
-let b0_driver = B0_ocaml.lib "b0.driver/b0_driver"
-let b0_driver_b0 = B0_ocaml.lib "b0.driver.b0/b0_driver_b0"
+let b00_std = B0_ocaml.lib "b0.b00.std"
+let b00 = B0_ocaml.lib "b0.b00"
+let b00_kit = B0_ocaml.lib "b0.b00.kit"
+let b0 = B0_ocaml.lib "b0"
+let b0_kit = B0_ocaml.lib "b0.kit"
+let b0_driver = B0_ocaml.lib "b0.driver"
+let b0_driver_b0 = B0_ocaml.lib "b0.driver.b0"
 
 (* Library units *)
 
 let b00_std_lib =
-  let requires = [stdlib; unix] in
+  let requires = [unix] in
   let srcs = [`D_rec "src-b00-std"] in
   B0_ocaml.Unit.lib b00_std ~doc:"B00 stdlib extensions" ~requires ~srcs
 
 let b00_lib =
-  let requires = [stdlib; unix; b00_std] in
+  let requires = [unix; b00_std] in
   let srcs = [`D "src-b00"] in
   B0_ocaml.Unit.lib b00 ~doc:"B00 build abstraction" ~requires ~srcs
 
 let b00_kit_lib =
-  let requires = [stdlib; unix; cmdliner; b00_std; b00] in
+  let requires = [unix; cmdliner; b00_std; b00] in
   let srcs = [`D "src-b00-kit"] in
   B0_ocaml.Unit.lib b00_kit ~doc:"B00 toolkit" ~requires ~srcs
 
 let b0_lib =
-  let requires = [stdlib; unix; b00_std; b00] in
+  let requires = [unix; b00_std; b00] in
   let srcs = [`D "src-b0"] in
   B0_ocaml.Unit.lib b0 ~doc:"B0 description API" ~requires ~srcs
 
 let b0_kit_lib =
-  let requires = [stdlib; unix; cmdliner; b00_std; b00; b00_kit; b0] in
+  let requires = [unix; cmdliner; b00_std; b00; b00_kit; b0] in
   let srcs = [`D "src-b0-kit"] in
   B0_ocaml.Unit.lib b0_kit ~doc:"B0 toolkit" ~requires ~srcs
 
 let b0_driver_lib =
-  let requires = [stdlib; unix; cmdliner; b00_std; b00; b00_kit; b0] in
+  let requires = [unix; cmdliner; b00_std; b00; b00_kit; b0] in
   let srcs = [`D "src-b0-driver"] in
   B0_ocaml.Unit.lib b0_driver ~doc:"B0 driver API" ~requires ~srcs
 
@@ -49,7 +48,7 @@ let b0_driver_lib =
 
 let b0_driver_b0_lib =
   let requires =
-    [stdlib; unix; cmdliner; b00_std; b00; b00_kit; b0; b0_kit; b0_driver]
+    [unix; cmdliner; b00_std; b00; b00_kit; b0; b0_kit; b0_driver]
   in
   let srcs = [`D "src-b0-driver-b0"; `X "src-b0-driver-b0/b0_main_run.ml"] in
   B0_ocaml.Unit.lib b0_driver_b0 ~doc:"b0 tool driver library" ~requires ~srcs
@@ -62,7 +61,7 @@ let b0_tool =
 (* Low-level B00 tools units *)
 
 let b00_tool =
-  let requires = [stdlib; cmdliner; b00_std; b00; b00_kit] in
+  let requires = [cmdliner; b00_std; b00; b00_kit] in
   fun n ~doc f -> B0_ocaml.Unit.exe n ~doc ~requires ~srcs:[`F ("tools/" ^ f)]
 
 let b00_cache_tool =

@@ -1,0 +1,36 @@
+#!/usr/bin/env ocaml
+(*---------------------------------------------------------------------------
+   Copyright (c) 2020 The b0 programmers. All rights reserved.
+   Distributed under the ISC license, see terms at the end of the file.
+  ---------------------------------------------------------------------------*)
+
+(* See DEVEL.md for details. Usage: ocaml b00t/clean *)
+
+let ( / ) = Filename.concat
+let root_dir = Sys.getcwd ()
+let boot_dir = root_dir / "b00t"
+let boot_exe = (boot_dir / "run") ^ (if Sys.win32 then ".exe" else "")
+let boot_build_dir = boot_dir / "_build"
+
+let clean () =
+  let rm = function ".KEEPME" -> () | f -> Sys.remove (boot_build_dir / f) in
+  Array.iter rm (Sys.readdir boot_build_dir);
+  if Sys.file_exists boot_exe then Sys.remove boot_exe
+
+let () = clean ()
+
+(*---------------------------------------------------------------------------
+   Copyright (c) 2020 The b0 programmers
+
+   Permission to use, copy, modify, and/or distribute this software for any
+   purpose with or without fee is hereby granted, provided that the above
+   copyright notice and this permission notice appear in all copies.
+
+   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+   ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+   ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  ---------------------------------------------------------------------------*)

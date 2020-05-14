@@ -1,0 +1,207 @@
+#!/usr/bin/env ocaml
+(*---------------------------------------------------------------------------
+   Copyright (c) 2020 The b0 programmers. All rights reserved.
+   Distributed under the ISC license, see terms at the end of the file.
+  ---------------------------------------------------------------------------*)
+
+(* See DEVEL.md for details. Usage: ocaml b00t/strap *)
+
+let debug = false
+let ( / ) = Filename.concat
+let strf = Printf.sprintf
+let err fmt = Printf.kfprintf (fun oc -> flush oc; exit 1) stderr fmt
+let log fmt = Printf.kfprintf (fun oc -> flush oc) stdout fmt
+
+(* Files and directories to consider *)
+
+let root_dir = Sys.getcwd ()
+let b0_file = root_dir / "B0.ml"
+let boot_dir = root_dir / "b00t"
+let boot_build_dir = boot_dir / "_build"
+let boot_exe = (boot_dir / "run") ^ (if Sys.win32 then ".exe" else "")
+
+let c_src_dirs = ["src-b00-std"; "src-b00-std" / "vendor"]
+let ml_src_dirs =
+  [ "src-b00-std"; "src-b00"; "src-b00-kit"; "src-b0"; "src-b0-kit";
+    "src-b0-driver"; "src-b0-driver-b0"; ]
+
+let src_excludes = (* These files should not be part of the driver *)
+  [ "src-b00-std" / "b00_std_top_init.ml";
+    "src-b0-driver-b0" / "b0_main_run.ml"; ]
+
+(* Read, write and collect files *)
+
+let string_of_file file =
+  let ic = open_in_bin file in
+  let len = in_channel_length ic in
+  let buf = Bytes.create len in
+  really_input ic buf 0 len; close_in ic; Bytes.unsafe_to_string buf
+
+let string_to_file file s =
+  let oc = open_out_bin file in output_string oc s; close_out oc
+
+let files_with_ext ~excludes ~ext dirs =
+  let add_file dir acc fname =
+    let file = dir / fname in
+    if Filename.extension file = ext && not (List.mem file excludes)
+    then file :: acc else acc
+  in
+  let add_dir acc dir = Array.fold_left (add_file dir) acc (Sys.readdir dir) in
+  List.sort compare (* for build repro *) @@ List.fold_left add_dir [] dirs
+
+(* Finding and running commands *)
+
+let find_cmd cmds =
+  let test, null = match Sys.win32 with
+  | true -> "where", " NUL"
+  | false -> "type", "/dev/null"
+  in
+  let cmd c = Sys.command (strf "%s %s 1>%s 2>%s" test c null null) = 0 in
+  try Some (List.find cmd cmds) with Not_found -> None
+
+let err_cmd exit cmd = err "exited with %d: %s\n" exit cmd
+let quote_cmd = match Sys.win32 with
+| false -> fun cmd -> cmd
+| true -> fun cmd -> strf "\"%s\"" cmd
+
+let run_cmd args =
+  let cmd = String.concat " " (List.map Filename.quote args) in
+  if debug then log "[EXEC] %s\n" cmd;
+  let exit = Sys.command (quote_cmd cmd) in
+  if exit = 0 then () else err_cmd exit cmd
+
+let read_cmd args =
+  let stdout = Filename.temp_file "b00t" (Filename.basename Sys.argv.(0)) in
+  at_exit (fun () -> try ignore (Sys.remove stdout) with _ -> ());
+  let cmd = String.concat " " (List.map Filename.quote args) in
+  let cmd = quote_cmd @@ strf "%s 1>%s" cmd (Filename.quote stdout) in
+  if debug then log "[EXEC] %s\n" cmd;
+  let exit = Sys.command cmd in
+  if exit = 0 then string_of_file stdout else err_cmd exit cmd
+
+(* Look for an OCaml compiler and ocamldep *)
+
+let comp, archive_ext = match find_cmd ["ocamlopt"] with
+| Some comp -> [comp], ".cmxa"
+| None ->
+    match find_cmd ["ocamlc"] with
+    | None -> err "No OCaml (byte or native) compiler found in PATH\n"
+    | Some comp ->
+        (* once we get to >= 4.10 use -output-complete-exe instead of -custom *)
+        [comp; "-custom"], ".cma"
+
+let ocamldep = match find_cmd ["ocamldep"] with
+| None -> err "No ocamldep found in PATH\n" | Some dep -> dep
+
+let sort_srcs srcs =
+  (* [srcs] must NOT be absolute because ocamldep -sort doesn't
+     support paths with spaces but root_dir might have. See MPR6968. *)
+  read_cmd (ocamldep :: "-sort" :: srcs)
+  |> String.trim |> String.split_on_char ' '
+
+(* Look up external libraries *)
+
+let find_archive ~name dir =
+  let lib = dir / "lib" ^ archive_ext in (* library convention *)
+  let named = dir / name ^ archive_ext in
+  if Sys.file_exists lib then Some lib else
+  if Sys.file_exists named then Some named else None
+
+let get_archive ~name dir = match find_archive dir ~name with
+| None -> err "No archive found for %s in %s" name dir
+| Some archive -> dir, archive
+
+let getenv v = match Sys.getenv_opt v with Some "" | None -> None | v -> v
+let ocaml_where = read_cmd [List.hd comp; "-where"] |> String.trim
+
+let cmdliner_dir, cmdliner_archive =
+  let name = "cmdliner" in
+  let get_archive = get_archive ~name in
+  match getenv "B0_BOOT_CMDLINER_LIBDIR" with
+  | Some dir -> get_archive dir
+  | None ->
+      match getenv "OPAM_SWITCH_PREFIX" with
+      | Some d -> get_archive (d / "lib" / name)
+      | None -> get_archive (ocaml_where / ".." / name)
+
+let unix_dir, unix_archive =
+  let name = "unix" in
+  let get_archive = get_archive ~name in
+  match getenv "B0_BOOT_UNIX_LIBDIR" with
+  | Some dir -> get_archive dir
+  | None ->
+      let unix_dir = ocaml_where / "unix" (* may happen at some point *) in
+      match find_archive ~name unix_dir with
+      | Some archive -> unix_dir, archive
+      | None -> get_archive ocaml_where
+
+let ext_lib_dirs = [cmdliner_dir; unix_dir]
+let ext_lib_archives = [cmdliner_archive; unix_archive]
+
+(* Ad-hoc compile of a b0 driver for the B0 file of b0.
+
+   We concatenate the sorted source files of all needed B0 libraries
+   with the B0 file to a single source. This source is compiled and
+   linked along with the C stub sources in a single step in the
+   b00t/_build directory to produce the b00t/run executable. The build
+   directory exists in the repo to avoid having to mkdir which Sys
+   doesn't provide. *)
+
+let driver_src ~ml_srcs b0_file =
+  let add_module b ml =
+    let mli = ml ^ "i" in
+    let mod_name = Filename.remove_extension (Filename.basename ml) in
+    let mod_name = String.capitalize_ascii mod_name in
+    Buffer.add_string b @@ strf
+      "module %s : sig\n#1 %S\n%s\nend = struct\n#1 %S\n%s\nend\n"
+      mod_name mli (string_of_file mli) ml (string_of_file ml)
+  in
+  let add_b0_file b b0_file =
+    (* This mimics what B0_file.expanded_src does in a simpler manner *)
+    Buffer.add_string b @@ strf
+      "let () = B0_def.Scope.root (B00_std.Fpath.v %S)\n\
+       #1 %S\n\
+       %s\n\
+       #1 \"-\"\n\
+       let () = B0_def.Scope.seal ()\n\
+       let () = B0_driver.run ~has_b0_file:true\n"
+      b0_file b0_file (string_of_file b0_file)
+  in
+  let b = Buffer.create (2 * 1024 * 1024) in
+  List.iter (add_module b) ml_srcs; add_b0_file b b0_file; Buffer.contents b
+
+let compile () =
+  let absolute p = root_dir / p in
+  let c_srcs = files_with_ext ~excludes:src_excludes ~ext:".c" c_src_dirs in
+  let c_srcs = List.map absolute c_srcs in
+  let ml_srcs = files_with_ext ~excludes:src_excludes ~ext:".ml" ml_src_dirs in
+  let ml_srcs = List.map absolute (sort_srcs ml_srcs) in
+  let driver_src = driver_src ~ml_srcs b0_file in
+  let driver_src_file = boot_build_dir / "run.ml" in
+  let incs = List.fold_right (fun i acc -> "-I" :: i :: acc) ext_lib_dirs [] in
+  let cmd =
+    let out = ["-o"; boot_exe] in
+    List.concat [comp; out; incs; ext_lib_archives; c_srcs; [driver_src_file]]
+  in
+  string_to_file driver_src_file driver_src;
+  (* .o files of cstubs are generated in the cwd so we chdir to the build dir *)
+  Sys.chdir boot_build_dir; run_cmd cmd; Sys.chdir root_dir
+
+let main () = compile (); log "[ OK ] Invoke %s to continue.\n" boot_exe
+let () = main ()
+
+(*---------------------------------------------------------------------------
+   Copyright (c) 2020 The b0 programmers
+
+   Permission to use, copy, modify, and/or distribute this software for any
+   purpose with or without fee is hereby granted, provided that the above
+   copyright notice and this permission notice appear in all copies.
+
+   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+   ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+   ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  ---------------------------------------------------------------------------*)
