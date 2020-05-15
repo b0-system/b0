@@ -25,9 +25,78 @@ end
 
 module Unit = struct
   type lib_resolver = Lib.Name.t -> Lib.t Memo.fiber
-  let default_lib_resolver _ _ k = k (fun b lib -> failwith "TODO")
-  let lib_resolver =
-    Store.key ~mark:"ocaml-lib-resolver"  default_lib_resolver
+
+  let buildable_libs b : Lib.t Lazy.t B00_ocaml.Lib.Name.Map.t =
+    let lib_of_unit b u lib_name =
+      let m = B0_build.memo b in
+      let name = lib_name in
+      let requires = match B0_meta.find Meta.requires (B0_unit.meta u) with
+      | Some requires -> requires
+      | None ->
+          Memo.fail m "Built unit %a has no %a metadata"
+            B0_unit.pp_name u B0_meta.Key.pp_name Meta.requires
+      in
+      let dir = B0_build.Unit.build_dir b u in
+      let archive = Lib.Name.to_archive_name lib_name in
+      let lib = Lib.v ~installed:false ~archive m ~name ~requires ~dir in
+      B0_build.Unit.require b u;
+      lib
+    in
+    let add u acc = match B0_meta.find Meta.library (B0_unit.meta u) with
+    | None -> acc
+    | Some lib_name ->
+        let lib = lazy (lib_of_unit b u lib_name) in
+        B00_ocaml.Lib.Name.Map.add lib_name lib acc
+    in
+    B0_unit.Set.fold add (B0_build.Unit.may b) B00_ocaml.Lib.Name.Map.empty
+
+  let default_lib_resolver store m k =
+    Store.get store B0_build.current @@ fun b ->
+    let buildable_libs = buildable_libs b in
+    let memo_dir = B0_build.shared_build_dir b in
+    B00_ocaml.Ocamlpath.get m None @@ fun ocamlpath ->
+    let resolver = B00_ocaml.Lib_resolver.create m ~memo_dir ~ocamlpath in
+    (* FIXME we likely want to plug buildable_libs in the Lib_resolver
+       data structure. There's certainly some stuff to be done w.r.t.
+       to better error handling, e.g. spell checking. *)
+    let lib_resolver n k =
+      match B00_ocaml.Lib.Name.Map.find_opt n buildable_libs with
+      | Some (lazy (lib)) -> k lib
+      | None -> B00_ocaml.Lib_resolver.find resolver n k
+    in
+    k lib_resolver
+
+  let lib_resolver = Store.key ~mark:"b0.ocaml-lib"  default_lib_resolver
+
+  let get_libs b libs k =
+    Store.get (B0_build.store b) lib_resolver @@ fun resolve ->
+    B00.Memo.Fiber.of_list (List.map resolve libs) k
+
+  let get_recursive_libs b libs k =
+    Store.get (B0_build.store b) lib_resolver @@ fun resolve ->
+    let rec loop seen acc ls k = match ls with
+    | [] -> k (seen, acc)
+    | l :: ls  ->
+        if Lib.Name.Set.mem l seen then loop seen acc ls k else
+        let seen = Lib.Name.Set.add l seen in
+        resolve l @@ fun lib ->
+        let not_seen n = not (Lib.Name.Set.mem n seen) in
+        let deps = List.filter not_seen (Lib.requires lib) in
+        loop seen acc deps @@ fun (seen, acc) ->
+        loop seen (lib :: acc) ls k
+    in
+    loop Lib.Name.Set.empty [] libs @@ fun (_, acc) ->
+    k (List.rev acc)
+
+  let sync_built_requires m ~code ~requires k =
+    (* FIXME we want more fine grained syncing for parallelism.
+       cmi and archive. We need something in Build.t per unit maybe
+       a fut dict. *)
+    let built l = not (Lib.installed l) in
+    let built_libs = List.filter built requires in
+    let to_sync = List.map (Lib.archive ~code) built_libs in
+    Memo.wait_files m to_sync k
+
   (* XXX brzo copy cats ! *)
 
   let compile_c_srcs m ~in_dir ~srcs k =
@@ -59,7 +128,7 @@ module Unit = struct
     let mli_only = false in
     let exts = B00_fexts.v (".mli" :: if mli_only then [] else [".ml"]) in
     let srcs = B00_fexts.find_files exts srcs in
-    let o = Fpath.(in_dir / "ocaml.compdeps") in
+    let o = Fpath.(in_dir / "ocaml.srcdeps") in
     B00_ocaml.Mod_src.Deps.write m ~src_root ~srcs ~o;
     B00_ocaml.Mod_src.Deps.read m ~src_root o @@
     fun src_deps -> k (B00_ocaml.Mod_src.of_srcs m ~src_deps ~srcs)
@@ -100,7 +169,11 @@ module Unit = struct
             Mod_src.as_impl_dep_files ~code ~init:acc ~in_dir dep
           in
           let local_objs = List.fold_left add_dep_objs [] local_deps in
-          let ext_objs = [] in
+          let ext_objs =
+            (* FIXME add cmx *)
+            let add_lib acc l = List.rev_append (Lib.cmis l) acc in
+            List.fold_left add_lib [] requires
+          in
           let has_cmi, local_objs = match Mod_src.mli msrc with
           | None -> false, local_objs
           | Some _ -> true, Mod_src.cmi_file ~in_dir msrc :: local_objs
@@ -124,34 +197,36 @@ module Unit = struct
     in
     String.Map.fold compile local_mods []
 
-  let compile_srcs m ~in_dir ~src_root ~requires ~srcs k =
-    let code = B00_ocaml.Cobj.Native in
+  let compile_srcs m ~code ~in_dir ~src_root ~requires ~srcs k =
     compile_c_srcs m ~in_dir ~srcs @@ fun c_objs ->
     local_mods m ~in_dir ~src_root ~srcs @@ fun local_mods ->
+    sync_built_requires m ~code ~requires @@ fun () ->
     let _cmis = compile_intfs m ~in_dir ~requires ~local_mods in
-    let _cobjs = compile_impls m ~code ~in_dir ~requires ~local_mods in
-    k ()
-
-  (* FIXME share resolver and resolutions between units. *)
-  let get_resolver m ~build_dir k =
-    B00_ocaml.Ocamlpath.get m None @@ fun ocamlpath ->
-    k (B00_ocaml.Lib_resolver.create m ~memo_dir:build_dir ~ocamlpath)
-
-  let get_libs r libs =
-    B00.Memo.Fiber.of_list @@ List.map (B00_ocaml.Lib_resolver.find r) libs
+    let cobjs = compile_impls m ~code ~in_dir ~requires ~local_mods in
+    k (c_objs, cobjs)
 
   let exe_proc srcs b k =
+    Store.get (B0_build.store b) B00_ocaml.Conf.key @@ fun ocaml_conf ->
     let u = B0_build.Unit.current b in
     let build_dir = B0_build.Unit.build_dir b u in
     let src_root = B0_build.Unit.root_dir b u in
     let meta = B0_unit.meta u in
     let requires = B0_meta.get Meta.requires meta in
-    let _exe_name = B0_meta.get B0_meta.exe_name meta in
+    let exe_name = B0_meta.get B0_meta.exe_name meta in
+    let exe_ext = B00_ocaml.Conf.exe_ext ocaml_conf
+                  (* FIXME solve that in Link.exe *)
+    in
+    let code = B00_ocaml.Cobj.Native (* TODO *) in
     let m = B0_build.memo b in
     B0_srcs.select b srcs @@ fun srcs ->
-    get_resolver m ~build_dir @@ fun r ->
-    get_libs r requires @@ fun requires ->
-    compile_srcs m ~in_dir:build_dir ~src_root ~requires ~srcs k
+    get_libs b requires @@ fun req_libs ->
+    compile_srcs m ~code ~in_dir:build_dir ~src_root ~requires:req_libs ~srcs @@
+    fun (c_objs, cobjs) ->
+    let o = Fpath.(build_dir / (exe_name ^ exe_ext)) in
+    get_recursive_libs b requires @@ fun requires ->
+    let lib_objs = List.map (Lib.archive ~code) requires in
+    Link.exe m ~code ~c_objs ~cobjs:(lib_objs @ cobjs) ~o;
+    k ()
 
   let exe ?doc ?(meta = B0_meta.empty) ?(requires = []) ?name exe_name ~srcs =
     let name = Option.value ~default:exe_name name in
@@ -171,12 +246,18 @@ module Unit = struct
     let meta = B0_unit.meta u in
     let requires = B0_meta.get Meta.requires meta in
     let lib_name = B0_meta.get Meta.library meta in
-    let _lib_name = B00_ocaml.Lib.Name.to_string lib_name in
+    let archive_name = B00_ocaml.Lib.Name.to_archive_name lib_name in
+    let code = B00_ocaml.Cobj.Native (* TODO *) in
     let m = B0_build.memo b in
     B0_srcs.select b srcs @@ fun srcs ->
-    get_resolver m ~build_dir @@ fun r ->
-    get_libs r requires @@ fun requires ->
-    compile_srcs m ~in_dir:build_dir ~src_root ~requires ~srcs k
+    get_libs b requires @@ fun requires ->
+    compile_srcs m ~code ~in_dir:build_dir ~src_root ~requires ~srcs @@
+    fun (c_objs, cobjs) ->
+    let odir = build_dir and oname = archive_name in
+    let has_cstubs = c_objs <> [] in
+    if has_cstubs then Compile.cstubs_archives m ~c_objs ~odir ~oname;
+    Compile.archive m ~code ~has_cstubs ~cobjs ~odir ~oname;
+    k ()
 
   let lib ?doc ?(meta = B0_meta.empty) ?(requires = []) ?name lib_name ~srcs =
     let name = match name with

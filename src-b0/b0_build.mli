@@ -18,11 +18,13 @@ val memo : t -> B00.Memo.t
 (** [memo b] the memoizer for the build. *)
 
 val store : t -> B00.Store.t
-(** [store b] is the store for the build. *)
+(** [store b] is the store for the build. Note that [b] itself
+    can be found in store via the {!current} key. *)
 
-val locked : t -> bool
-(** [locked b] is [true] iff [b] is a locked build. In a locked build
-    build units that are built are fixed before the build starts. *)
+val shared_build_dir : t -> Fpath.t
+(** [shared_build_dir] is a build directory shared by all units of the
+     build. This is used by computations shared by units. Most of the
+     time one should use {!Unit.build_dir}. *)
 
 (** Built units. *)
 module Unit : sig
@@ -33,10 +35,16 @@ module Unit : sig
   (** [current b] is [b]'s current unit. In the {{!B0_unit.type-proc}procedure}
       of build unit that is the unit itself. *)
 
+  val must : t -> B0_unit.Set.t
+  (** [must b] are the units in [b] that must build. *)
+
+  val may : t -> B0_unit.Set.t
+  (** [may b] are all the units in [b] that may build, i.e. that
+      can be {!required}. This includes the elements in [must_list b]. *)
+
   val require : t -> B0_unit.t -> unit
   (** [require_unit b u] asks to build unit [u] in [b]. This fails the
-      fiber if [b] is {!locked} and [u] not part of the initial
-      units. *)
+      fiber if [b] is [u] is not in {!may}. *)
 
   (** {1:dir Directories} *)
 
@@ -53,11 +61,20 @@ end
 (** {1:run Creating and running} *)
 
 val create :
-  root_dir:Fpath.t -> b0_dir:Fpath.t -> B00.Memo.t -> locked:bool ->
-  B0_unit.t list -> t
+  root_dir:Fpath.t -> b0_dir:Fpath.t -> B00.Memo.t -> may:B0_unit.Set.t ->
+  must:B0_unit.Set.t -> t
+(** [create ~root_dir ~b0_dir m ~may ~must]
+    {ul
+    {- [must] are the build units that must be build by [b].}
+    {- [may] are the build units that may build in [b]. [must] units
+        are automatically added to this set.}} *)
 
 val run : t -> (unit, unit) result
 (** [run b] runs the build. *)
+
+val current : t B00.Store.key
+(** [current] is a store key that holds the build itself. The store
+    returned by {!store} has this key bound to the build. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

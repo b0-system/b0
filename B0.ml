@@ -2,7 +2,7 @@ open B0_kit.V000
 
 (* OCaml library names *)
 
-let unix = B0_ocaml.lib "ocaml.unix"
+let unix = B0_ocaml.lib "unix"
 let cmdliner = B0_ocaml.lib "cmdliner"
 let b00_std = B0_ocaml.lib "b0.b00.std"
 let b00 = B0_ocaml.lib "b0.b00"
@@ -12,12 +12,12 @@ let b0_kit = B0_ocaml.lib "b0.kit"
 let b0_driver = B0_ocaml.lib "b0.driver"
 let b0_driver_b0 = B0_ocaml.lib "b0.driver.b0"
 
-(* Library units *)
+(* Libraries *)
 
 let b00_std_lib =
   let requires = [unix] in
-  let srcs = [`D_rec "src-b00-std"] in
-  B0_ocaml.Unit.lib b00_std ~doc:"B00 stdlib extensions" ~requires ~srcs
+  let srcs = [`D_rec "src-b00-std"; `X "src-b00-std/b00_std_top_init.ml" ] in
+  B0_ocaml.Unit.lib b00_std ~doc:"B00 Stdlib extensions" ~requires ~srcs
 
 let b00_lib =
   let requires = [unix; b00_std] in
@@ -30,7 +30,7 @@ let b00_kit_lib =
   B0_ocaml.Unit.lib b00_kit ~doc:"B00 toolkit" ~requires ~srcs
 
 let b0_lib =
-  let requires = [unix; b00_std; b00] in
+  let requires = [unix; b00_std; b00; b00_kit] in
   let srcs = [`D "src-b0"] in
   B0_ocaml.Unit.lib b0 ~doc:"B0 description API" ~requires ~srcs
 
@@ -44,7 +44,7 @@ let b0_driver_lib =
   let srcs = [`D "src-b0-driver"] in
   B0_ocaml.Unit.lib b0_driver ~doc:"B0 driver API" ~requires ~srcs
 
-(* B0 drivers units *)
+(* B0 driver and tool *)
 
 let b0_driver_b0_lib =
   let requires =
@@ -61,7 +61,7 @@ let b0_tool =
 (* Low-level B00 tools units *)
 
 let b00_tool =
-  let requires = [cmdliner; b00_std; b00; b00_kit] in
+  let requires = [cmdliner; b00_std; b00; b00_kit; b0_driver] in
   fun n ~doc f -> B0_ocaml.Unit.exe n ~doc ~requires ~srcs:[`F ("tools/" ^ f)]
 
 let b00_cache_tool =
@@ -101,4 +101,4 @@ let default =
       repo, "git+https://erratique.ch/repos/b0.git";
       issues, "https://github.com/b0-system/b0/issues"]
   in
-  B0_pack.v "b0-system" ~doc:"The B0 system" ~meta ~locked:true us
+  B0_pack.v "b0" ~doc:"The B0 system" ~meta ~locked:true us

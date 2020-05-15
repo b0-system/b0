@@ -8,6 +8,8 @@ open B00_std
 (* At a certain point we might want to cache the directory folds and
    file stats. But for now that seems good enough. *)
 
+(* FIXME we should gather sets or sorted lists for build repo *)
+
 type fpath = string
 let fpath = Fpath.to_string
 

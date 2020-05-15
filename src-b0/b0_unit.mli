@@ -42,21 +42,23 @@ module Build : sig
 
   val memo : t -> B00.Memo.t
   val store : t -> B00.Store.t
-  val locked : t -> bool
+  val shared_build_dir : t -> Fpath.t
 
   module Unit : sig
     val current : t -> bunit
+    val must : t -> Set.t
+    val may : t -> Set.t
     val require : t -> bunit -> unit
     val build_dir : t -> bunit -> Fpath.t
-    val shared_build_dir : t -> bunit -> Fpath.t
     val root_dir : t -> bunit -> Fpath.t
   end
 
   val create :
-    root_dir:Fpath.t -> b0_dir:Fpath.t -> B00.Memo.t -> locked:bool ->
-    bunit list -> t
+    root_dir:Fpath.t -> b0_dir:Fpath.t -> B00.Memo.t -> may:Set.t ->
+    must:Set.t -> t
 
   val run : t -> (unit, unit) result
+  val current : t B00.Store.key
 end
 (**/**)
 

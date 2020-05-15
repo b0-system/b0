@@ -558,6 +558,12 @@ module Store = struct
       match Tid.equal k.Key.tid l'.Key.tid with
       | None -> assert false
       | Some Tid.Eq -> Memo.Fut.await fut
+
+  let set s k v = match Store.Kmap.mem k.Key.untyped s.Store.map with
+  | true -> Fmt.invalid_arg "Key %s already set in store" k.Key.mark
+  | false ->
+      let fut = Memo.Fut.ret s.Store.memo v in
+      s.map <- Store.Kmap.add k.Key.untyped (Store.B (k, fut)) s.map
 end
 
 (*---------------------------------------------------------------------------

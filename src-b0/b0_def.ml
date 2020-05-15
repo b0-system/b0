@@ -158,7 +158,7 @@ module type S = sig
   val find : string -> t option
   val get : string -> t
   val get_or_suggest : string -> (t, t list) result
-  val get_all : string list -> (t list, string) result
+  val get_list : string list -> (t list, string) result
   val pp_name_str : string Fmt.t
   val pp_name : t Fmt.t
   val pp_doc : t Fmt.t
@@ -240,25 +240,23 @@ module Make (V : VALUE) = struct
       let add k v vs = if String.is_prefix ~affix:pre k then v :: vs else vs in
       String.Map.fold add !defs []
 
-  let get_all = function
-  | [] -> Ok (list ())
-  | ns ->
-      let rec loop vs es = function
-      | [] ->
-          if es <> []
-          then Error (String.concat "\n" (List.rev es))
-          else Ok (List.rev vs)
-      | n :: ns ->
-          match get_or_suggest n with
-          | Ok v -> loop (v :: vs) es ns
-          | Error suggs ->
-              let kind ppf () = Fmt.pf ppf "%s" def_kind in
-              let hint = Fmt.did_you_mean in
+  let get_list ns =
+    let rec loop vs es = function
+    | [] ->
+        if es <> []
+        then Error (String.concat "\n" (List.rev es))
+        else Ok (List.rev vs)
+    | n :: ns ->
+        match get_or_suggest n with
+        | Ok v -> loop (v :: vs) es ns
+        | Error suggs ->
+            let kind ppf () = Fmt.pf ppf "%s" def_kind in
+            let hint = Fmt.did_you_mean in
               let pp = Fmt.unknown' ~kind V.pp_name_str ~hint in
-              let e = Fmt.str "@[%a@]" pp (n, List.map name suggs) in
-              loop vs (e :: es) ns
-      in
-      loop [] [] ns
+            let e = Fmt.str "@[%a@]" pp (n, List.map name suggs) in
+            loop vs (e :: es) ns
+    in
+    loop [] [] ns
 
   let pp_name_str = V.pp_name_str
   let pp_name = Fmt.using name pp_name_str

@@ -10,6 +10,7 @@ let driver =
   B0_driver.create ~name:"b0" ~version:"%%VERSION%%" ~libs
 
 module Def = struct
+
   let list (module Def : B0_def.S) c format ds =
     let pp, sep = match format with
     | `Short -> Def.pp_name, Fmt.cut
@@ -17,7 +18,8 @@ module Def = struct
     | `Long -> Def.pp, Fmt.(cut ++ cut)
     in
     Log.if_error ~use:B0_driver.Exit.no_such_name @@
-    Result.bind (Def.get_all ds) @@ fun ds ->
+    let ds = match ds with [] -> Ok (Def.list ()) | ds -> Def.get_list ds in
+    Result.bind ds @@ fun ds ->
     Log.if_error' ~use:B0_driver.Exit.some_error @@
     let don't = B0_driver.Conf.no_pager c in
     Result.bind (B00_pager.find ~don't ()) @@ fun pager ->
@@ -35,7 +37,8 @@ module Def = struct
     in
     let edit_all = ds = [] in
     Log.if_error ~use:B0_driver.Exit.no_such_name @@
-    Result.bind (Def.get_all ds) @@ fun ds ->
+    let ds = match ds with [] -> Ok (Def.list ()) | ds -> Def.get_list ds in
+    Result.bind ds @@ fun ds ->
     let not_found, files = find_files Def.Set.empty [] ds in
     Log.if_error' ~use:B0_driver.Exit.some_error @@
     match not edit_all && not (Def.Set.is_empty not_found) with
@@ -61,7 +64,8 @@ module Def = struct
         Fmt.error "@[%a@]" pp (key, List.map name suggs)
     in
     Result.bind key @@ fun (B0_meta.Key.V key) ->
-    Result.bind (Def.get_all ds) @@ fun ds ->
+    let ds = match ds with [] -> Ok (Def.list ()) | ds -> Def.get_list ds in
+    Result.bind ds @@ fun ds ->
     let add_meta acc d = match B0_meta.find_binding key (Def.meta d) with
     | None -> acc | Some v -> (d, v) :: acc
     in

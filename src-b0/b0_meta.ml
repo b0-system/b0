@@ -51,6 +51,7 @@ module Key = struct
   let equal (V k0) (V k1) = k0.uid = k1.uid
   let compare (V k0) (V k1) = (compare : int -> int -> int) k0.uid k1.uid
   let pp_name_str = Fmt.tty_string [`Fg `Yellow]
+  let pp_name ppf k = pp_name_str ppf k.name
   let pp ppf (V k) = pp_name_str ppf k.name
 
   (* Lookup keys by name *)

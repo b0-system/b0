@@ -582,6 +582,9 @@ module Link : sig
 
   (** Link dependencies. *)
   module Deps : sig
+
+    (** {1:ocamlobjinfo Via ocamlobjinfo} *)
+
     val write : B00.Memo.t -> cobjs:Fpath.t list -> o:Fpath.t -> unit
     (** [write m cobjs o] writes the external link dependencies and order
         of compilation unit objects of [cobjs] to [o]. *)
@@ -616,7 +619,9 @@ end
 
 (** {1:libs Libraries} *)
 
-(** OCAMLPATH search path. *)
+(** OCAMLPATH search path.
+
+    FIXME, maybe this should be a store key. *)
 module Ocamlpath : sig
 
   val get : Memo.t -> Fpath.t list option -> Fpath.t list Memo.fiber
@@ -653,6 +658,15 @@ module Lib : sig
     (** [v s] is a library for [n]. Raises [Invalid_argument] if [s] is
         not a valid library name. *)
 
+    val first : t -> string
+    (** [first n] is [n]'s first name, that is the rightmost one. *)
+
+    val last : t -> string
+    (** [last n] is [n]'s last name, that is the leftmost one. *)
+
+    val to_archive_name : t -> string
+    (** [to_archive_name n] is [n] with [.] mapped to [_]. *)
+
     val of_string : string -> (t, string) result
     (** [of_string s] is a library name from [n]. *)
 
@@ -685,12 +699,13 @@ module Lib : sig
   (** The type for libraries. *)
 
   val v :
-    ?archive:string -> B00.Memo.t -> name:Name.t -> requires:Name.t list ->
-    dir:Fpath.t -> t
-  (** [v ~archive ~name ~dir ~requires] is a library named [name]
+    ?installed:bool -> ?archive:string -> Memo.t -> name:Name.t ->
+    requires:Name.t list -> dir:Fpath.t -> t
+  (** [v ~installed ~archive ~name ~dir ~requires] is a library named [name]
       whose directory is [dir] and which requires libraries [requires]
       at link time. [archive] is the base name of the library archive,
-      defaults to ["lib"]. *)
+      defaults to ["lib"]. [installed] indicates whether the library is
+      installed. *)
 
   val name : t -> Name.t
   (** [name l] is the library name of [l]. *)
@@ -705,6 +720,10 @@ module Lib : sig
   val archive : code:Cobj.code -> t -> Fpath.t
   (** [archive ~code l] is the path to the library archive for code [c].
       Not checked for existence. *)
+
+  val installed : t -> bool
+  (** [installed l] is [true] if [l] is an installed library. FIXME
+      this should not be needed. *)
 
   val cmis : t -> Fpath.t list
   (** [cmis l] is the list of cmis for the library. *)

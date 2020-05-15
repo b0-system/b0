@@ -542,6 +542,14 @@ det s (Memo.with_mark mark (Store.memo s))
 
   val get : t -> 'a key -> 'a Memo.fiber
   (** [get s k] is the value bound to [k] in [s]. *)
+
+(**/**)
+  val set : t -> 'a key -> 'a -> unit
+  (** [set s k v] sets value [k] to [v] in [s]. {b Warning.} In general
+      this should not be used but it may be useful to initialize the
+      store. In particular this will raise [Invalid_argument] if [k] is
+      already set in [s]. *)
+(**/**)
 end
 
 (*---------------------------------------------------------------------------

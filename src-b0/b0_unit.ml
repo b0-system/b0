@@ -5,35 +5,58 @@
 
 open B00_std
 
-(* Build procedures *)
+(* A bit of annoying recursive definition. *)
 
-type t = { def : B0_def.t; proc : proc; }
-and proc = build -> unit B00.Memo.fiber
+module rec Build_def : sig
+  type t = { u : build_ctx; b : build_state }
+  and build_ctx = { current : Unit.t option; m : B00.Memo.t; }
+  and build_state =
+    { root_dir : Fpath.t;
+      b0_dir : Fpath.t;
+      build_dir : Fpath.t;
+      shared_build_dir : Fpath.t;
+      store : B00.Store.t;
+      must : Unit.Set.t; may : Unit.Set.t;
+      mutable requested : Unit.t String.Map.t;
+      mutable waiting : Unit.t Rqueue.t; }
+end = struct
+  type t = { u : build_ctx; b : build_state }
+  and build_ctx = { current : Unit.t option; m : B00.Memo.t; }
+  and build_state =
+    { root_dir : Fpath.t;
+      b0_dir : Fpath.t;
+      build_dir : Fpath.t;
+      shared_build_dir : Fpath.t;
+      store : B00.Store.t;
+      must : Unit.Set.t; may : Unit.Set.t;
+      mutable requested : Unit.t String.Map.t;
+      mutable waiting : Unit.t Rqueue.t; }
+end
 
-and build = { u : build_ctx; b : build_state }
-and build_ctx = { current : t option; m : B00.Memo.t; }
-and build_state =
-  { root_dir : Fpath.t;
-    b0_dir : Fpath.t;
-    build_dir : Fpath.t;
-    shared_build_dir : Fpath.t;
-    locked : bool;
-    store : B00.Store.t;
-    mutable units : t String.Map.t;
-    mutable waiting : t Rqueue.t; }
-
-let nop _ k = k ()
-
-(* Build units *)
-
-module T = struct
-  type nonrec t = t
+and Unit_def : sig
+  type proc = Build_def.t -> unit B00.Memo.fiber
+  type t = { def : B0_def.t; proc : proc; }
+  include B0_def.VALUE with type t := t
+end = struct
+  type proc = Build_def.t -> unit B00.Memo.fiber
+  type t = { def : B0_def.t; proc : proc; }
   let def_kind = "unit"
   let def u = u.def
   let pp_name_str = Fmt.(code string)
 end
 
-include (B0_def.Make (T) : B0_def.S with type t := t)
+and Unit : sig include B0_def.S with type t = Unit_def.t end
+  = B0_def.Make (Unit_def)
+
+(* Build procedures *)
+
+type build = Build_def.t
+type proc = Unit_def.proc
+let nop _ k = k ()
+
+(* Build units *)
+
+include Unit
 
 let pp_synopsis ppf v =
   let pp_tag ppf u =
@@ -51,60 +74,69 @@ let pp ppf v =
 
 let v ?doc ?meta n proc =
   let def = define ?doc ?meta n in
-  let u = { def; proc } in add u; u
+  let u = { Unit_def.def; proc } in add u; u
 
-let proc u = u.proc
+let proc u = u.Unit_def.proc
 
 (* Builds *)
 
 module Build = struct
-  type bunit = t
-  type t = build
+  type bunit = Unit.t
+  include Build_def
+
+  let current =
+    B00.Store.key @@ fun _ ->
+      failwith
+        "B0_build.current can't be determined is must be set at store creation"
 
   let build_dir ~b0_dir = Fpath.(b0_dir / "b" / "user")
-  let shared_build_dir ~build_dir = Fpath.(build_dir / ".shared")
-  let store_dir ~build_dir = Fpath.(build_dir / ".store")
+  let shared_build_dir ~build_dir = Fpath.(build_dir / "_shared")
+  let store_dir ~build_dir = Fpath.(build_dir / "_store")
 
-  let create ~root_dir ~b0_dir m ~locked us =
+  let create ~root_dir ~b0_dir m ~may ~must =
     let u = { current = None; m } in
     let build_dir = build_dir ~b0_dir in
     let shared_build_dir = shared_build_dir ~build_dir in
     let store = B00.Store.create m ~dir:(store_dir ~build_dir) [] in
-    let units =
-      let add acc u = String.Map.add (name u) u acc in
-      List.fold_left add String.Map.empty us
+    let may = Set.union may must in
+    let add_requested u acc = String.Map.add (name u) u acc in
+    let requested = Unit.Set.fold add_requested must String.Map.empty in
+    let waiting =
+      let q = Rqueue.empty () in Unit.Set.iter (Rqueue.add q) must; q
     in
-    let waiting = Rqueue.empty () in
-    let () = List.iter (Rqueue.add waiting) us in
     let b =
-      { root_dir; b0_dir; build_dir; shared_build_dir; locked; store; waiting;
-        units }
+      { root_dir; b0_dir; build_dir; shared_build_dir; store; must; may;
+        requested; waiting; }
     in
-    { u; b }
+    let b = { u; b } in
+    B00.Store.set store current b;
+    b
 
   let memo b = b.u.m
-  let locked b = b.b.locked
   let store b = b.b.store
+  let shared_build_dir b = b.b.shared_build_dir
 
   module Unit = struct
     let current b = match b.u.current with
     | None -> invalid_arg "Build not running" | Some u -> u
 
-    let add b u = match b.b.locked with
-    | false ->
-        b.b.units <- String.Map.add (name u) u b.b.units;
-        Rqueue.add b.b.waiting u
-    | true ->
+    let must b = b.b.must
+    let may b = b.b.may
+
+    let require b u =
+      if String.Map.mem (name u) b.b.requested then () else
+      match Unit.Set.mem u b.b.may with
+      | true ->
+          b.b.requested <- String.Map.add (name u) u b.b.requested;
+          Rqueue.add b.b.waiting u
+      | false ->
           B00.Memo.fail b.u.m
-            "@[<v>Unit %a requested %a which is not part of the locked build.@,\
+            "@[<v>Unit %a requested %a which is not part of the build.@,\
              Try with %a or add the unit %a to the build."
             pp_name (current b) pp_name u Fmt.(code string) "--unlock"
             pp_name u
 
-    let require b u = if String.Map.mem (name u) b.b.units then () else add b u
-
     let build_dir b u = Fpath.(b.b.build_dir / name u)
-    let shared_build_dir b u = b.b.shared_build_dir
     let root_dir b u = match B0_def.dir (def u) with
     | None -> b.b.root_dir
     | Some dir -> dir
@@ -123,7 +155,7 @@ module Build = struct
       B00.Memo.stir ~block:true b.u.m;
       if Rqueue.length b.b.waiting = 0 then () else run_units b
 
-  let log_file b = Fpath.(b.b.build_dir / ".log")
+  let log_file b = Fpath.(b.b.build_dir / "_log")
   let write_log_file ~log_file m =
     Log.if_error ~use:() @@ B00_ui.Memo.Log.(write log_file (of_memo m))
 

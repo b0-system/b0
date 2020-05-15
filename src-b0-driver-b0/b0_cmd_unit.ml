@@ -49,6 +49,10 @@ let man = [
   `I ("$(b,edit) [$(i,UNIT)]...",
       "Edit in your editor the B0 file(s) in which all or the given units \
        are defined.");
+  `I ("$(b,exec) [$(b,--dry-run)] $(i,UNIT) -- $(i,ARG)...",
+      "Build and execute $(i,UNIT) with given arguments. If [--dry-run]
+      is specified prints out the invocation. The unit needs to
+      specify the $(b,B0_meta.exe_name) key for this to work.");
   `I ("$(b,get) $(i,KEY) [$(i,UNIT)]...",
       "Get metadata key $(i,KEY) of given or all units.");
   `I ("$(b,list) [$(i,UNIT)]...",
@@ -56,7 +60,7 @@ let man = [
        unit metadata.");
   `I ("$(b,show) [$(i,UNIT)]...",
       "Show is an alias for $(b,list -l).");
-  `S Manpage.s_arguments;
+`S Manpage.s_arguments;
   `S Manpage.s_options;
   B0_b0.Cli.man_see_manual; ]
 

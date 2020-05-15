@@ -5,48 +5,62 @@
 
 open B00_std
 
+
+let memo c =
+  let hash_fun = B0_driver.Conf.hash_fun c in
+  let cwd = B0_driver.Conf.cwd c in
+  let cache_dir = B0_driver.Conf.cache_dir c in
+  let b0_dir = B0_driver.Conf.b0_dir c in
+  let trash_dir = Fpath.(b0_dir / B00_ui.Memo.trash_dir_name) in
+  let jobs = B0_driver.Conf.jobs c in
+  let feedback =
+    let op_howto ppf o = Fmt.pf ppf "b0 log --id %d" (B000.Op.id o) in
+    let show_op = Log.Info and show_ui = Log.Error and level = Log.level () in
+    B00_ui.Memo.pp_leveled_feedback ~op_howto ~show_op ~show_ui ~level
+      Fmt.stderr
+  in
+  B00.Memo.memo ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs ~feedback ()
+
+
 let get_units packs units =
-  let ps = if packs = [] then Ok [] else B0_pack.get_all packs in
-  let us = if units = [] then Ok [] else B0_unit.get_all units in
+  let ps = B0_pack.get_list packs in
+  let us = B0_unit.get_list units in
   Result.bind ps @@ fun ps ->
   Result.bind us @@ fun us ->
-  (* FIXME for now excludes implies locked builds I think we may
-     rather want. to have an explicit exclude set in Build.t *)
-  let locked = packs <> [] || units <> [] in
   let us = List.rev_append us (List.concat_map B0_pack.units ps) in
   let us = B0_unit.Set.of_list us in
-  Ok (locked, us)
+  let has_locked_pack = List.exists B0_pack.locked ps in
+  Ok (has_locked_pack, us)
 
-let find_units_to_build packs x_packs units x_units =
-  let incs = match packs, units with
+let find_units_to_build lock packs x_packs units x_units =
+  let must = match packs, units with
   | [], [] ->
-      (* FIXME do something smarter. *)
+      (* FIXME do something smarter to get a default build set *)
       Ok (false, B0_unit.(Set.of_list (list ())))
   | _ -> get_units packs units
   in
-  let xs = match x_packs, x_units with
-  | [], [] -> Ok (false, B0_unit.Set.empty)
-  | _ -> get_units x_packs x_units
-  in
-  Result.bind incs @@ fun (locked, incs) ->
-  Result.bind xs @@ fun (xlocked, xs) ->
-  let us = B0_unit.Set.diff incs xs in
-  Ok (locked || xlocked, B0_unit.Set.elements us)
+  Result.bind must @@ fun (has_locked_pack, must) ->
+  Result.bind (get_units x_packs x_units) @@ fun (_, excluded) ->
+  let all = B0_unit.Set.of_list (B0_unit.list ()) in
+  let must = B0_unit.Set.diff must excluded in
+  let lock = Option.value ~default:has_locked_pack lock (* cli *) in
+  let may = if lock then must else (B0_unit.Set.diff all excluded) in
+  Ok (may, must)
 
-let build locked packs x_packs units x_units c =
+let build lock packs x_packs units x_units c =
   Log.if_error ~use:B0_driver.Exit.no_such_name @@
-  Result.bind (find_units_to_build packs x_packs units x_units) @@ function
-  | _, [] ->
+  Result.bind (find_units_to_build lock packs x_packs units x_units) @@
+  fun (may, must) ->
+  match B0_unit.Set.is_empty must with
+  | true ->
       Log.err (fun m -> m "Nothing found to build!");
       Ok B0_driver.Exit.build_error
-  | locked_pack, units ->
-      let locked = Option.value ~default:locked_pack locked (* cli *) in
+  | false ->
       let b0_file = Option.get (B0_driver.Conf.b0_file c) in
       let root_dir = Fpath.parent b0_file in
       let b0_dir = B0_driver.Conf.b0_dir c in
-      Result.bind (B0_driver.Conf.memo c) @@ fun memo ->
-      (* FIXME We'll have to create our own memo here. *)
-      let build = B0_build.create ~root_dir ~b0_dir memo ~locked units in
+      Result.bind (memo c) @@ fun memo ->
+      let build = B0_build.create ~root_dir ~b0_dir memo ~may ~must in
       match B0_build.run build with
       | Ok () -> Ok (B0_driver.Exit.ok)
       | Error () -> Ok B0_driver.Exit.build_error
@@ -74,7 +88,7 @@ let x_packs =
              Takes over inclusion and locks the build." in
   Arg.(value & opt_all string [] & info ["X"; "x-pack"] ~doc ~docv:"PACK")
 
-let locked =
+let lock =
   (* FIXME env var *)
   let lock =
     let doc = "Lock the build to units and packs specified on the cli." in
@@ -102,7 +116,7 @@ let man = [
 
 let cmd =
   let build_cmd =
-    Term.(const build $ locked $ packs $ x_packs $ units $ x_units)
+    Term.(const build $ lock $ packs $ x_packs $ units $ x_units)
   in
   B0_driver.with_b0_file ~driver:B0_b0.driver build_cmd,
   Term.info "build" ~doc ~sdocs ~exits ~man ~man_xrefs

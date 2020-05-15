@@ -190,10 +190,9 @@ module type S = sig
   (** [get_or_suggest n] is the value named [n] or a (possibly empty)
       list of suggested values whose name could match [n]. *)
 
-  val get_all : string list -> (t list, string) result
-  (** [get_all ns] are the value named [ns] or an error that indicates
-      the names that could not be found with suggested names. If [ns]
-      is empty then {!list} is returned. *)
+  val get_list : string list -> (t list, string) result
+  (** [get_list ns] are the value named [ns] or an error that indicates
+      the names that could not be found with suggested names. *)
 
   (** {1:fmt Formatters} *)
 

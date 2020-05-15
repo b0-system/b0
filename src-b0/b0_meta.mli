@@ -52,6 +52,9 @@ module Key : sig
   val pp_value : 'a key -> 'a Fmt.t
   (** [pp k] is [k]'s value formatter. *)
 
+  val pp_name : 'a key Fmt.t
+  (** [pp_name k] formats [k]'s name with {!pp_name_str}. *)
+
   (** {1:exist Existential keys} *)
 
   type t = V : 'a key -> t (** *)

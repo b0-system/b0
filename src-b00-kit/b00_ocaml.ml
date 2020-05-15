@@ -773,14 +773,13 @@ end
 (* Libraries *)
 
 module Ocamlpath = struct
-  let get_var parse var m =
+  let get_var parse var m = (* FIXME move that to Memo.env ? *)
     let env = Env.env (Memo.env m) in
-    match String.Map.find var env with
-    | exception Not_found -> None
-    | "" -> None
-    | v ->
+    match String.Map.find_opt var env with
+    | None | Some "" -> None
+    | Some v ->
         match parse v with
-        | Error e -> Memo.fail m "%s parse: %s" var v
+        | Error e -> Memo.fail m "parsing %a: %s" Fmt.(code string) var v
         | Ok v -> Some v
 
   let get m ps k = match ps with
@@ -793,7 +792,7 @@ module Ocamlpath = struct
           | Some p -> k [Fpath.(p / "lib")]
           | None ->
               Memo.fail m
-                "No %a determined in the build environment."
+                "Could not determine an %a in the build environment."
                 Fmt.(code string) "OCAMLPATH"
 end
 
@@ -802,10 +801,10 @@ module Lib = struct
   (* Library names. *)
 
   module Name = struct
-    let fpath_to_name s =
+    let fpath_to_name ?(sep = '.') s =
       let b = Bytes.of_string (Fpath.to_string s) in
       for i = 0 to Bytes.length b - 1 do
-        if Bytes.get b i = Fpath.dir_sep_char then Bytes.set b i '.';
+        if Bytes.get b i = Fpath.dir_sep_char then Bytes.set b i sep;
       done;
       Bytes.unsafe_to_string b
 
@@ -834,6 +833,18 @@ module Lib = struct
 
     type t = Fpath.t (* dots are Fpath.dir_sep_char *)
 
+    let first n =
+      let n = Fpath.to_string n in
+      match String.cut_right ~sep:Fpath.dir_sep n with
+      | None -> n | Some (_, n) -> n
+
+    let last n =
+      let n = Fpath.to_string n in
+      match String.cut_left ~sep:Fpath.dir_sep n with
+      | None -> n | Some (n, _) -> n
+
+    let to_archive_name n = fpath_to_name ~sep:'_' n
+
     let of_string s = Result.bind (name_to_fpath s) @@ fun name -> Ok name
     let to_string n = fpath_to_name n
     let to_fpath n = n
@@ -847,24 +858,33 @@ module Lib = struct
     module Map = Map.Make (T)
   end
 
+  (* Libraries *)
+
+  (* This doesn't work well for built libraries and needs fixing.
+     Should work but for reasons that are subtle, also doesn't
+     maxmimize // (in B0_ocaml sync on archive ready rather more fine
+     grained on ifaces). *)
+
   type t =
     { name : Name.t;
       requires : Name.t list;
       dir : Fpath.t;
       archive : string;
-      dir_files_by_ext : B00_fexts.map; }
+      dir_files_by_ext : B00_fexts.map Lazy.t;
+      installed : bool; (* this should not be needed. *) }
 
-  let dir_files_by_ext m dir =
+
+  let dir_files_by_ext m ~installed dir =
     Memo.fail_if_error m @@
     let add _ _ p acc =
-      Memo.file_ready m p;
+      if installed then Memo.file_ready m p;
       String.Map.add_to_list (Fpath.get_ext p) p acc
     in
     Os.Dir.fold_files ~recurse:false add dir String.Map.empty
 
-  let v ?(archive = "lib") m ~name ~requires ~dir =
-    let dir_files_by_ext = dir_files_by_ext m dir in
-    { name; requires; dir; archive; dir_files_by_ext }
+  let v ?(installed = true) ?(archive = "lib") m ~name ~requires ~dir =
+    let dir_files_by_ext = lazy (dir_files_by_ext m ~installed dir) in
+    { name; requires; dir; archive; dir_files_by_ext; installed }
 
   let name l = l.name
   let requires l = l.requires
@@ -873,7 +893,8 @@ module Lib = struct
     let a = l.archive ^ Cobj.archive_ext_of_code code in
     Fpath.(l.dir / a)
 
-  let cmis l = match String.Map.find ".cmi" l.dir_files_by_ext with
+  let installed l = l.installed
+  let cmis l = match String.Map.find ".cmi" (Lazy.force l.dir_files_by_ext) with
   | exception Not_found -> [] | cmis -> cmis
 end
 
@@ -914,12 +935,17 @@ module Ocamlfind = struct
         Result.map_error (Fmt.str "required library: %s") @@
         Lib.Name.of_string s
       in
+      if requires = "" then [] else
       List.map to_libname (String.split_on_char ' ' requires)
+    in
+    let parse_archive a = match String.cut_right "." a with
+    | None -> a | Some (a, _ext) -> a
     in
     try
       match String.split_on_char ':' (String.trim s) with
       | [meta; dir; archive; requires] ->
           let requires = parse_requires requires in
+          let archive = parse_archive archive in
           let dir =
             Result.to_failure @@
             Result.map_error (Fmt.str "library directory: %s") @@
@@ -928,9 +954,7 @@ module Ocamlfind = struct
           Ok (meta, Lib.v m ~name:n ~requires ~dir ~archive)
       | _ -> Fmt.failwith "could not parse %S" s
     with
-    | Failure e ->
-        Fmt.error "@[<v>%a: %a library information:@,%s]"
-          Fpath.pp_unquoted file Lib.Name.pp n s
+    | Failure e -> Fmt.error "@[<v>%a: %s@]" Fpath.pp_unquoted file e
 
 
   (* FIXME need to solve the META file read.
@@ -963,7 +987,6 @@ module Ocamlfind = struct
     k lib
 end
 
-
 module Lib_resolver = struct
 
   type t =
@@ -973,13 +996,13 @@ module Lib_resolver = struct
       mutable libs : Lib.t B00.Memo.Fut.t Lib.Name.Map.t; }
 
   let create memo ~memo_dir ~ocamlpath =
-    let memo = B00.Memo.with_mark memo "b00.ocaml.lib-resolver" in
+    let memo = B00.Memo.with_mark memo "b00.ocaml.lib.resolver" in
     { memo; memo_dir; ocamlpath; libs = Lib.Name.Map.empty }
 
   let find r n = match Lib.Name.Map.find n r.libs with
   | lib -> Memo.Fut.await lib
   | exception Not_found ->
-      let fname = Fmt.str "%s.ocamlfind" (Lib.Name.to_string n) in
+      let fname = Fmt.str "ocamlib-%s.ocamlfind" (Lib.Name.to_string n) in
       let o = Fpath.(r.memo_dir / fname) in
       Ocamlfind.write_info r.memo n o;
       let fib = Ocamlfind.read_info r.memo n o in

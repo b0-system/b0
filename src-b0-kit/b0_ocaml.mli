@@ -42,20 +42,20 @@ module Unit : sig
       the domain of the resolver for error correction (or we bundle
       this into the fiber failure). *)
 
-  val lib_resolver : (B0_build.t -> lib_resolver) Store.key
+  val lib_resolver : lib_resolver Store.key
   (** [lib_resolver] is the library resolver used by OCaml build units.
       See {!default_lib_resolver} for the default. *)
 
-  val default_lib_resolver :
-    Store.t -> Memo.t -> (B0_build.t -> lib_resolver) Memo.fiber
+  val default_lib_resolver : Store.t -> Memo.t -> lib_resolver Memo.fiber
   (** [default_resolver] determines the default value of {!lib_resolver}.
       This resolver does the following:
       {ol
-      {- It first looks if the library name is defined by a unit
-         of the build, if that is the case it creates a library out
-         of that build unit's.}
+      {- It first looks if the library name is {{!Meta.library}defined}
+         by a unit  that {{!B0_build.Unit.may}may} be built. If that
+         is the case it creates a library out of that build unit's.}
       {- It looks into the environment for a library via
-         {!B00_ocaml.Lib_resolver}}} *)
+         {!B00_ocaml.Lib_resolver} that writes its result in the
+         {!B0_build.shared_build_dir} of the build.}} *)
 
   (** {1:unit Units} *)
 

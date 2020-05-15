@@ -10,7 +10,7 @@ let log c details format op_selector =
   let don't = B0_driver.Conf.no_pager c || format = `Trace_event in
   let b0_dir = B0_driver.Conf.b0_dir c in
   (* FIXME *)
-  let log_file = Fpath.(b0_dir / "b" / "user" / ".log") in
+  let log_file = Fpath.(b0_dir / "b" / "user" / "_log") in
   Result.bind (B00_pager.find ~don't ()) @@ fun pager ->
   Result.bind (B00_pager.page_stdout pager) @@ fun () ->
   Result.bind (B00_ui.Memo.Log.read log_file) @@ fun l ->
