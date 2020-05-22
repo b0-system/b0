@@ -6,21 +6,25 @@ open Topkg
 let () =
   Pkg.describe "b0" @@ fun c ->
   Ok [
-    (* B00 *)
-    Pkg.mllib "src-b00-std/b00_std.mllib" ~dst_dir:"b00/std";
-    Pkg.clib "src-b00-std/libb00_stubs.clib" ~lib_dst_dir:"b00/std";
-    Pkg.lib "src-b00-std/b00_std_top_init.ml"
-      ~dst:"b00/std/b00_std_top_init.ml";
-    Pkg.mllib "src-b00/b00.mllib" ~dst_dir:"b00";
-    Pkg.mllib "src-b00-kit/b00_kit.mllib" ~dst_dir:"b00/kit";
+    (* B00 libraries *)
+    Pkg.mllib "src-b00/std/b0_b00_std.mllib" ~dst_dir:"b00/std";
+    Pkg.clib "src-b00/std/libb0_b00_stubs.clib" ~lib_dst_dir:"b00/std";
+    Pkg.lib "src-b00/std/b0_b00_std_top_init.ml"
+      ~dst:"b00/std/b0_b00_std_top_init.ml";
+    Pkg.mllib "src-b00/b0_b00.mllib" ~dst_dir:"b00";
+    Pkg.mllib "src-b00/kit/b0_b00_kit.mllib" ~dst_dir:"b00/kit";
 
-    (* B0 *)
-    Pkg.mllib "src-b0/b0.mllib";
-    Pkg.mllib "src-b0-kit/b0_kit.mllib" ~dst_dir:"kit";
-    Pkg.mllib "src-b0-driver/b0_driver.mllib" ~dst_dir:"driver";
-    Pkg.mllib "src-b0-driver-b0/b0_driver_b0.mllib" ~dst_dir:"driver/b0";
-    Pkg.bin "src-b0-driver-b0/b0_main_run" ~dst:"b0";
-(*    Pkg.mllib "src-b0-driver-d0/b0_driver_d0.mllib" ~dst_dir:"driver/d0"; *)
+    (* B0 libraries *)
+    Pkg.mllib "src/b0.mllib";
+    Pkg.mllib "src/kit/b0_kit.mllib" ~dst_dir:"kit";
+    Pkg.mllib "src/driver/b0_driver.mllib" ~dst_dir:"driver";
+
+    (* b0 & d0 tools *)
+    Pkg.mllib "tool-b0/b0_driver_b0.mllib" ~dst_dir:"driver/b0";
+    Pkg.bin "tool-b0/b0_main_run" ~dst:"b0";
+(*    Pkg.mllib "tool-d0/b0_driver_d0.mllib" ~dst_dir:"driver/d0";
+      Pkg.bin "tool-d0/d0_main_run" ~dst:"b0";
+ *)
 
     (* Tools *)
     Pkg.bin "tools/b00_cache" ~dst:"b00-cache";

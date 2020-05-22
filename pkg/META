@@ -7,20 +7,20 @@ package "b00" (
   description = "B00 build abstraction"
   version = "%%VERSION_NUM%%"
   requires = "unix b0.b00.std"
-  archive(byte) = "b00.cma"
-  archive(native) = "b00.cmxa"
-  plugin(byte) = "b00.cma"
-  plugin(native) = "b00.cmxs"
+  archive(byte) = "b0_b00.cma"
+  archive(native) = "b0_b00.cmxa"
+  plugin(byte) = "b0_b00.cma"
+  plugin(native) = "b0_b00.cmxs"
 
   package "std" (
     directory = "std"
     description = "B00 stdlib extensions"
     version = "%%VERSION_NUM%%"
     requires = "unix"
-    archive(byte) = "b00_std.cma"
-    archive(native) = "b00_std.cmxa"
-    plugin(byte) = "b00_std.cma"
-    plugin(native) = "b00_std.cmxs"
+    archive(byte) = "b0_b00_std.cma"
+    archive(native) = "b0_b00_std.cmxa"
+    plugin(byte) = "b0_b00_std.cma"
+    plugin(native) = "b0_b00_std.cmxs"
   )
 
   package "kit" (
@@ -28,10 +28,10 @@ package "b00" (
     description = "B00 toolkit"
     version = "%%VERSION_NUM%%"
     requires = "unix cmdliner b0.b00.std b0.b00"
-    archive(byte) = "b00_kit.cma"
-    archive(native) = "b00_kit.cmxa"
-    plugin(byte) = "b00_kit.cma"
-    plugin(native) = "b00_kit.cmxs"
+    archive(byte) = "b0_b00_kit.cma"
+    archive(native) = "b0_b00_kit.cmxa"
+    plugin(byte) = "b0_b00_kit.cma"
+    plugin(native) = "b0_b00_kit.cmxs"
   )
 )
 

@@ -1,32 +1,33 @@
-true : bin_annot, safe_string, keep_locs
+true : bin_annot
 true : package(unix)
 # true : package(landmarks.ppx,landmarks)
+<_b0> : -traverse
 
 # B00
-<src-b00-std> : include
-<src-b00-std/b00_std.{cma,cmxa}> : record_b00_stubs
-<src-b00-std/b00_std.cmxs> : link_b00_stubs
+<src-b00/std> : include
+<src-b00/std/b0_b00_std.{cma,cmxa}> : record_b00_stubs
+<src-b00/std/b0_b00_std.cmxs> : link_b00_stubs
 <src-b00> : include
-<src-b00-kit> : include
-<src-b00-kit/**> : package(cmdliner)
+<src-b00/kit> : include
+<src-b00/kit/**> : package(cmdliner)
 
 # B0
-<src-b0> : include
-<src-b0-kit> : include
-<src-b0-kit/**> : package(cmdliner)
-<src-b0-driver> : include
-<src-b0-driver/**> : package(cmdliner)
-<src-b0-driver-b0> : include
-<src-b0-driver-b0/**> : package(cmdliner)
-<src-b0-driver-b0/b0_main_run.*> : use_b00_stubs
+<src> : include
+<src/kit> : include
+<src/kit/**> : package(cmdliner)
+<src/driver> : include
+<src/driver/**> : package(cmdliner)
+
+# b0 & d0 tools
+<tool-b0> : include
+<tool-b0/**> : package(cmdliner)
+<tool-b0/b0_main_run.*> : use_b00_stubs
+
+<tools> : include
+<tools/**> : use_b00_stubs, package(cmdliner)
 
 <examples> : include
 <examples/**> : use_b00_stubs, not_hygienic
 
 <test> : include
 <test/**> : use_b00_stubs, package(cmdliner)
-
-<tools> : include
-<tools/**> : use_b00_stubs, package(cmdliner)
-
-<_b0> : -traverse

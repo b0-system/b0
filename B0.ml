@@ -12,11 +12,11 @@ let b0_kit = B0_ocaml.lib "b0.kit"
 let b0_driver = B0_ocaml.lib "b0.driver"
 let b0_driver_b0 = B0_ocaml.lib "b0.driver.b0"
 
-(* Libraries *)
+(* B00 libraries *)
 
 let b00_std_lib =
   let requires = [unix] in
-  let srcs = [`D_rec "src-b00-std"; `X "src-b00-std/b00_std_top_init.ml" ] in
+  let srcs = [`D_rec "src-b00/std"; `X "src-b00/std/b0_b00_std_top_init.ml" ] in
   B0_ocaml.Unit.lib b00_std ~doc:"B00 Stdlib extensions" ~requires ~srcs
 
 let b00_lib =
@@ -26,22 +26,24 @@ let b00_lib =
 
 let b00_kit_lib =
   let requires = [unix; cmdliner; b00_std; b00] in
-  let srcs = [`D "src-b00-kit"] in
+  let srcs = [`D "src-b00/kit"] in
   B0_ocaml.Unit.lib b00_kit ~doc:"B00 toolkit" ~requires ~srcs
+
+(* B0 libraries *)
 
 let b0_lib =
   let requires = [unix; b00_std; b00; b00_kit] in
-  let srcs = [`D "src-b0"] in
+  let srcs = [`D "src"] in
   B0_ocaml.Unit.lib b0 ~doc:"B0 description API" ~requires ~srcs
 
 let b0_kit_lib =
   let requires = [unix; cmdliner; b00_std; b00; b00_kit; b0] in
-  let srcs = [`D "src-b0-kit"] in
+  let srcs = [`D "src/kit"] in
   B0_ocaml.Unit.lib b0_kit ~doc:"B0 toolkit" ~requires ~srcs
 
 let b0_driver_lib =
   let requires = [unix; cmdliner; b00_std; b00; b00_kit; b0] in
-  let srcs = [`D "src-b0-driver"] in
+  let srcs = [`D "src/driver"] in
   B0_ocaml.Unit.lib b0_driver ~doc:"B0 driver API" ~requires ~srcs
 
 (* B0 driver and tool *)
@@ -50,12 +52,12 @@ let b0_driver_b0_lib =
   let requires =
     [unix; cmdliner; b00_std; b00; b00_kit; b0; b0_kit; b0_driver]
   in
-  let srcs = [`D "src-b0-driver-b0"; `X "src-b0-driver-b0/b0_main_run.ml"] in
+  let srcs = [`D "tool-b0"; `X "tool-b0/b0_main_run.ml"] in
   B0_ocaml.Unit.lib b0_driver_b0 ~doc:"b0 tool driver library" ~requires ~srcs
 
 let b0_tool =
   let requires = [b0_driver; b0_driver_b0] in
-  let srcs = [`F "src-b0-driver-b0/b0_main_run.ml"] in
+  let srcs = [`F "tool-b0/b0_main_run.ml"] in
   B0_ocaml.Unit.exe "b0" ~name:"b0-tool" ~doc:"b0 tool" ~requires ~srcs
 
 (* Low-level B00 tools units *)

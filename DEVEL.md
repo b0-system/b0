@@ -47,11 +47,11 @@ There is one OCaml library per directory. We distinguish two levels
 This is the core infrastructure that can be used on its own to devise
 build tools (e.g. `odig`, `brzo`).
 
-* `src-b00-std` has the `b0.b00.std` library. This has a few things that 
+* `src-b00/std` has the `b0.b00.std` library. This has a few things that 
   should be in the stdlib and a few others that shouldn't but are useful 
   for `b00` based programs.
 * `src-b00` is the core `b0.b00` build library.
-* `src-b00-kit` is the `b0.b00.kit` library. An end-user toolkit for working
+* `src-b00/kit` is the `b0.b00.kit` library. An end-user toolkit for working
    with the `b00` API.
 * `tools` has a few b00 low-level tools. 
 
@@ -60,12 +60,12 @@ build tools (e.g. `odig`, `brzo`).
 This is the system for describing software contruction and deployments
 via B0 files.
 
-* `src-b0` has the `b0` library which for describing software construction 
+* `src` has the `b0` library which for describing software construction 
   and deployments.
-* `src-b0-kit` is the `b0.kit` library. An end-user toolkit for B0 files. 
-* `src-b0-driver` is the `b0.driver` library. It provides programmatic
+* `src/kit` is the `b0.kit` library. An end-user toolkit for B0 files. 
+* `src/driver` is the `b0.driver` library. It provides programmatic
   access to the definitions of B0 files.
-* `src-b0-driver-b0`, is the `b0.driver.b0` library. The driver library
+* `tool-b0`, is the `b0.driver.b0` library. The driver library
   for the `b0` tool.
 
 
