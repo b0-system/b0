@@ -382,10 +382,10 @@ module Mod_src : sig
   module Deps : sig
     val write :
       ?src_root:Fpath.t -> Memo.t -> srcs:Fpath.t list -> o:Fpath.t -> unit
-    (** [write m ~src_root ~srcs ~o] writes dependencies of [srcs]
-        in file [o]. If [src_root] if specified it is used as the [cwd]
-        for the operation and assumed to be a prefix of every file in
-        [srcs], this allows the output not to the depend on absolute
+    (** [write m ~src_root ~srcs ~o] writes the module dependencies of each
+        file in [srcs] in file [o]. If [src_root] if specified it is used
+        as the [cwd] for the operation and assumed to be a prefix of every
+        file in [srcs], this allows the output not to the depend on absolute
         paths.
 
         {b UPSTREAM FIXME.} We don't actually do what is mentioned
@@ -399,10 +399,10 @@ module Mod_src : sig
     val read :
       ?src_root:Fpath.t -> Memo.t -> Fpath.t ->
       Mod_name.Set.t Fpath.Map.t Memo.fiber
-      (** [read ~src_root depsfile] reads dependencies produced by
-          {!write} as a map from absolute file paths to their
-          dependencies.  Relative file paths are made absolute using
-          [src_root] (defaults to {!B00_std.Os.Dir.cwd}). *)
+    (** [read ~src_root file] reads dependencies produced by {!write}
+        as a map from absolute file paths to their dependencies.
+        Relative file paths are made absolute relative to {!src_root}
+        if specified. *)
   end
 
   type t
@@ -475,19 +475,27 @@ module Mod_src : sig
   (** {1:map Module name maps} *)
 
   val of_srcs :
-    Memo.t -> src_deps:Mod_name.Set.t Fpath.Map.t -> srcs:Fpath.t list ->
+    Memo.t -> srcs:Fpath.t list -> src_deps:Mod_name.Set.t Fpath.Map.t ->
     t Mod_name.Map.t
-  (** [of_srcs ~src_deps deps ~srcs] determines source modules (mapped
-      by their names) given sources [srcs] and their dependencies
+  (** [of_srcs m ~srcs ~src_deps] determines source modules values
+      (mapped by their names) given sources [srcs] and their dependencies
       [src_deps] (e.g. obtainted via {!Deps.read}. If there's more
       than one [mli] or [ml] file for a given module name a warning is
       notified on [m] and a single one is kept. *)
+
+  val sort :
+    ?stable:t list -> deps:(t -> Mod_name.Set.t) -> t Mod_name.Map.t -> t list
+  (** [sort ~stable ~deps srcs] sorts [srcs] in [deps] dependency order
+      respecting elements mentioned in [stable] (if any). *)
 
   val find_local_deps :
     t Mod_name.Map.t -> Mod_name.Set.t -> t list * Mod_name.Set.t
   (** [find_local_deps ms deps] is [(mods, remain)] with [mods] the
       modules of [ms] whose name is in [deps] and [remain] the names
-      of [deps] which cannot be found in [ms]. *)
+      of [deps] which cannot be found in [ms].
+
+      {b FIXME.} This function has a confusing name. Also can
+      we eject it back to brzo ? *)
 end
 
 (** OCaml and C stub compilation. *)
@@ -666,6 +674,9 @@ module Lib : sig
 
     val to_archive_name : t -> string
     (** [to_archive_name n] is [n] with [.] mapped to [_]. *)
+
+    val undot : rep:Char.t -> t -> string
+    (** [undot ~rep n] is [n] with [.] replaced by [rep]. *)
 
     val of_string : string -> (t, string) result
     (** [of_string s] is a library name from [n]. *)

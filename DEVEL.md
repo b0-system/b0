@@ -18,7 +18,7 @@ ocaml b00t/run    # builds b0 via b0 itself
 
 The first invocation produces the `b00t/run` executable which has B0's
 own B0 file linked with a `b0` driver. Running it is equivalent to run
-`b0` on the root `B0.ml` file. The executable must be recomiled redone
+`b0` on the root `B0.ml` file. The executable must be recompiled
 if `B0.ml` changes or if the B0 libraries change in a meaningful way
 for it's interpretation.
 

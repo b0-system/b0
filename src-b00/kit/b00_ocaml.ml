@@ -197,7 +197,6 @@ module Mod_name = struct
     | None | Some _ -> "M" ^ s
     in
     String.Ascii.capitalize s
-
 end
 
 module Mod_ref = struct
@@ -531,7 +530,7 @@ module Mod_src = struct
     in
     List.fold_left add Mod_name.Map.empty files
 
-  let of_srcs m ~src_deps ~srcs =
+  let of_srcs m ~srcs ~src_deps  =
     let get_src_deps = function
     | None -> Mod_name.Set.empty
     | Some file ->
@@ -548,6 +547,29 @@ module Mod_src = struct
       Some (v ~mod_name ~opaque:false ~mli ~mli_deps ~ml ~ml_deps)
     in
     Mod_name.Map.merge mod' mlis mls
+
+  let sort ?stable ~deps name_map =
+    let rec loop seen acc = function
+    | [] -> seen, acc
+    | src :: srcs ->
+        if Mod_name.Set.mem src.mod_name seen then loop seen acc srcs else
+        let seen = Mod_name.Set.add src.mod_name seen in
+        let add_src_dep n acc = match Mod_name.Set.mem n seen with
+        | true -> acc
+        | false ->
+            match Mod_name.Map.find_opt n name_map with
+            | None -> acc
+            | Some src -> src :: acc
+        in
+        let deps = Mod_name.Set.fold add_src_dep (deps src) [] in
+        let seen, acc = loop seen acc deps in
+        loop seen (src :: acc) srcs
+    in
+    let add_src _ src acc = src :: acc in
+    let stable = Option.value ~default:[] stable in
+    let todo = stable @ Mod_name.Map.fold add_src name_map [] in
+    let _, acc = loop Mod_name.Set.empty [] todo in
+    List.rev acc
 
   let find_local_deps map ns =
     let rec loop res remain deps = match Mod_name.Set.choose deps with
@@ -844,6 +866,7 @@ module Lib = struct
       | None -> n | Some (n, _) -> n
 
     let to_archive_name n = fpath_to_name ~sep:'_' n
+    let undot ~rep n = fpath_to_name ~sep:rep n
 
     let of_string s = Result.bind (name_to_fpath s) @@ fun name -> Ok name
     let to_string n = fpath_to_name n

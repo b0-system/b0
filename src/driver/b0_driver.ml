@@ -240,10 +240,12 @@ module Compile = struct
     B00.Memo.write m ~reads src_file @@ fun () ->
     Ok (B0_file.expanded_src esrc)
 
-  let base_libs =
+  let base_ext_libs =
     [ B00_ocaml.Lib.Name.v "cmdliner";
-      B00_ocaml.Lib.Name.v "unix"; (* FIXME system switches *)
-      B00_ocaml.Lib.Name.v "b0.b00.std";
+      B00_ocaml.Lib.Name.v "unix"; ]
+
+  let base_libs =
+    [ B00_ocaml.Lib.Name.v "b0.b00.std";
       B00_ocaml.Lib.Name.v "b0.b00";
       B00_ocaml.Lib.Name.v "b0.b00.kit";
       B00_ocaml.Lib.Name.v "b0.b0";
@@ -258,17 +260,31 @@ module Compile = struct
     in
     loop [] libs
 
+  let find_boot_libs m ~env libs r k =
+    match Os.Env.find ~empty_is_none:true "B0_B00T" with
+    | None -> find_libs libs r k
+    | Some bdir ->
+        let bdir = Fpath.v bdir in
+        let boot_lib name =
+          let dir = Fpath.(bdir / B00_ocaml.Lib.Name.undot ~rep:'-' name) in
+          let archive = B00_ocaml.Lib.Name.to_archive_name name in
+          B00_ocaml.Lib.v m ~name ~requires:[] ~archive ~dir
+        in
+        k (List.map boot_lib libs)
+
   let find_libs m ~build_dir ~driver ~requires k =
     B00_ocaml.Ocamlpath.get m None @@ fun ocamlpath ->
-    let memo_dir = Fpath.(build_dir / "ocaml-lib-resolve") in
+    let memo_dir = Fpath.(build_dir / "ocamlib") in
     let r = B00_ocaml.Lib_resolver.create m ~memo_dir ~ocamlpath in
     let requires = List.map fst requires in
     (* FIXME we are loosing locations here would be nice to
        have them to report errors. *)
     find_libs requires r @@ fun requires ->
-    find_libs (libs driver) r @@ fun driver_libs ->
-    find_libs base_libs r @@ fun base_libs ->
-    let all_libs = base_libs @ driver_libs @ requires in
+    (* FIXME we likely also want a notion of ext lib for drivers *)
+    find_boot_libs m ~env:"B0_DRIVER_BOOT" (libs driver) r @@ fun driver_libs ->
+    find_libs base_ext_libs r @@ fun base_ext_libs ->
+    find_boot_libs m ~env:"B0_B00T" base_libs r @@ fun base_libs ->
+    let all_libs = base_ext_libs @ base_libs @ driver_libs @ requires in
     let seen_libs = base_libs @ requires in
     k (all_libs, seen_libs)
 

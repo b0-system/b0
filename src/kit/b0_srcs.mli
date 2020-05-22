@@ -15,14 +15,15 @@ let srcs = [ `D "src-exe"; `D_rec "src"; `X "src/not.ml"; `X "src/not"]
 ]}
     instructs to:
     {ul
-    {- Select all the files in directory [src-exe].}
-    {- Select all the files in the file hierarchy rooted at directory [src].}
+    {- Select all the files in {e directory} [src-exe].}
+    {- Select all the files in the {e file hierarchy} rooted at
+    directory [src].}
     {- Remove from the files found in directories the files whose paths
        segments are prefixed by [src/not.ml] and [src/not].}}
 
     The prefix relation for exclusions respects path segments
     boundaries. In the example any file whose path matches
-    [src/not.ml], [src/not.ml/*], [src/not] and [src/not/*] is
+    [src/not.ml], [src/not.ml/*], [src/not] or [src/not/*] is
     excluded from the selection. But for example [src/not.c] is not.
 
     The relative order of directory selections and exclusions doesn't
@@ -91,7 +92,10 @@ val select : B0_build.t -> t -> B00_fexts.map B00.Memo.fiber
     [`D] and [`D_rec] are automatically {{!B00.Memo.file_ready}made
     ready} in the build. For those selected via [`Fiber] readyness
     determination is left to the fiber and the mechanisms it
-    invokes. *)
+    invokes.
+
+    {b FIXME.} Provide ordering guarantes and avoid non-det from the
+    fs. We likely don't want to return only file extension map. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

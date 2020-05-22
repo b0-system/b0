@@ -69,11 +69,11 @@ module Unit = struct
   let lib_resolver = Store.key ~mark:"b0.ocaml-lib"  default_lib_resolver
 
   let get_libs b libs k =
-    Store.get (B0_build.store b) lib_resolver @@ fun resolve ->
-    B00.Memo.Fiber.of_list (List.map resolve libs) k
+    B0_build.get b lib_resolver @@ fun resolve ->
+    Memo.Fiber.of_list (List.map resolve libs) k
 
   let get_recursive_libs b libs k =
-    Store.get (B0_build.store b) lib_resolver @@ fun resolve ->
+    B0_build.get b lib_resolver @@ fun resolve ->
     let rec loop seen acc ls k = match ls with
     | [] -> k (seen, acc)
     | l :: ls  ->
@@ -97,13 +97,12 @@ module Unit = struct
     let to_sync = List.map (Lib.archive ~code) built_libs in
     Memo.wait_files m to_sync k
 
-  (* XXX brzo copy cats ! *)
-
-  let compile_c_srcs m ~in_dir ~srcs k =
+  let compile_c_srcs b ~in_dir ~srcs k =
     (* XXX Maybe better things could be done here once we have a good C
        domain. *)
-    (* FIXME conf *)
-    let obj_ext = ".o" in
+    B0_build.get b B00_ocaml.Conf.key @@ fun ocaml_conf ->
+    let obj_ext = B00_ocaml.Conf.obj_ext ocaml_conf in
+    let m = B0_build.memo b in
     let rec loop os cunits hs = function
     | [] -> List.rev os
     | c :: cs ->
@@ -124,85 +123,78 @@ module Unit = struct
     let cs = B00_fexts.(find_files (ext ".c") srcs) in
     k (loop [] String.Map.empty hs cs)
 
-  let local_mods m ~in_dir ~src_root ~srcs k =
-    let mli_only = false in
-    let exts = B00_fexts.v (".mli" :: if mli_only then [] else [".ml"]) in
+  let get_mod_srcs ?(only_mlis = false) m ~in_dir ~src_root ~srcs k =
+    let exts = B00_fexts.v (".mli" :: if only_mlis then [] else [".ml"]) in
     let srcs = B00_fexts.find_files exts srcs in
-    let o = Fpath.(in_dir / "ocaml.srcdeps") in
+    let o = Fpath.(in_dir / "ocaml-srcs.deps") in
     B00_ocaml.Mod_src.Deps.write m ~src_root ~srcs ~o;
-    B00_ocaml.Mod_src.Deps.read m ~src_root o @@
-    fun src_deps -> k (B00_ocaml.Mod_src.of_srcs m ~src_deps ~srcs)
+    B00_ocaml.Mod_src.Deps.read m ~src_root o @@ fun src_deps ->
+    k (B00_ocaml.Mod_src.of_srcs m ~srcs ~src_deps)
 
-  let compile_intf m ~in_dir ~requires ~local_mods msrc =
-    let open B00_ocaml in
-    match Mod_src.mli msrc with
-    | None -> None
+  let compile_intf m ~in_dir ~requires ~mod_srcs src =
+    match Mod_src.mli src with
+    | None -> ()
     | Some mli ->
-        let o = Mod_src.cmi_file ~in_dir msrc in
-        begin
-          let deps = Mod_src.mli_deps msrc in
-          let local_deps, _remain = Mod_src.find_local_deps local_mods deps in
-          let add_dep_objs acc dep =
-            Mod_src.as_intf_dep_files ~init:acc ~in_dir dep
-          in
-          let local_objs = List.fold_left add_dep_objs [] local_deps in
-          let ext_objs =
-            (* TODO could be more precise *)
-            let add_lib acc l = List.rev_append (Lib.cmis l) acc in
-            List.fold_left add_lib [] requires
-          in
-          let reads = List.rev_append local_objs ext_objs in
-          Compile.mli_to_cmi m ~reads ~mli ~o
-        end;
-        Some o
+        let o = Mod_src.cmi_file ~in_dir src in
+        let deps = Mod_src.mli_deps src in
+        let local_deps, _remain = Mod_src.find_local_deps mod_srcs deps in
+        let add_dep_objs acc dep =
+          Mod_src.as_intf_dep_files ~init:acc ~in_dir dep
+        in
+        let local_objs = List.fold_left add_dep_objs [] local_deps in
+        let ext_objs =
+          (* TODO could be more precise *)
+          let add_lib acc l = List.rev_append (Lib.cmis l) acc in
+          List.fold_left add_lib [] requires
+        in
+        let reads = List.rev_append local_objs ext_objs in
+        Compile.mli_to_cmi m ~reads ~mli ~o
 
-  let compile_impl m ~code ~in_dir ~requires ~local_mods msrc =
-    let open B00_ocaml in
-    match Mod_src.ml msrc with
-    | None -> None
+  let compile_impl m ~code ~in_dir ~requires ~mod_srcs src =
+    match Mod_src.ml src with
+    | None -> ()
     | Some ml ->
-        let o = Mod_src.impl_file ~code ~in_dir msrc in
-        begin
-          let deps = Mod_src.ml_deps msrc in
-          let local_deps, _remain = Mod_src.find_local_deps local_mods deps in
-          let add_dep_objs acc dep =
-            Mod_src.as_impl_dep_files ~code ~init:acc ~in_dir dep
-          in
-          let local_objs = List.fold_left add_dep_objs [] local_deps in
-          let ext_objs =
-            (* FIXME add cmx *)
-            let add_lib acc l = List.rev_append (Lib.cmis l) acc in
-            List.fold_left add_lib [] requires
-          in
-          let has_cmi, local_objs = match Mod_src.mli msrc with
-          | None -> false, local_objs
-          | Some _ -> true, Mod_src.cmi_file ~in_dir msrc :: local_objs
-          in
-          let reads = List.rev_append ext_objs local_objs in
-          Compile.ml_to_impl m ~code ~has_cmi ~reads ~ml ~o;
-        end;
-        Some o
+        let o = Mod_src.impl_file ~code ~in_dir src in
+        let deps = Mod_src.ml_deps src in
+        let local_deps, _remain = Mod_src.find_local_deps mod_srcs deps in
+        let add_dep_objs acc dep =
+          Mod_src.as_impl_dep_files ~code ~init:acc ~in_dir dep
+        in
+        let local_objs = List.fold_left add_dep_objs [] local_deps in
+        let ext_objs =
+          (* FIXME add cmx *)
+          let add_lib acc l = List.rev_append (Lib.cmis l) acc in
+          List.fold_left add_lib [] requires
+        in
+        let has_cmi, local_objs = match Mod_src.mli src with
+         | None -> false, local_objs
+        | Some _ -> true, Mod_src.cmi_file ~in_dir src :: local_objs
+        in
+        let reads = List.rev_append ext_objs local_objs in
+        Compile.ml_to_impl m ~code ~has_cmi ~reads ~ml ~o
 
-  let compile_intfs m ~in_dir ~requires ~local_mods =
-    let compile _ msrc acc =
-      match compile_intf m ~local_mods ~requires ~in_dir msrc with
-      | None -> acc | Some cmi -> cmi :: acc
-    in
-    String.Map.fold compile local_mods []
+  let compile_intfs m ~in_dir ~requires ~mod_srcs =
+    let compile _ src = compile_intf m ~mod_srcs ~requires ~in_dir src in
+    String.Map.iter compile mod_srcs
 
-  let compile_impls b ~code ~in_dir ~requires ~local_mods =
-    let compile _ m acc =
-      match compile_impl b ~code ~local_mods ~requires ~in_dir m with
-      | None -> acc | Some o -> o :: acc
-    in
-    String.Map.fold compile local_mods []
+  let compile_impls b ~code ~in_dir ~requires ~mod_srcs =
+    let compile _ src = compile_impl b ~code ~mod_srcs ~requires ~in_dir src in
+    String.Map.iter compile mod_srcs
 
-  let compile_srcs m ~code ~in_dir ~src_root ~requires ~srcs k =
-    compile_c_srcs m ~in_dir ~srcs @@ fun c_objs ->
-    local_mods m ~in_dir ~src_root ~srcs @@ fun local_mods ->
+  let compile_srcs b ~code ~in_dir ~src_root ~requires ~srcs k =
+    let m = B0_build.memo b in
+    compile_c_srcs b ~in_dir ~srcs @@ fun c_objs ->
+    get_mod_srcs m ~in_dir ~src_root ~srcs @@ fun mod_srcs ->
     sync_built_requires m ~code ~requires @@ fun () ->
-    let _cmis = compile_intfs m ~in_dir ~requires ~local_mods in
-    let cobjs = compile_impls m ~code ~in_dir ~requires ~local_mods in
+    compile_intfs m ~in_dir ~requires ~mod_srcs;
+    compile_impls m ~code ~in_dir ~requires ~mod_srcs;
+    let cobj src = match Mod_src.ml src with
+    | None -> None
+    | Some _ -> Some (Mod_src.impl_file ~code ~in_dir src)
+    in
+    let deps = B00_ocaml.Mod_src.ml_deps in
+    let mod_srcs = B00_ocaml.Mod_src.sort ~deps mod_srcs in
+    let cobjs = List.filter_map cobj mod_srcs (* sorted for link *) in
     k (c_objs, cobjs)
 
   let exe_proc srcs b k =
@@ -220,7 +212,7 @@ module Unit = struct
     let m = B0_build.memo b in
     B0_srcs.select b srcs @@ fun srcs ->
     get_libs b requires @@ fun req_libs ->
-    compile_srcs m ~code ~in_dir:build_dir ~src_root ~requires:req_libs ~srcs @@
+    compile_srcs b ~code ~in_dir:build_dir ~src_root ~requires:req_libs ~srcs @@
     fun (c_objs, cobjs) ->
     let o = Fpath.(build_dir / (exe_name ^ exe_ext)) in
     get_recursive_libs b requires @@ fun requires ->
@@ -251,7 +243,7 @@ module Unit = struct
     let m = B0_build.memo b in
     B0_srcs.select b srcs @@ fun srcs ->
     get_libs b requires @@ fun requires ->
-    compile_srcs m ~code ~in_dir:build_dir ~src_root ~requires ~srcs @@
+    compile_srcs b ~code ~in_dir:build_dir ~src_root ~requires ~srcs @@
     fun (c_objs, cobjs) ->
     let odir = build_dir and oname = archive_name in
     let has_cstubs = c_objs <> [] in
@@ -261,11 +253,8 @@ module Unit = struct
 
   let lib ?doc ?(meta = B0_meta.empty) ?(requires = []) ?name lib_name ~srcs =
     let name = match name with
-    | Some n -> n
-    | None ->
-        let dot_to_dash = function '.' -> '-' | c -> c in
-        let lib_name = B00_ocaml.Lib.Name.to_string lib_name in
-        String.map dot_to_dash lib_name
+    | None -> B00_ocaml.Lib.Name.undot ~rep:'-' lib_name
+    | Some name -> name
     in
     let meta =
       B0_meta.tag Meta.tag @@

@@ -7,7 +7,7 @@ let cmdliner = B0_ocaml.lib "cmdliner"
 let b00_std = B0_ocaml.lib "b0.b00.std"
 let b00 = B0_ocaml.lib "b0.b00"
 let b00_kit = B0_ocaml.lib "b0.b00.kit"
-let b0 = B0_ocaml.lib "b0"
+let b0 = B0_ocaml.lib "b0.b0"
 let b0_kit = B0_ocaml.lib "b0.kit"
 let b0_driver = B0_ocaml.lib "b0.driver"
 let b0_driver_b0 = B0_ocaml.lib "b0.driver.b0"
@@ -58,7 +58,7 @@ let b0_driver_b0_lib =
 let b0_tool =
   let requires = [b0_driver; b0_driver_b0] in
   let srcs = [`F "tool-b0/b0_main_run.ml"] in
-  B0_ocaml.Unit.exe "b0" ~name:"b0-tool" ~doc:"b0 tool" ~requires ~srcs
+  B0_ocaml.Unit.exe "b0" ~name:"tool-b0" ~doc:"b0 tool" ~requires ~srcs
 
 (* Low-level B00 tools units *)
 

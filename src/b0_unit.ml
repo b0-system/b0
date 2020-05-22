@@ -115,6 +115,7 @@ module Build = struct
   let memo b = b.u.m
   let store b = b.b.store
   let shared_build_dir b = b.b.shared_build_dir
+  let get b k = B00.Store.get b.b.store k
 
   module Unit = struct
     let current b = match b.u.current with
