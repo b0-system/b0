@@ -1254,14 +1254,6 @@ module List = struct
   | [] -> None
   | v :: vs -> match f v with Some _ as r -> r | None -> find_map f vs
 
-  let filter_map f l =
-    let rec loop acc = function
-    | [] -> List.rev acc
-    | v :: vs ->
-        match f v with None -> loop acc vs | Some v -> loop (v :: acc) vs
-    in
-    loop [] l
-
   let concat_map f l =
     let rec loop f acc = function
     | [] -> rev acc

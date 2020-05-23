@@ -1010,12 +1010,6 @@ module List : sig
 
       {b Note.} Available in 4.10. *)
 
-  val filter_map : ('a -> 'b option) -> 'a list -> 'b list
-  (** [filter_map f l] applies [f] to the elements of [l]
-      in order and keeps the results of the form [Some v].
-
-      {b Note.} Available in 4.08. *)
-
   val concat_map : ('a -> 'b list) -> 'a list -> 'b list
   (** [concat_map f l] maps [l] with [f] and concatenates
       the result. Tail recursive.
