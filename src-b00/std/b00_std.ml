@@ -522,8 +522,6 @@ module Result = struct
   (* Interacting with Stdlib exceptions *)
 
   let to_failure = function Ok v -> v | Error e -> failwith e
-  let catch_failure f = try Ok (f ()) with Failure e -> Error e
-  let catch_sys_error f = try Ok (f ()) with Sys_error e -> Error e
 end
 
 (* Characters *)

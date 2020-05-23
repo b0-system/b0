@@ -413,12 +413,6 @@ module Result : sig
   val to_failure : ('a, string) result -> 'a
   (** [to_failure r] is [failwith e] if [r] is [Error e] and [v]
       if [r] is [Ok v]. *)
-
-  val catch_failure : (unit -> 'a) -> ('a, string) result
-  (** [catch_failure f] is [try Ok (f ()) with Failure e -> Error e] *)
-
-  val catch_sys_error : (unit -> 'a) -> ('a, string) result
-  (** [catch_sys_error f] is [try Ok (f ()) with Sys_error e -> Error e] *)
 end
 
 (** Characters (bytes in fact). *)
