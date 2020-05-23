@@ -11,7 +11,7 @@
 
     In a nutshell the declaration:
 {[
-let srcs = [ `D "src-exe"; `D_rec "src"; `X "src/not.ml"; `X "src/not"]
+let srcs = [ `Dir "src-exe"; `Dir_rec "src"; `X "src/not.ml"; `X "src/not"]
 ]}
     instructs to:
     {ul
@@ -27,12 +27,12 @@ let srcs = [ `D "src-exe"; `D_rec "src"; `X "src/not.ml"; `X "src/not"]
     excluded from the selection. But for example [src/not.c] is not.
 
     The relative order of directory selections and exclusions doesn't
-    matter, the semantics is to select all the files via [`D] and
-    [`D_rec] and then apply the exclusion [`X] on the resulting
-    set. Exclusions affect only directory selections, not file [`F]
+    matter, the semantics is to select all the files via [`Dir] and
+    [`Dir_rec] and then apply the exclusion [`X] on the resulting
+    set. Exclusions affect only directory selections, not file [`File]
     and fiber [`Fiber] {{!sel}selections}.
 
-    When a directory is selected via [`D] or [`D_rec], all its files
+    When a directory is selected via [`Dir] or [`Dir_rec], all its files
     are, modulo exclusions.  It is expected that build units
     themselves filter the final result by file extension or additional
     mechanisms. Consult the documentation of build units for more
@@ -56,18 +56,18 @@ val fpath : Fpath.t -> fpath
     the clean way. TODO remove ? *)
 
 type sel =
-[ `D of fpath
-| `D_rec of fpath
+[ `Dir of fpath
+| `Dir_rec of fpath
 | `X of fpath
-| `F of fpath
+| `File of fpath
 | `Fiber of B0_build.t -> Fpath.Set.t B00.Memo.fiber ]
 (** The type for file selectors.
     {ul
-    {- [`F f] unconditionaly selects the file [f]. [f] must exist and be
+    {- [`File f] unconditionaly selects the file [f]. [f] must exist and be
        a file.}
-    {- [`D d] selects the files of directory [d] modulo [`X] exclusions.
+    {- [`Dir d] selects the files of directory [d] modulo [`X] exclusions.
        [d] must exist and be a directory. dotfile paths are ignored.}
-    {- [`D_rec d] selects the files of the file {e hierarchy} rooted
+    {- [`Dir_rec d] selects the files of the file {e hierarchy} rooted
        at [d] modulo [`X] exclusions. [d] must exist and be a directory.
        dotfile paths are ignored.}
     {- [`X x] removes from directory selections any file whose path segments

@@ -14,10 +14,10 @@ type fpath = string
 let fpath = Fpath.to_string
 
 type sel =
-[ `D of fpath
-| `D_rec of fpath
+[ `Dir of fpath
+| `Dir_rec of fpath
 | `X of fpath
-| `F of fpath
+| `File of fpath
 | `Fiber of B0_build.t -> Fpath.Set.t B00.Memo.fiber ]
 
 type t = sel list
@@ -107,12 +107,12 @@ let select b sels k =
   let fs, ds, xs, fibers =
     let rec loop fs ds xs fibers = function
     | [] -> fs, ds, xs, fibers
-    | `D d :: ss -> loop fs ((abs d, false) :: ds) xs fibers ss
-    | `D_rec d :: ss -> loop fs ((abs d, true) :: ds) xs fibers ss
+    | `Dir d :: ss -> loop fs ((abs d, false) :: ds) xs fibers ss
+    | `Dir_rec d :: ss -> loop fs ((abs d, true) :: ds) xs fibers ss
     | `X x :: ss ->
         let x = Fpath.rem_empty_seg (abs x) in
         loop fs ds (Fpath.Set.add x xs) fibers ss
-    | `F f :: ss -> loop ((abs f) :: fs) ds xs fibers ss
+    | `File f :: ss -> loop ((abs f) :: fs) ds xs fibers ss
     | `Fiber f :: ss -> loop fs ds xs (f :: fibers) ss
     in
     loop [] [] Fpath.Set.empty [] sels
