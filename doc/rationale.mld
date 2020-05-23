@@ -1,22 +1,20 @@
-# Why b0 ?
+{0 Why b0 ?}
 
-**Note** This was Written in 2017 and is history by now, but it has
-aged well and reflects B0's vision well.
+{b Note.} This was Written in 2017 and is history by now, but it has
+aged well and still reflects B0's vision.
 
 A few high-level motivating arguments. To see how b0 supports these
-points see the [manual][manual].
+points see the {{!page-index.manuals}manuals}.
 
-[manual]: http://erratique.ch/software/b0/doc
-
-## Goals
+{1:goals  Goals}
 
 B0 is a system to assist the programmer during the whole software
 construction process, from development to deployment. It is a
-*generic* system that integrates, using modular descriptions written
+{e generic} system that integrates, using modular descriptions written
 in OCaml: configuration, build, source or binary deployment and custom
 software life-cycle operations.
 
-## Why a generic and modular system ?
+{1:generic Why a generic and modular system ?}
 
 B0 provides both genericity and domain specific usability by
 rethinking how builds are to be described, organized and (re)executed.
@@ -34,7 +32,7 @@ language specific system. Besides these descriptions should be
 modularized, distributed and reused as we do with software: via
 libraries.
 
-## Why OCaml as a description language ?
+{1:ocaml Why OCaml as a description language ?}
 
 B0 is an EDSL that provides build description expressiveness, reuse and
 distribution from the onset.
@@ -58,7 +56,7 @@ At the same time this trivially solves the description reuse and
 distribution problem by piggybacking on the OCaml packaging
 infrastructure.
 
-## A simpler build model
+{1:model A simpler build model}
 
 B0 provides a simple build model that permits build description
 abstraction and directly matches both the operational and user mental
@@ -86,7 +84,7 @@ deterministic functions. In turn this makes it trivial for the build
 script to be automatically parallelized and incrementally re-executed
 by memoizing the "functions" via an on-disk cache.
 
-## Metadata and build outcome introspection
+{1:metadata Metadata and build outcome introspection}
 
 B0 provides support for build understanding and DRY custom software
 life-cycle operations by keeping track of low and high-level metadata
@@ -110,7 +108,7 @@ up and compiling against vendored library dependencies) and for
 further processing the source or build outcomes in a DRY manner
 (e.g. for deployment or packaging).
 
-## Deployment and software life-cycle operations
+{1:deploy Deployment and software life-cycle operations}
 
 B0 provides custom and reusable support for massaging, distributing
 and deploying the project sources and build outcomes.
@@ -128,7 +126,7 @@ deployment and hooks: customizable procedures to stage sources or
 build outcomes resulting from multiple build variants. The metadata
 mentioned in the last section allows to keep all this smooth and DRY.
 
-## B0's scope
+{1:scope B0's scope}
 
 Build is an important part of b0 and we believe it provides
 discriminating and outstanding support for it. The user can express
@@ -143,7 +141,7 @@ B0 is not just a build system: it is a system for software
 construction care. A framework in which general software life-cycle
 and construction problems can be expressed and solved.
 
-## ANNEX: The problem with rule-based build models
+{1:annex ANNEX: The problem with rule-based build models}
 
 Rule-based build model expose build structure as a directed acyclic
 graph (DAG) of dependencies between file targets. This DAG is
@@ -153,15 +151,16 @@ commands needed to produce them once their prerequisites are ready.
 
 We argue this is not a very good build model:
 
-1. Pattern rules lead to rule matching. In rule matching a more
+{ol
+{- Pattern rules lead to rule matching. In rule matching a more
    specific build rule can be selected to build a particular
    target. If new rules can be added to the set of global rules, this
    leads to a system that is very difficult to understand: any part of
    the system can affect the other. In other words the pattern rule
-   approach is anti-modular and uncompositional.
-2. Pattern rules are effectively a form of rule meta-programming which
-   is not needed if there are functions in the description language.
-3. The complete build description of a target is scattered among
+   approach is anti-modular and uncompositional.}
+{- Pattern rules are effectively a form of rule meta-programming which
+   is not needed if there are functions in the description language.}
+{- The complete build description of a target is scattered among
    different build rules as needed by its prerequisites. In order to
    reconstruct and understand the actual sequence of operations that
    actually occurs, the programmer has to replay the rule matching
@@ -169,13 +168,13 @@ We argue this is not a very good build model:
    executed. This is similar to the hell of callback programming: the
    final description of a build product is non-obvious and scattered
    among different handlers whose invocation order is unclear and
-   non-trivial.
-4. The rule-based model is at odds with what the user eventually sees
+   non-trivial.}
+{- The rule-based model is at odds with what the user eventually sees
    and wants to specify: a sequence of commands that need to be issued
    in order to produce a given target. In other words this model
    neither matches the actual mental model of the user nor the
-   effective visible behaviour of the build system.
-5. Build abstraction cannot be performed inside the rule-based system.
+   effective visible behaviour of the build system.}
+{- Build abstraction cannot be performed inside the rule-based system.
    As an escape hatch it can be performed by an external system via
    meta-programming but, this along with 1. and 2., further obscures
-   build understanding and hampers usability.
+   build understanding and hampers usability.}}

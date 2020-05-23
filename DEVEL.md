@@ -9,28 +9,23 @@ export B0_BOOT_CMDLINER_LIBDIR=/path/to/cmdliner/dir
 export B0_BOOT_UNIX_LIBDIR=/path/to/unix/dir
 ```
 
-Now invoke: 
+Now the following OCaml scripts can be invoked:
 
 ```
 ocaml b00t/strap  # produces b00t/run
-ocaml b00t/run    # builds b0 via b0 itself
+./b00t/run        # builds b0 via b0 itself
+ocaml b00t/clean  # clean the boostrap build
 ```
 
-The first invocation produces the `b00t/run` executable which has B0's
-own B0 file linked with a `b0` driver. Running it is equivalent to run
-`b0` on the root `B0.ml` file. The executable must be recompiled
-if `B0.ml` changes or if the B0 libraries change in a meaningful way
-for it's interpretation.
-
-To clean the bootstrap build issue:
-
-```
-ocaml b00t/clean
-```
+The `b00/strap` invocation produces the `b00t/run` executable which
+has B0's own B0 file linked with a `b0` driver. Running `b00t/run` it
+is equivalent to run `b0` on the root `B0.ml` file. After this we have
+a usable `b0` exectuable and libraries in the `_b0` directory.  See
+the next section to use them.
 
 ## Adding the boostrapped `b0` and `d0` tools to your environment
 
-To add the built `b0` and `d0` tools do 
+To add the built `b0` and `d0` tools in your environent
 
 ```
 source b00t/env

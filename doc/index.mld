@@ -24,7 +24,9 @@ For B0 programmers.
    how to make your own drivers to operate on B0 files.}
 {- The {{!page-todo}TODO} page}
 {- {{!page-old_manual}Old manual fragments} and TODO which will eventually
-   disapear.}}
+   disapear.}
+{- The {{!page-rationale}rationale} of B0, written a long time ago but
+   still relevant}}
 
 {1:b00_libs B00}
 

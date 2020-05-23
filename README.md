@@ -29,7 +29,8 @@ b0 can be installed with `opam`:
 
     opam install b0
 
-If you don't use `opam`, TODO
+If you don't use `opam`, consult [`DEVEL.md`](DEVEL.md) for bootstrap 
+instructions.
 
 ## Documentation
 
