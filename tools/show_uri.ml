@@ -4,29 +4,30 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open Result.Syntax
 
 let urify u = (* Detects if u is simply a file path and urifies it *)
   let file_uri p = Fmt.str "file://%s" (Fpath.to_string p) in
   Result.value ~default:u @@
-  Result.bind (Fpath.of_string u) @@ fun p ->
-  Result.bind (Os.Path.exists p) @@ function
-  | false -> Ok u
-  | true when (Fpath.is_abs p) -> Ok (file_uri p)
-  | true ->
-      Result.bind (Os.Dir.cwd ()) @@ fun cwd -> Ok (file_uri Fpath.(cwd // p))
+  let* p = Fpath.of_string u in
+  let* exists = Os.Path.exists p in
+  if not exists then Ok u else
+  if Fpath.is_abs p then Ok (file_uri p) else
+  let* cwd = Os.Dir.cwd () in
+  Ok (file_uri Fpath.(cwd // p))
 
 let show_uris tty_cap log_level background prefix browser uris =
   let tty_cap = B00_std_ui.get_tty_cap tty_cap in
   let log_level = B00_std_ui.get_log_level log_level in
   B00_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
   Log.if_error ~use:1 @@
-  Result.bind (B00_www_browser.find ~browser ()) @@ fun browser ->
+  let* browser = B00_www_browser.find ~browser () in
   let open_uri u = B00_www_browser.show ~background ~prefix browser (urify u) in
   let rec loop = function
   | [] -> Ok 0
-  | u :: us -> match open_uri u with Ok () -> loop us | Error _ as e -> e
+  | u :: us -> let* () = open_uri u in loop us
   in
-  Log.if_error' ~use:1 (loop uris)
+  loop uris
 
 open Cmdliner
 
