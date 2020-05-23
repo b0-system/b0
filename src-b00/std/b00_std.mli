@@ -1246,6 +1246,16 @@ module Fpath : sig
   val ( // ) : t -> t -> t
   (** [p // p'] is [append p p']. Left associative. *)
 
+  (** {1:famous Famous file paths} *)
+
+  val null : t
+  (** [null] represents a file on the OS that discards all writes
+      and returns end of file on reads. *)
+
+  val dash : t
+  (** [dash] is ["-"]. This value is used in cli interface
+      to respectively denote standard input and output. *)
+
   (** {1:dirpaths Directory paths}
 
       {b Note.} The following functions use syntactic semantic
@@ -2149,16 +2159,6 @@ module Os : sig
       This module operates on regular files, most functions error if
       they are applied to other file kinds. *)
   module File : sig
-
-    (** {1:paths Famous file paths} *)
-
-    val null : Fpath.t
-    (** [null] represents a file on the OS that discards all writes
-        and returns end of file on reads. *)
-
-    val dash : Fpath.t
-    (** [dash] is ["-"]. This value is used by {!read} and {!write} to
-        respectively denote {!stdin} and {!stdout}. *)
 
     (** {1:existence Existence} *)
 

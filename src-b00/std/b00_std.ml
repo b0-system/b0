@@ -1612,6 +1612,11 @@ module Fpath = struct
 
   let append = if Sys.win32 then Windows.append else Posix.append
 
+  (* Famous file paths *)
+
+  let null = v (if Sys.win32 then "NUL" else "/dev/null")
+  let dash = v "-"
+
   (* Directory paths *)
 
   let is_dir_path p = (* check is . .. or ends with / /. or /.. *)
@@ -1643,7 +1648,6 @@ module Fpath = struct
       let max = len - 1 in
       if p.[max] <> dir_sep_char then p else
       String.subrange p ~last:(max - 1)
-
 
   (* Strict prefixes *)
 
@@ -2862,9 +2866,7 @@ module Os = struct
 
     (* Famous file paths *)
 
-    let null = Fpath.v (if Sys.win32 then "NUL" else "/dev/null")
-    let dash = Fpath.v "-"
-    let is_dash = Fpath.equal dash
+    let is_dash = Fpath.equal Fpath.dash
 
     (* Existence *)
 
@@ -3597,7 +3599,7 @@ module Os = struct
     let in_file f = In_file f
     let in_fd ~close fd = In_fd { fd; close }
     let in_stdin = In_fd { fd = Unix.stdin; close = false }
-    let in_null = In_file File.null
+    let in_null = In_file Fpath.null
     let stdi_to_fd fds = function
     | In_fd { fd; close } -> if close then Fd.Set.add fd fds; fd
     | In_string s ->
@@ -3635,7 +3637,7 @@ module Os = struct
     let out_fd ~close fd = Out_fd { fd; close }
     let out_stdout = Out_fd { fd = Unix.stdout; close = false }
     let out_stderr = Out_fd { fd = Unix.stderr; close = false }
-    let out_null = out_file ~force:true ~make_path:false File.null
+    let out_null = out_file ~force:true ~make_path:false Fpath.null
 
     let stdo_to_fd fds = function
     | Out_fd { fd; close } -> if close then Fd.Set.add fd fds; fd
@@ -4071,7 +4073,7 @@ module Bincode = struct
   let to_string ?(buf = Buffer.create 1024) c v =
     c.enc buf v; Buffer.contents buf
 
-  let of_string ?(file = Os.File.dash) c s =
+  let of_string ?(file = Fpath.dash) c s =
     try let i, v = c.dec s 0 in dec_eoi s i; Ok v with
     | Failure e -> Fmt.error "%a:%s" Fpath.pp_unquoted file e
 

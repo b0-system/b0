@@ -418,7 +418,7 @@ end
 
 module Mod_src = struct
   module Deps = struct
-    let of_string ?(file = Os.File.dash) ?src_root data =
+    let of_string ?(file = Fpath.dash) ?src_root data =
       (* Parse ocamldep's [-slash -modules], a bit annoying to parse.
          ocamldep shows its Makefile legacy. *)
       let parse_path n p = (* ocamldep escapes spaces as "\ ", a bit annoying *)
@@ -951,7 +951,7 @@ end
 
 module Ocamlfind = struct
   let tool = B00.Tool.by_name "ocamlfind"
-  let parse_info m ?(file = Os.File.dash) n s =
+  let parse_info m ?(file = Fpath.dash) n s =
     let parse_requires requires =
       let to_libname s =
         Result.to_failure @@

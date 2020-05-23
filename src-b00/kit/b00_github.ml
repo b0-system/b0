@@ -245,7 +245,7 @@ module Pages = struct
       follow_symlinks : bool }
 
   let update ?(follow_symlinks = true) ~src dst = { dst; src; follow_symlinks }
-  let nojekyll = update ~src:(Some Os.File.null) (Fpath.v ".nojekyll")
+  let nojekyll = update ~src:(Some Fpath.null) (Fpath.v ".nojekyll")
 
   let fetch_branch r ~log ~remote ~branch =
     let exists = B00_vcs.Git.remote_branch_exists r ~remote ~branch in

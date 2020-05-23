@@ -25,7 +25,7 @@ let cannot_read build_dir m =
 let did_not_write build_dir m =
   let f p = Fpath.(build_dir // p) in
   echo m ~reads:[] ~writes:[f (Fpath.v "heyho/bla"); f (Fpath.v "bli")]
-    Os.File.null "echoooo"
+    Fpath.null "echoooo"
 
 let failures build_dir m =
   let f file = Fpath.(build_dir / file) in

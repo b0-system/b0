@@ -120,7 +120,7 @@ module Compilation_database = struct
 
   let add_op arr o = match Op.kind o with
   | Op.Spawn s ->
-      let src = match Op.reads o with [] -> Os.File.null | fs -> List.hd fs in
+      let src = match Op.reads o with [] -> Fpath.null | fs -> List.hd fs in
       List.fold_left (spawn_out o s src) arr (Op.writes o)
   | _ -> arr
 

@@ -7,7 +7,7 @@ open B00_std
 
 let err_unknown = 1
 
-let hash_file (module H : Hash.T) f = match Fpath.equal f Os.File.dash with
+let hash_file (module H : Hash.T) f = match Fpath.equal f Fpath.dash with
 | false -> Result.bind (H.file f) @@ fun h -> Ok (f, h)
 | true -> Result.bind (Os.File.read f) @@ fun data -> Ok (f, H.string data)
 
