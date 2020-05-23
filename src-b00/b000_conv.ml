@@ -104,7 +104,8 @@ module Op = struct
   let pp_spawn_multi_line_and_exit =
     Fmt.(pp_spawn_cmd ~single_line:false ++ using Op.Spawn.exit pp_spawn_exit)
 
-  let pp_notify ppf n =
+  let pp_notify ppf o =
+    let n = Op.Notify.get o in
     let label, s = match Op.Notify.kind n with
     | `Fail -> "FAIL", style_err
     | `Warn -> "WARN", style_notify_warn
@@ -112,8 +113,11 @@ module Op = struct
     | `End -> "END", style_notify_info
     | `Info -> "NOTE", style_notify_info
     in
-    Fmt.pf ppf "@[[%a] @[%a@]@]"
-      (Fmt.tty_string s) label Fmt.lines (Op.Notify.msg n)
+    let pp_mark ppf o = match Op.mark o with
+    | "" -> () | m -> Fmt.sp ppf (); Fmt.pf ppf "[%a]" Fmt.(code string) m
+    in
+    Fmt.pf ppf "@[@[<h>[%a]%a@]:@ @[%a@]@]"
+      (Fmt.tty_string s) label pp_mark o Fmt.lines (Op.Notify.msg n)
 
   let pp_header ppf o =
     let pp_status ppf o = match Op.status o with
@@ -138,7 +142,7 @@ module Op = struct
       (Fmt.sp ppf (); pp_revived ppf o; Fmt.char ppf ':'; pp_hash ppf h)
     in
     let pp_mark ppf o = match Op.mark o with
-    | "" -> () | g -> Fmt.sp ppf (); Fmt.string ppf g
+    | "" -> () | g -> Fmt.sp ppf (); Fmt.(code string) ppf g
     in
     let pp_dur ppf o = match Op.status o with
     | Op.Failed _ | Op.Done -> Fmt.sp ppf (); Time.Span.pp ppf (Op.duration o)
@@ -179,7 +183,7 @@ module Op = struct
         pp_file_read (Op.Copy.src c) pp_file_write (Op.Copy.dst c)
   | Op.Delete d -> pp_file_delete ppf (Op.Delete.path d)
   | Op.Mkdir m -> pp_file_write ppf (Op.Mkdir.dir m)
-  | Op.Notify n -> pp_notify ppf n
+  | Op.Notify _ -> pp_notify ppf o
   | Op.Read r -> pp_file_read ppf (Op.Read.file r)
   | Op.Spawn s -> pp_spawn_and_exit ppf s
   | Op.Wait_files _ -> (Fmt.vbox @@ Fmt.list Fpath.pp_quoted) ppf (Op.reads o)
@@ -188,11 +192,11 @@ module Op = struct
   (* Line formatting *)
 
   let pp_line ppf o = match Op.kind o with
-  | Op.Notify n -> pp_notify ppf n
+  | Op.Notify _ -> pp_notify ppf o
   | _ -> Fmt.pf ppf "@[<h>%a %a@]" pp_header o pp_kind_line o
 
   let pp_line_and_ui ppf o = match Op.kind o with
-  | Op.Notify n -> pp_notify ppf n
+  | Op.Notify _ -> pp_notify ppf o
   | _ -> Fmt.pf ppf "@[<v>%a%a@]" pp_line o pp_op_extra o
 
   (* Ui formatting *)
@@ -211,7 +215,7 @@ module Op = struct
       | k -> pp_kind_line ppf o
       in
       let pp_mark ppf o = match Op.mark o with
-      | "" -> () | g -> Fmt.string ppf g; Fmt.sp ppf ()
+      | "" -> () | g -> Fmt.(code string) ppf g; Fmt.sp ppf ()
       in
       let pp_status ppf o = match Op.status o with
       | Op.Failed _ ->
@@ -227,7 +231,7 @@ module Op = struct
         (Fmt.tty [`Faint] (Fmt.parens op_howto)) o
     in
     match Op.kind o with
-    | Op.Notify n -> pp_notify ppf n; sep ppf ()
+    | Op.Notify _ -> pp_notify ppf o; sep ppf ()
     | _ when is_failed (Op.status o) || is_spawn_with_ui o ->
         Fmt.pf ppf "@[<v>%a%a@]%a"
           (pp_ui_header ~op_howto) o pp_op_extra o sep ()
@@ -294,7 +298,7 @@ module Op = struct
       [ maybe_failure_and @@ Fmt.using Op.Mkdir.get pp_path; pp_timings ]
 
   let pp_notify_full =
-    Fmt.record [ Fmt.using Op.Notify.get pp_notify; pp_timings]
+    Fmt.record [ pp_notify; pp_timings]
 
   let pp_read_full =
     let pp_path = Fmt.using Op.Read.file pp_file_read in

@@ -17,7 +17,7 @@ let b0_driver_b0 = B0_ocaml.lib "b0.driver.b0"
 let b00_std_lib =
   let requires = [unix] in
   let srcs =
-    [`Dir_rec "src-b00/std"; `X "src-b00/std/b0_b00_std_top_init.ml" ]
+    [`Dir_rec "src-b00/std"; `X "src-b00/std/b0_b00_std_top_init.ml"]
   in
   B0_ocaml.Unit.lib b00_std ~doc:"B00 Stdlib extensions" ~requires ~srcs
 
