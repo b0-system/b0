@@ -6,4 +6,3 @@ tmp
 \.\#*
 \#*#
 *.install
-src-ocaml/b0_ocaml_cmi.ml
