@@ -23,7 +23,7 @@ is equivalent to run `b0` on the root `B0.ml` file. After this we have
 a usable `b0` exectuable and libraries in the `_b0` directory.  See
 the next section to use them.
 
-## Adding the boostrapped `b0` and `d0` tools to your environment
+## Adding the bootsrapped `b0` and `d0` tools to your environment
 
 To add the built `b0` and `d0` tools in your environent
 

@@ -4,7 +4,7 @@ authors: ["The b0 programmers"]
 homepage: "https://erratique.ch/software/b0"
 doc: "https://erratique.ch/software/b0/doc"
 license: ["ISC" "BSD2"]
-dev-repo: "git+https://erratique.ch/repos/b0.git#b00"
+dev-repo: "git+https://erratique.ch/repos/b0.git"
 bug-reports: "https://github.com/b0-system/b0/issues"
 tags: ["dev" "org:erratique" "org:b0-system" "build" ]
 depends:
