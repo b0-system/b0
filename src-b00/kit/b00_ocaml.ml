@@ -871,7 +871,7 @@ module Lib = struct
     let of_string s = Result.bind (name_to_fpath s) @@ fun name -> Ok name
     let to_string n = fpath_to_name n
     let to_fpath n = n
-    let v s = match of_string s with Ok v -> v | Error e -> invalid_arg e
+    let v s = of_string s |> Result.to_invalid_arg
     let equal = Fpath.equal
     let compare = Fpath.compare
     let pp = Fmt.using to_string (Fmt.code Fmt.string)
@@ -895,7 +895,6 @@ module Lib = struct
       archive : string;
       dir_files_by_ext : B00_fexts.map Lazy.t;
       installed : bool; (* this should not be needed. *) }
-
 
   let dir_files_by_ext m ~installed dir =
     Memo.fail_if_error m @@
@@ -978,7 +977,6 @@ module Ocamlfind = struct
       | _ -> Fmt.failwith "could not parse %S" s
     with
     | Failure e -> Fmt.error "@[<v>%a: %s@]" Fpath.pp_unquoted file e
-
 
   (* FIXME need to solve the META file read.
      FIXME post exec is still messy, check if we can make it to use Memo.t *)

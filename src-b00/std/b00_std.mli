@@ -412,6 +412,10 @@ module Result : sig
   (** [to_failure r] is [failwith e] if [r] is [Error e] and [v]
       if [r] is [Ok v]. *)
 
+  val to_invalid_arg : ('a, string) result -> 'a
+  (** [to_invalid_arg r] is [invalid_arg e] if [r] is [Error e] and [v]
+      if [r] is [Ok v]. *)
+
   (** let operators. *)
   module Syntax : sig
     val ( let* ) : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result

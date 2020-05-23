@@ -526,6 +526,7 @@ module Result = struct
   (* Interacting with Stdlib exceptions *)
 
   let to_failure = function Ok v -> v | Error e -> failwith e
+  let to_invalid_arg = function Ok v -> v | Error e -> invalid_arg e
 
   (* Syntax *)
 
