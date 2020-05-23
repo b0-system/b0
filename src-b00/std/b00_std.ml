@@ -519,9 +519,22 @@ module Result = struct
 
   include Stdlib.Result
 
+  let product r0 r1 = match r0, r1 with
+  | (Error _ as r), _ | _, (Error _ as r) -> r
+  | Ok v0, Ok v1 -> Ok (v0, v1)
+
   (* Interacting with Stdlib exceptions *)
 
   let to_failure = function Ok v -> v | Error e -> failwith e
+
+  (* Syntax *)
+
+  module Syntax = struct
+    let ( let* ) x f = bind x f
+    let ( and* ) a b = product a b
+    let ( let+ ) x f = map f x
+    let ( and+ ) a b = product a b
+  end
 end
 
 (* Characters *)

@@ -408,11 +408,24 @@ module Result : sig
 
   include module type of Stdlib.Result
 
-  (** {1:exn Interacting with [Stdlib] exceptions} *)
-
   val to_failure : ('a, string) result -> 'a
   (** [to_failure r] is [failwith e] if [r] is [Error e] and [v]
       if [r] is [Ok v]. *)
+
+  (** let operators. *)
+  module Syntax : sig
+    val ( let* ) : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
+    (** [( let* )] is {!bind}. *)
+
+    val ( and* ) : ('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e) result
+    (** [( and* )] is {!product}. *)
+
+    val ( let+ ) : ('a, 'e) result -> ('a -> 'b) -> ('b, 'e) result
+    (** [( let+ )] is {!map}. *)
+
+    val ( and+ ) : ('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e) result
+    (** [( and* )] is {!product}. *)
+  end
 end
 
 (** Characters (bytes in fact). *)
