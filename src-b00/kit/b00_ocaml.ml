@@ -1017,19 +1017,22 @@ module Lib_resolver = struct
       mutable libs : Lib.t B00.Memo.Fut.t Lib.Name.Map.t; }
 
   let create memo ~memo_dir ~ocamlpath =
-    let memo = B00.Memo.with_mark memo "b00.ocaml.lib.resolver" in
+    let memo = B00.Memo.with_mark memo "b00.ocamlib" in
     { memo; memo_dir; ocamlpath; libs = Lib.Name.Map.empty }
 
   let find r n = match Lib.Name.Map.find n r.libs with
   | lib -> Memo.Fut.await lib
   | exception Not_found ->
-      let fname = Fmt.str "ocamlib-%s.ocamlfind" (Lib.Name.to_string n) in
-      let o = Fpath.(r.memo_dir / fname) in
-      Ocamlfind.write_info r.memo n o;
-      let fib = Ocamlfind.read_info r.memo n o in
-      let fut = Memo.Fut.of_fiber r.memo fib in
+      let fut, set = Memo.Fut.create r.memo in
       r.libs <- Lib.Name.Map.add n fut r.libs;
-      fib
+      let fname = Fmt.str "ocamfind.%s" (Lib.Name.to_string n) in
+      let o = Fpath.(r.memo_dir / fname) in
+      begin
+        Ocamlfind.write_info r.memo n o;
+        Ocamlfind.read_info r.memo n o @@ fun lib ->
+        set (Some lib)
+      end;
+      Memo.Fut.await fut
 
 (*
   let find_in_ocamlpath r n =
