@@ -296,48 +296,45 @@ module Memo = struct
 
   module Fut = struct
     type memo = t
-    type 'a undet =
-      { mutable awaits_det : ('a -> unit) list; (* on Det *)
-        mutable awaits_set : ('a option -> unit) list; (* on Det or Never *)}
-
-    type 'a state = Det of 'a | Undet of 'a undet | Never
+    type 'a state = Det of 'a | Undet of { mutable awaits : ('a -> unit) list }
     type 'a t = { mutable state : 'a state; m : memo }
 
-    let undet () = { awaits_det = []; awaits_set = [] }
     let set f v = match f.state with
+    | Det _ -> invalid_arg "The future is already set"
     | Undet u ->
-        begin match v with
-        | None ->
-            f.state <- Never;
-            let add_set k = Rqueue.add f.m.m.fiber_ready (fun () -> k None) in
-            List.iter add_set u.awaits_set
-        | Some v as set ->
-            f.state <- Det v;
-            let add_det k = Rqueue.add f.m.m.fiber_ready (fun () -> k v) in
-            let add_set k = Rqueue.add f.m.m.fiber_ready (fun () -> k set) in
-            List.iter add_det u.awaits_det;
-            List.iter add_set u.awaits_set;
-        end
-    | Never | Det _ -> invalid_arg "fut already set"
+        f.state <- Det v;
+        let add_det k = Rqueue.add f.m.m.fiber_ready (fun () -> k v) in
+        List.iter add_det u.awaits
 
-    let create m = let f = { state = Undet (undet ()); m } in f, set f
-    let ret m v = { state = Det v; m }
-    let state f = f.state
+    let _create m = { state = Undet { awaits = []; }; m }
+    let create m = let f = _create m in f, set f
     let value f = match f.state with Det v -> Some v | _ -> None
     let await f k = match f.state with
     | Det v -> Rqueue.add f.m.m.fiber_ready (fun () -> k v)
-    | Undet u -> u.awaits_det <- k :: u.awaits_det
-    | Never -> ()
+    | Undet u -> u.awaits <- k :: u.awaits
 
-    let await_set f k = match f.state with
-    | Det v -> Rqueue.add f.m.m.fiber_ready (fun () -> k (Some v))
-    | Undet u -> u.awaits_set <- k :: u.awaits_set
-    | Never -> ()
+    let return m v = { state = Det v; m }
+
+    let map fn f =
+      let r = _create f.m in
+      await f (fun v -> set r (fn v)); r
+
+    let bind f fn =
+      let r = _create f.m in
+      await f (fun v -> await (fn v) (set r)); r
+
+    let pair f0 f1 =
+      let r = _create f0.m in
+      await f0 (fun v0 -> await f1 (fun v1 -> set r (v0, v1))); r
+
+    module Syntax = struct
+      let ( let* ) = bind
+      let ( and* ) = pair
+    end
 
     let of_fiber m k =
-      let f, set = create m in
-      let run () = try k (fun v -> set (Some v)) with e -> set None; raise e in
-      Rqueue.add f.m.m.fiber_ready run; f
+      let r, set = create m in
+      Rqueue.add r.m.m.fiber_ready (fun () -> k set); r
   end
 
   (* Notifications *)
@@ -533,7 +530,7 @@ module Store = struct
 
   let create memo ~dir bs =
     let add m (B (k, v)) =
-      Store.Kmap.add k.untyped (Store.B (k, Memo.Fut.ret memo v)) m
+      Store.Kmap.add k.untyped (Store.B (k, Memo.Fut.return memo v)) m
     in
     let map = List.fold_left add Store.Kmap.empty bs in
     { Store.memo; map; dir : Fpath.t; }
@@ -548,13 +545,13 @@ module Store = struct
     and untyped = Key.V k in k
 
   let get : type a. t -> a key -> a Memo.fiber =
-  fun s k -> match Store.Kmap.find k.Key.untyped s.map with
-  | exception Not_found ->
+  fun s k -> match Store.Kmap.find_opt k.Key.untyped s.map with
+  | None ->
       let memo = Memo.with_mark s.memo k.Key.mark in
       let fut = Memo.Fut.of_fiber memo (k.Key.det s memo) in
       s.map <- Store.Kmap.add k.Key.untyped (Store.B (k, fut)) s.map;
       Memo.Fut.await fut
-  | Store.B (l', fut) ->
+  | (Some Store.B (l', fut)) ->
       match Tid.equal k.Key.tid l'.Key.tid with
       | None -> assert false
       | Some Tid.Eq -> Memo.Fut.await fut
@@ -562,7 +559,7 @@ module Store = struct
   let set s k v = match Store.Kmap.mem k.Key.untyped s.Store.map with
   | true -> Fmt.invalid_arg "Key %s already set in store" k.Key.mark
   | false ->
-      let fut = Memo.Fut.ret s.Store.memo v in
+      let fut = Memo.Fut.return s.Store.memo v in
       s.map <- Store.Kmap.add k.Key.untyped (Store.B (k, fut)) s.map
 end
 

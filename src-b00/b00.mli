@@ -300,34 +300,39 @@ module Memo : sig
     type memo = t
     (** See {!Memo.t} *)
 
-    type 'a undet
-    (** The type for undetermined future information. Forget about this,
-        it cannot be acted upon. *)
-
-    type 'a state =
-    | Det of 'a (** The future is determined with the given value. *)
-    | Undet of 'a undet (** The future is undetermined. *)
-    | Never (** The future will never determine. *)
-    (** The type for future state. When the state is [Det _] or [Never] we
-        say the future is {e set}. *)
-
     type 'a t
     (** The type for futures with values of type ['a]. *)
 
-    val create : memo -> 'a t * ('a option -> unit)
-    (** [create m] is [(f, set)] with [f] the future value and
-        [set] the function to [set] it. The latter can be called only
-        once, [Invalid_argument] is raised otherwise. If called with
-        [None] the future value becomes [Never]. *)
-
-    val ret : memo -> 'a -> 'a t
-    (** [ret m v] is [v] as a determined future value. *)
-
-    val state : 'a t -> 'a state
-    (** [state f] is the state of [f]'s. *)
+    val create : memo -> 'a t * ('a -> unit)
+    (** [create m] is [(f, set)] with [f] the future value and [set]
+        the function to [set] it. The latter can be called only once,
+        [Invalid_argument] is raised otherwise. *)
 
     val value : 'a t -> 'a option
     (** [value f] is [f]'s value, if any. *)
+
+    val return : memo -> 'a -> 'a t
+    (** [return m v] is a future that determines [v]. *)
+
+    val map : ('a -> 'b) -> 'a t -> 'b t
+    (** [map fn f] is [return (fn v)] with [v] the value determined by
+        [f]. *)
+
+    val bind : 'a t -> ('a -> 'b t) -> 'b t
+    (** [bind f fn] is the future [fn v] with [v] the value determined
+        by [f]. *)
+
+    val pair : 'a t -> 'b t -> ('a * 'b) t
+    (** [pair f0 f1] determines with the result of [f0] and [f1]. *)
+
+    (** [let] operators. *)
+    module Syntax : sig
+      val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+      (** [let*] is {!bind}. *)
+
+      val ( and* ) : 'a t -> 'b t -> ('a * 'b) t
+      (** [and*] is {!pair}. *)
+    end
 
     val await : 'a t -> 'a fiber
     (** [await f k] waits for [f] to be determined and continues with [k v]
@@ -335,14 +340,9 @@ module Memo : sig
         [k] is not invoked. Use {!await_set} to witness never determining
         futures. *)
 
-    val await_set : 'a t -> 'a option fiber
-    (** [await_set f k] waits for [f] to be set and continues with
-        [k None] if [state f] is [Never] and [k (Some v)] if
-        [state f] is [Det v]. *)
-
     val of_fiber : memo -> 'a fiber -> 'a t
     (** [of_fiber m f] runs fiber [f] and sets the resulting future when it
-        returns. If [f] raises then the future is set to [Never]. *)
+        returns. *)
   end
 
   (** {1:feedback Feedback}
