@@ -16,7 +16,7 @@ module rec Build_def : sig
       build_dir : Fpath.t;
       shared_build_dir : Fpath.t;
       store : B00.Store.t;
-      must : Unit.Set.t; may : Unit.Set.t;
+      must_build : Unit.Set.t; may_build : Unit.Set.t;
       mutable requested : Unit.t String.Map.t;
       mutable waiting : Unit.t Rqueue.t; }
 end = struct
@@ -28,7 +28,7 @@ end = struct
       build_dir : Fpath.t;
       shared_build_dir : Fpath.t;
       store : B00.Store.t;
-      must : Unit.Set.t; may : Unit.Set.t;
+      must_build : Unit.Set.t; may_build : Unit.Set.t;
       mutable requested : Unit.t String.Map.t;
       mutable waiting : Unit.t Rqueue.t; }
 end
@@ -93,20 +93,20 @@ module Build = struct
   let shared_build_dir ~build_dir = Fpath.(build_dir / "_shared")
   let store_dir ~build_dir = Fpath.(build_dir / "_store")
 
-  let create ~root_dir ~b0_dir m ~may ~must =
+  let create ~root_dir ~b0_dir m ~may_build ~must_build =
     let u = { current = None; m } in
     let build_dir = build_dir ~b0_dir in
     let shared_build_dir = shared_build_dir ~build_dir in
     let store = B00.Store.create m ~dir:(store_dir ~build_dir) [] in
-    let may = Set.union may must in
+    let may_build = Set.union may_build must_build in
     let add_requested u acc = String.Map.add (name u) u acc in
-    let requested = Unit.Set.fold add_requested must String.Map.empty in
+    let requested = Unit.Set.fold add_requested must_build String.Map.empty in
     let waiting =
-      let q = Rqueue.empty () in Unit.Set.iter (Rqueue.add q) must; q
+      let q = Rqueue.empty () in Unit.Set.iter (Rqueue.add q) must_build; q
     in
     let b =
-      { root_dir; b0_dir; build_dir; shared_build_dir; store; must; may;
-        requested; waiting; }
+      { root_dir; b0_dir; build_dir; shared_build_dir; store; must_build;
+        may_build; requested; waiting; }
     in
     let b = { u; b } in
     B00.Store.set store current b;
@@ -121,12 +121,12 @@ module Build = struct
     let current b = match b.u.current with
     | None -> invalid_arg "Build not running" | Some u -> u
 
-    let must b = b.b.must
-    let may b = b.b.may
+    let must_build b = b.b.must_build
+    let may_build b = b.b.may_build
 
     let require b u =
       if String.Map.mem (name u) b.b.requested then () else
-      match Unit.Set.mem u b.b.may with
+      match Unit.Set.mem u b.b.may_build with
       | true ->
           b.b.requested <- String.Map.add (name u) u b.b.requested;
           Rqueue.add b.b.waiting u

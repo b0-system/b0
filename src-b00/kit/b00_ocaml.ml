@@ -886,7 +886,9 @@ module Lib = struct
   (* This doesn't work well for built libraries and needs fixing.
      Should work but for reasons that are subtle, also doesn't
      maxmimize // (in B0_ocaml sync on archive ready rather more fine
-     grained on ifaces). *)
+     grained on ifaces).
+
+     Also FIXME: the archive may not exist. *)
 
   type t =
     { name : Name.t;
@@ -950,6 +952,7 @@ end
 
 module Ocamlfind = struct
   let tool = B00.Tool.by_name "ocamlfind"
+
   let parse_info m ?(file = Fpath.dash) n s =
     let parse_requires requires =
       let to_libname s =
@@ -960,8 +963,10 @@ module Ocamlfind = struct
       if requires = "" then [] else
       List.map to_libname (String.split_on_char ' ' requires)
     in
-    let parse_archive a = match String.cut_right "." a with
-    | None -> a | Some (a, _ext) -> a
+    let parse_archive a =
+      if a = "" then None else
+      match String.cut_right "." a with
+      | None -> Some a | Some (a, _ext) -> Some a
     in
     try
       match String.split_on_char ':' (String.trim s) with
@@ -973,7 +978,7 @@ module Ocamlfind = struct
             Result.map_error (Fmt.str "library directory: %s") @@
             Fpath.of_string dir
           in
-          Ok (meta, Lib.v m ~name:n ~requires ~dir ~archive)
+          Ok (meta, Lib.v m ~name:n ~requires ~dir ?archive)
       | _ -> Fmt.failwith "could not parse %S" s
     with
     | Failure e -> Fmt.error "@[<v>%a: %s@]" Fpath.pp_unquoted file e
@@ -997,10 +1002,16 @@ module Ocamlfind = struct
     | _ -> ()
     in
     let success_exits = [0; 2 (* not found *) ] in
+    let info =
+      (* We use %A otherwise whith %a we get a blank line if there's
+         no archive. Technically though we only support single library
+         archives *)
+      "%m:%d:%A:%(requires)"
+    in
     Memo.spawn m ~success_exits ~reads:[] ~writes:[o] ~stdout:(`File o)
       ~post_exec @@
     ocamlfind Cmd.(arg "query" % lib % "-predicates" % "byte,native" %
-                   "-format" % "%m:%d:%a:%(requires)")
+                   "-format" % info)
 
   let read_info m n f k =
     Memo.read m f @@ fun s ->
@@ -1025,12 +1036,12 @@ module Lib_resolver = struct
   | exception Not_found ->
       let fut, set = Memo.Fut.create r.memo in
       r.libs <- Lib.Name.Map.add n fut r.libs;
-      let fname = Fmt.str "ocamfind.%s" (Lib.Name.to_string n) in
+      let fname = Fmt.str "ocamlfind.%s" (Lib.Name.to_string n) in
       let o = Fpath.(r.memo_dir / fname) in
       begin
         Ocamlfind.write_info r.memo n o;
         Ocamlfind.read_info r.memo n o @@ fun lib ->
-        set (Some lib)
+        set lib
       end;
       Memo.Fut.await fut
 

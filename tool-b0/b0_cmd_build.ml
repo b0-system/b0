@@ -50,8 +50,8 @@ let find_units_to_build lock packs x_packs units x_units =
 let build lock packs x_packs units x_units c =
   Log.if_error ~use:B0_driver.Exit.no_such_name @@
   Result.bind (find_units_to_build lock packs x_packs units x_units) @@
-  fun (may, must) ->
-  match B0_unit.Set.is_empty must with
+  fun (may_build, must_build) ->
+  match B0_unit.Set.is_empty must_build with
   | true ->
       Log.err (fun m -> m "Nothing found to build!");
       Ok B0_driver.Exit.build_error
@@ -59,8 +59,8 @@ let build lock packs x_packs units x_units c =
       let b0_file = Option.get (B0_driver.Conf.b0_file c) in
       let root_dir = Fpath.parent b0_file in
       let b0_dir = B0_driver.Conf.b0_dir c in
-      Result.bind (memo c) @@ fun memo ->
-      let build = B0_build.create ~root_dir ~b0_dir memo ~may ~must in
+      Result.bind (memo c) @@ fun m ->
+      let build = B0_build.create ~root_dir ~b0_dir m ~may_build ~must_build in
       match B0_build.run build with
       | Ok () -> Ok (B0_driver.Exit.ok)
       | Error () -> Ok B0_driver.Exit.build_error

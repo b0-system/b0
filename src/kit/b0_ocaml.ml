@@ -48,7 +48,8 @@ module Unit = struct
         let lib = lazy (lib_of_unit b u lib_name) in
         B00_ocaml.Lib.Name.Map.add lib_name lib acc
     in
-    B0_unit.Set.fold add (B0_build.Unit.may b) B00_ocaml.Lib.Name.Map.empty
+    B0_unit.Set.fold add (B0_build.Unit.may_build b)
+      B00_ocaml.Lib.Name.Map.empty
 
   let default_lib_resolver store m k =
     Store.get store B0_build.current @@ fun b ->

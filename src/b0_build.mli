@@ -38,16 +38,16 @@ module Unit : sig
   (** [current b] is [b]'s current unit. In the {{!B0_unit.type-proc}procedure}
       of build unit that is the unit itself. *)
 
-  val must : t -> B0_unit.Set.t
-  (** [must b] are the units in [b] that must build. *)
+  val must_build : t -> B0_unit.Set.t
+  (** [must_build b] are the units in [b] that must build. *)
 
-  val may : t -> B0_unit.Set.t
-  (** [may b] are all the units in [b] that may build, i.e. that
-      can be {!required}. This includes the elements in [must_list b]. *)
+  val may_build : t -> B0_unit.Set.t
+  (** [may_build b] are all the units in [b] that may build, i.e. that
+      can be {!required}. This includes the elements in [must_build b]. *)
 
   val require : t -> B0_unit.t -> unit
-  (** [require_unit b u] asks to build unit [u] in [b]. This fails the
-      fiber if [b] is [u] is not in {!may}. *)
+  (** [require b u] asks to build unit [u] in [b]. This fails the
+      fiber if [b] is [u] is not in {!may_build}. *)
 
   (** {1:dir Directories} *)
 
@@ -64,12 +64,12 @@ end
 (** {1:run Creating and running} *)
 
 val create :
-  root_dir:Fpath.t -> b0_dir:Fpath.t -> B00.Memo.t -> may:B0_unit.Set.t ->
-  must:B0_unit.Set.t -> t
-(** [create ~root_dir ~b0_dir m ~may ~must]
+  root_dir:Fpath.t -> b0_dir:Fpath.t -> B00.Memo.t -> may_build:B0_unit.Set.t ->
+  must_build:B0_unit.Set.t -> t
+(** [create ~root_dir ~b0_dir m ~may_build ~must_build]
     {ul
-    {- [must] are the build units that must be build by [b].}
-    {- [may] are the build units that may build in [b]. [must] units
+    {- [must_build] are the build units that must be build by [b].}
+    {- [may_build] are the build units that may build in [b]. [must] units
         are automatically added to this set.}} *)
 
 val run : t -> (unit, unit) result

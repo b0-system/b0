@@ -47,16 +47,16 @@ module Build : sig
 
   module Unit : sig
     val current : t -> bunit
-    val must : t -> Set.t
-    val may : t -> Set.t
+    val must_build : t -> Set.t
+    val may_build : t -> Set.t
     val require : t -> bunit -> unit
     val build_dir : t -> bunit -> Fpath.t
     val root_dir : t -> bunit -> Fpath.t
   end
 
   val create :
-    root_dir:Fpath.t -> b0_dir:Fpath.t -> B00.Memo.t -> may:Set.t ->
-    must:Set.t -> t
+    root_dir:Fpath.t -> b0_dir:Fpath.t -> B00.Memo.t -> may_build:Set.t ->
+    must_build:Set.t -> t
 
   val run : t -> (unit, unit) result
   val current : t B00.Store.key
