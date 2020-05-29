@@ -5,10 +5,11 @@
 
 open B00_std
 open B00
+open B00.Memo.Fut.Syntax
 
-let read_spawn_stdout m file cmd k =
+let read_spawn_stdout m file cmd =
   Memo.spawn m ~writes:[file] ~stdout:(`File file) cmd;
-  Memo.read m file @@ fun s -> k (String.trim s )
+  Memo.Fut.map String.trim (Memo.read m file)
 
 let rec find_first_existing_file = function
 | [] -> None
@@ -48,174 +49,176 @@ let os_release =
       | Some (k, v) ->
           String.Map.add (String.trim k) (unquote (String.trim v)) acc
   in
-  let det s m k =
+  let det s m =
     let files = [Fpath.v "/etc/os-release"; Fpath.v "/usr/lib/os-release"] in
     match find_first_existing_file files with
-    | None -> k String.Map.empty
+    | None -> Memo.Fut.return m String.Map.empty
     | Some file ->
         Memo.file_ready m file;
-        Memo.read m file @@ fun s ->
+        let* s = Memo.read m file in
         let map = B00_lines.fold s ~file parse_line String.Map.empty in
-        k (Memo.notify_if_error m `Warn ~use:String.Map.empty map)
+        let map = Memo.notify_if_error m `Warn ~use:String.Map.empty map in
+        Memo.Fut.return m map
   in
   Store.key ~mark:"B00_os.os_release_file" det
 
 let uname = (* gets system name, release version, machine arch *)
   let mark = "b00_os.uname" in
-  let det s m k = match Memo.tool_opt m Tool.uname with
-  | None -> k None
+  let det s m = match Memo.tool_opt m Tool.uname with
+  | None -> Memo.Fut.return m None
   | Some uname ->
       let file = Fpath.(Store.dir s / mark) in
       let uname = uname Cmd.(arg "-s" % "-r" % "-m") in
-      read_spawn_stdout m file uname @@ fun s ->
+      let* s = read_spawn_stdout m file uname in
       match String.split_on_char ' ' s with
-      | [sys; rel; mach] -> k (Some (sys, rel, mach))
+      | [sys; rel; mach] -> Memo.Fut.return m (Some (sys, rel, mach))
       | _ ->
           Memo.notify m
             `Warn "Could not parse %a output %S." Fmt.(code string) "uname" s;
-          k None
+          Memo.Fut.return m None
   in
   Store.key ~mark det
 
 (* name *)
 
 let name =
-  let det s m k = Store.get s uname @@ function
+  let of_uname m = function
   | None ->
       let env = Env.env (Memo.env m) in
       if String.Map.mem "COMSPEC" env || String.Map.mem "ComSpec" env
-      then k "windows"
-      else k "unknown"
+      then "windows"
+      else "unknown"
   | Some (s, _, _) ->
       match String.Ascii.lowercase s with
-      | "darwin" -> k "macos"
-      | s -> k s
+      | "darwin" -> "macos"
+      | s -> s
   in
+  let det s m = Memo.Fut.map (of_uname m) (Store.get s uname) in
   Store.key ~mark:"b00_os.name" det
 
 (* version *)
 
-let freebsd_version s m file k =
+let freebsd_version s m file =
   let file = Fpath.(Store.dir s / file) in
   let uname = (Memo.tool m Tool.uname) (Cmd.arg "-U") in
-  read_spawn_stdout m file uname k
+  read_spawn_stdout m file uname
 
-let try_android_version s m file k = match Memo.tool_opt m Tool.getprop with
-| None -> k None
+let try_android_version s m file = match Memo.tool_opt m Tool.getprop with
+| None -> Memo.Fut.return m None
 | Some getprop ->
     let file = Fpath.(Store.dir s / file) in
     let getprop = getprop (Cmd.arg "ro.build.version.release") in
-    read_spawn_stdout m file getprop @@ fun s -> k (Some s)
+    Memo.Fut.map Option.some (read_spawn_stdout m file getprop)
 
-let linux_version s m file k =
-  try_android_version s m file @@ function
-  | Some v -> k v
+let linux_version s m file =
+  Memo.Fut.bind (try_android_version s m file) @@ function
+  | Some v -> Memo.Fut.return m v
   | None ->
-      Store.get s os_release @@ function info ->
-      match String.Map.find "VERSION_ID" info with
-      | exception Not_found -> k "unknown"
-      | v -> k v
+      Memo.Fut.bind (Store.get s os_release) @@ function info ->
+      match String.Map.find_opt "VERSION_ID" info with
+      | None -> Memo.Fut.return m "unknown"
+      | Some v -> Memo.Fut.return m v
 
-let macos_version s m file k =
+let macos_version s m file =
   let file = Fpath.(Store.dir s / file) in
   let sw_vers = (Memo.tool m Tool.sw_vers) (Cmd.arg "-productVersion") in
-  read_spawn_stdout m file sw_vers k
+  read_spawn_stdout m file sw_vers
 
-let windows_version s m file k =
+let windows_version s m file =
   let file = Fpath.(Store.dir s / file) in
   let cmd_exe = (Memo.tool m Tool.cmd_exe) Cmd.(arg "/c" % "ver") in
-  read_spawn_stdout m file cmd_exe @@ fun s ->
+  let* s = read_spawn_stdout m file cmd_exe in
   (* Format is 'Product [Version XXXX]', we parse the XXX *)
-  let err m s k =
+  let err m s =
     Memo.notify m `Warn
       "@[<v>Could not parse %a output %S." Fmt.(code string) "ver" s;
-    k "unknown"
+    Memo.Fut.return m "unknown"
   in
   let last = String.length s - 2 in
-  if last < 0 then err m s k else
-  match String.rindex s ' ' with
-  | exception Not_found -> err m s k
-  | i -> k (String.subrange ~first:(i + 1) ~last s)
+  if last < 0 then err m s else
+  match String.rindex_opt s ' ' with
+  | None -> err m s
+  | Some i -> Memo.Fut.return m (String.subrange ~first:(i + 1) ~last s)
 
 let version =
   let mark = "b00_os.version" in
-  let det s m k = Store.get s name @@ function
-  | "freebsd" -> freebsd_version s m mark k
-  | "linux" -> linux_version s m mark k
-  | "macos" -> macos_version s m mark k
-  | "windows" -> windows_version s m mark k
+  let det s m = Memo.Fut.bind (Store.get s name) @@ function
+  | "freebsd" -> freebsd_version s m mark
+  | "linux" -> linux_version s m mark
+  | "macos" -> macos_version s m mark
+  | "windows" -> windows_version s m mark
   | _ ->
-      Store.get s uname @@ function
-      | Some (_, r, _) -> k (String.trim r)
-      | None -> k "unknown"
+      Memo.Fut.bind (Store.get s uname) @@ function
+      | Some (_, r, _) -> Memo.Fut.return m (String.trim r)
+      | None -> Memo.Fut.return m "unknown"
   in
   Store.key ~mark det
 
 (* distribution *)
 
-let linux_distribution s m k =
-  Store.get s os_release @@ function info ->
-  match String.Map.find "ID" info with
-  | exception Not_found -> k "unknown"
-  | v -> k v
+let linux_distribution s m =
+  let* info = Store.get s os_release in
+  match String.Map.find_opt "ID" info with
+  | None -> Memo.Fut.return m "unknown"
+  | Some v -> Memo.Fut.return m v
 
-let macos_distribution s m k = match Memo.tool_opt m Tool.brew with
-| Some _ -> k "homebrew"
+let macos_distribution s m = match Memo.tool_opt m Tool.brew with
+| Some _ -> Memo.Fut.return m "homebrew"
 | None ->
     match Memo.tool_opt m Tool.port with
-    | Some _ -> k "macports"
-    | None -> k "macos"
+    | Some _ -> Memo.Fut.return m "macports"
+    | None -> Memo.Fut.return m "macos"
 
 let distribution =
-  let det s m k = Store.get s name @@ function
-  | "linux" -> linux_distribution s m k
-  | "macos" -> macos_distribution s m k
-  | n -> k n
+  let det s m = Memo.Fut.bind (Store.get s name) @@ function
+  | "linux" -> linux_distribution s m
+  | "macos" -> macos_distribution s m
+  | n -> Memo.Fut.return m n
   in
   Store.key ~mark:"b00_os.distribution" det
 
 (* family *)
 
-let linux_family s m k =
-  Store.get s os_release @@ function info ->
-  match String.Map.find "ID_LIKE" info with
-  | exception Not_found -> Store.get s distribution k
-  | v -> match String.cut_left ~sep:" " v with None -> k v | Some (f, _) -> k f
+let linux_family s m =
+  let* info = Store.get s os_release in
+  match String.Map.find_opt "ID_LIKE" info with
+  | None -> Store.get s distribution
+  | Some v ->
+      Memo.Fut.return m @@
+      match String.cut_left ~sep:" " v with None -> v | Some (f, _) -> f
 
 let family =
-  let det s m k = Store.get s name @@ function
-  | "linux" -> linux_family s m k
-  | "freebsd" | "openbsd" | "netbsd" | "dragonfly" -> k "bsd"
-  | "windows" | "cygwin" -> k "windows"
-  | n -> k n
+  let det s m = Memo.Fut.bind (Store.get s name) @@ function
+  | "linux" -> linux_family s m
+  | "freebsd" | "openbsd" | "netbsd" | "dragonfly" -> Memo.Fut.return m "bsd"
+  | "windows" | "cygwin" -> Memo.Fut.return m "windows"
+  | n -> Memo.Fut.return m n
   in
   Store.key ~mark:"b00_os.family" det
 
 (* Executable file extension *)
 
 let exe_ext =
-  let det s m k = Store.get s name @@ function
-  | "windows" -> k ".exe"
-  | _ -> k ""
-  in
+  let ext_of_name = function "windows" -> ".exe" | _ -> "" in
+  let det s m = Memo.Fut.map ext_of_name (Store.get s name) in
   Store.key ~mark:"b00_os.exe_ext" det
 
 (* Machine architecture *)
 
 let arch =
   let ret a = if a = "" then "unknown" else String.Ascii.lowercase a in
-  let det s m k = Store.get s uname @@ function
-  | Some (_, _, a) -> k (ret a)
+  let det s m = Memo.Fut.bind (Store.get s uname) @@ function
+  | Some (_, _, a) -> Memo.Fut.return m (ret a)
   | None ->
       let env = Env.env (Memo.env m) in
       match String.Map.find "PROCESSOR_ARCHITECTURE" env with
-      | exception Not_found -> k "unknown"
+      | exception Not_found -> Memo.Fut.return m "unknown"
       | "x86" as a ->
           begin match String.Map.find "PROCESSOR_ARCHITEW6432" env with
-          | exception Not_found -> k a
-          | a -> k (ret a)
+          | exception Not_found -> Memo.Fut.return m a
+          | a -> Memo.Fut.return m (ret a)
           end
-      | a -> k (ret a)
+      | a -> Memo.Fut.return m (ret a)
   in
   Store.key ~mark:"b00_os.arch" det
 
@@ -231,19 +234,20 @@ let arch_normalized =
                    is_prefix "armv7" a || is_prefix "earmv7" a) -> "arm32"
   | a -> a
   in
-  let det s m k = Store.get s arch @@ fun a -> k (normalize a) in
+  let det s m = Memo.Fut.map normalize (Store.get s arch) in
   Store.key ~mark:"b00_os.arch_normalized" det
 
 let arch_bits =
   let default = 64 in
-  let det s m k = Store.get s arch_normalized @@ function
-  | "x86_64" | "ppc64" | "ia64" | "arm64" | "sparc64" | "mips64"-> k 64
-  | "x86_32" | "ppc32" | "arm32" -> k 32
+  let det s m = Memo.Fut.bind (Store.get s arch_normalized) @@ function
+    | "x86_64" | "ppc64" | "ia64" | "arm64" | "sparc64" | "mips64"->
+        Memo.Fut.return m 64
+  | "x86_32" | "ppc32" | "arm32" -> Memo.Fut.return m 32
   | a ->
       Memo.notify m
         `Warn "Unknown word size for arch %a. Using %d bits."
         Fmt.(code string) a default;
-      k default
+      Memo.Fut.return m default
   in
   Store.key ~mark:"b00_os.arch_bits" det
 

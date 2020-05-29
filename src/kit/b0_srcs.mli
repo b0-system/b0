@@ -60,7 +60,7 @@ type sel =
 | `Dir_rec of fpath
 | `X of fpath
 | `File of fpath
-| `Fiber of B0_build.t -> Fpath.Set.t B00.Memo.fiber ]
+| `Fut of B0_build.t -> Fpath.Set.t B00.Memo.Fut.t ]
 (** The type for file selectors.
     {ul
     {- [`File f] unconditionaly selects the file [f]. [f] must exist and be
@@ -73,13 +73,13 @@ type sel =
     {- [`X x] removes from directory selections any file whose path segments
        are prefixed by [x], respecting segment boundaries. A potential trailing
        directory separators in [x] is removed.}
-    {- [`Fiber f] uses the given fiber during the build to determine
+    {- [`Fut f] uses the given fiber during the build to determine
        a set of files unconditionally added to the selection.}} *)
 
 type t = sel list
 (** The type for source selection. *)
 
-val select : B0_build.t -> t -> B00_fexts.map B00.Memo.fiber
+val select : B0_build.t -> t -> B00_fexts.map B00.Memo.Fut.t
 (** [select b sels] selects in [b] the sources specified by [sels] and
     returns them mapped by their file extension (not
     {{!B00_std.Fpath.file_exts}multiple file extension}). Each file is
@@ -88,9 +88,9 @@ val select : B0_build.t -> t -> B00_fexts.map B00.Memo.fiber
     Any relative path of {!srcs} is made absolute to the current build
     unit with {!B0_build.Unit.root_dir}.
 
-    {b Important.} All files in the map that were selected via [`F],
+    {b Important.} All files in the map that were selected via [`File],
     [`D] and [`D_rec] are automatically {{!B00.Memo.file_ready}made
-    ready} in the build. For those selected via [`Fiber] readyness
+    ready} in the build. For those selected via [`Fut] readyness
     determination is left to the fiber and the mechanisms it
     invokes.
 

@@ -36,7 +36,7 @@ module Unit : sig
 
   (** {1:library_resolver Library resolver} *)
 
-  type lib_resolver = Lib.Name.t -> Lib.t Memo.fiber
+  type lib_resolver = Lib.Name.t -> Lib.t Memo.Fut.t
   (** The type for library resolvers. FIXME maybe we want a data structure
       with given operations. In particular we are interested in getting
       the domain of the resolver for error correction (or we bundle
@@ -46,7 +46,7 @@ module Unit : sig
   (** [lib_resolver] is the library resolver used by OCaml build units.
       See {!default_lib_resolver} for the default. *)
 
-  val default_lib_resolver : Store.t -> Memo.t -> lib_resolver Memo.fiber
+  val default_lib_resolver : Store.t -> Memo.t -> lib_resolver Memo.Fut.t
   (** [default_resolver] determines the default value of {!lib_resolver}.
       This resolver does the following:
       {ol

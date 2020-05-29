@@ -4,6 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open B00.Memo.Fut.Syntax
 
 module Exit = struct
   type t = Code of int | Exec of Fpath.t * Cmd.t
@@ -252,17 +253,13 @@ module Compile = struct
       B00_ocaml.Lib.Name.v "b0.kit";
       B00_ocaml.Lib.Name.v "b0.driver"; ]
 
-  let find_libs libs r k =
-    let rec loop acc = function
-    | [] -> k (List.rev acc)
-    | l :: libs ->
-        B00_ocaml.Lib_resolver.find r l @@ fun lib -> loop (lib :: acc) libs
-    in
-    loop [] libs
+  let find_libs m r libs =
+    let find = B00_ocaml.Lib_resolver.find in
+    B00.Memo.Fut.of_list m (List.map (find r) libs)
 
-  let find_boot_libs m ~env libs r k =
+  let find_boot_libs m ~env libs r =
     match Os.Env.find ~empty_is_none:true "B0_B00T" with
-    | None -> find_libs libs r k
+    | None -> find_libs m r libs
     | Some bdir ->
         let bdir = Fpath.v bdir in
         let boot_lib name =
@@ -270,23 +267,23 @@ module Compile = struct
           let archive = B00_ocaml.Lib.Name.to_archive_name name in
           B00_ocaml.Lib.v m ~name ~requires:[] ~archive ~dir
         in
-        k (List.map boot_lib libs)
+        B00.Memo.Fut.return m (List.map boot_lib libs)
 
-  let find_libs m ~build_dir ~driver ~requires k =
-    B00_ocaml.Ocamlpath.get m None @@ fun ocamlpath ->
+  let find_libs m ~build_dir ~driver ~requires =
+    let* ocamlpath = B00_ocaml.Ocamlpath.get m None in
     let memo_dir = Fpath.(build_dir / "ocamlib") in
     let r = B00_ocaml.Lib_resolver.create m ~memo_dir ~ocamlpath in
     let requires = List.map fst requires in
+    let* requires = find_libs m r requires in
     (* FIXME we are loosing locations here would be nice to
        have them to report errors. *)
-    find_libs requires r @@ fun requires ->
     (* FIXME we likely also want a notion of ext lib for drivers *)
-    find_boot_libs m ~env:"B0_DRIVER_BOOT" (libs driver) r @@ fun driver_libs ->
-    find_libs base_ext_libs r @@ fun base_ext_libs ->
-    find_boot_libs m ~env:"B0_B00T" base_libs r @@ fun base_libs ->
+    let* driver_libs = find_boot_libs m ~env:"B0_DRIVER_BOOT" (libs driver) r in
+    let* base_ext_libs = find_libs m r base_ext_libs in
+    let* base_libs = find_boot_libs m ~env:"B0_B00T" base_libs r in
     let all_libs = base_ext_libs @ base_libs @ driver_libs @ requires in
     let seen_libs = base_libs @ requires in
-    k (all_libs, seen_libs)
+    B00.Memo.Fut.return m (all_libs, seen_libs)
 
   let find_compiler c m = match Conf.code c with
   | Some (B00_ocaml.Cobj.Byte as c) -> B00_ocaml.Tool.ocamlc, c
@@ -300,12 +297,12 @@ module Compile = struct
     let ocaml_conf = Fpath.(build_dir / "ocaml.conf") in
     let comp, code = find_compiler c m in
     B00_ocaml.Conf.write m ~comp ~o:ocaml_conf;
-    B00_ocaml.Conf.read m ocaml_conf @@ fun ocaml_conf ->
+    let* ocaml_conf = B00_ocaml.Conf.read m ocaml_conf in
     let obj_ext = B00_ocaml.Conf.obj_ext ocaml_conf in
     let lib_ext = B00_ocaml.Conf.lib_ext ocaml_conf in
     let comp = B00.Memo.tool m comp in
     let requires = B0_file.requires src in
-    find_libs m ~build_dir ~driver ~requires @@ fun (all_libs, seen_libs) ->
+    let* all_libs, seen_libs = find_libs m ~build_dir ~driver ~requires in
     let src_file = Fpath.(build_dir / "src.ml") in
     write_src m c src ~src_file;
     let writes =
@@ -325,7 +322,8 @@ module Compile = struct
     let reads = src_file :: ars in
     B00.Memo.spawn m ~reads ~writes @@
     comp Cmd.(arg "-linkall" % "-g" % "-o" %% unstamp (path exe) % "-opaque" %%
-              incs %% (unstamp @@ (paths archives %% path src_file)))
+              incs %% (unstamp @@ (paths archives %% path src_file)));
+    B00.Memo.Fut.return m ()
 
   let write_log_file ~log_file m =
     Log.if_error ~use:() @@ B00_ui.Memo.Log.(write log_file (of_memo m))
@@ -340,8 +338,9 @@ module Compile = struct
     Os.Sig_exit.on_sigint
       ~hook:(fun () -> write_log_file ~log_file m) @@ fun () ->
     B00.Memo.spawn_fiber m begin fun () ->
-      B00.Memo.delete m build_dir @@ fun () ->
-      B00.Memo.mkdir m build_dir @@ fun () ->
+      ignore @@
+      let* () = B00.Memo.delete m build_dir in
+      let* () = B00.Memo.mkdir m build_dir in
       compile_src m c ~driver ~build_dir src ~exe;
     end;
     B00.Memo.stir ~block:true m;

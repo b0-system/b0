@@ -271,7 +271,9 @@ module El = struct
     =
     (* FIXME Ideally we would like the read to be in write.
        The write fun should be a fiber but this has other impacts. *)
-    B00.Memo.read m frag @@ fun contents ->
+    let open B00.Memo.Fut.Syntax in
+    ignore @@ (* FIXME maybe get rid of that. *)
+    let* contents = B00.Memo.read m frag in
     let title = if title = "" then title_of_fpath o else title in
     let more_head = match more_head with
     | None -> ""
@@ -281,13 +283,14 @@ module El = struct
     let stamp = List.rev_append styles stamp in
     let stamp = List.rev_append scripts stamp in
     let stamp = String.concat "" stamp in
-    B00.Memo.write m ~stamp ~reads:[frag] o @@ fun () ->
+    B00.Memo.Fut.return m @@
+    (B00.Memo.write m ~stamp ~reads:[frag] o @@ fun () ->
     let more_head = raw more_head in
     let body = body [raw contents] in
     let page =
       basic_page ~lang ~generator ~styles ~scripts ~more_head ~title body
     in
-    Ok (to_string ~doc_type:true page)
+    Ok (to_string ~doc_type:true page))
 end
 
 (*---------------------------------------------------------------------------

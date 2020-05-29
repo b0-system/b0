@@ -5,14 +5,16 @@
 
 open B00_std
 open B00
+open B00.Memo.Fut.Syntax
 
-let read_path_writes m file k =
+let read_path_writes m file =
   let parse_path n p acc = match Fpath.of_string p with
   | Error e -> B00_lines.err n "%s" e
   | Ok p -> p :: acc
   in
   let parse lines = B00_lines.fold ~file (String.trim lines) parse_path [] in
-  Memo.read m file (fun lines -> k (Memo.fail_if_error m (parse lines)))
+  let* lines = Memo.read m file in
+  Memo.Fut.return m (Memo.fail_if_error m (parse lines))
 
 let tool = Tool.by_name "odoc" (* FIXME conf ! *)
 
@@ -42,9 +44,10 @@ module Compile = struct
       Memo.spawn m ~reads:[cobj] ~writes:[o] ~stdout:(`File o) @@
       odoc Cmd.(arg "compile-deps" %% path cobj)
 
-    let read m file k =
+    let read m file =
       let parse lines = B00_lines.fold ~file (String.trim lines) parse_dep [] in
-      Memo.read m file (fun lines -> k (Memo.fail_if_error m (parse lines)))
+      let* lines = Memo.read m file in
+      Memo.Fut.return m (Memo.fail_if_error m (parse lines))
   end
 
   module Writes = struct
@@ -68,10 +71,12 @@ module Compile = struct
               "-o" %% path o %% path cobj %% incs)
 
   let to_odoc m ?hidden ~pkg ~odoc_deps obj ~o:odoc =
+    ignore @@ (* FIXME maybe remove that. *)
     let writes = Fpath.(odoc + ".writes") in
     Writes.write m obj ~to_odoc:odoc ~o:writes;
-    Writes.read m writes @@ fun writes ->
-    cmd m ?hidden ~odoc_deps ~writes ~pkg obj ~o:odoc
+    let* writes = Writes.read m writes in
+    cmd m ?hidden ~odoc_deps ~writes ~pkg obj ~o:odoc;
+    Memo.Fut.return m ()
 end
 
 module Html = struct
@@ -97,9 +102,10 @@ module Html = struct
       Memo.spawn m ~reads:odoc_files ~writes:[o] ~stdout:(`File o) @@
       odoc Cmd.(arg "html-deps" %% path pkg_odoc_dir)
 
-    let read m file k =
+    let read m file =
       let parse lines = B00_lines.fold ~file (String.trim lines) parse_dep [] in
-      Memo.read m file (fun lines -> k (Memo.fail_if_error m (parse lines)))
+      let* lines = Memo.read m file in
+      Memo.Fut.return m (Memo.fail_if_error m (parse lines))
   end
 
   module Writes = struct
@@ -126,6 +132,7 @@ module Html = struct
               path to_dir %% path odoc_file %% incs)
 
   let write m ?theme_uri ~html_dir ~odoc_deps odoc =
+    ignore @@ (* FIXME maybe remove that *)
     let writes = Fpath.(odoc -+ ".html.writes") in
     let odoc_deps = match odoc_deps with
     | [] ->
@@ -139,8 +146,9 @@ module Html = struct
         (odoc :: deps)
     in
     Writes.write m ~odoc_deps odoc ~to_dir:html_dir ~o:writes;
-    Writes.read m writes @@ fun writes ->
-    cmd m ?theme_uri ~odoc_deps ~writes odoc ~to_dir:html_dir
+    let* writes = Writes.read m writes in
+    cmd m ?theme_uri ~odoc_deps ~writes odoc ~to_dir:html_dir;
+    Memo.Fut.return m ()
 end
 
 module Html_fragment = struct
@@ -169,11 +177,13 @@ module Support_files = struct
     odoc Cmd.(arg "support-files" %% theme % "-o" %% path to_dir)
 
   let write m ~without_theme ~html_dir ~build_dir =
+    ignore @@ (* FIXME maybe remove that *)
     let o = Fpath.(build_dir / "odoc-support-files.writes") in
     let to_dir = html_dir in
     Writes.write m ~without_theme ~to_dir ~o;
-    Writes.read m o @@ fun writes ->
-    cmd m ~writes ~without_theme ~to_dir
+    let* writes = Writes.read m o in
+    cmd m ~writes ~without_theme ~to_dir;
+    Memo.Fut.return m ()
 end
 
 module Theme = struct

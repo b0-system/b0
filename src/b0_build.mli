@@ -26,7 +26,7 @@ val shared_build_dir : t -> Fpath.t
      build. This is used by computations shared by units. Most of the
      time one should use {!Unit.build_dir}. *)
 
-val get : t -> 'a B00.Store.key -> 'a B00.Memo.fiber
+val get : t -> 'a B00.Store.key -> 'a B00.Memo.Fut.t
 (** [get b k] is {!B00.Store.get}[ (store b) k]. *)
 
 (** Built units. *)

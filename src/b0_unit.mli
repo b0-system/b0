@@ -15,7 +15,7 @@ open B00_std
 type build
 (** The type for builds, see {!B0_build}. *)
 
-type proc = build -> unit B00.Memo.fiber
+type proc = build -> unit B00.Memo.Fut.t
 (** The type for unit build procedures. *)
 
 val nop : proc
@@ -43,7 +43,7 @@ module Build : sig
   val memo : t -> B00.Memo.t
   val store : t -> B00.Store.t
   val shared_build_dir : t -> Fpath.t
-  val get : t -> 'a B00.Store.key -> 'a B00.Memo.fiber
+  val get : t -> 'a B00.Store.key -> 'a B00.Memo.Fut.t
 
   module Unit : sig
     val current : t -> bunit

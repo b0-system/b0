@@ -327,7 +327,18 @@ module Memo = struct
       let r = _create f0.m in
       await f0 (fun v0 -> await f1 (fun v1 -> set r (v0, v1))); r
 
+    let of_list m fs = match fs with
+    | [] -> return m []
+    | fs ->
+        let r = _create m in
+        let rec loop acc = function
+        | [] -> set r (List.rev acc)
+        | f :: fs -> await f (fun v -> loop (v :: acc) fs)
+        in
+        loop [] fs; r
+
     module Syntax = struct
+      let ( >>= ) = bind
       let ( let* ) = bind
       let ( and* ) = pair
     end
@@ -358,20 +369,23 @@ module Memo = struct
     Guard.set_file_ready m.m.guard p;
     m.m.ready_roots <- Fpath.Set.add p m.m.ready_roots
 
-  let read m file k =
+  let read m file =
     let id = new_op_id m and created = timestamp m in
+    let r, set = Fut.create m in
     let k o =
       let r = Op.Read.get o in
       let data = Op.Read.data r in
-      Op.Read.discard_data r; k data
+      Op.Read.discard_data r; set data
     in
     let o = Op.Read.v_op ~id ~mark:m.c.mark ~created ~k file in
-    add_op_and_stir m o
+    add_op_and_stir m o; r
 
-  let wait_files m files k =
-    let id = new_op_id m and created = timestamp m and k o = k () in
+  let wait_files m files =
+    let id = new_op_id m and created = timestamp m in
+    let r, set = Fut.create m in
+    let k o = set () in
     let o = Op.Wait_files.v_op ~id ~mark:m.c.mark ~created ~k files in
-    add_op_and_stir m o
+    add_op_and_stir m o; r
 
   let write m ?(stamp = "") ?(reads = []) ?(mode = 0o644) write d =
     let id = new_op_id m and mark = m.c.mark and created = timestamp m in
@@ -383,15 +397,20 @@ module Memo = struct
     let o = Op.Copy.v_op ~id ~mark ~created ~mode ~linenum ~src dst in
     add_op_and_stir m o
 
-  let mkdir m ?(mode = 0o755) dir k =
-    let id = new_op_id m and created = timestamp m and k o = k () in
-    let o = Op.Mkdir.v_op ~id ~mark:m.c.mark ~created ~k ~mode dir in
-    add_op_and_stir m o
+  let mkdir m ?(mode = 0o755) dir =
+    let id = new_op_id m and mark = m.c.mark and created = timestamp m in
+    let r, set = Fut.create m in
+    let k o = set () in
+    let o = Op.Mkdir.v_op ~id ~mark ~created ~k ~mode dir in
+    add_op_and_stir m o; r
 
-  let delete m p k =
-    let id = new_op_id m and created = timestamp m and k o = k () in
-    let o = Op.Delete.v_op ~id ~mark:m.c.mark ~created ~k p in
-    add_op_and_stir m o
+  let delete m p =
+    let id = new_op_id m and mark = m.c.mark and created = timestamp m in
+    let r, set = Fut.create m in
+    let k o = set () in
+    let o = Op.Delete.v_op ~id ~mark ~created ~k p in
+    add_op_and_stir m o;
+    r
 
   (* FIXME better strategy to deal with builded tools. If the tool is a
      path check for readyness if not add it to the operations reads.
@@ -505,13 +524,13 @@ module Store = struct
     type t = V : 'a typed -> t
     and 'a typed =
       { uid : int; tid : 'a Tid.t; mark : string;
-        det : Store.t -> Memo.t -> 'a Memo.fiber; untyped : t; }
+        det : Store.t -> Memo.t -> 'a Memo.Fut.t; untyped : t; }
     val compare : t -> t -> int
   end = struct
     type t = V : 'a typed -> t
     and 'a typed =
       { uid : int; tid : 'a Tid.t; mark : string;
-        det : Store.t -> Memo.t -> 'a Memo.fiber; untyped : t;}
+        det : Store.t -> Memo.t -> 'a Memo.Fut.t; untyped : t;}
     let compare (V l0) (V l1) = (compare : int -> int -> int) l0.uid l1.uid
   end
   and Store : sig
@@ -544,17 +563,17 @@ module Store = struct
     let rec k = { Key.uid; tid; mark; det; untyped }
     and untyped = Key.V k in k
 
-  let get : type a. t -> a key -> a Memo.fiber =
+  let get : type a. t -> a key -> a Memo.Fut.t =
   fun s k -> match Store.Kmap.find_opt k.Key.untyped s.map with
   | None ->
       let memo = Memo.with_mark s.memo k.Key.mark in
-      let fut = Memo.Fut.of_fiber memo (k.Key.det s memo) in
+      let fut = k.Key.det s memo in
       s.map <- Store.Kmap.add k.Key.untyped (Store.B (k, fut)) s.map;
-      Memo.Fut.await fut
+      fut
   | (Some Store.B (l', fut)) ->
       match Tid.equal k.Key.tid l'.Key.tid with
       | None -> assert false
-      | Some Tid.Eq -> Memo.Fut.await fut
+      | Some Tid.Eq -> fut
 
   let set s k v = match Store.Kmap.mem k.Key.untyped s.Store.map with
   | true -> Fmt.invalid_arg "Key %s already set in store" k.Key.mark

@@ -325,8 +325,16 @@ module Memo : sig
     val pair : 'a t -> 'b t -> ('a * 'b) t
     (** [pair f0 f1] determines with the result of [f0] and [f1]. *)
 
-    (** [let] operators. *)
+    val of_list : memo -> 'a t list -> 'a list t
+    (** [of_list fs] determines with the determining of all
+        [fs], in the same order. *)
+
+    (** Future syntax. *)
     module Syntax : sig
+
+      val ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t
+      (** [>>=] is {!bind}. *)
+
       val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
       (** [let*] is {!bind}. *)
 
@@ -371,9 +379,9 @@ module Memo : sig
       up-to-date in [b]. This is typically used with source files
       and files external to the build (e.g. installed libraries). *)
 
-  val read : t -> Fpath.t -> string fiber
-  (** [read m file k] reads the contents of file [file] as [s] when it
-      becomes ready and continues with [k s]. *)
+  val read : t -> Fpath.t -> string Fut.t
+  (** [read m file k] is a future that determines with the contents
+      [s] of file [file] when it becomes ready in  [m]. *)
 
   val write :
     t -> ?stamp:string -> ?reads:Fpath.t list -> ?mode:int ->
@@ -393,19 +401,20 @@ module Memo : sig
 #line $(linenum) "$(src)"
 ]} *)
 
-  val mkdir : t -> ?mode:int -> Fpath.t -> unit fiber
-  (** [mkdir m dir p] creates the directory path [p] with [mode]
-      [mode] (defaults to [0o755]) and continues with [k ()] whne
-      [dir] is available. The behaviour with respect to file
-      permission matches {!Os.Dir.create}. *)
+  val mkdir : t -> ?mode:int -> Fpath.t -> unit Fut.t
+  (** [mkdir m dir p] is a future that determines with [()] when the
+      directory path [p] has been created with mode [mode] (defaults
+      to [0o755]). The behaviour with respect to file permission
+      of intermediate path segments matches {!Os.Dir.create}. *)
 
-  val delete : t -> Fpath.t -> unit fiber
-  (** [delete m p] deletes (trashes in fact) path [p] and continues
-      with [k ()] when the path [p] is free to use. *)
+  val delete : t -> Fpath.t -> unit Fut.t
+  (** [delete m p] is a future that determines with [()] when path [p]
+      is deleted (trashed in fact) and free to reuse. *)
 
-  val wait_files : t -> Fpath.t list -> unit fiber
-  (** [wait_files m files k] continues with [k ()] when [files] become
-      ready. {b FIXME} Unclear whether we really want this. *)
+  val wait_files : t -> Fpath.t list -> unit Fut.t
+  (** [wait_files m files] is a future that deterines with [()]
+      when all [files] are ready in [m]. {b FIXME} Unclear whether
+      we really want this. *)
 
   (** {1:spawn Memoizing tool spawns} *)
 
@@ -532,16 +541,17 @@ module Store : sig
       prefixes (e.g. lowercased module or lib names) to avoid name
       clashes. *)
 
-  val key : ?mark:string -> (t -> Memo.t -> 'a Memo.fiber) -> 'a key
+  val key : ?mark:string -> (t -> Memo.t -> 'a Memo.Fut.t) -> 'a key
   (** [key ~mark det] is a new key whose value is determined on
-      {{!get}access} by the fiber:
+      {{!get}access} by the future:
 {[
 det s (Memo.with_mark mark (Store.memo s))
 ]}
       [mark] defaults to [""]. *)
 
-  val get : t -> 'a key -> 'a Memo.fiber
-  (** [get s k] is the value bound to [k] in [s]. *)
+  val get : t -> 'a key -> 'a Memo.Fut.t
+  (** [get s k] is a future that dermines with the value of [k] in
+      [s]. *)
 
 (**/**)
   val set : t -> 'a key -> 'a -> unit

@@ -18,7 +18,7 @@ type sel =
 | `Dir_rec of fpath
 | `X of fpath
 | `File of fpath
-| `Fiber of B0_build.t -> Fpath.Set.t B00.Memo.fiber ]
+| `Fut of B0_build.t -> Fpath.Set.t B00.Memo.Fut.t ]
 
 type t = sel list
 
@@ -84,36 +84,22 @@ let select_files_in_dirs m u xs (seen, by_ext as acc) ds =
   in
   loop m u xs acc ds
 
-let select_file_from_fibers b acc fibers k =
-  let rec loop b acc = function
-  | [] -> k acc
-  | fiber :: fibers ->
-      fiber b @@ fun files ->
-      let add_file file (seen, by_ext as acc) =
-        if Fpath.Set.mem file seen then acc else
-        let ext = Fpath.get_ext file in
-        let by_ext = String.Map.add_to_list ext file by_ext in
-        (Fpath.Set.add file seen), by_ext
-      in
-      loop b (Fpath.Set.fold add_file files acc) fibers
-  in
-  loop b acc fibers
-
-let select b sels k =
+let select b sels =
+  let open B00.Memo.Fut.Syntax in
   let m = B0_build.memo b in
   let u = B0_build.Unit.current b in
   let root = B0_build.Unit.root_dir b u in
   let abs d = Fpath.(root // v d) in
-  let fs, ds, xs, fibers =
-    let rec loop fs ds xs fibers = function
-    | [] -> fs, ds, xs, fibers
-    | `Dir d :: ss -> loop fs ((abs d, false) :: ds) xs fibers ss
-    | `Dir_rec d :: ss -> loop fs ((abs d, true) :: ds) xs fibers ss
+  let fs, ds, xs, futs =
+    let rec loop fs ds xs futs = function
+    | [] -> fs, ds, xs, futs
+    | `Dir d :: ss -> loop fs ((abs d, false) :: ds) xs futs ss
+    | `Dir_rec d :: ss -> loop fs ((abs d, true) :: ds) xs futs ss
     | `X x :: ss ->
         let x = Fpath.rem_empty_seg (abs x) in
-        loop fs ds (Fpath.Set.add x xs) fibers ss
-    | `File f :: ss -> loop ((abs f) :: fs) ds xs fibers ss
-    | `Fiber f :: ss -> loop fs ds xs (f :: fibers) ss
+        loop fs ds (Fpath.Set.add x xs) futs ss
+    | `File f :: ss -> loop ((abs f) :: fs) ds xs futs ss
+    | `Fut f :: ss -> loop fs ds xs (f b :: futs) ss
     in
     loop [] [] Fpath.Set.empty [] sels
   in
@@ -121,8 +107,18 @@ let select b sels k =
   let acc = select_files m u acc fs in
   let (seen, _ as acc) = select_files_in_dirs m u xs acc ds in
   Fpath.Set.iter (B00.Memo.file_ready m) seen;
-  select_file_from_fibers b acc fibers @@ fun acc ->
-  k (snd acc)
+  let* futs = B00.Memo.Fut.of_list m futs in
+  let add_files acc files =
+    let add_file file (seen, by_ext as acc) =
+      if Fpath.Set.mem file seen then acc else
+      let ext = Fpath.get_ext file in
+      let by_ext = String.Map.add_to_list ext file by_ext in
+      (Fpath.Set.add file seen), by_ext
+    in
+    Fpath.Set.fold add_file files acc
+  in
+  let _, acc = List.fold_left add_files acc futs in
+  B00.Memo.Fut.return m acc
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

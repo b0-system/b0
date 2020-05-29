@@ -104,7 +104,7 @@ module Conf : sig
   (** [write m ~o] writes the toolchain configuration to [o] by
       running [comp] with [-config]. *)
 
-  val read : B00.Memo.t -> Fpath.t -> t Memo.fiber
+  val read : B00.Memo.t -> Fpath.t -> t Memo.Fut.t
   (** [read m file] reads a toolchain configuration from [file]. *)
 
   val of_string : ?file:Fpath.t -> string -> (t, string) result
@@ -140,9 +140,9 @@ module Conf : sig
 
   (** {1:todo TODO remove that} *)
 
-  val exists : Memo.t -> bool Memo.fiber
-  val if_exists : Memo.t -> (unit -> 'a Memo.fiber) -> 'a option Memo.fiber
-  val stdlib_dir : Memo.t -> unit -> Fpath.t Memo.fiber
+  val exists : Memo.t -> bool Memo.Fut.t
+  val if_exists : Memo.t -> (unit -> 'a Memo.Fut.t) -> 'a option Memo.Fut.t
+  val stdlib_dir : Memo.t -> unit -> Fpath.t Memo.Fut.t
 end
 
 (** Module names. *)
@@ -364,7 +364,7 @@ module Cobj : sig
   (** [write m ~cobjs o] writes information about the compilation [cobjs]
       to [o]. *)
 
-  val read : B00.Memo.t -> Fpath.t -> t list Memo.fiber
+  val read : B00.Memo.t -> Fpath.t -> t list Memo.Fut.t
   (** [read m file] has the [cobjs] of a {!write} to [file]. *)
 
   val of_string : ?file:Fpath.t -> string -> (t list, string) result
@@ -398,7 +398,7 @@ module Mod_src : sig
 
     val read :
       ?src_root:Fpath.t -> Memo.t -> Fpath.t ->
-      Mod_name.Set.t Fpath.Map.t Memo.fiber
+      Mod_name.Set.t Fpath.Map.t Memo.Fut.t
     (** [read ~src_root file] reads dependencies produced by {!write}
         as a map from absolute file paths to their dependencies.
         Relative file paths are made absolute relative to {!src_root}
@@ -598,7 +598,7 @@ module Link : sig
         of compilation unit objects of [cobjs] to [o]. *)
 
     val read :
-      B00.Memo.t -> Fpath.t -> (Cobj.t list * Mod_ref.Set.t) Memo.fiber
+      B00.Memo.t -> Fpath.t -> (Cobj.t list * Mod_ref.Set.t) Memo.Fut.t
       (** [read m file] has the [cobjs] of a {!write} to [file] in dependency
           order and external dependencies to resolve. *)
   end
@@ -632,7 +632,7 @@ end
     FIXME, maybe this should be a store key. *)
 module Ocamlpath : sig
 
-  val get : Memo.t -> Fpath.t list option -> Fpath.t list Memo.fiber
+  val get : Memo.t -> Fpath.t list option -> Fpath.t list Memo.Fut.t
   (** [get m o k] is [k ps] if [o] is [Some ps] and otherwise in order:
       {ol
       {- If the [OCAMLPATH] environment variable is defined in [m] and
@@ -771,7 +771,7 @@ module Lib_resolver : sig
       libraries in the OCAMLPATH [ocamlpath] and caching results
       in [memo_dir] *)
 
-  val find : t -> Lib.Name.t -> Lib.t B00.Memo.fiber
+  val find : t -> Lib.Name.t -> Lib.t B00.Memo.Fut.t
   (** [find r l] finds library names [l] using [r]. The fiber fails
       if a library cannot be found. *)
 end
