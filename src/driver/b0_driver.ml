@@ -337,11 +337,10 @@ module Compile = struct
        have similar setup/log/reporting bits. *)
     Os.Sig_exit.on_sigint
       ~hook:(fun () -> write_log_file ~log_file m) @@ fun () ->
-    B00.Memo.spawn_fiber m begin fun () ->
-      ignore @@
+    B00.Memo.run_proc m begin fun () ->
       let* () = B00.Memo.delete m build_dir in
       let* () = B00.Memo.mkdir m build_dir in
-      compile_src m c ~driver ~build_dir src ~exe;
+      compile_src m c ~driver ~build_dir src ~exe
     end;
     B00.Memo.stir ~block:true m;
     write_log_file ~log_file m;

@@ -47,7 +47,7 @@ module Unit : sig
 
   val require : t -> B0_unit.t -> unit
   (** [require b u] asks to build unit [u] in [b]. This fails the
-      fiber if [b] is [u] is not in {!may_build}. *)
+      memo if [b] is [u] is not in {!may_build}. *)
 
   (** {1:dir Directories} *)
 

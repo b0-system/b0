@@ -158,20 +158,7 @@ module Memo = struct
   let has_failures m = m.m.has_failures
   let add_op m o = m.m.ops <- o :: m.m.ops; Guard.add m.m.guard o
 
-  (* Fibers *)
-
-  type 'a fiber = ('a -> unit) -> unit
   exception Fail
-
-  module Fiber = struct
-    type 'a t = 'a fiber
-    let of_list l k =
-      let rec loop acc = function
-      | [] -> k (List.rev acc)
-      | f :: fs -> f (fun v -> loop (v :: acc) fs)
-      in
-      loop [] l
-  end
 
   let notify_op m ?k kind msg =
     let k = match k with None -> None | Some k -> Some (fun o -> k ()) in
@@ -201,7 +188,9 @@ module Memo = struct
       in
       notify_op m `Fail err
 
-  let spawn_fiber m k = Rqueue.add m.m.fiber_ready (fun () -> k ())
+  let run_proc m k =
+    Rqueue.add m.m.fiber_ready (fun () -> ignore (k ()))
+
   let continue_fiber m k =
     let pp_kind ppf () = Fmt.string ppf "Fiber" in
     invoke_k m ~pp_kind k ()
@@ -342,10 +331,6 @@ module Memo = struct
       let ( let* ) = bind
       let ( and* ) = pair
     end
-
-    let of_fiber m k =
-      let r, set = create m in
-      Rqueue.add r.m.m.fiber_ready (fun () -> k set); r
   end
 
   (* Notifications *)

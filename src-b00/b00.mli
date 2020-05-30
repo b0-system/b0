@@ -252,41 +252,7 @@ module Memo : sig
   (** [mark m mark] is [m] but operations performed on [m] are marked by
       [mark]. *)
 
-  (** {1:fibers Futures and fibers} *)
-
-  type 'a fiber = ('a -> unit) -> unit
-  (** The type for memoizer fibers returning values of type ['a]. A
-      fiber [f k] represent a thread of execution that eventually
-      kontinues [k] with its result value when it reaches an end.
-
-      Fibers should always be run on a Memo via {!spawn_fiber} or as
-      the continuation of a build operation. A fiber can fail either
-      explictly via {!fail} or because an uncaught exception
-      occurs. In both these cases a [`Fail] {!notify} operation gets
-      added to the memo to witness the fiber failure.  The status of
-      this operation is like any [Fail] notify: {!B000.Op.Failed}. *)
-
-  module Fiber : sig
-    type 'a t = 'a fiber
-    (** The type for fibers. See {!Memo.fiber}. *)
-
-    val of_list : 'a fiber list -> 'a list fiber
-    (** [of_list l] continues all the fibers in [l] in the same
-        order. *)
-  end
-
-  val spawn_fiber : t -> unit fiber
-  (** [run m k] calls [k ()] asynchronously and handles any fiber
-      {!fail}ure. This also catches non-asynchronous uncaught
-      exceptions and turns them into [`Fail] notification
-      operations. *)
-
-  val fail : t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
-  (** [fail m fmt ...] fails the fiber via a {!notify} operation. *)
-
-  val fail_if_error : t -> ('a, string) result -> 'a
-  (** [fail_if_error m r] is [v] if [r] is [Ok v] and [fail m "%s" e] if
-      [r] is [Error _]. *)
+  (** {1:futs Futures} *)
 
   (** Future values.
 
@@ -329,6 +295,11 @@ module Memo : sig
     (** [of_list fs] determines with the determining of all
         [fs], in the same order. *)
 
+    val await : 'a t -> ('a -> unit) -> unit
+    (** [await f k] waits for [f] to be determined and continues with [k v]
+        with [v] the value of the future. If the future never determines
+        [k] is not invoked. *)
+
     (** Future syntax. *)
     module Syntax : sig
 
@@ -341,17 +312,21 @@ module Memo : sig
       val ( and* ) : 'a t -> 'b t -> ('a * 'b) t
       (** [and*] is {!pair}. *)
     end
-
-    val await : 'a t -> 'a fiber
-    (** [await f k] waits for [f] to be determined and continues with [k v]
-        with [v] the value of the future. If the future never determines
-        [k] is not invoked. Use {!await_set} to witness never determining
-        futures. *)
-
-    val of_fiber : memo -> 'a fiber -> 'a t
-    (** [of_fiber m f] runs fiber [f] and sets the resulting future when it
-        returns. *)
   end
+
+  (** {2:proc Procedures} *)
+
+  val run_proc : t -> (unit -> unit Fut.t) -> unit
+  (** [run m proc] calls [proc ()] and handles any {!fail}ure. This
+      also catches non-asynchronous uncaught exceptions and turns them
+      into [`Fail] notification operations. *)
+
+  val fail : t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
+  (** [fail m fmt ...] fails the procedure via a {!notify} operation. *)
+
+  val fail_if_error : t -> ('a, string) result -> 'a
+  (** [fail_if_error m r] is [v] if [r] is [Ok v] and [fail m "%s" e] if
+      [r] is [Error _]. *)
 
   (** {1:feedback Feedback}
 

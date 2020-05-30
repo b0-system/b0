@@ -170,8 +170,7 @@ module Build = struct
     let hook () = write_log_file ~log_file b.u.m in
     Os.Sig_exit.on_sigint ~hook @@ fun () ->
     begin
-      B00.Memo.spawn_fiber b.u.m begin fun () ->
-        ignore @@
+      B00.Memo.run_proc b.u.m begin fun () ->
         let* () = B00.Memo.delete b.u.m b.b.build_dir in
         let* () = B00.Memo.mkdir b.u.m b.b.build_dir in
         let* () = B00.Memo.mkdir b.u.m (B00.Store.dir b.b.store) in

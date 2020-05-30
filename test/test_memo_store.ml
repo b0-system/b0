@@ -4,18 +4,19 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open B00.Memo.Fut.Syntax
 open B00
 open Test_memo_setup
 
 let lookup_b00_os build_dir m =
   let store = Store.create m ~dir:build_dir [] in
-  Store.get store B00_os.name @@ fun n ->
-  Store.get store B00_os.version @@ fun v ->
-  Store.get store B00_os.distribution @@ fun d ->
-  Store.get store B00_os.family @@ fun f ->
-  Store.get store B00_os.arch @@ fun a ->
-  Store.get store B00_os.arch_normalized @@ fun an ->
-  Store.get store B00_os.arch_bits @@ fun bits ->
+  let* n = Store.get store B00_os.name in
+  let* v = Store.get store B00_os.version in
+  let* d = Store.get store B00_os.distribution in
+  let* f = Store.get store B00_os.family in
+  let* a = Store.get store B00_os.arch in
+  let* an = Store.get store B00_os.arch_normalized in
+  let* bits = Store.get store B00_os.arch_bits in
   Log.app (fun m ->
       m "@[<v>%a@,%a@,%a@,%a@,%a@,%a@,%a@]"
         Fmt.(field "name" id string) n
@@ -24,7 +25,8 @@ let lookup_b00_os build_dir m =
         Fmt.(field "family" id string) f
         Fmt.(field "arch" id string) a
         Fmt.(field "arch-normalized" id string) an
-        Fmt.(field "arch-bits" id int) bits)
+        Fmt.(field "arch-bits" id int) bits);
+  B00.Memo.Fut.return m ()
 
 let test_memo_store () =
   with_memo lookup_b00_os;

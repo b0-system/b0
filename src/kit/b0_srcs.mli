@@ -30,7 +30,7 @@ let srcs = [ `Dir "src-exe"; `Dir_rec "src"; `X "src/not.ml"; `X "src/not"]
     matter, the semantics is to select all the files via [`Dir] and
     [`Dir_rec] and then apply the exclusion [`X] on the resulting
     set. Exclusions affect only directory selections, not file [`File]
-    and fiber [`Fiber] {{!sel}selections}.
+    and future [`Future] {{!sel}selections}.
 
     When a directory is selected via [`Dir] or [`Dir_rec], all its files
     are, modulo exclusions.  It is expected that build units
@@ -73,7 +73,7 @@ type sel =
     {- [`X x] removes from directory selections any file whose path segments
        are prefixed by [x], respecting segment boundaries. A potential trailing
        directory separators in [x] is removed.}
-    {- [`Fut f] uses the given fiber during the build to determine
+    {- [`Fut f] uses the given future during the build to determine
        a set of files unconditionally added to the selection.}} *)
 
 type t = sel list
@@ -91,8 +91,7 @@ val select : B0_build.t -> t -> B00_fexts.map B00.Memo.Fut.t
     {b Important.} All files in the map that were selected via [`File],
     [`D] and [`D_rec] are automatically {{!B00.Memo.file_ready}made
     ready} in the build. For those selected via [`Fut] readyness
-    determination is left to the fiber and the mechanisms it
-    invokes.
+    determination is left to the invoked funtion.
 
     {b FIXME.} Provide ordering guarantes and avoid non-det from the
     fs. We likely don't want to return only file extension map. *)

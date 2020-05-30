@@ -270,7 +270,7 @@ module El = struct
       ?more_head ?(title = "") m ~frag ~o
     =
     (* FIXME Ideally we would like the read to be in write.
-       The write fun should be a fiber but this has other impacts. *)
+       The write fun return a future but this has other impacts. *)
     let open B00.Memo.Fut.Syntax in
     ignore @@ (* FIXME maybe get rid of that. *)
     let* contents = B00.Memo.read m frag in

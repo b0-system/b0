@@ -640,7 +640,7 @@ module Ocamlpath : sig
          {!B00_std.Fpath.list_of_search_path}.}
       {- If the [OPAM_SWITCH_PREFIX] environment variable is defined with
          a path [P] then [[P/lib]] is used.}
-      {- The fiber fails.}} *)
+      {- The memo fails.}} *)
 end
 
 (** Libraries
@@ -772,7 +772,7 @@ module Lib_resolver : sig
       in [memo_dir] *)
 
   val find : t -> Lib.Name.t -> Lib.t B00.Memo.Fut.t
-  (** [find r l] finds library names [l] using [r]. The fiber fails
+  (** [find r l] finds library names [l] using [r]. The memo fails
       if a library cannot be found. *)
 end
 

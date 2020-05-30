@@ -40,7 +40,7 @@ module Unit : sig
   (** The type for library resolvers. FIXME maybe we want a data structure
       with given operations. In particular we are interested in getting
       the domain of the resolver for error correction (or we bundle
-      this into the fiber failure). *)
+      this into the function failure). *)
 
   val lib_resolver : lib_resolver Store.key
   (** [lib_resolver] is the library resolver used by OCaml build units.
