@@ -2267,32 +2267,11 @@ module Fut = struct
   type 'a state = Det of 'a | Undet of { mutable awaits : ('a -> unit) list }
   type 'a t = 'a state ref
 
-  let default_trap e bt =
-    (* Should we use the Log (it's defined below) ? *)
-    Fmt.epr "@[<v>Future awaiter raised unexpectedly:@,%a@]"
-      Fmt.exn_backtrace (e, bt)
-
-  let exn_trap = ref default_trap
-  let set_exn_trap t = exn_trap := t
-  let with_exn_trap t f =
-    let old = !exn_trap in
-    try set_exn_trap t; f (); set_exn_trap old with
-    | e ->
-        let bt = Printexc.get_raw_backtrace () in
-        set_exn_trap old; Printexc.raise_with_backtrace e bt
-
   let rec kontinue ks v =
     let todo = ref ks in
-    try
-      while match !todo with [] -> false | _ -> true do
-        match !todo with k :: ks -> todo := ks; k v | [] -> ()
-      done
-    with
-    | (Stack_overflow | Out_of_memory | Sys.Break) as e -> raise e
-    | e ->
-        let bt = Printexc.get_raw_backtrace () in
-        !exn_trap e bt;
-        kontinue !todo v
+    while match !todo with [] -> false | _ -> true do
+      match !todo with k :: ks -> todo := ks; k v | [] -> ()
+    done
 
   let set f v = match !f with
   | Det _ -> invalid_arg "The future is already set"
