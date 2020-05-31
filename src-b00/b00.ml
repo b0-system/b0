@@ -283,81 +283,6 @@ module Memo = struct
 
   (* Futures *)
 
-  module Fut = struct
-    type memo = t
-    type 'a state = Det of 'a | Undet of { mutable awaits : ('a -> unit) list }
-    type 'a t = { mutable state : 'a state; m : memo }
-
-
-    let default_trap e bt =
-        Log.err
-          (fun m -> m "@[<v>Future awaiter raised unexpectedly:@,%a@]"
-              Fmt.exn_backtrace (e, bt))
-
-    let exn_trap = ref default_trap
-    let set_exn_trap t = exn_trap := t
-    let with_exn_trap t f =
-      let old = !exn_trap in
-      try set_exn_trap t; f (); set_exn_trap old with
-      | e ->
-          let bt = Printexc.get_raw_backtrace () in
-          set_exn_trap old; Printexc.raise_with_backtrace e bt
-
-    let rec kontinue ks v =
-      let todo = ref ks in
-      try
-        while match !todo with [] -> false | _ -> true do
-          match !todo with k :: ks -> todo := ks; k v | [] -> ()
-        done
-      with
-      | (Stack_overflow | Out_of_memory | Sys.Break) as e -> raise e
-      | e ->
-          let bt = Printexc.get_raw_backtrace () in
-          !exn_trap e bt;
-          kontinue !todo v
-
-    let set f v = match f.state with
-    | Det _ -> invalid_arg "The future is already set"
-    | Undet u -> f.state <- Det v; kontinue u.awaits v
-
-    let _create m = { state = Undet { awaits = []; }; m }
-    let create m = let f = _create m in f, set f
-    let value f = match f.state with Det v -> Some v | _ -> None
-    let await f k = match f.state with
-    | Det v -> k v
-    | Undet u -> u.awaits <- k :: u.awaits
-
-    let return m v = { state = Det v; m }
-
-    let map fn f =
-      let r = _create f.m in
-      await f (fun v -> set r (fn v)); r
-
-    let bind f fn =
-      let r = _create f.m in
-      await f (fun v -> await (fn v) (set r)); r
-
-    let pair f0 f1 =
-      let r = _create f0.m in
-      await f0 (fun v0 -> await f1 (fun v1 -> set r (v0, v1))); r
-
-    let of_list m fs = match fs with
-    | [] -> return m []
-    | fs ->
-        let r = _create m in
-        let rec loop acc = function
-        | [] -> set r (List.rev acc)
-        | f :: fs -> await f (fun v -> loop (v :: acc) fs)
-        in
-        loop [] fs; r
-
-    module Syntax = struct
-      let ( >>= ) = bind
-      let ( let* ) = bind
-      let ( and* ) = pair
-    end
-  end
-
   (* Notifications *)
 
   let notify ?k m kind fmt = Fmt.kstr (notify_op m ?k kind) fmt
@@ -381,7 +306,7 @@ module Memo = struct
 
   let read m file =
     let id = new_op_id m and created = timestamp m in
-    let r, set = Fut.create m in
+    let r, set = Fut.create () in
     let k o =
       let r = Op.Read.get o in
       let data = Op.Read.data r in
@@ -392,7 +317,7 @@ module Memo = struct
 
   let wait_files m files =
     let id = new_op_id m and created = timestamp m in
-    let r, set = Fut.create m in
+    let r, set = Fut.create () in
     let k o = set () in
     let o = Op.Wait_files.v_op ~id ~mark:m.c.mark ~created ~k files in
     add_op_and_stir m o; r
@@ -409,14 +334,14 @@ module Memo = struct
 
   let mkdir m ?(mode = 0o755) dir =
     let id = new_op_id m and mark = m.c.mark and created = timestamp m in
-    let r, set = Fut.create m in
+    let r, set = Fut.create () in
     let k o = set () in
     let o = Op.Mkdir.v_op ~id ~mark ~created ~k ~mode dir in
     add_op_and_stir m o; r
 
   let delete m p =
     let id = new_op_id m and mark = m.c.mark and created = timestamp m in
-    let r, set = Fut.create m in
+    let r, set = Fut.create () in
     let k o = set () in
     let o = Op.Delete.v_op ~id ~mark ~created ~k p in
     add_op_and_stir m o;
@@ -534,22 +459,22 @@ module Store = struct
     type t = V : 'a typed -> t
     and 'a typed =
       { uid : int; tid : 'a Tid.t; mark : string;
-        det : Store.t -> Memo.t -> 'a Memo.Fut.t; untyped : t; }
+        det : Store.t -> Memo.t -> 'a Fut.t; untyped : t; }
     val compare : t -> t -> int
   end = struct
     type t = V : 'a typed -> t
     and 'a typed =
       { uid : int; tid : 'a Tid.t; mark : string;
-        det : Store.t -> Memo.t -> 'a Memo.Fut.t; untyped : t;}
+        det : Store.t -> Memo.t -> 'a Fut.t; untyped : t;}
     let compare (V l0) (V l1) = (compare : int -> int -> int) l0.uid l1.uid
   end
   and Store : sig
     module Kmap : Map.S with type key = Key.t
-    type binding = B : 'a Key.typed * 'a Memo.Fut.t -> binding
+    type binding = B : 'a Key.typed * 'a Fut.t -> binding
     type t = { memo : Memo.t; mutable map : binding Kmap.t; dir : Fpath.t }
   end = struct
     module Kmap = Map.Make (Key)
-    type binding = B : 'a Key.typed * 'a Memo.Fut.t -> binding
+    type binding = B : 'a Key.typed * 'a Fut.t -> binding
     type t = { memo : Memo.t; mutable map : binding Kmap.t; dir : Fpath.t }
   end
 
@@ -559,7 +484,7 @@ module Store = struct
 
   let create memo ~dir bs =
     let add m (B (k, v)) =
-      Store.Kmap.add k.untyped (Store.B (k, Memo.Fut.return memo v)) m
+      Store.Kmap.add k.untyped (Store.B (k, Fut.return v)) m
     in
     let map = List.fold_left add Store.Kmap.empty bs in
     { Store.memo; map; dir : Fpath.t; }
@@ -573,7 +498,7 @@ module Store = struct
     let rec k = { Key.uid; tid; mark; det; untyped }
     and untyped = Key.V k in k
 
-  let get : type a. t -> a key -> a Memo.Fut.t =
+  let get : type a. t -> a key -> a Fut.t =
   fun s k -> match Store.Kmap.find_opt k.Key.untyped s.map with
   | None ->
       let memo = Memo.with_mark s.memo k.Key.mark in
@@ -588,7 +513,7 @@ module Store = struct
   let set s k v = match Store.Kmap.mem k.Key.untyped s.Store.map with
   | true -> Fmt.invalid_arg "Key %s already set in store" k.Key.mark
   | false ->
-      let fut = Memo.Fut.return s.Store.memo v in
+      let fut = Fut.return v in
       s.map <- Store.Kmap.add k.Key.untyped (Store.B (k, fut)) s.map
 end
 

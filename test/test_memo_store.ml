@@ -4,7 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
-open B00.Memo.Fut.Syntax
+open B00_std.Fut.Syntax
 open B00
 open Test_memo_setup
 
@@ -26,7 +26,7 @@ let lookup_b00_os build_dir m =
         Fmt.(field "arch" id string) a
         Fmt.(field "arch-normalized" id string) an
         Fmt.(field "arch-bits" id int) bits);
-  B00.Memo.Fut.return m ()
+  Fut.return ()
 
 let test_memo_store () =
   with_memo lookup_b00_os;

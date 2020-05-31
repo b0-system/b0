@@ -4,7 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
-open B00.Memo.Fut.Syntax
+open B00_std.Fut.Syntax
 open B00
 open B00_ocaml
 
@@ -25,7 +25,7 @@ module Meta = struct
 end
 
 module Unit = struct
-  type lib_resolver = Lib.Name.t -> Lib.t Memo.Fut.t
+  type lib_resolver = Lib.Name.t -> Lib.t Fut.t
 
   let buildable_libs b : Lib.t Lazy.t B00_ocaml.Lib.Name.Map.t =
     let lib_of_unit b u lib_name =
@@ -63,21 +63,21 @@ module Unit = struct
        to better error handling, e.g. spell checking. *)
     let lib_resolver n =
       match B00_ocaml.Lib.Name.Map.find_opt n buildable_libs with
-      | Some (lazy (lib)) -> Memo.Fut.return m lib
+      | Some (lazy (lib)) -> Fut.return lib
       | None -> B00_ocaml.Lib_resolver.find resolver n
     in
-    Memo.Fut.return m lib_resolver
+    Fut.return lib_resolver
 
   let lib_resolver = Store.key ~mark:"b0.ocaml-lib"  default_lib_resolver
 
   let get_libs b libs =
-    Memo.Fut.bind (B0_build.get b lib_resolver) @@ fun resolve ->
-    Memo.Fut.of_list (B0_build.memo b) (List.map resolve libs)
+    let* resolve = B0_build.get b lib_resolver in
+    Fut.of_list (List.map resolve libs)
 
   let get_recursive_libs b libs =
-    Memo.Fut.bind (B0_build.get b lib_resolver) @@ fun resolve ->
+    Fut.bind (B0_build.get b lib_resolver) @@ fun resolve ->
     let rec loop seen acc ls = match ls with
-    | [] -> Memo.Fut.return (B0_build.memo b) (seen, acc)
+    | [] -> Fut.return (seen, acc)
     | l :: ls  ->
         if Lib.Name.Set.mem l seen then loop seen acc ls else
         let seen = Lib.Name.Set.add l seen in
@@ -88,7 +88,7 @@ module Unit = struct
         loop seen (lib :: acc) ls
     in
     let* _, acc = loop Lib.Name.Set.empty [] libs in
-    Memo.Fut.return (B0_build.memo b) (List.rev acc)
+    Fut.return (List.rev acc)
 
   let sync_built_requires m ~code ~requires =
     (* FIXME we want more fine grained syncing for parallelism.
@@ -124,7 +124,7 @@ module Unit = struct
     let hs = B00_fexts.(find_files (ext ".h") srcs) in
     let cs = B00_fexts.(find_files (ext ".c") srcs) in
     let os = loop [] String.Map.empty hs cs in
-    B00.Memo.Fut.return m os
+    Fut.return os
 
   let get_mod_srcs ?(only_mlis = false) m ~in_dir ~src_root ~srcs =
     let exts = B00_fexts.v (".mli" :: if only_mlis then [] else [".ml"]) in
@@ -132,7 +132,7 @@ module Unit = struct
     let o = Fpath.(in_dir / "ocaml-srcs.deps") in
     B00_ocaml.Mod_src.Deps.write m ~src_root ~srcs ~o;
     let* src_deps = B00_ocaml.Mod_src.Deps.read m ~src_root o in
-    Memo.Fut.return m (B00_ocaml.Mod_src.of_srcs m ~srcs ~src_deps)
+    Fut.return (B00_ocaml.Mod_src.of_srcs m ~srcs ~src_deps)
 
   let compile_intf m ~in_dir ~requires ~mod_srcs src =
     match Mod_src.mli src with
@@ -198,7 +198,7 @@ module Unit = struct
     let deps = B00_ocaml.Mod_src.ml_deps in
     let mod_srcs = B00_ocaml.Mod_src.sort ~deps mod_srcs in
     let cobjs = List.filter_map cobj mod_srcs (* sorted for link *) in
-    Memo.Fut.return m (c_objs, cobjs)
+    Fut.return (c_objs, cobjs)
 
   let exe_proc srcs b =
     let* ocaml_conf = Store.get (B0_build.store b) B00_ocaml.Conf.key in
@@ -222,7 +222,7 @@ module Unit = struct
     let* requires = get_recursive_libs b requires in
     let lib_objs = List.map (Lib.archive ~code) requires in
     Link.exe m ~code ~c_objs ~cobjs:(lib_objs @ cobjs) ~o;
-    B00.Memo.Fut.return m ()
+    Fut.return ()
 
   let exe ?doc ?(meta = B0_meta.empty) ?(requires = []) ?name exe_name ~srcs =
     let name = Option.value ~default:exe_name name in
@@ -254,7 +254,7 @@ module Unit = struct
     let has_cstubs = c_objs <> [] in
     if has_cstubs then Compile.cstubs_archives m ~c_objs ~odir ~oname;
     Compile.archive m ~code ~has_cstubs ~cobjs ~odir ~oname;
-    B00.Memo.Fut.return m ()
+    Fut.return ()
 
   let lib ?doc ?(meta = B0_meta.empty) ?(requires = []) ?name lib_name ~srcs =
     let name = match name with

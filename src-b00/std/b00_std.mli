@@ -1821,6 +1821,64 @@ let ocamlopt ?(profile = false) ?(debug = false) incs file =
 ]} *)
 end
 
+
+(** Future values.
+
+
+    A future is an undetermined value that becomes determined at an an
+    arbitrary point in the future. The future acts as a placeholder
+    for the value while it is undetermined. *)
+module Fut : sig
+
+  (** {1:fut Future values} *)
+
+  type 'a t
+  (** The type for futures with values of type ['a]. *)
+
+  val create : unit -> 'a t * ('a -> unit)
+  (** [create ()] is [(f, set)] with [f] the future value and [set]
+      the function to [set] it. The latter can be called only once,
+      [Invalid_argument] is raised otherwise. *)
+
+  val await : 'a t -> ('a -> unit) -> unit
+  (** [await f k] waits for [f] to be determined and continues with [k v]
+      with [v] the value of the future. If the future never determines
+      [k] is not invoked. [k] must not raise. *)
+
+  val value : 'a t -> 'a option
+  (** [value f] is [f]'s value, if any. *)
+
+  val return : 'a -> 'a t
+  (** [return v] is a future that determines [v]. *)
+
+  val map : ('a -> 'b) -> 'a t -> 'b t
+  (** [map fn f] is [return (fn v)] with [v] the value determined by [f]. *)
+
+  val bind : 'a t -> ('a -> 'b t) -> 'b t
+  (** [bind f fn] is the future [fn v] with [v] the value determined by [f]. *)
+
+  val pair : 'a t -> 'b t -> ('a * 'b) t
+  (** [pair f0 f1] determines with the result of [f0] and [f1]. *)
+
+  val of_list : 'a t list -> 'a list t
+  (** [of_list fs] determines with the determining of all [fs], in the same
+      order. *)
+
+  (** Future syntax. *)
+  module Syntax : sig
+
+    (*
+    val ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t
+    (** [>>=] is {!bind}. *) *)
+
+    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+    (** [let*] is {!bind}. *)
+
+    val ( and* ) : 'a t -> 'b t -> ('a * 'b) t
+    (** [and*] is {!pair}. *)
+  end
+end
+
 (** OS interaction. *)
 module Os : sig
 

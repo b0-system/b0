@@ -4,7 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
-open B00.Memo.Fut.Syntax
+open B00_std.Fut.Syntax
 
 module Exit = struct
   type t = Code of int | Exec of Fpath.t * Cmd.t
@@ -255,7 +255,7 @@ module Compile = struct
 
   let find_libs m r libs =
     let find = B00_ocaml.Lib_resolver.find in
-    B00.Memo.Fut.of_list m (List.map (find r) libs)
+    Fut.of_list (List.map (find r) libs)
 
   let find_boot_libs m ~env libs r =
     match Os.Env.find ~empty_is_none:true "B0_B00T" with
@@ -267,7 +267,7 @@ module Compile = struct
           let archive = B00_ocaml.Lib.Name.to_archive_name name in
           B00_ocaml.Lib.v m ~name ~requires:[] ~archive ~dir
         in
-        B00.Memo.Fut.return m (List.map boot_lib libs)
+        Fut.return (List.map boot_lib libs)
 
   let find_libs m ~build_dir ~driver ~requires =
     let* ocamlpath = B00_ocaml.Ocamlpath.get m None in
@@ -283,7 +283,7 @@ module Compile = struct
     let* base_libs = find_boot_libs m ~env:"B0_B00T" base_libs r in
     let all_libs = base_ext_libs @ base_libs @ driver_libs @ requires in
     let seen_libs = base_libs @ requires in
-    B00.Memo.Fut.return m (all_libs, seen_libs)
+    Fut.return (all_libs, seen_libs)
 
   let find_compiler c m = match Conf.code c with
   | Some (B00_ocaml.Cobj.Byte as c) -> B00_ocaml.Tool.ocamlc, c
@@ -323,7 +323,7 @@ module Compile = struct
     B00.Memo.spawn m ~reads ~writes @@
     comp Cmd.(arg "-linkall" % "-g" % "-o" %% unstamp (path exe) % "-opaque" %%
               incs %% (unstamp @@ (paths archives %% path src_file)));
-    B00.Memo.Fut.return m ()
+    Fut.return ()
 
   let write_log_file ~log_file m =
     Log.if_error ~use:() @@ B00_ui.Memo.Log.(write log_file (of_memo m))

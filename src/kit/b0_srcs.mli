@@ -60,7 +60,7 @@ type sel =
 | `Dir_rec of fpath
 | `X of fpath
 | `File of fpath
-| `Fut of B0_build.t -> Fpath.Set.t B00.Memo.Fut.t ]
+| `Fut of B0_build.t -> Fpath.Set.t Fut.t ]
 (** The type for file selectors.
     {ul
     {- [`File f] unconditionaly selects the file [f]. [f] must exist and be
@@ -79,7 +79,7 @@ type sel =
 type t = sel list
 (** The type for source selection. *)
 
-val select : B0_build.t -> t -> B00_fexts.map B00.Memo.Fut.t
+val select : B0_build.t -> t -> B00_fexts.map Fut.t
 (** [select b sels] selects in [b] the sources specified by [sels] and
     returns them mapped by their file extension (not
     {{!B00_std.Fpath.file_exts}multiple file extension}). Each file is

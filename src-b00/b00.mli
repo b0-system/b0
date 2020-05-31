@@ -252,68 +252,6 @@ module Memo : sig
   (** [mark m mark] is [m] but operations performed on [m] are marked by
       [mark]. *)
 
-  (** {1:futs Futures} *)
-
-  (** Future values.
-
-      A future is an undetermined value that becomes determined
-      at an an arbitrary point in the future. The future acts as
-      a placeholder for the value while it is undetermined. *)
-  module Fut : sig
-
-    (** {1:fut Future values} *)
-
-    type memo = t
-    (** See {!Memo.t} *)
-
-    type 'a t
-    (** The type for futures with values of type ['a]. *)
-
-    val create : memo -> 'a t * ('a -> unit)
-    (** [create m] is [(f, set)] with [f] the future value and [set]
-        the function to [set] it. The latter can be called only once,
-        [Invalid_argument] is raised otherwise. *)
-
-    val value : 'a t -> 'a option
-    (** [value f] is [f]'s value, if any. *)
-
-    val return : memo -> 'a -> 'a t
-    (** [return m v] is a future that determines [v]. *)
-
-    val map : ('a -> 'b) -> 'a t -> 'b t
-    (** [map fn f] is [return (fn v)] with [v] the value determined by
-        [f]. *)
-
-    val bind : 'a t -> ('a -> 'b t) -> 'b t
-    (** [bind f fn] is the future [fn v] with [v] the value determined
-        by [f]. *)
-
-    val pair : 'a t -> 'b t -> ('a * 'b) t
-    (** [pair f0 f1] determines with the result of [f0] and [f1]. *)
-
-    val of_list : memo -> 'a t list -> 'a list t
-    (** [of_list fs] determines with the determining of all
-        [fs], in the same order. *)
-
-    val await : 'a t -> ('a -> unit) -> unit
-    (** [await f k] waits for [f] to be determined and continues with [k v]
-        with [v] the value of the future. If the future never determines
-        [k] is not invoked. *)
-
-    (** Future syntax. *)
-    module Syntax : sig
-
-      val ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t
-      (** [>>=] is {!bind}. *)
-
-      val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
-      (** [let*] is {!bind}. *)
-
-      val ( and* ) : 'a t -> 'b t -> ('a * 'b) t
-      (** [and*] is {!pair}. *)
-    end
-  end
-
   (** {2:proc Procedures} *)
 
   val run_proc : t -> (unit -> unit Fut.t) -> unit
@@ -516,7 +454,7 @@ module Store : sig
       prefixes (e.g. lowercased module or lib names) to avoid name
       clashes. *)
 
-  val key : ?mark:string -> (t -> Memo.t -> 'a Memo.Fut.t) -> 'a key
+  val key : ?mark:string -> (t -> Memo.t -> 'a Fut.t) -> 'a key
   (** [key ~mark det] is a new key whose value is determined on
       {{!get}access} by the future:
 {[
@@ -524,7 +462,7 @@ det s (Memo.with_mark mark (Store.memo s))
 ]}
       [mark] defaults to [""]. *)
 
-  val get : t -> 'a key -> 'a Memo.Fut.t
+  val get : t -> 'a key -> 'a Fut.t
   (** [get s k] is a future that dermines with the value of [k] in
       [s]. *)
 

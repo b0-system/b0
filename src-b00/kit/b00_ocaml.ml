@@ -4,8 +4,9 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open B00_std.Fut.Syntax
 open B00
-open B00.Memo.Fut.Syntax
+
 module Tool = struct
   let comp_env_vars =
     [ "CAMLLIB"; "CAMLSIGPIPE"; "CAML_DEBUG_FILE"; "CAML_DEBUG_SOCKET";
@@ -104,14 +105,14 @@ module Conf = struct
 
   let read m file =
     let* s = Memo.read m file in
-    Memo.Fut.return m (of_string ~file s |> Memo.fail_if_error m)
+    Fut.return (of_string ~file s |> Memo.fail_if_error m)
 
   (* Build orchestration *)
 
   type built_code = [ `Byte | `Native | `Both ]
 
   let build_code =
-    let det _ m = Memo.Fut.return m `Auto in
+    let det _ _ = Fut.return `Auto in
     Store.key det
 
   let built_code =
@@ -120,14 +121,14 @@ module Conf = struct
     | `Auto when Option.is_some (Memo.tool_opt m Tool.ocamlopt) -> `Native
     | `Auto -> `Byte
     in
-    let det s m = Memo.Fut.map (of_build_code m) (Store.get s build_code) in
+    let det s m = Fut.map (of_build_code m) (Store.get s build_code) in
     Store.key det
 
   let auto_comp s m =
     let of_built_code = function
     | `Native | `Both -> Tool.ocamlopt | `Byte -> Tool.ocamlc
     in
-    Memo.Fut.map of_built_code (Store.get s built_code)
+    Fut.map of_built_code (Store.get s built_code)
 
   let key : t B00.Store.key =
     let det s m =
@@ -142,23 +143,23 @@ module Conf = struct
 
   let ocamlc_bin = Cmd.arg "ocamlc"
   let exists m =
-    Memo.Fut.return m @@
+    Fut.return @@
     match Os.Cmd.find ocamlc_bin |> Memo.fail_if_error m with
     | None -> false | Some _ -> true
 
   let if_exists m f =
     let* exists = exists m in
-    if not exists then Memo.Fut.return m None else
-    Memo.Fut.map Option.some (f ())
+    if not exists then Fut.return None else
+    Fut.map Option.some (f ())
 
   let run m cmd =
     let ocamlc = Os.Cmd.must_find ocamlc_bin |> Memo.fail_if_error m in
-    Memo.Fut.return m (Os.Cmd.run_out ~trim:true Cmd.(ocamlc %% cmd))
+    Fut.return (Os.Cmd.run_out ~trim:true Cmd.(ocamlc %% cmd))
 
   let stdlib_dir m () =
     let* r = run m (Cmd.arg "-where") in
     let r = Result.bind r Fpath.of_string in
-    Memo.Fut.return m (Memo.fail_if_error m r)
+    Fut.return (Memo.fail_if_error m r)
 end
 
 module Mod_name = struct
@@ -416,7 +417,7 @@ module Cobj = struct
 
   let read m file =
     let* s = B00.Memo.read m file in
-    Memo.Fut.return m (of_string ~file s |> Memo.fail_if_error m)
+    Fut.return (of_string ~file s |> Memo.fail_if_error m)
 end
 
 module Mod_src = struct
@@ -478,7 +479,7 @@ module Mod_src = struct
 
     let read ?src_root m file =
       let* s = Memo.read m file in
-      Memo.Fut.return m (of_string ?src_root ~file s |> Memo.fail_if_error m)
+      Fut.return (of_string ?src_root ~file s |> Memo.fail_if_error m)
   end
 
   type t =
@@ -751,7 +752,7 @@ end
 module Link = struct
   module Deps = struct
     let write = Cobj.write
-    let read m file = Memo.Fut.map Cobj.sort (Cobj.read m file)
+    let read m file = Fut.map Cobj.sort (Cobj.read m file)
   end
 
   (* FIXME How to add cstubs archives of cm[x]a to [reads].
@@ -808,13 +809,13 @@ module Ocamlpath = struct
         | Ok v -> Some v
 
   let get m ps = match ps with
-  | Some ps -> Memo.Fut.return m ps
+  | Some ps -> Fut.return ps
   | None ->
       match get_var Fpath.list_of_search_path "OCAMLPATH" m with
-      | Some ps -> Memo.Fut.return m ps
+      | Some ps -> Fut.return ps
       | None ->
           match get_var Fpath.of_string "OPAM_SWITCH_PREFIX" m with
-          | Some p -> Memo.Fut.return m [Fpath.(p / "lib")]
+          | Some p -> Fut.return [Fpath.(p / "lib")]
           | None ->
               Memo.fail m
                 "Could not determine an %a in the build environment."
@@ -1019,7 +1020,7 @@ module Ocamlfind = struct
   let read_info m n f =
     let* s = Memo.read m f in
     let _meta_file, lib = parse_info ~file:f m n s |> Memo.fail_if_error m in
-    Memo.Fut.return m lib
+    Fut.return lib
 end
 
 module Lib_resolver = struct
@@ -1028,7 +1029,7 @@ module Lib_resolver = struct
     { memo : B00.Memo.t;
       memo_dir : Fpath.t;
       ocamlpath : Fpath.t list;
-      mutable libs : Lib.t B00.Memo.Fut.t Lib.Name.Map.t; }
+      mutable libs : Lib.t Fut.t Lib.Name.Map.t; }
 
   let create memo ~memo_dir ~ocamlpath =
     let memo = B00.Memo.with_mark memo "b00.ocamlib" in
@@ -1037,14 +1038,14 @@ module Lib_resolver = struct
   let find r n = match Lib.Name.Map.find n r.libs with
   | lib -> lib
   | exception Not_found ->
-      let fut, set = Memo.Fut.create r.memo in
+      let fut, set = Fut.create () in
       r.libs <- Lib.Name.Map.add n fut r.libs;
       begin
         ignore @@
         let fname = Fmt.str "ocamlfind.%s" (Lib.Name.to_string n) in
         let o = Fpath.(r.memo_dir / fname) in
         Ocamlfind.write_info r.memo n o;
-        Memo.Fut.await (Ocamlfind.read_info r.memo n o) set
+        Fut.await (Ocamlfind.read_info r.memo n o) set
       end;
       fut
 end

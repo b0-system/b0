@@ -49,7 +49,7 @@ module Compile : sig
     (** [write m cobj o] writes the odoc dependencies of the compilation
         object [cobj] to [o]. *)
 
-    val read : Memo.t -> Fpath.t -> t list Memo.Fut.t
+    val read : Memo.t -> Fpath.t -> t list Fut.t
     (** [read m file] reads the result of a {!write} from
         [file] and continues with the dependencies. *)
   end
@@ -66,7 +66,7 @@ module Compile : sig
     (** [write m cobj ~to_odoc ~o] writes the files written by a compilation
         of [cobj] to [to_odoc] to [o]. *)
 
-    val read : Memo.t -> Fpath.t -> Fpath.t list Memo.Fut.t
+    val read : Memo.t -> Fpath.t -> Fpath.t list Fut.t
     (** [read m file] reads the result of a {!write} from [file]
         and continues with the files that will be written. *)
   end
@@ -135,7 +135,7 @@ module Html : sig
         dependencies of the package directory [pkg_odoc_dir] that
         contains the odoc files [odoc_files] to [o]. *)
 
-    val read : Memo.t -> Fpath.t -> t list Memo.Fut.t
+    val read : Memo.t -> Fpath.t -> t list Fut.t
     (** [read m file] reads the result of a {!write} from [file] and
         continues with the dependencies. *)
   end
@@ -159,7 +159,7 @@ module Html : sig
            the [odoc] file, they can be obtained by resolving the result
            of {!Dep} on the package odoc directory of [odoc].}} *)
 
-    val read : Memo.t -> Fpath.t -> Fpath.t list Memo.Fut.t
+    val read : Memo.t -> Fpath.t -> Fpath.t list Fut.t
     (** [read m file] reads the result of a {!write} from [file] and
         continues with the files that will be written. *)
   end
@@ -217,7 +217,7 @@ module Support_files : sig
         files written to the [to_dir] directory. [without_theme] is the
         corresponding [odoc] option. *)
 
-    val read : Memo.t -> Fpath.t -> Fpath.t list Memo.Fut.t
+    val read : Memo.t -> Fpath.t -> Fpath.t list Fut.t
     (** [read m file] reads the result of a {!write} from [file]
         and continues with the files that will be written. *)
   end

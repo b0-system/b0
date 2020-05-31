@@ -2261,6 +2261,80 @@ module Cmd = struct
   | Rseq _ -> false
 end
 
+(* Futures *)
+
+module Fut = struct
+  type 'a state = Det of 'a | Undet of { mutable awaits : ('a -> unit) list }
+  type 'a t = 'a state ref
+
+  let default_trap e bt =
+    (* Should we use the Log (it's defined below) ? *)
+    Fmt.epr "@[<v>Future awaiter raised unexpectedly:@,%a@]"
+      Fmt.exn_backtrace (e, bt)
+
+  let exn_trap = ref default_trap
+  let set_exn_trap t = exn_trap := t
+  let with_exn_trap t f =
+    let old = !exn_trap in
+    try set_exn_trap t; f (); set_exn_trap old with
+    | e ->
+        let bt = Printexc.get_raw_backtrace () in
+        set_exn_trap old; Printexc.raise_with_backtrace e bt
+
+  let rec kontinue ks v =
+    let todo = ref ks in
+    try
+      while match !todo with [] -> false | _ -> true do
+        match !todo with k :: ks -> todo := ks; k v | [] -> ()
+      done
+    with
+    | (Stack_overflow | Out_of_memory | Sys.Break) as e -> raise e
+    | e ->
+        let bt = Printexc.get_raw_backtrace () in
+        !exn_trap e bt;
+        kontinue !todo v
+
+  let set f v = match !f with
+  | Det _ -> invalid_arg "The future is already set"
+  | Undet u -> f := Det v; kontinue u.awaits v
+
+  let _create () = ref (Undet { awaits = [] })
+  let create () = let f = _create () in f, set f
+  let value f = match !f with Det v -> Some v | _ -> None
+  let await f k = match !f with
+  | Det v -> k v | Undet u -> u.awaits <- k :: u.awaits
+
+  let return v = ref (Det v)
+
+  let map fn f =
+    let r = _create () in
+    await f (fun v -> set r (fn v)); r
+
+  let bind f fn =
+    let r = _create () in
+    await f (fun v -> await (fn v) (set r)); r
+
+  let pair f0 f1 =
+    let r = _create () in
+    await f0 (fun v0 -> await f1 (fun v1 -> set r (v0, v1))); r
+
+  let of_list fs = match fs with
+  | [] -> return []
+  | fs ->
+      let r = _create () in
+      let rec loop acc = function
+      | [] -> set r (List.rev acc)
+      | f :: fs -> await f (fun v -> loop (v :: acc) fs)
+      in
+      loop [] fs; r
+
+  module Syntax = struct
+    let ( >>= ) = bind
+    let ( let* ) = bind
+    let ( and* ) = pair
+  end
+end
+
 (* Operating system interactions *)
 
 module Os = struct

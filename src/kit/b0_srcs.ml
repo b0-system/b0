@@ -18,7 +18,7 @@ type sel =
 | `Dir_rec of fpath
 | `X of fpath
 | `File of fpath
-| `Fut of B0_build.t -> Fpath.Set.t B00.Memo.Fut.t ]
+| `Fut of B0_build.t -> Fpath.Set.t Fut.t ]
 
 type t = sel list
 
@@ -85,7 +85,7 @@ let select_files_in_dirs m u xs (seen, by_ext as acc) ds =
   loop m u xs acc ds
 
 let select b sels =
-  let open B00.Memo.Fut.Syntax in
+  let open B00_std.Fut.Syntax in
   let m = B0_build.memo b in
   let u = B0_build.Unit.current b in
   let root = B0_build.Unit.root_dir b u in
@@ -107,7 +107,7 @@ let select b sels =
   let acc = select_files m u acc fs in
   let (seen, _ as acc) = select_files_in_dirs m u xs acc ds in
   Fpath.Set.iter (B00.Memo.file_ready m) seen;
-  let* futs = B00.Memo.Fut.of_list m futs in
+  let* futs = Fut.of_list futs in
   let add_files acc files =
     let add_file file (seen, by_ext as acc) =
       if Fpath.Set.mem file seen then acc else
@@ -118,7 +118,7 @@ let select b sels =
     Fpath.Set.fold add_file files acc
   in
   let _, acc = List.fold_left add_files acc futs in
-  B00.Memo.Fut.return m acc
+  Fut.return acc
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

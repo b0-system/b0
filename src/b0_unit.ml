@@ -4,7 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
-open B00.Memo.Fut.Syntax
+open B00_std.Fut.Syntax
 
 (* A bit of annoying recursive definition. *)
 
@@ -35,11 +35,11 @@ end = struct
 end
 
 and Unit_def : sig
-  type proc = Build_def.t -> unit B00.Memo.Fut.t
+  type proc = Build_def.t -> unit Fut.t
   type t = { def : B0_def.t; proc : proc; }
   include B0_def.VALUE with type t := t
 end = struct
-  type proc = Build_def.t -> unit B00.Memo.Fut.t
+  type proc = Build_def.t -> unit Fut.t
   type t = { def : B0_def.t; proc : proc; }
   let def_kind = "unit"
   let def u = u.def
@@ -53,7 +53,7 @@ and Unit : sig include B0_def.S with type t = Unit_def.t end
 
 type build = Build_def.t
 type proc = Unit_def.proc
-let nop b = B00.Memo.Fut.return b.Build_def.u.m ()
+let nop b = Fut.return ()
 
 (* Build units *)
 
@@ -148,11 +148,13 @@ module Build = struct
     let m = B00.Memo.with_mark b.u.m (name unit) in
     let u = { current = Some unit; m } in
     let b = { b with u } in
-    B00.Memo.Fut.bind (B00.Memo.mkdir b.u.m (Unit.build_dir b unit)) @@
+    Fut.bind (B00.Memo.mkdir b.u.m (Unit.build_dir b unit)) @@
     fun () -> (proc unit) b
 
   let rec run_units b = match Rqueue.take b.b.waiting with
-  | Some u -> ignore (run_unit b u); run_units b
+  | Some u ->
+      (* FIXME catch exns *)
+      ignore (run_unit b u); run_units b
   | None ->
       B00.Memo.stir ~block:true b.u.m;
       if Rqueue.length b.b.waiting = 0 then () else run_units b
@@ -174,7 +176,7 @@ module Build = struct
         let* () = B00.Memo.delete b.u.m b.b.build_dir in
         let* () = B00.Memo.mkdir b.u.m b.b.build_dir in
         let* () = B00.Memo.mkdir b.u.m (B00.Store.dir b.b.store) in
-        B00.Memo.Fut.return b.u.m (run_units b)
+        Fut.return (run_units b)
       end;
       B00.Memo.stir ~block:true b.u.m;
       let ret = match B00.Memo.status b.u.m with

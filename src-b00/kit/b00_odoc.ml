@@ -4,8 +4,8 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open B00_std.Fut.Syntax
 open B00
-open B00.Memo.Fut.Syntax
 
 let read_path_writes m file =
   let parse_path n p acc = match Fpath.of_string p with
@@ -14,7 +14,7 @@ let read_path_writes m file =
   in
   let parse lines = B00_lines.fold ~file (String.trim lines) parse_path [] in
   let* lines = Memo.read m file in
-  Memo.Fut.return m (Memo.fail_if_error m (parse lines))
+  Fut.return (Memo.fail_if_error m (parse lines))
 
 let tool = Tool.by_name "odoc" (* FIXME conf ! *)
 
@@ -47,7 +47,7 @@ module Compile = struct
     let read m file =
       let parse lines = B00_lines.fold ~file (String.trim lines) parse_dep [] in
       let* lines = Memo.read m file in
-      Memo.Fut.return m (Memo.fail_if_error m (parse lines))
+      Fut.return (Memo.fail_if_error m (parse lines))
   end
 
   module Writes = struct
@@ -76,7 +76,7 @@ module Compile = struct
     Writes.write m obj ~to_odoc:odoc ~o:writes;
     let* writes = Writes.read m writes in
     cmd m ?hidden ~odoc_deps ~writes ~pkg obj ~o:odoc;
-    Memo.Fut.return m ()
+    Fut.return ()
 end
 
 module Html = struct
@@ -105,7 +105,7 @@ module Html = struct
     let read m file =
       let parse lines = B00_lines.fold ~file (String.trim lines) parse_dep [] in
       let* lines = Memo.read m file in
-      Memo.Fut.return m (Memo.fail_if_error m (parse lines))
+      Fut.return (Memo.fail_if_error m (parse lines))
   end
 
   module Writes = struct
@@ -148,7 +148,7 @@ module Html = struct
     Writes.write m ~odoc_deps odoc ~to_dir:html_dir ~o:writes;
     let* writes = Writes.read m writes in
     cmd m ?theme_uri ~odoc_deps ~writes odoc ~to_dir:html_dir;
-    Memo.Fut.return m ()
+    Fut.return ()
 end
 
 module Html_fragment = struct
@@ -183,7 +183,7 @@ module Support_files = struct
     Writes.write m ~without_theme ~to_dir ~o;
     let* writes = Writes.read m o in
     cmd m ~writes ~without_theme ~to_dir;
-    Memo.Fut.return m ()
+    Fut.return ()
 end
 
 module Theme = struct
