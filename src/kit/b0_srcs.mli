@@ -21,6 +21,10 @@ let srcs = [ `Dir "src-exe"; `Dir_rec "src"; `X "src/not.ml"; `X "src/not"]
     {- Remove from the files found in directories the files whose paths
        segments are prefixed by [src/not.ml] and [src/not].}}
 
+    Relative file paths are expressed relative to the build unit's
+    {{!B0_build.Unit.root_dir}root directory}.
+
+
     The prefix relation for exclusions respects path segments
     boundaries. In the example any file whose path matches
     [src/not.ml], [src/not.ml/*], [src/not] or [src/not/*] is
@@ -74,7 +78,11 @@ type sel =
        are prefixed by [x], respecting segment boundaries. A potential trailing
        directory separators in [x] is removed.}
     {- [`Fut f] uses the given future during the build to determine
-       a set of files unconditionally added to the selection.}} *)
+       a set of files unconditionally added to the selection.}}
+
+    Except for [`Fut], any relative path is made absolute to the
+    current build unit with {!B0_build.Unit.root_dir}. *)
+
 
 type t = sel list
 (** The type for source selection. *)
@@ -84,9 +92,6 @@ val select : B0_build.t -> t -> B00_fexts.map Fut.t
     returns them mapped by their file extension (not
     {{!B00_std.Fpath.file_exts}multiple file extension}). Each file is
     guaranteed to appear only once in the map.
-
-    Any relative path of {!srcs} is made absolute to the current build
-    unit with {!B0_build.Unit.root_dir}.
 
     {b Important.} All files in the map that were selected via [`File],
     [`D] and [`D_rec] are automatically {{!B00.Memo.file_ready}made

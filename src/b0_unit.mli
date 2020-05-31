@@ -43,6 +43,7 @@ module Build : sig
   val memo : t -> B00.Memo.t
   val store : t -> B00.Store.t
   val shared_build_dir : t -> Fpath.t
+  val current_root_dir : t -> Fpath.t
   val get : t -> 'a B00.Store.key -> 'a Fut.t
 
   module Unit : sig

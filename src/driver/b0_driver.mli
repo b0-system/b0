@@ -102,7 +102,7 @@ module Conf : sig
 
   val v :
     b0_dir:Fpath.t -> b0_file:Fpath.t option -> cache_dir:Fpath.t ->
-    cwd:Fpath.t -> code:B00_ocaml.Cobj.code option ->
+    cwd:Fpath.t -> code:B00_ocaml.Compile.code option ->
     hash_fun:(module Hash.T) -> jobs:int -> log_level:Log.level ->
     no_pager:bool -> tty_cap:Tty.cap -> unit -> t
   (** [v] constructs a configuration with given attributes. See the
@@ -120,7 +120,7 @@ module Conf : sig
   val cwd : t -> Fpath.t
   (** [cwd] is the absolute path to the current working directory. *)
 
-  val code : t -> B00_ocaml.Cobj.code option
+  val code : t -> B00_ocaml.Compile.code option
   (** [code] is the code to which the driver is compiled. *)
 
   val hash_fun : t -> (module Hash.T)
@@ -150,7 +150,7 @@ module Conf : sig
 
   val setup_with_cli :
     b0_dir:Fpath.t option -> b0_file:Fpath.t option ->
-    cache_dir:Fpath.t option -> code:B00_ocaml.Cobj.code option ->
+    cache_dir:Fpath.t option -> code:B00_ocaml.Compile.code option ->
     hash_fun:(module Hash.T) option -> jobs:int option ->
     log_level:Log.level option -> no_pager:bool ->
     tty_cap:Tty.cap option option -> unit -> (t, string) result

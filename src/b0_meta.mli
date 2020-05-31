@@ -171,7 +171,8 @@ val authors : string list key
 (** [authors] describes a list of persons with authorship. *)
 
 val doc_tags : string list key
-(** [doc_tags] describes a list of documentation classification tags. *)
+(** [doc_tags] describes a list of classification tags used for
+    documentation. *)
 
 val homepage : string key
 (** [issues] is an URI to an issue tracker. *)

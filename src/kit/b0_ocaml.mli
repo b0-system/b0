@@ -9,12 +9,39 @@ open B00_std
 open B00
 open B00_ocaml
 
-(** {1 Convenience} *)
-
 val lib : string -> Lib.Name.t
-(** [lib] is {!B00_ocaml.Lib_name.v}. *)
+(** [lib] is {!B00_ocaml.Lib.Name.v}. *)
 
-(** {1 Metadata keys} *)
+(** {1:build_conf Build configuration} *)
+
+val conf : Tool.Conf.t Store.key
+(** [conf] is a memo key store with the OCaml configuration. *)
+
+val version : B0_build.t -> (int * int * int * string option) Fut.t
+(** [ocaml_version b] gets {!B00_ocaml.Tool.Conf.version} from {!conf}. *)
+
+(** {2:code Generated code}
+
+    In a build it is desirable to know which code is being produced
+    because if both are produced the compilers may compete to
+    produce some of the shared build artefacts. The following store
+    keys allow to express build code {{!code_wanted}desires} and
+    determine the actual {{!built_code}decision}. *)
+
+type built_code = [ `Byte | `Native | `Both ]
+(** The type indicating which code is being built. *)
+
+val wanted_code : [ built_code | `Auto ] Store.key
+(** [wanted_code] indicates which code should be built, default
+    determines to [`Auto]. [`Auto] indicates [`Native] should be
+    used if [ocamlopt] can be found in the memo environment and
+    [`Byte] otherwise. *)
+
+val built_code : built_code Store.key
+(** [build_code] is a memo key indicating the built code. By default
+    determines by consulting [code_wanted]. *)
+
+(** {1:units Build units} *)
 
 (** Metadata keys *)
 module Meta : sig
@@ -29,6 +56,9 @@ module Meta : sig
   val library : Lib.Name.t B0_meta.key
   (** [library] on a build unit specifies that the unit defines
       the library. *)
+
+  val mod_srcs : Mod.Src.t Mod.Name.Map.t  Fut.t B0_meta.key
+  (** FIXME quick hack this should not be in meta. *)
 end
 
 (** OCaml build units *)

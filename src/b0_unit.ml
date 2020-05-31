@@ -5,30 +5,31 @@
 
 open B00_std
 open B00_std.Fut.Syntax
+open B00
 
 (* A bit of annoying recursive definition. *)
 
 module rec Build_def : sig
   type t = { u : build_ctx; b : build_state }
-  and build_ctx = { current : Unit.t option; m : B00.Memo.t; }
+  and build_ctx = { current : Unit.t option; m : Memo.t; }
   and build_state =
     { root_dir : Fpath.t;
       b0_dir : Fpath.t;
       build_dir : Fpath.t;
       shared_build_dir : Fpath.t;
-      store : B00.Store.t;
+      store : Store.t;
       must_build : Unit.Set.t; may_build : Unit.Set.t;
       mutable requested : Unit.t String.Map.t;
       mutable waiting : Unit.t Rqueue.t; }
 end = struct
   type t = { u : build_ctx; b : build_state }
-  and build_ctx = { current : Unit.t option; m : B00.Memo.t; }
+  and build_ctx = { current : Unit.t option; m : Memo.t; }
   and build_state =
     { root_dir : Fpath.t;
       b0_dir : Fpath.t;
       build_dir : Fpath.t;
       shared_build_dir : Fpath.t;
-      store : B00.Store.t;
+      store : Store.t;
       must_build : Unit.Set.t; may_build : Unit.Set.t;
       mutable requested : Unit.t String.Map.t;
       mutable waiting : Unit.t Rqueue.t; }
@@ -86,7 +87,7 @@ module Build = struct
   include Build_def
 
   let current =
-    B00.Store.key @@ fun _ ->
+    Store.key @@ fun _ ->
       failwith
         "B0_build.current can't be determined is must be set at store creation"
 
@@ -98,7 +99,7 @@ module Build = struct
     let u = { current = None; m } in
     let build_dir = build_dir ~b0_dir in
     let shared_build_dir = shared_build_dir ~build_dir in
-    let store = B00.Store.create m ~dir:(store_dir ~build_dir) [] in
+    let store = Store.create m ~dir:(store_dir ~build_dir) [] in
     let may_build = Set.union may_build must_build in
     let add_requested u acc = String.Map.add (name u) u acc in
     let requested = Unit.Set.fold add_requested must_build String.Map.empty in
@@ -110,13 +111,13 @@ module Build = struct
         may_build; requested; waiting; }
     in
     let b = { u; b } in
-    B00.Store.set store current b;
+    Store.set store current b;
     b
 
   let memo b = b.u.m
   let store b = b.b.store
   let shared_build_dir b = b.b.shared_build_dir
-  let get b k = B00.Store.get b.b.store k
+  let get b k = Store.get b.b.store k
 
   module Unit = struct
     let current b = match b.u.current with
@@ -132,7 +133,7 @@ module Build = struct
           b.b.requested <- String.Map.add (name u) u b.b.requested;
           Rqueue.add b.b.waiting u
       | false ->
-          B00.Memo.fail b.u.m
+          Memo.fail b.u.m
             "@[<v>Unit %a requested %a which is not part of the build.@,\
              Try with %a or add the unit %a to the build."
             pp_name (current b) pp_name u Fmt.(code string) "--unlock"
@@ -142,35 +143,36 @@ module Build = struct
     let root_dir b u = match B0_def.dir (def u) with
     | None -> b.b.root_dir
     | Some dir -> dir
+
   end
 
+  let current_root_dir b = Unit.root_dir b (Unit.current b)
+
   let run_unit b unit =
-    let m = B00.Memo.with_mark b.u.m (name unit) in
+    let m = Memo.with_mark b.u.m (name unit) in
     let u = { current = Some unit; m } in
     let b = { b with u } in
-    B00.Memo.run_proc m begin fun () ->
-      let* () = B00.Memo.mkdir b.u.m (Unit.build_dir b unit) in
+    Memo.run_proc m begin fun () ->
+      let* () = Memo.mkdir b.u.m (Unit.build_dir b unit) in
       (proc unit) b
     end
 
   let rec run_units b = match Rqueue.take b.b.waiting with
   | Some u -> run_unit b u; run_units b
   | None ->
-      B00.Memo.stir ~block:true b.u.m;
+      Memo.stir ~block:true b.u.m;
       if Rqueue.length b.b.waiting = 0 then () else run_units b
 
   let log_file b = Fpath.(b.b.build_dir / "_log")
   let write_log_file ~log_file m =
     Log.if_error ~use:() @@ B00_ui.Memo.Log.(write log_file (of_memo m))
 
-
-  let report_memo_errors fmt m = match B00.Memo.status m with
+  let report_memo_errors ppf m = match Memo.status m with
   | Ok _ as v -> v
   | Error e ->
       let read_howto = Fmt.any "b0 log -r " in
       let write_howto = Fmt.any "b0 log -w " in
-      B000_conv.Op.pp_aggregate_error
-        ~read_howto ~write_howto () fmt e;
+      B000_conv.Op.pp_aggregate_error ~read_howto ~write_howto () ppf e;
       Error ()
 
   let run b =
@@ -182,16 +184,16 @@ module Build = struct
     let hook () = write_log_file ~log_file b.u.m in
     Os.Sig_exit.on_sigint ~hook @@ fun () ->
     begin
-      B00.Memo.run_proc b.u.m begin fun () ->
-        let* () = B00.Memo.delete b.u.m b.b.build_dir in
-        let* () = B00.Memo.mkdir b.u.m b.b.build_dir in
-        let* () = B00.Memo.mkdir b.u.m (B00.Store.dir b.b.store) in
+      Memo.run_proc b.u.m begin fun () ->
+        let* () = Memo.delete b.u.m b.b.build_dir in
+        let* () = Memo.mkdir b.u.m b.b.build_dir in
+        let* () = Memo.mkdir b.u.m (Store.dir b.b.store) in
         run_units b; Fut.return ()
       end;
-      B00.Memo.stir ~block:true b.u.m;
+      Memo.stir ~block:true b.u.m;
       let ret = report_memo_errors Fmt.stderr b.u.m in
       Log.time (fun _ m -> m "deleting trash") begin fun () ->
-        Log.if_error ~use:() (B00.Memo.delete_trash ~block:false b.u.m)
+        Log.if_error ~use:() (Memo.delete_trash ~block:false b.u.m)
       end;
       write_log_file ~log_file b.u.m;
       ret

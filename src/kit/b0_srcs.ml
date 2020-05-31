@@ -4,6 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open B00
 
 (* At a certain point we might want to cache the directory folds and
    file stats. But for now that seems good enough. *)
@@ -22,11 +23,8 @@ type sel =
 
 type t = sel list
 
-let fail m u fmt =
-  B00.Memo.fail m ("@[Unit %a: " ^^ fmt ^^ "@]") B0_unit.pp_name u
-
 let fail_if_error m u = function
-| Error e -> fail m u " source selection: %s" e
+| Error e -> Memo.fail m "Source selection: %s" e
 | Ok v -> v
 
 let select_files m u (seen, by_ext) fs =
@@ -36,7 +34,7 @@ let select_files m u (seen, by_ext) fs =
       match Os.File.exists f |> fail_if_error m u with
       | false ->
           let pp_file = Fmt.(code Fpath.pp_unquoted) in
-          fail m u "source file@ %a@ does not exist." pp_file f
+          Memo.fail m "Source file@ %a@ does not exist." pp_file f
       | true ->
           if Fpath.Set.mem f seen then loop m u seen by_ext fs else
           let seen = Fpath.Set.add f seen in
@@ -75,7 +73,7 @@ let select_files_in_dirs m u xs (seen, by_ext as acc) ds =
       match Os.Dir.exists d |> fail_if_error m u with
       | false ->
           let pp_dir = Fmt.(code Fpath.pp_unquoted) in
-          fail m u "source directory@ %a@ does not exist." pp_dir d
+          Memo.fail m "Source directory@ %a@ does not exist." pp_dir d
       | true ->
           let prune _ dname dir _ = exclude dname dir  in
           let dotfiles = true (* exclusions handled by prune *) in
@@ -106,7 +104,7 @@ let select b sels =
   let acc = Fpath.Set.empty, String.Map.empty in
   let acc = select_files m u acc fs in
   let (seen, _ as acc) = select_files_in_dirs m u xs acc ds in
-  Fpath.Set.iter (B00.Memo.file_ready m) seen;
+  Fpath.Set.iter (Memo.file_ready m) seen;
   let* futs = Fut.of_list futs in
   let add_files acc files =
     let add_file file (seen, by_ext as acc) =

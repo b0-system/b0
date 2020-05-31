@@ -5,6 +5,8 @@
 
 open B00_std
 open B00_std.Fut.Syntax
+open B00
+open B00_ocaml
 
 module Exit = struct
   type t = Code of int | Exec of Fpath.t * Cmd.t
@@ -51,12 +53,12 @@ module Conf = struct
       b0_file : Fpath.t option;
       cache_dir : Fpath.t;
       cwd : Fpath.t;
-      code : B00_ocaml.Cobj.code option;
+      code : Compile.code option;
       hash_fun : (module Hash.T);
       jobs : int;
       log_level : Log.level;
       no_pager : bool;
-      memo : (B00.Memo.t, string) result Lazy.t;
+      memo : (Memo.t, string) result Lazy.t;
       tty_cap : Tty.cap; }
 
   let memo ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs =
@@ -66,7 +68,7 @@ module Conf = struct
       B00_ui.Memo.pp_leveled_feedback ~op_howto ~show_op ~show_ui ~level
         Fmt.stderr
     in
-    B00.Memo.memo ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs ~feedback ()
+    Memo.memo ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs ~feedback ()
 
   let v
       ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~hash_fun ~jobs
@@ -147,10 +149,7 @@ module Cli = struct
   let cache_dir = B00_ui.Memo.cache_dir ~docs ()
   let code =
     let env = Arg.env_var Env.code in
-    let code_enum = [ "byte", Some B00_ocaml.Cobj.Byte;
-                      "native", Some B00_ocaml.Cobj.Native;
-                      "auto", None ]
-    in
+    let code_enum = ["byte", Some `Byte; "native", Some `Native; "auto", None]in
     let code = Arg.enum code_enum in
     let docv = "CODE" in
     let doc =
@@ -184,7 +183,7 @@ type main = unit -> Exit.t Cmdliner.Term.result
 type t =
   { name : string;
     version : string;
-    libs : B00_ocaml.Lib.Name.t list }
+    libs : Lib.Name.t list }
 
 let create ~name ~version ~libs = { name; version; libs }
 let name d = d.name
@@ -235,87 +234,95 @@ module Compile = struct
     Fpath.(Conf.b0_dir c / Conf.drivers_dir_name / name driver / "exe")
 
   let write_src m c src ~src_file  =
-    let esrc = B00.Memo.fail_if_error m (B0_file.expand src) in
+    let esrc = Memo.fail_if_error m (B0_file.expand src) in
     let reads = B0_file.expanded_file_manifest esrc in
-    List.iter (B00.Memo.file_ready m) reads;
-    B00.Memo.write m ~reads src_file @@ fun () ->
+    List.iter (Memo.file_ready m) reads;
+    Memo.write m ~reads src_file @@ fun () ->
     Ok (B0_file.expanded_src esrc)
 
   let base_ext_libs =
-    [ B00_ocaml.Lib.Name.v "cmdliner";
-      B00_ocaml.Lib.Name.v "unix"; ]
+    [ Lib.Name.v "cmdliner";
+      Lib.Name.v "unix"; ]
 
   let base_libs =
-    [ B00_ocaml.Lib.Name.v "b0.b00.std";
-      B00_ocaml.Lib.Name.v "b0.b00";
-      B00_ocaml.Lib.Name.v "b0.b00.kit";
-      B00_ocaml.Lib.Name.v "b0.b0";
-      B00_ocaml.Lib.Name.v "b0.kit";
-      B00_ocaml.Lib.Name.v "b0.driver"; ]
+    [ Lib.Name.v "b0.b00.std";
+      Lib.Name.v "b0.b00";
+      Lib.Name.v "b0.b00.kit";
+      Lib.Name.v "b0.b0";
+      Lib.Name.v "b0.kit";
+      Lib.Name.v "b0.driver"; ]
 
   let find_libs m r libs =
-    let find = B00_ocaml.Lib_resolver.find in
+    let find = Lib_resolver.find in
     Fut.of_list (List.map (find r) libs)
 
-  let find_boot_libs m ~env libs r =
+  let find_boot_libs m ~clib_ext ~env libs r =
     match Os.Env.find ~empty_is_none:true "B0_B00T" with
     | None -> find_libs m r libs
     | Some bdir ->
         let bdir = Fpath.v bdir in
         let boot_lib name =
-          let dir = Fpath.(bdir / B00_ocaml.Lib.Name.undot ~rep:'-' name) in
-          let archive = B00_ocaml.Lib.Name.to_archive_name name in
-          B00_ocaml.Lib.v m ~name ~requires:[] ~archive ~dir
+          let dir = Fpath.(bdir / Lib.Name.undot ~rep:'-' name) in
+          let archive = Some (Lib.Name.to_archive_name name) in
+          Memo.fail_if_error m @@
+          Lib.of_dir m ~clib_ext ~name ~requires:[] ~archive ~dir
         in
         Fut.return (List.map boot_lib libs)
 
-  let find_libs m ~build_dir ~driver ~requires =
-    let* ocamlpath = B00_ocaml.Ocamlpath.get m None in
+  let find_libs m ~clib_ext ~build_dir ~driver ~requires =
+    let* ocamlpath = Ocamlpath.get m None in
     let memo_dir = Fpath.(build_dir / "ocamlib") in
-    let r = B00_ocaml.Lib_resolver.create m ~memo_dir ~ocamlpath in
+    let r = Lib_resolver.create m ~memo_dir ~ocamlpath ~clib_ext in
     let requires = List.map fst requires in
     let* requires = find_libs m r requires in
     (* FIXME we are loosing locations here would be nice to
        have them to report errors. *)
     (* FIXME we likely also want a notion of ext lib for drivers *)
-    let* driver_libs = find_boot_libs m ~env:"B0_DRIVER_BOOT" (libs driver) r in
+    let* driver_libs =
+      find_boot_libs m ~clib_ext ~env:"B0_DRIVER_BOOT" (libs driver) r
+    in
     let* base_ext_libs = find_libs m r base_ext_libs in
-    let* base_libs = find_boot_libs m ~env:"B0_B00T" base_libs r in
+    let* base_libs = find_boot_libs m ~clib_ext ~env:"B0_B00T" base_libs r in
     let all_libs = base_ext_libs @ base_libs @ driver_libs @ requires in
     let seen_libs = base_libs @ requires in
     Fut.return (all_libs, seen_libs)
 
   let find_compiler c m = match Conf.code c with
-  | Some (B00_ocaml.Cobj.Byte as c) -> B00_ocaml.Tool.ocamlc, c
-  | Some (B00_ocaml.Cobj.Native as c) -> B00_ocaml.Tool.ocamlopt, c
+  | Some (`Byte as c) -> Tool.ocamlc, c
+  | Some (`Native as c) -> Tool.ocamlopt, c
   | None ->
-      match B00.Memo.tool_opt m B00_ocaml.Tool.ocamlopt with
-      | None -> B00_ocaml.Tool.ocamlc, B00_ocaml.Cobj.Byte
-      | Some comp -> B00_ocaml.Tool.ocamlopt, B00_ocaml.Cobj.Native
+      match B00.Memo.tool_opt m Tool.ocamlopt with
+      | None -> Tool.ocamlc, `Byte
+      | Some comp -> Tool.ocamlopt, `Native
 
   let compile_src m c ~driver ~build_dir src ~exe =
     let ocaml_conf = Fpath.(build_dir / "ocaml.conf") in
     let comp, code = find_compiler c m in
-    B00_ocaml.Conf.write m ~comp ~o:ocaml_conf;
-    let* ocaml_conf = B00_ocaml.Conf.read m ocaml_conf in
-    let obj_ext = B00_ocaml.Conf.obj_ext ocaml_conf in
-    let lib_ext = B00_ocaml.Conf.lib_ext ocaml_conf in
+    Tool.Conf.write m ~comp ~o:ocaml_conf;
+    let* ocaml_conf = Tool.Conf.read m ocaml_conf in
+    let obj_ext = Tool.Conf.obj_ext ocaml_conf in
+    let clib_ext = Tool.Conf.lib_ext ocaml_conf in
     let comp = B00.Memo.tool m comp in
     let requires = B0_file.requires src in
-    let* all_libs, seen_libs = find_libs m ~build_dir ~driver ~requires in
+    let* all_libs, seen_libs =
+      find_libs m ~clib_ext ~build_dir ~driver ~requires
+    in
     let src_file = Fpath.(build_dir / "src.ml") in
     write_src m c src ~src_file;
     let writes =
       let base = Fpath.rem_ext src_file in
       let base ext = Fpath.(base + ext) in
       match code with
-      | B00_ocaml.Cobj.Byte -> [base ".cmo"; exe ]
-      | B00_ocaml.Cobj.Native -> [base ".cmx"; base obj_ext; exe ]
+      | `Byte -> [base ".cmo"; exe ]
+      | `Native -> [base ".cmx"; base obj_ext; exe ]
     in
-    let dirs = List.map B00_ocaml.Lib.dir seen_libs in
+    let dirs = List.map Lib.dir seen_libs in
     let incs = Cmd.unstamp @@ Cmd.paths ~slip:"-I" dirs in
-    let archives = List.map (B00_ocaml.Lib.archive ~code) all_libs in
-    let c_archives = List.map (fun p -> Fpath.(p -+ lib_ext)) archives in
+    let archives =
+      let ar = match code with `Native -> Lib.cmxa | `Byte -> Lib.cma in
+      List.filter_map ar all_libs
+    in
+    let c_archives = List.filter_map Lib.c_archive all_libs in
     let ars = List.rev_append archives c_archives in
     (* FIXME this should be done b the resolver *)
     List.iter (B00.Memo.file_ready m) ars;

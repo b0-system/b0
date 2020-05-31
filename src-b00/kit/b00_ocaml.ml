@@ -8,6 +8,9 @@ open B00_std.Fut.Syntax
 open B00
 
 module Tool = struct
+
+  (* Compilers *)
+
   let comp_env_vars =
     [ "CAMLLIB"; "CAMLSIGPIPE"; "CAML_DEBUG_FILE"; "CAML_DEBUG_SOCKET";
       "CAML_LD_LIBRARY_PATH"; "BUILD_PATH_PREFIX_MAP"; "OCAMLDEBUG"; "OCAMLLIB";
@@ -30,6 +33,8 @@ module Tool = struct
 
   let ocamlobjinfo = Tool.by_name ~vars:comp_env_vars "ocamlobjinfo"
 
+  (* Toplevels *)
+
   let top_env_vars =
     [ "CAML_LD_LIBRARY_PATH"; "CAMLRUNPARAM";
       "OCAMLTOP_INCLUDE_PATH";
@@ -37,235 +42,556 @@ module Tool = struct
 
   let ocaml = Tool.by_name ~vars:top_env_vars "ocaml"
   let ocamlnat = Tool.by_name ~vars:top_env_vars "ocamlnat"
+
+  module Conf = struct
+    type t =
+      { fields : string String.Map.t;
+        version : int * int * int * string option;
+        where : Fpath.t;
+        asm_ext : string;
+        dll_ext : string;
+        exe_ext : string;
+        lib_ext : string;
+        obj_ext : string; }
+
+    let find k c = String.Map.find_opt k c.fields
+    let version c = c.version
+    let where c = c.where
+    let asm_ext c = c.asm_ext
+    let exe_ext c = c.exe_ext
+    let dll_ext c = c.dll_ext
+    let lib_ext c = c.lib_ext
+    let obj_ext c = c.obj_ext
+    let to_string_map c = c.fields
+    let of_string_map fields =
+      try
+        let err = Fmt.failwith in
+        let err_key k = err "key %a not found." Fmt.(code string) k in
+        let find k fs = match String.Map.find_opt k fs with
+        | None -> err_key k | Some v -> v
+        in
+        let version =
+          let v = find "version" fields in
+          match String.to_version v with
+          | None -> err "could not parse version string %S" v
+          | Some v -> v
+        in
+        let where = Fpath.of_string (find "standard_library" fields) in
+        let where = where |> Result.to_failure in
+        let asm_ext = find "ext_asm" fields in
+        let dll_ext = find "ext_dll" fields in
+        let exe_ext = find "ext_exe" fields in
+        let lib_ext = find "ext_lib" fields in
+        let obj_ext = find "ext_obj" fields in
+        Ok { fields; version; where; asm_ext; dll_ext; exe_ext; lib_ext;
+             obj_ext }
+      with
+      | Failure e -> Error e
+
+    (* IO *)
+
+    let of_string ?file s =
+      let parse_line i l acc = match String.cut_left ~sep:":" l with
+      | None -> acc
+      | Some (k, v) -> String.Map.add (String.trim k) (String.trim v) acc
+      in
+      let s = String.trim s in
+      Result.bind (B00_lines.fold ?file s parse_line String.Map.empty) @@
+      fun fields -> match of_string_map fields with
+      | Ok v -> Ok v
+      | Error e -> B00_lines.err_file ?file (Fmt.str "OCaml config: %s" e)
+
+    let write m ~comp ~o =
+      let comp = Memo.tool m comp in
+      Memo.spawn m ~writes:[o] ~stdout:(`File o) @@
+      comp (Cmd.arg "-config")
+
+    let read m file =
+      let* s = Memo.read m file in
+      Fut.return (of_string ~file s |> Memo.fail_if_error m)
+  end
 end
 
-module Conf = struct
-  type t =
-    { fields : string String.Map.t;
-      version : int * int * int * string option;
-      where : Fpath.t;
-      asm_ext : string;
-      dll_ext : string;
-      exe_ext : string;
-      lib_ext : string;
-      obj_ext : string; }
+module Compile = struct
 
-  let find k c = match String.Map.find k c.fields with
-  | exception Not_found -> None | v -> Some v
+  (* XXX We should properly investigate how to use BUILD_PATH_PREFIX_MAP.
+     However for some reasons that were never not really answered by @gasche in
+     https://github.com/ocaml/ocaml/pull/1515, the map does not affect
+     absolute paths which severly limits its applicability.
 
-  let version c = c.version
-  let where c = c.where
-  let asm_ext c = c.asm_ext
-  let exe_ext c = c.exe_ext
-  let dll_ext c = c.dll_ext
-  let lib_ext c = c.lib_ext
-  let obj_ext c = c.obj_ext
-  let to_string_map c = c.fields
-  let of_string_map fields =
-    try
-      let err = Fmt.failwith in
-      let err_key k = err "key %a not found." Fmt.(code string) k in
-      let find k fs = match String.Map.find k fs with
-      | exception Not_found -> err_key k | v -> v
-      in
-      let version =
-        let v = find "version" fields in
-        match String.to_version v with
-        | None -> err "could not parse version string %S" v
-        | Some v -> v
-      in
-      let where = Fpath.of_string (find "standard_library" fields) in
-      let where = where |> Result.to_failure in
-      let asm_ext = find "ext_asm" fields in
-      let dll_ext = find "ext_dll" fields in
-      let exe_ext = find "ext_exe" fields in
-      let lib_ext = find "ext_lib" fields in
-      let obj_ext = find "ext_obj" fields in
-      Ok { fields; version; where; asm_ext; dll_ext; exe_ext; lib_ext; obj_ext }
-    with
-    | Failure e -> Error e
+     XXX At some point we would had -o OBJ src [-I inc...] this worked
+     at least in 4.07 but not in 4.03, where apparently the order mattered.
 
-  (* IO *)
+     XXX thread conf/version at that level ? E.g. if `-inc` becomes a
+     reality. We'd like to slip `-inc` in incs_of_file. *)
 
-  let of_string ?file s =
-    let parse_line i l acc = match String.cut_left ~sep:":" l with
-    | None -> acc
-    | Some (k, v) -> String.Map.add (String.trim k) (String.trim v) acc
+  let add_if c v l = if c  then v :: l else l
+
+  type code = [ `Byte | `Native ]
+
+  let incs_of_files files =
+    Cmd.paths ~slip:"-I" @@ Fpath.uniquify @@ List.map Fpath.parent files
+
+  let c_to_o ?post_exec ?k m cmd ~reads ~c ~o =
+    let ocamlc = Memo.tool m Tool.ocamlc in (* FIXME pass as arg *)
+    let cwd = Fpath.parent o
+      (* We can't use `-c` and `-o` on C files see
+         https://github.com/ocaml/ocaml/issues/7677 so we cwd to the
+         output directory to perform the spawn. *)
     in
-    let s = String.trim s in
-    Result.bind (B00_lines.fold ?file s parse_line String.Map.empty) @@
-    fun fields -> match of_string_map fields with
-    | Ok v -> Ok v
-    | Error e -> B00_lines.err_file ?file (Fmt.str "OCaml config: %s" e)
+    let incs = incs_of_files reads in
+    Memo.spawn m ?post_exec ?k ~reads:(c :: reads) ~writes:[o] ~cwd @@
+    ocamlc Cmd.(arg "-c" %% cmd %% unstamp (incs %% path c))
 
-  let write m ~comp ~o =
-    let comp = Memo.tool m comp in
-    Memo.spawn m ~writes:[o] ~stdout:(`File o) @@
-    comp (Cmd.arg "-config")
+  let mli_to_cmi ?post_exec ?k m cmd ~reads ~mli ~o ~and_cmti =
+    let ocamlc = Memo.tool m Tool.ocamlc in (* FIXME pass as arg *)
+    let base = Fpath.rem_ext o in
+    let stamp = Fpath.basename base in
+    let reads = mli :: reads in
+    let writes = o :: if and_cmti then [Fpath.(base + ".cmti")] else [] in
+    let incs = incs_of_files reads in
+    let bin_annot = Cmd.if' and_cmti (Cmd.arg "-bin-annot") in
+    let io = Cmd.(unstamp (path o %% incs %% path mli)) in
+    Memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
+    ocamlc Cmd.(arg "-c" %% bin_annot %% cmd % "-o" %% io)
 
-  let read m file =
-    let* s = Memo.read m file in
-    Fut.return (of_string ~file s |> Memo.fail_if_error m)
-
-  (* Build orchestration *)
-
-  type built_code = [ `Byte | `Native | `Both ]
-
-  let build_code =
-    let det _ _ = Fut.return `Auto in
-    Store.key det
-
-  let built_code =
-    let of_build_code m = function
-    | #built_code as v -> v
-    | `Auto when Option.is_some (Memo.tool_opt m Tool.ocamlopt) -> `Native
-    | `Auto -> `Byte
+  let ml_to_cmo ?post_exec ?k m cmd ~reads ~has_cmi ~ml ~o ~and_cmt =
+    let ocamlc = Memo.tool m Tool.ocamlc in
+    let base = Fpath.rem_ext o in
+    let stamp = Fpath.basename base (* output depends on mod name *) in
+    let reads = ml :: reads in
+    let writes =
+      o :: (add_if and_cmt Fpath.(base + ".cmt") @@
+            add_if (not has_cmi) Fpath.(base + ".cmi") [])
     in
-    let det s m = Fut.map (of_build_code m) (Store.get s build_code) in
-    Store.key det
+    let incs = incs_of_files reads in
+    let bin_annot = Cmd.if' and_cmt (Cmd.arg "-bin-annot") in
+    let io = Cmd.(unstamp (path o %% incs %% path ml)) in
+    Memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
+    ocamlc Cmd.(arg "-c" %% bin_annot %% cmd % "-o" %% io)
 
-  let auto_comp s m =
-    let of_built_code = function
-    | `Native | `Both -> Tool.ocamlopt | `Byte -> Tool.ocamlc
+  let ml_to_cmx ?post_exec ?k m cmd ~reads ~has_cmi ~ml ~o ~and_cmt =
+    let ocamlopt = Memo.tool m Tool.ocamlopt in
+    let base = Fpath.rem_ext o in
+    let stamp = Fpath.basename base (* output depends on mod name *) in
+    let reads = ml :: reads in
+    let writes =
+      o :: Fpath.(base + ".o") ::
+      (add_if and_cmt Fpath.(base + ".cmt") @@
+       add_if (not has_cmi) Fpath.(base + ".cmi") [])
     in
-    Fut.map of_built_code (Store.get s built_code)
+    let incs = incs_of_files reads in
+    let bin_annot = Cmd.if' and_cmt (Cmd.arg "-bin-annot") in
+    let io = Cmd.(unstamp (path o %% incs %% path ml)) in
+    Memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
+    ocamlopt Cmd.(arg "-c" %% bin_annot %% cmd % "-o" %% io)
 
-  let key : t B00.Store.key =
-    let det s m =
-      let* comp = auto_comp s m in
-      let file = Fpath.(Store.dir s / Memo.mark m) in
-      write m ~comp ~o:file;
-      read m file
-    in
-    Store.key ~mark:"b00_ocaml.conf" det
-
-  (* TODO remove that *)
-
-  let ocamlc_bin = Cmd.arg "ocamlc"
-  let exists m =
-    Fut.return @@
-    match Os.Cmd.find ocamlc_bin |> Memo.fail_if_error m with
-    | None -> false | Some _ -> true
-
-  let if_exists m f =
-    let* exists = exists m in
-    if not exists then Fut.return None else
-    Fut.map Option.some (f ())
-
-  let run m cmd =
-    let ocamlc = Os.Cmd.must_find ocamlc_bin |> Memo.fail_if_error m in
-    Fut.return (Os.Cmd.run_out ~trim:true Cmd.(ocamlc %% cmd))
-
-  let stdlib_dir m () =
-    let* r = run m (Cmd.arg "-where") in
-    let r = Result.bind r Fpath.of_string in
-    Fut.return (Memo.fail_if_error m r)
+  let ml_to_impl ?post_exec ?k m ~code cmd ~reads ~has_cmi ~ml ~o ~and_cmt =
+    let ml_to_obj = match code with `Byte -> ml_to_cmo | `Native -> ml_to_cmx in
+    ml_to_obj ?post_exec ?k m cmd ~reads ~has_cmi ~ml ~o ~and_cmt
 end
 
-module Mod_name = struct
-  type t = string
-  let of_filename f = String.Ascii.capitalize (Fpath.basename ~no_ext:true f)
-  let v n = String.Ascii.capitalize n
-  let equal = String.equal
-  let compare = String.compare
-  let pp = Fmt.tty_string [`Bold]
-  module Set = String.Set
-  module Map = String.Map
+module Archive = struct
 
-  (* Filename mangling *)
+  let debug = Cmd.arg "-g"
 
-  let of_mangled_filename s =
-    let rem_ocaml_ext s = match String.cut_right ~sep:"." s with
-    | None -> s | Some (s, ("ml" | ".mli")) -> s | Some _ -> s
+  let cstubs_name name = Fmt.str "%s_stubs" name
+  let cstubs_clib name ext_lib = Fmt.str "lib%s_stubs%s" name ext_lib
+  let cstubs_dll name ext_dll = Fmt.str "dll%s_stubs%s" name ext_dll
+  let cstubs ?post_exec ?k ?args:(more_args = Cmd.empty) m ~c_objs ~odir ~oname
+    =
+    (* FIXME Conf *)
+    let lib_ext = ".a" in
+    let dll_ext = ".so" in
+    let ocamlmklib = Memo.tool m Tool.ocamlmklib in
+    let o = Fpath.(odir / cstubs_name oname) in
+    let writes =
+      [ Fpath.(odir / cstubs_clib oname lib_ext);
+        Fpath.(odir / cstubs_dll oname dll_ext)] (* FIXME dynlink cond. *)
     in
-    let mangle s =
-      let char_len = function
-      | '-' | '.' | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '\'' -> 1
-      | _ -> 2
-      in
-      let set_char b i c = match c with
-      | '.' | '-' -> Bytes.set b i '_'; i + 1
-      | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '\'' as c ->
-          Bytes.set b i c; i + 1
-      | c ->
-          let c = Char.code c in
-          Bytes.set b (i    ) (Char.Ascii.upper_hex_digit (c lsr 4));
-          Bytes.set b (i + 1) (Char.Ascii.upper_hex_digit (c      ));
-          i + 2
-      in
-      String.byte_replacer char_len set_char s
+    Memo.spawn ?post_exec ?k m ~reads:c_objs ~writes @@
+    ocamlmklib
+      Cmd.(debug % "-o" %% unstamp (path o) %% unstamp (paths c_objs))
+
+  let byte
+      ?post_exec ?k ?args:(more_args = Cmd.empty) m ~has_cstubs ~cobjs ~odir
+      ~oname
+    =
+    let ocamlc = Memo.tool m Tool.ocamlc in
+    let cstubs_opts = match has_cstubs with
+    | false -> Cmd.empty
+    | true ->
+        let lib = Fmt.str "-l%s" (cstubs_name oname) in
+        let cclib = Cmd.(arg "-cclib" % lib) in
+        let dllib = Cmd.(arg "-dllib" % lib) in (* FIXME dynlink cond. *)
+        Cmd.(cclib %% dllib)
     in
-    let s = mangle (rem_ocaml_ext s) in
-    let s = match String.head s with
-    | Some c when Char.Ascii.is_letter c -> s
-    | None | Some _ -> "M" ^ s
+    let cma = Fpath.(odir / Fmt.str "%s.cma" oname) in
+    Memo.spawn m ~reads:cobjs ~writes:[cma] @@
+    ocamlc Cmd.(debug % "-a" % "-o" %%
+                unstamp (path cma) %% cstubs_opts %% unstamp (paths cobjs))
+
+  let native
+      ?post_exec ?k ?args:(more_args = Cmd.empty) m ~has_cstubs ~cobjs ~odir
+      ~oname
+    =
+    (* FIXME Conf *)
+    let lib_ext = ".a" in
+    let ocamlopt = Memo.tool m Tool.ocamlopt in
+    let cstubs_opts = match has_cstubs with
+    | false -> Cmd.empty
+    | true -> Cmd.(arg "-cclib" % Fmt.str "-l%s" (cstubs_name oname))
     in
-    String.Ascii.capitalize s
+    let cmxa = Fpath.(odir / Fmt.str "%s.cmxa" oname) in
+    let cmxa_clib = Fpath.(odir / Fmt.str "%s%s" oname lib_ext) in
+    Memo.spawn m ?post_exec ?k ~reads:cobjs ~writes:[cmxa; cmxa_clib] @@
+    ocamlopt Cmd.(debug % "-a" % "-o" %% unstamp (path cmxa) %%
+                  cstubs_opts %% unstamp (paths cobjs))
+
+  let code ?post_exec ?k ?args m ~code ~has_cstubs ~cobjs ~odir ~oname =
+    (match code with `Byte -> byte | `Native -> native)
+    ?post_exec ?k ?args m ~has_cstubs ~cobjs ~odir ~oname
+
+  let native_dynlink
+      ?post_exec ?k ?args:(more_args = Cmd.empty) m ~has_cstubs ~cmxa ~o
+    =
+    let lib_ext = ".a" in
+    let ocamlopt = Memo.tool m Tool.ocamlopt in
+    let cmxa_clib = Fpath.(cmxa -+ lib_ext) in
+    let cstubs_opts, reads = match has_cstubs with
+    | false -> Cmd.empty, [cmxa; cmxa_clib]
+    | true ->
+        (* Fixme do this on a cstubs path *)
+        let oname = Fpath.basename ~no_ext:true cmxa in
+        let cstubs_dir = Fpath.(parent cmxa) in
+        let cstubs = Fpath.(cstubs_dir / cstubs_clib oname lib_ext) in
+        let inc = Cmd.(arg "-I" %% unstamp (path cstubs_dir)) in
+        Cmd.(inc %% unstamp (path cstubs)), [cstubs; cmxa; cmxa_clib]
+    in
+    Memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
+    ocamlopt Cmd.(debug % "-shared" % "-linkall" % "-o" %%
+                  unstamp (path o) %% cstubs_opts %% unstamp (path cmxa))
 end
 
-module Mod_ref = struct
-  type t = Mod_name.t * Digest.t
-  let v n d = (String.Ascii.capitalize n, d)
-  let name = fst
-  let digest = snd
-  let equal (_, d0) (_, d1) = Digest.equal d0 d1
-  let compare (n0, d0) (n1, d1) = match Mod_name.compare n0 n1 with
-  | 0 -> Digest.compare d0 d1
-  | c -> c
+module Link = struct
 
-  let pp ppf (n, d) = Fmt.pf ppf "@[%s %a@]" (Digest.to_hex d) Mod_name.pp n
+  (* FIXME How to add cstubs archives of cm[x]a to [reads].
+     Do we need it ? *)
 
-  module T = struct
-    type nonrec t = t
-    let compare = compare
+  let debug = Cmd.arg "-g"
+
+  let cstubs_incs objs =
+    let add_inc acc obj = Fpath.Set.add (Fpath.parent obj) acc in
+    let incs = List.fold_left add_inc Fpath.Set.empty objs in
+    Cmd.paths ~slip:"-I" (Fpath.Set.elements incs)
+
+  let byte ?post_exec ?k ?args:(more_args = Cmd.empty) m ~c_objs ~cobjs ~o =
+    let ocamlc = Memo.tool m Tool.ocamlc in
+    let reads = List.rev_append cobjs c_objs in
+    let incs = cstubs_incs cobjs in
+    Memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
+    ocamlc Cmd.(debug % "-custom" % "-o" %%
+                unstamp (path o %% incs %% paths c_objs %% paths cobjs))
+
+  let native
+      ?post_exec ?k ?args:(more_args = Cmd.empty) m ~c_objs ~cobjs ~o
+    =
+    let ocamlopt = Memo.tool m Tool.ocamlopt in
+    (* FIXME lift that as args or ask for OCaml.Conf.t *)
+    let obj_ext = ".o" in
+    let lib_ext = ".a" in
+    let cobj_side_obj cobj =
+      let ext = if Fpath.has_ext ".cmx" cobj then obj_ext else lib_ext in
+      Fpath.set_ext ext cobj
+    in
+    let incs = cstubs_incs cobjs in
+    let reads =
+      let sides = List.rev_map cobj_side_obj cobjs in
+      List.rev_append cobjs (List.rev_append sides c_objs)
+    in
+    Memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
+    ocamlopt Cmd.(debug % "-o" %%
+                  unstamp (path o %% incs %% paths c_objs %% paths cobjs))
+
+  let code ?post_exec ?k ?args m ~code ~c_objs ~cobjs ~o =
+    (match code with `Byte -> byte | `Native -> native)
+    ?post_exec ?k ?args m ~c_objs ~cobjs ~o
+end
+
+module Mod = struct
+  module Name = struct
+    type t = string
+    let of_filename f = String.Ascii.capitalize (Fpath.basename ~no_ext:true f)
+    let v n = String.Ascii.capitalize n
+    let equal = String.equal
+    let compare = String.compare
+    let pp = Fmt.tty_string [`Bold]
+    module Set = String.Set
+    module Map = String.Map
+
+    (* Filename mangling *)
+
+    let of_mangled_filename s =
+      let rem_ocaml_ext s = match String.cut_right ~sep:"." s with
+      | None -> s | Some (s, ("ml" | ".mli")) -> s | Some _ -> s
+      in
+      let mangle s =
+        let char_len = function
+        | '-' | '.' | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '\'' -> 1
+        | _ -> 2
+        in
+        let set_char b i c = match c with
+        | '.' | '-' -> Bytes.set b i '_'; i + 1
+        | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '\'' as c ->
+            Bytes.set b i c; i + 1
+        | c ->
+            let c = Char.code c in
+            Bytes.set b (i    ) (Char.Ascii.upper_hex_digit (c lsr 4));
+            Bytes.set b (i + 1) (Char.Ascii.upper_hex_digit (c      ));
+            i + 2
+        in
+        String.byte_replacer char_len set_char s
+      in
+      let s = mangle (rem_ocaml_ext s) in
+      let s = match String.head s with
+      | Some c when Char.Ascii.is_letter c -> s
+      | None | Some _ -> "M" ^ s
+      in
+      String.Ascii.capitalize s
   end
 
-  module Set = struct
-    include Set.Make (T)
+  module Ref = struct
+    type t = Name.t * Digest.t
+    let v n d = (String.Ascii.capitalize n, d)
+    let name = fst
+    let digest = snd
+    let equal (_, d0) (_, d1) = Digest.equal d0 d1
+    let compare (n0, d0) (n1, d1) = match Name.compare n0 n1 with
+    | 0 -> Digest.compare d0 d1
+    | c -> c
 
-    let dump ppf rs =
-      Fmt.pf ppf "@[<1>{%a}@]" (Fmt.iter ~sep:Fmt.comma iter pp) rs
+    let pp ppf (n, d) = Fmt.pf ppf "@[%s %a@]" (Digest.to_hex d) Name.pp n
 
-    let pp ?sep pp_elt = Fmt.iter ?sep iter pp_elt
+    module T = struct
+      type nonrec t = t
+      let compare = compare
+    end
+
+    module Set = struct
+      include Set.Make (T)
+
+      let dump ppf rs =
+        Fmt.pf ppf "@[<1>{%a}@]" (Fmt.iter ~sep:Fmt.comma iter pp) rs
+
+      let pp ?sep pp_elt = Fmt.iter ?sep iter pp_elt
+    end
+
+    module Map = struct
+      include Map.Make (T)
+
+      let dom m = fold (fun k _ acc -> Set.add k acc) m Set.empty
+      let of_list bs = List.fold_left (fun m (k,v) -> add k v m) empty bs
+
+      let add_to_list k v m = match find k m with
+      | exception Not_found -> add k [v] m
+      | l -> add k (v :: l) m
+
+      let add_to_set
+          (type set) (type elt)
+          (module S : B00_std.Stdlib_set.S with type elt = elt and type t = set)
+          k v m = match find k m with
+      | exception Not_found -> add k (S.singleton v) m
+      | set -> add k (S.add v set) m
+
+      let dump pp_v ppf m =
+        let pp_binding ppf (k, v) =
+          Fmt.pf ppf "@[<1>(@[%a@],@ @[%a@])@]" pp k pp_v v
+        in
+        Fmt.pf ppf "@[<1>{%a}@]"
+          (Fmt.iter_bindings ~sep:Fmt.sp iter pp_binding) m
+
+      let pp ?sep pp_binding = Fmt.iter_bindings ?sep iter pp_binding
+    end
   end
 
-  module Map = struct
-    include Map.Make (T)
+  module Src = struct
+    module Deps = struct
+      let of_string ?(file = Fpath.dash) ?src_root data =
+        (* Parse ocamldep's [-slash -modules], a bit annoying to parse.
+           ocamldep shows its Makefile legacy. *)
+        let parse_path n p = (* ocamldep escapes spaces as "\ ", a bit annoying *)
+          let char_len_at s i = match s.[i] with
+          | '\\' when i + 1 < String.length s && s.[i+1] = ' ' -> 2
+          | _ -> 1
+          in
+          let set_char b k s i = match char_len_at s i with
+          | 2 -> Bytes.set b k ' '; 2
+          | 1 -> Bytes.set b k s.[i]; 1
+          | _ -> assert false
+          in
+          match String.byte_unescaper char_len_at set_char p with
+          | Error j -> B00_lines.err n "%d: illegal escape" j
+          | Ok p ->
+              match Fpath.of_string p with
+              | Error e -> B00_lines.err n "%s" e
+              | Ok p -> p
+        in
+        let parse_line ~src_root n line acc =
+          if line = "" then acc else
+          match String.cut_right (* right, windows drives *) ~sep:":" line with
+          | None -> B00_lines.err n "cannot parse line: %S" line
+          | Some (file, mods) ->
+              let file = parse_path n file in
+              let file = match src_root with
+              | None -> file
+              | Some src_root -> Fpath.(src_root // file)
+              in
+              let add_mod acc m = Name.Set.add m acc in
+              let mods = String.cuts_left ~drop_empty:true ~sep:" " mods in
+              let start = Name.Set.singleton "Stdlib" in
+              let mods = List.fold_left add_mod start mods in
+              Fpath.Map.add file mods acc
+        in
+        B00_lines.fold ~file data (parse_line ~src_root) Fpath.Map.empty
 
-    let dom m = fold (fun k _ acc -> Set.add k acc) m Set.empty
-    let of_list bs = List.fold_left (fun m (k,v) -> add k v m) empty bs
+      let write ?src_root m ~srcs ~o =
+        let ocamldep = Memo.tool m Tool.ocamldep in
+        let srcs', cwd = match src_root with
+        | None -> srcs, None
+        | Some root ->
+            (* FIXME unfortunately this doesn't report parse error
+               at the right place. So we don't do anything for now
+               the output thus depends on the path location and can't
+               be cached across machines.
+               let rem_prefix src = Fpath.rem_prefix root src |> Option.get in
+               List.map rem_prefix srcs, Some root
+            *)
+            srcs, None
+        in
+        Memo.spawn m ?cwd ~reads:srcs ~writes:[o] ~stdout:(`File o) @@
+        ocamldep Cmd.(arg "-slash" % "-modules" %% paths srcs')
 
-    let add_to_list k v m = match find k m with
-    | exception Not_found -> add k [v] m
-    | l -> add k (v :: l) m
+      let read ?src_root m file =
+        let* s = Memo.read m file in
+        Fut.return (of_string ?src_root ~file s |> Memo.fail_if_error m)
+    end
 
-    let add_to_set
-        (type set) (type elt)
-        (module S : B00_std.Stdlib_set.S with type elt = elt and type t = set)
-        k v m = match find k m with
-    | exception Not_found -> add k (S.singleton v) m
-    | set -> add k (S.add v set) m
+    type t =
+      { mod_name : Name.t;
+        opaque : bool;
+        mli : Fpath.t option;
+        mli_deps : Name.Set.t;
+        ml : Fpath.t option;
+        ml_deps : Name.Set.t }
 
-    let dump pp_v ppf m =
-      let pp_binding ppf (k, v) =
-        Fmt.pf ppf "@[<1>(@[%a@],@ @[%a@])@]" pp k pp_v v
+    let v ~mod_name ~opaque ~mli ~mli_deps ~ml ~ml_deps =
+      { mod_name; opaque; mli; mli_deps; ml; ml_deps }
+
+    let mod_name m = m.mod_name
+    let opaque m = m.opaque
+    let mli m = m.mli
+    let mli_deps m = m.mli_deps
+    let ml m = m.ml
+    let ml_deps m = m.ml_deps
+
+    let file ~in_dir m ~ext =
+      let fname = String.Ascii.uncapitalize (mod_name m) in
+      Fpath.(in_dir / Fmt.str "%s%s" fname ext)
+
+    let cmi_file ~in_dir m = file ~in_dir m ~ext:".cmi"
+    let cmo_file ~in_dir m = file ~in_dir m ~ext:".cmo"
+    let cmx_file ~in_dir m = file ~in_dir m ~ext:".cmx"
+    let impl_file ~code ~in_dir m =
+      (match code with
+      | `Byte -> cmo_file
+      | `Native -> cmx_file) ~in_dir m
+
+    let as_intf_dep_files ?(init = []) ~in_dir m = cmi_file ~in_dir m :: init
+    let as_impl_dep_files ?(init = []) ~code ~in_dir m = match code with
+    | `Byte -> cmi_file ~in_dir m :: init
+    | `Native ->
+        match ml m with
+        | None -> cmi_file ~in_dir m :: init
+        | Some _ when m.opaque -> cmi_file ~in_dir m :: init
+        | Some _ -> cmi_file ~in_dir m :: cmx_file ~in_dir m :: init
+
+    let mod_name_map m ~kind files =
+      let add acc f =
+        let mname = Name.of_filename f in
+        match Name.Map.find mname acc with
+        | exception Not_found -> Name.Map.add mname f acc
+        | f' ->
+            Memo.notify m `Warn
+              "@[<v>%a:@,File ignored. %a's module %s defined by file:@,%a:@]"
+              Fpath.pp_unquoted f Name.pp mname kind Fpath.pp_unquoted f';
+            acc
       in
-      Fmt.pf ppf "@[<1>{%a}@]" (Fmt.iter_bindings ~sep:Fmt.sp iter pp_binding) m
+      List.fold_left add Name.Map.empty files
 
-    let pp ?sep pp_binding = Fmt.iter_bindings ?sep iter pp_binding
+    let of_srcs m ~srcs ~src_deps  =
+      let get_src_deps = function
+      | None -> Name.Set.empty
+      | Some file ->
+          match Fpath.Map.find file src_deps with
+          | exception Not_found -> Name.Set.empty
+          | deps -> deps
+      in
+      let mlis, mls = List.partition (Fpath.has_ext ".mli") srcs in
+      let mlis = mod_name_map m ~kind:"interface" mlis in
+      let mls = mod_name_map m ~kind:"implementation" mls in
+      let mod' mod_name mli ml =
+        let mli_deps = get_src_deps mli in
+        let ml_deps = get_src_deps ml in
+        Some (v ~mod_name ~opaque:false ~mli ~mli_deps ~ml ~ml_deps)
+      in
+      Name.Map.merge mod' mlis mls
+
+    let sort ?stable ~deps name_map =
+      let rec loop seen acc = function
+      | [] -> seen, acc
+      | src :: srcs ->
+          if Name.Set.mem src.mod_name seen then loop seen acc srcs else
+          let seen = Name.Set.add src.mod_name seen in
+          let add_src_dep n acc = match Name.Set.mem n seen with
+          | true -> acc
+          | false ->
+              match Name.Map.find_opt n name_map with
+              | None -> acc
+              | Some src -> src :: acc
+          in
+          let deps = Name.Set.fold add_src_dep (deps src) [] in
+          let seen, acc = loop seen acc deps in
+          loop seen (src :: acc) srcs
+      in
+      let add_src _ src acc = src :: acc in
+      let stable = Option.value ~default:[] stable in
+      let todo = stable @ Name.Map.fold add_src name_map [] in
+      let _, acc = loop Name.Set.empty [] todo in
+      List.rev acc
+
+    let find_local_deps map ns =
+      let rec loop res remain deps = match Name.Set.choose deps with
+      | exception Not_found -> res, remain
+      | dep ->
+          let deps = Name.Set.remove dep deps in
+          match Name.Map.find dep map with
+          | m -> loop (m :: res) remain deps
+          | exception Not_found ->
+              loop res (Name.Set.add dep remain) deps
+      in
+      loop [] Name.Set.empty ns
   end
 end
 
 module Cobj = struct
-  type code = Byte | Native
-  let archive_ext_of_code = function Byte -> ".cma" | Native -> ".cmxa"
-  let object_ext_of_code = function Byte -> ".cmo" | Native -> ".cmx"
+  let archive_ext_of_code = function `Byte -> ".cma" | `Native -> ".cmxa"
+  let object_ext_of_code = function `Byte -> ".cmo" | `Native -> ".cmx"
 
   type t =
     { file : Fpath.t;
-      defs : Mod_ref.Set.t;
-      deps : Mod_ref.Set.t;
-      link_deps : Mod_ref.Set.t; (* deps whose name appear in required
+      defs : Mod.Ref.Set.t;
+      deps : Mod.Ref.Set.t;
+      link_deps : Mod.Ref.Set.t; (* deps whose name appear in required
                                     globals/implementations imported *) }
 
   let file c = c.file
@@ -277,9 +603,9 @@ module Cobj = struct
   let pp =
     Fmt.record @@
     [ Fmt.field "file" file Fpath.pp_quoted;
-      Fmt.field "defs" defs Mod_ref.Set.dump;
-      Fmt.field "deps" deps Mod_ref.Set.dump;
-      Fmt.field "link-deps" link_deps Mod_ref.Set.dump; ]
+      Fmt.field "defs" defs Mod.Ref.Set.dump;
+      Fmt.field "deps" deps Mod.Ref.Set.dump;
+      Fmt.field "link-deps" link_deps Mod.Ref.Set.dump; ]
 
   module T = struct type nonrec t = t let compare = compare end
   module Set = Set.Make (T)
@@ -288,19 +614,19 @@ module Cobj = struct
   let sort ?(deps = link_deps) cobjs =
     let rec loop cobjs_defs seen ext_deps cobjs = function
     | (c :: cs as l) :: todo ->
-        begin match Mod_ref.Set.subset (defs c) seen with
+        begin match Mod.Ref.Set.subset (defs c) seen with
         | true -> loop cobjs_defs seen ext_deps cobjs (cs :: todo)
         | false ->
-            let seen = Mod_ref.Set.union (defs c) seen in
+            let seen = Mod.Ref.Set.union (defs c) seen in
             let add_dep d (local_deps, ext_deps as acc) =
-              if Mod_ref.Set.mem d seen then acc else
-              match Mod_ref.Map.find d cobjs_defs with
-              | exception Not_found -> local_deps, Mod_ref.Set.add d ext_deps
+              if Mod.Ref.Set.mem d seen then acc else
+              match Mod.Ref.Map.find d cobjs_defs with
+              | exception Not_found -> local_deps, Mod.Ref.Set.add d ext_deps
               | dep_cobj -> dep_cobj :: local_deps, ext_deps
             in
             let start = [], ext_deps in
             let local_deps, ext_deps =
-              Mod_ref.Set.fold add_dep (deps c) start
+              Mod.Ref.Set.fold add_dep (deps c) start
             in
             match local_deps with
             | [] -> loop cobjs_defs seen ext_deps (c :: cobjs) (cs :: todo)
@@ -315,18 +641,18 @@ module Cobj = struct
         sorted, ext_deps
     | [] -> assert false
     in
-    let add_def c d acc = Mod_ref.Map.add d c acc in
-    let add_defs acc c = Mod_ref.Set.fold (add_def c) (defs c) acc in
-    let cobjs_defs = List.fold_left add_defs Mod_ref.Map.empty cobjs in
-    loop cobjs_defs Mod_ref.Set.empty Mod_ref.Set.empty [] (cobjs :: [])
+    let add_def c d acc = Mod.Ref.Map.add d c acc in
+    let add_defs acc c = Mod.Ref.Set.fold (add_def c) (defs c) acc in
+    let cobjs_defs = List.fold_left add_defs Mod.Ref.Map.empty cobjs in
+    loop cobjs_defs Mod.Ref.Set.empty Mod.Ref.Set.empty [] (cobjs :: [])
 
   (* ocamlobjinfo output parsing, could be easier... *)
 
   let make_cobj file defs deps ldeps =
-    let deps = Mod_ref.Set.diff deps defs in
+    let deps = Mod.Ref.Set.diff deps defs in
     let link_deps =
-      let keep m = String.Set.mem (Mod_ref.name m) ldeps in
-      Mod_ref.Set.filter keep deps
+      let keep m = String.Set.mem (Mod.Ref.name m) ldeps in
+      Mod.Ref.Set.filter keep deps
     in
     { file; defs; deps; link_deps; }
 
@@ -363,10 +689,10 @@ module Cobj = struct
           let dname = String.trim dname in
           match Digest.from_hex dhex with
           | digest ->
-              let mref = Mod_ref.v dname digest in
+              let mref = Mod.Ref.v dname digest in
               let defs, deps = match String.equal dname name with
-              | true -> Mod_ref.Set.add mref defs, deps
-              | false -> defs, Mod_ref.Set.add mref deps
+              | true -> Mod.Ref.Set.add mref defs, deps
+              | false -> defs, Mod.Ref.Set.add mref deps
               in
               parse_deps acc file defs deps ldeps name (n + 1) ls
           | exception Invalid_argument _ ->
@@ -393,7 +719,7 @@ module Cobj = struct
       let acc = make_cobj file defs deps ldeps :: acc in
       let file = parse_file_path n l in
       parse_file
-        acc file Mod_ref.Set.empty Mod_ref.Set.empty String.Set.empty (n + 1) ls
+        acc file Mod.Ref.Set.empty Mod.Ref.Set.empty String.Set.empty (n + 1) ls
   | _ :: ls -> parse_file acc file defs deps ldeps (n + 1) ls
 
   and parse_files acc n = function
@@ -401,7 +727,7 @@ module Cobj = struct
   | l :: ls when String.is_prefix file_prefix l ->
       let file = parse_file_path n l in
       parse_file
-        acc file Mod_ref.Set.empty Mod_ref.Set.empty String.Set.empty (n + 1) ls
+        acc file Mod.Ref.Set.empty Mod.Ref.Set.empty String.Set.empty (n + 1) ls
   | l :: ls -> parse_files acc (n + 1) ls
 
   let of_string ?file data =
@@ -418,382 +744,6 @@ module Cobj = struct
   let read m file =
     let* s = B00.Memo.read m file in
     Fut.return (of_string ~file s |> Memo.fail_if_error m)
-end
-
-module Mod_src = struct
-  module Deps = struct
-    let of_string ?(file = Fpath.dash) ?src_root data =
-      (* Parse ocamldep's [-slash -modules], a bit annoying to parse.
-         ocamldep shows its Makefile legacy. *)
-      let parse_path n p = (* ocamldep escapes spaces as "\ ", a bit annoying *)
-        let char_len_at s i = match s.[i] with
-        | '\\' when i + 1 < String.length s && s.[i+1] = ' ' -> 2
-        | _ -> 1
-        in
-        let set_char b k s i = match char_len_at s i with
-        | 2 -> Bytes.set b k ' '; 2
-        | 1 -> Bytes.set b k s.[i]; 1
-        | _ -> assert false
-        in
-        match String.byte_unescaper char_len_at set_char p with
-        | Error j -> B00_lines.err n "%d: illegal escape" j
-        | Ok p ->
-            match Fpath.of_string p with
-            | Error e -> B00_lines.err n "%s" e
-            | Ok p -> p
-      in
-      let parse_line ~src_root n line acc =
-        if line = "" then acc else
-        match String.cut_right (* right, windows drives *) ~sep:":" line with
-        | None -> B00_lines.err n "cannot parse line: %S" line
-        | Some (file, mods) ->
-            let file = parse_path n file in
-            let file = match src_root with
-            | None -> file
-            | Some src_root -> Fpath.(src_root // file)
-            in
-            let add_mod acc m = Mod_name.Set.add m acc in
-            let mods = String.cuts_left ~drop_empty:true ~sep:" " mods in
-            let start = Mod_name.Set.singleton "Stdlib" in
-            let mods = List.fold_left add_mod start mods in
-            Fpath.Map.add file mods acc
-      in
-      B00_lines.fold ~file data (parse_line ~src_root) Fpath.Map.empty
-
-    let write ?src_root m ~srcs ~o =
-      let ocamldep = Memo.tool m Tool.ocamldep in
-      let srcs', cwd = match src_root with
-      | None -> srcs, None
-      | Some root ->
-          (* FIXME unfortunately this doesn't report parse error
-             at the right place. So we don't do anything for now
-             the output thus depends on the path location and can't
-             be cached across machines.
-          let rem_prefix src = Fpath.rem_prefix root src |> Option.get in
-          List.map rem_prefix srcs, Some root
-          *)
-          srcs, None
-      in
-      Memo.spawn m ?cwd ~reads:srcs ~writes:[o] ~stdout:(`File o) @@
-      ocamldep Cmd.(arg "-slash" % "-modules" %% paths srcs')
-
-    let read ?src_root m file =
-      let* s = Memo.read m file in
-      Fut.return (of_string ?src_root ~file s |> Memo.fail_if_error m)
-  end
-
-  type t =
-    { mod_name : Mod_name.t;
-      opaque : bool;
-      mli : Fpath.t option;
-      mli_deps : Mod_name.Set.t;
-      ml : Fpath.t option;
-      ml_deps : Mod_name.Set.t }
-
-  let v ~mod_name ~opaque ~mli ~mli_deps ~ml ~ml_deps =
-    { mod_name; opaque; mli; mli_deps; ml; ml_deps }
-
-  let mod_name m = m.mod_name
-  let opaque m = m.opaque
-  let mli m = m.mli
-  let mli_deps m = m.mli_deps
-  let ml m = m.ml
-  let ml_deps m = m.ml_deps
-
-  let file ~in_dir m ~ext =
-    let fname = String.Ascii.uncapitalize (mod_name m) in
-    Fpath.(in_dir / Fmt.str "%s%s" fname ext)
-
-  let cmi_file ~in_dir m = file ~in_dir m ~ext:".cmi"
-  let cmo_file ~in_dir m = file ~in_dir m ~ext:".cmo"
-  let cmx_file ~in_dir m = file ~in_dir m ~ext:".cmx"
-  let impl_file ~code ~in_dir m =
-    (match code with
-    | Cobj.Byte -> cmo_file
-    | Cobj.Native -> cmx_file) ~in_dir m
-
-  let as_intf_dep_files ?(init = []) ~in_dir m = cmi_file ~in_dir m :: init
-  let as_impl_dep_files ?(init = []) ~code ~in_dir m = match code with
-  | Cobj.Byte -> cmi_file ~in_dir m :: init
-  | Cobj.Native ->
-      match ml m with
-      | None -> cmi_file ~in_dir m :: init
-      | Some _ when m.opaque -> cmi_file ~in_dir m :: init
-      | Some _ -> cmi_file ~in_dir m :: cmx_file ~in_dir m :: init
-
-  let mod_name_map m ~kind files =
-    let add acc f =
-      let mname = Mod_name.of_filename f in
-      match Mod_name.Map.find mname acc with
-      | exception Not_found -> Mod_name.Map.add mname f acc
-      | f' ->
-          Memo.notify m `Warn
-            "@[<v>%a:@,File ignored. %a's module %s defined by file:@,%a:@]"
-            Fpath.pp_unquoted f Mod_name.pp mname kind Fpath.pp_unquoted f';
-          acc
-    in
-    List.fold_left add Mod_name.Map.empty files
-
-  let of_srcs m ~srcs ~src_deps  =
-    let get_src_deps = function
-    | None -> Mod_name.Set.empty
-    | Some file ->
-        match Fpath.Map.find file src_deps with
-        | exception Not_found -> Mod_name.Set.empty
-        | deps -> deps
-    in
-    let mlis, mls = List.partition (Fpath.has_ext ".mli") srcs in
-    let mlis = mod_name_map m ~kind:"interface" mlis in
-    let mls = mod_name_map m ~kind:"implementation" mls in
-    let mod' mod_name mli ml =
-      let mli_deps = get_src_deps mli in
-      let ml_deps = get_src_deps ml in
-      Some (v ~mod_name ~opaque:false ~mli ~mli_deps ~ml ~ml_deps)
-    in
-    Mod_name.Map.merge mod' mlis mls
-
-  let sort ?stable ~deps name_map =
-    let rec loop seen acc = function
-    | [] -> seen, acc
-    | src :: srcs ->
-        if Mod_name.Set.mem src.mod_name seen then loop seen acc srcs else
-        let seen = Mod_name.Set.add src.mod_name seen in
-        let add_src_dep n acc = match Mod_name.Set.mem n seen with
-        | true -> acc
-        | false ->
-            match Mod_name.Map.find_opt n name_map with
-            | None -> acc
-            | Some src -> src :: acc
-        in
-        let deps = Mod_name.Set.fold add_src_dep (deps src) [] in
-        let seen, acc = loop seen acc deps in
-        loop seen (src :: acc) srcs
-    in
-    let add_src _ src acc = src :: acc in
-    let stable = Option.value ~default:[] stable in
-    let todo = stable @ Mod_name.Map.fold add_src name_map [] in
-    let _, acc = loop Mod_name.Set.empty [] todo in
-    List.rev acc
-
-  let find_local_deps map ns =
-    let rec loop res remain deps = match Mod_name.Set.choose deps with
-    | exception Not_found -> res, remain
-    | dep ->
-        let deps = Mod_name.Set.remove dep deps in
-        match Mod_name.Map.find dep map with
-        | m -> loop (m :: res) remain deps
-        | exception Not_found ->
-            loop res (Mod_name.Set.add dep remain) deps
-    in
-    loop [] Mod_name.Set.empty ns
-end
-
-module Compile = struct
-
-  (* XXX We should properly investigate how to use BUILD_PATH_PREFIX_MAP.
-     However for some reasons that were never not really answered by @gasche in
-     https://github.com/ocaml/ocaml/pull/1515, the map does not affect
-     absolute paths which severly limits its applicability.
-
-     XXX At some point we would had -o OBJ src [-I inc...] this worked
-     at least in 4.07 but not in 4.03, where apparently the order mattered. *)
-
-  let add_if c v l = if c  then v :: l else l
-  let debug = Cmd.arg "-g"
-
-  let c_to_o ?post_exec ?k m ~hs ~c ~o =
-    let ocamlc = Memo.tool m Tool.ocamlc in
-    let cwd =
-      (* We can't use `-c` and `-o` on C files see
-         https://github.com/ocaml/ocaml/issues/7677 so we cwd to the
-         output directory to perform the spawn. *)
-      Fpath.parent o
-    in
-    let incs = Fpath.uniquify @@ List.map Fpath.parent hs in
-    let incs = Cmd.paths ~slip:"-I" incs in
-    Memo.spawn m ?post_exec ?k ~reads:(c :: hs) ~writes:[o] ~cwd @@
-    ocamlc Cmd.(debug % "-c" %% unstamp (incs %% path c))
-
-  let mli_to_cmi
-      ?post_exec ?k ?args:(more_args = Cmd.empty) ?(with_cmti = true) m
-      ~reads ~mli ~o
-    =
-    let ocamlc = Memo.tool m Tool.ocamlc in
-    let incs = Fpath.uniquify @@ List.map Fpath.parent reads in
-    let incs = Cmd.paths ~slip:"-I" incs in
-    let bin_annot = Cmd.if' with_cmti (Cmd.arg "-bin-annot") in
-    let stamp = Fpath.basename o in
-    let reads = mli :: reads in
-    let writes = o :: if with_cmti then [Fpath.(o -+ ".cmti")] else [] in
-    Memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
-    ocamlc Cmd.(debug %% bin_annot % "-c" % "-o" %%
-                unstamp (path o %% incs) %% more_args %% unstamp (path mli))
-
-  let ml_to_cmo
-      ?post_exec ?k ?args:(more_args = Cmd.empty) ?(with_cmt = true) m
-      ~has_cmi ~reads ~ml ~o
-    =
-    let ocamlc = Memo.tool m Tool.ocamlc in
-    let incs = Fpath.uniquify @@ List.map Fpath.parent reads in
-    let incs = Cmd.paths ~slip:"-I" incs in
-    let bin_annot = Cmd.if' with_cmt (Cmd.arg "-bin-annot") in
-    let stamp = Fpath.basename o in
-    let reads = ml :: reads in
-    let writes =
-      o :: (add_if with_cmt Fpath.(o -+ ".cmt") @@
-            add_if (not has_cmi) Fpath.(o -+ ".cmi") [])
-    in
-    Memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
-    ocamlc Cmd.(debug %% bin_annot % "-c" % "-o" %% unstamp (path o) %%
-                unstamp incs %% more_args %% unstamp (path ml))
-
-  let ml_to_cmx
-      ?post_exec ?k ?args:(more_args = Cmd.empty) ?(with_cmt = true) m ~has_cmi
-      ~reads ~ml ~o
-    =
-    let ocamlopt = Memo.tool m Tool.ocamlopt in
-    let incs = Fpath.uniquify @@ List.map Fpath.parent reads in
-    let incs = Cmd.paths ~slip:"-I" incs in
-    let bin_annot = Cmd.if' with_cmt (Cmd.arg "-bin-annot") in
-    let reads = ml :: reads in
-    let stamp = Fpath.basename o in
-    let base = Fpath.rem_ext o in
-    let writes = [o; Fpath.(base + ".o")] in
-    let writes = add_if with_cmt Fpath.(base + ".cmt") writes in
-    let writes = add_if (not has_cmi) Fpath.(base + ".cmi") writes in
-    Memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
-    ocamlopt Cmd.(debug %% bin_annot % "-c" % "-o" %% unstamp (path o) %%
-                  unstamp incs %% more_args %% unstamp (path ml))
-
-  let ml_to_impl
-      ?post_exec ?k ?args ?with_cmt m ~code ~has_cmi ~reads ~ml ~o
-    =
-    (match code with Cobj.Byte -> ml_to_cmo | Cobj.Native -> ml_to_cmx)
-      ?post_exec ?k ?args ?with_cmt m ~has_cmi ~reads ~ml ~o
-
-  let cstubs_name name = Fmt.str "%s_stubs" name
-  let cstubs_clib name ext_lib = Fmt.str "lib%s_stubs%s" name ext_lib
-  let cstubs_dll name ext_dll = Fmt.str "dll%s_stubs%s" name ext_dll
-  let cstubs_archives
-      ?post_exec ?k ?args:(more_args = Cmd.empty) m ~c_objs ~odir ~oname
-    =
-    (* FIXME Conf *)
-    let lib_ext = ".a" in
-    let dll_ext = ".so" in
-    let ocamlmklib = Memo.tool m Tool.ocamlmklib in
-    let o = Fpath.(odir / cstubs_name oname) in
-    let writes =
-      [ Fpath.(odir / cstubs_clib oname lib_ext);
-        Fpath.(odir / cstubs_dll oname dll_ext)] (* FIXME dynlink cond. *)
-    in
-    Memo.spawn ?post_exec ?k m ~reads:c_objs ~writes @@
-    ocamlmklib Cmd.(debug % "-o" %% unstamp (path o) %% unstamp (paths c_objs))
-
-  let byte_archive
-      ?post_exec ?k ?args:(more_args = Cmd.empty) m ~has_cstubs ~cobjs ~odir
-      ~oname
-    =
-    let ocamlc = Memo.tool m Tool.ocamlc in
-    let cstubs_opts = match has_cstubs with
-    | false -> Cmd.empty
-    | true ->
-        let lib = Fmt.str "-l%s" (cstubs_name oname) in
-        let cclib = Cmd.(arg "-cclib" % lib) in
-        let dllib = Cmd.(arg "-dllib" % lib) in (* FIXME dynlink cond. *)
-        Cmd.(cclib %% dllib)
-    in
-    let cma = Fpath.(odir / Fmt.str "%s.cma" oname) in
-    Memo.spawn m ~reads:cobjs ~writes:[cma] @@
-    ocamlc Cmd.(debug % "-a" % "-o" %% unstamp (path cma) %% cstubs_opts %%
-                unstamp (paths cobjs))
-
-  let native_archive
-      ?post_exec ?k ?args:(more_args = Cmd.empty) m ~has_cstubs ~cobjs ~odir
-      ~oname
-    =
-    (* FIXME Conf *)
-    let lib_ext = ".a" in
-    let ocamlopt = Memo.tool m Tool.ocamlopt in
-    let cstubs_opts = match has_cstubs with
-    | false -> Cmd.empty
-    | true -> Cmd.(arg "-cclib" % Fmt.str "-l%s" (cstubs_name oname))
-    in
-    let cmxa = Fpath.(odir / Fmt.str "%s.cmxa" oname) in
-    let cmxa_clib = Fpath.(odir / Fmt.str "%s%s" oname lib_ext) in
-    Memo.spawn m ?post_exec ?k ~reads:cobjs ~writes:[cmxa; cmxa_clib] @@
-    ocamlopt Cmd.(debug % "-a" % "-o" %% unstamp (path cmxa) %% cstubs_opts %%
-                  unstamp (paths cobjs))
-
-  let archive ?post_exec ?k ?args m ~code ~has_cstubs ~cobjs ~odir ~oname =
-    (match code with Cobj.Byte -> byte_archive | Cobj.Native -> native_archive)
-    ?post_exec ?k ?args m ~has_cstubs ~cobjs ~odir ~oname
-
-  let native_dynlink_archive
-      ?post_exec ?k ?args:(more_args = Cmd.empty) m ~has_cstubs ~cmxa ~o
-    =
-    let lib_ext = ".a" in
-    let ocamlopt = Memo.tool m Tool.ocamlopt in
-    let cmxa_clib = Fpath.(cmxa -+ lib_ext) in
-    let cstubs_opts, reads = match has_cstubs with
-    | false -> Cmd.empty, [cmxa; cmxa_clib]
-    | true ->
-        (* Fixme do this on a cstubs path *)
-        let oname = Fpath.basename ~no_ext:true cmxa in
-        let cstubs_dir = Fpath.(parent cmxa) in
-        let cstubs = Fpath.(cstubs_dir / cstubs_clib oname lib_ext) in
-        let inc = Cmd.(arg "-I" %% unstamp (path cstubs_dir)) in
-        Cmd.(inc %% unstamp (path cstubs)), [cstubs; cmxa; cmxa_clib]
-    in
-    Memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
-    ocamlopt Cmd.(debug % "-shared" % "-linkall" % "-o" %% unstamp (path o) %%
-                  cstubs_opts %% unstamp (path cmxa))
-end
-
-module Link = struct
-  module Deps = struct
-    let write = Cobj.write
-    let read m file = Fut.map Cobj.sort (Cobj.read m file)
-  end
-
-  (* FIXME How to add cstubs archives of cm[x]a to [reads].
-     Do we need it ? *)
-
-  let cstubs_incs objs =
-    let add_inc acc obj = Fpath.Set.add (Fpath.parent obj) acc in
-    let incs = List.fold_left add_inc Fpath.Set.empty objs in
-    Cmd.paths ~slip:"-I" (Fpath.Set.elements incs)
-
-  let byte_exe ?post_exec ?k ?args:(more_args = Cmd.empty) m ~c_objs ~cobjs ~o =
-    let ocamlc = Memo.tool m Tool.ocamlc in
-    let reads = List.rev_append cobjs c_objs in
-    let incs = cstubs_incs cobjs in
-    Memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
-    ocamlc Cmd.(Compile.debug % "-custom" % "-o" %%
-                unstamp (path o %% incs %% paths c_objs %% paths cobjs))
-
-  let native_exe
-      ?post_exec ?k ?args:(more_args = Cmd.empty) m ~c_objs ~cobjs ~o
-    =
-    let ocamlopt = Memo.tool m Tool.ocamlopt in
-    (* FIXME lift that as args or ask for OCaml.Conf.t *)
-    let obj_ext = ".o" in
-    let lib_ext = ".a" in
-    let cobj_side_obj cobj =
-      let ext = if Fpath.has_ext ".cmx" cobj then obj_ext else lib_ext in
-      Fpath.set_ext ext cobj
-    in
-    let incs = cstubs_incs cobjs in
-    let reads =
-      let sides = List.rev_map cobj_side_obj cobjs in
-      List.rev_append cobjs (List.rev_append sides c_objs)
-    in
-    Memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
-    ocamlopt Cmd.(Compile.debug % "-o" %%
-                  unstamp (path o %% incs %% paths c_objs %% paths cobjs))
-
-  let exe ?post_exec ?k ?args m ~code ~c_objs ~cobjs ~o =
-    (match code with Cobj.Byte -> byte_exe | Cobj.Native -> native_exe)
-    ?post_exec ?k ?args m ~c_objs ~cobjs ~o
 end
 
 (* Libraries *)
@@ -887,43 +837,70 @@ module Lib = struct
 
   (* Libraries *)
 
-  (* This doesn't work well for built libraries and needs fixing.
-     Should work but for reasons that are subtle, also doesn't
-     maxmimize // (in B0_ocaml sync on archive ready rather more fine
-     grained on ifaces).
-
-     Also FIXME: the archive may not exist. *)
-
   type t =
     { name : Name.t;
       requires : Name.t list;
       dir : Fpath.t;
-      archive : string;
-      dir_files_by_ext : B00_fexts.map Lazy.t;
-      installed : bool; (* this should not be needed. *) }
+      cmis : Fpath.t list;
+      cmxs : Fpath.t list;
+      cma : Fpath.t option;
+      cmxa : Fpath.t option;
+      c_archive : Fpath.t option;
+      c_stubs : Fpath.t list; }
 
-  let dir_files_by_ext m ~installed dir =
-    Memo.fail_if_error m @@
-    let add _ _ p acc =
-      if installed then Memo.file_ready m p;
-      String.Map.add_to_list (Fpath.get_ext p) p acc
+  let v ~name ~requires ~dir ~cmis ~cmxs ~cma ~cmxa ~c_archive ~c_stubs =
+    { name; requires; dir; cmis; cmxs; cma; cmxa; c_archive; c_stubs }
+
+  let of_dir m ~clib_ext ~name ~requires ~dir ~archive =
+    let rec loop cmis cmxs cma cmxa c_archive c_stubs = function
+    | [] -> v ~name ~requires ~dir ~cmis ~cmxs ~cma ~cmxa ~c_archive ~c_stubs
+    | f :: fs ->
+        let is_lib_archive f = match archive with
+        | None -> false
+        | Some a -> String.equal (Fpath.basename ~no_ext:true f) a
+        in
+        match Fpath.get_ext f with
+        | ".cmi" ->
+            Memo.file_ready m f;
+            loop (f :: cmis) cmxs cma cmxa c_archive c_stubs fs
+        | ".cmx" ->
+            Memo.file_ready m f;
+            loop cmis (f :: cmxs) cma cmxa c_archive c_stubs fs
+        | ".cma" ->
+            let cma = match is_lib_archive f with
+            | true -> Memo.file_ready m f; Some f
+            | false -> cma
+            in
+            loop cmis cmxs cma cmxa c_archive c_stubs fs
+        | ".cmxa" ->
+            let cmxa = match is_lib_archive f with
+            | true -> Memo.file_ready m f; Some f
+            | false -> cmxa
+            in
+            loop cmis cmxs cma cmxa c_archive c_stubs fs
+        | ext when String.equal ext clib_ext ->
+            Memo.file_ready m f;
+            let c_archive, c_stubs = match is_lib_archive f with
+            | true -> Some f, c_stubs
+            | false -> c_archive, (f :: c_stubs)
+            in
+            loop cmis cmxs cma cmxa c_archive c_stubs fs
+        | _ ->
+            loop cmis cmxs cma cmxa c_archive c_stubs fs
     in
-    Os.Dir.fold_files ~recurse:false add dir String.Map.empty
-
-  let v ?(installed = true) ?(archive = "lib") m ~name ~requires ~dir =
-    let dir_files_by_ext = lazy (dir_files_by_ext m ~installed dir) in
-    { name; requires; dir; archive; dir_files_by_ext; installed }
+    Result.map_error (fun e -> Fmt.str "library %a: %s" Name.pp name e) @@
+    Result.bind (Os.Dir.fold_files ~recurse:false Os.Dir.path_list dir []) @@
+    fun fs -> Ok (loop [] [] None None None [] fs)
 
   let name l = l.name
   let requires l = l.requires
   let dir l = l.dir
-  let archive ~code l =
-    let a = l.archive ^ Cobj.archive_ext_of_code code in
-    Fpath.(l.dir / a)
-
-  let installed l = l.installed
-  let cmis l = match String.Map.find ".cmi" (Lazy.force l.dir_files_by_ext) with
-  | exception Not_found -> [] | cmis -> cmis
+  let cmis l = l.cmis
+  let cmxs l = l.cmxs
+  let cma l = l.cma
+  let cmxa l = l.cmxa
+  let c_archive l = l.c_archive
+  let c_stubs l = l.c_stubs
 end
 
 (* Resolver *)
@@ -953,11 +930,10 @@ module Lib_convention = struct
 *)
 end
 
-
 module Ocamlfind = struct
   let tool = B00.Tool.by_name "ocamlfind"
 
-  let parse_info m ?(file = Fpath.dash) n s =
+  let parse_info m ?(file = Fpath.dash) ~name s =
     let parse_requires requires =
       let to_libname s =
         Result.to_failure @@
@@ -982,13 +958,14 @@ module Ocamlfind = struct
             Result.map_error (Fmt.str "library directory: %s") @@
             Fpath.of_string dir
           in
-          Ok (meta, Lib.v m ~name:n ~requires ~dir ?archive)
+          Ok (meta, requires, dir, archive)
       | _ -> Fmt.failwith "could not parse %S" s
     with
     | Failure e -> Fmt.error "@[<v>%a: %s@]" Fpath.pp_unquoted file e
 
   (* FIXME need to solve the META file read.
-     FIXME post exec is still messy, check if we can make it to use Memo.t *)
+     FIXME post exec is still super messy, check if we can make it
+     to use Memo.t *)
 
   let write_info m n ~o =
     (* FIXME better [n] not found error *)
@@ -1012,28 +989,34 @@ module Ocamlfind = struct
          archives *)
       "%m:%d:%A:%(requires)"
     in
-    Memo.spawn m ~success_exits ~reads:[] ~writes:[o] ~stdout:(`File o)
-      ~post_exec @@
+    let stdout = `File o in
+    Memo.spawn m ~success_exits ~reads:[] ~writes:[o] ~stdout ~post_exec @@
     ocamlfind Cmd.(arg "query" % lib % "-predicates" % "byte,native" %
                    "-format" % info)
 
-  let read_info m n f =
-    let* s = Memo.read m f in
-    let _meta_file, lib = parse_info ~file:f m n s |> Memo.fail_if_error m in
+
+  let read_info m clib_ext name file =
+    let* s = Memo.read m file in
+    let lib =
+      Memo.fail_if_error m @@
+      Result.bind (parse_info ~file m ~name s) @@
+      fun (_meta, requires, dir, archive) ->
+      Lib.of_dir m ~clib_ext ~name ~requires ~dir ~archive
+    in
     Fut.return lib
 end
 
 module Lib_resolver = struct
-
   type t =
     { memo : B00.Memo.t;
       memo_dir : Fpath.t;
       ocamlpath : Fpath.t list;
+      clib_ext : Fpath.ext;
       mutable libs : Lib.t Fut.t Lib.Name.Map.t; }
 
-  let create memo ~memo_dir ~ocamlpath =
+  let create memo ~memo_dir ~ocamlpath ~clib_ext =
     let memo = B00.Memo.with_mark memo "b00.ocamlib" in
-    { memo; memo_dir; ocamlpath; libs = Lib.Name.Map.empty }
+    { memo; memo_dir; ocamlpath; clib_ext; libs = Lib.Name.Map.empty }
 
   let find r n = match Lib.Name.Map.find n r.libs with
   | lib -> lib
@@ -1045,7 +1028,7 @@ module Lib_resolver = struct
         let fname = Fmt.str "ocamlfind.%s" (Lib.Name.to_string n) in
         let o = Fpath.(r.memo_dir / fname) in
         Ocamlfind.write_info r.memo n o;
-        Fut.await (Ocamlfind.read_info r.memo n o) set
+        Fut.await (Ocamlfind.read_info r.memo r.clib_ext n o) set
       end;
       fut
 end

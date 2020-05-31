@@ -26,6 +26,11 @@ val shared_build_dir : t -> Fpath.t
      build. This is used by computations shared by units. Most of the
      time one should use {!Unit.build_dir}. *)
 
+val current_root_dir : t -> Fpath.t
+(** [current_root_dir b] is the directory of the B0 file in which
+    the {{!Unit.current}current} unit is defined, otherwise said this is
+    {!Unit.root_dir}[ b ]{!Unit.current}. *)
+
 val get : t -> 'a B00.Store.key -> 'a Fut.t
 (** [get b k] is {!B00.Store.get}[ (store b) k]. *)
 
@@ -36,7 +41,7 @@ module Unit : sig
 
   val current : t -> B0_unit.t
   (** [current b] is [b]'s current unit. In the {{!B0_unit.type-proc}procedure}
-      of build unit that is the unit itself. *)
+      of a build unit this is the unit itself. *)
 
   val must_build : t -> B0_unit.Set.t
   (** [must_build b] are the units in [b] that must build. *)
