@@ -299,7 +299,7 @@ module Memo = struct
     let create m = let f = _create m in f, set f
     let value f = match f.state with Det v -> Some v | _ -> None
     let await f k = match f.state with
-    | Det v -> Rqueue.add f.m.m.fiber_ready (fun () -> k v)
+    | Det v -> k v
     | Undet u -> u.awaits <- k :: u.awaits
 
     let return m v = { state = Det v; m }
