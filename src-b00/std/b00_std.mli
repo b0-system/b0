@@ -1821,9 +1821,7 @@ let ocamlopt ?(profile = false) ?(debug = false) incs file =
 ]} *)
 end
 
-
 (** Future values.
-
 
     A future is an undetermined value that becomes determined at an an
     arbitrary point in the future. The future acts as a placeholder
@@ -1852,17 +1850,16 @@ module Fut : sig
   (** [return v] is a future that determines [v]. *)
 
   val map : ('a -> 'b) -> 'a t -> 'b t
-  (** [map fn f] is [return (fn v)] with [v] the value determined by [f]. *)
+  (** [map fn f] is [return (fn v)] with [v] the value of [f]. *)
 
   val bind : 'a t -> ('a -> 'b t) -> 'b t
-  (** [bind f fn] is the future [fn v] with [v] the value determined by [f]. *)
+  (** [bind f fn] is the future [fn v] with [v] the value of [f]. *)
 
   val pair : 'a t -> 'b t -> ('a * 'b) t
-  (** [pair f0 f1] determines with the result of [f0] and [f1]. *)
+  (** [pair f0 f1] determines with the value of [f0] and [f1]. *)
 
   val of_list : 'a t list -> 'a list t
-  (** [of_list fs] determines with the determining of all [fs], in the same
-      order. *)
+  (** [of_list fs] determines with the values of all [fs], in the same order. *)
 
   (** Future syntax. *)
   module Syntax : sig
