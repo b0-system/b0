@@ -148,13 +148,13 @@ module Build = struct
     let m = B00.Memo.with_mark b.u.m (name unit) in
     let u = { current = Some unit; m } in
     let b = { b with u } in
-    Fut.bind (B00.Memo.mkdir b.u.m (Unit.build_dir b unit)) @@
-    fun () -> (proc unit) b
+    B00.Memo.run_proc m begin fun () ->
+      let* () = B00.Memo.mkdir b.u.m (Unit.build_dir b unit) in
+      (proc unit) b
+    end
 
   let rec run_units b = match Rqueue.take b.b.waiting with
-  | Some u ->
-      (* FIXME catch exns *)
-      ignore (run_unit b u); run_units b
+  | Some u -> run_unit b u; run_units b
   | None ->
       B00.Memo.stir ~block:true b.u.m;
       if Rqueue.length b.b.waiting = 0 then () else run_units b
@@ -162,6 +162,16 @@ module Build = struct
   let log_file b = Fpath.(b.b.build_dir / "_log")
   let write_log_file ~log_file m =
     Log.if_error ~use:() @@ B00_ui.Memo.Log.(write log_file (of_memo m))
+
+
+  let report_memo_errors fmt m = match B00.Memo.status m with
+  | Ok _ as v -> v
+  | Error e ->
+      let read_howto = Fmt.any "b0 log -r " in
+      let write_howto = Fmt.any "b0 log -w " in
+      B000_conv.Op.pp_aggregate_error
+        ~read_howto ~write_howto () fmt e;
+      Error ()
 
   let run b =
     let log_file =
@@ -176,18 +186,10 @@ module Build = struct
         let* () = B00.Memo.delete b.u.m b.b.build_dir in
         let* () = B00.Memo.mkdir b.u.m b.b.build_dir in
         let* () = B00.Memo.mkdir b.u.m (B00.Store.dir b.b.store) in
-        Fut.return (run_units b)
+        run_units b; Fut.return ()
       end;
       B00.Memo.stir ~block:true b.u.m;
-      let ret = match B00.Memo.status b.u.m with
-      | Ok _ as v -> v
-      | Error e ->
-          let read_howto = Fmt.any "b0 log -r " in
-          let write_howto = Fmt.any "b0 log -w " in
-          B000_conv.Op.pp_aggregate_error
-            ~read_howto ~write_howto () Fmt.stderr e;
-          Error ()
-      in
+      let ret = report_memo_errors Fmt.stderr b.u.m in
       Log.time (fun _ m -> m "deleting trash") begin fun () ->
         Log.if_error ~use:() (B00.Memo.delete_trash ~block:false b.u.m)
       end;
