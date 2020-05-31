@@ -288,12 +288,37 @@ module Memo = struct
     type 'a state = Det of 'a | Undet of { mutable awaits : ('a -> unit) list }
     type 'a t = { mutable state : 'a state; m : memo }
 
+
+    let default_trap e bt =
+        Log.err
+          (fun m -> m "@[<v>Future awaiter raised unexpectedly:@,%a@]"
+              Fmt.exn_backtrace (e, bt))
+
+    let exn_trap = ref default_trap
+    let set_exn_trap t = exn_trap := t
+    let with_exn_trap t f =
+      let old = !exn_trap in
+      try set_exn_trap t; f (); set_exn_trap old with
+      | e ->
+          let bt = Printexc.get_raw_backtrace () in
+          set_exn_trap old; Printexc.raise_with_backtrace e bt
+
+    let rec kontinue ks v =
+      let todo = ref ks in
+      try
+        while match !todo with [] -> false | _ -> true do
+          match !todo with k :: ks -> todo := ks; k v | [] -> ()
+        done
+      with
+      | (Stack_overflow | Out_of_memory | Sys.Break) as e -> raise e
+      | e ->
+          let bt = Printexc.get_raw_backtrace () in
+          !exn_trap e bt;
+          kontinue !todo v
+
     let set f v = match f.state with
     | Det _ -> invalid_arg "The future is already set"
-    | Undet u ->
-        f.state <- Det v;
-        let add_det k = Rqueue.add f.m.m.fiber_ready (fun () -> k v) in
-        List.iter add_det u.awaits
+    | Undet u -> f.state <- Det v; kontinue u.awaits v
 
     let _create m = { state = Undet { awaits = []; }; m }
     let create m = let f = _create m in f, set f
