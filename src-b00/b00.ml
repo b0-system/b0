@@ -96,7 +96,6 @@ module Memo = struct
       guard : Guard.t;
       reviver : Reviver.t;
       exec : Exec.t;
-      fiber_ready : (unit -> unit) Rqueue.t;
       mutable has_failures : bool;
       mutable op_id : int;
       mutable ops : Op.t list;
@@ -105,10 +104,10 @@ module Memo = struct
   let create ?clock ?cpu_clock:cc ~feedback ~cwd env guard reviver exec =
     let clock = match clock with None -> Time.counter () | Some c -> c in
     let cpu_clock = match cc with None -> Time.cpu_counter () | Some c -> c in
-    let fiber_ready = Rqueue.empty () and op_id = 0 and  ops = [] in
+    let op_id = 0 and  ops = [] in
     let c = { mark = "" } in
     let m =
-      { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec; fiber_ready;
+      { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec;
         has_failures = false; op_id; ops; ready_roots = Fpath.Set.empty }
     in
     { c; m }
@@ -189,10 +188,8 @@ module Memo = struct
       notify_op m `Fail err
 
   let run_proc m k =
-    Rqueue.add m.m.fiber_ready (fun () -> ignore (k ()))
-
-  let continue_fiber m k =
-    let pp_kind ppf () = Fmt.string ppf "Fiber" in
+    let k = fun () -> ignore (k ()) in
+    let pp_kind = Fmt.any "Procedure" in
     invoke_k m ~pp_kind k ()
 
   let continue_op m o =
@@ -203,8 +200,8 @@ module Memo = struct
 
   let discontinue_op m o =
     (* This is may not be entirely clear from the code :-( but any failed op
-       or fiber means this function eventually gets called, hereby giving
-       [has_failure] its appropriate semantics. *)
+       means this function eventually gets called, hereby giving [has_failure]
+       its appropriate semantics. *)
     m.m.has_failures <- true;
     List.iter (Guard.set_file_never m.m.guard) (Op.writes o);
     Op.discard_k o; m.m.feedback (`Op_complete o)
@@ -271,10 +268,7 @@ module Memo = struct
   | None ->
       match Exec.collect m.m.exec ~block with
       | Some o -> finish_op m o; stir ~block m
-      | None ->
-          match Rqueue.take m.m.fiber_ready with
-          | Some k -> continue_fiber m k; stir ~block m
-          | None -> ()
+      | None -> ()
 
   let add_op_and_stir m o = add_op m o; stir ~block:false m
 

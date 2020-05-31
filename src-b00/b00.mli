@@ -207,8 +207,7 @@ module Memo : sig
   (** [trash m] is [m]'s trash. *)
 
   val has_failures : t -> bool
-  (** [has_failures m] is [true] iff at least one operation (or fiber)
-      has failed. *)
+  (** [has_failures m] is [true] iff at least one operation has failed. *)
 
   val hash_string : t -> string -> Hash.t
   (** [hash_string m s] is {!B000.Reviver.hash_string}[ (reviver m) s]. *)
@@ -219,8 +218,7 @@ module Memo : sig
 
   val stir : block:bool -> t -> unit
   (** [stir ~block m] runs the memoizer a bit. If [block] is [true]
-      blocks until the memoizer is stuck with no operation and fibers to
-      execute. *)
+      blocks until the memoizer is stuck with no operation to execute. *)
 
   val status : t -> (unit, B000.Op.aggregate_error) result
   (** [status m] looks for aggregate errors in [m] in [ops m], see
@@ -384,7 +382,7 @@ module Memo : sig
          be used to define the [reads] and [writes] of the operation
          if they are difficult to find out before hand. {b Do not}
          access [m] in that function.}
-      {- [k], if specified a fiber invoked once the spawn has succesfully
+      {- [k], if specified a function invoked once the spawn has succesfully
          executed with the exit code.}
       {- [stamp] is used for caching if two spawns diff only in their
          stamp they will cache to different keys. This can be used to
@@ -420,8 +418,8 @@ end
     The value of a key in a store is defined either:
     {ul
     {- Explicitly when the store is {{!create}created}.}
-    {- Lazily on the first key {{!get}access} via a fiber specified
-       at {{!val-key}key creation time}.}}
+    {- Lazily on the first key {{!get}access} via a key determination function
+       specified at {{!val-key}key creation time}.}}
     Once determined the value of a key in the store never changes.
 
     {b XXX.} Maybe move that at the B0 level. *)
@@ -442,15 +440,15 @@ module Store : sig
   (** [create memo ~dir bs] is a store with predefined bindings [bs].
       If a key is mentioned more than once in [bs] the last binding
       takes over. The store uses [memo] to determine other keys as
-      {{!get}needed}.  [dir] is a scratch directory used by key fibers to
-      write memoized file outputs. *)
+      {{!get}needed}.  [dir] is a scratch directory used by key determination
+      functions to write memoized file outputs. *)
 
   val memo : t -> Memo.t
   (** [memo s] is [s]'s memo as given on {!create}. *)
 
   val dir : t -> Fpath.t
-  (** [dir s] is the scratch directory of [s]. Key fibers using this
-      directory to write files should do so using nice file name
+  (** [dir s] is the scratch directory of [s]. Key determination functions
+      using this directory to write files should do so using nice file name
       prefixes (e.g. lowercased module or lib names) to avoid name
       clashes. *)
 

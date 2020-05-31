@@ -704,8 +704,7 @@ module Op : sig
   (** The type for errors related to a {e list} of operations. This is:
       {ul
       {- [Failures], if there is one or more operations in the list that
-         {!Failed} (and hence for a {!B00.Memo} also if a fiber failed,
-         see {{!B00.Memo.fiber}here}).}
+         {!Failed}.}
       {- [Cycle ops], if there is a set of {!Waiting} operations
          in the list whose individual reads and writes leads to a dependency
          cycle. See also {!find_read_write_cycle}.}
