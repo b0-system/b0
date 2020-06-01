@@ -16,7 +16,8 @@ type build
 (** The type for builds, see {!B0_build}. *)
 
 type proc = build -> unit Fut.t
-(** The type for unit build procedures. *)
+(** The type for unit build procedures. Note that when the future
+    determines the build may not be finished. *)
 
 val nop : proc
 (** [nop] does nothing. *)
@@ -27,11 +28,11 @@ type t
 (** The type for build units. *)
 
 val v : ?doc:string -> ?meta:B0_meta.t -> string -> proc -> t
-(** [v n ~doc ~meta] is a build unit named [n] with build operations
-    [run] and described by [doc]. *)
+(** [v n ~doc ~meta n proc] is a build unit named [n] with build procedure
+    [proc] and described by [doc]. *)
 
 val proc : t -> proc
-(** [proc u] are the unit's build operations. *)
+(** [proc u] are the unit's build procedure. *)
 
 include B0_def.S with type t := t
 

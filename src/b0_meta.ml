@@ -167,6 +167,12 @@ let exe_name =
   let doc = "Executable name without platform specific extension" in
   str_key "exe-name" ~doc
 
+let exe_path = (* FIXME *)
+  let doc = "Full path to a built exectuable" in
+  let pp_value = Fmt.any "<n/a>" in
+  Key.v "exe-path" ~doc ~pp_value
+
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers
 

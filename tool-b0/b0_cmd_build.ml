@@ -5,7 +5,6 @@
 
 open B00_std
 
-
 let memo c =
   let hash_fun = B0_driver.Conf.hash_fun c in
   let cwd = B0_driver.Conf.cwd c in
@@ -20,7 +19,6 @@ let memo c =
       Fmt.stderr
   in
   B00.Memo.memo ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs ~feedback ()
-
 
 let get_units packs units =
   let ps = B0_pack.get_list packs in
@@ -59,11 +57,13 @@ let build lock packs x_packs units x_units c =
       let b0_file = Option.get (B0_driver.Conf.b0_file c) in
       let root_dir = Fpath.parent b0_file in
       let b0_dir = B0_driver.Conf.b0_dir c in
+      Log.if_error' ~use:B0_driver.Exit.build_error @@
       Result.bind (memo c) @@ fun m ->
       let build = B0_build.create ~root_dir ~b0_dir m ~may_build ~must_build in
       match B0_build.run build with
       | Ok () -> Ok (B0_driver.Exit.ok)
-      | Error () -> Ok B0_driver.Exit.build_error
+      | Error () -> Ok (B0_driver.Exit.build_error)
+
 
 (* Command line interface *)
 

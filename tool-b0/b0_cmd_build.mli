@@ -3,10 +3,12 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-(** B0 [delete] command. *)
+(** B0 [build] command. *)
+
+val memo : B0_driver.Conf.t -> (B00.Memo.t, string) result
 
 val cmd : B0_driver.Exit.t Cmdliner.Term.t * Cmdliner.Term.info
-(** [cmd] is the command line for [delete]. *)
+(** [build] is the command line for [build]. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

@@ -222,6 +222,10 @@ val exe_name : string key
 (** [exe_name] is an executable name without the platform specific
     executable extension. *)
 
+val exe_path : Fpath.t Fut.t key
+(** [exe_path] is an absolute path to a built executable in the unit. *)
+
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers
 

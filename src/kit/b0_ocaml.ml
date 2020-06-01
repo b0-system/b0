@@ -256,7 +256,7 @@ module Unit = struct
     let cobjs = List.filter_map cobj mod_srcs (* sorted for link *) in
     Fut.return (c_objs, cobjs)
 
-  let exe_proc set_mod_srcs srcs b =
+  let exe_proc set_exe_path set_mod_srcs srcs b =
     let* ocaml_conf = Store.get (B0_build.store b) conf in
     let u = B0_build.Unit.current b in
     let build_dir = B0_build.Unit.build_dir b u in
@@ -276,6 +276,7 @@ module Unit = struct
         ~code ~in_dir:build_dir ~src_root ~requires:req_libs ~srcs
     in
     let o = Fpath.(build_dir / (exe_name ^ exe_ext)) in
+    set_exe_path o;
     let* requires = get_recursive_libs b requires in
     let lib_objs =
       let ar = match code with
@@ -290,15 +291,17 @@ module Unit = struct
   let exe ?doc ?(meta = B0_meta.empty) ?(requires = []) ?name exe_name ~srcs =
     let name = Option.value ~default:exe_name name in
     let mod_srcs, set_mod_srcs = Fut.create () in
+    let exe_path, set_exe_path = Fut.create () in
     let meta =
       B0_meta.tag Meta.tag @@
       B0_meta.tag B0_meta.exe @@
       B0_meta.add B0_meta.exe_name exe_name @@
       B0_meta.add Meta.requires requires @@
       B0_meta.add Meta.mod_srcs mod_srcs @@
+      B0_meta.add B0_meta.exe_path exe_path @@
       meta
     in
-    B0_unit.v ?doc ~meta name (exe_proc set_mod_srcs srcs)
+    B0_unit.v ?doc ~meta name (exe_proc set_exe_path set_mod_srcs srcs)
 
   let lib_proc set_mod_srcs srcs b =
     let u = B0_build.Unit.current b in
