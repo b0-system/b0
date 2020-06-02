@@ -1,5 +1,13 @@
 {0 B00 manual}
 
+{1:howto Howto model}
+
+{ul
+{- Start with thin build tool bindings. Model just a spawn. Make options
+   for what allows you to model correctly the tool file outputs.
+   (see e.g. the OCaml tool that need various bit of info to correctly
+   model what will happen)}}
+
 {1:design Design considerations}
 
 {2:kernel_extract Kernel extraction from B0}

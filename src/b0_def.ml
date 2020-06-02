@@ -150,9 +150,12 @@ module type S = sig
   val def : t -> def
   val name : t -> string
   val doc : t -> string
-  val meta : t -> B0_meta.t
   val equal : t -> t -> bool
   val compare : t -> t -> int
+  val meta : t -> B0_meta.t
+  val has_meta : 'a B0_meta.key -> t -> bool
+  val find_meta : 'a B0_meta.key -> t -> 'a option
+  val get_meta : 'a B0_meta.key -> t -> ('a, string) result
   val add : t -> unit
   val list : unit -> t list
   val find : string -> t option
@@ -174,10 +177,21 @@ module Make (V : VALUE) = struct
   let def = V.def
   let name v = name (V.def v)
   let doc v = doc (V.def v)
-  let meta v = meta (V.def v)
+
   let scope v = scope (V.def v)
   let equal v0 v1 = String.equal (name v0) (name v1)
   let compare v0 v1 = String.compare (name v0) (name v1)
+
+  let meta v = meta (V.def v)
+  let has_meta k v = B0_meta.mem k (meta v)
+  let find_meta k v = B0_meta.find k (meta v)
+  let get_meta k v = match find_meta k v with
+  | Some v -> Ok v
+  | None ->
+      Fmt.error "%s %a has no %a metadata"
+        (String.Ascii.capitalize V.def_kind)
+        V.pp_name_str (name v) B0_meta.Key.pp_name k
+
 
   let defs = ref String.Map.empty
   let add v = defs := String.Map.add (name v) v !defs

@@ -3,7 +3,9 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-(** [b0] driver common definitions *)
+(** [b0] driver common definitions.
+
+    FIXME cleanup and move to [B0_cli], cmdlets may be interested. *)
 
 open B00_std
 
@@ -13,27 +15,26 @@ val driver : B0_driver.t
 (** {!B0_def} generic support.
 
     Generic implementation of a few standard commands we need for
-    B0 defintions. FIXME this could likely be moved to a B0_driver_ui in
-    B0 care. *)
+    B0 defintions. *)
 module Def : sig
 
   val list :
-    (module B0_def.S) -> B0_driver.Conf.t -> B00_ui.Cli.out_details ->
-    string list -> B0_driver.Exit.t
+    (module B0_def.S) -> B0_driver.Conf.t -> B00_cli.Arg.output_details ->
+    string list -> B00_std.Os.Exit.t
   (** [list (module Def) c details ns] lists definition [Def] named
       [ns] with details [details]. If [ns] is empty all definitions
       are listed. *)
 
   val edit :
     (module B0_def.S) -> B0_driver.Conf.t -> string list ->
-    B0_driver.Exit.t
+    B00_std.Os.Exit.t
   (** [edit (module Def) c ns] edits the B0 files which define [Def]s
       named [ns]. If [ns] is empty all the B0 files that have
       definitions of kind [Def] are edited. *)
 
   val get_meta_key :
-    (module B0_def.S) -> B0_driver.Conf.t -> B00_ui.Cli.out_details ->
-    string -> string list -> B0_driver.Exit.t
+    (module B0_def.S) -> B0_driver.Conf.t -> B00_cli.Arg.output_details ->
+    string -> string list -> B00_std.Os.Exit.t
   (** [get (module Def) k ns] gets key [k] in the metadata of
       definitions named [ns] with details [details]. If [ns] is empty
       all definitions are listed. *)

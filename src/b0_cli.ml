@@ -3,21 +3,24 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
+open B00_std
 open Cmdliner
 
-let info ?man_xrefs ?man ?envs ?exits ?sdocs ?docs ?doc ?version cmdlet =
-  let doc = Option.value ~default:(B0_cmdlet.doc cmdlet) doc in
-  let name = B0_cmdlet.name cmdlet in
-  Term.info ?man_xrefs ?man ?envs ?exits ?sdocs ?docs ?version name ~doc
+module Arg = struct
+  let units ?docs ?(doc = "Use unit $(docv).") () =
+    Arg.(value & opt_all string [] & info ["u"; "unit"] ?docs ~doc ~docv:"UNIT")
 
-let exit = function
-| `Ok c -> c
-| `Help | `Version -> B0_cmdlet.Exit.ok
-| `Error `Term -> B0_cmdlet.Exit.some_error
-| `Error `Exn -> B0_cmdlet.Exit.Code Term.exit_status_internal_error
-| `Error `Parse -> B0_cmdlet.Exit.Code Term.exit_status_cli_error
+  let x_units ?docs ?(doc = "Exclude unit $(docv). Takes over inclusion.") () =
+    let docv = "UNIT" in
+    Arg.(value & opt_all string [] & info ["x"; "x-unit"] ?docs ~doc ~docv)
 
-let run cmdlet ~argv t = exit @@ Term.eval ~argv (t, info cmdlet)
+  let packs ?docs ?(doc = "Use pack $(docv).")  () =
+    Arg.(value & opt_all string [] & info ["p"; "pack"] ?docs ~doc ~docv:"PACK")
+
+  let x_packs ?docs ?(doc = "Exclude pack $(docv). Takes over inclusion.") () =
+    let docv = "PACK" in
+    Arg.(value & opt_all string [] & info ["X"; "x-pack"] ?docs ~doc ~docv)
+end
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

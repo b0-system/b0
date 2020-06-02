@@ -4,7 +4,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-(* See DEVEL.md for details. Usage: ocaml b00t/strap *)
+(* See DEVEL.md for details. Usage: ocaml b00t/strap [--no-exec | --clean] *)
 
 let debug = false
 let ( / ) = Filename.concat
@@ -187,8 +187,36 @@ let compile () =
   (* .o files of cstubs are generated in the cwd so we chdir to the build dir *)
   Sys.chdir boot_build_dir; run_cmd cmd; Sys.chdir root_dir
 
-let main () = compile (); log "[ OK ] Invoke %s to continue.\n" boot_exe
-let () = main ()
+let clean () =
+  let rm = function ".KEEPME" -> () | f -> Sys.remove (boot_build_dir / f) in
+  Array.iter rm (Sys.readdir boot_build_dir);
+  if Sys.file_exists boot_exe then begin
+    ignore (Sys.command (boot_exe ^" delete -c"));
+    Sys.remove boot_exe
+  end
+
+let main () =
+  let usage = "Usage: ocaml b00t/strap [--no-exec | --clean] " in
+  let cmd = ref (`Build `Exec) in
+  let args =
+    ["--no-exec", Arg.Unit (fun () -> cmd := (`Build `No_exec)),
+     "Only build the bootstrap executable, do not run it.";
+     "--clean", Arg.Unit (fun () -> cmd := `Clean),
+     "Clean the bootstrap build."]
+  in
+  let fail_pos s = raise (Arg.Bad (strf "Don't know what to do with %S" s)) in
+  Arg.parse args fail_pos usage;
+  match !cmd with
+  | `Clean -> clean (); 0
+  | `Build `No_exec ->
+      compile (); log "[DONE] Invoke '%s' to continue.\n" boot_exe; 0
+  | `Build `Exec ->
+      compile ();
+      let c = Sys.command boot_exe in
+      if c <> 0 then c else
+      (log "[DONE] Invoke 'source b00t/env' to use the bootstrapped b0.\n"; 0)
+
+let () = if !Sys.interactive then () else (exit (main ()))
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

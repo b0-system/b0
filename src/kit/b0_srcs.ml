@@ -85,8 +85,8 @@ let select_files_in_dirs m u xs (seen, by_ext as acc) ds =
 let select b sels =
   let open B00_std.Fut.Syntax in
   let m = B0_build.memo b in
-  let u = B0_build.Unit.current b in
-  let root = B0_build.Unit.root_dir b u in
+  let u = B0_build.current b in
+  let root = B0_build.current_root_dir b in
   let abs d = Fpath.(root // v d) in
   let fs, ds, xs, futs =
     let rec loop fs ds xs futs = function

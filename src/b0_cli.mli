@@ -3,27 +3,29 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-(** Cmdliner cmdlet cli parsing *)
+(** Command line user interface fragments.
 
+    See also {!B00_cli}. *)
+
+open B00_std
 open Cmdliner
 
-val info :
-  ?man_xrefs:Manpage.xref list -> ?man:Manpage.block list ->
-  ?envs:Term.env_info list -> ?exits:Term.exit_info list ->
-  ?sdocs:string -> ?docs:string -> ?doc:string -> ?version:string ->
-  B0_cmdlet.t -> Cmdliner.Term.info
-(** [info c] derives a cmdliner term info for the cmdlet [c]. In
-    particular it uses {!B0_cmdlet.name} for the name and
-    {!B0cCmdlet.doc c} for [doc]. *)
+module Arg : sig
 
-val exit : B0_cmdlet.Exit.t Cmdliner.Term.result -> B0_cmdlet.Exit.t
-(** [exit r] turns a cmdliner evaluation result [r] into a cmdlet exit
-    code. *)
+  (** {1:def_spec Specifying B0 definitions} *)
 
-val run :
-  B0_cmdlet.t -> argv:string array -> B0_cmdlet.Exit.t Term.t ->
-  B0_cmdlet.Exit.t
-(** [run cmdlet ~argv t] is [exit @@ Term.eval ~argv (t, info c)]. *)
+  val units : ?docs:string -> ?doc:string -> unit -> string list Term.t
+  (** [units] defines unit names with [-u] and [--unit]. *)
+
+  val x_units : ?docs:string -> ?doc:string -> unit -> string list Term.t
+  (** [x_units] defines unit names to exclude with [-x] and [--x-unit]. *)
+
+  val packs : ?docs:string -> ?doc:string -> unit -> string list Term.t
+  (** [packs] defines pack names with [-p] and [--pack]. *)
+
+  val x_packs : ?docs:string -> ?doc:string -> unit -> string list Term.t
+  (** [packs] defines pack names to exclude via [-X] and [--x-pack]. *)
+end
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

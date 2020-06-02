@@ -1,6 +1,5 @@
 B0 — Software construction and deployment kit
 -------------------------------------------------------------------------------
-%%VERSION%%
 
 WARNING this package is unstable and work in progress, do not depend on it. 
 
@@ -11,7 +10,7 @@ B0 describes:
 
 * Build environments.
 * Software configuration, build and testing.
-* Source or built artefacts deployments.
+* Source and binary deployments.
 * Software life-cycle procedures.
 
 B0 also provides the B00 build library which provides abitrary build

@@ -16,41 +16,23 @@ open B00_std
 (** Driver exit codes. *)
 module Exit : sig
 
-  type t =
-  | Code of int
-  | Exec of Fpath.t * Cmd.t (** *)
-  (** The type for exits. Either an exit code or a command to [execv]. *)
+  (** See also {!B00_cli.Exit} *)
 
-  val code : t -> int
-  (** [code e] is the exit code of [e]. Raises [Invalid_argument] if
-      [e] is {!Exec}. *)
-
-  val build_error : t
+  val build_error : Os.Exit.t
   (** [build_error] indicates a build error. *)
 
-  val b0_file_error : t
+  val b0_file_error : Os.Exit.t
   (** [b0_file_error] indicates a B0 file error. *)
 
-  val deploy_error : t
+  val deploy_error : Os.Exit.t
   (** [deploy_error] indicates a deploy error. *)
 
-  val no_b0_file : t
+  val no_b0_file : Os.Exit.t
   (** [no_b0_file] indicates no B0 file could be found. *)
 
-  val no_such_name : t
-  (** [no_such_name] indicates a named entity was not found. *)
-
-  val ok : t
-  (** [ok] is the zero exit code. *)
-
-  val some_error : t
-  (** [some_error] indicates an indiscriminate error reported on stdout. *)
-
-  (** Cmdliner documentation. *)
-  module Info : sig
-    val base_cmd : Cmdliner.Term.exit_info list
-    (** [base_cmd] documents the exit code of {!B0_driver.Exit}. *)
-  end
+  val infos : Cmdliner.Term.exit_info list
+  (** [infos] has the infos of {!Cmdliner.Term.default_exits},
+       {!Os.Exit.ok}, {!Os.Exit.some_error} and those above.  *)
 end
 
 (** Driver environment variables. *)
@@ -102,7 +84,7 @@ module Conf : sig
 
   val v :
     b0_dir:Fpath.t -> b0_file:Fpath.t option -> cache_dir:Fpath.t ->
-    cwd:Fpath.t -> code:B00_ocaml.Compile.code option ->
+    cwd:Fpath.t -> code:B00_ocaml.Conf.code option ->
     hash_fun:(module Hash.T) -> jobs:int -> log_level:Log.level ->
     no_pager:bool -> tty_cap:Tty.cap -> unit -> t
   (** [v] constructs a configuration with given attributes. See the
@@ -120,7 +102,7 @@ module Conf : sig
   val cwd : t -> Fpath.t
   (** [cwd] is the absolute path to the current working directory. *)
 
-  val code : t -> B00_ocaml.Compile.code option
+  val code : t -> B00_ocaml.Conf.code option
   (** [code] is the code to which the driver is compiled. *)
 
   val hash_fun : t -> (module Hash.T)
@@ -150,7 +132,7 @@ module Conf : sig
 
   val setup_with_cli :
     b0_dir:Fpath.t option -> b0_file:Fpath.t option ->
-    cache_dir:Fpath.t option -> code:B00_ocaml.Compile.code option ->
+    cache_dir:Fpath.t option -> code:B00_ocaml.Conf.code option ->
     hash_fun:(module Hash.T) option -> jobs:int option ->
     log_level:Log.level option -> no_pager:bool ->
     tty_cap:Tty.cap option option -> unit -> (t, string) result
@@ -166,7 +148,7 @@ end
 
 (** {1:driver Drivers} *)
 
-type main = unit -> Exit.t Cmdliner.Term.result
+type main = unit -> Os.Exit.t Cmdliner.Term.result
 (** The type for driver main functions. A function that returns
     a Cmdliner evaluation result. This evaluation result is used
     by {!run} to handle program termination. Note that the driver
@@ -208,7 +190,7 @@ val run : has_b0_file:bool -> unit
 (** {1:require Require the B0 file} *)
 
 val with_b0_file :
-  driver:t -> (Conf.t -> Exit.t) Cmdliner.Term.t -> Exit.t Cmdliner.Term.t
+  driver:t -> (Conf.t -> Os.Exit.t) Cmdliner.Term.t -> Os.Exit.t Cmdliner.Term.t
 (** [with_b0_file ~driver cmd] wraps [cmd] to make sure it runs with
     the B0 file compiled and linked in as specified by [driver]. *)
 
@@ -234,8 +216,7 @@ module Compile : sig
   (** [exe c ~driver] is the driver executable for driver [driver]
       in configuration [c]. *)
 
-  val compile :
-    Conf.t -> driver:t -> B0_file.t -> (Fpath.t, string) result
+  val compile : Conf.t -> driver:t -> B0_file.t -> (Fpath.t, string) result
   (** [compile c ~driver b0_file] compiles [b0_file] with driver [driver]
       in configuration [c]. If all is well the executable file path is
       returned. *)

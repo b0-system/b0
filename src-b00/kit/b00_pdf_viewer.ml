@@ -48,7 +48,7 @@ let pdf_viewer ?docs ?(opts = ["pdf-viewer"]) () =
      of $(b,xdg-open(1)) or $(b,open(1)) is used. If not found and \
      on Windows $(b,start) is used."
   in
-  let cmd = Arg.some ~none:"OS dependent fallback" B00_std_ui.cmd in
+  let cmd = Arg.some ~none:"OS dependent fallback" B00_cli.cmd in
   Arg.(value & opt cmd None & info opts ~env ~doc ?docs ~docv:"CMD")
 
 (*---------------------------------------------------------------------------

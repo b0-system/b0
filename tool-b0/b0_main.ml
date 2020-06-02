@@ -7,7 +7,7 @@ open Cmdliner
 
 let doc = "Software construction and deployment kit"
 let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.Info.base_cmd
+let exits = B0_driver.Exit.infos
 let man = [
   `S Manpage.s_description;
   `P "B0 describes software construction and deployments using modular and \
@@ -28,6 +28,8 @@ let cmds =
     B0_cmd_file.cmd;
     B0_cmd_log.cmd;
     B0_cmd_pack.cmd;
+    B0_cmd_root.cmd;
+    B0_cmd_scope.cmd;
     B0_cmd_unit.cmd ]
 
 let b0 =

@@ -17,9 +17,9 @@ let urify u = (* Detects if u is simply a file path and urifies it *)
   Ok (file_uri Fpath.(cwd // p))
 
 let show_uris tty_cap log_level background prefix browser uris =
-  let tty_cap = B00_std_ui.get_tty_cap tty_cap in
-  let log_level = B00_std_ui.get_log_level log_level in
-  B00_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
+  let tty_cap = B00_cli.B00_std.get_tty_cap tty_cap in
+  let log_level = B00_cli.B00_std.get_log_level log_level in
+  B00_cli.B00_std.setup tty_cap log_level ~log_spawns:Log.Debug;
   Log.if_error ~use:1 @@
   let* browser = B00_www_browser.find ~browser () in
   let open_uri u = B00_www_browser.show ~background ~prefix browser (urify u) in
@@ -54,8 +54,8 @@ let show_uri =
     Arg.(non_empty & pos_all string [] & info [] ~doc ~docv:"URI")
   in
   Term.(const show_uris $
-        B00_std_ui.tty_cap ~docs:sdocs () $
-        B00_std_ui.log_level ~docs:sdocs () $
+        B00_cli.B00_std.tty_cap ~docs:sdocs () $
+        B00_cli.B00_std.log_level ~docs:sdocs () $
         B00_www_browser.background ~opts:["g"; "background"] () $
         B00_www_browser.prefix ~opts:["p"; "prefix"] () $
         B00_www_browser.browser ~opts:["b"; "browser"] () $ uris),

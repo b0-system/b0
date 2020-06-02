@@ -162,14 +162,27 @@ module type S = sig
   val doc : t -> string
   (** [doc v] is [v]'s documentation string. *)
 
-  val meta : t -> B0_meta.t
-  (** [meta v] is [v]'s metadata. *)
-
   val equal : t -> t -> bool
   (** [equal v0 v1] is [true] iff [v0] and [v1] have the same name. *)
 
   val compare : t -> t -> int
   (** [compare v0 v1] sorts [v0] and [v0] in lexicographical order. *)
+
+
+  (** {1:metadata Metadata} *)
+
+  val meta : t -> B0_meta.t
+  (** [meta v] is [v]'s metadata. *)
+
+  val has_meta : 'a B0_meta.key -> t -> bool
+  (** [has_meta k u] is [B0_meta.mem k (B0_unit.meta u)]. *)
+
+  val find_meta : 'a B0_meta.key -> t -> 'a option
+  (** [find_meta k u] is [B0_meta.find k (B0_unit.meta u)]. *)
+
+  val get_meta : 'a B0_meta.key -> t -> ('a, string) result
+  (** [get_meta m k u] is [Ok v] if {!find_meta}[ k u] is [Some v] and
+      a final user friendly error message if [None]. *)
 
   (** {1:add_lookup Add & Lookup} *)
 

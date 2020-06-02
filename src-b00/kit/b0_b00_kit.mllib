@@ -1,5 +1,4 @@
-B00_std_ui
-B00_ui
+B00_cli
 B00_base64
 B00_cmark
 B00_editor
@@ -10,6 +9,7 @@ B00_htmlg
 B00_http
 B00_lines
 B00_ocaml
+B00_jsoo
 B00_odoc
 B00_os
 B00_pager

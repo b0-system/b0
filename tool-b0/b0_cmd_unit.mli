@@ -5,7 +5,7 @@
 
 (** B0 [unit] command. *)
 
-val cmd : B0_driver.Exit.t Cmdliner.Term.t * Cmdliner.Term.info
+val cmd : B00_std.Os.Exit.t Cmdliner.Term.t * Cmdliner.Term.info
 (** [cmd] is the command line for [unit]. *)
 
 (*---------------------------------------------------------------------------

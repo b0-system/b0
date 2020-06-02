@@ -20,22 +20,7 @@
 
 {1:design_b0 B0 library}
 
-{ul
-{- It's a bit unclear whether maybe packs and units should
-   share the same namespace. This would allow to avoid [-p] options
-   for builds and for example have both [-x] and [-X]}}
-
 {1:design_b0_tool [b0] tool}
 
 {ul
-{- What to build by default, on [b0 build] ?
-    {ul
-      {- Define explicitely a [default] pack. Good explicit and easy to
-         track on the cli. Bad, a bit annoying when starting a project, don't
-         makee me type, also when I define a new unit I'll likely forget about
-      putting it in the default.}
-   {- Define an [implied] tag on units (default true) and pack (default false)
-      only implied units/packs defined in the B0 file root get built.}
-   {- Maybe something more fine grained based on tags would e.g. exclude
-      tests. See if we introduce artefact tags like [test, doc, exe, lib]
-      etc.}}}}
+{- [b0 build] consider [-x|-u] ordering ? }}

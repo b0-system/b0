@@ -18,7 +18,7 @@ let main () =
   let cmd =
     let path =
       let doc = "$(docv) is the b0 file to read" in
-      Arg.(required & pos 0 (some B00_std_ui.fpath) None &
+      Arg.(required & pos 0 (some B00_cli.fpath) None &
            info [] ~doc ~docv:"PATH")
     in
     Term.(const b0_file_read $ path),

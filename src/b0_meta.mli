@@ -8,12 +8,15 @@
     Typed key-value dictionaries. Values of this type are used with
     various B0 definitions to specify metadata.
 
-    The module defines a few {{!std}standard keys} and a list syntax to
-    write metadata literals:
+    The module defines a few {{!std}standard keys}. The recommended
+    way of formatting constant dictionaries is:
 {[
-let meta = B0_meta.v @@ B0_meta.[
-  authors, ["The project programmers"];
-  homepage, "https://example.org"]
+let meta =
+  let open B0_meta in (* This can be omitted *)
+  empty
+  |> add authors ["The project programmers"]
+  |> add homepage "https://example.org"
+  |> tag B0_opam.Meta.tag
 ]}
     {b XXX.} They used to be serializable, see if we don't want that again. *)
 
@@ -89,28 +92,17 @@ module Key : sig
       list of suggested values whose name could match [n]. *)
 end
 
-(** {1:bind Bindings} *)
+(** {1:meta Metadata} *)
 
-type binding = B : 'a key * 'a -> binding
+type binding = B : 'a key * 'a -> binding (** *)
 (** The type for metadata bindings. *)
 
 val pp_binding : binding Fmt.t
 (** [pp_binding] formats a binding using {!B00_std.Fmt.field} and the
     key's value print function. *)
 
-type bindings =
-| [] : bindings
-| ( :: ) : ('a key * 'a) * bindings -> bindings (** *)
-(** The type for sugared lists of bindings. Just because we can. *)
-
-(** {1:meta Metadata} *)
-
 type t
 (** The type for metadata. *)
-
-val v : bindings -> t
-(** [v bs] is metadata with bindings [vs]. If a key is defined
-    more than once in [bs] the last definition in the list takes over. *)
 
 val empty : t
 (** [empty] is the empty metadata. *)
@@ -170,9 +162,12 @@ val pp_non_empty : t Fmt.t
 val authors : string list key
 (** [authors] describes a list of persons with authorship. *)
 
-val doc_tags : string list key
-(** [doc_tags] describes a list of classification tags used for
-    documentation. *)
+val description_tags : string list key
+(** [description_tags] describes a list of classification tags used
+    for documentation. *)
+
+val description : string key
+(** [description] is a long description for the entity. *)
 
 val homepage : string key
 (** [issues] is an URI to an issue tracker. *)
@@ -192,6 +187,9 @@ val online_doc : string key
 
 val repo : string key
 (** [repo] is an URI to a VCS system. *)
+
+val synopsis : string key
+(** [synopsis] is a one line synopsis for an entity. *)
 
 (** {2:entity Entity tags} *)
 
@@ -224,7 +222,6 @@ val exe_name : string key
 
 val exe_path : Fpath.t Fut.t key
 (** [exe_path] is an absolute path to a built executable in the unit. *)
-
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

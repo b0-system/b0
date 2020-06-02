@@ -4,19 +4,19 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open B00_std.Result.Syntax
 
 let log c details format op_selector =
-  Log.if_error ~use:B0_driver.Exit.some_error @@
+  Log.if_error ~use:B00_cli.Exit.some_error @@
   let don't = B0_driver.Conf.no_pager c || format = `Trace_event in
   let b0_dir = B0_driver.Conf.b0_dir c in
   (* FIXME *)
   let log_file = Fpath.(b0_dir / "b" / "user" / "_log") in
-  Result.bind (B00_pager.find ~don't ()) @@ fun pager ->
-  Result.bind (B00_pager.page_stdout pager) @@ fun () ->
-  Result.bind (B00_ui.Memo.Log.read log_file) @@ fun l ->
-  B00_ui.Memo.Log.out
-    Fmt.stdout format details op_selector ~path:log_file l;
-  Ok B0_driver.Exit.ok
+  let* pager = B00_pager.find ~don't () in
+  let* () = B00_pager.page_stdout pager in
+  let* l = B00_cli.Memo.Log.read log_file in
+  B00_cli.Memo.Log.out Fmt.stdout format details op_selector ~path:log_file l;
+  Ok B00_cli.Exit.ok
 
 (* Command line interface *)
 
@@ -24,7 +24,7 @@ open Cmdliner
 
 let doc = "Show build logs"
 let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.Info.base_cmd
+let exits = B0_driver.Exit.infos
 let man_xrefs = [ `Main ]
 let docs_format = "OUTPUT FORMATS"
 let docs_details = "OUTPUT DETAILS"
@@ -38,14 +38,14 @@ let man = [
   `S docs_details;
   `P "If applicable.";
   `S docs_select;
-  `Blocks B00_ui.Op.query_man;
+  `Blocks B00_cli.Op.query_man;
   B0_b0.Cli.man_see_manual; ]
 
 let cmd =
   Term.(const log $ B0_driver.Cli.conf $
-        B00_ui.Cli.out_details ~docs:docs_details () $
-        B00_ui.Memo.Log.out_format_cli ~docs:docs_format () $
-        B00_ui.Op.query_cli ~docs:docs_select ()),
+        B00_cli.Arg.output_details ~docs:docs_details () $
+        B00_cli.Memo.Log.out_format_cli ~docs:docs_format () $
+        B00_cli.Op.query_cli ~docs:docs_select ()),
   Term.info "log" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 (*---------------------------------------------------------------------------

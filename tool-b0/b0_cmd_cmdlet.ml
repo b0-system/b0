@@ -10,7 +10,7 @@ let get c format args = match args with
 | k :: ps -> B0_b0.Def.get_meta_key (module B0_pack) c format k ps
 | [] ->
     Log.err (fun m -> m "No metadata key specified");
-    B0_driver.Exit.some_error
+    B00_cli.Exit.some_error
 
 let cmdlet action format args c = match action with
 | `Edit -> B0_b0.Def.edit (module B0_cmdlet) c args
@@ -39,7 +39,7 @@ let action_args =
 
 let doc = "Operate on cmdlets"
 let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.Info.base_cmd
+let exits = B0_driver.Exit.infos
 let envs = B00_editor.envs ()
 let man_xrefs = [`Main; `Cmd "cmd"]
 let man = [
@@ -62,7 +62,7 @@ let man = [
 
 let cmd =
   let cmdlet_cmd =
-    Term.(const cmdlet $ action $ B00_ui.Cli.out_details () $ action_args)
+    Term.(const cmdlet $ action $ B00_cli.Arg.output_details () $ action_args)
   in
   B0_driver.with_b0_file ~driver:B0_b0.driver cmdlet_cmd,
   Term.info "cmdlet" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs

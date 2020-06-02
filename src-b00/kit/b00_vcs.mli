@@ -146,6 +146,10 @@ val describe : t -> dirty_mark:bool -> commit_ish -> (string, string) result
     will fail in a non-user friendly way. *)
 module Git : sig
 
+  val find : ?dir:Fpath.t -> unit -> (t option, string) result
+  (** [find ~dir ()] finds, using VCS functionality, a git repository
+      starting in directory [dir] (if unspecified this is the [cwd]). *)
+
   val check_kind : t -> (unit, string) result
   (** [check_kind r] is [Ok ()] if [r]'s kind is [Git] and errors
       otherwise. *)
@@ -269,6 +273,13 @@ module Git : sig
       of [files] do not match files. [stderr] and [stdout] indicates
       where they should be redirected, defaults to the values of
       {!Os.Cmd.run_status}. *)
+end
+
+module Hg : sig
+
+  val find : ?dir:Fpath.t -> unit -> (t option, string) result
+  (** [find ~dir ()] finds, using VCS functionality, an hg repository
+      starting in directory [dir] (if unspecified this is the [cwd]). *)
 end
 
 (*---------------------------------------------------------------------------

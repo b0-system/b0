@@ -4,92 +4,163 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open B00_std.Result.Syntax
+
+(* Running the build *)
 
 let memo c =
   let hash_fun = B0_driver.Conf.hash_fun c in
   let cwd = B0_driver.Conf.cwd c in
   let cache_dir = B0_driver.Conf.cache_dir c in
   let b0_dir = B0_driver.Conf.b0_dir c in
-  let trash_dir = Fpath.(b0_dir / B00_ui.Memo.trash_dir_name) in
+  let trash_dir = Fpath.(b0_dir / B00_cli.Memo.trash_dir_name) in
   let jobs = B0_driver.Conf.jobs c in
   let feedback =
     let op_howto ppf o = Fmt.pf ppf "b0 log --id %d" (B000.Op.id o) in
     let show_op = Log.Info and show_ui = Log.Error and level = Log.level () in
-    B00_ui.Memo.pp_leveled_feedback ~op_howto ~show_op ~show_ui ~level
+    B00_cli.Memo.pp_leveled_feedback ~op_howto ~show_op ~show_ui ~level
       Fmt.stderr
   in
   B00.Memo.memo ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs ~feedback ()
 
-let get_units packs units =
-  let ps = B0_pack.get_list packs in
-  let us = B0_unit.get_list units in
-  Result.bind ps @@ fun ps ->
-  Result.bind us @@ fun us ->
-  let us = List.rev_append us (List.concat_map B0_pack.units ps) in
-  let us = B0_unit.Set.of_list us in
-  let has_locked_pack = List.exists B0_pack.locked ps in
-  Ok (has_locked_pack, us)
+let units_of ~units ~packs =
+  let pack_units = List.concat_map B0_pack.units packs in
+  B0_unit.Set.of_list (List.rev_append units pack_units)
 
-let find_units_to_build lock packs x_packs units x_units =
-  let must = match packs, units with
+let get_excluded_units ~x_units ~x_packs =
+  let* units = B0_unit.get_list x_units in
+  let* packs = B0_pack.get_list x_packs in
+  Ok (units_of ~units ~packs)
+
+let get_must_units_and_locked_packs ~units ~packs =
+  let* units, packs = match units, packs with
   | [], [] ->
-      (* FIXME do something smarter to get a default build set *)
-      Ok (false, B0_unit.(Set.of_list (list ())))
-  | _ -> get_units packs units
+      begin match B0_pack.find "default" with
+      | None -> Ok (B0_unit.list (), [])
+      | Some t -> Ok ([], [t])
+      end
+  | _ ->
+      let* units = B0_unit.get_list units in
+      let* packs = B0_pack.get_list packs in
+      Ok (units, packs)
   in
-  Result.bind must @@ fun (has_locked_pack, must) ->
-  Result.bind (get_units x_packs x_units) @@ fun (_, excluded) ->
-  let all = B0_unit.Set.of_list (B0_unit.list ()) in
-  let must = B0_unit.Set.diff must excluded in
-  let lock = Option.value ~default:has_locked_pack lock (* cli *) in
-  let may = if lock then must else (B0_unit.Set.diff all excluded) in
-  Ok (may, must)
+  let locked_packs = List.filter B0_pack.locked packs in
+  Ok (units_of ~units ~packs, locked_packs)
 
-let build lock packs x_packs units x_units c =
-  Log.if_error ~use:B0_driver.Exit.no_such_name @@
-  Result.bind (find_units_to_build lock packs x_packs units x_units) @@
-  fun (may_build, must_build) ->
+let is_locked ~lock ~locked_packs = match lock, locked_packs with
+| Some false, _ -> false
+| None, [] -> false
+| _, _ -> true
+
+let get_may_must ~locked ~units ~x_units =
+  let must = B0_unit.Set.diff units x_units in
+  let may =
+    if locked then must else
+    let all = B0_unit.Set.of_list (B0_unit.list ()) in
+    B0_unit.Set.diff all x_units
+  in
+  may, must
+
+let build_run lock ~units ~packs ~x_units ~x_packs c =
+  Log.if_error ~use:B00_cli.Exit.no_such_name @@
+  let* x_units = get_excluded_units ~x_units ~x_packs in
+  let* units, locked_packs = get_must_units_and_locked_packs ~units ~packs in
+  let locked = is_locked ~lock ~locked_packs in
+  let may_build, must_build = get_may_must ~locked ~units ~x_units in
   match B0_unit.Set.is_empty must_build with
-  | true ->
-      Log.err (fun m -> m "Nothing found to build!");
-      Ok B0_driver.Exit.build_error
+  | true -> Log.err (fun m -> m "Empty build!"); Ok B0_driver.Exit.build_error
   | false ->
       let b0_file = Option.get (B0_driver.Conf.b0_file c) in
       let root_dir = Fpath.parent b0_file in
       let b0_dir = B0_driver.Conf.b0_dir c in
       Log.if_error' ~use:B0_driver.Exit.build_error @@
-      Result.bind (memo c) @@ fun m ->
+      let* m = memo c in
       let build = B0_build.create ~root_dir ~b0_dir m ~may_build ~must_build in
       match B0_build.run build with
-      | Ok () -> Ok (B0_driver.Exit.ok)
-      | Error () -> Ok (B0_driver.Exit.build_error)
+      | Ok () -> Ok B00_cli.Exit.ok
+      | Error () -> Ok B0_driver.Exit.build_error
 
+(* Explaining what gets into the build *)
+
+let green = Fmt.(tty_string [`Fg `Green])
+let red = Fmt.(tty_string [`Fg `Red])
+let log_explain_lock ~locked ~lock ~locked_packs =
+  let option_reason pre opt ppf = function
+  | None -> () | Some _ -> Fmt.pf ppf "%s option %a" pre Fmt.(code string) opt
+  in
+  let packs_reason lock ppf = function
+  | [] -> ()
+  | p :: rest as ps ->
+      Fmt.pf ppf "%s pack%s %a"
+        (match lock with Some true -> " and" | _ -> "")
+        (if rest = [] then "" else "s")
+        (Fmt.and_enum B0_pack.pp_name) ps
+  in
+  match locked with
+  | true ->
+      Log.app (fun m ->
+          m "Build %a by%a%a."
+            red "locked"
+            (option_reason "" "--lock") lock
+            (packs_reason lock) locked_packs);
+  | false ->
+      Log.app (fun m ->
+          m "Build %a%a" green "unlocked" (option_reason " by" "--unlock") lock)
+
+let log_units color ~kind us =
+  Log.app (fun m ->
+      m "@[<v1>%a build:@,@[<v>%a@]@]"
+        color kind Fmt.(list B0_unit.pp_synopsis) (B0_unit.Set.elements us))
+
+let build_what lock ~units ~packs ~x_units ~x_packs c =
+  Log.if_error ~use:B00_cli.Exit.no_such_name @@
+  let* x_units = get_excluded_units ~x_units ~x_packs in
+  let* units, locked_packs = get_must_units_and_locked_packs ~units ~packs in
+  let locked = is_locked ~lock ~locked_packs in
+  let may_build, must_build = get_may_must ~locked ~units ~x_units in
+  Log.if_error' ~use:B00_cli.Exit.some_error @@
+  let don't = B0_driver.Conf.no_pager c in
+  let* pager = B00_pager.find ~don't () in
+  let* () = B00_pager.page_stdout pager in
+  match B0_unit.Set.is_empty must_build with
+  | true -> Log.app (fun m -> m "Empty build."); Ok B00_cli.Exit.ok
+  | false ->
+      log_explain_lock ~locked ~lock ~locked_packs;
+      log_units red ~kind:"Must" must_build;
+      if not locked then begin
+        let may_build = B0_unit.Set.diff may_build must_build in
+        if not (B0_unit.Set.is_empty may_build)
+        then log_units green ~kind:"May" may_build
+      end;
+      Ok B00_cli.Exit.ok
+
+(* Build command *)
+
+let build what lock units packs x_units x_packs c =
+  if what
+  then build_what lock ~units ~packs ~x_units ~x_packs c
+  else build_run  lock ~units ~packs ~x_units ~x_packs c
 
 (* Command line interface *)
 
 open Cmdliner
 
-let units =
-  let doc = "Build the unit $(docv)."
-  in
-  Arg.(value & pos_all string [] & info [] ~doc ~docv:"UNIT")
-
-let packs =
-  let doc = "Build the pack $(docv)" in
-  Arg.(value & opt_all string [] & info ["p"; "pack"] ~doc ~docv:"PACK")
+let units = B0_cli.Arg.units ~doc:"Build unit $(docv). Repeatable." ()
+let packs = B0_cli.Arg.packs ~doc:"Build pack $(docv). Repeteable." ()
 
 let x_units =
-  let doc = "Exclude unit $(docv) from the build. Takes over inclusion and \
-             locks the build." in
-  Arg.(value & opt_all string [] & info ["x"; "x-unit"] ~doc ~docv:"UNIT")
+  B0_cli.Arg.x_units ()
+    ~doc:"Exclude unit $(docv) from the build. Takes over inclusion."
 
 let x_packs =
-  let doc = "Exclude units of pack $(docv) from the build. \
-             Takes over inclusion and locks the build." in
-  Arg.(value & opt_all string [] & info ["X"; "x-pack"] ~doc ~docv:"PACK")
+  B0_cli.Arg.x_packs ()
+    ~doc:"Exclude units in pack $(docv) from the build. Takes over inclusion."
+
+let what =
+  let doc = "Do not run the build, show units that must and may build." in
+  Arg.(value & flag & info ["what"] ~doc)
 
 let lock =
-  (* FIXME env var *)
   let lock =
     let doc = "Lock the build to units and packs specified on the cli." in
     Some true, Arg.info ["lock"] ~doc
@@ -100,26 +171,42 @@ let lock =
   in
   Arg.(value & vflag None [lock; unlock])
 
-
-let doc = "Build (default)"
-let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.Info.base_cmd
-let man_xrefs = [ `Main; ]
-let man = [
-  `S Manpage.s_description;
-  `P "The $(tname) command builds the software.";
-  `P "If no unit or pack is specified on the command line all of those \
-      which are tagged as implied in the root b0 file are built.";
-  `P "FIXME explain excludes";
-  `P "FIXME explain build locks or defer to manual";
-  B0_b0.Cli.man_see_manual; ]
-
 let cmd =
+  let doc = "Build (default)" in
+  let sdocs = Manpage.s_common_options in
+  let exits = B0_driver.Exit.infos in
+  let envs = B00_pager.envs () in
+  let man_xrefs = [ `Main ] in
+  let man = [
+    `S Manpage.s_synopsis;
+    `P "$(mname) $(tname) \
+        [$(b,-u) $(i,UNIT) | $(b,-p) $(i,PACK) | $(i,OPTION)]... \
+        [$(b,--) ARG...]";
+    `S Manpage.s_description;
+    `P "The $(tname) command runs your builds.";
+    `P "To build a unit use the $(b,-u) option. To build all the units of \
+        a pack use the $(b,-p) option. If no unit or pack is specified on \
+        the command line all units implied unless a pack named $(b,default) \
+        exists in which case $(b,-p default) is implied.";
+    `P "Build procedures may dynamically require the build of units \
+        unspecified on the command line. To prevent a unit from building \
+        use the $(b,-x) and $(b,-X) options; they take over $$(b,-u) and \
+        (b,-p)inclusion options.";
+    `P "If you want to make sure only the exact units you specified are \
+        in the build, use the $(b,--lock) option to lock the build. \
+        If you request a pack that has the $(b,B0_meta.locked) tag, \
+        the build locks automatically unless $(b,--unlock) is specified.";
+    `P "If you add the $(b,--what) option, the build doesn't run but what must
+        and may build is shown.";
+    `P "More background information is available in the manuals, \
+        see $(b,odig doc b0).";
+    B0_b0.Cli.man_see_manual; ]
+  in
   let build_cmd =
-    Term.(const build $ lock $ packs $ x_packs $ units $ x_units)
+    Term.(const build $ what $ lock $ units $ packs $ x_units $ x_packs)
   in
   B0_driver.with_b0_file ~driver:B0_b0.driver build_cmd,
-  Term.info "build" ~doc ~sdocs ~exits ~man ~man_xrefs
+  Term.info "build" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

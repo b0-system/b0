@@ -195,7 +195,7 @@ module Httpr = struct
   let curl ?docs ?env () =
     let open Cmdliner in
     let doc = "The curl command $(docv) to use." in
-    let cmd = B00_std_ui.cmd in
+    let cmd = B00_cli.cmd in
     let default = Cmd.arg "curl" in
     Arg.(value & opt cmd default & info ["curl"] ~doc ?docs ?env ~docv:"CMD")
 

@@ -4,53 +4,52 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open B00_std.Result.Syntax
 
 let get_b0_file_src c k =
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
-  Result.bind (B0_driver.Conf.get_b0_file c) @@ fun b0_file ->
+  let* b0_file = B0_driver.Conf.get_b0_file c in
   Log.if_error' ~header:"" ~use:B0_driver.Exit.b0_file_error @@
-  Result.bind (Os.File.read b0_file) @@ fun s ->
-  Result.bind (B0_file.of_string ~file:b0_file s) k
+  let* s = Os.File.read b0_file in
+  let* b0_file = B0_file.of_string ~file:b0_file s in
+  k b0_file
 
 let boot c root =
   let pp_boots = Fmt.(list @@ hbox @@ list ~sep:sp (using fst string)) in
   get_b0_file_src c @@ fun src ->
-  let boots = match root with
-  | true -> Ok (B0_file.b0_boots src)
-  | false ->
-      Result.bind (B0_file.expand src) @@ fun e ->
-      Ok (B0_file.expanded_b0_boots e)
+  let* boots =
+    if root then Ok (B0_file.b0_boots src) else
+    let* exp = B0_file.expand src in
+    Ok (B0_file.expanded_b0_boots exp)
   in
-  Result.bind boots @@ fun boots ->
   Log.app (fun m -> m "Boot is TODO.");
   if boots <> [] then Log.app (fun m -> m "@[<v>%a@]" pp_boots boots);
-  Ok B0_driver.Exit.ok
+  Ok B00_cli.Exit.ok
 
 let compile c =
   get_b0_file_src c @@ fun f ->
-  Result.bind (B0_driver.Compile.compile c ~driver:B0_b0.driver f) @@ fun _ ->
-  Ok B0_driver.Exit.ok
+  let* _ = B0_driver.Compile.compile c ~driver:B0_b0.driver f in
+  Ok B00_cli.Exit.ok
 
 let edit c all =
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
-  Result.bind (B0_driver.Conf.get_b0_file c) @@ fun b0_file ->
-  Log.if_error' ~use:B0_driver.Exit.some_error @@
-  Result.bind (B00_editor.find ()) @@ fun editor ->
-  let files = match all with
+  let* b0_file = B0_driver.Conf.get_b0_file c in
+  Log.if_error' ~use:B00_cli.Exit.some_error @@
+  let* editor = B00_editor.find () in
+  Log.if_error' ~header:"" ~use:B0_driver.Exit.b0_file_error @@
+  let* files = match all with
   | false -> Ok [b0_file]
   | true ->
-      Result.bind (Os.File.read b0_file) @@ fun s ->
-      Result.bind (B0_file.of_string ~file:b0_file s) @@ fun src ->
-      Result.bind (B0_file.expand src) @@ fun e ->
-      let incs = B0_file.expanded_b0_includes e in
+      let* s = Os.File.read b0_file in
+      let* src = B0_file.of_string ~file:b0_file s in
+      let* exp = B0_file.expand src in
+      let incs = B0_file.expanded_b0_includes exp in
       let add_inc acc (_, (p, _)) = p :: acc in
       Ok (List.rev @@ List.fold_left add_inc [b0_file] incs)
   in
-  Log.if_error' ~header:"" ~use:B0_driver.Exit.b0_file_error @@
-  Result.bind files @@ fun files ->
   Result.bind (B00_editor.edit_files editor files) @@ function
-  | `Exited 0 -> Ok B0_driver.Exit.ok
-  | _ -> Ok B0_driver.Exit.some_error
+  | `Exited 0 -> Ok B00_cli.Exit.ok
+  | _ -> Ok B00_cli.Exit.some_error
 
 let includes c root details =
   let pp_inc = match details with
@@ -60,61 +59,59 @@ let includes c root details =
         Fmt.pf ppf "@[%a %a@]" Fmt.(code string) n Fpath.pp_unquoted p
   in
   get_b0_file_src c @@ fun src ->
-  let incs = match root with
+  let* incs = match root with
   | true -> Ok (B0_file.b0_includes src)
   | false ->
-      Result.bind (B0_file.expand src) @@ fun e ->
-      Ok (B0_file.expanded_b0_includes e)
+      let* exp = B0_file.expand src in
+      Ok (B0_file.expanded_b0_includes exp)
   in
-  Result.bind incs @@ fun incs ->
-  Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_inc) incs);
-  Ok B0_driver.Exit.ok
+  if incs <> [] then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_inc) incs);
+  Ok B00_cli.Exit.ok
 
 let log c format details op_selector =
-  Log.if_error ~use:B0_driver.Exit.some_error @@
+  Log.if_error ~use:B00_cli.Exit.some_error @@
   let don't = B0_driver.Conf.no_pager c || format = `Trace_event in
   let log_file = B0_driver.Compile.build_log c ~driver:B0_b0.driver in
-  Result.bind (B00_pager.find ~don't ()) @@ fun pager ->
-  Result.bind (B00_pager.page_stdout pager) @@ fun () ->
-  Result.bind (B00_ui.Memo.Log.read log_file) @@ fun l ->
-  B00_ui.Memo.Log.out
-    Fmt.stdout format details op_selector ~path:log_file l;
-  Ok B0_driver.Exit.ok
+  let* pager = B00_pager.find ~don't () in
+  let* () = B00_pager.page_stdout pager in
+  let* l = B00_cli.Memo.Log.read log_file in
+  B00_cli.Memo.Log.out Fmt.stdout format details op_selector ~path:log_file l;
+  Ok B00_cli.Exit.ok
 
 let path c =
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
-  Result.bind (B0_driver.Conf.get_b0_file c) @@ fun b0_file ->
+  let* b0_file = B0_driver.Conf.get_b0_file c in
   Log.app (fun m -> m "%a" Fpath.pp_unquoted b0_file);
-  Ok B0_driver.Exit.ok
+  Ok B00_cli.Exit.ok
 
 let source c root =
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
-  Result.bind (B0_driver.Conf.get_b0_file c) @@ fun b0_file ->
+  let* b0_file = B0_driver.Conf.get_b0_file c in
   Log.if_error' ~header:"" ~use:B0_driver.Exit.b0_file_error @@
   match root with
   | true ->
-      Result.bind (Os.File.read b0_file) @@ fun s ->
-      Log.app (fun m -> m "%s" s); Ok B0_driver.Exit.ok
+      let* s = Os.File.read b0_file in
+      Log.app (fun m -> m "%s" s); Ok B00_cli.Exit.ok
   | false ->
-      Result.bind (Os.File.read b0_file) @@ fun s ->
-      Result.bind (B0_file.of_string ~file:b0_file s) @@ fun src ->
-      Result.bind (B0_file.expand src) @@ fun e ->
-      let esrc = B0_file.expanded_src e in
+      let* s = Os.File.read b0_file in
+      let* src = B0_file.of_string ~file:b0_file s in
+      let* exp = B0_file.expand src in
+      let esrc = B0_file.expanded_src exp in
       Log.app (fun m -> m "%s" esrc);
-      Ok B0_driver.Exit.ok
+      Ok B00_cli.Exit.ok
 
 let requires c root =
   let pp_require = Fmt.using fst B00_ocaml.Lib.Name.pp in
   get_b0_file_src c @@ fun src ->
-  let reqs = match root with
+  let* reqs = match root with
   | true -> Ok (B0_file.requires src)
   | false ->
-      Result.bind (B0_file.expand src) @@ fun e ->
-      Ok (B0_file.expanded_requires e)
+      let* exp = B0_file.expand src in
+      Ok (B0_file.expanded_requires exp)
   in
-  Result.bind reqs @@ fun reqs ->
-  Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_require) reqs);
-  Ok B0_driver.Exit.ok
+  if reqs <> []
+  then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_require) reqs);
+  Ok B00_cli.Exit.ok
 
 let file c root all details format op_selector = function
 | `Boot -> boot c root
@@ -152,7 +149,7 @@ let all =
 
 let doc = "Operate on the B0 file"
 let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.Info.base_cmd
+let exits = B0_driver.Exit.infos
 let envs = B00_editor.envs ()
 let man_xrefs = [ `Main ]
 let docs_format = "LOG OUTPUT FORMATS"
@@ -191,14 +188,14 @@ let man = [
   `S docs_details;
   `P "If applicable.";
   `S docs_select;
-  `Blocks B00_ui.Op.query_man;
+  `Blocks B00_cli.Op.query_man;
   B0_b0.Cli.man_see_manual; ]
 
 let cmd =
   Term.(const file $ B0_driver.Cli.conf $ root $ all $
-        B00_ui.Cli.out_details ~docs:docs_details () $
-        B00_ui.Memo.Log.out_format_cli ~docs:docs_format () $
-        B00_ui.Op.query_cli ~docs:docs_select () $ action),
+        B00_cli.Arg.output_details ~docs:docs_details () $
+        B00_cli.Memo.Log.out_format_cli ~docs:docs_format () $
+        B00_cli.Op.query_cli ~docs:docs_select () $ action),
   Term.info "file" ~doc ~sdocs ~envs ~exits ~man ~man_xrefs
 
 (*---------------------------------------------------------------------------

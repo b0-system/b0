@@ -63,9 +63,9 @@ include Unit
 let pp_synopsis ppf v =
   let pp_tag ppf u =
     Fmt.string ppf
-      (if B0_meta.mem B0_meta.exe (meta u) then "exe" else
-       if B0_meta.mem B0_meta.lib (meta u) then "lib" else
-       if B0_meta.mem B0_meta.doc (meta u) then "doc" else "   ")
+      (if has_meta B0_meta.exe u then "exe" else
+       if has_meta B0_meta.lib u then "lib" else
+       if has_meta B0_meta.doc u then "doc" else "   ")
   in
   Fmt.pf ppf "@[[%a] %a %a@]" pp_tag v pp_name v pp_doc v
 
@@ -83,22 +83,63 @@ let proc u = u.Unit_def.proc
 (* Builds *)
 
 module Build = struct
-  type bunit = Unit.t
+  type build_unit = Unit.t
   include Build_def
 
-  let current =
-    Store.key @@ fun _ ->
-      failwith
-        "B0_build.current can't be determined is must be set at store creation"
+  let memo b = b.u.m
 
-  let build_dir ~b0_dir = Fpath.(b0_dir / "b" / "user")
-  let shared_build_dir ~build_dir = Fpath.(build_dir / "_shared")
+  (* Units *)
+
+  let must_build b = b.b.must_build
+  let may_build b = b.b.may_build
+  let current b = match b.u.current with
+  | None -> invalid_arg "Build not running" | Some u -> u
+
+  let require b u =
+    if String.Map.mem (name u) b.b.requested then () else
+    match Unit.Set.mem u b.b.may_build with
+    | true ->
+        b.b.requested <- String.Map.add (name u) u b.b.requested;
+        Rqueue.add b.b.waiting u
+    | false ->
+        Memo.fail b.u.m
+          "@[<v>Unit %a requested %a which is not part of the build.@,\
+           Try with %a or add the unit %a to the build."
+          pp_name (current b) pp_name u Fmt.(code string) "--unlock"
+          pp_name u
+
+  let current_meta b = meta (current b)
+
+  (* Directories *)
+
+  let build_build_dir ~b0_dir = Fpath.(b0_dir / "b" / "user")
+  let build_shared_build_dir ~build_dir = Fpath.(build_dir / "_shared")
   let store_dir ~build_dir = Fpath.(build_dir / "_store")
+
+  let root_dir b u = match B0_def.dir (def u) with
+  | None -> b.b.root_dir
+  | Some dir -> dir
+
+  let current_root_dir b = root_dir b (current b)
+  let build_dir b u = Fpath.(b.b.build_dir / name u)
+  let current_build_dir b = build_dir b (current b)
+  let shared_build_dir b = b.b.shared_build_dir
+
+  (* Store *)
+
+  let self =
+    Store.key @@ fun _ ->
+    failwith "B0_build.self was not set at store creation"
+
+  let store b = b.b.store
+  let get b k = Store.get b.b.store k
+
+  (* Create *)
 
   let create ~root_dir ~b0_dir m ~may_build ~must_build =
     let u = { current = None; m } in
-    let build_dir = build_dir ~b0_dir in
-    let shared_build_dir = shared_build_dir ~build_dir in
+    let build_dir = build_build_dir ~b0_dir in
+    let shared_build_dir = build_shared_build_dir ~build_dir in
     let store = Store.create m ~dir:(store_dir ~build_dir) [] in
     let may_build = Set.union may_build must_build in
     let add_requested u acc = String.Map.add (name u) u acc in
@@ -111,49 +152,17 @@ module Build = struct
         may_build; requested; waiting; }
     in
     let b = { u; b } in
-    Store.set store current b;
+    Store.set store self b;
     b
 
-  let memo b = b.u.m
-  let store b = b.b.store
-  let shared_build_dir b = b.b.shared_build_dir
-  let get b k = Store.get b.b.store k
-
-  module Unit = struct
-    let current b = match b.u.current with
-    | None -> invalid_arg "Build not running" | Some u -> u
-
-    let must_build b = b.b.must_build
-    let may_build b = b.b.may_build
-
-    let require b u =
-      if String.Map.mem (name u) b.b.requested then () else
-      match Unit.Set.mem u b.b.may_build with
-      | true ->
-          b.b.requested <- String.Map.add (name u) u b.b.requested;
-          Rqueue.add b.b.waiting u
-      | false ->
-          Memo.fail b.u.m
-            "@[<v>Unit %a requested %a which is not part of the build.@,\
-             Try with %a or add the unit %a to the build."
-            pp_name (current b) pp_name u Fmt.(code string) "--unlock"
-            pp_name u
-
-    let build_dir b u = Fpath.(b.b.build_dir / name u)
-    let root_dir b u = match B0_def.dir (def u) with
-    | None -> b.b.root_dir
-    | Some dir -> dir
-
-  end
-
-  let current_root_dir b = Unit.root_dir b (Unit.current b)
+  (* Run *)
 
   let run_unit b unit =
     let m = Memo.with_mark b.u.m (name unit) in
     let u = { current = Some unit; m } in
     let b = { b with u } in
     Memo.run_proc m begin fun () ->
-      let* () = Memo.mkdir b.u.m (Unit.build_dir b unit) in
+      let* () = Memo.mkdir b.u.m (build_dir b unit) in
       (proc unit) b
     end
 
@@ -165,7 +174,7 @@ module Build = struct
 
   let log_file b = Fpath.(b.b.build_dir / "_log")
   let write_log_file ~log_file m =
-    Log.if_error ~use:() @@ B00_ui.Memo.Log.(write log_file (of_memo m))
+    Log.if_error ~use:() @@ B00_cli.Memo.Log.(write log_file (of_memo m))
 
   let report_memo_errors ppf m = match Memo.status m with
   | Ok _ as v -> v
@@ -182,7 +191,7 @@ module Build = struct
       log_file b
     in
     let hook () = write_log_file ~log_file b.u.m in
-    Os.Sig_exit.on_sigint ~hook @@ fun () ->
+    Os.Exit.on_sigint ~hook @@ fun () ->
     begin
       Memo.run_proc b.u.m begin fun () ->
         let* () = Memo.delete b.u.m b.b.build_dir in

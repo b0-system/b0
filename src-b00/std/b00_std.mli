@@ -740,7 +740,21 @@ module String : sig
          need to be performed on [i] or the returned value.}}
 
       For any [b], [c] and [i] the invariant
-      [i + char_len c = set_char b i c] must hold. *)
+      [i + char_len c = set_char b i c] must hold.
+
+      Here's a small example that escapes ['"'] by prefixing
+      them by backslashes.
+      double quotes from strings:
+{[
+let escape_dquotes s =
+  let char_len = function '"' -> 2 | _ -> 1 in
+  let set_char b i = function
+  | '"' -> Bytes.set b i '\\'; Bytes.set b (i+1) '"'; 2
+  | c -> Bytes.set b i c; i + 1
+  in
+  String.byte_escaper char_len set_char
+]}
+*)
 
   val byte_replacer :
     (char -> int) -> (bytes -> int -> char -> int) -> string -> string
@@ -1920,6 +1934,9 @@ module Os : sig
     val override : t -> by:t -> t
     (** [override env ~by:o] overrides the definitions in [env] by [o]. *)
 
+    val add : string -> string -> t -> t
+    (** [add] is {!String.Map.add}. *)
+
     val current : unit -> (t, string) result
     (** [current ()] is the current process environment. *)
 
@@ -2748,31 +2765,67 @@ module Os : sig
     val execv :
       ?env:Env.assignments -> ?cwd:Fpath.t -> Fpath.t -> Cmd.t ->
       ('a, string) result
-    (** [execv ~env ~cwd file argv] executes file [file] as a new
-        process in environment [env] with current working directory
-        [cwd] and [args] as the {!Sys.argv} of this process (in
-        particular [Sys.argv.(0)] is the name of the program not the
-        first argument to the program). The function only recurns in
-        case of error. [env] defaults to
-        {!B00_std.Os.Env.current_assignments}[ ()], [cwd] to
-        {!B00_std.Dir.current}[ ()]. *)
+    (** [execv ~env ~cwd file argv] executes file [file] as a new process in
+        environment [env] with [args] as the {!Sys.argv} of this
+        process (in particular [Sys.argv.(0)] is the name of the
+        program not the first argument to the program). The function
+        only recturns in case of error. [env] defaults to
+        {!B00_std.Os.Env.current_assignments}[ ()],
+        [cwd] to {!B00_std.Dir.current}[ ()]. *)
+
+    type t = Cmd.t
+    (** {!Exit} needs that alias to refer to {!Cmd.t}. *)
   end
 
-  (** Signal exit hooks. *)
-  module Sig_exit : sig
+  (** Program exit. *)
+  module Exit : sig
+
+    (** {1:exitspec Specifying exits} *)
+
+    type t =
+    | Code : int -> t (** [exit] with code. *)
+    | Exec : (unit -> ('a, string) result) -> t (** exit with [execv] *)
+    (** The type for specifying program exits. Either an exit code or a
+        function (should be) calling {!Cmd.execv}. *)
+
+    val code : int -> t
+    (** [code c] is [Code c]. *)
+
+    val exec : ?env:Env.assignments -> ?cwd:Fpath.t -> Fpath.t -> Cmd.t -> t
+    (** [exec ?env ?cwd file argv] is an [Exec _]. That has a call to
+        {!Cmd.execv} with the corresponding arguments. *)
+
+    val get_code : t -> int
+    (** [get_code e] is the exit code of [e]. Raises [Invalid_argument] if
+        [e] is {!Exec}. *)
+
+    (** {1:exitexit Exiting exits} *)
+
+    val exit : t -> ('a, string) result
+    (** [exit e] exits according to [e]:
+        {ul
+        {- If [e] is [Code c], {!Stdlib.exit}[ c] is called and the
+           function never returns.}
+        {- If [e] is [Exec execv], [execv] is called. This can
+           only return with an [Error _]. In that case log it
+           and call the function again with an error code -
+           this guarantees termination.}} *)
+
+    (** {1:sigexit Signal exit hooks} *)
 
     val on_sigint :  hook:(unit -> unit) -> (unit -> 'a) -> 'a
-    (** [on_sigint ~hook f] calls [f ()] and returns its value. If [SIGINT]
-        is signalled during that time [hook] is called followed by [exit 130]
-        – that is the exit code a [SIGINT] would produce.
+    (** [on_sigint ~hook f] calls [f ()] and returns its value. If
+        [SIGINT] is signalled during that time [hook] is called
+        followed by [exit 130] – that is the exit code a [SIGINT]
+        would produce.
 
         [on_sigint] replaces an existing signal handler for
         {!Sys.sigint} during time of the function call. It is restored
         when the function returns.
 
-        {b Note.} Since {!exit} is called {!at_exit} functions are
-        called if a [SIGINT] occurs during the function call. This is not
-        the case on an unhandled [SIGINT]. *)
+        {b Note.} Since {!Stdlib.exit} is called {!Stdlib.at_exit}
+        functions are called if a [SIGINT] occurs during the call to
+        [f]. This is not the case on an unhandled [SIGINT]. *)
   end
 end
 

@@ -57,7 +57,7 @@ The build library.
 Toolkit for working with B00 and B0. A few things do not depend on the
 [b0.b00] library but are useful to have under your hand.
 
-{3:io IO}
+{3:io IO and file formats}
 
 {!modules:
 B00_base64
@@ -68,26 +68,27 @@ B00_http
 B00_lines
 B00_serialk_json
 B00_serialk_sexp
-B00_serialk_text}
+B00_serialk_text
+B00_trace
+}
 
 {3:build_dev Dev tools and info}
 
 {!modules:
 B00_cmark
 B00_github
+B00_jsoo
 B00_ocaml
 B00_odoc
 B00_os
-B00_vcs}
+B00_vcs
+}
 
 {3:ui UI fragments}
 
-Mostly {!Cmdliner} user interface fragments.
-
 {!modules:
-B00_ui
-B00_std_ui
-B00_trace}
+B00_cli
+}
 
 {3:viewers_editors Viewers and editors}
 
@@ -95,7 +96,8 @@ B00_trace}
 B00_editor
 B00_pager
 B00_pdf_viewer
-B00_www_browser}
+B00_www_browser
+}
 
 {1:b0 B0}
 
@@ -104,7 +106,19 @@ via {{!page-manual.b0_file}B0 files}.
 
 {2:b0 Library [b0]}
 
-{!modules: B0_def B0_meta B0_build B0_unit B0_pack B0_cmdlet}
+{!modules:
+B0_build
+B0_def
+B0_meta
+B0_cli}
+
+{3:def B0 definitions}
+
+{!modules:
+B0_cmdlet
+B0_pack
+B0_unit
+}
 
 {2:b0_kit Library [b0.kit]}
 
@@ -112,9 +126,10 @@ Toolkit for B0 files.
 
 {!modules:
 B0_kit
-B0_srcs
+B0_jsoo
 B0_ocaml
-B0_cmdlet_cli
+B0_opam
+B0_srcs
 }
 
 {2:b0_driver Library [b0.driver]}
@@ -124,5 +139,6 @@ B0 files. Only needed if you want to process B0 files your own own
 way.
 
 {!modules:
-  B0_file
-  B0_driver}
+B0_file
+B0_driver
+}

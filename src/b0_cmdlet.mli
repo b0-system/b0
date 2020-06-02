@@ -7,11 +7,11 @@
 
     Cmdlets are used to define custom software life-cycle procedures.
     Examples range from invoking linters on your sources to perform
-    post build checks.
+    post build checks or actions.
 
     {b TODO.}
     {ul
-    {- Definition root/scopes retreival.}
+    {- Definition root/scopes retrieval and cwd}
     {- Visibility control.}} *)
 
 open B00_std
@@ -21,26 +21,11 @@ open B00_std
 type t
 (** The type for cmdlets. *)
 
-(** The type for cmdlet exits. *)
-module Exit : sig
-
-  (* FIXME better exec *)
-  type t =
-  | Code of int
-  | Exec of Fpath.t * Cmd.t
-
-  val ok : t
-  (** [ok] is the zero exit code. *)
-
-  val some_error : t
-  (** [some_error] indicates an indiscriminate error reported on stdout. *)
-end
-
-type cmd = [ `Cmd of t -> argv:string array -> Exit.t ]
+type cmd = [ `Cmd of t -> argv:string list -> Os.Exit.t ]
 (** The type for cmdlet commands. [argv] has the arguments for the
     cmdlet and the name of the cmdlet is in [argv.(0)], it can be given
     as is to your command line parsing technology, see for example
-    {!B0_cmdlet_cli}. *)
+    {!Cli}. *)
 
 val v : ?doc:string -> ?meta:B0_meta.t -> string -> cmd -> t
 (** [v n cmd ~doc ~meta] is a cmdlet named [n] implemented by [cmd]
@@ -48,6 +33,42 @@ val v : ?doc:string -> ?meta:B0_meta.t -> string -> cmd -> t
 
 val cmd : t -> cmd
 (** [cmd c] is the command of the cmdlet. *)
+
+(** {1:cli Command line interaction} *)
+
+(** Command line interaction. *)
+module Cli : sig
+  open Cmdliner
+
+  (** Use {!B00_cli.Exit} as a basis for exit codes. See {!B00_cli} and
+      {!B0_cli} for arg definitions.
+
+      {b FIXME}. This looks daunting but it's not make simple examples. *)
+
+  val info :
+    ?man_xrefs:Manpage.xref list -> ?man:Manpage.block list ->
+    ?envs:Term.env_info list -> ?exits:Term.exit_info list ->
+    ?sdocs:string -> ?docs:string -> ?doc:string -> ?version:string ->
+    t -> Term.info
+  (** [info c] derives a cmdliner term info for the cmdlet [c]. In
+      particular it uses {!B0_cmdlet.name} for the name and
+      {!B0_cmdlet.doc c} for [doc]. [exits] defaults to
+      {!B00_cli.Exit.infos}.*)
+
+  val run :
+    ?info:Cmdliner.Term.info -> t -> argv:string list -> Os.Exit.t Term.t ->
+    Os.Exit.t
+  (** [run cmdlet ~argv t ~info] is [B00_cli.Exit.of_eval_result @@ Term.eval
+      ~argv (t, info)]. [info] defaults to [info c]. *)
+
+  val run_cmds :
+    t -> argv:string list -> (Os.Exit.t Term.t * Term.info) ->
+    (Os.Exit.t Term.t * Term.info) list -> Os.Exit.t
+  (** [run_choice cmdlet ~argv main cmds] is [B00_cli.Exit.of_eval_result @@
+      Term.eval_choice ~argv main cmds] *)
+end
+
+(** {1:b0_def B0 definition API} *)
 
 include B0_def.S with type t := t
 

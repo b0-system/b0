@@ -1,23 +1,34 @@
-#!/usr/bin/env ocaml
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers. All rights reserved.
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-(* See DEVEL.md for details. Usage: ocaml b00t/clean *)
+open B00_std
+open B00_std.Result.Syntax
 
-let ( / ) = Filename.concat
-let root_dir = Sys.getcwd ()
-let boot_dir = root_dir / "b00t"
-let boot_exe = (boot_dir / "run") ^ (if Sys.win32 then ".exe" else "")
-let boot_build_dir = boot_dir / "_build"
+let root c =
+  Log.if_error ~use:B0_driver.Exit.no_b0_file @@
+  let* b0_file = B0_driver.Conf.get_b0_file c in
+  let root = Fpath.parent b0_file in
+  Log.app (fun m -> m "%a" Fpath.pp_unquoted root);
+  Ok B00_cli.Exit.ok
 
-let clean () =
-  let rm = function ".KEEPME" -> () | f -> Sys.remove (boot_build_dir / f) in
-  Array.iter rm (Sys.readdir boot_build_dir);
-  if Sys.file_exists boot_exe then Sys.remove boot_exe
+(* Command line interface *)
 
-let () = clean ()
+open Cmdliner
+
+let cmd =
+  let doc = "Show the root directory" in
+  let sdocs = Manpage.s_common_options in
+  let exits = B0_driver.Exit.infos in
+  let man_xrefs = [ `Main ] in
+  let man = [
+    `S Manpage.s_description;
+    `P "$(tname) shows the b0 root directory.";
+    B0_b0.Cli.man_see_manual; ]
+  in
+  Term.(const root $ B0_driver.Cli.conf),
+  Term.info "root" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

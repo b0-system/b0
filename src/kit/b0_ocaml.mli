@@ -9,12 +9,46 @@ open B00_std
 open B00
 open B00_ocaml
 
-val lib : string -> Lib.Name.t
-(** [lib] is {!B00_ocaml.Lib.Name.v}. *)
+(** {1:units Units}
+
+    A few high-level build units. *)
+
+val libname : string -> Lib.Name.t
+(** [libname n] is [n] as an OCaml {{!B00_ocaml.Lib.Name}library name}.
+    This is shortcut for {!B00_ocaml.Lib.Name.v}. *)
+
+val exe :
+  ?doc:string -> ?meta:B0_meta.t -> ?requires:Lib.Name.t list ->
+  ?name:string -> string -> srcs:B0_srcs.t -> B0_unit.t
+(** [exe n] is a build unit for an executable named [n] (without
+    the platform specific extension).
+    {ul
+    {- [doc] is the unit doc string.}
+    {- [meta] is the initial metadata.}
+    {- [requires] are the OCaml libraries required to compile the executable.}
+    {- [name] is the name of the unit (defaults to [n]).}
+    {- [srcs] are the executable sources. All files with extension [.ml],
+       [.mli], [.c] and [.h] are considered for compiling and linking the
+       executable.}} *)
+
+val lib :
+  ?doc:string -> ?meta:B0_meta.t -> ?requires:Lib.Name.t list ->
+  ?name:string -> Lib.Name.t -> srcs:B0_srcs.t -> B0_unit.t
+(** [lib n ~srcs] is a built unit for a library named [l] made of
+    sources [src].
+    {ul
+    {- [doc] is the unit doc string.}
+    {- [meta] is the initial metadata.}
+    {- [requires] are the OCaml libraries required to compile the library.}
+    {- [name] is the name of the build unit (default to [n] with [.]
+        substituted by [-])}
+    {- [srcs] are the library sources. extension [.ml],
+       [.mli], [.c] and [.h] are considered for compiling and linking the
+       executable.}} *)
 
 (** {1:build_conf Build configuration} *)
 
-val conf : Tool.Conf.t Store.key
+val conf : B00_ocaml.Conf.t Store.key
 (** [conf] is a memo key store with the OCaml configuration. *)
 
 val version : B0_build.t -> (int * int * int * string option) Fut.t
@@ -25,29 +59,35 @@ val version : B0_build.t -> (int * int * int * string option) Fut.t
     In a build it is desirable to know which code is being produced
     because if both are produced the compilers may compete to
     produce some of the shared build artefacts. The following store
-    keys allow to express build code {{!code_wanted}desires} and
-    determine the actual {{!built_code}decision}. *)
+    keys allow to express build code {{!wanted_code}desires} and
+    determine the actual {{!built_code}decision}. Note the desires
+    may actually be altered units that may build FIXME maybe we
+    should stick to must. *)
 
-type built_code = [ `Byte | `Native | `Both ]
+type built_code = [ `Byte | `Native | `All ]
 (** The type indicating which code is being built. *)
+
+val pp_built_code : built_code Fmt.t
+(** [pp_built_code] formats {!built_code} values. *)
 
 val wanted_code : [ built_code | `Auto ] Store.key
 (** [wanted_code] indicates which code should be built, default
-    determines to [`Auto]. [`Auto] indicates [`Native] should be
+    determines to [`Auto]. If [`Auto] is used and no unit that
+    may build has specific {!Meta.needs_code} then [`Native] is
     used if [ocamlopt] can be found in the memo environment and
     [`Byte] otherwise. *)
 
 val built_code : built_code Store.key
 (** [build_code] is a memo key indicating the built code. By default
-    determines by consulting [code_wanted]. *)
+    determines by consulting [wanted_code]. *)
 
-(** {1:units Build units} *)
+(** {1:metadata Metadata} *)
+
+val tag : unit B0_meta.key
+(** [tag] indicates the entity is relatd to OCaml. *)
 
 (** Metadata keys *)
 module Meta : sig
-
-  val tag : unit B0_meta.key
-  (** [tag] indicates the entity deals with OCaml code. *)
 
   val requires : Lib.Name.t list B0_meta.key
   (** [requires] on a build unit specifies the OCaml libraries needed to
@@ -55,70 +95,54 @@ module Meta : sig
 
   val library : Lib.Name.t B0_meta.key
   (** [library] on a build unit specifies that the unit defines
-      the library. *)
+      the library with the given name. *)
 
   val mod_srcs : Mod.Src.t Mod.Name.Map.t  Fut.t B0_meta.key
   (** FIXME quick hack this should not be in meta. *)
+
+  val supported_code : built_code B0_meta.key
+  (** [supported_code] indicates which backend code the unit supports.
+      If the meta is unspecified this assumes [`All]. *)
+
+  val needs_code : built_code  B0_meta.key
+  (** [needs_code] indicates the unit unconditionally needs a given
+      code build. *)
 end
 
-(** OCaml build units *)
-module Unit : sig
+(** {1:lib Library resolution} *)
 
-  (** {1:library_resolver Library resolver} *)
+val lib_resolver : Lib.Resolver.t Store.key
+(** [lib_resolver] is the library resolver used by the build units defined by
+    this module. See {!default_lib_resolver} for the default. *)
 
-  type lib_resolver = Lib.Name.t -> Lib.t Fut.t
-  (** The type for library resolvers. FIXME maybe we want a data structure
-      with given operations. In particular we are interested in getting
-      the domain of the resolver for error correction (or we bundle
-      this into the function failure). *)
+val default_lib_resolver : Store.t -> Memo.t -> Lib.Resolver.t Fut.t
+(** [default_lib_resolver] determines the default value of {!lib_resolver}.
+    This resolver does the following:
+    {ol
+    {- It first looks if the library name is {{!Meta.library}defined}
+       by a unit that {{!B0_build.may_build}may} be built. If that
+       is the case it creates a library out of that build unit via
+       {!lib_of_unit}.}
+    {- It looks into the build environment via
+       {!B00_ocaml.Lib.Resolver.ocamlpath} and
+       {!B00_ocaml.Lib.Resolver.ocamlfind}
+       using the {!B0_build.shared_build_dir} directory of the build.}} *)
 
-  val lib_resolver : lib_resolver Store.key
-  (** [lib_resolver] is the library resolver used by OCaml build units.
-      See {!default_lib_resolver} for the default. *)
+val lib_of_unit :
+  B0_build.t -> B00_ocaml.Conf.t -> B0_unit.t -> Lib.t option Fut.t
+(** [lib_of_unit b ocaml_conf u] defines a library from unit [u] by
+    consulting {!Meta.requires}, {!Meta.library} and {!Meta.mod_srcs}.
+    As a side effect this {!B0_build.require} [u]. *)
 
-  val default_lib_resolver : Store.t -> Memo.t -> lib_resolver Fut.t
-  (** [default_resolver] determines the default value of {!lib_resolver}.
-      This resolver does the following:
-      {ol
-      {- It first looks if the library name is {{!Meta.library}defined}
-         by a unit  that {{!B0_build.Unit.may}may} be built. If that
-         is the case it creates a library out of that build unit's.}
-      {- It looks into the environment for a library via
-         {!B00_ocaml.Lib_resolver} that writes its result in the
-         {!B0_build.shared_build_dir} of the build.}} *)
-
-  (** {1:unit Units} *)
-
-  val exe :
-    ?doc:string -> ?meta:B0_meta.t -> ?requires:Lib.Name.t list ->
-    ?name:string -> string -> srcs:B0_srcs.t -> B0_unit.t
-  (** [exe n] is a build unit for an executable named [n] (without
-      the platform specific extension).
-      {ul
-      {- [doc] is the unit doc string.}
-      {- [meta] is the initial metadata.}
-      {- [requires] are the OCaml libraries required to compile the executable.}
-      {- [name] is the name of the unit (defaults to [n]).}
-      {- [srcs] are the executable sources. All files with extension [.ml],
-         [.mli], [.c] and [.h] are considered for compiling and linking the
-         executable.}} *)
-
-  val lib :
-    ?doc:string -> ?meta:B0_meta.t -> ?requires:Lib.Name.t list ->
-    ?name:string -> Lib.Name.t -> srcs:B0_srcs.t -> B0_unit.t
-  (** [lib n ~srcs] is a built unit for a library named [l] made of
-      sources [src].
-      {ul
-      {- [doc] is the unit doc string.}
-      {- [meta] is the initial metadata.}
-      {- [requires] are the OCaml libraries required to compile the
-         library.}
-      {- [name] is the name of the build unit (default to [n] with
-          [.] substituted by [-])}
-      {- [srcs] are the library sources. extension [.ml],
-         [.mli], [.c] and [.h] are considered for compiling and linking the
-         executable.}} *)
-end
+val lib_resolver_build_scope :
+  B0_build.t -> B00_ocaml.Conf.t -> B00_ocaml.Lib.Resolver.scope
+(** [lib_resolver_build_scope b conf] is a library resolver scope for
+    OCaml libraries that can be built in [b]. For a unit [u] to be recognized
+    as such it has to:
+    {ul
+    {- Be in the {!B0_build.may_build} set of [b].}
+    {- Define the {!Meta.library} and {!Meta.requires} in its
+       metadata.}} *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

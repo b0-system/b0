@@ -10,14 +10,12 @@ let get c format args = match args with
 | k :: us -> B0_b0.Def.get_meta_key (module B0_unit) c format k us
 | [] ->
     Log.err (fun m -> m "No metadata key specified");
-    B0_driver.Exit.some_error
+    B00_cli.Exit.some_error
 
 let get_unit args k = match args with
-| [] ->
-    Log.err (fun m -> m "No unit name specified");
-    B0_driver.Exit.some_error
+| [] -> Log.err (fun m -> m "No unit name specified"); B00_cli.Exit.some_error
 | u :: args ->
-    Log.if_error ~use:B0_driver.Exit.no_such_name @@
+    Log.if_error ~use:B00_cli.Exit.no_such_name @@
     let* u = B0_unit.get_list [u] in
     let u = List.hd u in
     Ok (k u args)
@@ -37,7 +35,7 @@ let build_unit c u k =
     | Error () -> Ok B0_driver.Exit.build_error
     | Ok () -> Ok (k build)
 
-let act c args =
+let action c args =
   get_unit args @@ fun u args ->
   build_unit c u @@ fun build ->
   failwith "TODO"
@@ -50,21 +48,21 @@ let exec c dry_run args =
   | None ->
       Log.err (fun m -> m "Unit %a does not define metadata key %a"
                   B0_unit.pp_name u B0_meta.Key.pp_name B0_meta.exe_path);
-      B0_driver.Exit.some_error
+      B00_cli.Exit.some_error
   | Some exe ->
       build_unit c u @@ fun build ->
       match Fut.value exe with
       | None ->
           Log.err (fun m -> m "Unit %a did not determine %a"
                       B0_unit.pp_name u B0_meta.Key.pp_name B0_meta.exe_path);
-          B0_driver.Exit.some_error
+          B00_cli.Exit.some_error
       | Some exe ->
           let cmd = Cmd.(path exe %% args cmd) in
-          if not dry_run then B0_driver.Exit.Exec (exe, cmd) else
-          (Fmt.pr "%s" (Cmd.to_string cmd); B0_driver.Exit.ok)
+          if not dry_run then Os.Exit.exec exe cmd else
+          (Fmt.pr "%s" (Cmd.to_string cmd); B00_cli.Exit.ok)
 
-let unit action format dry_run args c = match action with
-| `Action -> act c args
+let unit act format dry_run args c = match act with
+| `Action -> action c args
 | `Edit -> B0_b0.Def.edit (module B0_unit) c args
 | `Exec -> exec c dry_run args
 | `Get -> get c format args
@@ -99,39 +97,39 @@ let action_args =
   let doc = "Positional arguments for the action." in
   Arg.(value & pos_right 0 string [] & info [] ~doc ~docv:"ARG")
 
-let doc = "Operate on build units"
-let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.Info.base_cmd
-let envs = B00_editor.envs ()
-let man_xrefs = [ `Main ]
-let man = [
-  `S Manpage.s_description;
-  `P "$(tname) operates on build units.";
-  `S "ACTIONS";
-  `I ("$(b,action) $(i,UNIT) -- $(i,ARG)...",
-      "Builds $(i,UNIT) and execute its action. The unit needs to \
-       have an action defined for this to work.");
-  `I ("$(b,edit) [$(i,UNIT)]...",
-      "Edit in your editor the B0 file(s) in which all or the given units \
-       are defined.");
-  `I ("$(b,exec) [$(b,--dry-run)] $(i,UNIT) -- $(i,ARG)...",
-      "Build $(i,UNIT) and execute with given arguments the executable
-       specified in the unit's $(b,B0_meta.exe_path) metadata key.
-       If $(b,--dry-run) is specified prints out the invocation.");
-  `I ("$(b,get) $(i,KEY) [$(i,UNIT)]...",
-      "Get metadata key $(i,KEY) of given or all units.");
-  `I ("$(b,list) [$(i,UNIT)]...",
-      "List all or given units. Use with $(b,-l) to get more info on \
-       unit metadata.");
-  `I ("$(b,show) [$(i,UNIT)]...",
-      "Show is an alias for $(b,list -l).");
-`S Manpage.s_arguments;
-  `S Manpage.s_options;
-  B0_b0.Cli.man_see_manual; ]
-
 let cmd =
+  let doc = "Operate on build units" in
+  let sdocs = Manpage.s_common_options in
+  let exits = B0_driver.Exit.infos in
+  let envs = List.rev_append (B00_editor.envs ()) (B00_pager.envs ()) in
+  let man_xrefs = [ `Main ] in
+  let man = [
+    `S Manpage.s_description;
+    `P "$(tname) operates on build units.";
+    `S "ACTIONS";
+    `I ("$(b,action) $(i,UNIT) -- $(i,ARG)...",
+        "Builds $(i,UNIT) and execute its action. The unit needs to \
+         have an action defined for this to work.");
+    `I ("$(b,edit) [$(i,UNIT)]...",
+        "Edit in your editor the B0 file(s) in which all or the given units \
+         are defined.");
+    `I ("$(b,exec) [$(b,--dry-run)] $(i,UNIT) -- $(i,ARG)...",
+        "Build $(i,UNIT) and execute with given arguments the executable
+         specified in the unit's $(b,B0_meta.exe_path) metadata key.
+         If $(b,--dry-run) is specified prints out the invocation.");
+    `I ("$(b,get) $(i,KEY) [$(i,UNIT)]...",
+        "Get metadata key $(i,KEY) of given or all units.");
+    `I ("$(b,list) [$(i,UNIT)]...",
+        "List all or given units. Use with $(b,-l) to get more info on \
+         unit metadata.");
+    `I ("$(b,show) [$(i,UNIT)]...",
+        "Show is an alias for $(b,list -l).");
+    `S Manpage.s_arguments;
+    `S Manpage.s_options;
+    B0_b0.Cli.man_see_manual; ]
+  in
   let unit_cmd =
-    Term.(const unit $ action $ B00_ui.Cli.out_details () $ dry_run $
+    Term.(const unit $ action $ B00_cli.Arg.output_details () $ dry_run $
           action_args)
   in
   B0_driver.with_b0_file ~driver:B0_b0.driver unit_cmd,

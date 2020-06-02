@@ -16,7 +16,7 @@ end
 
 include (B0_def.Make (T) : B0_def.S with type t := t)
 
-let v ?doc ?meta ?(locked = false) n units =
+let v ?doc ?meta n ~locked units  =
   let def = define ?doc ?meta n in
   let p = { def; units; locked; } in add p; p
 
@@ -25,16 +25,14 @@ let locked p = p.locked
 
 (* Formatting *)
 
-let pp_locked ppf p = match locked p with
-| true -> Fmt.tty_string [`Fg `Red] ppf "locked "
-| false -> Fmt.nop ppf ()
+let pp_locked ppf p =
+  if locked p then Fmt.tty_string [`Fg `Red] ppf "locked " else Fmt.nop ppf ()
 
 let pp_units ppf p =
   if units p = [] then () else
-  let label = Fmt.tty_string [`Fg (`Green) ] in
-  let pp_units = Fmt.(pp_locked ++ using units (list ~sep:sp B0_unit.pp_name))
-  in
-  Fmt.field ~label "units" Fmt.id pp_units ppf p
+  let label = Fmt.tty_string [`Fg `Green ] in
+  let pp = Fmt.(pp_locked ++ using units (list ~sep:sp B0_unit.pp_name)) in
+  Fmt.field ~label "units" Fmt.id pp ppf p
 
 let pp ppf p =
   Fmt.pf ppf "@[<v>@[%a %a@]@, @[<v>%a%a@]@]"

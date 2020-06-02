@@ -4,56 +4,48 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
-open B00_std.Fut.Syntax
 open B00
-open B00_ocaml
 
 module Exit = struct
-  type t = Code of int | Exec of Fpath.t * Cmd.t
-  let code = function Code c -> c | _ -> invalid_arg "not an exit code"
-  let ok = Code 0
-  let deploy_error = Code 118
-  let build_error = Code 119
-  let no_such_name = Code 120
-  let b0_file_error = Code 121
-  let no_b0_file = Code 122
-  let some_error = Code 123
+  open Cmdliner
 
-  module Info = struct
-    let e c doc = Cmdliner.Term.exit_info (code c) ~doc
-    let deploy_error = e deploy_error "on deploy error."
-    let build_error = e build_error "on build error."
-    let no_such_name = e no_such_name "a specified name does not exist."
-    let b0_file_error = e b0_file_error "on B0 file error."
-    let no_b0_file = e no_b0_file "no B0 file found."
-    let some_error = e some_error "on indiscriminate errors reported on stderr."
-    let base_cmd =
-      deploy_error :: build_error :: no_such_name :: b0_file_error ::
-      no_b0_file :: some_error :: Cmdliner.Term.default_exits
-  end
+  let deploy_error = Os.Exit.Code 118
+  let build_error = Os.Exit.Code 119
+  let b0_file_error = Os.Exit.Code 120
+  let no_b0_file = Os.Exit.Code 121
+
+  let e c doc = Term.exit_info (Os.Exit.get_code c) ~doc
+  let info_deploy_error = e deploy_error "on deploy error."
+  let info_build_error = e build_error "on build error."
+  let info_b0_file_error = e b0_file_error "on B0 file error."
+  let info_no_b0_file = e no_b0_file "no B0 file found."
+
+  let infos =
+    info_deploy_error :: info_build_error ::
+    info_b0_file_error :: info_no_b0_file ::
+    B00_cli.Exit.infos
 end
 
 module Env = struct
-  let b0_dir = B00_ui.Memo.b0_dir_env
+  let b0_dir = B00_cli.Memo.b0_dir_env
   let b0_file = "B0_FILE"
-  let cache_dir = B00_ui.Memo.cache_dir_env
+  let cache_dir = B00_cli.Memo.cache_dir_env
   let color = "B0_COLOR"
   let code = "B0_DRIVER_CODE"
-  let hash_fun = B00_ui.Memo.hash_fun_env
-  let jobs = B00_ui.Memo.jobs_env
+  let hash_fun = B00_cli.Memo.hash_fun_env
+  let jobs = B00_cli.Memo.jobs_env
   let verbosity = "B0_VERBOSITY"
 end
 
 module Conf = struct
   let b0_file_name = "B0.ml"
   let drivers_dir_name = ".drivers"
-
   type t =
     { b0_dir : Fpath.t;
       b0_file : Fpath.t option;
       cache_dir : Fpath.t;
       cwd : Fpath.t;
-      code : Compile.code option;
+      code : B00_ocaml.Conf.code option;
       hash_fun : (module Hash.T);
       jobs : int;
       log_level : Log.level;
@@ -65,7 +57,7 @@ module Conf = struct
     let feedback =
       let op_howto ppf o = Fmt.pf ppf "b0 file log --id %d" (B000.Op.id o) in
       let show_op = Log.Info and show_ui = Log.Error and level = Log.level () in
-      B00_ui.Memo.pp_leveled_feedback ~op_howto ~show_op ~show_ui ~level
+      B00_cli.Memo.pp_leveled_feedback ~op_howto ~show_op ~show_ui ~level
         Fmt.stderr
     in
     Memo.memo ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs ~feedback ()
@@ -74,7 +66,7 @@ module Conf = struct
       ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~hash_fun ~jobs
       ~log_level ~no_pager ~tty_cap ()
     =
-    let trash_dir = Fpath.(b0_dir / B00_ui.Memo.trash_dir_name) in
+    let trash_dir = Fpath.(b0_dir / B00_cli.Memo.trash_dir_name) in
     let memo = lazy (memo ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs) in
     { b0_dir; b0_file; cache_dir; cwd; code; hash_fun; jobs;
       memo; log_level; no_pager; tty_cap }
@@ -120,16 +112,16 @@ module Conf = struct
       ~b0_dir ~b0_file ~cache_dir ~code ~hash_fun ~jobs
       ~log_level ~no_pager ~tty_cap ()
     =
-    let tty_cap = B00_std_ui.get_tty_cap tty_cap in
-    let log_level = B00_std_ui.get_log_level log_level in
-    B00_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
+    let tty_cap = B00_cli.B00_std.get_tty_cap tty_cap in
+    let log_level = B00_cli.B00_std.get_log_level log_level in
+    B00_cli.B00_std.setup tty_cap log_level ~log_spawns:Log.Debug;
     Result.bind (Os.Dir.cwd ()) @@ fun cwd ->
     let b0_file = find_b0_file ~cwd ~b0_file in
     let root = match b0_file with Some f -> Fpath.parent f | None -> cwd  in
-    let b0_dir = B00_ui.Memo.get_b0_dir ~cwd ~root ~b0_dir in
-    let cache_dir = B00_ui.Memo.get_cache_dir ~cwd ~b0_dir ~cache_dir in
-    let hash_fun = B00_ui.Memo.get_hash_fun ~hash_fun in
-    let jobs = B00_ui.Memo.get_jobs ~jobs in
+    let b0_dir = B00_cli.Memo.get_b0_dir ~cwd ~root ~b0_dir in
+    let cache_dir = B00_cli.Memo.get_cache_dir ~cwd ~b0_dir ~cache_dir in
+    let hash_fun = B00_cli.Memo.get_hash_fun ~hash_fun in
+    let jobs = B00_cli.Memo.get_jobs ~jobs in
     Ok (v ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~hash_fun
           ~jobs ~log_level ~no_pager ~tty_cap ())
 end
@@ -138,15 +130,15 @@ module Cli = struct
   open Cmdliner
 
   let docs = Manpage.s_common_options
-  let b0_dir = B00_ui.Memo.b0_dir ~docs ()
+  let b0_dir = B00_cli.Memo.b0_dir ~docs ()
   let b0_file =
     let env = Arg.env_var Env.b0_file in
     let doc = "Use $(docv) as the B0 file." and docv = "PATH" in
     let none = "B0.ml file in cwd or first upwards" in
-    Arg.(value & opt (Arg.some ~none B00_std_ui.fpath) None &
+    Arg.(value & opt (Arg.some ~none B00_cli.fpath) None &
          info ["b0-file"] ~doc ~docv ~docs ~env)
 
-  let cache_dir = B00_ui.Memo.cache_dir ~docs ()
+  let cache_dir = B00_cli.Memo.cache_dir ~docs ()
   let code =
     let env = Arg.env_var Env.code in
     let code_enum = ["byte", Some `Byte; "native", Some `Native; "auto", None]in
@@ -158,10 +150,12 @@ module Cli = struct
     in
     Arg.(value & opt code None & info ["driver-code"] ~doc ~docv ~docs ~env)
 
-  let hash_fun = B00_ui.Memo.hash_fun ~docs ()
-  let jobs = B00_ui.Memo.jobs ~docs ()
-  let log_level = B00_std_ui.log_level ~docs ~env:(Arg.env_var Env.verbosity) ()
-  let tty_cap = B00_std_ui.tty_cap ~docs ~env:(Arg.env_var Env.color) ()
+  let hash_fun = B00_cli.Memo.hash_fun ~docs ()
+  let jobs = B00_cli.Memo.jobs ~docs ()
+  let log_level =
+    B00_cli.B00_std.log_level ~docs ~env:(Arg.env_var Env.verbosity) ()
+
+  let tty_cap = B00_cli.B00_std.tty_cap ~docs ~env:(Arg.env_var Env.color) ()
   let no_pager = B00_pager.don't ~docs ()
   let conf =
     let conf
@@ -179,11 +173,11 @@ end
 
 (* Drivers *)
 
-type main = unit -> Exit.t Cmdliner.Term.result
+type main = unit -> Os.Exit.t Cmdliner.Term.result
 type t =
   { name : string;
     version : string;
-    libs : Lib.Name.t list }
+    libs : B00_ocaml.Lib.Name.t list }
 
 let create ~name ~version ~libs = { name; version; libs }
 let name d = d.name
@@ -193,37 +187,35 @@ let libs d = d.libs
 let has_b0_file = ref false (* set by run *)
 let driver = ref None
 let set ~driver:d ~main = driver := Some (d, main)
-let run ~has_b0_file:b0_file = match !driver with
-| None -> invalid_arg "No driver set via B0_driver.set"
-| Some (d, main) ->
-    let wrap_main main () =
-      try main () with B0_def.Scope.After_seal e ->
+
+let timing b0_file d _ m =
+  let b0_file = if b0_file then "with B0.ml" else "no B0.ml" in
+  m "total time %s %s %s" d.name d.version b0_file
+
+let run ~has_b0_file:b0_file =
+  B00_cli.Exit.exit ~exec_error:B00_cli.Exit.some_error @@
+  match !driver with
+  | None -> invalid_arg "No driver set via B0_driver.set"
+  | Some (d, main) ->
+      has_b0_file := b0_file;
+      Log.time begin fun _ m ->
+        let b0_file = if b0_file then "with B0.ml" else "no B0.ml" in
+        m "total time %s %s %s" d.name d.version b0_file
+      end @@ fun () ->
+      B00_cli.Exit.of_eval_result @@
+      try main ()
+      with B0_def.Scope.After_seal e ->
         (* FIXME I suspect we may never see this it will be catched
            by memo protection. At least make a good error msg. *)
         let bt = Printexc.get_raw_backtrace () in
         Log.err (fun m -> m ~header:"" "@[<v>%a@,@[%s@]@]" Fmt.backtrace bt e);
         `Ok Exit.b0_file_error
-    in
-    let run_main main =
-      Log.time begin fun _ m ->
-        let b0_file = if b0_file then "with B0.ml" else "no B0.ml" in
-        m "total time %s %s %s" d.name d.version b0_file
-      end main
-    in
-    let exit_main = function
-    | Exit.Code c -> exit c
-    | Exit.Exec (exec, cmd) ->
-        exit @@ Log.if_error ~use:Exit.(code some_error) @@
-        Result.bind (Os.Cmd.execv exec cmd) @@ fun _ -> assert false
-    in
-    has_b0_file := b0_file;
-    match run_main (wrap_main main) with
-    | `Ok res -> exit_main res
-    | e -> Cmdliner.Term.exit ~term_err:Exit.(code some_error) e
 
 let has_b0_file () = !has_b0_file
 
 module Compile = struct
+  open B00_std.Fut.Syntax
+
   let build_dir c ~driver =
     Fpath.(Conf.b0_dir c / Conf.drivers_dir_name / name driver)
 
@@ -241,20 +233,19 @@ module Compile = struct
     Ok (B0_file.expanded_src esrc)
 
   let base_ext_libs =
-    [ Lib.Name.v "cmdliner";
-      Lib.Name.v "unix"; ]
+    [ B00_ocaml.Lib.Name.v "cmdliner";
+      B00_ocaml.Lib.Name.v "unix"; ]
 
   let base_libs =
-    [ Lib.Name.v "b0.b00.std";
-      Lib.Name.v "b0.b00";
-      Lib.Name.v "b0.b00.kit";
-      Lib.Name.v "b0.b0";
-      Lib.Name.v "b0.kit";
-      Lib.Name.v "b0.driver"; ]
+    [ B00_ocaml.Lib.Name.v "b0.b00.std";
+      B00_ocaml.Lib.Name.v "b0.b00";
+      B00_ocaml.Lib.Name.v "b0.b00.kit";
+      B00_ocaml.Lib.Name.v "b0.b0";
+      B00_ocaml.Lib.Name.v "b0.kit";
+      B00_ocaml.Lib.Name.v "b0.driver"; ]
 
   let find_libs m r libs =
-    let find = Lib_resolver.find in
-    Fut.of_list (List.map (find r) libs)
+    Fut.of_list @@ List.map (B00_ocaml.Lib.Resolver.get r) libs
 
   let find_boot_libs m ~clib_ext ~env libs r =
     match Os.Env.find ~empty_is_none:true "B0_B00T" with
@@ -262,22 +253,29 @@ module Compile = struct
     | Some bdir ->
         let bdir = Fpath.v bdir in
         let boot_lib name =
-          let dir = Fpath.(bdir / Lib.Name.undot ~rep:'-' name) in
-          let archive = Some (Lib.Name.to_archive_name name) in
-          Memo.fail_if_error m @@
-          Lib.of_dir m ~clib_ext ~name ~requires:[] ~archive ~dir
+          let dir = Fpath.(bdir / B00_ocaml.Lib.Name.undot ~rep:'-' name) in
+          let archive = Some (B00_ocaml.Lib.Name.to_archive_name name) in
+          let* lib =
+            B00_ocaml.Lib.of_dir m ~clib_ext ~name ~requires:[] ~archive ~dir
+          in
+          match lib with
+          | Error _ as e -> Memo.fail_if_error m e
+          | Ok lib -> Fut.return lib
         in
-        Fut.return (List.map boot_lib libs)
+        Fut.of_list (List.map boot_lib libs)
 
-  let find_libs m ~clib_ext ~build_dir ~driver ~requires =
-    let* ocamlpath = Ocamlpath.get m None in
-    let memo_dir = Fpath.(build_dir / "ocamlib") in
-    let r = Lib_resolver.create m ~memo_dir ~ocamlpath ~clib_ext in
+  let find_libs m ocaml_conf ~build_dir ~driver ~requires =
+    let* ocamlpath = B00_ocaml.Ocamlpath.get m None in
+    let cache_dir = Fpath.(build_dir / "ocamlib") in
+    let ocamlpath = B00_ocaml.Lib.Resolver.ocamlpath ~cache_dir ~ocamlpath in
+    let ocamlfind = B00_ocaml.Lib.Resolver.ocamlfind ~cache_dir in
+    let r = B00_ocaml.Lib.Resolver.create m ocaml_conf [ocamlpath; ocamlfind] in
     let requires = List.map fst requires in
     let* requires = find_libs m r requires in
     (* FIXME we are loosing locations here would be nice to
        have them to report errors. *)
     (* FIXME we likely also want a notion of ext lib for drivers *)
+    let clib_ext = B00_ocaml.Conf.lib_ext ocaml_conf in
     let* driver_libs =
       find_boot_libs m ~clib_ext ~env:"B0_DRIVER_BOOT" (libs driver) r
     in
@@ -288,24 +286,23 @@ module Compile = struct
     Fut.return (all_libs, seen_libs)
 
   let find_compiler c m = match Conf.code c with
-  | Some (`Byte as c) -> Tool.ocamlc, c
-  | Some (`Native as c) -> Tool.ocamlopt, c
+  | Some (`Byte as c) -> B00_ocaml.Tool.ocamlc, c
+  | Some (`Native as c) -> B00_ocaml.Tool.ocamlopt, c
   | None ->
-      match B00.Memo.tool_opt m Tool.ocamlopt with
-      | None -> Tool.ocamlc, `Byte
-      | Some comp -> Tool.ocamlopt, `Native
+      match B00.Memo.tool_opt m B00_ocaml.Tool.ocamlopt with
+      | None -> B00_ocaml.Tool.ocamlc, `Byte
+      | Some comp -> B00_ocaml.Tool.ocamlopt, `Native
 
   let compile_src m c ~driver ~build_dir src ~exe =
     let ocaml_conf = Fpath.(build_dir / "ocaml.conf") in
     let comp, code = find_compiler c m in
-    Tool.Conf.write m ~comp ~o:ocaml_conf;
-    let* ocaml_conf = Tool.Conf.read m ocaml_conf in
-    let obj_ext = Tool.Conf.obj_ext ocaml_conf in
-    let clib_ext = Tool.Conf.lib_ext ocaml_conf in
+    B00_ocaml.Conf.write m ~comp ~o:ocaml_conf;
+    let* ocaml_conf = B00_ocaml.Conf.read m ocaml_conf in
+    let obj_ext = B00_ocaml.Conf.obj_ext ocaml_conf in
     let comp = B00.Memo.tool m comp in
     let requires = B0_file.requires src in
     let* all_libs, seen_libs =
-      find_libs m ~clib_ext ~build_dir ~driver ~requires
+      find_libs m ocaml_conf ~build_dir ~driver ~requires
     in
     let src_file = Fpath.(build_dir / "src.ml") in
     write_src m c src ~src_file;
@@ -316,13 +313,16 @@ module Compile = struct
       | `Byte -> [base ".cmo"; exe ]
       | `Native -> [base ".cmx"; base obj_ext; exe ]
     in
-    let dirs = List.map Lib.dir seen_libs in
+    let dirs = List.map B00_ocaml.Lib.dir seen_libs in
     let incs = Cmd.unstamp @@ Cmd.paths ~slip:"-I" dirs in
     let archives =
-      let ar = match code with `Native -> Lib.cmxa | `Byte -> Lib.cma in
+      let ar = match code with
+      | `Native -> B00_ocaml.Lib.cmxa
+      | `Byte -> B00_ocaml.Lib.cma
+      in
       List.filter_map ar all_libs
     in
-    let c_archives = List.filter_map Lib.c_archive all_libs in
+    let c_archives = List.filter_map B00_ocaml.Lib.c_archive all_libs in
     let ars = List.rev_append archives c_archives in
     (* FIXME this should be done b the resolver *)
     List.iter (B00.Memo.file_ready m) ars;
@@ -333,7 +333,7 @@ module Compile = struct
     Fut.return ()
 
   let write_log_file ~log_file m =
-    Log.if_error ~use:() @@ B00_ui.Memo.Log.(write log_file (of_memo m))
+    Log.if_error ~use:() @@ B00_cli.Memo.Log.(write log_file (of_memo m))
 
   let compile c ~driver src =
     Result.bind (Conf.memo c) @@ fun m ->
@@ -342,7 +342,7 @@ module Compile = struct
     let exe = exe c ~driver in
     (* That shit should be streamlined: brzo, odig, b0caml all
        have similar setup/log/reporting bits. *)
-    Os.Sig_exit.on_sigint
+    Os.Exit.on_sigint
       ~hook:(fun () -> write_log_file ~log_file m) @@ fun () ->
     B00.Memo.run_proc m begin fun () ->
       let* () = B00.Memo.delete m build_dir in
@@ -365,17 +365,18 @@ module Compile = struct
 end
 
 let with_b0_file ~driver cmd =
+ let open B00_std.Result.Syntax in
   let run conf cmd = match has_b0_file () with
   | true -> cmd conf
   | false ->
       Log.if_error ~use:Exit.no_b0_file @@
-      Result.bind (Conf.get_b0_file conf) @@ fun b0_file ->
+      let* b0_file = Conf.get_b0_file conf in
       Log.if_error' ~use:Exit.b0_file_error @@
-      Result.bind (Os.File.read b0_file) @@ fun s ->
-      Result.bind (B0_file.of_string ~file:b0_file s) @@ fun src ->
-      Result.bind (Compile.compile conf ~driver src) @@ fun exe ->
+      let* s = Os.File.read b0_file in
+      let* src = B0_file.of_string ~file:b0_file s in
+      let* exe = Compile.compile conf ~driver src in
       let argv = Cmd.of_list (fun x -> x) (Array.to_list Sys.argv) in
-      Ok (Exit.Exec (exe, argv))
+      Ok (Os.Exit.exec exe argv)
   in
   Cmdliner.Term.(pure run $ Cli.conf $ cmd)
 

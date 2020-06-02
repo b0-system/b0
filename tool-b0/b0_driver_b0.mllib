@@ -7,4 +7,6 @@ B0_cmd_unit
 B0_cmd_log
 B0_cmd_pack
 B0_cmd_delete
+B0_cmd_scope
+B0_cmd_root
 B0_main

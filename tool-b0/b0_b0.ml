@@ -18,15 +18,15 @@ module Def = struct
     | `Normal -> Def.pp_synopsis, Fmt.cut
     | `Long -> Def.pp, Fmt.(cut ++ cut)
     in
-    Log.if_error ~use:B0_driver.Exit.no_such_name @@
+    Log.if_error ~use:B00_cli.Exit.no_such_name @@
     let* ds = match ds with [] -> Ok (Def.list ()) | ds -> Def.get_list ds in
     let ds = List.sort Def.compare ds in
-    Log.if_error' ~use:B0_driver.Exit.some_error @@
+    Log.if_error' ~use:B00_cli.Exit.some_error @@
     let don't = B0_driver.Conf.no_pager c in
     let* pager = B00_pager.find ~don't () in
     let* () = B00_pager.page_stdout pager in
     if ds <> [] then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp) ds);
-    Ok B0_driver.Exit.ok
+    Ok B00_cli.Exit.ok
 
   let edit (module Def : B0_def.S) c ds =
     let rec find_files not_found fs = function
@@ -37,11 +37,10 @@ module Def = struct
         | Some f -> find_files not_found (f :: fs) ds
     in
     let edit_all = ds = [] in
-    Log.if_error ~use:B0_driver.Exit.no_such_name @@
-    let ds = match ds with [] -> Ok (Def.list ()) | ds -> Def.get_list ds in
-    Result.bind ds @@ fun ds ->
+    Log.if_error ~use:B00_cli.Exit.no_such_name @@
+    let* ds = match ds with [] -> Ok (Def.list ()) | ds -> Def.get_list ds in
     let not_found, files = find_files Def.Set.empty [] ds in
-    Log.if_error' ~use:B0_driver.Exit.some_error @@
+    Log.if_error' ~use:B00_cli.Exit.some_error @@
     match not edit_all && not (Def.Set.is_empty not_found) with
     | true ->
         let plural = if (Def.Set.cardinal not_found > 1) then "s" else "" in
@@ -51,11 +50,11 @@ module Def = struct
     | false ->
         let* editor = B00_editor.find () in
         Result.bind (B00_editor.edit_files editor files) @@ function
-        | `Exited 0 -> Ok B0_driver.Exit.ok
-        | _ -> Ok B0_driver.Exit.some_error
+        | `Exited 0 -> Ok B00_cli.Exit.ok
+        | _ -> Ok B00_cli.Exit.some_error
 
   let get_meta_key (module Def : B0_def.S) c format key ds =
-    Log.if_error ~use:B0_driver.Exit.no_such_name @@
+    Log.if_error ~use:B00_cli.Exit.no_such_name @@
     let* B0_meta.Key.V key = match B0_meta.Key.get_or_suggest key with
     | Ok _ as v -> v
     | Error suggs ->
@@ -84,7 +83,7 @@ module Def = struct
         in
         Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_bindings) bs)
     end;
-    Ok B0_driver.Exit.ok
+    Ok B00_cli.Exit.ok
 end
 
 module Cli = struct

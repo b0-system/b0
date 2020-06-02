@@ -98,6 +98,7 @@ let empty = M.empty
 let is_empty = M.is_empty
 let mem k m = M.mem k.Key.untyped m
 let add k v m = M.add k.Key.untyped (B (k, v)) m
+let ( ++ ) = add
 let tag k m = add k () m
 let rem k m = M.remove k.Key.untyped m
 let find : type a. a key -> t -> a option =
@@ -143,13 +144,15 @@ let str_key k ~doc = Key.v k ~doc ~pp_value:Fmt.string
 (* End-user information. *)
 
 let authors = str_list_key "authors" ~doc:"Author list"
-let doc_tags = str_list_key "doc-tags" ~doc:"Documentation classification tags"
+let description = str_key "description" ~doc:"Description"
+let description_tags = str_list_key "descr-tags" ~doc:"Description tags"
 let homepage = str_key "homepage" ~doc:"Homepage URI"
 let issues = str_key "issues" ~doc:"Issue tracker URI"
 let licenses = str_list_key "licenses" ~doc:"License list (SPDX ids)"
 let maintainers = str_list_key "maintainers" ~doc:"Maintainer list"
 let online_doc = str_key "online-doc" ~doc:"Online documentation URI"
 let repo = str_key "repo" ~doc:"VCS source repository URI"
+let synopsis = str_key "synopsis" ~doc:"one line synopsis"
 
 (* Entity tags *)
 

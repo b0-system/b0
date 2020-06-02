@@ -28,40 +28,39 @@ type t
 (** The type for build units. *)
 
 val v : ?doc:string -> ?meta:B0_meta.t -> string -> proc -> t
-(** [v n ~doc ~meta n proc] is a build unit named [n] with build procedure
-    [proc] and described by [doc]. *)
+(** [v n proc ~doc ~meta] is a build unit named [n] with build procedure
+    [proc], synopsis [doc] and metada [meta]. *)
 
 val proc : t -> proc
 (** [proc u] are the unit's build procedure. *)
+
+(** {1:b0_def B0 definition API} *)
 
 include B0_def.S with type t := t
 
 (**/**)
 module Build : sig
-  type bunit = t
+  type build_unit = t
   type t = build
-
   val memo : t -> B00.Memo.t
-  val store : t -> B00.Store.t
-  val shared_build_dir : t -> Fpath.t
+  val must_build : t -> Set.t
+  val may_build : t -> Set.t
+  val require : t -> build_unit -> unit
+  val current : t -> build_unit
+  val current_meta : t -> B0_meta.t
   val current_root_dir : t -> Fpath.t
-  val get : t -> 'a B00.Store.key -> 'a Fut.t
-
-  module Unit : sig
-    val current : t -> bunit
-    val must_build : t -> Set.t
-    val may_build : t -> Set.t
-    val require : t -> bunit -> unit
-    val build_dir : t -> bunit -> Fpath.t
-    val root_dir : t -> bunit -> Fpath.t
-  end
-
+  val current_build_dir : t -> Fpath.t
+  val shared_build_dir : t -> Fpath.t
+  val root_dir : t -> build_unit -> Fpath.t
+  val build_dir : t -> build_unit -> Fpath.t
   val create :
     root_dir:Fpath.t -> b0_dir:Fpath.t -> B00.Memo.t -> may_build:Set.t ->
     must_build:Set.t -> t
 
+  val store : t -> B00.Store.t
+  val get : t -> 'a B00.Store.key -> 'a Fut.t
+  val self : t B00.Store.key
   val run : t -> (unit, unit) result
-  val current : t B00.Store.key
 end
 (**/**)
 

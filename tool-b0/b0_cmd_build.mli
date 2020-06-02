@@ -7,7 +7,7 @@
 
 val memo : B0_driver.Conf.t -> (B00.Memo.t, string) result
 
-val cmd : B0_driver.Exit.t Cmdliner.Term.t * Cmdliner.Term.info
+val cmd : B00_std.Os.Exit.t Cmdliner.Term.t * Cmdliner.Term.info
 (** [build] is the command line for [build]. *)
 
 (*---------------------------------------------------------------------------

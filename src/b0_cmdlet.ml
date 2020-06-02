@@ -5,16 +5,7 @@
 
 open B00_std
 
-module Exit = struct
-  type t =
-  | Code of int
-  | Exec of Fpath.t * Cmd.t
-
-  let ok = Code 0
-  let some_error = Code 123 (* see B0_driver.Exit.some_error *)
-end
-
-type cmd = [ `Cmd of t -> argv:string array -> Exit.t ]
+type cmd = [ `Cmd of t -> argv:string list -> Os.Exit.t ]
 and t = { def : B0_def.t; cmd : cmd }
 
 module T = struct
@@ -31,6 +22,25 @@ let v ?doc ?meta n cmd =
   let p = { def; cmd } in add p; p
 
 let cmd c = c.cmd
+
+module Cli = struct
+  open Cmdliner
+
+  let info ?man_xrefs ?man ?envs ?exits ?sdocs ?docs ?doc:d ?version cmdlet =
+    let doc = Option.value ~default:(doc cmdlet) d in
+    let exits = Option.value ~default:B00_cli.Exit.infos exits in
+    let name = name cmdlet in
+    Term.info ?man_xrefs ?man ?envs ~exits ?sdocs ?docs ?version name ~doc
+
+  let run ?info:i cmdlet ~argv t =
+    let argv = Array.of_list argv in
+    let info = match i with None -> info cmdlet | Some info -> info in
+    B00_cli.Exit.of_eval_result @@ Term.eval ~argv (t, info)
+
+  let run_cmds cmdlet ~argv main cmds =
+    let argv = Array.of_list argv in
+    B00_cli.Exit.of_eval_result @@ Term.eval_choice ~argv main cmds
+end
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

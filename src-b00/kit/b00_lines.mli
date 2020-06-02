@@ -21,12 +21,11 @@ val fold :
   ?file:Fpath.t -> string -> (int -> string -> 'a -> 'a) -> 'a ->
   ('a, string) result
 (** [fold ~file data f acc] folds [f] with [acc] over the lines of
-      [data] assuming it came from [file]. [f] is given the one-based
-      line number, the line and the accumulator, it may use {!err} to
-      error which turns it in an [Error _] for [file] via
-      {!err_file}.
+    [data] assuming it came from [file]. [f] is given the one-based
+    line number, the line and the accumulator, it may use {!err} to
+    error which turns it in an [Error _] for [file] via {!err_file}.
 
-      If [data] is [""] this returns [acc]. *)
+    If [data] is [""] this returns [acc]. *)
 
 (** {1:errors Parse errors} *)
 

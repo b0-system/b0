@@ -8,15 +8,15 @@ open B00_std
 let err_unknown = 123
 
 let log tty_cap log_level no_pager format details query log_file =
-  let tty_cap = B00_std_ui.get_tty_cap tty_cap in
-  let log_level = B00_std_ui.get_log_level log_level in
-  B00_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
+  let tty_cap = B00_cli.B00_std.get_tty_cap tty_cap in
+  let log_level = B00_cli.B00_std.get_log_level log_level in
+  B00_cli.B00_std.setup tty_cap log_level ~log_spawns:Log.Debug;
   Log.if_error ~use:err_unknown @@
   let don't = no_pager || format = `Trace_event in
   Result.bind (B00_pager.find ~don't ()) @@ fun pager ->
   Result.bind (B00_pager.page_stdout pager) @@ fun () ->
-  Result.bind (B00_ui.Memo.Log.read log_file) @@ fun l ->
-  B00_ui.Memo.Log.out Fmt.stdout format details query ~path:log_file l;
+  Result.bind (B00_cli.Memo.Log.read log_file) @@ fun l ->
+  B00_cli.Memo.Log.out Fmt.stdout format details query ~path:log_file l;
   Ok 0
 
 (* Command line interface *)
@@ -30,7 +30,7 @@ let docs_format = "OUTPUT FORMAT"
 let docs_details = "OUTPUT DETAILS"
 let docs_selection = "OPTIONS FOR SELECTING OPERATIONS"
 let envs = B00_pager.envs ()
-let exits = B0_driver.Exit.Info.base_cmd
+let exits = B0_driver.Exit.infos
 
 let man_xrefs = [`Tool "b0"; `Tool "b00-cache"; `Tool "b00-hash";
                  `Tool "b00-driver" ]
@@ -43,21 +43,22 @@ let man = [
   `S docs_details;
   `P "If applicable.";
   `S docs_selection;
-  `Blocks B00_ui.Op.query_man;
+  `Blocks B00_cli.Op.query_man;
   `S Manpage.s_bugs;
   `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ]
 
 let log_file =
   let docv = "LOG_FILE" in
-  Arg.(required & pos 0 (some B00_std_ui.fpath) None & info [] ~doc ~docv)
+  Arg.(required & pos 0 (some B00_cli.fpath) None & info [] ~doc ~docv)
 
 let tool =
   Term.(const log $
-        B00_std_ui.tty_cap ~docs:sdocs () $
-        B00_std_ui.log_level ~docs:sdocs () $ B00_pager.don't ~docs:sdocs () $
-        B00_ui.Memo.Log.out_format_cli ~docs:docs_format () $
-        B00_ui.Cli.out_details ~docs:docs_details () $
-        B00_ui.Op.query_cli ~docs:docs_selection () $ log_file),
+        B00_cli.B00_std.tty_cap ~docs:sdocs () $
+        B00_cli.B00_std.log_level ~docs:sdocs () $
+        B00_pager.don't ~docs:sdocs () $
+        B00_cli.Memo.Log.out_format_cli ~docs:docs_format () $
+        B00_cli.Arg.output_details ~docs:docs_details () $
+        B00_cli.Op.query_cli ~docs:docs_selection () $ log_file),
   Term.info "b00-log" ~version ~doc ~sdocs ~envs ~exits ~man ~man_xrefs
 
 let main () = Term.(exit_status @@ eval tool)

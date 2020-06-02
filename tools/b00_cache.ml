@@ -23,7 +23,7 @@ let with_cache_dir cache_dir k = match Os.Dir.exists cache_dir with
 
 let find_used_keys ~err ~cwd ~b0_dir ~log_file k =
   let implicit_file = log_file = None in
-  let file = B00_ui.Memo.get_log_file ~cwd ~b0_dir ~log_file in
+  let file = B00_cli.Memo.get_log_file ~cwd ~b0_dir ~log_file in
   Result.bind (Os.File.exists file) @@ function
   | false when implicit_file && err ->
       Log.err begin fun m ->
@@ -35,45 +35,45 @@ let find_used_keys ~err ~cwd ~b0_dir ~log_file k =
   | _ ->
       Log.if_error' ~use:err_no_log_file @@
       Result.map_error (Fmt.str "Cannot determine used keys: %s") @@
-      Result.bind (B00_ui.Memo.Log.read file) @@ fun l ->
-      k (B00_ui.File_cache.keys_of_done_ops (B00_ui.Memo.Log.ops l))
+      Result.bind (B00_cli.Memo.Log.read file) @@ fun l ->
+      k (B00_cli.File_cache.keys_of_done_ops (B00_cli.Memo.Log.ops l))
 
 let cache_cmd
     tty_cap log_level no_pager b0_dir cache_dir
     (max_byte_size, pct) (action, log_file, args)
   =
-  let tty_cap = B00_std_ui.get_tty_cap tty_cap in
-  let log_level = B00_std_ui.get_log_level log_level in
-  B00_std_ui.setup tty_cap log_level ~log_spawns:Log.Debug;
+  let tty_cap = B00_cli.B00_std.get_tty_cap tty_cap in
+  let log_level = B00_cli.B00_std.get_log_level log_level in
+  B00_cli.B00_std.setup tty_cap log_level ~log_spawns:Log.Debug;
   Log.if_error ~use:err_unknown @@
   Result.bind (Os.Dir.cwd ()) @@ fun cwd ->
-  let root = B00_ui.Memo.find_dir_with_b0_dir ~start:cwd in
+  let root = B00_cli.Memo.find_dir_with_b0_dir ~start:cwd in
   let root = Option.value root ~default:cwd in
-  let b0_dir = B00_ui.Memo.get_b0_dir ~cwd ~root ~b0_dir in
-  let cache_dir = B00_ui.Memo.get_cache_dir ~cwd ~b0_dir ~cache_dir in
+  let b0_dir = B00_cli.Memo.get_b0_dir ~cwd ~root ~b0_dir in
+  let cache_dir = B00_cli.Memo.get_cache_dir ~cwd ~b0_dir ~cache_dir in
   let action = match action with
   | `Delete ->
       with_cache_dir cache_dir @@ fun dir ->
       let args = match args with [] -> `All | keys -> `Keys keys in
-      Result.bind (B00_ui.File_cache.delete ~dir args) @@ fun _ -> Ok 0
+      Result.bind (B00_cli.File_cache.delete ~dir args) @@ fun _ -> Ok 0
   | `Gc ->
       with_cache_dir cache_dir @@ fun dir ->
       find_used_keys ~err:true ~cwd ~b0_dir ~log_file @@ fun used ->
-      Result.bind (B00_ui.File_cache.gc ~dir ~used) @@ fun _ -> Ok 0
+      Result.bind (B00_cli.File_cache.gc ~dir ~used) @@ fun _ -> Ok 0
   | `Keys ->
       with_cache_dir cache_dir @@ fun dir ->
-      Result.bind (B00_ui.File_cache.keys ~dir) @@ fun _ -> Ok 0
+      Result.bind (B00_cli.File_cache.keys ~dir) @@ fun _ -> Ok 0
   | `Path ->
       Log.app (fun m -> m "%a" Fpath.pp_unquoted cache_dir);
       Ok 0
   | `Stats ->
       with_cache_dir cache_dir @@ fun dir ->
       find_used_keys ~err:false ~cwd ~b0_dir ~log_file @@ fun used ->
-      Result.bind (B00_ui.File_cache.stats ~dir ~used) @@ fun _ -> Ok 0
+      Result.bind (B00_cli.File_cache.stats ~dir ~used) @@ fun _ -> Ok 0
   | `Trim ->
       with_cache_dir cache_dir @@ fun dir ->
       find_used_keys ~err:false ~cwd ~b0_dir ~log_file @@ fun used ->
-      Result.bind (B00_ui.File_cache.trim ~dir ~used ~max_byte_size ~pct)
+      Result.bind (B00_cli.File_cache.trim ~dir ~used ~max_byte_size ~pct)
       @@ fun _ -> Ok 0
   in
   Log.if_error' ~use:err_unknown @@ action
@@ -130,7 +130,7 @@ let action =
 
 let parse_cli =
   let args = Arg.(value & pos_right 0 string [] & info []) in
-  let log_file_opt = B00_ui.Memo.log_file ~docs:sdocs () in
+  let log_file_opt = B00_cli.Memo.log_file ~docs:sdocs () in
   let parse action log_file_opt args = match action with
   | `Gc | `Stats | `Trim ->
       begin match args with
@@ -156,11 +156,12 @@ let parse_cli =
   Term.(ret (pure parse $ action $ log_file_opt $ args))
 
 let tool =
-  Term.(const cache_cmd $ B00_std_ui.tty_cap ~docs:sdocs () $
-        B00_std_ui.log_level ~docs:sdocs () $ B00_pager.don't ~docs:sdocs () $
-        B00_ui.Memo.b0_dir ~docs:sdocs () $
-        B00_ui.Memo.cache_dir ~docs:sdocs () $
-        B00_ui.File_cache.trim_cli () $
+  Term.(const cache_cmd $ B00_cli.B00_std.tty_cap ~docs:sdocs () $
+        B00_cli.B00_std.log_level ~docs:sdocs () $
+        B00_pager.don't ~docs:sdocs () $
+        B00_cli.Memo.b0_dir ~docs:sdocs () $
+        B00_cli.Memo.cache_dir ~docs:sdocs () $
+        B00_cli.File_cache.trim_cli () $
         parse_cli),
   Term.info "b00-cache" ~version ~doc ~sdocs ~exits ~man ~man_xrefs
 

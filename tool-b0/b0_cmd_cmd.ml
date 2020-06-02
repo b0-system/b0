@@ -7,14 +7,10 @@ open B00_std
 open B00_std.Result.Syntax
 
 let cmd cmdlet args c =
-  Log.if_error ~use:B0_driver.Exit.no_such_name @@
+  Log.if_error ~use:B00_cli.Exit.no_such_name @@
   let* clet = Result.map List.hd (B0_cmdlet.get_list [cmdlet]) in
-  let `Cmd f = B0_cmdlet.cmd clet in
-  let ret = match f clet ~argv:(Array.of_list @@ cmdlet :: args) with
-  | B0_cmdlet.Exit.Code c -> B0_driver.Exit.Code c
-  | B0_cmdlet.Exit.Exec (exe, cmd) -> B0_driver.Exit.Exec (exe, cmd)
-  in
-  Ok ret
+  let `Cmd cmd = B0_cmdlet.cmd clet in
+  Ok (cmd clet ~argv:(cmdlet :: args))
 
 (* Command line interface *)
 
@@ -27,24 +23,24 @@ let cmdlet =
 let cmdlet_args =
   let doc =
     "Argument for the cmdlet. Specify arguments after the $(b,--) \
-     otherwise command line options will be interpreted by $(b,cmd) itself."
+     otherwise command line options will be interpreted by $(tname) $(mname)."
   in
   Arg.(value & pos_right 0 string [] & info [] ~doc ~docv:"ARG")
 
-let doc = "Execute cmdlets"
-let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.Info.base_cmd
-let man_xrefs = [ `Main ]
-let man = [
-  `S Manpage.s_synopsis;
-  `P "$(mname) $(tname) [$(i,OPTION)]... $(i,CMDLET) $(b,--) $(i,ARG)...";
-  `S Manpage.s_description;
-  `P "$(tname) executes cmdlets.";
-  `S Manpage.s_arguments;
-  `S Manpage.s_options;
-  B0_b0.Cli.man_see_manual; ]
-
 let cmd =
+  let doc = "Execute cmdlets" in
+  let sdocs = Manpage.s_common_options in
+  let exits = B0_driver.Exit.infos in
+  let man_xrefs = [ `Main ] in
+  let man = [
+    `S Manpage.s_synopsis;
+    `P "$(mname) $(tname) [$(i,OPTION)]... $(i,CMDLET) $(b,--) $(i,ARG)...";
+    `S Manpage.s_description;
+    `P "$(tname) executes cmdlets.";
+    `S Manpage.s_arguments;
+    `S Manpage.s_options;
+    B0_b0.Cli.man_see_manual; ]
+  in
   let cmd_cmd = Term.(const cmd $ cmdlet $ cmdlet_args) in
   B0_driver.with_b0_file ~driver:B0_b0.driver cmd_cmd,
   Term.info "cmd" ~doc ~sdocs ~exits ~man ~man_xrefs

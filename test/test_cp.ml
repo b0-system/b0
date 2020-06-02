@@ -27,12 +27,12 @@ let main () =
     in
     let src =
       let doc = "$(docv) is the source file or directory" in
-      Arg.(required & pos 0 (some B00_std_ui.fpath) None &
+      Arg.(required & pos 0 (some B00_cli.fpath) None &
            info [] ~doc ~docv:"SRC")
     in
     let dst =
       let doc = "$(docv) is the destination path; which must not exist." in
-      Arg.(required & pos 1 (some B00_std_ui.fpath) None &
+      Arg.(required & pos 1 (some B00_cli.fpath) None &
            info [] ~doc ~docv:"DST")
     in
     Term.(const cp_cmd $ follow_symlinks $ recurse $ src $ dst),

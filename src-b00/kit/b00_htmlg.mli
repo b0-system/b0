@@ -217,7 +217,7 @@ module El : sig
          (unconditional).}
       {- A stylesheet {!El.link} of type [text/css] for each element
          of [styles], in order (defaults to [[]]).}
-      {- A deferred {!El.script} of type [text/javascript] for
+      {- A {e deferred} {!El.script} of type [text/javascript] for
          each element of [scripts], in order (defaults to [[]]).}
       {- [more_head] (defaults to {!El.void}).}
       {- The page has a title [title], which must be non-white and

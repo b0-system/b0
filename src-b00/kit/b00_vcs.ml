@@ -4,6 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open B00_std.Result.Syntax
 
 let parse_changes lines =
   try
@@ -21,7 +22,6 @@ let parse_files ~err o =
   let file_of_string l = Fpath.of_string l |> Result.to_failure in
   try Ok (List.map file_of_string (String.cuts_left ~sep:"\n" o)) with
   | Failure e -> Fmt.error "%s: %s" err e
-
 
 let dirtify id = id ^ "-dirty"
 
@@ -105,11 +105,13 @@ module Git_vcs : VCS = struct
   let find ?dir () = Result.bind (Lazy.force vcs_cmd) @@ function
   | None -> Ok None
   | Some git ->
-      let get_path cmd =
+      let get_path ~must cmd =
         let stderr = `Stdo Os.Cmd.out_null in
         Result.bind (Os.Cmd.run_status_out ~stderr ~trim:true cmd) @@ function
-        | `Exited 0, repo_dir -> Fpath.of_string repo_dir
-        | status, _ -> err cmd status
+        | `Exited 0, repo_dir ->
+            Result.map Option.some (Fpath.of_string repo_dir)
+        | status, _ when must -> err cmd status
+        | status, _ -> Ok None
       in
       let cwd = match dir with
       | Some d -> Cmd.(arg "-C" %% path d)
@@ -117,10 +119,13 @@ module Git_vcs : VCS = struct
       in
       let repo_dir = Cmd.(git %% cwd % "rev-parse" % "--absolute-git-dir") in
       let work_dir = Cmd.(git %% cwd % "rev-parse" % "--show-toplevel") in
-      Result.bind (get_path repo_dir) @@ fun repo_dir ->
-      Result.bind (get_path work_dir) @@ fun work_dir ->
-      let cmd = repo_cmd git repo_dir work_dir in
-      Ok (Some { kind = Git; cmd; repo_dir; work_dir })
+      Result.bind (get_path ~must:false repo_dir) @@ function
+      | None -> Ok None
+      | Some repo_dir ->
+          Result.bind (get_path ~must:true work_dir) @@ fun work_dir ->
+          let work_dir = Option.get work_dir in
+          let cmd = repo_cmd git repo_dir work_dir in
+          Ok (Some { kind = Git; cmd; repo_dir; work_dir })
 
   let cmd r = r.cmd
   let work_tree r = Cmd.(arg "--work-tree" %% path (Fpath.parent r.repo_dir))
@@ -412,6 +417,11 @@ let describe (r, (module Vcs : VCS)) = Vcs.describe r
 (* Git specific *)
 
 module Git = struct
+
+  let find ?dir () =
+    let* vcs = Git_vcs.find ?dir () in
+    Ok (Option.map (fun r -> r, (module Git_vcs : VCS)) vcs)
+
   let check_kind (r, _) = match r.kind with
   | Hg -> Fmt.error "%a: not a git repository" Fpath.pp_quoted r.repo_dir
   | Git -> Ok ()
@@ -525,6 +535,12 @@ module Git = struct
     let ign = Cmd.(if' ignore_unmatch (arg "--ignore-unmatch")) in
     let rm = Cmd.(r.cmd % "rm" %% force %% recurse %% ign %% paths files) in
     Os.Cmd.run ?stdout ?stderr rm
+end
+
+module Hg = struct
+  let find ?dir () =
+    let* vcs = Hg_vcs.find ?dir () in
+    Ok (Option.map (fun r -> r, (module Hg_vcs : VCS)) vcs)
 end
 
 (*---------------------------------------------------------------------------

@@ -2355,6 +2355,7 @@ module Os = struct
 
     type t = string String.Map.t
     let empty = String.Map.empty
+    let add = String.Map.add
     let override env ~by =
       if String.Map.is_empty by then env else
       let lean_right _ l r = match r with
@@ -3784,7 +3785,7 @@ module Os = struct
        runs the program as a sub-process on which we waitpid(2) and then
        exit with the resulting status. *)
 
-    let _execv_win32 ~env f cmd =
+    let _execv_win32 ~env file cmd =
       let exit pid = match Unix.waitpid [] pid with
       | _, (Unix.WEXITED c) -> exit c
       | _, (Unix.WSIGNALED sg) ->
@@ -3794,10 +3795,11 @@ module Os = struct
       | _ -> assert false
       in
       let env = spawn_env env in
-      exit Unix.(create_process_env f cmd env stdin stderr stderr)
+      exit Unix.(create_process_env file cmd env stdin stderr stderr)
 
-    let _execv_posix ~env f cmd =
-      Ok (Unix.execve f cmd (spawn_env env))
+    let _execv_posix ~env file cmd =
+      Ok (Unix.execve file cmd (spawn_env env))
+
     let _execv = if Sys.win32 then _execv_win32 else _execv_posix
 
     let execv ?env ?cwd file cmd =
@@ -3816,14 +3818,26 @@ module Os = struct
       with
       | Failure e -> err_execv file e
       | Unix.Unix_error (e, _, _) -> err_execv file (uerr e)
+
+    type t = Cmd.t
   end
 
-  module Sig_exit = struct
+  module Exit = struct
+    type t = Code : int -> t | Exec : (unit -> ('a, string) result) -> t
+
+    let code c = Code c
+    let exec ?env ?cwd file cmd = Exec (fun () -> Cmd.execv ?env ?cwd file cmd)
+    let get_code = function Code c -> c | _ -> invalid_arg "not an Exit.Code"
+
+    let exit = function
+    | Code c -> Stdlib.exit c
+    | Exec execv -> Result.bind (execv ()) @@ fun _ -> assert false
+
     let on_sigint ~hook f =
-      let hook _ = hook (); exit 130 (* as if SIGINT signaled *) in
-      let restore = Sys.signal Sys.sigint (Sys.Signal_handle hook) in
-      let restore () = Sys.set_signal Sys.sigint restore in
-      try let v = f () in restore (); v with e -> restore (); raise e
+      let hook _ = hook (); Stdlib.exit 130 (* as if SIGINT signaled *) in
+      let previous = Sys.signal Sys.sigint (Sys.Signal_handle hook) in
+      let restore () = Sys.set_signal Sys.sigint previous in
+      Fun.protect ~finally:restore f
   end
 end
 
@@ -3957,8 +3971,6 @@ module Log = struct
   | Error msg ->
       !_kmsg.kmsg (fun _ -> Ok use) level @@ fun m ->
       m ?header "@[%a@]" Fmt.lines msg
-
-  let warn_if_error ?header ~use r = if_error ~level:Warning ?header ~use r
 
   let if_error_pp ?(level = Error) ?header pp ~use = function
   | Ok v -> v

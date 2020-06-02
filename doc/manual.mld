@@ -6,19 +6,18 @@ explains the basic mechanics of B0 files and their definitions. See
 
 {1:intro Introduction}
 
-B0 aims at liberating the programmer from the essential but often
-tedious and brittle bureaucracy that surrounds the programming
-activity. It provides a framework with a decent description language
-to devise modular and custom solutions to software construction and
-deployment problems.
+B0 aims at liberating the programmer from the essential but tedious
+and brittle bureaucracy that surrounds the programming activity. It
+provides a system with a decent description language to devise modular
+and custom solutions to software construction and deployment problems.
 
 B0 describes:
 
 {ul
 {- Build environments.}
 {- Software configuration, build and testing.}
-{- Source or built artefact deployments.}
-{- Development life-cycle procedures and actions.}}
+{- Source or binary deployments.}
+{- Development life-cycle procedures.}}
 
 These descriptions are made in {e B0 files} which we describe
 next.
@@ -30,11 +29,25 @@ few {{!directives}directives}. The OCaml code creates definitions to
 describe the software by using the versioned {!B0_kit} API and
 possibly other third-party OCaml {{!libs}libraries}.
 
-Usually B0 files are named [B0.ml] and are found at the root of a
+B0 files are named [B0.ml] and are usually found at the root of a
 project's source tree. It centralizes the definitions that describe
-the software.
+the software project.
 
-The definitions in B0 files are consulted and processed by {e
+The following is a simple [B0.ml] files that declares an executable to
+build from the OCaml [src/hello.ml] source and that uses the
+[cmdliner] OCaml library.
+
+{[
+open B0_kit.V000
+
+let cmdliner = B0_ocaml.libname "cmdliner"
+let hello =
+  let srcs = [`File "src/hello.ml"] in
+  let requires = [cmdliner] in
+  B0_ocaml.exe "hello" ~doc:"Greeting tool" ~srcs ~requires
+]}
+
+The definitions of B0 files are consulted and processed by {e
 drivers}. The [b0] and [d0] tools distributed with B0 are examples of
 drivers. An API is provided to create custom driver, see the
 {{!page-driver_dev} B0 driver development manual}.
@@ -42,35 +55,58 @@ drivers. An API is provided to create custom driver, see the
 {2:root_b0_file Root B0 file}
 
 The B0 file executed by a driver is called the {e root B0 file}. When
-a driver like [b0] is invoked in a directory [cwd], the root B0 file
-is the {e first} [B0.ml] file found starting at the [cwd] and moving
-upwards in parent directories.
+a driver like [b0] is invoked in a current working directory [cwd],
+the root B0 file is the {e first} [B0.ml] file found starting at the
+[cwd] and moving upwards in parent directories.
 
 The root B0 file can also be specified explicitely via the [--b0-file]
-option or the [B0_FILE] environment variable. Invoke [b0 file path] to
-find out which root B0 file is determined by [b0].
+option or the [B0_FILE] environment variable. The [b0 file] command
+allows to find out which root B0 file is determined by [b0] and provides
+a few actions on it:
+
+{v
+b0 file path    # Show the absolute path to the root B0 file
+b0 file edit    # Edit the root B0 file.
+b0 file --help  # See all actions available on the B0 file
+v}
 
 {2:root_dir Root and [_b0] directory}
 
 The {e root directory} is the directory in which the
-{{!root_b0_file}root B0 file} is found. Most of the time the root
-directory coincides with the root of the project's source
-tree. However in case a root B0 file simply gathers multiple project
-definitions by {{!inclusion}including} B0 files the root directory may
-be empty.
+{{!root_b0_file}root B0 file} is found. The [b0 root] command
+shows that directly:
 
-The root directory is where the scratchable {e [_b0] directory} used by
-drivers to operate and store their results gets created by
+{v
+b0 root  # Show the absolute path to the root directory, effectively
+         # this is: dirname $(b0 file path)
+v}
+
+Most of the time the root directory is the root of a project's source
+tree. However as we will see below, a B0 file can gather multiple
+project definitions by {{!inclusion}including} other B0 files. In
+this case the root directory may be unrelated to the directory of
+these B0 files and may well be empty.
+
+The root directory is where the scratchable {e [_b0] directory} used
+by drivers to operate and store their results gets created by
 default. The location of the [_b0] directory can also be specified
 explicitely via the [--b0-dir] option or the [B0_DIR] environment
 variable. [_b0] directories should be ignored by version control
-systems.
+systems:
+
+{v
+echo _b0 >> .gitignore  # Let git ignore the _b0 directory
+echo _b0 >> .hgignore   # Let hg ignore the _b0 directory
+v}
 
 {2:rel_paths Relative file paths}
 
 Unless otherwise indicated relative file paths specified in
-definitions and directives of a B0 file are {e always} relative to
-the directory where the B0 file lies.
+definitions and directives of a specific B0 file are {e always} relative to
+the directory of the B0 file.
+
+In the B0 file example we gave above the [src/hello.ml] file is
+relative to the the directory of the B0 file.
 
 {2:inclusion Including B0 files}
 
@@ -104,6 +140,10 @@ Scope names must be unique in a given B0 file and must not contain
 definitions. If these constraints are not satisfied the B0 file
 errors.
 
+{b XXX} Idea: let local toplevel scopes and global scope clash
+and use [.bla] to disambuigate if that is the case (and let . denote
+the root scope).
+
 {3:access Access control and isolation}
 
 At definition time a B0 file can only access definitions that are in
@@ -123,14 +163,17 @@ their definitions may interact indirectly via metadata and build logic
 name resolution procedures which have access to the global scope, see
 {!vendoring}.
 
-The {e OCaml language} scope of included files is not accessible and
-always fully isolated. Both includer and includee cannot access each
-other's OCaml identifiers.
+Syntactically, the {e OCaml} scope of included files is not accessible
+and always fully isolated: both includer and includee cannot access
+each other's OCaml identifiers. You can think of them as being wrapped
+in their own [module _ : sig end] module.
 
 {3:vendoring Dependency vendoring}
 
-Support for build dependency vendoring depends on the name resolution
-procedure of the build logic you are using.
+Support for build dependency vendoring depends on the name resolutions
+procedure of the build logic you are using, there is no specific
+support for it in B0 execpt for the inclusion mecanism which allows
+to gather definitions from other B0 projects.
 
 If the build logic you use is able to look in the definitions of the
 root B0 file for dependencies and use these instead of those found in the
@@ -187,7 +230,7 @@ and the [#require]d libraries in the [OCAMLPATH].
 
 Making sure these libraries are available is the purpose of B0 file
 boostrapping. The {{!directive_boot}[@@@B0.boot]} directive allows to
-specify a system to run in order to install the B0 file prerequistes.
+specify a system to run in order to install the B0 file prerequisites.
 
 For example the following directive:
 
@@ -212,14 +255,14 @@ files to describe the software.
 
 B0 definitions are named and {e static}. The latter means they need to
 be defined during the initialisation of the B0 file. This allows
-end-user to query and act upon them from user interfaces like the
-command line.
+end-user to query and act upon them from the command line or other
+user interfaces.
 
 {2:meta Metadata}
 
 All definitions in B0 have a metadata dictionary of type {!B0_meta.t}
-attached. Metadata is used to drive build logics and inform actions
-and deployments.
+attached. Metadata is used to drive build logics, deployments and
+custom procedures.
 
 The type {!B0_meta.t} is a simple type-safe heterogenous value map. A
 few {{!B0_meta.std}standard keys} are provided, consider using these
@@ -237,9 +280,8 @@ the smallest unit of build that can be be requested for building by
 the user.
 
 They are given a build directory in [_b0] according to the build
-environment and their name where they {e should}, but are not required
+environment and their name where they should – but are not required –
 to output their results.
-
 
 {2:packs Build packs}
 
@@ -268,8 +310,36 @@ The [default] pack defines the build units that are built when a bare
 {3:default_env The [default] environment}
 {3:user_env The [user] environment}
 
+{2:cmdlets Cmdlets}
 
-{2:actions Actions}
+Cmdlets are convenience named commands you can define and directely
+invoke via
+{[
+b0 cmd NAME -- ...
+]}
+If your development practice needs a bit of shell scripting here and
+there, consider rewriting them in a decent programming language as cmdlets.
+
+{1:editor_support Editor support}
+
+{2:emacs Emacs}
+
+If you want to have [b0] as a default [compile] command add one of
+the following to your [.emacs]:
+
+{v
+(require 'compile)
+(setq compile-command "b0") ; Globally instead of the default make -k
+
+; Only in a particular mode. Here caml-mode.
+(add-hook 'caml-mode-hook
+  (lambda ()
+    (set (make-local-variable 'compile-command) "b0")))
+v}
+
+FIXME do something more subtle that uses [locate-dominating-file] the issue
+so far is that you can't do this globally: [compile-command] can't
+be function.
 
 {1:b0_file_reference B0 file reference}
 

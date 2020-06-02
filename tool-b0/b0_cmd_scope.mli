@@ -1,38 +1,15 @@
 (*---------------------------------------------------------------------------
-   Copyright (c) 2019 The b0 programmers. All rights reserved.
+   Copyright (c) 2020 The b0 programmers. All rights reserved.
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
+(** B0 [scope] command. *)
 
-let rm_cmd recurse p  = match Os.Path.delete ~recurse p with
-| Ok _ -> 0
-| Error e -> Fmt.epr "%s: %s" (Filename.basename Sys.argv.(0)) e; 1
-
-let main () =
-  let open Cmdliner in
-  let cmd =
-    let recurse =
-      let doc = "If $(i,PATH) is a non empty directory, delete it \
-                 recursively instead of errors."
-      in
-      Arg.(value & flag & info ["r"; "recurse"] ~doc)
-    in
-    let path =
-      let doc = "$(docv) is file path to delete" in
-      Arg.(required & pos 0 (some B00_cli.fpath) None &
-           info [] ~doc ~docv:"PATH")
-    in
-    Term.(const rm_cmd $ recurse $ path),
-    Term.info "test-rm" ~sdocs:Manpage.s_common_options
-  in
-  Term.exit_status (Term.eval cmd)
-
-let () = if !Sys.interactive then () else main ()
-
+val cmd : B00_std.Os.Exit.t Cmdliner.Term.t * Cmdliner.Term.info
+(** [cmd] is the command line for [scope]. *)
 
 (*---------------------------------------------------------------------------
-   Copyright (c) 2019 The b0 programmers
+   Copyright (c) 2020 The b0 programmers
 
    Permission to use, copy, modify, and/or distribute this software for any
    purpose with or without fee is hereby granted, provided that the above

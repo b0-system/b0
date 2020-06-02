@@ -8,7 +8,7 @@ open B00
 
 let feedback =
   let show_ui = Log.Error and show_op = Log.Info and level = Log.level () in
-  B00_ui.Memo.pp_leveled_feedback ~show_op ~show_ui ~level
+  B00_cli.Memo.pp_leveled_feedback ~show_op ~show_ui ~level
     Fmt.stderr
 
 let with_memo ?jobs f =
@@ -28,7 +28,7 @@ let with_memo ?jobs f =
   | Ok () -> ()
   | Error e -> (B000_conv.Op.pp_aggregate_error ()) Fmt.stderr e
   end;
-  Log.if_error ~use:() (B00_ui.Memo.Log.(write log_file (of_memo m)));
+  Log.if_error ~use:() (B00_cli.Memo.Log.(write log_file (of_memo m)));
   Ok ()
 
 (*---------------------------------------------------------------------------
