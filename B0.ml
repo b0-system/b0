@@ -1,4 +1,5 @@
 open B0_kit.V000
+open B00_std
 
 (* OCaml library names *)
 
@@ -24,12 +25,12 @@ let b00_std_lib =
 let b00_lib =
   let requires = [unix; b00_std] in
   let srcs = [`Dir "src-b00"] in
-  B0_ocaml.Unit.lib b00 ~doc:"B00 build abstraction" ~requires ~srcs
+  B0_ocaml.Unit.lib b00 ~doc:"B00 build API" ~requires ~srcs
 
 let b00_kit_lib =
   let requires = [unix; cmdliner; b00_std; b00] in
   let srcs = [`Dir "src-b00/kit"] in
-  B0_ocaml.Unit.lib b00_kit ~doc:"B00 toolkit" ~requires ~srcs
+  B0_ocaml.Unit.lib b00_kit ~doc:"B00 toolkit API" ~requires ~srcs
 
 (* B0 libraries *)
 
@@ -41,7 +42,7 @@ let b0_lib =
 let b0_kit_lib =
   let requires = [unix; cmdliner; b00_std; b00; b00_kit; b0] in
   let srcs = [`Dir "src/kit"] in
-  B0_ocaml.Unit.lib b0_kit ~doc:"B0 toolkit" ~requires ~srcs
+  B0_ocaml.Unit.lib b0_kit ~doc:"B0 toolkit API" ~requires ~srcs
 
 let b0_driver_lib =
   let requires = [unix; cmdliner; b00_std; b00; b00_kit; b0] in
@@ -60,7 +61,7 @@ let b0_driver_b0_lib =
 let b0_tool =
   let requires = [b0_driver; b0_driver_b0] in
   let srcs = [`File "tool-b0/b0_main_run.ml"] in
-  B0_ocaml.Unit.exe "b0" ~name:"tool-b0" ~doc:"b0 tool" ~requires ~srcs
+  B0_ocaml.Unit.exe "b0" ~doc:"The b0 tool" ~requires ~srcs
 
 (* Low-level B00 tools units *)
 
@@ -104,6 +105,7 @@ let default =
       online_doc, "https://erratique.ch/software/b0/doc";
       licenses, ["ISC"; "BSD2"];
       repo, "git+https://erratique.ch/repos/b0.git";
-      issues, "https://github.com/b0-system/b0/issues"]
+      issues, "https://github.com/b0-system/b0/issues";
+      B0_opam.Meta.tag, (); ]
   in
   B0_pack.v "b0" ~doc:"The B0 system" ~meta ~locked:true us

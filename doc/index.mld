@@ -104,7 +104,7 @@ via {{!page-manual.b0_file}B0 files}.
 
 {2:b0 Library [b0]}
 
-{!modules: B0_def B0_meta B0_build B0_unit B0_pack}
+{!modules: B0_def B0_meta B0_build B0_unit B0_pack B0_cmdlet}
 
 {2:b0_kit Library [b0.kit]}
 
@@ -113,7 +113,9 @@ Toolkit for B0 files.
 {!modules:
 B0_kit
 B0_srcs
-B0_ocaml}
+B0_ocaml
+B0_cmdlet_cli
+}
 
 {2:b0_driver Library [b0.driver]}
 

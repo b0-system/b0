@@ -6,8 +6,8 @@ ROOT=`pwd`/_b0/b/user
 
 b0 ()
 {
-  if [ -e $ROOT/tool-b0/b0 ]; then
-    B0_B00T=$ROOT B0_DRIVER_B00T=$ROOT $ROOT/tool-b0/b0 $@
+  if [ -e $ROOT/b0/b0 ]; then
+    B0_B00T=$ROOT B0_DRIVER_B00T=$ROOT $ROOT/b0/b0 $@
   else
     echo "[ERROR] No b0 boostrap build found."
   fi

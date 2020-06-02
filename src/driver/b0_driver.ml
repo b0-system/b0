@@ -284,7 +284,7 @@ module Compile = struct
     let* base_ext_libs = find_libs m r base_ext_libs in
     let* base_libs = find_boot_libs m ~clib_ext ~env:"B0_B00T" base_libs r in
     let all_libs = base_ext_libs @ base_libs @ driver_libs @ requires in
-    let seen_libs = base_libs @ requires in
+    let seen_libs = base_ext_libs @ base_libs @ requires in
     Fut.return (all_libs, seen_libs)
 
   let find_compiler c m = match Conf.code c with

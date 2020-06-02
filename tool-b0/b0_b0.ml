@@ -4,6 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open B00_std.Result.Syntax
 
 let driver =
   let libs = [B00_ocaml.Lib.Name.v "b0.driver.b0"] in
@@ -18,12 +19,12 @@ module Def = struct
     | `Long -> Def.pp, Fmt.(cut ++ cut)
     in
     Log.if_error ~use:B0_driver.Exit.no_such_name @@
-    let ds = match ds with [] -> Ok (Def.list ()) | ds -> Def.get_list ds in
-    Result.bind ds @@ fun ds ->
+    let* ds = match ds with [] -> Ok (Def.list ()) | ds -> Def.get_list ds in
+    let ds = List.sort Def.compare ds in
     Log.if_error' ~use:B0_driver.Exit.some_error @@
     let don't = B0_driver.Conf.no_pager c in
-    Result.bind (B00_pager.find ~don't ()) @@ fun pager ->
-    Result.bind (B00_pager.page_stdout pager) @@ fun () ->
+    let* pager = B00_pager.find ~don't () in
+    let* () = B00_pager.page_stdout pager in
     if ds <> [] then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp) ds);
     Ok B0_driver.Exit.ok
 
@@ -48,14 +49,14 @@ module Def = struct
         Fmt.error "Could not find B0 file for %s%s: @[%a@]"
           Def.def_kind plural Fmt.(list ~sep:sp Def.pp_name) none
     | false ->
-        Result.bind (B00_editor.find ()) @@ fun editor ->
+        let* editor = B00_editor.find () in
         Result.bind (B00_editor.edit_files editor files) @@ function
         | `Exited 0 -> Ok B0_driver.Exit.ok
         | _ -> Ok B0_driver.Exit.some_error
 
-  let get (module Def : B0_def.S) c format key ds =
+  let get_meta_key (module Def : B0_def.S) c format key ds =
     Log.if_error ~use:B0_driver.Exit.no_such_name @@
-    let key = match B0_meta.Key.get_or_suggest key with
+    let* B0_meta.Key.V key = match B0_meta.Key.get_or_suggest key with
     | Ok _ as v -> v
     | Error suggs ->
         let kind = Fmt.any "metadata key" and hint = Fmt.did_you_mean in
@@ -63,9 +64,7 @@ module Def = struct
         let name (B0_meta.Key.V k) = B0_meta.Key.name k in
         Fmt.error "@[%a@]" pp (key, List.map name suggs)
     in
-    Result.bind key @@ fun (B0_meta.Key.V key) ->
-    let ds = match ds with [] -> Ok (Def.list ()) | ds -> Def.get_list ds in
-    Result.bind ds @@ fun ds ->
+    let* ds = match ds with [] -> Ok (Def.list ()) | ds -> Def.get_list ds in
     let add_meta acc d = match B0_meta.find_binding key (Def.meta d) with
     | None -> acc | Some v -> (d, v) :: acc
     in

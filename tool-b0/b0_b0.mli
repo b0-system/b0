@@ -31,7 +31,7 @@ module Def : sig
       named [ns]. If [ns] is empty all the B0 files that have
       definitions of kind [Def] are edited. *)
 
-  val get :
+  val get_meta_key :
     (module B0_def.S) -> B0_driver.Conf.t -> B00_ui.Cli.out_details ->
     string -> string list -> B0_driver.Exit.t
   (** [get (module Def) k ns] gets key [k] in the metadata of

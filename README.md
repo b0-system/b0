@@ -12,7 +12,7 @@ B0 describes:
 * Build environments.
 * Software configuration, build and testing.
 * Source or built artefacts deployments.
-* Development life-cycle procedures and actions.
+* Software life-cycle procedures.
 
 B0 also provides the B00 build library which provides abitrary build
 abstraction with reliable and efficient incremental rebuilds. The B00

@@ -3,39 +3,43 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open Cmdliner
+open B00_std
+open B00_std.Result.Syntax
 
-let doc = "Software construction and deployment kit"
-let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.Info.base_cmd
-let man = [
-  `S Manpage.s_description;
-  `P "B0 describes software construction and deployments using modular and \
-      customizable definitions written in OCaml.";
-  `Pre "Use $(mname) or $(mname) $(b,build) to build.";
-  `Noblank;
-  `Pre "Use $(mname) [$(i,COMMAND)] $(b,--help) for basic help.";
-  `P "More information is available in the manuals, see $(b,odig doc b0).";
-  B0_b0.Cli.man_see_manual;
-  `S Manpage.s_bugs;
-  `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information."; ]
+let () = B0_def.Scope.lib "opam"
 
-let cmds =
-  [ B0_cmd_build.cmd;
-    B0_cmd_cmdlet.cmd;
-    B0_cmd_cmd.cmd;
-    B0_cmd_delete.cmd;
-    B0_cmd_file.cmd;
-    B0_cmd_log.cmd;
-    B0_cmd_pack.cmd;
-    B0_cmd_unit.cmd ]
+module Meta = struct
+  let tag = B0_meta.Key.tag "opam" ~doc:"opam related entity"
+end
 
-let b0 =
-  fst B0_cmd_build.cmd,
-  Term.info "b0" ~version:"%%VERSION%%" ~doc ~sdocs ~exits ~man
+(* Cmdlet *)
 
-let main () = Term.eval_choice b0 cmds
-let () = B0_driver.set ~driver:B0_b0.driver ~main
+let cmdlet =
+  let gen_file ps =
+    let use = B0_cmdlet.Exit.Code 120 in
+    Log.if_error ~use(* FIXME B0_driver.Exit.no_such_name *) @@
+    let* ps = match ps with
+    | [] -> Ok (B0_pack.list ())
+    | ps -> B0_pack.get_list ps
+    in
+    let has_opam p = B0_meta.mem Meta.tag (B0_pack.meta p) in
+    let ps = List.filter has_opam ps in
+    begin match List.sort B0_pack.compare ps with
+    | [] -> ()
+    | ps -> Log.app (fun m -> m "@[<v>%a@]" Fmt.(list B0_pack.pp_synopsis) ps)
+    end;
+    Ok (B0_cmdlet.Exit.Code 0)
+  in
+  let gen_file cmdlet ~argv =
+    let open Cmdliner in
+    let packs = Arg.(value & pos_all string [] & info []
+                       ~doc:"packs to consider for publishing" ~docv:"PACK")
+    in
+    let term = Term.(const gen_file $ packs) in
+    B0_cmdlet_cli.run cmdlet ~argv term
+  in
+  let doc = "Interaction with opam repositories" in
+  B0_cmdlet.v "opam" ~doc (`Cmd gen_file)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

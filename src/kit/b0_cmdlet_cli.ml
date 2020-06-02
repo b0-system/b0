@@ -5,37 +5,19 @@
 
 open Cmdliner
 
-let doc = "Software construction and deployment kit"
-let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.Info.base_cmd
-let man = [
-  `S Manpage.s_description;
-  `P "B0 describes software construction and deployments using modular and \
-      customizable definitions written in OCaml.";
-  `Pre "Use $(mname) or $(mname) $(b,build) to build.";
-  `Noblank;
-  `Pre "Use $(mname) [$(i,COMMAND)] $(b,--help) for basic help.";
-  `P "More information is available in the manuals, see $(b,odig doc b0).";
-  B0_b0.Cli.man_see_manual;
-  `S Manpage.s_bugs;
-  `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information."; ]
+let info ?man_xrefs ?man ?envs ?exits ?sdocs ?docs ?doc ?version cmdlet =
+  let doc = Option.value ~default:(B0_cmdlet.doc cmdlet) doc in
+  let name = B0_cmdlet.name cmdlet in
+  Term.info ?man_xrefs ?man ?envs ?exits ?sdocs ?docs ?version name ~doc
 
-let cmds =
-  [ B0_cmd_build.cmd;
-    B0_cmd_cmdlet.cmd;
-    B0_cmd_cmd.cmd;
-    B0_cmd_delete.cmd;
-    B0_cmd_file.cmd;
-    B0_cmd_log.cmd;
-    B0_cmd_pack.cmd;
-    B0_cmd_unit.cmd ]
+let exit = function
+| `Ok c -> c
+| `Help | `Version -> B0_cmdlet.Exit.ok
+| `Error `Term -> B0_cmdlet.Exit.some_error
+| `Error `Exn -> B0_cmdlet.Exit.Code Term.exit_status_internal_error
+| `Error `Parse -> B0_cmdlet.Exit.Code Term.exit_status_cli_error
 
-let b0 =
-  fst B0_cmd_build.cmd,
-  Term.info "b0" ~version:"%%VERSION%%" ~doc ~sdocs ~exits ~man
-
-let main () = Term.eval_choice b0 cmds
-let () = B0_driver.set ~driver:B0_b0.driver ~main
+let run cmdlet ~argv t = exit @@ Term.eval ~argv (t, info cmdlet)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

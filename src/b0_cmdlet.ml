@@ -3,39 +3,34 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open Cmdliner
+open B00_std
 
-let doc = "Software construction and deployment kit"
-let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.Info.base_cmd
-let man = [
-  `S Manpage.s_description;
-  `P "B0 describes software construction and deployments using modular and \
-      customizable definitions written in OCaml.";
-  `Pre "Use $(mname) or $(mname) $(b,build) to build.";
-  `Noblank;
-  `Pre "Use $(mname) [$(i,COMMAND)] $(b,--help) for basic help.";
-  `P "More information is available in the manuals, see $(b,odig doc b0).";
-  B0_b0.Cli.man_see_manual;
-  `S Manpage.s_bugs;
-  `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information."; ]
+module Exit = struct
+  type t =
+  | Code of int
+  | Exec of Fpath.t * Cmd.t
 
-let cmds =
-  [ B0_cmd_build.cmd;
-    B0_cmd_cmdlet.cmd;
-    B0_cmd_cmd.cmd;
-    B0_cmd_delete.cmd;
-    B0_cmd_file.cmd;
-    B0_cmd_log.cmd;
-    B0_cmd_pack.cmd;
-    B0_cmd_unit.cmd ]
+  let ok = Code 0
+  let some_error = Code 123 (* see B0_driver.Exit.some_error *)
+end
 
-let b0 =
-  fst B0_cmd_build.cmd,
-  Term.info "b0" ~version:"%%VERSION%%" ~doc ~sdocs ~exits ~man
+type cmd = [ `Cmd of t -> argv:string array -> Exit.t ]
+and t = { def : B0_def.t; cmd : cmd }
 
-let main () = Term.eval_choice b0 cmds
-let () = B0_driver.set ~driver:B0_b0.driver ~main
+module T = struct
+  type nonrec t = t
+  let def_kind = "cmdlet"
+  let def p = p.def
+  let pp_name_str = Fmt.(code string)
+end
+
+include (B0_def.Make (T) : B0_def.S with type t := t)
+
+let v ?doc ?meta n cmd =
+  let def = define ?doc ?meta n in
+  let p = { def; cmd } in add p; p
+
+let cmd c = c.cmd
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

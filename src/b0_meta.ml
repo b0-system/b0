@@ -169,9 +169,8 @@ let exe_name =
 
 let exe_path = (* FIXME *)
   let doc = "Full path to a built exectuable" in
-  let pp_value = Fmt.any "<n/a>" in
+  let pp_value = Fmt.any "<built value>" in
   Key.v "exe-path" ~doc ~pp_value
-
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

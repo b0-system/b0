@@ -3,39 +3,17 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open Cmdliner
+(** B0 opam support. *)
 
-let doc = "Software construction and deployment kit"
-let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.Info.base_cmd
-let man = [
-  `S Manpage.s_description;
-  `P "B0 describes software construction and deployments using modular and \
-      customizable definitions written in OCaml.";
-  `Pre "Use $(mname) or $(mname) $(b,build) to build.";
-  `Noblank;
-  `Pre "Use $(mname) [$(i,COMMAND)] $(b,--help) for basic help.";
-  `P "More information is available in the manuals, see $(b,odig doc b0).";
-  B0_b0.Cli.man_see_manual;
-  `S Manpage.s_bugs;
-  `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information."; ]
+module Meta : sig
 
-let cmds =
-  [ B0_cmd_build.cmd;
-    B0_cmd_cmdlet.cmd;
-    B0_cmd_cmd.cmd;
-    B0_cmd_delete.cmd;
-    B0_cmd_file.cmd;
-    B0_cmd_log.cmd;
-    B0_cmd_pack.cmd;
-    B0_cmd_unit.cmd ]
+  val tag : unit B0_meta.key
+  (** [tag] indicates the entity deals with opam matters. *)
+end
 
-let b0 =
-  fst B0_cmd_build.cmd,
-  Term.info "b0" ~version:"%%VERSION%%" ~doc ~sdocs ~exits ~man
 
-let main () = Term.eval_choice b0 cmds
-let () = B0_driver.set ~driver:B0_b0.driver ~main
+val cmdlet : B0_cmdlet.t
+(** [cmdlet] is the [opam] cmdlet. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

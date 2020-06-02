@@ -3,39 +3,51 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
+open B00_std
+open B00_std.Result.Syntax
+
+let cmd cmdlet args c =
+  Log.if_error ~use:B0_driver.Exit.no_such_name @@
+  let* clet = Result.map List.hd (B0_cmdlet.get_list [cmdlet]) in
+  let `Cmd f = B0_cmdlet.cmd clet in
+  let ret = match f clet ~argv:(Array.of_list @@ cmdlet :: args) with
+  | B0_cmdlet.Exit.Code c -> B0_driver.Exit.Code c
+  | B0_cmdlet.Exit.Exec (exe, cmd) -> B0_driver.Exit.Exec (exe, cmd)
+  in
+  Ok ret
+
+(* Command line interface *)
+
 open Cmdliner
 
-let doc = "Software construction and deployment kit"
+let cmdlet =
+  let doc = "The cmdlet to execute." in
+  Arg.(required & pos 0 (some string) None & info [] ~doc ~docv:"CMDLET")
+
+let cmdlet_args =
+  let doc =
+    "Argument for the cmdlet. Specify arguments after the $(b,--) \
+     otherwise command line options will be interpreted by $(b,cmd) itself."
+  in
+  Arg.(value & pos_right 0 string [] & info [] ~doc ~docv:"ARG")
+
+let doc = "Execute cmdlets"
 let sdocs = Manpage.s_common_options
 let exits = B0_driver.Exit.Info.base_cmd
+let man_xrefs = [ `Main ]
 let man = [
+  `S Manpage.s_synopsis;
+  `P "$(mname) $(tname) [$(i,OPTION)]... $(i,CMDLET) $(b,--) $(i,ARG)...";
   `S Manpage.s_description;
-  `P "B0 describes software construction and deployments using modular and \
-      customizable definitions written in OCaml.";
-  `Pre "Use $(mname) or $(mname) $(b,build) to build.";
-  `Noblank;
-  `Pre "Use $(mname) [$(i,COMMAND)] $(b,--help) for basic help.";
-  `P "More information is available in the manuals, see $(b,odig doc b0).";
-  B0_b0.Cli.man_see_manual;
-  `S Manpage.s_bugs;
-  `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information."; ]
+  `P "$(tname) executes cmdlets.";
+  `S Manpage.s_arguments;
+  `S Manpage.s_options;
+  B0_b0.Cli.man_see_manual; ]
 
-let cmds =
-  [ B0_cmd_build.cmd;
-    B0_cmd_cmdlet.cmd;
-    B0_cmd_cmd.cmd;
-    B0_cmd_delete.cmd;
-    B0_cmd_file.cmd;
-    B0_cmd_log.cmd;
-    B0_cmd_pack.cmd;
-    B0_cmd_unit.cmd ]
-
-let b0 =
-  fst B0_cmd_build.cmd,
-  Term.info "b0" ~version:"%%VERSION%%" ~doc ~sdocs ~exits ~man
-
-let main () = Term.eval_choice b0 cmds
-let () = B0_driver.set ~driver:B0_b0.driver ~main
+let cmd =
+  let cmd_cmd = Term.(const cmd $ cmdlet $ cmdlet_args) in
+  B0_driver.with_b0_file ~driver:B0_b0.driver cmd_cmd,
+  Term.info "cmd" ~doc ~sdocs ~exits ~man ~man_xrefs
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

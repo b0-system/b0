@@ -3,39 +3,27 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
+(** Cmdliner cmdlet cli parsing *)
+
 open Cmdliner
 
-let doc = "Software construction and deployment kit"
-let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.Info.base_cmd
-let man = [
-  `S Manpage.s_description;
-  `P "B0 describes software construction and deployments using modular and \
-      customizable definitions written in OCaml.";
-  `Pre "Use $(mname) or $(mname) $(b,build) to build.";
-  `Noblank;
-  `Pre "Use $(mname) [$(i,COMMAND)] $(b,--help) for basic help.";
-  `P "More information is available in the manuals, see $(b,odig doc b0).";
-  B0_b0.Cli.man_see_manual;
-  `S Manpage.s_bugs;
-  `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information."; ]
+val info :
+  ?man_xrefs:Manpage.xref list -> ?man:Manpage.block list ->
+  ?envs:Term.env_info list -> ?exits:Term.exit_info list ->
+  ?sdocs:string -> ?docs:string -> ?doc:string -> ?version:string ->
+  B0_cmdlet.t -> Cmdliner.Term.info
+(** [info c] derives a cmdliner term info for the cmdlet [c]. In
+    particular it uses {!B0_cmdlet.name} for the name and
+    {!B0cCmdlet.doc c} for [doc]. *)
 
-let cmds =
-  [ B0_cmd_build.cmd;
-    B0_cmd_cmdlet.cmd;
-    B0_cmd_cmd.cmd;
-    B0_cmd_delete.cmd;
-    B0_cmd_file.cmd;
-    B0_cmd_log.cmd;
-    B0_cmd_pack.cmd;
-    B0_cmd_unit.cmd ]
+val exit : B0_cmdlet.Exit.t Cmdliner.Term.result -> B0_cmdlet.Exit.t
+(** [exit r] turns a cmdliner evaluation result [r] into a cmdlet exit
+    code. *)
 
-let b0 =
-  fst B0_cmd_build.cmd,
-  Term.info "b0" ~version:"%%VERSION%%" ~doc ~sdocs ~exits ~man
-
-let main () = Term.eval_choice b0 cmds
-let () = B0_driver.set ~driver:B0_b0.driver ~main
+val run :
+  B0_cmdlet.t -> argv:string array -> B0_cmdlet.Exit.t Term.t ->
+  B0_cmdlet.Exit.t
+(** [run cmdlet ~argv t] is [exit @@ Term.eval ~argv (t, info c)]. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

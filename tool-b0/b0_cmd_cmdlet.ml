@@ -4,6 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open B00_std.Result.Syntax
 
 let get c format args = match args with
 | k :: ps -> B0_b0.Def.get_meta_key (module B0_pack) c format k ps
@@ -11,20 +12,20 @@ let get c format args = match args with
     Log.err (fun m -> m "No metadata key specified");
     B0_driver.Exit.some_error
 
-let pack action format args c = match action with
-| `Edit -> B0_b0.Def.edit (module B0_pack) c args
+let cmdlet action format args c = match action with
+| `Edit -> B0_b0.Def.edit (module B0_cmdlet) c args
 | `Get -> get c format args
-| `List -> B0_b0.Def.list (module B0_pack) c format args
+| `List -> B0_b0.Def.list (module B0_cmdlet) c format args
 | `Show ->
     let format = if format = `Normal then `Long else format in
-    B0_b0.Def.list (module B0_pack) c format args
+    B0_b0.Def.list (module B0_cmdlet) c format args
 
 (* Command line interface *)
 
 open Cmdliner
 
 let action =
-  let action = [ "edit", `Edit; "get", `Get; "list", `List; "show", `Show] in
+  let action = ["edit", `Edit; "get", `Get; "list", `List; "show", `Show] in
   let doc =
     let alts = Arg.doc_alts_enum action in
     Fmt.str "The action to perform. $(docv) must be one of %s." alts
@@ -36,35 +37,35 @@ let action_args =
   let doc = "Positional arguments for the action." in
   Arg.(value & pos_right 0 string [] & info [] ~doc ~docv:"ARG")
 
-let doc = "Operate on build packs"
+let doc = "Operate on cmdlets"
 let sdocs = Manpage.s_common_options
 let exits = B0_driver.Exit.Info.base_cmd
 let envs = B00_editor.envs ()
-let man_xrefs = [ `Main ]
+let man_xrefs = [`Main; `Cmd "cmd"]
 let man = [
   `S Manpage.s_description;
-  `P "$(tname) operates on build pack.";
+  `P "$(tname) operates on cmdlets. Use $(mname) $(b,cmd) to execute them.";
   `S "ACTIONS";
-  `I ("$(b,edit) [$(i,PACK)]...",
-      "Edit in your editor the B0 file(s) in which all or the given packs \
+  `I ("$(b,edit) [$(i,CMDLET)]...",
+      "Edit in your editor the B0 file(s) in which all or the given cmdlets \
        are defined.");
-  `I ("$(b,get) $(i,KEY) [$(i,PACK)]...",
-      "Get metadata key $(i,KEY) of given or all packs.");
-  `I ("$(b,list) [$(i,PACK)]...",
-      "List all or given packs. Use with $(b,-l) to get more info on \
-       pack metadata.");
-  `I ("$(b,show) [$(i,PACK)]...",
+  `I ("$(b,get) $(i,KEY) [$(i,CMDLET)]...",
+      "Get metadata key $(i,KEY) of given or all cmdlets.");
+  `I ("$(b,list) [$(i,CMDLET)]...",
+      "List all or given cmdlets. Use with $(b,-l) to get more info on \
+       cmdlet metadata.");
+  `I ("$(b,show) [$(i,CMDLET)]...",
       "Show is an alias for $(b,list -l)");
   `S Manpage.s_arguments;
   `S Manpage.s_options;
-  B0_b0.Cli.man_see_manual; ]
+  B0_b0.Cli.man_see_manual]
 
 let cmd =
-  let pack_cmd =
-    Term.(const pack $ action $ B00_ui.Cli.out_details () $ action_args)
+  let cmdlet_cmd =
+    Term.(const cmdlet $ action $ B00_ui.Cli.out_details () $ action_args)
   in
-  B0_driver.with_b0_file ~driver:B0_b0.driver pack_cmd,
-  Term.info "pack" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs
+  B0_driver.with_b0_file ~driver:B0_b0.driver cmdlet_cmd,
+  Term.info "cmdlet" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

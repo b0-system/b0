@@ -7,11 +7,10 @@ open B00_std
 open B00_std.Result.Syntax
 
 let get c format args = match args with
+| k :: us -> B0_b0.Def.get_meta_key (module B0_unit) c format k us
 | [] ->
     Log.err (fun m -> m "No metadata key specified");
     B0_driver.Exit.some_error
-| k :: us ->
-    B0_b0.Def.get (module B0_unit) c format k us
 
 let get_unit args k = match args with
 | [] ->
@@ -38,7 +37,7 @@ let build_unit c u k =
     | Error () -> Ok B0_driver.Exit.build_error
     | Ok () -> Ok (k build)
 
-let act c dry_run args =
+let act c args =
   get_unit args @@ fun u args ->
   build_unit c u @@ fun build ->
   failwith "TODO"
@@ -49,7 +48,7 @@ let exec c dry_run args =
   get_unit args @@ fun u cmd ->
   match B0_meta.find B0_meta.exe_path (B0_unit.meta u) with
   | None ->
-      Log.err (fun m -> m "Unit %a does not define meta %a"
+      Log.err (fun m -> m "Unit %a does not define metadata key %a"
                   B0_unit.pp_name u B0_meta.Key.pp_name B0_meta.exe_path);
       B0_driver.Exit.some_error
   | Some exe ->
@@ -65,7 +64,7 @@ let exec c dry_run args =
           (Fmt.pr "%s" (Cmd.to_string cmd); B0_driver.Exit.ok)
 
 let unit action format dry_run args c = match action with
-| `Action -> act c dry_run args
+| `Action -> act c args
 | `Edit -> B0_b0.Def.edit (module B0_unit) c args
 | `Exec -> exec c dry_run args
 | `Get -> get c format args
@@ -109,17 +108,16 @@ let man = [
   `S Manpage.s_description;
   `P "$(tname) operates on build units.";
   `S "ACTIONS";
-  `I ("$(b,action) [$(b,--dry-run)] $(i,UNIT) -- $(i,ARG)...",
-      "Builds $(i,UNIT) and execute its action. If [--dry-run]
-      is specified prints out the invocation. The unit needs to
-      have an action defined for this to work.");
+  `I ("$(b,action) $(i,UNIT) -- $(i,ARG)...",
+      "Builds $(i,UNIT) and execute its action. The unit needs to \
+       have an action defined for this to work.");
   `I ("$(b,edit) [$(i,UNIT)]...",
       "Edit in your editor the B0 file(s) in which all or the given units \
        are defined.");
   `I ("$(b,exec) [$(b,--dry-run)] $(i,UNIT) -- $(i,ARG)...",
-      "Build and execute $(i,UNIT) with given arguments. If [--dry-run]
-       is specified prints out the invocation. The unit needs to
-       specify the $(b,B0_meta.exe_path) key for this to work.");
+      "Build $(i,UNIT) and execute with given arguments the executable
+       specified in the unit's $(b,B0_meta.exe_path) metadata key.
+       If $(b,--dry-run) is specified prints out the invocation.");
   `I ("$(b,get) $(i,KEY) [$(i,UNIT)]...",
       "Get metadata key $(i,KEY) of given or all units.");
   `I ("$(b,list) [$(i,UNIT)]...",

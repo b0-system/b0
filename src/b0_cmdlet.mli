@@ -3,39 +3,53 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open Cmdliner
+(** Cmdlets.
 
-let doc = "Software construction and deployment kit"
-let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.Info.base_cmd
-let man = [
-  `S Manpage.s_description;
-  `P "B0 describes software construction and deployments using modular and \
-      customizable definitions written in OCaml.";
-  `Pre "Use $(mname) or $(mname) $(b,build) to build.";
-  `Noblank;
-  `Pre "Use $(mname) [$(i,COMMAND)] $(b,--help) for basic help.";
-  `P "More information is available in the manuals, see $(b,odig doc b0).";
-  B0_b0.Cli.man_see_manual;
-  `S Manpage.s_bugs;
-  `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information."; ]
+    Cmdlets are used to define custom software life-cycle procedures.
+    Examples range from invoking linters on your sources to perform
+    post build checks.
 
-let cmds =
-  [ B0_cmd_build.cmd;
-    B0_cmd_cmdlet.cmd;
-    B0_cmd_cmd.cmd;
-    B0_cmd_delete.cmd;
-    B0_cmd_file.cmd;
-    B0_cmd_log.cmd;
-    B0_cmd_pack.cmd;
-    B0_cmd_unit.cmd ]
+    {b TODO.}
+    {ul
+    {- Definition root/scopes retreival.}
+    {- Visibility control.}} *)
 
-let b0 =
-  fst B0_cmd_build.cmd,
-  Term.info "b0" ~version:"%%VERSION%%" ~doc ~sdocs ~exits ~man
+open B00_std
 
-let main () = Term.eval_choice b0 cmds
-let () = B0_driver.set ~driver:B0_b0.driver ~main
+(** {1:cmdlets Cmdlets} *)
+
+type t
+(** The type for cmdlets. *)
+
+(** The type for cmdlet exits. *)
+module Exit : sig
+
+  (* FIXME better exec *)
+  type t =
+  | Code of int
+  | Exec of Fpath.t * Cmd.t
+
+  val ok : t
+  (** [ok] is the zero exit code. *)
+
+  val some_error : t
+  (** [some_error] indicates an indiscriminate error reported on stdout. *)
+end
+
+type cmd = [ `Cmd of t -> argv:string array -> Exit.t ]
+(** The type for cmdlet commands. [argv] has the arguments for the
+    cmdlet and the name of the cmdlet is in [argv.(0)], it can be given
+    as is to your command line parsing technology, see for example
+    {!B0_cmdlet_cli}. *)
+
+val v : ?doc:string -> ?meta:B0_meta.t -> string -> cmd -> t
+(** [v n cmd ~doc ~meta] is a cmdlet named [n] implemented by [cmd]
+    with doc string [doc] and metadata [meta]. *)
+
+val cmd : t -> cmd
+(** [cmd c] is the command of the cmdlet. *)
+
+include B0_def.S with type t := t
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers
