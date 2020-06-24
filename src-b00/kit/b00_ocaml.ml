@@ -678,8 +678,8 @@ module Cobj = struct
       match String.cut_right ~sep:"\t" l with
       | None ->
           begin match l with
-          | l when String.is_prefix "Implementations imported:" l ||
-                   String.is_prefix "Required globals:" l ->
+          | l when String.starts_with "Implementations imported:" l ||
+                   String.starts_with "Required globals:" l ->
               parse_ldeps acc file defs deps ldeps name (n + 1) ls
           | _ ->
               parse_file acc file defs deps ldeps n data
@@ -703,19 +703,20 @@ module Cobj = struct
 
   and parse_unit acc file defs deps ldeps name n = function
   | [] -> B00_lines.err n "unexpected end of input"
-  | line :: rest when String.is_prefix "Interfaces imported:" line ->
+  | line :: rest when String.starts_with "Interfaces imported:" line ->
       parse_deps acc file defs deps ldeps name (n + 1) rest
   | _ :: rest -> parse_unit acc file defs deps ldeps name (n + 1) rest
 
   and parse_file acc file defs deps ldeps n = function
   | [] -> make_cobj file defs deps ldeps :: acc
-  | l :: ls when String.is_prefix "Unit name" l || String.is_prefix "Name" l ->
+  | l :: ls when String.starts_with "Unit name" l ||
+                 String.starts_with "Name" l ->
       begin match String.cut_left ~sep:":" l with
       | None -> assert false
       | Some (_, name) ->
           parse_unit acc file defs deps ldeps (String.trim name) (n + 1) ls
       end
-  | l :: ls when String.is_prefix file_prefix l ->
+  | l :: ls when String.starts_with file_prefix l ->
       let acc = make_cobj file defs deps ldeps :: acc in
       let file = parse_file_path n l in
       parse_file
@@ -724,7 +725,7 @@ module Cobj = struct
 
   and parse_files acc n = function
   | [] -> acc
-  | l :: ls when String.is_prefix file_prefix l ->
+  | l :: ls when String.starts_with file_prefix l ->
       let file = parse_file_path n l in
       parse_file
         acc file Mod.Ref.Set.empty Mod.Ref.Set.empty String.Set.empty (n + 1) ls

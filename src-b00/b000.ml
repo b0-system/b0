@@ -218,7 +218,7 @@ module File_cache = struct
   let key_dir c k = String.concat "" [c.dir; k; key_ext; Fpath.dir_sep]
   let key_of_filename n = String.drop_right (String.length key_ext) n
   let key_dir_of_filename c n = String.concat "" [c.dir; n; Fpath.dir_sep]
-  let filename_is_key_dir dir = String.is_suffix ~affix:key_ext dir
+  let filename_is_key_dir dir = String.ends_with ~suffix:key_ext dir
 
   let to_hex_digit n = Char.unsafe_chr @@ n + if n < 10 then 0x30 else 0x61 - 10
   let ilog16 x =

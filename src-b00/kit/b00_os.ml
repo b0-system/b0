@@ -229,9 +229,9 @@ let arch_normalized =
   | "powerpc" | "ppc" | "ppcle" -> "ppc32"
   | "ppc64" | "ppc64le" -> "ppc64"
   | "aarch64_be" | "aarch64" | "armv8b" | "armv8l" -> "arm64"
-  | a when String.(is_prefix "armv5" a ||
-                   is_prefix "armv6" a || is_prefix "earmv6" a ||
-                   is_prefix "armv7" a || is_prefix "earmv7" a) -> "arm32"
+  | a when String.(starts_with "armv5" a ||
+                   starts_with "armv6" a || starts_with "earmv6" a ||
+                   starts_with "armv7" a || starts_with "earmv7" a) -> "arm32"
   | a -> a
   in
   let det s m = Fut.map normalize (Store.get s arch) in

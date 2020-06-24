@@ -558,17 +558,21 @@ module String : sig
   val is_empty : string -> bool
   (** [is_empty s] is [equal empty s]. *)
 
-  val is_prefix : affix:string -> string -> bool
-  (** [is_prefix ~affix s] is [true] iff [affix.[i] = s.[i]] for
-      all indices [i] of [affix]. *)
+  val starts_with : prefix:string -> string -> bool
+  (** [starts_with ~prefix s] is [true] iff [prefix.[i] = s.[i]] for
+      all indices [i] of [prefix].
 
-  val is_infix : affix:string -> string -> bool
-  (** [is_infix ~affix s] is [true] iff there exists an index [j]
-      such that for all indices [i] of [affix], [affix.[i] = s.[j+ 1]]. *)
+      {b Note.} Available in 4.12. *)
 
-  val is_suffix : affix:string -> string -> bool
-  (** [is_suffix ~affix s] is true iff [affix.[i] = s.[m - i]] for all
-      indices [i] of [affix] and with [m = String.length s - 1]. *)
+  val ends_with : suffix:string -> string -> bool
+  (** [eds_with ~suffix s] is true iff [suffix.[i] = s.[m - i]] for all
+      indices [i] of [affix] and with [m = String.length s - 1].
+
+      {b Note.} Available in 4.12. *)
+
+  val has_substring : sub:string -> string -> bool
+  (** [has_substring ~sub s] is [true] iff there exists an index [j]
+      such that for all indices [i] of [affix], [sub.[i] = s.[j+ 1]]. *)
 
   val for_all : (char -> bool) -> string -> bool
   (** [for_all p s] is [true] iff for all indices [i] of [s], [p s.[i]

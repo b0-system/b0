@@ -600,19 +600,19 @@ module String = struct
   (* Predicates *)
 
   let is_empty s = equal empty s
-  let is_prefix ~affix s =
-    let len_a = String.length affix in
+  let starts_with ~prefix s =
+    let len_a = String.length prefix in
     let len_s = String.length s in
     if len_a > len_s then false else
     let max_idx_a = len_a - 1 in
     let rec loop i =
       if i > max_idx_a then true else
-      if unsafe_get affix i <> unsafe_get s i then false else loop (i + 1)
+      if unsafe_get prefix i <> unsafe_get s i then false else loop (i + 1)
     in
     loop 0
 
-  let is_infix ~affix s =
-    let len_a = String.length affix in
+  let ends_with ~suffix s =
+    let len_a = String.length suffix in
     let len_s = String.length s in
     if len_a > len_s then false else
     let max_idx_a = len_a - 1 in
@@ -621,21 +621,21 @@ module String = struct
       if i > max_idx_s then false else
       if k > max_idx_a then true else
       if k > 0 then
-        if unsafe_get affix k = unsafe_get s (i + k)
+        if unsafe_get suffix k = unsafe_get s (i + k)
         then loop i (k + 1) else loop (i + 1) 0
       else
-        if unsafe_get affix 0 = unsafe_get s i
+        if unsafe_get suffix 0 = unsafe_get s i
         then loop i 1 else loop (i + 1) 0
     in
     loop 0 0
 
-  let is_suffix ~affix s =
-    let max_idx_a = String.length affix - 1 in
+  let has_substring ~sub s =
+    let max_idx_sub = String.length sub - 1 in
     let max_idx_s = String.length s - 1 in
-    if max_idx_a > max_idx_s then false else
+    if max_idx_sub > max_idx_s then false else
     let rec loop i =
-      if i > max_idx_a then true else
-      if unsafe_get affix (max_idx_a - i) <> unsafe_get s (max_idx_s - i)
+      if i > max_idx_sub then true else
+      if unsafe_get sub (max_idx_sub - i) <> unsafe_get s (max_idx_s - i)
       then false
       else loop (i + 1)
     in
@@ -1342,7 +1342,7 @@ module Fpath = struct
       let valid c = c <> dir_sep_char && c <> '/' && c <> '\x00' in
       String.for_all valid s
 
-    let is_unc_path p = String.is_prefix "\\\\" p
+    let is_unc_path p = String.starts_with "\\\\" p
     let has_drive p = String.exists (Char.equal ':') p
     let non_unc_path_start p = match String.rindex p ':' with
     | exception Not_found -> 0
@@ -1583,7 +1583,7 @@ module Fpath = struct
 
   (* Strict prefixes *)
 
-  let is_prefix pre p = match String.is_prefix pre p with
+  let is_prefix pre p = match String.starts_with pre p with
   | false -> false
   | true ->
       let suff_start = String.length pre in
@@ -1771,7 +1771,8 @@ module Fpath = struct
   let relative ~to_dir p =
     (* XXX dirty, need a normalization function and/or a better parent
        to handle that  *)
-    if String.is_infix ".." p then Fmt.invalid_arg "%s: not dotdot allowed" p;
+    if String.has_substring ".." p
+    then Fmt.invalid_arg "%s: not dotdot allowed" p;
     let to_dir = to_dir_path to_dir in
     match rem_prefix to_dir p with
     | Some q -> q
@@ -3501,7 +3502,7 @@ module Os = struct
     let ensure_exe_suffix_if_win32 = match Sys.win32 with
     | false -> fun t -> t
     | true ->
-        fun t -> match String.is_suffix ~affix:".exe" t with
+        fun t -> match String.ends_with ~suffix:".exe" t with
         | true -> t
         | false -> t ^ ".exe"
 

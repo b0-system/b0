@@ -237,7 +237,7 @@ module Make (V : VALUE) = struct
       String.Map.fold add !defs []
   | false ->
       let pre = Scope.qualify_name "" in
-      let add k v vs = if String.is_prefix ~affix:pre k then v :: vs else vs in
+      let add k v vs = if String.starts_with pre k then v :: vs else vs in
       String.Map.fold add !defs []
 
   let get_list ns =
