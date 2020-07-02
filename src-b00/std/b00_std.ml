@@ -3800,15 +3800,22 @@ module Os = struct
       Ok (Unix.execve f cmd (spawn_env env))
     let _execv = if Sys.win32 then _execv_win32 else _execv_posix
 
-    let execv ?env ?cwd f cmd =
+    let execv ?env ?cwd file cmd =
       let err_execv f e = Fmt.error "execv %a: %s" Fpath.pp f e in
       try
-        Option.iter chdir cwd;
+        let file = Path._realpath (Fpath.to_string file) in
+        let reset_cwd = match cwd with
+        | None -> Fun.id
+        | Some cwd ->
+            let old_cwd = getcwd () in
+            chdir cwd; fun () -> try chdir old_cwd with Failure _ -> ()
+        in
+        Fun.protect ~finally:reset_cwd @@ fun () ->
         !_spawn_tracer None env cwd cmd;
-        _execv ~env (Fpath.to_string f) (Array.of_list @@ Cmd.to_list cmd)
+        _execv ~env file (Array.of_list @@ Cmd.to_list cmd)
       with
-      | Failure e -> err_execv f e
-      | Unix.Unix_error (e, _, _) -> err_execv f (uerr e)
+      | Failure e -> err_execv file e
+      | Unix.Unix_error (e, _, _) -> err_execv file (uerr e)
   end
 
   module Sig_exit = struct

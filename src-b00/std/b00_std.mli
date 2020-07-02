@@ -2747,13 +2747,15 @@ module Os : sig
 
     val execv :
       ?env:Env.assignments -> ?cwd:Fpath.t -> Fpath.t -> Cmd.t ->
-      (unit, string) result
-    (** [execv ~env ~cwd f argv] executes file [f] as a new process in
-        environment [env] with [args] as the {!Sys.argv} of this
-        process (in particular [Sys.argv.(0)] is the name of the
-        program not the first argument to the program). The function
-        only recturns in case of error. [env] defaults to
-        {!B00.OS.Env.current_assignments}[ ()], [cwd] to {!Dir.current}[ ()]. *)
+      ('a, string) result
+    (** [execv ~env ~cwd file argv] executes file [file] as a new
+        process in environment [env] with current working directory
+        [cwd] and [args] as the {!Sys.argv} of this process (in
+        particular [Sys.argv.(0)] is the name of the program not the
+        first argument to the program). The function only recurns in
+        case of error. [env] defaults to
+        {!B00_std.Os.Env.current_assignments}[ ()], [cwd] to
+        {!B00_std.Dir.current}[ ()]. *)
   end
 
   (** Signal exit hooks. *)
