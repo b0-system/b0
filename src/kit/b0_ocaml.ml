@@ -29,7 +29,7 @@ module Meta = struct
     B0_meta.Key.v "ocaml-library" ~doc:"Defined OCaml library name" ~pp_value
 
   let mod_srcs = (* FIXME don't do that. *)
-    let pp_value = Fmt.any "<n/a>" in
+    let pp_value = Fmt.any "<dynamic>" in
     B0_meta.Key.v "srcs" ~doc:"Module sources" ~pp_value
 
   let supported_code =
@@ -293,7 +293,21 @@ let lib_proc set_mod_srcs srcs b =
   end;
   Fut.return ()
 
-let exe ?doc ?(meta = B0_meta.empty) ?(requires = []) ?name exe_name ~srcs =
+let exe_action _ u ~args:argl =
+  (* XXX environment % cwd *)
+  match B0_meta.find B0_meta.exe_path (B0_unit.meta u) with
+  | None ->
+      Log.err (fun m -> m "Unit %a does not define metadata key %a"
+                  B0_unit.pp_name u B0_meta.Key.pp_name B0_meta.exe_path);
+      Fut.return @@ B00_cli.Exit.some_error
+  | Some exe ->
+      Fut.bind exe @@ fun exe ->
+      let cmd = Cmd.(path exe %% args argl) in
+      Fut.return @@ Os.Exit.exec exe cmd
+
+let exe
+    ?doc ?(meta = B0_meta.empty) ?action ?(requires = []) ?name exe_name ~srcs
+  =
   let name = Option.value ~default:exe_name name in
   let mod_srcs, set_mod_srcs = Fut.create () in
   let exe_path, set_exe_path = Fut.create () in
@@ -306,9 +320,12 @@ let exe ?doc ?(meta = B0_meta.empty) ?(requires = []) ?name exe_name ~srcs =
     |> B0_meta.add Meta.mod_srcs mod_srcs
     |> B0_meta.add B0_meta.exe_path exe_path
   in
-  B0_unit.v ?doc ~meta name (exe_proc set_exe_path set_mod_srcs srcs)
+  let action = match action with None -> exe_action | Some a -> a in
+  B0_unit.v ?doc ~meta ~action name (exe_proc set_exe_path set_mod_srcs srcs)
 
-let lib ?doc ?(meta = B0_meta.empty) ?(requires = []) ?name lib_name ~srcs =
+let lib
+    ?doc ?(meta = B0_meta.empty) ?action ?(requires = []) ?name lib_name ~srcs
+  =
   let name = match name with
   | None -> Lib.Name.undot ~rep:'-' lib_name
   | Some name -> name
@@ -322,7 +339,7 @@ let lib ?doc ?(meta = B0_meta.empty) ?(requires = []) ?name lib_name ~srcs =
     |> B0_meta.add Meta.requires requires
     |> B0_meta.add Meta.mod_srcs mod_srcs
   in
-  B0_unit.v ?doc ~meta name (lib_proc set_mod_srcs srcs)
+  B0_unit.v ?doc ~meta ?action name (lib_proc set_mod_srcs srcs)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

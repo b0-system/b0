@@ -19,20 +19,37 @@ type proc = build -> unit Fut.t
 (** The type for unit build procedures. Note that when the future
     determines the build may not be finished. *)
 
-val nop : proc
-(** [nop] does nothing. *)
+val proc_nop : proc
+(** [proc_nop] does nothing. *)
+
+(** {1:action Unit actions} *)
 
 (** {1:units Units} *)
 
-type t
+type action = build -> t -> args:string list -> Os.Exit.t Fut.t
+(** The type for unit outcome actions. This associates a default
+    action to the built unit. [args] are command line argument passed
+    on the command line.
+
+    For example for executables a natural action is to [execv] them
+    directly or via their runtime. For non-executable files it can be
+    to (re)load them in their corresponding viewer application, etc.
+
+    {b TODO.} This is not a final design, {{!page-todo.unit_action}see
+    unit actions}. *)
+
+and t
 (** The type for build units. *)
 
-val v : ?doc:string -> ?meta:B0_meta.t -> string -> proc -> t
-(** [v n proc ~doc ~meta] is a build unit named [n] with build procedure
-    [proc], synopsis [doc] and metada [meta]. *)
+val v : ?doc:string -> ?meta:B0_meta.t -> ?action:action -> string -> proc -> t
+(** [v n proc ~doc ~meta ~action] is a build unit named [n] with build
+    procedure [proc], synopsis [doc] and metada [meta]. *)
 
 val proc : t -> proc
 (** [proc u] are the unit's build procedure. *)
+
+val action : t -> action option
+(** [action] is the unit's action. *)
 
 (** {1:b0_def B0 definition API} *)
 
@@ -54,8 +71,8 @@ module Build : sig
   val root_dir : t -> build_unit -> Fpath.t
   val build_dir : t -> build_unit -> Fpath.t
   val create :
-    root_dir:Fpath.t -> b0_dir:Fpath.t -> B00.Memo.t -> may_build:Set.t ->
-    must_build:Set.t -> t
+    root_dir:Fpath.t -> b0_dir:Fpath.t -> variant:string -> B00.Memo.t ->
+    may_build:Set.t -> must_build:Set.t -> t
 
   val store : t -> B00.Store.t
   val get : t -> 'a B00.Store.key -> 'a Fut.t

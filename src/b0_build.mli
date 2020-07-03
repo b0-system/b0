@@ -75,8 +75,8 @@ val self : t B00.Store.key
 (** {1:run Creating and running} *)
 
 val create :
-  root_dir:Fpath.t -> b0_dir:Fpath.t -> B00.Memo.t -> may_build:B0_unit.Set.t ->
-  must_build:B0_unit.Set.t -> t
+  root_dir:Fpath.t -> b0_dir:Fpath.t -> variant:string ->
+  B00.Memo.t -> may_build:B0_unit.Set.t -> must_build:B0_unit.Set.t -> t
 (** [create ~root_dir ~b0_dir m ~may_build ~must_build]
     {ul
     {- [must_build] are the build units that must be build by [b].}

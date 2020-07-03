@@ -109,6 +109,7 @@ via {{!page-manual.b0_file}B0 files}.
 {!modules:
 B0_build
 B0_def
+B0_dir
 B0_meta
 B0_cli}
 

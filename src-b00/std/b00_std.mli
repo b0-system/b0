@@ -931,7 +931,7 @@ let escape_dquotes s =
   val to_version : string -> (int * int * int * string option) option
   (** [to_version] parses version strings of the form:
       {[
-        "[v|V]major.minor[.patchlevel][+additional-info]"
+        "[v|V]major.minor[.patchlevel][(+|~)additional-info]"
       ]}
       into [(major, minor, patch, additional_info)] tuples. If no
       [patchlevel] is found [0] is used. *)
@@ -1863,6 +1863,10 @@ module Fut : sig
 
   val value : 'a t -> 'a option
   (** [value f] is [f]'s value, if any. *)
+
+  val sync : 'a t -> 'a
+  (** [sync f] waits for [f] to determine. {b Warning.} This is relaxed busy
+      waiting. *)
 
   val return : 'a -> 'a t
   (** [return v] is a future that determines [v]. *)

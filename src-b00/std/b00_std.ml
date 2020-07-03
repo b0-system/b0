@@ -1134,19 +1134,24 @@ module String = struct
 
   let to_version s =
     if s = "" then None else
+    let cut_left_plus_or_tilde s = (* we should have find_{left,right}. *)
+      match cut_left ~sep:"+" s with
+      | None -> cut_left ~sep:"~" s
+      | Some _ as v -> v
+    in
     try match cut_left ~sep:"." s with
     | None -> None
     | Some (maj, rest) ->
         let maj = int_of_string (drop_initial_v maj) in
         match cut_left ~sep:"." rest with
         | None ->
-            begin match cut_left ~sep:"+" rest with
+            begin match cut_left_plus_or_tilde rest with
             | None -> Some (maj, int_of_string rest, 0, None)
             | Some (min, i) ->  Some (maj, int_of_string min, 0, Some i)
             end
         | Some (min, rest) ->
             let min = int_of_string min in
-            begin match cut_left ~sep:"+" rest with
+            begin match cut_left_plus_or_tilde rest with
             | None -> Some (maj, min, int_of_string rest, None)
             | Some (p, i) -> Some (maj, min, int_of_string p, Some i)
             end
@@ -2283,6 +2288,15 @@ module Fut = struct
   let value f = match !f with Det v -> Some v | _ -> None
   let await f k = match !f with
   | Det v -> k v | Undet u -> u.awaits <- k :: u.awaits
+
+  let rec sync f = match !f with
+  | Det v -> v
+  | Undet _ ->
+      let relax () =
+        try ignore (Unix.select [] [] [] 0.0001) with
+        | Unix.Unix_error _ -> ()
+      in
+      relax (); sync f
 
   let return v = ref (Det v)
 

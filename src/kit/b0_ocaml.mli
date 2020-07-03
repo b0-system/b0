@@ -18,8 +18,9 @@ val libname : string -> Lib.Name.t
     This is shortcut for {!B00_ocaml.Lib.Name.v}. *)
 
 val exe :
-  ?doc:string -> ?meta:B0_meta.t -> ?requires:Lib.Name.t list ->
-  ?name:string -> string -> srcs:B0_srcs.t -> B0_unit.t
+  ?doc:string -> ?meta:B0_meta.t -> ?action:B0_unit.action ->
+  ?requires:Lib.Name.t list -> ?name:string -> string -> srcs:B0_srcs.t ->
+  B0_unit.t
 (** [exe n] is a build unit for an executable named [n] (without
     the platform specific extension).
     {ul
@@ -32,8 +33,9 @@ val exe :
        executable.}} *)
 
 val lib :
-  ?doc:string -> ?meta:B0_meta.t -> ?requires:Lib.Name.t list ->
-  ?name:string -> Lib.Name.t -> srcs:B0_srcs.t -> B0_unit.t
+  ?doc:string -> ?meta:B0_meta.t -> ?action:B0_unit.action ->
+  ?requires:Lib.Name.t list -> ?name:string -> Lib.Name.t ->
+  srcs:B0_srcs.t -> B0_unit.t
 (** [lib n ~srcs] is a built unit for a library named [l] made of
     sources [src].
     {ul
@@ -105,8 +107,8 @@ module Meta : sig
       If the meta is unspecified this assumes [`All]. *)
 
   val needs_code : built_code  B0_meta.key
-  (** [needs_code] indicates the unit unconditionally needs a given
-      code build. *)
+  (** [needs_code] indicates the unit unconditionally needs a given code
+      build. *)
 end
 
 (** {1:lib Library resolution} *)

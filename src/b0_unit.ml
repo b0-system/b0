@@ -37,11 +37,13 @@ end
 
 and Unit_def : sig
   type proc = Build_def.t -> unit Fut.t
-  type t = { def : B0_def.t; proc : proc; }
+  type action = Build_def.t -> t -> args:string list -> Os.Exit.t Fut.t
+  and t = { def : B0_def.t; proc : proc; action : action option }
   include B0_def.VALUE with type t := t
 end = struct
   type proc = Build_def.t -> unit Fut.t
-  type t = { def : B0_def.t; proc : proc; }
+  type action = Build_def.t -> t -> args:string list -> Os.Exit.t Fut.t
+  and t = { def : B0_def.t; proc : proc; action : action option }
   let def_kind = "unit"
   let def u = u.def
   let pp_name_str = Fmt.(code string)
@@ -54,11 +56,20 @@ and Unit : sig include B0_def.S with type t = Unit_def.t end
 
 type build = Build_def.t
 type proc = Unit_def.proc
-let nop b = Fut.return ()
+let proc_nop b = Fut.return ()
 
 (* Build units *)
 
+type action = Unit_def.action
 include Unit
+
+
+let v ?doc ?meta ?action n proc =
+  let def = define ?doc ?meta n in
+  let u = { Unit_def.def; proc; action } in add u; u
+
+let proc u = u.Unit_def.proc
+let action u = u.Unit_def.action
 
 let pp_synopsis ppf v =
   let pp_tag ppf u =
@@ -73,12 +84,6 @@ let pp ppf v =
   let pp_non_empty ppf m = match B0_meta.is_empty m with
   | true -> () | false -> Fmt.pf ppf "@, @[%a@]" B0_meta.pp m in
   Fmt.pf ppf "@[<v>%a%a@]" pp_synopsis v pp_non_empty (meta v)
-
-let v ?doc ?meta n proc =
-  let def = define ?doc ?meta n in
-  let u = { Unit_def.def; proc } in add u; u
-
-let proc u = u.Unit_def.proc
 
 (* Builds *)
 
@@ -112,16 +117,14 @@ module Build = struct
 
   (* Directories *)
 
-  let build_build_dir ~b0_dir = Fpath.(b0_dir / "b" / "user")
-  let build_shared_build_dir ~build_dir = Fpath.(build_dir / "_shared")
-  let store_dir ~build_dir = Fpath.(build_dir / "_store")
-
   let root_dir b u = match B0_def.dir (def u) with
   | None -> b.b.root_dir
   | Some dir -> dir
 
   let current_root_dir b = root_dir b (current b)
-  let build_dir b u = Fpath.(b.b.build_dir / name u)
+  let build_dir b u =
+    B0_dir.unit_build_dir ~build_dir:b.b.build_dir ~name:(name u)
+
   let current_build_dir b = build_dir b (current b)
   let shared_build_dir b = b.b.shared_build_dir
 
@@ -136,11 +139,11 @@ module Build = struct
 
   (* Create *)
 
-  let create ~root_dir ~b0_dir m ~may_build ~must_build =
+  let create ~root_dir ~b0_dir ~variant m ~may_build ~must_build =
     let u = { current = None; m } in
-    let build_dir = build_build_dir ~b0_dir in
-    let shared_build_dir = build_shared_build_dir ~build_dir in
-    let store = Store.create m ~dir:(store_dir ~build_dir) [] in
+    let build_dir = B0_dir.build_dir ~b0_dir ~variant in
+    let shared_build_dir = B0_dir.shared_build_dir ~build_dir in
+    let store = Store.create m ~dir:(B0_dir.store_dir ~build_dir) [] in
     let may_build = Set.union may_build must_build in
     let add_requested u acc = String.Map.add (name u) u acc in
     let requested = Unit.Set.fold add_requested must_build String.Map.empty in

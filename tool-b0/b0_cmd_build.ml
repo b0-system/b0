@@ -61,7 +61,26 @@ let get_may_must ~locked ~units ~x_units =
   in
   may, must
 
-let build_run lock ~units ~packs ~x_units ~x_packs c =
+let find_outcome_action ~must_build (* not empty *) action args =
+  let warn_args () = Log.warn @@ fun m ->
+    m "Ignoring outcome action arguments: action not enabled."
+  in
+  let warn_disable () = Log.warn @@ fun m ->
+    m "Disabling outcome action: multiple units requested."
+  in
+  let warn_noact u = Log.warn @@ fun m ->
+    m  "No outcome action for unit %a." B0_unit.pp_name u
+  in
+  match action with
+  | false -> (if args = [] then warn_args ()); None
+  | true when B0_unit.Set.cardinal must_build > 1 -> warn_disable (); None
+  | true ->
+      let u = B0_unit.Set.choose_opt must_build |> Option.get in
+      match B0_unit.action u with
+      | None -> warn_noact u; None
+      | Some act -> Some (act, u)
+
+let build_run lock ~units ~packs ~x_units ~x_packs action args c =
   Log.if_error ~use:B00_cli.Exit.no_such_name @@
   let* x_units = get_excluded_units ~x_units ~x_packs in
   let* units, locked_packs = get_must_units_and_locked_packs ~units ~packs in
@@ -75,10 +94,17 @@ let build_run lock ~units ~packs ~x_units ~x_packs c =
       let b0_dir = B0_driver.Conf.b0_dir c in
       Log.if_error' ~use:B0_driver.Exit.build_error @@
       let* m = memo c in
-      let build = B0_build.create ~root_dir ~b0_dir m ~may_build ~must_build in
+      let variant = "user" in
+      let build =
+        B0_build.create ~root_dir ~b0_dir ~variant  m ~may_build ~must_build
+      in
+      let  action = find_outcome_action ~must_build action args in
       match B0_build.run build with
-      | Ok () -> Ok B00_cli.Exit.ok
       | Error () -> Ok B0_driver.Exit.build_error
+      | Ok () ->
+          match action with
+          | None -> Ok B00_cli.Exit.ok
+          | Some (action, u) -> Ok (Fut.sync (action build u ~args))
 
 (* Explaining what gets into the build *)
 
@@ -136,10 +162,10 @@ let build_what lock ~units ~packs ~x_units ~x_packs c =
 
 (* Build command *)
 
-let build what lock units packs x_units x_packs c =
+let build what lock units packs x_units x_packs action args c =
   if what
   then build_what lock ~units ~packs ~x_units ~x_packs c
-  else build_run  lock ~units ~packs ~x_units ~x_packs c
+  else build_run  lock ~units ~packs ~x_units ~x_packs action args c
 
 (* Command line interface *)
 
@@ -171,6 +197,17 @@ let lock =
   in
   Arg.(value & vflag None [lock; unlock])
 
+let action =
+  let doc = "Perform the unit outcome action (only if one unit is specified)."
+  in
+  Arg.(value & flag & info ["a"; "action"] ~doc)
+
+let args =
+  let doc = "Arguments given as is to the outcome action. Start with $(b,--) \
+             otherwise options get interpreted by $(mname)."
+  in
+  Arg.(value & pos_all string [] & info [] ~doc ~docv:"ARG")
+
 let cmd =
   let doc = "Build (default)" in
   let sdocs = Manpage.s_common_options in
@@ -190,8 +227,8 @@ let cmd =
         exists in which case $(b,-p default) is implied.";
     `P "Build procedures may dynamically require the build of units \
         unspecified on the command line. To prevent a unit from building \
-        use the $(b,-x) and $(b,-X) options; they take over $$(b,-u) and \
-        (b,-p)inclusion options.";
+        use the $(b,-x) and $(b,-X) options; they take over $(b,-u) and \
+        $(b,-p)inclusion options.";
     `P "If you want to make sure only the exact units you specified are \
         in the build, use the $(b,--lock) option to lock the build. \
         If you request a pack that has the $(b,B0_meta.locked) tag, \
@@ -203,7 +240,8 @@ let cmd =
     B0_b0.Cli.man_see_manual; ]
   in
   let build_cmd =
-    Term.(const build $ what $ lock $ units $ packs $ x_units $ x_packs)
+    Term.(const build $ what $ lock $ units $ packs $ x_units $ x_packs $
+          action $ args)
   in
   B0_driver.with_b0_file ~driver:B0_b0.driver build_cmd,
   Term.info "build" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs

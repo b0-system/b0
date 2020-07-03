@@ -30,15 +30,38 @@ let build_unit c u k =
     let b0_dir = B0_driver.Conf.b0_dir c in
     Log.if_error ~use:B0_driver.Exit.build_error @@
     let* m = B0_cmd_build.memo c in
-    let build = B0_build.create ~root_dir ~b0_dir m ~may_build ~must_build in
+    let build =
+      let variant = "user" in
+      B0_build.create ~root_dir ~b0_dir ~variant m ~may_build ~must_build
+    in
     match B0_build.run build with
     | Error () -> Ok B0_driver.Exit.build_error
     | Ok () -> Ok (k build)
 
 let action c args =
   get_unit args @@ fun u args ->
-  build_unit c u @@ fun build ->
-  failwith "TODO"
+  match B0_unit.action u with
+  | None ->
+      Log.err (fun m -> m "Unit %a has no outcome action." B0_unit.pp_name u);
+      B00_cli.Exit.some_error
+  | Some action ->
+      build_unit c u @@ fun build ->
+      Fut.sync (action build u ~args)
+
+let build_dir c args =
+  Log.if_error ~use:B00_cli.Exit.no_such_name @@
+  let* us = B0_unit.get_list args in
+  match us with
+  | [] -> Ok B00_cli.Exit.ok
+  | us ->
+      let b0_dir = B0_driver.Conf.b0_dir c in
+      let build_dir = B0_dir.build_dir ~b0_dir ~variant:"user" in
+      let unit_dir u =
+        B0_dir.unit_build_dir ~build_dir ~name:(B0_unit.name u)
+      in
+      let dirs = List.map unit_dir us in
+      Log.app (fun m -> m "@[<v>%a@]" (Fmt.list Fpath.pp_unquoted) dirs);
+      Ok B00_cli.Exit.ok
 
 let exec c dry_run args =
   (* TODO we should have a better definition of where
@@ -63,6 +86,7 @@ let exec c dry_run args =
 
 let unit act format dry_run args c = match act with
 | `Action -> action c args
+| `Build_dir -> build_dir c args
 | `Edit -> B0_b0.Def.edit (module B0_unit) c args
 | `Exec -> exec c dry_run args
 | `Get -> get c format args
@@ -77,14 +101,14 @@ open Cmdliner
 
 let dry_run =
   let doc =
-    "Do not execute the unit action. If applicable, show the invocation"
+    "Do not execute the outcome unit action. If applicable, show the invocation"
   in
   Arg.(value & flag & info ["dry-run"] ~doc)
 
 let action =
   let action =
-    ["action", `Action; "edit", `Edit; "exec", `Exec; "get", `Get;
-     "list", `List; "show", `Show]
+    ["action", `Action; "build-dir", `Build_dir; "edit", `Edit;
+     "exec", `Exec; "get", `Get; "list", `List; "show", `Show]
   in
   let doc =
     let alts = Arg.doc_alts_enum action in
@@ -108,8 +132,10 @@ let cmd =
     `P "$(tname) operates on build units.";
     `S "ACTIONS";
     `I ("$(b,action) $(i,UNIT) -- $(i,ARG)...",
-        "Builds $(i,UNIT) and execute its action. The unit needs to \
-         have an action defined for this to work.");
+        "Builds $(i,UNIT) and execute its outcome action with arguments \
+         $(i,ARG)... (if any).");
+    `I ("$(b,build-dir) [$(i,UNIT)]...",
+        "Show build directory of given $(i,UNIT). The path may not exist.");
     `I ("$(b,edit) [$(i,UNIT)]...",
         "Edit in your editor the B0 file(s) in which all or the given units \
          are defined.");
