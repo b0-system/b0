@@ -22,18 +22,17 @@ type proc = build -> unit Fut.t
 val proc_nop : proc
 (** [proc_nop] does nothing. *)
 
-(** {1:action Unit actions} *)
-
 (** {1:units Units} *)
 
 type action = build -> t -> args:string list -> Os.Exit.t Fut.t
-(** The type for unit outcome actions. This associates a default
-    action to the built unit. [args] are command line argument passed
-    on the command line.
+(** The type for unit outcome actions. Defines an action to perform on
+    build results. [args] are command line argument passed on the
+    command line.
 
     For example for executables a natural action is to [execv] them
-    directly or via their runtime. For non-executable files it can be
-    to (re)load them in their corresponding viewer application, etc.
+    directly or via their runtime (see {!Action.exec}). For built
+    document files it can be to (re)load them in their corresponding
+    viewer application, etc.
 
     {b TODO.} This is not a final design, {{!page-todo.unit_action}see
     unit actions}. *)
@@ -49,7 +48,44 @@ val proc : t -> proc
 (** [proc u] are the unit's build procedure. *)
 
 val action : t -> action option
-(** [action] is the unit's action. *)
+(** [action] is the unit's outcome action. *)
+
+(** {1:action Action} *)
+
+module Action : sig
+
+  (** {1:prog_exec Program execution} *)
+
+  val exec_cwd : (build -> t -> Fpath.t Fut.t) B0_meta.key
+  (** [exec_cwd] is a function to determine a current working directory
+      for {!exec} actions. *)
+
+  val exec_env : (build -> t -> Os.Env.assignments Fut.t) B0_meta.key
+  (** [exec_env] is a function to determine an environement for {!exec}
+      actions. *)
+
+  val exec : action
+  (** [exec] is an action that {!B00_std.Os.Exit.exec}'s a unit's outcome
+      as follows:
+      {ul
+      {- The executed file is the unit's {!B0_meta.exe_file}.}
+      {- The arguments have {!B00_std.Fpath.basename} of
+         {!B0_meta.exe_file} as the program name and the action's [args]
+         as arguments.}
+      {- If the unit defines {!exec_cwd}, it is used to determine the
+         [cwd] otherwise the default of {!B00_std.Os.Exit.exec} is used.}
+      {- If the unit defines {!exec_env}, it is used to determine the
+         environment otherwise the default {!B00_std.Os.Exit.exec} is used.}} *)
+
+  val exec_file : build -> t -> Fpath.t -> Cmd.t -> Os.Exit.t Fut.t
+  (** [exec_file u file argv] is a {!B00_std.Os.Exit.exec} with
+      [file] and [argv] and:
+      {ul
+      {- If the unit [u] defines {!exec_cwd}, it is used to determine the
+         [cwd] otherwise the default of {!B00_std.Os.Exit.exec} is used.}
+      {- If the unit [u] defines {!exec_env}, it is used to determine the
+         environment otherwise the default {!B00_std.Os.Exit.exec} is used.}} *)
+end
 
 (** {1:b0_def B0 definition API} *)
 

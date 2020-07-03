@@ -63,32 +63,10 @@ let build_dir c args =
       Log.app (fun m -> m "@[<v>%a@]" (Fmt.list Fpath.pp_unquoted) dirs);
       Ok B00_cli.Exit.ok
 
-let exec c dry_run args =
-  (* TODO we should have a better definition of where
-     this should be run. Basically this should be on the host os. *)
-  get_unit args @@ fun u cmd ->
-  match B0_meta.find B0_meta.exe_path (B0_unit.meta u) with
-  | None ->
-      Log.err (fun m -> m "Unit %a does not define metadata key %a"
-                  B0_unit.pp_name u B0_meta.Key.pp_name B0_meta.exe_path);
-      B00_cli.Exit.some_error
-  | Some exe ->
-      build_unit c u @@ fun build ->
-      match Fut.value exe with
-      | None ->
-          Log.err (fun m -> m "Unit %a did not determine %a"
-                      B0_unit.pp_name u B0_meta.Key.pp_name B0_meta.exe_path);
-          B00_cli.Exit.some_error
-      | Some exe ->
-          let cmd = Cmd.(path exe %% args cmd) in
-          if not dry_run then Os.Exit.exec exe cmd else
-          (Fmt.pr "%s" (Cmd.to_string cmd); B00_cli.Exit.ok)
-
-let unit act format dry_run args c = match act with
+let unit act format args c = match act with
 | `Action -> action c args
 | `Build_dir -> build_dir c args
 | `Edit -> B0_b0.Def.edit (module B0_unit) c args
-| `Exec -> exec c dry_run args
 | `Get -> get c format args
 | `List -> B0_b0.Def.list (module B0_unit) c format args
 | `Show ->
@@ -99,16 +77,10 @@ let unit act format dry_run args c = match act with
 
 open Cmdliner
 
-let dry_run =
-  let doc =
-    "Do not execute the outcome unit action. If applicable, show the invocation"
-  in
-  Arg.(value & flag & info ["dry-run"] ~doc)
-
 let action =
   let action =
-    ["action", `Action; "build-dir", `Build_dir; "edit", `Edit;
-     "exec", `Exec; "get", `Get; "list", `List; "show", `Show]
+    ["action", `Action; "build-dir", `Build_dir; "edit", `Edit; "get", `Get;
+     "list", `List; "show", `Show]
   in
   let doc =
     let alts = Arg.doc_alts_enum action in
@@ -139,10 +111,6 @@ let cmd =
     `I ("$(b,edit) [$(i,UNIT)]...",
         "Edit in your editor the B0 file(s) in which all or the given units \
          are defined.");
-    `I ("$(b,exec) [$(b,--dry-run)] $(i,UNIT) -- $(i,ARG)...",
-        "Build $(i,UNIT) and execute with given arguments the executable
-         specified in the unit's $(b,B0_meta.exe_path) metadata key.
-         If $(b,--dry-run) is specified prints out the invocation.");
     `I ("$(b,get) $(i,KEY) [$(i,UNIT)]...",
         "Get metadata key $(i,KEY) of given or all units.");
     `I ("$(b,list) [$(i,UNIT)]...",
@@ -155,8 +123,7 @@ let cmd =
     B0_b0.Cli.man_see_manual; ]
   in
   let unit_cmd =
-    Term.(const unit $ action $ B00_cli.Arg.output_details () $ dry_run $
-          action_args)
+    Term.(const unit $ action $ B00_cli.Arg.output_details () $ action_args)
   in
   B0_driver.with_b0_file ~driver:B0_b0.driver unit_cmd,
   Term.info "unit" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs

@@ -4,9 +4,10 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-(* See DEVEL.md for details. Usage: ocaml b00t/strap [--no-exec | --clean] *)
+(* See DEVEL.md for details.
+   Usage: ocaml b00t/strap [--debug | --no-exec | --clean] *)
 
-let debug = false
+let debug = ref false
 let ( / ) = Filename.concat
 let strf = Printf.sprintf
 let err fmt = Printf.kfprintf (fun oc -> flush oc; exit 1) stderr fmt
@@ -22,12 +23,12 @@ let boot_exe = (boot_dir / "run") ^ (if Sys.win32 then ".exe" else "")
 
 let c_src_dirs = ["src-b00" / "std"; "src-b00" / "std" / "vendor"]
 let ml_src_dirs =
-  [ "src-b00" / "std"; "src-b00"; "src-b00" / "kit";
-    "src"; "src" / "kit"; "src" / "driver"; "tool-b0"; ]
+  [ "src-b00"/"std"; "src-b00"; "src-b00"/"kit";
+    "src"; "src"/"kit"; "tool-b0"; ]
 
 let src_excludes = (* These files should not be part of the driver *)
-  [ "src-b00" / "std"/"b0_b00_std_top_init.ml";
-    "tool-b0" / "b0_main_run.ml"; ]
+  [ "src-b00"/"std"/"b0_b00_std_top_init.ml";
+    "tool-b0"/"b0_main_run.ml"; ]
 
 (* Read, write and collect files *)
 
@@ -66,7 +67,7 @@ let quote_cmd = match Sys.win32 with
 
 let run_cmd args =
   let cmd = String.concat " " (List.map Filename.quote args) in
-  if debug then log "[EXEC] %s\n" cmd;
+  if !debug then log "[EXEC] %s\n" cmd;
   let exit = Sys.command (quote_cmd cmd) in
   if exit = 0 then () else err_cmd exit cmd
 
@@ -75,7 +76,7 @@ let read_cmd args =
   at_exit (fun () -> try ignore (Sys.remove stdout) with _ -> ());
   let cmd = String.concat " " (List.map Filename.quote args) in
   let cmd = quote_cmd @@ strf "%s 1>%s" cmd (Filename.quote stdout) in
-  if debug then log "[EXEC] %s\n" cmd;
+  if !debug then log "[EXEC] %s\n" cmd;
   let exit = Sys.command cmd in
   if exit = 0 then string_of_file stdout else err_cmd exit cmd
 
@@ -199,7 +200,9 @@ let main () =
   let usage = "Usage: ocaml b00t/strap [--no-exec | --clean] " in
   let cmd = ref (`Build `Exec) in
   let args =
-    ["--no-exec", Arg.Unit (fun () -> cmd := (`Build `No_exec)),
+    ["--debug", Arg.Set debug,
+     "Trace program execution.";
+     "--no-exec", Arg.Unit (fun () -> cmd := (`Build `No_exec)),
      "Only build the bootstrap executable, do not run it.";
      "--clean", Arg.Unit (fun () -> cmd := `Clean),
      "Clean the bootstrap build."]

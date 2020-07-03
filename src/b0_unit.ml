@@ -63,7 +63,6 @@ let proc_nop b = Fut.return ()
 type action = Unit_def.action
 include Unit
 
-
 let v ?doc ?meta ?action n proc =
   let def = define ?doc ?meta n in
   let u = { Unit_def.def; proc; action } in add u; u
@@ -84,6 +83,38 @@ let pp ppf v =
   let pp_non_empty ppf m = match B0_meta.is_empty m with
   | true -> () | false -> Fmt.pf ppf "@, @[%a@]" B0_meta.pp m in
   Fmt.pf ppf "@[<v>%a%a@]" pp_synopsis v pp_non_empty (meta v)
+
+(* Predefined actions *)
+
+module Action = struct
+
+  let exec_cwd =
+    let doc = "Current working directory for outcome action." in
+    let pp_value = Fmt.any "<built value>" in
+    B0_meta.Key.v "action-cwd" ~doc ~pp_value
+
+  let exec_env =
+    let doc = "Process environement for outcome action." in
+    let pp_value = Fmt.any "<built value>" in
+    B0_meta.Key.v "action-env" ~doc ~pp_value
+
+  let exec_file build u exe_file cmd =
+    let get_exec_meta = function
+    | None -> Fut.return None
+    | Some f -> Fut.map Option.some (f build u)
+    in
+    let* cwd = get_exec_meta (find_meta exec_cwd u) in
+    let* env = get_exec_meta (find_meta exec_env u) in
+    Fut.return (Os.Exit.exec ?env ?cwd exe_file cmd)
+
+  let exec build u ~args:argl = match get_meta B0_meta.exe_file u with
+  | Error e -> Log.err (fun m -> m "%s" e); Fut.return B00_cli.Exit.some_error
+  | Ok exe_file ->
+      let* exe_file = exe_file in
+      let exe = Fpath.basename exe_file in
+      let cmd = Cmd.(arg exe %% args argl) in
+      exec_file build u exe_file cmd
+end
 
 (* Builds *)
 

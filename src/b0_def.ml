@@ -188,7 +188,7 @@ module Make (V : VALUE) = struct
   let get_meta k v = match find_meta k v with
   | Some v -> Ok v
   | None ->
-      Fmt.error "%s %a has no %a metadata"
+      Fmt.error "%s %a does not define metadata %a"
         (String.Ascii.capitalize V.def_kind)
         V.pp_name_str (name v) B0_meta.Key.pp_name k
 

@@ -1,4 +1,4 @@
-# Bootstrap
+OB# Bootstrap
 
 To bootstrap `b0`, we need to find the paths to the `cmdliner` and
 `unix` library directories. These are discovered using a few heuristics 
@@ -24,8 +24,8 @@ The `b00t/strap` invocation produces the `b00t/run` executable which
 has B0's own B0 file linked with the `b0` tool driver. Running
 `b00t/run` it is equivalent to run `b0` on the root `B0.ml`
 file. After this we have usable `b0` executables and libraries in the
-`_b0` directory. We can use these by having the `B0_B00T` and 
-`B0_DRIVER_B00T` point to the libraries (see [`b00t/env`](b00t/env)).
+`_b0` directory. We can use these by having the `B0_BOOTSTRAP` and 
+`B0_DRIVER_BOOTSTRAP` point to the libraries (see [`b00t/env`](b00t/env)).
 
 # Source map
 
@@ -51,10 +51,7 @@ This is the system for describing software contruction and deployments
 via B0 files.
 
 * [`src`](src) has the `b0` library which for describing software construction 
-  and deployments.
+  and deployments and provides programmatic access to the definitions of B0 files.
 * [`src/kit`](src/kit) is the `b0.kit` library. An end-user toolkit
   for B0 files.
-* [`src/driver`](src/driver) is the `b0.driver` library. It provides
-  programmatic access to the definitions of B0 files.
-* [`tool-b0`](tool-b0), is the `b0.driver.b0` library. The driver
-  library for the `b0` tool.
+* [`tool-b0`](tool-b0) is b0 tool driver.

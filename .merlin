@@ -1,13 +1,9 @@
 PKG unix cmdliner
-S src-b0
-S src-b0-driver
-S src-b0-driver-b0
-S src-b0-kit
-S src-b00
-S src-b00-kit
-S src-b00-std
-S examples/*
-S tools
-S test
+S src/**
+S src-b00/**
+S tool-b0/**
+S tools/**
+S test/**
+S examples/**
 B _build/**
 B _b0/**

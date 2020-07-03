@@ -12,8 +12,8 @@ used. Instead the driver executable relinks its objects with a
 compilation of the B0 file to produce another executable that is
 executed to run the driver on the definitions.
 
-With the help of the {!B0_driver} API this all happens transparently
-in the [.drivers] directory of the [_b0] directory.
+With the help of the {!B0_driver} module this all happens
+transparently in the [.drivers] directory of the [_b0] directory.
 
 {1:library The driver library}
 

@@ -240,15 +240,14 @@ module Compile = struct
     [ B00_ocaml.Lib.Name.v "b0.b00.std";
       B00_ocaml.Lib.Name.v "b0.b00";
       B00_ocaml.Lib.Name.v "b0.b00.kit";
-      B00_ocaml.Lib.Name.v "b0.b0";
-      B00_ocaml.Lib.Name.v "b0.kit";
-      B00_ocaml.Lib.Name.v "b0.driver"; ]
+      B00_ocaml.Lib.Name.v "b0";
+      B00_ocaml.Lib.Name.v "b0.kit"; ]
 
   let find_libs m r libs =
     Fut.of_list @@ List.map (B00_ocaml.Lib.Resolver.get r) libs
 
   let find_boot_libs m ~clib_ext ~env libs r =
-    match Os.Env.find ~empty_is_none:true "B0_B00T" with
+    match Os.Env.find ~empty_is_none:true "B0_BOOTSTRAP" with
     | None -> find_libs m r libs
     | Some bdir ->
         let bdir = Fpath.v bdir in
@@ -277,10 +276,12 @@ module Compile = struct
     (* FIXME we likely also want a notion of ext lib for drivers *)
     let clib_ext = B00_ocaml.Conf.lib_ext ocaml_conf in
     let* driver_libs =
-      find_boot_libs m ~clib_ext ~env:"B0_DRIVER_BOOT" (libs driver) r
+      find_boot_libs m ~clib_ext ~env:"B0_DRIVER_BOOTSTRAP" (libs driver) r
     in
     let* base_ext_libs = find_libs m r base_ext_libs in
-    let* base_libs = find_boot_libs m ~clib_ext ~env:"B0_B00T" base_libs r in
+    let* base_libs =
+      find_boot_libs m ~clib_ext ~env:"B0_BOOTSTRAP" base_libs r
+    in
     let all_libs = base_ext_libs @ base_libs @ driver_libs @ requires in
     let seen_libs = base_ext_libs @ base_libs @ requires in
     Fut.return (all_libs, seen_libs)

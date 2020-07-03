@@ -17,10 +17,9 @@ let () =
     (* B0 libraries *)
     Pkg.mllib "src/b0.mllib";
     Pkg.mllib "src/kit/b0_kit.mllib" ~dst_dir:"kit";
-    Pkg.mllib "src/driver/b0_driver.mllib" ~dst_dir:"driver";
 
     (* b0 & d0 tools *)
-    Pkg.mllib "tool-b0/b0_driver_b0.mllib" ~dst_dir:"driver/b0";
+    Pkg.mllib "tool-b0/b0_b0.mllib" ~dst_dir:"b0";
     Pkg.bin "tool-b0/b0_main_run" ~dst:"b0";
 (*    Pkg.mllib "tool-d0/b0_driver_d0.mllib" ~dst_dir:"driver/d0";
       Pkg.bin "tool-d0/d0_main_run" ~dst:"b0";

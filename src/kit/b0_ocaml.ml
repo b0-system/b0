@@ -293,18 +293,6 @@ let lib_proc set_mod_srcs srcs b =
   end;
   Fut.return ()
 
-let exe_action _ u ~args:argl =
-  (* XXX environment % cwd *)
-  match B0_meta.find B0_meta.exe_path (B0_unit.meta u) with
-  | None ->
-      Log.err (fun m -> m "Unit %a does not define metadata key %a"
-                  B0_unit.pp_name u B0_meta.Key.pp_name B0_meta.exe_path);
-      Fut.return @@ B00_cli.Exit.some_error
-  | Some exe ->
-      Fut.bind exe @@ fun exe ->
-      let cmd = Cmd.(path exe %% args argl) in
-      Fut.return @@ Os.Exit.exec exe cmd
-
 let exe
     ?doc ?(meta = B0_meta.empty) ?action ?(requires = []) ?name exe_name ~srcs
   =
@@ -318,9 +306,9 @@ let exe
     |> B0_meta.add B0_meta.exe_name exe_name
     |> B0_meta.add Meta.requires requires
     |> B0_meta.add Meta.mod_srcs mod_srcs
-    |> B0_meta.add B0_meta.exe_path exe_path
+    |> B0_meta.add B0_meta.exe_file exe_path
   in
-  let action = match action with None -> exe_action | Some a -> a in
+  let action = match action with None -> B0_unit.Action.exec | Some a -> a in
   B0_unit.v ?doc ~meta ~action name (exe_proc set_exe_path set_mod_srcs srcs)
 
 let lib

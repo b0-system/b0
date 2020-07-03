@@ -14,8 +14,9 @@ open B00_ocaml
 (** {1:unit Units} *)
 
 val exe :
-  ?doc:string -> ?meta:B0_meta.t -> ?requires:Lib.Name.t list ->
-  ?name:string -> string -> srcs:B0_srcs.t -> B0_unit.t
+  ?doc:string -> ?meta:B0_meta.t -> ?action:B0_unit.action ->
+  ?requires:Lib.Name.t list -> ?name:string -> string -> srcs:B0_srcs.t ->
+  B0_unit.t
 (** [exe n] is a JavaScript "executable" file named [n] (without
     the [.js] extension.
     {ul
@@ -28,8 +29,9 @@ val exe :
        JavaScript file.}} *)
 
 val web :
-  ?doc:string -> ?meta:B0_meta.t -> ?requires:Lib.Name.t list ->
-  ?name:string -> string -> srcs:B0_srcs.t -> B0_unit.t
+  ?doc:string -> ?meta:B0_meta.t -> ?action:B0_unit.action ->
+  ?requires:Lib.Name.t list -> ?name:string -> string -> srcs:B0_srcs.t ->
+  B0_unit.t
 (** [web n] is an HTML page named [n] (without the [.html] extension).
     {ul
     {- [doc] is the unit doc string.}
@@ -38,9 +40,13 @@ val web :
     {- [name] is the name of the unit (defaults to [n]).}
     {- [srcs] are the executable sources. All files with extension [.ml],
        [.mli] and [.js] are considered for compiling and linking the
-       executable.}}
+       executable. The files {!B00_fexts.www} in [srcs] minus [.js] files are
+       copied over the build directory.}}
 
-    FIXME add the css/html/js crap like brzo does. *)
+    {b TODO document.} The js file is [n.js], if there's an [n.html] source
+    it is used otherwhise a minimal HTML file is generated in which [n.js]
+    is linked as a script and any css file in [srcs] as a stylesheet.*)
+
 
 (** Metadata keys *)
 

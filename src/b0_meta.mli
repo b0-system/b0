@@ -218,10 +218,10 @@ val lib : unit key
 
 val exe_name : string key
 (** [exe_name] is an executable name without the platform specific
-    executable extension. *)
+    executable extension. FIXME rename that to [tool]. *)
 
-val exe_path : Fpath.t Fut.t key
-(** [exe_path] is an absolute path to a built executable in the unit. *)
+val exe_file : Fpath.t Fut.t key
+(** [exe_file] is an absolute file path to an executable build by the unit. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

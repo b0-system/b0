@@ -17,8 +17,6 @@ true : package(unix)
 <src/**> : package(cmdliner)
 <src/kit> : include
 <src/kit/**> : package(cmdliner)
-<src/driver> : include
-<src/driver/**> : package(cmdliner)
 
 # b0 & d0 tools
 <tool-b0> : include

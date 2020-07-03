@@ -66,19 +66,75 @@ let exe_proc set_exe_path set_mod_srcs srcs b =
   let* srcs = B0_srcs.select b srcs in
   _exe_proc set_exe_path set_mod_srcs srcs b
 
+let copy_assets m srcs ~dst =
+  let exts = String.Set.remove ".js" B00_fexts.www in
+  let assets = B00_fexts.find_files exts srcs in
+  let copy src =
+    let dst = Fpath.(dst / Fpath.basename src) in
+    Memo.copy m ~src dst
+    (* FIXME for now this is flat.  I think we should expose a
+       src_root in [srcs] (at that level because of watermarking) and
+       redo the the hierarchy. *)
+  in
+  List.iter (Memo.file_ready m) assets;
+  List.iter copy assets
+
+let has_html file srcs =
+  let has_file src = String.equal file (Fpath.basename src) in
+  List.exists has_file (B00_fexts.find_files (B00_fexts.ext ".html") srcs)
+
+let find_styles srcs =
+  List.map Fpath.basename (B00_fexts.find_files B00_fexts.css srcs)
+
 let web_proc set_exe_path set_mod_srcs srcs b =
   let* srcs = B0_srcs.select b srcs in
-  let* () = _exe_proc set_exe_path set_mod_srcs srcs b in
+  let* () = _exe_proc (fun _ -> ()) set_mod_srcs srcs b in
   let m = B0_build.memo b in
   let build_dir = B0_build.current_build_dir b in
   let meta = B0_build.current_meta b in
   let exe_name = B0_meta.get B0_meta.exe_name meta in
+  let html_file = exe_name ^ ".html" in
   let js = exe_name ^ ".js" in
-  let o = Fpath.(build_dir / exe_name + ".html") in
-  B00_jsoo.write_page m ~scripts:[js] ~o;
+  let o = Fpath.(build_dir / html_file) in
+  set_exe_path o;
+  copy_assets m srcs ~dst:build_dir;
+  if has_html html_file srcs then Fut.return () else
+  let styles = find_styles srcs in
+  B00_jsoo.write_page m ~styles ~scripts:[js] ~o;
   Fut.return ()
 
-let exe ?doc ?(meta = B0_meta.empty) ?(requires = []) ?name exe_name ~srcs =
+(* XXX factorize *)
+
+let node_action build u ~args:argl =
+  let err e = Log.err (fun m -> m "%s" e); Fut.return B00_cli.Exit.some_error in
+  match B0_unit.get_meta B0_meta.exe_file u with
+  | Error e -> err e
+  | Ok exe_file ->
+      let* exe_file = exe_file in
+      let node = Fpath.v "node" in
+      match Os.Cmd.must_find_tool (* FIXME first search in build *) node with
+      | Error e -> err e
+      | Ok node_exe ->
+          let cmd = Cmd.(path node %% path exe_file %% args argl) in
+          B0_unit.Action.exec_file build u node_exe cmd
+
+let show_uri_action build u ~args:argl =
+  let err e = Log.err (fun m -> m "%s" e); Fut.return B00_cli.Exit.some_error in
+  match B0_unit.get_meta B0_meta.exe_file u with
+  | Error e -> err e
+  | Ok exe_file ->
+      let* exe_file = exe_file in
+      let show_uri = Fpath.v "show-uri" in
+      match Os.Cmd.must_find_tool (* FIXME search in build *) show_uri with
+      | Error e -> err e
+      | Ok show_uri_exe ->
+          let cmd = Cmd.(path show_uri %% path exe_file %% args argl) in
+          B0_unit.Action.exec_file build u show_uri_exe cmd
+
+let exe
+    ?doc ?(meta = B0_meta.empty) ?(action = show_uri_action) ?(requires = [])
+    ?name exe_name ~srcs
+  =
   let name = Option.value ~default:exe_name name in
   let mod_srcs, set_mod_srcs = Fut.create () in
   let exe_path, set_exe_path = Fut.create () in
@@ -90,13 +146,16 @@ let exe ?doc ?(meta = B0_meta.empty) ?(requires = []) ?name exe_name ~srcs =
     |> B0_meta.add B0_meta.exe_name exe_name
     |> B0_meta.add B0_ocaml.Meta.requires requires
     |> B0_meta.add B0_ocaml.Meta.mod_srcs mod_srcs
-    |> B0_meta.add B0_meta.exe_path exe_path
+    |> B0_meta.add B0_meta.exe_file exe_path
     |> B0_meta.add B0_ocaml.Meta.supported_code `Byte
     |> B0_meta.add B0_ocaml.Meta.needs_code `Byte
   in
-  B0_unit.v ?doc ~meta name (exe_proc set_exe_path set_mod_srcs srcs)
+  B0_unit.v ?doc ~action ~meta name (exe_proc set_exe_path set_mod_srcs srcs)
 
-let web ?doc ?(meta = B0_meta.empty) ?(requires = []) ?name page ~srcs =
+let web
+    ?doc ?(meta = B0_meta.empty) ?(action = show_uri_action) ?(requires = [])
+    ?name page ~srcs
+  =
   let name = Option.value ~default:page name in
   let mod_srcs, set_mod_srcs = Fut.create () in
   let exe_path, set_exe_path = Fut.create () in
@@ -108,10 +167,10 @@ let web ?doc ?(meta = B0_meta.empty) ?(requires = []) ?name page ~srcs =
     |> B0_meta.add B0_meta.exe_name page
     |> B0_meta.add B0_ocaml.Meta.requires requires
     |> B0_meta.add B0_ocaml.Meta.mod_srcs mod_srcs
-    |> B0_meta.add B0_meta.exe_path exe_path
+    |> B0_meta.add B0_meta.exe_file exe_path
     |> B0_meta.add B0_ocaml.Meta.needs_code `Byte
   in
-  B0_unit.v ?doc ~meta name (web_proc set_exe_path set_mod_srcs srcs)
+  B0_unit.v ?doc ~action ~meta name (web_proc set_exe_path set_mod_srcs srcs)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

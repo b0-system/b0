@@ -2718,7 +2718,7 @@ module Os : sig
     (** [spawn ~env ~cwd ~stdin ~stdout ~stderr cmd] spawns command
         [cmd] in environment [env] with current directory [cwd] and
         standard IO connections [stdin], [stdout] and [stderr]. [env]
-        defaults to {!Env.current_assignments}[ ()], [cwd] to {!Dir.current}[
+        defaults to {!Env.current_assignments}[ ()], [cwd] to {!Dir.cwd}[
         ()], [stdin] to {!in_stdin}, [stdout] to {!out_stdout} and
         [stderr] to {!out_stderr}. *)
 
@@ -2775,7 +2775,7 @@ module Os : sig
         program not the first argument to the program). The function
         only recturns in case of error. [env] defaults to
         {!B00_std.Os.Env.current_assignments}[ ()],
-        [cwd] to {!B00_std.Dir.current}[ ()]. *)
+        [cwd] to {!B00_std.Dir.cwd}[ ()]. *)
 
     type t = Cmd.t
     (** {!Exit} needs that alias to refer to {!Cmd.t}. *)

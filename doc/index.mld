@@ -121,9 +121,19 @@ B0_pack
 B0_unit
 }
 
+{3:b0_files B0 files}
+
+Only needed if you want to process B0 files your own own way.
+See the {{!page-driver_dev}B0 driver development manual}.
+
+{!modules:
+B0_file
+B0_driver
+}
+
 {2:b0_kit Library [b0.kit]}
 
-Toolkit for B0 files.
+Toolkit for writing your B0 files.
 
 {!modules:
 B0_kit
@@ -131,15 +141,4 @@ B0_jsoo
 B0_ocaml
 B0_opam
 B0_srcs
-}
-
-{2:b0_driver Library [b0.driver]}
-
-The driver library provides programmatic access to the definitions of
-B0 files. Only needed if you want to process B0 files your own own
-way.
-
-{!modules:
-B0_file
-B0_driver
 }

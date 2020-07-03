@@ -63,17 +63,24 @@ let get_may_must ~locked ~units ~x_units =
 
 let find_outcome_action ~must_build (* not empty *) action args =
   let warn_args () = Log.warn @@ fun m ->
-    m "Ignoring outcome action arguments: action not enabled."
+    m "Outcome action disabled: ignoring arguments (use %a to enable)."
+      Fmt.(code string) "-a"
   in
   let warn_disable () = Log.warn @@ fun m ->
-    m "Disabling outcome action: multiple units requested."
+    m "Outcome action ignored: multiple units with actions requested."
   in
   let warn_noact u = Log.warn @@ fun m ->
-    m  "No outcome action for unit %a." B0_unit.pp_name u
+    m  "No outcome action for %a: ignoring arguments." B0_unit.pp_name u
+  in
+  let disable =
+    let has_action u = Option.is_some (B0_unit.action u) in
+    let count_actions u c = if has_action u then c + 1 else c in
+    B0_unit.Set.cardinal must_build > 1 &&
+    B0_unit.Set.fold count_actions must_build 0 > 1
   in
   match action with
-  | false -> (if args = [] then warn_args ()); None
-  | true when B0_unit.Set.cardinal must_build > 1 -> warn_disable (); None
+  | false -> (if args <> [] then warn_args ()); None
+  | true when disable -> warn_disable (); None
   | true ->
       let u = B0_unit.Set.choose_opt must_build |> Option.get in
       match B0_unit.action u with
