@@ -15,7 +15,7 @@ module Env = struct
     in
     match Fpath.list_of_search_path ?sep search_path with
     | Error _ as e -> fun _ -> e
-    | Ok search -> fun tool -> Os.Cmd.must_find_tool ~search tool
+    | Ok search -> fun tool -> Os.Cmd.get_tool ~search tool
 
   type t =
     { env : Os.Env.t;

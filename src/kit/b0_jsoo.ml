@@ -29,7 +29,8 @@ let compile_impls ~and_cmt m ~code ~opts ~requires ~mod_srcs =
   in
   String.Map.iter compile mod_srcs
 
-let _exe_proc set_exe_path set_mod_srcs srcs b =
+
+let byte_comp set_mod_srcs srcs exe_name b =
   let m = B0_build.memo b in
   let build_dir = B0_build.current_build_dir b in
   let src_root = B0_build.current_root_dir b in
@@ -43,9 +44,7 @@ let _exe_proc set_exe_path set_mod_srcs srcs b =
   let exe_ext = B00_ocaml.Conf.exe_ext conf in
   let exe_name = B0_meta.get B0_meta.exe_name meta in
   let obyte = Fpath.(build_dir / (exe_name ^ ".byte" ^ exe_ext)) in
-  let o = Fpath.(build_dir / (exe_name ^ ".js")) in
   let opts = Cmd.(arg "-g") (* TODO *) in
-  set_exe_path o;
   let code = `Byte in
   let comp = Tool.ocamlc in
   compile_intfs ~and_cmti:true m ~comp ~opts ~requires:comp_requires ~mod_srcs;
@@ -56,10 +55,19 @@ let _exe_proc set_exe_path set_mod_srcs srcs b =
   let lib_objs = List.filter_map Lib.cma link_requires in
   let cobjs = List.filter_map (Mod.Src.impl_file ~code) mod_srcs  in
   let opts = Cmd.(opts % "-no-check-prims") in
-  Link.code m ~conf ~code ~opts ~c_objs ~cobjs:(lib_objs @ cobjs) ~o:obyte;
+  let cobjs = lib_objs @ cobjs in
+  Link.code m ~conf ~code ~opts ~c_objs ~cobjs ~o:obyte;
+  Fut.return (cobjs, obyte)
+
+let _exe_proc set_exe_path set_mod_srcs srcs b =
   let opts = Cmd.empty in
   let source_map = Some `File in
-  B00_jsoo.compile m ~opts ~source_map ~jss:[] ~byte:obyte ~o;
+  let build_dir = B0_build.current_build_dir b in
+  let exe_name = B0_meta.get B0_meta.exe_name (B0_build.current_meta b) in
+  let o = Fpath.(build_dir / (exe_name ^ ".js")) in
+  set_exe_path o;
+  let* _cobjs, obyte = byte_comp set_mod_srcs srcs exe_name b in
+  B00_jsoo.compile (B0_build.memo b) ~opts ~source_map ~jss:[] ~byte:obyte ~o;
   Fut.return ()
 
 let exe_proc set_exe_path set_mod_srcs srcs b =
@@ -86,9 +94,8 @@ let has_html file srcs =
 let find_styles srcs =
   List.map Fpath.basename (B00_fexts.find_files B00_fexts.css srcs)
 
-let web_proc set_exe_path set_mod_srcs srcs b =
-  let* srcs = B0_srcs.select b srcs in
-  let* () = _exe_proc (fun _ -> ()) set_mod_srcs srcs b in
+
+let web_assets set_exe_path srcs b =
   let m = B0_build.memo b in
   let build_dir = B0_build.current_build_dir b in
   let meta = B0_build.current_meta b in
@@ -103,7 +110,30 @@ let web_proc set_exe_path set_mod_srcs srcs b =
   B00_jsoo.write_page m ~styles ~scripts:[js] ~o;
   Fut.return ()
 
-(* XXX factorize *)
+
+let web_proc set_exe_path set_mod_srcs srcs b =
+  let* srcs = B0_srcs.select b srcs in
+  let* () = _exe_proc (fun _ -> ()) set_mod_srcs srcs b in
+  web_assets set_exe_path srcs b
+(*
+                     "--toplevel" % "--no-runtime" %
+                     "--export" %% unstamp (path mod_names) %
+                     "+runtime.js" % "+toplevel.js" % "+dynlink.js" %%
+                     unstamp (path byte_exe))
+*)
+
+let top_proc set_exe_path set_mod_srcs srcs b =
+  let* srcs = B0_srcs.select b srcs in
+  let source_map = Some `File in
+  let build_dir = B0_build.current_build_dir b in
+  let exe_name = B0_meta.get B0_meta.exe_name (B0_build.current_meta b) in
+  let o = Fpath.(build_dir / (exe_name ^ ".js")) in
+  let* _cobjs, obyte = byte_comp set_mod_srcs srcs exe_name b in
+  let opts = Cmd.(arg "--toplevel" % "+toplevel.js" % "+dynlink.js") in
+  B00_jsoo.compile (B0_build.memo b) ~opts ~source_map ~jss:[] ~byte:obyte ~o;
+  web_assets set_exe_path srcs b
+
+(* FIXME lots to factorize *)
 
 let node_action build u ~args:argl =
   let err e = Log.err (fun m -> m "%s" e); Fut.return B00_cli.Exit.some_error in
@@ -112,7 +142,7 @@ let node_action build u ~args:argl =
   | Ok exe_file ->
       let* exe_file = exe_file in
       let node = Fpath.v "node" in
-      match Os.Cmd.must_find_tool (* FIXME first search in build *) node with
+      match Os.Cmd.get_tool (* FIXME first search in build *) node with
       | Error e -> err e
       | Ok node_exe ->
           let cmd = Cmd.(path node %% path exe_file %% args argl) in
@@ -125,11 +155,23 @@ let show_uri_action build u ~args:argl =
   | Ok exe_file ->
       let* exe_file = exe_file in
       let show_uri = Fpath.v "show-uri" in
-      match Os.Cmd.must_find_tool (* FIXME search in build *) show_uri with
+      match Os.Cmd.get_tool (* FIXME search in build *) show_uri with
       | Error e -> err e
       | Ok show_uri_exe ->
           let cmd = Cmd.(path show_uri %% path exe_file %% args argl) in
           B0_unit.Action.exec_file build u show_uri_exe cmd
+
+let unit_meta ~meta ~requires ~name ~mod_srcs ~exe_name ~exe_path =
+  meta
+  |> B0_meta.tag tag
+  |> B0_meta.tag B0_ocaml.tag
+  |> B0_meta.tag B0_meta.exe
+  |> B0_meta.add B0_meta.exe_name exe_name
+  |> B0_meta.add B0_ocaml.Meta.requires requires
+  |> B0_meta.add B0_ocaml.Meta.mod_srcs mod_srcs
+  |> B0_meta.add B0_meta.exe_file exe_path
+  |> B0_meta.add B0_ocaml.Meta.supported_code `Byte
+  |> B0_meta.add B0_ocaml.Meta.needs_code `Byte
 
 let exe
     ?doc ?(meta = B0_meta.empty) ?(action = show_uri_action) ?(requires = [])
@@ -138,18 +180,7 @@ let exe
   let name = Option.value ~default:exe_name name in
   let mod_srcs, set_mod_srcs = Fut.create () in
   let exe_path, set_exe_path = Fut.create () in
-  let meta =
-    meta
-    |> B0_meta.tag tag
-    |> B0_meta.tag B0_ocaml.tag
-    |> B0_meta.tag B0_meta.exe
-    |> B0_meta.add B0_meta.exe_name exe_name
-    |> B0_meta.add B0_ocaml.Meta.requires requires
-    |> B0_meta.add B0_ocaml.Meta.mod_srcs mod_srcs
-    |> B0_meta.add B0_meta.exe_file exe_path
-    |> B0_meta.add B0_ocaml.Meta.supported_code `Byte
-    |> B0_meta.add B0_ocaml.Meta.needs_code `Byte
-  in
+  let meta = unit_meta ~meta ~requires ~name ~mod_srcs ~exe_name ~exe_path in
   B0_unit.v ?doc ~action ~meta name (exe_proc set_exe_path set_mod_srcs srcs)
 
 let web
@@ -159,18 +190,22 @@ let web
   let name = Option.value ~default:page name in
   let mod_srcs, set_mod_srcs = Fut.create () in
   let exe_path, set_exe_path = Fut.create () in
-  let meta =
-    meta
-    |> B0_meta.tag tag
-    |> B0_meta.tag B0_ocaml.tag
-    |> B0_meta.tag B0_meta.exe
-    |> B0_meta.add B0_meta.exe_name page
-    |> B0_meta.add B0_ocaml.Meta.requires requires
-    |> B0_meta.add B0_ocaml.Meta.mod_srcs mod_srcs
-    |> B0_meta.add B0_meta.exe_file exe_path
-    |> B0_meta.add B0_ocaml.Meta.needs_code `Byte
-  in
+  let exe_name = page in
+  let meta = unit_meta ~meta ~requires ~name ~mod_srcs ~exe_name ~exe_path in
   B0_unit.v ?doc ~action ~meta name (web_proc set_exe_path set_mod_srcs srcs)
+
+let top
+    ?doc ?(meta = B0_meta.empty) ?(action = show_uri_action) ?(requires = [])
+    ?name page ~srcs
+  =
+  let name = Option.value ~default:page name in
+  let mod_srcs, set_mod_srcs = Fut.create () in
+  let exe_path, set_exe_path = Fut.create () in
+  let exe_name = page in
+  let meta = unit_meta ~meta ~requires ~name ~mod_srcs ~exe_name ~exe_path in
+  B0_unit.v ?doc ~action ~meta name (top_proc set_exe_path set_mod_srcs srcs)
+
+
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

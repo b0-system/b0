@@ -4,6 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open B00_std.Result.Syntax
 open Cmdliner
 
 (* Environment variables *)
@@ -28,19 +29,26 @@ let envs =
 
 (* Paging *)
 
-let find ?search ~don't () =
+let find ?win_exe ?search ~don't () =
   if don't then Ok None else
   match Os.Env.find ~empty_is_none:true Env.term with
   | Some "dumb" | None -> Ok None
   | Some _ ->
       let cmds = [Cmd.arg "less"; Cmd.arg "more"] in
-      let cmds =
+      let* cmds =
         match Os.Env.find' ~empty_is_none:true Cmd.of_string Env.pager with
         | Error _ as e -> e
         | Ok None -> Ok cmds
         | Ok (Some cmd) -> Ok (cmd :: cmds)
       in
-      Result.bind cmds (Os.Cmd.find_first ?search)
+      let rec loop = function
+      | [] -> Ok None
+      | cmd :: cmds ->
+          match Os.Cmd.find ?win_exe ?search cmd with
+          | Ok None -> loop cmds
+          | v -> v
+      in
+      loop cmds
 
 let pager_env () = match Os.Env.find ~empty_is_none:false Env.less with
 | Some _ -> Ok None

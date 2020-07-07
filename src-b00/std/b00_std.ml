@@ -3514,19 +3514,13 @@ module Os = struct
       in
       loop tool dirs
 
-    let ensure_exe_suffix_if_win32 = match Sys.win32 with
-    | false -> fun t -> t
-    | true ->
-        fun t -> match String.ends_with ~suffix:".exe" t with
-        | true -> t
-        | false -> t ^ ".exe"
-
-    let tool_is_path t =
-      try ignore (String.index t Fpath.dir_sep_char); true with
-      | Not_found -> false
-
-    let find_tool ?search tool =
-      let tool = ensure_exe_suffix_if_win32 tool in
+    let tool_is_path t = String.contains t Fpath.dir_sep_char
+    let find_tool ?(win_exe = Sys.win32) ?search tool =
+      let tool =
+        let suffix = ".exe" in
+        if not win_exe || String.ends_with ~suffix tool then tool else
+        (tool ^ suffix)
+      in
       match tool_is_path tool with
       | true -> if File.is_executable tool then Ok (Some tool) else Ok None
       | false ->
@@ -3534,44 +3528,47 @@ module Os = struct
           | None -> Ok (search_in_path tool)
           | Some dirs -> Ok (search_in_dirs ~dirs tool)
 
-    let must_find_tool ?search tool = match find_tool ?search tool with
-    | Ok (Some t) -> Ok t
-    | Error _ as e -> e
-    | Ok None when tool_is_path tool ->
-        Fmt.error "%s: No such executable file" tool
-    | Ok None ->
-        let pp_search ppf = function
-        | None -> Fmt.string ppf "PATH"
-        | Some dirs ->Fmt.(list ~sep:comma Fpath.pp) ppf dirs
-        in
-        Fmt.error "%s: No such tool found in %a" tool pp_search search
+    let pp_search ppf = function
+    | None -> Fmt.string ppf "PATH"
+    | Some dirs ->Fmt.(list ~sep:comma Fpath.pp) ppf dirs
 
-    let rec find_first_tool ?search = function
-    | [] -> Ok None
-    | tool :: tools ->
-        match find_tool ?search tool with
-        | Ok None -> find_first_tool ?search tools
-        | v -> v
+    let get_tool ?win_exe ?search tool =
+      match find_tool ?win_exe ?search tool with
+      | Ok (Some t) -> Ok t
+      | Error _ as e -> e
+      | Ok None when tool_is_path tool ->
+          Fmt.error "%s: No such executable file" tool
+      | Ok None ->
+          Fmt.error "%s: No such tool found in %a" tool pp_search search
 
-    let find ?search cmd = match Cmd.tool cmd with
+    let rec get_first_tool ?win_exe ?search tools =
+      let rec loop = function
+      | [] ->
+          Fmt.error "%a:@[<v> No such tool find in %a@,@[as %a@]@]"
+            Fpath.pp_unquoted (List.hd tools)
+            pp_search search (Fmt.or_enum Fpath.pp_unquoted) tools
+      | tool :: tools ->
+          match find_tool ?win_exe ?search tool with
+          | Ok (Some t) -> Ok t
+          | Ok None -> loop tools
+          | Error _ as e -> e
+      in
+      loop tools
+
+    let find ?win_exe ?search cmd = match Cmd.tool cmd with
     | None -> Ok None
     | Some tool ->
-        Result.bind (find_tool ?search tool) @@ function
-        | Some tool -> Ok (Cmd.set_tool tool cmd)
-        | None -> Ok None
+        match find_tool ?win_exe ?search tool with
+        | Ok None as v  -> v
+        | Ok (Some t) -> Ok (Cmd.set_tool (Fpath.to_string t) cmd)
+        | Error e -> e
 
-    let must_find ?search cmd = match Cmd.tool cmd with
-    | None -> Fmt.error "%a: No tool specified" Cmd.pp_dump cmd
+    let get ?win_exe ?search cmd = match Cmd.tool cmd with
+    | None -> Fmt.error "No tool to lookup: empty command"
     | Some tool ->
-        Result.bind (must_find_tool ?search tool) @@ fun tool ->
-        Ok (match Cmd.set_tool tool cmd with None -> assert false | Some c -> c)
-
-    let rec find_first ?search = function
-    | [] -> Ok None
-    | cmd :: cmds ->
-        match find ?search cmd with
-        | Ok None -> find_first ?search cmds
-        | v -> v
+        match get_tool ?win_exe ?search tool with
+        | Ok t -> Ok (Option.get @@ Cmd.set_tool (Fpath.to_string t) cmd)
+        | Error _ as e -> e
 
     (* Process completion statuses *)
 

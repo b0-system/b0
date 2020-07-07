@@ -29,16 +29,17 @@ val envs : unit -> Term.env_info list
 (** {1:paging Paging} *)
 
 val find :
-  ?search:Fpath.t list -> don't:bool -> unit -> (Cmd.t option, string) result
+  ?win_exe:bool -> ?search:Fpath.t list -> don't:bool -> unit ->
+  (Cmd.t option, string) result
 (** [find ~search ~don't] finds a suitable pager. This is (in order):
     {ol
     {- [Ok None] if [don't] is [true] or if the [TERM] environment variable
        is [dumb] or undefined.}
     {- [Ok (Some pager)] if [pager] is a tool invocation parsed from the
        [PAGER] environment variable that can be found via
-       [Os.Cmd.find ?search].}
+       [Os.Cmd.find_tool ?win_exe ?search].}
     {- [Ok (Some pager)] if either [less] or [more] can be found
-       (in that order) via [Os.Cmd.find ?search].}
+       (in that order) via [Os.Cmd.find_tool ?win_exe ?search].}
     {- [Ok None] otherwise.}} *)
 
 val page_stdout : Cmd.t option -> (unit, string) result

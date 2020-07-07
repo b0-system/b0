@@ -2542,50 +2542,50 @@ module Os : sig
   (** Executing commands. *)
   module Cmd : sig
 
-    (** {1:search Tool search}
-
-      {b Portability.} In order to maximize portability no [.exe]
-      suffix should be added to executable names on Windows, tool
-      search adds the suffix during the tool search procedure. *)
+    (** {1:search Tool search}  *)
 
     val find_tool :
-      ?search:Fpath.t list -> Cmd.tool -> (Fpath.t option, string) result
-    (** [find_tool ~search tool] is the file path, if any, to the program
-        executable for the tool specification [tool].
+      ?win_exe:bool -> ?search:Fpath.t list -> Cmd.tool ->
+      (Fpath.t option, string) result
+    (** [find_tool ~win_exe ~search tool] is the file path, if any, to the
+        program executable for the tool specification [tool]. For
+        portability do not add an [.exe] suffix to [tool] on Windows,
+        see the [win_exe] argument.
         {ul
-        {- If [tool] has a single path segment. The [tool] file is
+        {- If [tool] has a single path segment: the {e filename} [tool] is
            searched, in list order, for the first matching executable
-           file in the directories of [search]. These directories
-           default to those that result from parsing [PATH] with
-           {!Fpath.list_of_search_path}.}
-        {- If [tool] has multiple path segments the corresponding file
-           is simply tested for {{!File.is_executable}existence and
-           executability}.  [Ok (Some tool)] is returned if that is
-           case and [Ok None] otherwise.}} *)
+           file in the directories of [search]. [search] defaults to
+           the env var [PATH] parsed with {!Fpath.list_of_search_path}.}
+        {- If [tool] has multiple path segments: the {e file path}
+           [tool] is simply tested for {{!File.is_executable}existence
+           and executability}. [Ok (Some tool)] is returned if that is
+           case and [Ok None] otherwise.}
+        {- If [win_exe] is [true] a [.exe] suffix is added to
+           [tool] if it doesn't already have one. Defaults to
+          {!Stdlib.Sys.win32}.}} *)
 
-    val must_find_tool :
-      ?search:Fpath.t list -> Cmd.tool -> (Fpath.t, string) result
-    (** [must_find_tool] is like {!find_tool} except it errors if [Ok None]
+    val get_tool :
+      ?win_exe:bool -> ?search:Fpath.t list -> Cmd.tool ->
+      (Fpath.t, string) result
+    (** [get_tool] is like {!find_tool} except it errors if [Ok None]
         is returned. *)
 
-    val find_first_tool :
-      ?search:Fpath.t list -> Cmd.tool list -> (Fpath.t option, string) result
-    (** [find_first_tool] is the first tool that can be found in the list
-        with {!find_tool}. *)
+    val get_first_tool :
+      ?win_exe:bool -> ?search:Fpath.t list -> Cmd.tool list ->
+      (Fpath.t, string) result
+    (** [get_first_tool tools] is the first tool that can be found in the list
+        with {!find_tool} or an error if none is found. [tools] must be
+        non-empty. *)
 
-    val find :
-      ?search:Fpath.t list -> Cmd.t -> (Cmd.t option, string) result
-    (** [find ~search cmd] resolves [cmd]'s tool as {!find_tool} does. *)
+    val find : ?win_exe:bool -> ?search:Fpath.t list -> Cmd.t ->
+      (Cmd.t option, string) result
+    (** [find cmd] is like {!find_tool} but looks and replaces
+        [cmd]'s {!Cmd.tool}. *)
 
-    val must_find :
-      ?search:Fpath.t list -> Cmd.t -> (Cmd.t, string) result
-    (** [must_find ~search cmd] resolves [cmd]'s tool as {!must_find_tool}
-        does. *)
-
-    val find_first :
-      ?search:Fpath.t list -> Cmd.t list -> (Cmd.t option, string) result
-    (** [find_first ~search cmds] resolves [cmds]'s {!Cmd.too}s
-        as {!find_first_tool} does. *)
+    val get : ?win_exe:bool -> ?search:Fpath.t list -> Cmd.t ->
+      (Cmd.t, string) result
+    (** [get cmd] is like {!get_tool} but looks and replaces [cmd]'s
+        {!Cmd.tool}. *)
 
     (** {1:statuses Process completion statuses} *)
 

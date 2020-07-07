@@ -27,20 +27,20 @@ module At : sig
   val v : name -> string -> t
   (** [v n value] is an attribute named [n] with value [value]. *)
 
-  val v_true : name -> t
-  (** [v_true n] is [v n ""], the {{:https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#boolean-attributes}boolean attribute} [n] set to true
+  val true' : name -> t
+  (** [true' n] is [v n ""], the {{:https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#boolean-attributes}boolean attribute} [n] set to true
       (the attribute must be omitted to be false). *)
 
-  val v_int : name -> int -> t
-  (** [v_int n i] is [v n (string_of_int i)]. *)
+  val int : name -> int -> t
+  (** [int n i] is [v n (string_of_int i)]. *)
 
   val add_if : bool -> t -> t list -> t list
   (** [add_if c att atts] is [att :: atts] if [c] is [true] and [atts]
         otherwise. *)
 
-  val add_some : name -> string option -> t list -> t list
-  (** [add_some n o atts] is [(v n value) :: atts] if [o] is [Some value] and
-      [atts] otherwise. *)
+  val add_if_some : name -> string option -> t list -> t list
+  (** [add_if_some n o atts] is [(v n value) :: atts] if [o] is [Some
+      value] and [atts] otherwise. *)
 
   (** {1:predef Predefined attribute constructors}
 
@@ -217,8 +217,9 @@ module El : sig
          (unconditional).}
       {- A stylesheet {!El.link} of type [text/css] for each element
          of [styles], in order (defaults to [[]]).}
-      {- A {e deferred} {!El.script} of type [text/javascript] for
-         each element of [scripts], in order (defaults to [[]]).}
+      {- A {!El.script} with {!At.defer} and of {!At.type'}
+         [text/javascript] for each element of [scripts],
+         in order (defaults to [[]]).}
       {- [more_head] (defaults to {!El.void}).}
       {- The page has a title [title], which must be non-white and
          and non-empty (falls back to ["Untitled"] in any of

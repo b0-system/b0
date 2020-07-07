@@ -7,22 +7,22 @@ module At = struct
   type name = string
   type t = name * string
   let v n v = (n, v)
-  let v_true n = v n ""
-  let v_int n i = v n (string_of_int i)
+  let true' n = v n ""
+  let int n i = v n (string_of_int i)
   let add_if c att atts = if c then att :: atts else atts
-  let add_some n o atts = match o with
+  let add_if_some n o atts = match o with
   | None -> atts | Some value -> (v n value) :: atts
 
   type 'a cons = 'a -> t
-  let autofocus = v_true "autofocus"
+  let autofocus = true' "autofocus"
   let charset = v "charset"
-  let checked = v_true "checked"
+  let checked = true' "checked"
   let class' = v "class"
   let content = v "content"
-  let defer = v_true "defer"
-  let disabled = v_true "disabled"
+  let defer = true' "defer"
+  let disabled = true' "disabled"
   let for' = v "for"
-  let height = v_int "height"
+  let height = int "height"
   let href = v "href"
   let id = v "id"
   let lang = v "lang"
@@ -31,11 +31,11 @@ module At = struct
   let placeholder = v "placeholder"
   let rel = v "rel"
   let src = v "src"
-  let tabindex = v_int "tabindex"
+  let tabindex = int "tabindex"
   let title = v "title"
   let type' = v "type"
   let value = v "value"
-  let width = v_int "width"
+  let width = int "width"
 end
 
 module El = struct

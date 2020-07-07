@@ -746,7 +746,16 @@ module Lib = struct
             Name.of_string s
           in
           if requires = "" then [] else
-          List.map to_libname (String.split_on_char ' ' requires)
+          (* ocamlfind does not normalize *)
+          let skip_ws = String.lose_left Char.Ascii.is_white in
+          let get_tok = String.span_left (Fun.negate Char.Ascii.is_white) in
+          let rec rev_toks acc s =
+            let s = (skip_ws s) in
+            match get_tok s with
+            | "", rest -> if rest = "" then acc else rest :: acc (* will err *)
+            | tok, rest -> rev_toks (tok :: acc) rest
+          in
+          List.rev_map to_libname (rev_toks [] requires)
         in
         let parse_archive a =
           if a = "" then None else

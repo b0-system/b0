@@ -199,7 +199,7 @@ module Httpr = struct
     let default = Cmd.arg "curl" in
     Arg.(value & opt cmd default & info ["curl"] ~doc ?docs ?env ~docv:"CMD")
 
-  let find_curl ?search ~curl () = Os.Cmd.must_find ?search curl
+  let find_curl ?search ~curl () = Os.Cmd.get ?search curl
 end
 
 (*---------------------------------------------------------------------------

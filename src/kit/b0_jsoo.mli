@@ -47,6 +47,12 @@ val web :
     it is used otherwhise a minimal HTML file is generated in which [n.js]
     is linked as a script and any css file in [srcs] as a stylesheet.*)
 
+val top :
+  ?doc:string -> ?meta:B0_meta.t -> ?action:B0_unit.action ->
+  ?requires:Lib.Name.t list -> ?name:string -> string -> srcs:B0_srcs.t ->
+  B0_unit.t
+(** [top] is like {!web} but creates the support files for a toplevel (it
+    remains your duty to provide one). *)
 
 (** Metadata keys *)
 

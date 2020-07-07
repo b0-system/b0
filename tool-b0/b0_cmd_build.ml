@@ -230,12 +230,12 @@ let cmd =
     `P "The $(tname) command runs your builds.";
     `P "To build a unit use the $(b,-u) option. To build all the units of \
         a pack use the $(b,-p) option. If no unit or pack is specified on \
-        the command line all units implied unless a pack named $(b,default) \
-        exists in which case $(b,-p default) is implied.";
+        the command line all units build unless a pack named $(b,default) \
+        exists in the root scope in which case $(b,-p default) is implied.";
     `P "Build procedures may dynamically require the build of units \
         unspecified on the command line. To prevent a unit from building \
-        use the $(b,-x) and $(b,-X) options; they take over $(b,-u) and \
-        $(b,-p)inclusion options.";
+        use the $(b,-x) and $(b,-X) options. These options take over \
+        unit inclusions specified with $(b,-u) and $(b,-p) options.";
     `P "If you want to make sure only the exact units you specified are \
         in the build, use the $(b,--lock) option to lock the build. \
         If you request a pack that has the $(b,B0_meta.locked) tag, \

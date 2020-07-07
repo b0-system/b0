@@ -25,16 +25,17 @@ val envs : unit -> Term.env_info list
 (** {1:edit Editing} *)
 
 val find :
-  ?search:Fpath.t list -> unit -> (Cmd.t option, string) result
-(** [find ?search ()] finds a suitable editor. This is (in order):
+  ?win_exe:bool -> ?search:Fpath.t list -> unit -> (Cmd.t option, string) result
+(** [find ?win_exe ?search ()] finds a suitable editor. This is (in order):
     {ol
     {- [Ok (Some pager)] if [pager] is a tool invocation parsed from the
        [VISUAL] environment variable that can be found via
        [Os.Cmd.find ?search].}
     {- [Ok (Some pager)] if [pager] is a tool invocation parsed from the
        [EDITOR] environment variable that can be found via
-       [Os.Cmd.find ?search].}
-    {- [Ok (Some pager)] if [nano] can be found via [Os.Cmd.find ?search].}
+       [Os.Cmd.find ?win_exe ?search].}
+    {- [Ok (Some pager)] if [nano] can be found via [Os.Cmd.find ?win_exe
+    ?search].}
     {- [Ok None] otherwise.}} *)
 
 val edit_files :

@@ -4,6 +4,8 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open B00_std.Result.Syntax
+
 open Cmdliner
 
 (* Environment variables *)
@@ -28,7 +30,7 @@ let envs =
 
 (* Editing *)
 
-let find ?search () =
+let find ?win_exe ?search () =
   let parse_env cmds env = match cmds with
   | Error _ as e -> e
   | Ok cmds as r ->
@@ -39,8 +41,15 @@ let find ?search () =
   in
   let cmds = Ok [Cmd.arg "nano"] in
   let cmds = parse_env cmds Env.editor in
-  let cmds = parse_env cmds Env.visual in
-  Result.bind cmds (Os.Cmd.find_first ?search)
+  let* cmds = parse_env cmds Env.visual in
+  let rec loop = function
+  | [] -> Ok None
+  | cmd :: cmds ->
+      match Os.Cmd.find ?win_exe ?search cmd with
+      | Ok None -> loop cmds
+      | v -> v
+  in
+  loop cmds
 
 let edit_files editor fs = match editor with
 | None -> Error "No runnable editor found in VISUAL or EDITOR"
