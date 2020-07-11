@@ -90,6 +90,10 @@ module Key : sig
   val get_or_suggest : string -> (t, t list) result
   (** [get_or_suggest n] is the key named [n] or or a (possibly empty)
       list of suggested values whose name could match [n]. *)
+
+  val get_or_hint : string -> (t, string) result
+  (** [get_or_hint n] is the key named [n] or an error message that
+      indicates that [n] could not be found with suggested names. *)
 end
 
 (** {1:meta Metadata} *)

@@ -19,8 +19,7 @@ module Def = struct
     | `Long -> Def.pp, Fmt.(cut ++ cut)
     in
     Log.if_error ~use:B00_cli.Exit.no_such_name @@
-    let* ds = match ds with [] -> Ok (Def.list ()) | ds -> Def.get_list ds in
-    let ds = List.sort Def.compare ds in
+    let* ds = Def.get_list_or_hint ~empty_means_all:true ds in
     Log.if_error' ~use:B00_cli.Exit.some_error @@
     let don't = B0_driver.Conf.no_pager c in
     let* pager = B00_pager.find ~don't () in
@@ -38,7 +37,7 @@ module Def = struct
     in
     let edit_all = ds = [] in
     Log.if_error ~use:B00_cli.Exit.no_such_name @@
-    let* ds = match ds with [] -> Ok (Def.list ()) | ds -> Def.get_list ds in
+    let* ds = Def.get_list_or_hint ~empty_means_all:true ds in
     let not_found, files = find_files Def.Set.empty [] ds in
     Log.if_error' ~use:B00_cli.Exit.some_error @@
     match not edit_all && not (Def.Set.is_empty not_found) with
@@ -55,15 +54,8 @@ module Def = struct
 
   let get_meta_key (module Def : B0_def.S) c format key ds =
     Log.if_error ~use:B00_cli.Exit.no_such_name @@
-    let* B0_meta.Key.V key = match B0_meta.Key.get_or_suggest key with
-    | Ok _ as v -> v
-    | Error suggs ->
-        let kind = Fmt.any "metadata key" and hint = Fmt.did_you_mean in
-        let pp = Fmt.unknown' ~kind B0_meta.Key.pp_name_str ~hint in
-        let name (B0_meta.Key.V k) = B0_meta.Key.name k in
-        Fmt.error "@[%a@]" pp (key, List.map name suggs)
-    in
-    let* ds = match ds with [] -> Ok (Def.list ()) | ds -> Def.get_list ds in
+    let* B0_meta.Key.V key = B0_meta.Key.get_or_hint key in
+    let* ds = Def.get_list_or_hint ~empty_means_all:true ds in
     let add_meta acc d = match B0_meta.find_binding key (Def.meta d) with
     | None -> acc | Some v -> (d, v) :: acc
     in

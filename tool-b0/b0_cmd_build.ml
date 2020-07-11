@@ -28,8 +28,8 @@ let units_of ~units ~packs =
   B0_unit.Set.of_list (List.rev_append units pack_units)
 
 let get_excluded_units ~x_units ~x_packs =
-  let* units = B0_unit.get_list x_units in
-  let* packs = B0_pack.get_list x_packs in
+  let* units = B0_unit.get_list_or_hint x_units in
+  let* packs = B0_pack.get_list_or_hint x_packs in
   Ok (units_of ~units ~packs)
 
 let get_must_units_and_locked_packs ~units ~packs =
@@ -40,8 +40,8 @@ let get_must_units_and_locked_packs ~units ~packs =
       | Some t -> Ok ([], [t])
       end
   | _ ->
-      let* units = B0_unit.get_list units in
-      let* packs = B0_pack.get_list packs in
+      let* units = B0_unit.get_list_or_hint units in
+      let* packs = B0_pack.get_list_or_hint packs in
       Ok (units, packs)
   in
   let locked_packs = List.filter B0_pack.locked packs in
@@ -63,29 +63,24 @@ let get_may_must ~locked ~units ~x_units =
 
 let find_outcome_action ~must_build (* not empty *) action args =
   let warn_args () = Log.warn @@ fun m ->
-    m "Outcome action disabled: ignoring arguments (use %a to enable)."
+    m "No outcome action specified: ignoring arguments (see option %a)."
       Fmt.(code string) "-a"
-  in
-  let warn_disable () = Log.warn @@ fun m ->
-    m "Outcome action ignored: multiple units with actions requested."
   in
   let warn_noact u = Log.warn @@ fun m ->
     m  "No outcome action for %a: ignoring arguments." B0_unit.pp_name u
   in
-  let disable =
-    let has_action u = Option.is_some (B0_unit.action u) in
-    let count_actions u c = if has_action u then c + 1 else c in
-    B0_unit.Set.cardinal must_build > 1 &&
-    B0_unit.Set.fold count_actions must_build 0 > 1
+  let warn_disable u = Log.warn @@ fun m ->
+    m "Outcome action ignored: unit %a must not build, see %a."
+      B0_unit.pp_name u Fmt.(code string) "--what"
   in
   match action with
-  | false -> (if args <> [] then warn_args ()); None
-  | true when disable -> warn_disable (); None
-  | true ->
-      let u = B0_unit.Set.choose_opt must_build |> Option.get in
+  | None -> (if args <> [] then warn_args ()); Ok None
+  | Some a ->
+      let* u = B0_unit.get_or_hint a in
       match B0_unit.action u with
-      | None -> warn_noact u; None
-      | Some act -> Some (act, u)
+      | None -> warn_noact u; Ok None
+      | Some act when B0_unit.Set.mem u must_build -> Ok (Some (act, u))
+      | Some _ -> warn_disable u; Ok None
 
 let build_run lock ~units ~packs ~x_units ~x_packs action args c =
   Log.if_error ~use:B00_cli.Exit.no_such_name @@
@@ -105,7 +100,7 @@ let build_run lock ~units ~packs ~x_units ~x_packs action args c =
       let build =
         B0_build.create ~root_dir ~b0_dir ~variant  m ~may_build ~must_build
       in
-      let  action = find_outcome_action ~must_build action args in
+      let* action = find_outcome_action ~must_build action args in
       match B0_build.run build with
       | Error () -> Ok B0_driver.Exit.build_error
       | Ok () ->
@@ -205,13 +200,12 @@ let lock =
   Arg.(value & vflag None [lock; unlock])
 
 let action =
-  let doc = "Perform the unit outcome action (only if one unit is specified)."
-  in
-  Arg.(value & flag & info ["a"; "action"] ~doc)
+  let doc = "Perform outcome unit action of unit $(docv)." in
+  Arg.(value & opt (some string) None & info ["a"; "action"] ~doc ~docv:"UNIT")
 
 let args =
-  let doc = "Arguments given as is to the outcome action. Start with $(b,--) \
-             otherwise options get interpreted by $(mname)."
+  let doc = "Arguments given as is to the outcome action. \
+             Start with $(b,--) otherwise options get interpreted by $(mname)."
   in
   Arg.(value & pos_all string [] & info [] ~doc ~docv:"ARG")
 

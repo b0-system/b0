@@ -168,7 +168,6 @@ module type S = sig
   val compare : t -> t -> int
   (** [compare v0 v1] sorts [v0] and [v0] in lexicographical order. *)
 
-
   (** {1:metadata Metadata} *)
 
   val meta : t -> B0_meta.t
@@ -190,7 +189,7 @@ module type S = sig
   (** [add v] adds the value [v] to the list of defined values. *)
 
   val list : unit -> t list
-  (** [list ()] is the list of units. FIXME scope that. *)
+  (** [list ()] is the list of units. *)
 
   val find : string -> t option
   (** [find n] is the value named [n] (if any). *)
@@ -203,9 +202,16 @@ module type S = sig
   (** [get_or_suggest n] is the value named [n] or a (possibly empty)
       list of suggested values whose name could match [n]. *)
 
-  val get_list : string list -> (t list, string) result
-  (** [get_list ns] are the value named [ns] or an error that indicates
-      the names that could not be found with suggested names. *)
+  val get_or_hint : string -> (t, string) result
+  (** [get_or_hint n] is the value named [n] or an error message that
+      indicates that [n] could not be found with suggested names. *)
+
+  val get_list_or_hint :
+    ?empty_means_all:bool -> string list -> (t list, string) result
+  (** [get_list_or_hint ns] are the value named [ns] or an error that
+      indicates the names that could not be found with suggested names.
+      If [empty_means_all] is [true] (defaults to [false]) an empty [ns]
+      returns [list ()] sorted by name. *)
 
   (** {1:fmt Formatters} *)
 

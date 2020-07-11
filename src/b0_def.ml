@@ -161,7 +161,9 @@ module type S = sig
   val find : string -> t option
   val get : string -> t
   val get_or_suggest : string -> (t, t list) result
-  val get_list : string list -> (t list, string) result
+  val get_or_hint : string -> (t, string) result
+  val get_list_or_hint :
+    ?empty_means_all:bool -> string list -> (t list, string) result
   val pp_name_str : string Fmt.t
   val pp_name : t Fmt.t
   val pp_doc : t Fmt.t
@@ -245,6 +247,14 @@ module Make (V : VALUE) = struct
       in
       Error (List.rev (String.Map.fold add_sugg !defs []))
 
+  let get_or_hint n = match get_or_suggest n with
+  | Ok _ as v -> v
+  | Error suggs ->
+      let kind ppf () = Fmt.pf ppf "%s" def_kind in
+      let hint = Fmt.did_you_mean in
+      let pp = Fmt.unknown' ~kind V.pp_name_str ~hint in
+      Fmt.error "@[%a@]" pp (n, List.map name suggs)
+
   let list () = match Scope.is_root () with
   | true ->
       let add _ v vs = v :: vs in
@@ -254,21 +264,17 @@ module Make (V : VALUE) = struct
       let add k v vs = if String.starts_with pre k then v :: vs else vs in
       String.Map.fold add !defs []
 
-  let get_list ns =
+  let get_list_or_hint ?(empty_means_all = false) ns =
+    if empty_means_all && ns = [] then Ok (List.sort compare (list ())) else
     let rec loop vs es = function
     | [] ->
         if es <> []
         then Error (String.concat "\n" (List.rev es))
         else Ok (List.rev vs)
     | n :: ns ->
-        match get_or_suggest n with
+        match get_or_hint n with
         | Ok v -> loop (v :: vs) es ns
-        | Error suggs ->
-            let kind ppf () = Fmt.pf ppf "%s" def_kind in
-            let hint = Fmt.did_you_mean in
-              let pp = Fmt.unknown' ~kind V.pp_name_str ~hint in
-            let e = Fmt.str "@[%a@]" pp (n, List.map name suggs) in
-            loop vs (e :: es) ns
+        | Error e -> loop vs (e :: es) ns
     in
     loop [] [] ns
 

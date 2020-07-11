@@ -16,8 +16,7 @@ let get_unit args k = match args with
 | [] -> Log.err (fun m -> m "No unit name specified"); B00_cli.Exit.some_error
 | u :: args ->
     Log.if_error ~use:B00_cli.Exit.no_such_name @@
-    let* u = B0_unit.get_list [u] in
-    let u = List.hd u in
+    let* u = B0_unit.get_or_hint u in
     Ok (k u args)
 
 let build_unit c u k =
@@ -50,18 +49,13 @@ let action c args =
 
 let build_dir c args =
   Log.if_error ~use:B00_cli.Exit.no_such_name @@
-  let* us = B0_unit.get_list args in
-  match us with
-  | [] -> Ok B00_cli.Exit.ok
-  | us ->
-      let b0_dir = B0_driver.Conf.b0_dir c in
-      let build_dir = B0_dir.build_dir ~b0_dir ~variant:"user" in
-      let unit_dir u =
-        B0_dir.unit_build_dir ~build_dir ~name:(B0_unit.name u)
-      in
-      let dirs = List.map unit_dir us in
-      Log.app (fun m -> m "@[<v>%a@]" (Fmt.list Fpath.pp_unquoted) dirs);
-      Ok B00_cli.Exit.ok
+  let* us = B0_unit.get_list_or_hint ~empty_means_all:true args in
+  let b0_dir = B0_driver.Conf.b0_dir c in
+  let build_dir = B0_dir.build_dir ~b0_dir ~variant:"user" in
+  let unit_dir u = B0_dir.unit_build_dir ~build_dir ~name:(B0_unit.name u) in
+  let dirs = List.map unit_dir us in
+  Log.app (fun m -> m "@[<v>%a@]" (Fmt.list Fpath.pp_unquoted) dirs);
+  Ok B00_cli.Exit.ok
 
 let unit act format args c = match act with
 | `Action -> action c args

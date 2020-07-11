@@ -162,10 +162,7 @@ end
 
 let file ps =
   Log.if_error ~use:B00_cli.Exit.no_such_name @@
-  let* ps = match ps with
-  | [] -> Ok (List.sort B0_pack.compare (B0_pack.list ()))
-  | ps -> B0_pack.get_list ps
-  in
+  let* ps = B0_pack.get_list_or_hint ~empty_means_all:true ps in
   match List.filter (B0_pack.has_meta tag) ps with
   | [] -> Ok B00_cli.Exit.ok
   | ps ->

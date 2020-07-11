@@ -8,7 +8,7 @@ open B00_std.Result.Syntax
 
 let cmd cmdlet args c =
   Log.if_error ~use:B00_cli.Exit.no_such_name @@
-  let* clet = Result.map List.hd (B0_cmdlet.get_list [cmdlet]) in
+  let* clet = B0_cmdlet.get_or_hint cmdlet in
   let `Cmd cmd = B0_cmdlet.cmd clet in
   Ok (cmd clet ~argv:(cmdlet :: args))
 

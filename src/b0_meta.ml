@@ -69,6 +69,14 @@ module Key = struct
         if String.edit_distance k n <= 2 then v :: acc else acc
       in
       Error (List.rev (String.Map.fold add_sugg !by_name []))
+
+  let get_or_hint n = match get_or_suggest n with
+  | Ok _ as v -> v
+  | Error suggs ->
+      let kind = Fmt.any "metadata key" and hint = Fmt.did_you_mean in
+      let pp = Fmt.unknown' ~kind pp_name_str ~hint in
+      let name (V k) = name k in
+      Fmt.error "@[%a@]" pp (n, List.map name suggs)
 end
 
 type 'a key = 'a Key.typed
