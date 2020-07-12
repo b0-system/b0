@@ -600,7 +600,7 @@ module String = struct
   (* Predicates *)
 
   let is_empty s = equal empty s
-  let starts_with ~prefix s =
+  let starts_with ~sub:prefix s =
     let len_a = String.length prefix in
     let len_s = String.length s in
     if len_a > len_s then false else
@@ -611,7 +611,7 @@ module String = struct
     in
     loop 0
 
-  let ends_with ~suffix s =
+  let ends_with ~sub:suffix s =
     let len_a = String.length suffix in
     let len_s = String.length s in
     if len_a > len_s then false else
@@ -629,7 +629,7 @@ module String = struct
     in
     loop 0 0
 
-  let has_substring ~sub s =
+  let includes ~sub s =
     let max_idx_sub = String.length sub - 1 in
     let max_idx_s = String.length s - 1 in
     if max_idx_sub > max_idx_s then false else
@@ -656,6 +656,26 @@ module String = struct
       if sat (unsafe_get s i) then true else loop (i + 1)
     in
     loop 0
+
+  (* Finding substrings. *)
+
+  let find_sub ?(start = 0) ~sub s =
+    (* naive algorithm, worst case O(length sub * length s) *)
+    let len_sub = length sub in
+    let len_s = length s in
+    let max_idx_sub = len_sub - 1 in
+    let max_idx_s = if len_sub <> 0 then len_s - len_sub else len_s - 1 in
+    let rec loop i k =
+      if i > max_idx_s then None else
+      if k > max_idx_sub then Some i else
+      if k > 0 then
+        if unsafe_get sub k = unsafe_get s (i + k)
+        then loop i (k + 1) else loop (i + 1) 0
+      else
+      if unsafe_get sub 0 = unsafe_get s i
+      then loop i 1 else loop (i + 1) 0
+    in
+    loop start 0
 
   (* Extracting substrings *)
 
@@ -1776,7 +1796,7 @@ module Fpath = struct
   let relative ~to_dir p =
     (* XXX dirty, need a normalization function and/or a better parent
        to handle that  *)
-    if String.has_substring ".." p
+    if String.includes ".." p
     then Fmt.invalid_arg "%s: not dotdot allowed" p;
     let to_dir = to_dir_path to_dir in
     match rem_prefix to_dir p with
@@ -3518,7 +3538,7 @@ module Os = struct
     let find_tool ?(win_exe = Sys.win32) ?search tool =
       let tool =
         let suffix = ".exe" in
-        if not win_exe || String.ends_with ~suffix tool then tool else
+        if not win_exe || String.ends_with ~sub:suffix tool then tool else
         (tool ^ suffix)
       in
       match tool_is_path tool with

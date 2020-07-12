@@ -5,20 +5,58 @@
 
 (** [js_of_ocaml] B0 file support *)
 
-(** {1:units Build units} *)
-
 open B00_std
 open B00
 open B00_ocaml
 
-(** {1:unit Units} *)
+(** {1:metadata Metadata} *)
+
+type comp_mode = [ `Separate | `Whole ]
+(** The type for [js_of_ocaml] compilation either whole program
+    compilation mode for runtime efficiency and minimality or
+    [`Separate] for build time efficiency. *)
+
+val comp : Cmd.t B0_meta.key
+(** [comp] are options added to the [js_of_ocaml] [compile] subcommand. *)
+
+val comp_mode : comp_mode B0_meta.key
+(** [mode] is the [js_of_ocaml] compilation mode.
+
+    {b FIXME} this should likely be a store key. *)
+
+val source_map : B00_jsoo.source_map B0_meta.key
+(** [source_map] is the source map option. *)
+
+val tag : unit B0_meta.key
+(** [tag] indicates the entity is related to [js_of_ocaml]. *)
+
+val toplevel : bool B0_meta.key
+(** [toplevel] should be [true] to embed toplevel support in
+    the js executable. *)
+
+val link : Cmd.t B0_meta.key
+(** [link] are options added to the [js_of_ocaml] [link] subcommand. *)
+
+val assets_root : Fpath.t B0_meta.key
+(** [assets_root] indicates the path w.r.t. to which assets are
+    are {!Fpath.reroot}ed. Assets that are not prefoxied by [assets_root]
+    are simply copied at the toplevel of the build dir. *)
+
+val meta :
+  ?meta:B0_meta.t -> ?assets_root:Fpath.t -> ?comp:Cmd.t ->
+  ?comp_mode:comp_mode -> ?link:Cmd.t -> ?requires:Lib.Name.t list ->
+  ?source_map:B00_jsoo.source_map -> ?toplevel:bool -> unit -> B0_meta.t
+(** [meta] creates a base metadata dictionary for compiling with
+    [js_of_ocaml]. See the corresponding keys above. FIXME defaults. *)
+
+
+(** {1:units Build units} *)
 
 val exe :
   ?doc:string -> ?meta:B0_meta.t -> ?action:B0_unit.action ->
-  ?requires:Lib.Name.t list -> ?name:string -> string -> srcs:B0_srcs.t ->
-  B0_unit.t
+  ?name:string -> string -> srcs:B0_srcs.sels -> B0_unit.t
 (** [exe n] is a JavaScript "executable" file named [n] (without
-    the [.js] extension.
+    the [.js] extension).
     {ul
     {- [doc] is the unit doc string.}
     {- [meta] is the initial metadata.}
@@ -30,8 +68,7 @@ val exe :
 
 val web :
   ?doc:string -> ?meta:B0_meta.t -> ?action:B0_unit.action ->
-  ?requires:Lib.Name.t list -> ?name:string -> string -> srcs:B0_srcs.t ->
-  B0_unit.t
+  ?name:string -> string -> srcs:B0_srcs.sels -> B0_unit.t
 (** [web n] is an HTML page named [n] (without the [.html] extension).
     {ul
     {- [doc] is the unit doc string.}
@@ -41,26 +78,21 @@ val web :
     {- [srcs] are the executable sources. All files with extension [.ml],
        [.mli] and [.js] are considered for compiling and linking the
        executable. The files {!B00_fexts.www} in [srcs] minus [.js] files are
-       copied over the build directory.}}
+       copied over the build directory. If these files are can be rerooted
+       to the build dir according to [assets_dir] they are copied as such
+       otherwise they are copied
+       [assets_dir]
+       {b FIXME.} A competing idea was to have a notion of root induced
+        by {!B0_srcs} selection. See the commented stuff there. This
+        is likely something that will play better with generated assets.
+        It's also sligthly borderline with deployements.}}
 
-    {b TODO document.} The js file is [n.js], if there's an [n.html] source
-    it is used otherwhise a minimal HTML file is generated in which [n.js]
+    {b TODO document.} The js file is [n.js], if there's no [.html] source
+    in the srcs a minimal HTML file is generated in which [n.js]
     is linked as a script and any css file in [srcs] as a stylesheet.*)
 
-val top :
-  ?doc:string -> ?meta:B0_meta.t -> ?action:B0_unit.action ->
-  ?requires:Lib.Name.t list -> ?name:string -> string -> srcs:B0_srcs.t ->
-  B0_unit.t
-(** [top] is like {!web} but creates the support files for a toplevel (it
-    remains your duty to provide one). *)
+(** {1:frag Build fragments} *)
 
-(** Metadata keys *)
-
-val tag : unit B0_meta.key
-(** [tag] indicates the entity is relatd to [js_of_ocaml]. *)
-
-module Meta : sig
-end
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

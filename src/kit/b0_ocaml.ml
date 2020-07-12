@@ -192,18 +192,6 @@ let compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs =
   let os = loop [] String.Map.empty hs cs in
   Fut.return os
 
-let compile_intfs ~and_cmti m ~comp ~opts ~requires ~mod_srcs =
-  let compile _ src =
-    Compile.mod_src_intf ~and_cmti m ~comp ~mod_srcs ~requires ~opts src
-  in
-  String.Map.iter compile mod_srcs
-
-let compile_impls ~and_cmt m ~code ~opts ~requires ~mod_srcs =
-  let compile _ src =
-    Compile.mod_src_impl ~and_cmt m ~code ~opts ~mod_srcs ~requires src
-  in
-  String.Map.iter compile mod_srcs
-
 let unit_code b m meta =
   let* built_code = B0_build.get b built_code in
   let _supported_code = B0_meta.find Meta.supported_code meta in
@@ -215,7 +203,7 @@ let exe_proc set_exe_path set_mod_srcs srcs b =
   let m = B0_build.memo b in
   let build_dir = B0_build.current_build_dir b in
   let src_root = B0_build.current_root_dir b in
-  let* srcs = B0_srcs.select b srcs in
+  let* srcs = B0_srcs.(Fut.map by_ext @@ select b srcs) in
   let* mod_srcs = Mod.Src.map_of_files m ~build_dir ~src_root ~srcs in
   let meta = B0_build.current_meta b in
   let requires = B0_meta.get Meta.requires meta in  set_mod_srcs mod_srcs;
@@ -233,10 +221,10 @@ let exe_proc set_exe_path set_mod_srcs srcs b =
   let comp = match unit_code with
   | `Native | `All -> Tool.ocamlopt | `Byte -> Tool.ocamlc
   in
-  compile_intfs ~and_cmti:true m ~comp ~opts ~requires:comp_requires ~mod_srcs;
-  compile_impls ~and_cmt:true m ~code ~opts ~requires:comp_requires ~mod_srcs;
+  Compile.intfs ~and_cmti:true m ~comp ~opts ~requires:comp_requires ~mod_srcs;
+  Compile.impls ~and_cmt:true m ~code ~opts ~requires:comp_requires ~mod_srcs;
   if all_code then begin
-    compile_impls
+    Compile.impls
       ~and_cmt:false m ~code:`Byte ~opts ~requires:comp_requires ~mod_srcs;
   end;
   let* c_objs = compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs in
@@ -259,7 +247,7 @@ let lib_proc set_mod_srcs srcs b =
   let m = B0_build.memo b in
   let build_dir = B0_build.current_build_dir b in
   let src_root = B0_build.current_root_dir b in
-  let* srcs = B0_srcs.select b srcs in
+  let* srcs = B0_srcs.(Fut.map by_ext @@ select b srcs) in
   let* mod_srcs = Mod.Src.map_of_files m ~build_dir ~src_root ~srcs in
   set_mod_srcs mod_srcs;
   let meta = B0_build.current_meta b in
@@ -276,10 +264,10 @@ let lib_proc set_mod_srcs srcs b =
   let comp = match built_code with
   | `Native | `All -> Tool.ocamlopt | `Byte -> Tool.ocamlc
   in
-  compile_intfs ~and_cmti:true m ~comp ~opts ~requires ~mod_srcs;
-  compile_impls ~and_cmt:true m ~code ~opts ~requires ~mod_srcs;
+  Compile.intfs ~and_cmti:true m ~comp ~opts ~requires ~mod_srcs;
+  Compile.impls ~and_cmt:true m ~code ~opts ~requires ~mod_srcs;
   if all_code
-  then (compile_impls ~and_cmt:true m ~code:`Byte ~opts ~requires ~mod_srcs);
+  then (Compile.impls ~and_cmt:true m ~code:`Byte ~opts ~requires ~mod_srcs);
   let* c_objs = compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs in
   let mod_srcs = Mod.Src.sort (* for link *) ~deps:Mod.Src.ml_deps mod_srcs in
   let cobjs = List.filter_map (Mod.Src.impl_file ~code) mod_srcs  in

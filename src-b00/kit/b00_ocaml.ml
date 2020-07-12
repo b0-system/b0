@@ -600,7 +600,8 @@ module Lib = struct
           end
       | false ->
           begin match Bytes.get b i with
-          | 'a' .. 'z' | '0' .. '9' | '_' | '-' -> loop (i + 1) ~id_start:false
+          | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '-' ->
+              loop (i + 1) ~id_start:false
           | '.' -> Bytes.set b i Fpath.dir_sep_char; loop (i + 1) ~id_start:true
           | c -> err s (Fmt.str "illegal character %C" c)
           end
@@ -1028,6 +1029,18 @@ module Compile = struct
         in
         let reads = List.rev_append ext_objs src_deps_objs in
         ml_to_impl ~and_cmt m ~code ~opts ~reads ~has_cmi ~ml ~o
+
+  let intfs ~and_cmti m ~comp ~opts ~requires ~mod_srcs =
+    let compile _ src =
+      mod_src_intf ~and_cmti m ~comp ~mod_srcs ~requires ~opts src
+    in
+    String.Map.iter compile mod_srcs
+
+  let impls ~and_cmt m ~code ~opts ~requires ~mod_srcs =
+    let compile _ src =
+      mod_src_impl ~and_cmt m ~code ~opts ~mod_srcs ~requires src
+    in
+    String.Map.iter compile mod_srcs
 end
 
 module Archive = struct

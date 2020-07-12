@@ -495,14 +495,24 @@ module Store = struct
   let get : type a. t -> a key -> a Fut.t =
   fun s k -> match Store.Kmap.find_opt k.Key.untyped s.map with
   | None ->
-      let memo = Memo.with_mark s.memo k.Key.mark in
-      let fut = k.Key.det s memo in
+      (* We don't use the key determination future directly because
+         its determination may indirectly trigger new gets of the same
+         key because the memo will be stired and possibly a [get] of
+         this key will occur before we get to indicate in the map that
+         the key is being determined. Using our own future here makes
+         sure all further [get]s end up in the other branch. *)
+      let fut, set = Fut.create () in
       s.map <- Store.Kmap.add k.Key.untyped (Store.B (k, fut)) s.map;
+      let memo =
+        (* XXX maybe it would be interesting to have a stack of marks
+           for build understanding "key via m ; m; m;" *)
+        Memo.with_mark s.memo k.Key.mark
+      in
+      Fut.await (k.Key.det s memo) set;
       fut
-  | (Some Store.B (l', fut)) ->
+  | Some (Store.B (l', fut)) ->
       match Tid.equal k.Key.tid l'.Key.tid with
-      | None -> assert false
-      | Some Tid.Eq -> fut
+      | Some Tid.Eq -> fut | None -> assert false
 
   let set s k v = match Store.Kmap.mem k.Key.untyped s.Store.map with
   | true -> Fmt.invalid_arg "Key %s already set in store" k.Key.mark

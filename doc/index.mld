@@ -15,7 +15,9 @@ For B0 and B00 users.
 {ul
 {- The {{!page-manual}B0 manual} is a conceptual overview of the
    B0 system and B0 files. It is recommended reading.}
-{- The {{!page-b00_manual}B00 manual} describes the B00 build library.}}
+{- The {{!page-b00_manual}B00 manual} describes the B00 build library.}
+{- The {{!page-b0_unit_manual}B0 build unit manual} describes how to
+   create your own build units.}}
 
 For B0 programmers.
 

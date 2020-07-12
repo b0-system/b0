@@ -58,6 +58,9 @@ val data : t
 val font : t
 (** [font] is [".otf"], [".ttf"], [".woff"] and [".woff2"]. *)
 
+val html : t
+(** [html] is [".html"] *)
+
 val html_lang : t
 (** [html_lang] is [".html"], [".css"] and [".js"] *)
 
@@ -65,8 +68,8 @@ val image : t
 (** [image] is [".eps"], [".gif"], [".ico"], [".jpeg"], [".jpg"],
     [".pdf"], [".png"], [".ps"] and [".tiff"]. *)
 
-val javascript : t
-(** [javascript] is [".js"]. *)
+val js : t
+(** [js] is [".js"]. *)
 
 val latex_lang : t
 (** [latex_lang] is [".tex"; ".sty"; ".bib"; ".bibdoi"]. *)

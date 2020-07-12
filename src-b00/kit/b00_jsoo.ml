@@ -6,6 +6,8 @@
 open B00_std
 open B00
 
+type source_map = [`Inline | `File ] option
+
 let env_vars = [ "BUILD_PATH_PREFIX_MAP" ]
 let tool = Tool.by_name ~vars:env_vars "js_of_ocaml"
 
@@ -31,7 +33,7 @@ let link m ~opts ~source_map ~jss ~o =
   let jsoo = Memo.tool m tool in
   let writes, source_map = handle_source_map ~o source_map in
   Memo.spawn m ~reads:jss ~writes @@
-  jsoo Cmd.(arg "compile" % "-o" %% (unstamp @@ path o) %% opts %% source_map %%
+  jsoo Cmd.(arg "link" % "-o" %% (unstamp @@ path o) %% opts %% source_map %%
             (unstamp @@ paths jss))
 
 let write_page

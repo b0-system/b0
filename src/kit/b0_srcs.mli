@@ -5,6 +5,14 @@
 
 (** Select source files.
 
+    {b FIXME.} This will need a few more design rounds. Here
+    are a few things:
+    {ul
+    {- We likely want combinators represenging {!sel}s and
+    producing {!t} and ways union [t]s (for `Fut users).}
+    {- The [`Fut] case should return a {!t}.}
+    {- Support for watermaking should likely occur here.}}
+
     This module provides a type to select source files for build units
     in B0 files. To support generated source files, selections can
     depend on the build.
@@ -23,7 +31,6 @@ let srcs = [ `Dir "src-exe"; `Dir_rec "src"; `X "src/not.ml"; `X "src/not"]
 
     Relative file paths are expressed relative to the build unit's
     {{!B0_build.Unit.root_dir}root directory}.
-
 
     The prefix relation for exclusions respects path segments
     boundaries. In the example any file whose path matches
@@ -78,28 +85,50 @@ type sel =
        are prefixed by [x], respecting segment boundaries. A potential trailing
        directory separators in [x] is removed.}
     {- [`Fut f] uses the given future during the build to determine
-       a set of files unconditionally added to the selection.}}
+       a set of files unconditionally added to the selection.
+       FIXME this s not the right interface, see {!root_of_file},
+       maybe we should return a {!t} itself and merge the results}}
 
     Except for [`Fut], any relative path is made absolute to the
     current build unit with {!B0_build.Unit.root_dir}. *)
 
-
-type t = sel list
+type sels = sel list
 (** The type for source selection. *)
 
-val select : B0_build.t -> t -> B00_fexts.map Fut.t
-(** [select b sels] selects in [b] the sources specified by [sels] and
-    returns them mapped by their file extension (not
-    {{!B00_std.Fpath.file_exts}multiple file extension}). Each file is
-    guaranteed to appear only once in the map.
+type t
+(** The type for source selection results. *)
 
-    {b Important.} All files in the map that were selected via [`File],
-    [`D] and [`D_rec] are automatically {{!B00.Memo.file_ready}made
-    ready} in the build. For those selected via [`Fut] readyness
-    determination is left to the invoked funtion.
+val select : B0_build.t -> sels -> t Fut.t
+(** [select b sels] selects in [b] the sources specified by [sels].
+
+    {b Important.} All files in the map that were selected via
+    [`File], [`D] and [`D_rec] are automatically
+    {{!B00.Memo.file_ready}made ready} in [b]. For those selected via
+    [`Fut] readyness determination is left to the invoked funtion.
 
     {b FIXME.} Provide ordering guarantes and avoid non-det from the
-    fs. We likely don't want to return only file extension map. *)
+    fs. *)
+
+val by_ext : t -> B00_fexts.map
+(** [by_ext s] are the selected files mapped by their file extension
+    (not {{!B00_std.Fpath.file_exts}multiple file extension}).  Each
+    file is guaranteed to appear only once in the map and is absolute. *)
+
+(*
+val root_for_file : t -> Fpath.t -> Fpath.t
+(** [root_for_file s f] is an absolute root directory for a file
+    [f] selected by [s]. If [f] was selected by:
+    {ul
+    {- [`File p] then this is [Fpath.parent p].}
+    {- [`Dir d] or [`Dir_rec d] this is [d].}
+    {- [`Fut fs] then this is like the parent of file.
+       {b FIXME} We should also be able to specify root dirs here.}}
+
+    In case a file is selected by multiple {!sel} the longer root
+    prefix wins.
+
+    Raises [Invalid_argument] if [f] was not selected by [s]. *)
+*)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

@@ -827,6 +827,16 @@ module Compile : sig
       asuming it dependencies are in [mod_src]. If [and_cmt] is [true]
       the [cmt] file is also produced. If [src] has no [.ml] this is
       a nop. *)
+
+  val intfs :
+    and_cmti:bool -> Memo.t -> comp:B00.Tool.t -> opts:Cmd.t ->
+    requires:Lib.t list -> mod_srcs:Mod.Src.t Mod.Name.Map.t -> unit
+  (** [intfs] iters {!mod_src_intf} over the elements of [mod_srcs]. *)
+
+  val impls :
+    and_cmt:bool -> Memo.t -> code:Conf.code -> opts:Cmd.t ->
+    requires:Lib.t list -> mod_srcs:Mod.Src.t Mod.Name.Map.t -> unit
+   (** [impls] iters {!mod_src_impl} over the elements of [mod_srcs]. *)
 end
 
 (** Archiving.

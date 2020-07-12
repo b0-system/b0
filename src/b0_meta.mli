@@ -120,6 +120,10 @@ val mem : 'a key -> t -> bool
 val add : 'a key -> 'a -> t -> t
 (** [add k v m] is [m] with [k] bound to [v]. *)
 
+val add_if_some : 'a key -> 'a option -> t -> t
+(** [add_if_some k o m] is [m] if [o] is [None] and [m] with [k]
+    bound to [v] if [o] is [Some v]. *)
+
 val tag : unit key -> t -> t
 (** [tag k m] is [add k () m]. *)
 

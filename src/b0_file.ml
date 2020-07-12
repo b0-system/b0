@@ -4,6 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open B00_std.Result.Syntax
 open B00_serialk_text
 
 (* Syntactic metadata *)
@@ -25,17 +26,20 @@ let loc_error m fmt = loc_err_fmt Fmt.error m fmt
 type b0_boot = (string * smeta) list
 type b0_include = (string * smeta) * (Fpath.t * smeta)
 type require = B00_ocaml.Lib.Name.t * smeta
+type mod_use = Fpath.t * smeta
 type t =
   { file : Fpath.t;
     b0_boots : b0_boot list;
     b0_includes : b0_include list;
     requires : require list;
+    mod_uses : mod_use list;
     ocaml_unit : string * smeta; }
 
 let file f = f.file
 let b0_includes f = f.b0_includes
 let b0_boots f = f.b0_boots
 let requires f = f.requires
+let mod_uses f = f.mod_uses
 let ocaml_unit f = f.ocaml_unit
 
 let pp_dump ppf s =
@@ -49,11 +53,13 @@ let pp_dump ppf s =
     Fmt.(vbox @@ list pp_include)
   in
   let pp_reqs = Fmt.(list ~sep:sp (pp_fst B00_ocaml.Lib.Name.pp)) in
+  let pp_mod_uses = Fmt.(list (pp_fst Fpath.pp_unquoted)) in
   Fmt.record
     [ Fmt.field "file" file Fpath.pp_quoted;
       Fmt.field "b0-boots" b0_boots pp_boots;
       Fmt.field "b0-includes" b0_includes pp_includes;
       Fmt.field "requires" requires pp_reqs;
+      Fmt.field "mod_uses" mod_uses pp_mod_uses;
       Fmt.field "ocaml_unit" ocaml_unit (Fmt.box @@ pp_fst Fmt.lines)]
     ppf s
 
@@ -63,15 +69,16 @@ let pp_locs ppf s =
   let pp_list pp_v ppf = function
   | [] -> () | l -> Fmt.list pp_v ppf l; Fmt.cut ppf ()
   in
-  Fmt.pf ppf "@[<v>%a%a%a%a@]"
+  Fmt.pf ppf "@[<v>%a%a%a%a%a@]"
     (pp_list (pp_list pp_loc)) (b0_boots s)
     (pp_list pp_loc_pair) (b0_includes s)
     (pp_list pp_loc) (requires s)
+    (pp_list pp_loc) (mod_uses s)
     pp_loc (ocaml_unit s)
 
 (* Parsing *)
 
-let directives = ["@@@B0.boot"; "@@@B0.include"; "#requires"]
+let directives = ["@@@B0.boot"; "@@@B0.include"; "#requires"; "#mod_use"]
 let pp_directive = Fmt.code Fmt.string
 
 let is_dir_letter c =
@@ -182,15 +189,21 @@ let parse_include_directive d ~sbyte ~sline =
 let parse_require_directive d ~sbyte ~sline =
   string_to B00_ocaml.Lib.Name.of_string (parse_string d)
 
+let parse_mod_use_directive d ~sbyte ~sline =
+  string_to Fpath.of_string (parse_string d)
+
 let parse_preamble d =
-  let rec loop boots incs reqs d = match skip_ws d; dec_byte d with
+  let rec loop boots incs reqs mus d = match skip_ws d; dec_byte d with
   | 0x23 (* # *) ->
       let sbyte = Tdec.pos d and sline = Tdec.line d in
       Tdec.accept_byte d;
       begin match parse_directive_name d ~sbyte ~sline with
       | "require", _ ->
           let r = parse_require_directive d ~sbyte ~sline in
-          loop boots incs (r :: reqs) d
+          loop boots incs (r :: reqs) mus d
+      | "mod_use", _ ->
+          let m = parse_mod_use_directive d ~sbyte ~sline in
+          loop boots incs reqs (m :: mus) d
       | dir, dir_loc ->
           err_unsupported_directive "#" dir_loc dir
       end
@@ -200,26 +213,26 @@ let parse_preamble d =
       begin match parse_directive_name d ~sbyte ~sline with
       | "@@@B0.boot", _ ->
           let b = parse_boot_directive d ~sbyte ~sline in
-          loop (b :: boots) incs reqs d
+          loop (b :: boots) incs reqs mus d
       | "@@@B0.include", _ ->
           let i = parse_include_directive d ~sbyte ~sline in
-          loop boots (i :: incs) reqs d
+          loop boots (i :: incs) reqs mus d
       | dir, dir_loc ->
           (* FIXME warn on @@@B0.* do not error. *)
           err_unsupported_directive "" dir_loc dir
       end
   | _ ->
-      List.rev boots, List.rev incs, List.rev reqs
+      List.rev boots, List.rev incs, List.rev reqs, List.rev mus
   in
-  loop [] [] [] d
+  loop [] [] [] [] d
 
 let of_string ~file src =
   try
     let d = Tdec.create ~file:(Fpath.to_string file) src in
-    let b0_boots, b0_includes, requires = parse_preamble d in
+    let b0_boots, b0_includes, requires, mod_uses = parse_preamble d in
     let rest = String.subrange ~first:(Tdec.pos d) src in
     let ocaml_unit = rest, smeta ~loc:(Tdec.loc_here d) in
-    Ok { file; b0_boots; b0_includes; requires; ocaml_unit }
+    Ok { file; b0_boots; b0_includes; requires; ocaml_unit; mod_uses }
   with Tdec.Err (loc, e) -> loc_error loc "%a" (Fmt.vbox Fmt.lines) e
 
 (* Expansion *)
@@ -239,8 +252,8 @@ let expanded_src e = e.expanded_src
 
 let get_include_src cwd (p, smeta) =
   let src =
-    Result.bind (Os.Path.realpath Fpath.(cwd // p)) @@ fun file ->
-    Result.bind (Os.File.read file) @@ fun src ->
+    let* file = Os.Path.realpath Fpath.(cwd // p) in
+    let* src = Os.File.read file in
     Ok (file, src)
   in
   match src with
@@ -249,12 +262,59 @@ let get_include_src cwd (p, smeta) =
       (* We could do a bit better with e here *)
       loc_err_fmt Fmt.failwith_notrace smeta "%s" e
 
+let get_mod_use_srcs cwd files (p, smeta) =
+  let file_impl = Fpath.(cwd // p) in
+  let file_intf = Fpath.(file_impl -+ ".mli") in
+  let res =
+    (* XXX maybe we should rather add non realpathed paths to files
+        e.g. if people play with symlinks. Sort that out. *)
+    let* file_impl = Os.Path.realpath file_impl in
+    let* src_impl = Os.File.read file_impl in
+    let files = file_impl :: files in
+    let* exists = Os.File.exists file_intf in
+    if not exists then Ok (files, None, (file_impl, src_impl)) else
+    let* file_intf = Os.Path.realpath file_intf in
+    let* src_intf = Os.File.read file_intf in
+    Ok (file_intf :: files, Some (file_intf, src_intf), (file_impl, src_impl))
+  in
+  match res with
+  | Ok (files, intf, impl) -> files, intf, impl
+  | Error e -> loc_err_fmt Fmt.failwith_notrace smeta "%s" e
+
 let nil_loc = "#1 \"-\""
 let lineno meta =
   let l = loc meta in
   Fmt.str "#%d %S" (fst (Tloc.sline l)) (Tloc.file l)
 
 let w acc l = l :: acc [@@ocaml.inline]
+
+let w_src b (file, src) =
+  let b = w b (Fmt.str "#1 %S" (Fpath.to_string file)) in
+  let b = w b src in
+  b
+
+let w_mod_use b cwd files (p, _ as mod_use) =
+  let files, intf, impl = get_mod_use_srcs cwd files mod_use in
+  let mod_name = B00_ocaml.Mod.Name.of_mangled_filename (Fpath.basename p) in
+  let b = match intf with
+  | None -> w b (Fmt.str "module %s = struct" mod_name)
+  | Some intf ->
+    let b = w b (Fmt.str "module %s : sig" mod_name) in
+    let b = w_src b intf in
+    let b = w b "end = struct" in
+    b
+  in
+  let b = w_src b impl in
+  let b = w b "end" in
+  let b = w b nil_loc in
+  b, files
+
+let rec w_mod_uses b cwd files = function
+| [] -> b, files
+| mod_use :: mod_uses ->
+    let b, files = w_mod_use b cwd files mod_use in
+    w_mod_uses b cwd files mod_uses
+
 let w_ocaml_unit b (src, src_meta) =
   let b = w b (lineno src_meta) in
   let b = w b src in
@@ -275,6 +335,7 @@ let rec w_include b cwd id npre files boots incs reqs ((n, nm), inc_file) =
     let incs = ((npre, nm), (file, snd inc_file)) :: incs in
     w_includes b id npre files boots incs reqs src
   in
+  let b, files = w_mod_uses b cwd files (mod_uses src) in
   let b = w_ocaml_unit b (ocaml_unit src) in
   let b = w b nil_loc in
   let b = w b "let () = B0_def.Scope.close ()" in
@@ -309,9 +370,12 @@ and w_includes b id npre files boots incs reqs src =
 let expand src =
   try
     let b = w [] nil_loc in
-    let r = Fpath.to_string (file src) in
+    let file = file src in
+    let cwd = Fpath.parent file in
+    let r = Fpath.to_string file in
     let b = w b (Fmt.str "let () = B0_def.Scope.root (B00_std.Fpath.v %S)" r) in
     let b, _, files, boots, incs, reqs = w_includes b 0 "" [] [] [] [] src in
+    let b, files = w_mod_uses b cwd files (mod_uses src) in
     let b = w_ocaml_unit b (ocaml_unit src) in
     let b = w b nil_loc in
     let b = w b "let () = B0_def.Scope.seal ()" in

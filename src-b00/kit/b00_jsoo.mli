@@ -13,6 +13,9 @@ open B00
 
 (** {1:jsoo Js_of_ocaml} *)
 
+type source_map = [`Inline | `File ] option
+(** The type for specifying source maps desires. *)
+
 val tool : Tool.t
 (** [tool] is the [js_of_ocaml] executable. *)
 
@@ -22,14 +25,14 @@ val build_runtime :
     files [jss] to [o]. *)
 
 val compile :
-  Memo.t -> opts:Cmd.t -> source_map:[`Inline | `File] option ->
+  Memo.t -> opts:Cmd.t -> source_map:source_map ->
   jss:Fpath.t list -> byte:Fpath.t -> o:Fpath.t -> unit
 (** [compile m ~source_map ~jss ~byte ~o] compiles the JavaScript
     files [jss] and byte code object or executable [byte] to the
     JavaScript file [o]. *)
 
 val link :
-  Memo.t -> opts:Cmd.t -> source_map:[`Inline | `File] option ->
+  Memo.t -> opts:Cmd.t -> source_map:source_map ->
   jss:Fpath.t list -> o:Fpath.t -> unit
 (** [link m ~opts ~jss ~o] links the JavaScript files [jss] to [o] with
     options [opts]. *)

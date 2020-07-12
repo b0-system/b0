@@ -30,7 +30,10 @@ type b0_include = (string * smeta) * (Fpath.t * smeta)
     the included file. *)
 
 type require = B00_ocaml.Lib.Name.t * smeta
-(** The type for require directive data. The library name. *)
+(** The type for #require directive data. The library name. *)
+
+type mod_use = Fpath.t * smeta
+(** The type for #mod_use directive data. The path to the module source. *)
 
 type t
 (** The type for B0 files sources. *)
@@ -51,6 +54,9 @@ val b0_includes : t -> b0_include list
 
 val requires : t ->  require list
 (** [requires s] are the library names of the [#require] directives. *)
+
+val mod_uses : t -> mod_use list
+(** [mod_uses s] are the file path of the [#mod_use] directives. *)
 
 val ocaml_unit : t -> string * smeta
 (** [ocaml_unit s] is the script's OCaml implementation unit. *)
@@ -87,7 +93,7 @@ val expanded_requires : expanded -> require list
 
 val expanded_src : expanded -> string
 (** [expanded_src e] is the expanded source with {!B0_def.Scope}ing
-    instructions and the call to {!B0_driver.main}. *)
+    and mod_uses spliced in instructions and the call to {!B0_driver.main}. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

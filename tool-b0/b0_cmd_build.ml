@@ -165,6 +165,7 @@ let build_what lock ~units ~packs ~x_units ~x_packs c =
 (* Build command *)
 
 let build what lock units packs x_units x_packs action args c =
+  let units = match action with None -> units | Some a -> a :: units in
   if what
   then build_what lock ~units ~packs ~x_units ~x_packs c
   else build_run  lock ~units ~packs ~x_units ~x_packs action args c
@@ -200,7 +201,7 @@ let lock =
   Arg.(value & vflag None [lock; unlock])
 
 let action =
-  let doc = "Perform outcome unit action of unit $(docv)." in
+  let doc = "Build and perform outcome unit action of unit $(docv)." in
   Arg.(value & opt (some string) None & info ["a"; "action"] ~doc ~docv:"UNIT")
 
 let args =

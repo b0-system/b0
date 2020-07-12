@@ -48,4 +48,8 @@ let () =
     Pkg.doc "doc/b00_manual.mld" ~dst:"odoc-pages/b00_manual.mld";
     Pkg.doc "doc/manual.mld" ~dst:"odoc-pages/manual.mld";
     Pkg.doc "doc/driver_dev.mld" ~dst:"odoc-pages/driver_dev.mld";
+    Pkg.doc "doc/old_manual.mld" ~dst:"odoc-pages/old_manual.mld";
+    Pkg.doc "doc/b0_unit_manual.mld" ~dst:"odoc-pages/b0_unit_manual.mld";
+    Pkg.doc "doc/rationale.mld" ~dst:"odoc-pages/rationale.mld";
+    Pkg.doc "doc/todo.mld" ~dst:"odoc-pages/todo.mld";
   ]

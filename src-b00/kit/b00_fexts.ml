@@ -40,12 +40,13 @@ let cmark = v [".md"]
 let css = v [".css"]
 let data = v [".json"; ".xml"]
 let font = v [".otf"; ".ttf"; ".woff"; ".woff2" ]
+let html = v [".html"]
 let html_lang = v [".html"; ".css"; ".js"; ]
 let image =
-  v [".eps"; ".gif"; ".ico"; ".jpeg"; ".jpg"; ".pdf"; ".png"; ".ps";
-     ".svg"; ".tiff"]
+  v [".eps"; ".gif"; ".ico"; ".jpeg"; ".jpg"; ".pdf"; ".png"; ".ps"; ".svg";
+     ".tiff"]
 
-let javascript = v [".js"]
+let js = v [".js"]
 let latex_lang = v [".tex"; ".sty"; ".bib"; ".bibdoi"]
 let ocaml_lang = v [".ml"; ".mld"; ".mli"; ".mll"; ".mly"]
 let sound = v [".aiff"; ".flac"; ".mp3"; ".wav"]
@@ -53,7 +54,7 @@ let tex = v [".tex"]
 let video = v [".flv"; ".mov"; ".mp4"]
 let www = data + font + html_lang + image + sound + video
 let all =
-  c_lang + cmark + css + data + font + html_lang + image + javascript +
+  c_lang + cmark + css + data + font + html_lang + image + js +
   latex_lang + video + ocaml_lang + sound
 
 (*---------------------------------------------------------------------------

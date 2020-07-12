@@ -3,7 +3,8 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-(** Standard library needs.
+(** Standard needs for B0 and B00 programs (and sometimes for
+    any program but it's getting better).
 
     Open this module to use it. Only redefines a few standard
     modules and introduces a few new ones. *)
@@ -558,20 +559,20 @@ module String : sig
   val is_empty : string -> bool
   (** [is_empty s] is [equal empty s]. *)
 
-  val starts_with : prefix:string -> string -> bool
-  (** [starts_with ~prefix s] is [true] iff [prefix.[i] = s.[i]] for
+  val starts_with : sub:string -> string -> bool
+  (** [starts_with ~sub s] is [true] iff [sub.[i] = s.[i]] for
       all indices [i] of [prefix].
 
       {b Note.} Available in 4.12. *)
 
-  val ends_with : suffix:string -> string -> bool
-  (** [eds_with ~suffix s] is true iff [suffix.[i] = s.[m - i]] for all
+  val ends_with : sub:string -> string -> bool
+  (** [eds_with ~sub s] is true iff [sub.[i] = s.[m - i]] for all
       indices [i] of [affix] and with [m = String.length s - 1].
 
       {b Note.} Available in 4.12. *)
 
-  val has_substring : sub:string -> string -> bool
-  (** [has_substring ~sub s] is [true] iff there exists an index [j]
+  val includes : sub:string -> string -> bool
+  (** [includes ~sub s] is [true] iff there exists an index [j]
       such that for all indices [i] of [affix], [sub.[i] = s.[j+ 1]]. *)
 
   val for_all : (char -> bool) -> string -> bool
@@ -582,6 +583,12 @@ module String : sig
   (** [exists p s] is [true] iff there exists an index [i] of [s] with
       [p s.[i] = true]. *)
 
+  (** {1:find Finding substrings} *)
+
+  val find_sub : ?start:int -> sub:string -> string -> int option
+  (** [find_sub ~start ~sub s] is the start index (if any) of the
+      first occurence of [sub] in [s] at or after [start]. *)
+
   (** {1:subs Extracting substrings} *)
 
   val subrange : ?first:int -> ?last:int -> string -> string
@@ -590,8 +597,8 @@ module String : sig
 
       [first] defaults to [0] and last to [String.length s - 1].
 
-      Note that both [first] and [last] can be any integer. If
-      [first > last] the interval is empty and the empty string is
+      Note that both [first] and [last] can be any integer. If [first
+      > last] the interval is empty and the empty string is
       returned. *)
 
   (** {1:break Breaking} *)

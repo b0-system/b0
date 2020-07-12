@@ -19,7 +19,7 @@ val libname : string -> Lib.Name.t
 
 val exe :
   ?doc:string -> ?meta:B0_meta.t -> ?action:B0_unit.action ->
-  ?requires:Lib.Name.t list -> ?name:string -> string -> srcs:B0_srcs.t ->
+  ?requires:Lib.Name.t list -> ?name:string -> string -> srcs:B0_srcs.sels ->
   B0_unit.t
 (** [exe n] is a build unit for an executable named [n] (without
     the platform specific extension).
@@ -35,7 +35,7 @@ val exe :
 val lib :
   ?doc:string -> ?meta:B0_meta.t -> ?action:B0_unit.action ->
   ?requires:Lib.Name.t list -> ?name:string -> Lib.Name.t ->
-  srcs:B0_srcs.t -> B0_unit.t
+  srcs:B0_srcs.sels -> B0_unit.t
 (** [lib n ~srcs] is a built unit for a library named [l] made of
     sources [src].
     {ul
@@ -83,10 +83,13 @@ val built_code : built_code Store.key
 (** [build_code] is a memo key indicating the built code. By default
     determines by consulting [wanted_code]. *)
 
+(** {1:frag Build fragments} *)
+
+
 (** {1:metadata Metadata} *)
 
 val tag : unit B0_meta.key
-(** [tag] indicates the entity is relatd to OCaml. *)
+(** [tag] indicates the entity is related to OCaml. *)
 
 (** Metadata keys *)
 module Meta : sig

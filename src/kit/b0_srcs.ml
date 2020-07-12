@@ -21,11 +21,16 @@ type sel =
 | `File of fpath
 | `Fut of B0_build.t -> Fpath.Set.t Fut.t ]
 
-type t = sel list
+type sels = sel list
+
+type t =
+  { by_ext : B00_fexts.map; (* selected files sorted by extension. *)
+    roots : Fpath.t Fpath.Map.t; (* maps selected files to their root. *) }
+
+let by_ext s = s.by_ext
 
 let fail_if_error m u = function
-| Error e -> Memo.fail m "Source selection: %s" e
-| Ok v -> v
+| Error e -> Memo.fail m "Source selection: %s" e | Ok v -> v
 
 let select_files m u (seen, by_ext) fs =
   let rec loop m u seen by_ext = function
@@ -116,7 +121,14 @@ let select b sels =
     Fpath.Set.fold add_file files acc
   in
   let _, acc = List.fold_left add_files acc futs in
-  Fut.return acc
+  Fut.return { by_ext = acc; roots = Fpath.Map.empty }
+
+(*
+let root_for_file s f = match Fpath.Map.find_opt f s.roots with
+| Some r -> r
+| None ->
+    Fmt.invalid_arg "%a: not in B00_src selection result" Fpath.pp_unquoted f
+*)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers
