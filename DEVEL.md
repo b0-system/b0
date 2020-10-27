@@ -1,4 +1,4 @@
-OB# Bootstrap
+# Bootstrap
 
 To bootstrap `b0`, we need to find the paths to the `cmdliner` and
 `unix` library directories. These are discovered using a few heuristics 

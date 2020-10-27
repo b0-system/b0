@@ -101,10 +101,10 @@ module Build : sig
   val require : t -> build_unit -> unit
   val current : t -> build_unit
   val current_meta : t -> B0_meta.t
-  val current_root_dir : t -> Fpath.t
+  val current_scope_dir : t -> Fpath.t
   val current_build_dir : t -> Fpath.t
   val shared_build_dir : t -> Fpath.t
-  val root_dir : t -> build_unit -> Fpath.t
+  val scope_dir : t -> build_unit -> Fpath.t
   val build_dir : t -> build_unit -> Fpath.t
   val create :
     root_dir:Fpath.t -> b0_dir:Fpath.t -> variant:string -> B00.Memo.t ->

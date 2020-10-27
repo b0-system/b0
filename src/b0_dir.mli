@@ -23,6 +23,11 @@ val store_dir : build_dir:Fpath.t -> Fpath.t
 
 val unit_build_dir : build_dir:Fpath.t -> name:string -> Fpath.t
 
+(** {1:other Other} *)
+
+val scratch_dir : b0_dir:Fpath.t -> Fpath.t
+(** [scratch_dir b0_dir] can be used by cmdlets. *)
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers
 

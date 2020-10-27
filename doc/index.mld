@@ -10,14 +10,16 @@ build abstraction with reliable, efficient incremental rebuilds.
 
 {1:manuals Manuals}
 
-For B0 and B00 users.
+For B0 users.
 
 {ul
 {- The {{!page-manual}B0 manual} is a conceptual overview of the
    B0 system and B0 files. It is recommended reading.}
-{- The {{!page-b00_manual}B00 manual} describes the B00 build library.}
-{- The {{!page-b0_unit_manual}B0 build unit manual} describes how to
-   create your own build units.}}
+{- The {{!page-unit_manual}build unit manual} describes how to
+   create your own build units.}
+{- The {{!page-cmdlet_manual}cmdlet manual} describes how to define
+   your own cmdlets.}
+{- The {{!page-b00_manual}B00 manual} describes the B00 build library.}}
 
 For B0 programmers.
 
@@ -84,6 +86,7 @@ B00_ocaml
 B00_odoc
 B00_os
 B00_vcs
+B00_rsync
 }
 
 {3:ui UI fragments}
@@ -141,6 +144,7 @@ Toolkit for writing your B0 files.
 B0_kit
 B0_jsoo
 B0_ocaml
+B0_ocaml_eco
 B0_opam
 B0_srcs
 }

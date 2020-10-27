@@ -514,7 +514,7 @@ module Op = struct
     let kind = "Cmd.t" in
     let next, b = Bincode.dec_byte ~kind s i in
     match b with
-    | 0 -> let i, s = Bincode.dec_string s next in i, Cmd.arg s
+    | 0 -> let i, s = Bincode.dec_string s next in i, Cmd.atom s
     | 1 -> let i, cmd = dec_cmd s next in i, Cmd.unstamp cmd
     | 2 ->
         let i, cmd0 = dec_cmd s next in

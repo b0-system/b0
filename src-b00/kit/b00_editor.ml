@@ -39,7 +39,7 @@ let find ?win_exe ?search () =
       | Ok None -> r
       | Ok (Some cmd) -> Ok (cmd :: cmds)
   in
-  let cmds = Ok [Cmd.arg "nano"] in
+  let cmds = Ok [Cmd.atom "nano"] in
   let cmds = parse_env cmds Env.editor in
   let* cmds = parse_env cmds Env.visual in
   let rec loop = function

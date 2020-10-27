@@ -9,9 +9,9 @@ open B00
 let tool = Tool.by_name "cmark"
 let cmd ?(validate_utf_8 = true) ?(format = "html") m ~opts ~mds ~o =
   let cmark = Memo.tool m tool in
-  let validate = Cmd.if' validate_utf_8 (Cmd.arg "--validate-utf8") in
+  let validate = Cmd.if' validate_utf_8 (Cmd.atom "--validate-utf8") in
   Memo.spawn m ~reads:mds ~writes:[o] ~stdout:(`File o) @@
-  cmark Cmd.(arg "--to" % format %% validate %% opts %% unstamp (paths mds))
+  cmark Cmd.(atom "--to" % format %% validate %% opts %% unstamp (paths mds))
 
 let to_html
     ?generator ?lang ?scripts ?styles ?title m ~opts ~mds ~o_frag:frag ~o

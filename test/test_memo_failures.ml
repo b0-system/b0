@@ -11,7 +11,7 @@ let cat = Tool.by_name "cat"
 let echo = Tool.by_name "echo"
 let echo m ~reads ~writes f msg =
   let echo = Memo.tool m echo in
-  Memo.spawn m ~reads ~writes ~stdout:(`File f) @@ echo (Cmd.arg msg)
+  Memo.spawn m ~reads ~writes ~stdout:(`File f) @@ echo (Cmd.atom msg)
 
 let cannot_read build_dir m =
   let cat = Memo.tool m cat in

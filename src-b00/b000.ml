@@ -28,7 +28,7 @@ module Trash = struct
   let delete_win32 ~block t = match block with
   | true -> delete_blocking t
   | false ->
-      let rm = Cmd.(arg "cmd.exe" % "/c" % "rd" % "/s" % "/q" %% path t.dir) in
+      let rm = Cmd.(atom "cmd.exe" % "/c" % "rd" % "/s" % "/q" %% path t.dir) in
       match Os.Cmd.spawn rm (* XXX redirect stdio to Fpath.null ? *) with
       | Ok _pid -> Ok ()
       | Error e -> Error (err_delete t e)

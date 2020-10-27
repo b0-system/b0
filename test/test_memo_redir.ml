@@ -12,7 +12,7 @@ let echo = Tool.by_name "echo"
 let redir_create_path build_dir m =
   let echo = Memo.tool m echo in
   let redir = Fpath.(build_dir / "hey" / "ho" / "out") in
-  Memo.spawn m ~stdout:(`File redir) @@ echo Cmd.(arg "Ha!")
+  Memo.spawn m ~stdout:(`File redir) @@ echo Cmd.(atom "Ha!")
 
 let test_memo_redir () =
   with_memo redir_create_path;

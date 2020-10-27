@@ -21,14 +21,14 @@ let find ?search ~pdf_viewer () =
   match pdf_viewer with
   | Some cmd -> Os.Cmd.find ?search cmd
   | None ->
-      Result.bind (Os.Cmd.find ?search Cmd.(arg "xdg-open")) @@ function
+      Result.bind (Os.Cmd.find ?search Cmd.(atom "xdg-open")) @@ function
       | Some xdg -> Ok (Some xdg)
       | None ->
-          Result.bind (Os.Cmd.find ?search Cmd.(arg "open")) @@ function
+          Result.bind (Os.Cmd.find ?search Cmd.(atom "open")) @@ function
           | Some oopen -> Ok (Some oopen)
           | None ->
               if Sys.win32
-              then Ok (Some Cmd.(arg "start" % "")) (* XXX really ? *)
+              then Ok (Some Cmd.(atom "start" % "")) (* XXX really ? *)
               else Ok None
 
 (* XXX support background *)

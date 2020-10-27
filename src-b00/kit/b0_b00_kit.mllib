@@ -14,6 +14,7 @@ B00_odoc
 B00_os
 B00_pager
 B00_pdf_viewer
+B00_rsync
 B00_serialk_json
 B00_serialk_sexp
 B00_serialk_text

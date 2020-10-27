@@ -8,6 +8,8 @@ open B00_std.Fut.Syntax
 open B00
 open B00_ocaml
 
+let () = B0_def.Scope.lib "ocaml"
+
 let libname = Lib.Name.v
 
 type built_code = [ `Byte | `Native | `All ]
@@ -202,7 +204,7 @@ let unit_code b m meta =
 let exe_proc set_exe_path set_mod_srcs srcs b =
   let m = B0_build.memo b in
   let build_dir = B0_build.current_build_dir b in
-  let src_root = B0_build.current_root_dir b in
+  let src_root = B0_build.current_scope_dir b in
   let* srcs = B0_srcs.(Fut.map by_ext @@ select b srcs) in
   let* mod_srcs = Mod.Src.map_of_files m ~build_dir ~src_root ~srcs in
   let meta = B0_build.current_meta b in
@@ -213,7 +215,7 @@ let exe_proc set_exe_path set_mod_srcs srcs b =
   let* comp_requires = Lib.Resolver.get_list resolver requires in
   let exe_name = B0_meta.get B0_meta.exe_name meta in
   let exe_ext = B00_ocaml.Conf.exe_ext conf in
-  let opts = Cmd.(arg "-g") (* TODO *) in
+  let opts = Cmd.(atom "-g") (* TODO *) in
   let o = Fpath.(build_dir / (exe_name ^ exe_ext)) in
   set_exe_path o;  (* FIXME introduce a general mecanism for that *)
   let code = match unit_code with `All | `Native -> `Native |`Byte -> `Byte in
@@ -246,7 +248,7 @@ let lib_proc set_mod_srcs srcs b =
   (* XXX we are still missing cmxs here *)
   let m = B0_build.memo b in
   let build_dir = B0_build.current_build_dir b in
-  let src_root = B0_build.current_root_dir b in
+  let src_root = B0_build.current_scope_dir b in
   let* srcs = B0_srcs.(Fut.map by_ext @@ select b srcs) in
   let* mod_srcs = Mod.Src.map_of_files m ~build_dir ~src_root ~srcs in
   set_mod_srcs mod_srcs;
@@ -254,7 +256,7 @@ let lib_proc set_mod_srcs srcs b =
   let requires = B0_meta.get Meta.requires meta in
   let library = B0_meta.get Meta.library meta in
   let archive_name = Lib.Name.to_archive_name library in
-  let opts = Cmd.(arg "-g") (* TODO *) in
+  let opts = Cmd.(atom "-g") (* TODO *) in
   let* built_code = B0_build.get b built_code in
   let* conf = B0_build.get b conf in
   let* resolver = B0_build.get b lib_resolver in
@@ -316,6 +318,8 @@ let lib
     |> B0_meta.add Meta.mod_srcs mod_srcs
   in
   B0_unit.v ?doc ~meta ?action name (lib_proc set_mod_srcs srcs)
+
+let () = B0_def.Scope.close ()
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

@@ -4,12 +4,21 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open Result.Syntax
 
-let build_dir ~b0_dir ~variant = Fpath.(b0_dir / "b" / variant)
-let shared_build_dir ~build_dir = Fpath.(build_dir / "_shared")
-let store_dir ~build_dir = Fpath.(build_dir / "_store")
-let unit_build_dir ~build_dir ~name = Fpath.(build_dir / name)
-let scratch_dir ~b0_dir = Fpath.(b0_dir / "_scratch")
+let rsync = Os.Cmd.get (Cmd.atom "rsync")
+let copy
+    ?(opts = Cmd.atom "-azh") ?(stats = true) ~delete
+    ?(src_host = "") ~src ?(dst_host = "") dst
+  =
+  let* rsync = Os.Cmd.get (Cmd.atom "rsync") in
+  (* XXX force slashes ?  *)
+  let src = src_host ^ Fpath.to_string src in
+  let dst = dst_host ^ Fpath.to_string dst in
+  let cmd = Cmd.(rsync %% if' delete (atom "--delete") %%
+                 if' stats (atom "--stats") %% opts % src % dst)
+  in
+  Os.Cmd.run cmd
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

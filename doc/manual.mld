@@ -25,13 +25,12 @@ next.
 {1:b0_file B0 files}
 
 A B0 file is a syntactically valid OCaml file possibly prefixed by a
-few directives. The OCaml code creates definitions to
-describe the software by using the versioned {!B0_kit} API and
-possibly other third-party OCaml libraries.
+few directives. The OCaml code creates definitions to describe the
+software by using the versioned {!B0_kit} API and possibly other
+third-party OCaml libraries.
 
-A B0 file is named [B0.ml] and usually found at the root of a
-project's source tree. It centralizes the definitions that describe
-the software project.
+A B0 file is named [B0.ml] and is usually found at the root of the
+software project's source tree it describes.
 
 The following is a simple [B0.ml] file that declares an executable to
 build from the OCaml [src/hello.ml] source and that uses the
@@ -61,8 +60,8 @@ the root B0 file is the {e first} [B0.ml] file found starting at the
 
 The root B0 file can also be specified explicitely via the [--b0-file]
 option or the [B0_FILE] environment variable. The [b0 file] command
-allows to find out which root B0 file is determined by [b0] and provides
-a few actions on it:
+allows to find out which root B0 file is determined by [b0] and
+provides a few actions on it:
 
 {v
 b0 file path    # Show the absolute path to the root B0 file
@@ -136,13 +135,11 @@ From the B0 file that includes, the syntax to access a definition
 named [d] in a scope [s] is [s.d].
 
 Scope names must be unique in a given B0 file and must not contain
-['.']  characters. The [lib] scope name is reserved and can't be used
-(bof change that). It is used as a root scope for library
-definitions. If these constraints are not satisfied the B0 file
-errors.
+['.']  characters. Definitions made in libraries are in their own
+library scope which is prefixed by [.].
 
 {b XXX} Idea: let local toplevel scopes and global scope clash
-and use [.bla] to disambuigate if that is the case (and let . denote
+and use [.bla] to disambiguate if that is the case (and let . denote
 the root scope).
 
 {3:access Access control and isolation}
@@ -355,6 +352,8 @@ b0 cmd NAME -- ...
 If your development practice needs a bit of shell scripting here and
 there, consider rewriting them in a decent programming language as cmdlets.
 
+Read the {{:page-cmdlet_manual}cmdlet manual}.
+
 {1:editor_support Editor support}
 
 {2:emacs Emacs}
@@ -370,7 +369,8 @@ compilation mode depending on the current buffer file.
   (if buffer-file-name
       (cond
        ((locate-dominating-file buffer-file-name "B0.ml") "b0 ")
-       ((locate-dominating-file buffer-file-name "dune-project")"dune build ")
+       ((locate-dominating-file buffer-file-name "dune-project")
+        "dune build ")
        ((locate-dominating-file buffer-file-name "Makefile") "make ")
        ((locate-dominating-file buffer-file-name "BRZO") "brzo -b ")
        (t
@@ -409,6 +409,7 @@ directive  = dir-boot / dir-inc / dir-req
 dir-boot   = "[@@@B0.boot" *(ws dstring) ws "]"
 dir-inc    = "[@@@B0.include" *(ws dstring) ws "]"
 dir-req    = "#require" ws dstring
+dir-moduse = "#mod_use" ws dstring
 dstring    = %x22 dchar *dchar %x22
 dchar      = escape / cont / ws / %x21 / %x23-%x5B / %x5D-%x7E / %x80-xFF
 escape     = %x5C (%x20 / %x22 / %x5C)

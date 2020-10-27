@@ -68,14 +68,14 @@ let list c root excludes details path =
     Ok B00_cli.Exit.ok
 
 let exec c root excludes keep_going cmd =
-  exec_when (fun _ -> Ok true) c root excludes keep_going (Cmd.args cmd)
+  exec_when (fun _ -> Ok true) c root excludes keep_going (Cmd.list cmd)
 
 let git c root excludes all keep_going full_cmd cmd =
-  let cmd = if full_cmd then Cmd.args cmd else Cmd.(arg "git" %% args cmd) in
+  let cmd = if full_cmd then Cmd.list cmd else Cmd.(atom "git" %% list cmd) in
   exec_when (is_vcs ~all B00_vcs.Git.find) c root excludes keep_going cmd
 
 let hg c root excludes all keep_going full_cmd cmd =
-  let cmd = if full_cmd then Cmd.args cmd else Cmd.(arg "hg" %% args cmd) in
+  let cmd = if full_cmd then Cmd.list cmd else Cmd.(atom "hg" %% list cmd) in
   exec_when (is_vcs ~all B00_vcs.Hg.find) c root excludes keep_going cmd
 
 let scope

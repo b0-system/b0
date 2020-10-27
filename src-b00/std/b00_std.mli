@@ -756,10 +756,10 @@ module String : sig
 let escape_dquotes s =
   let char_len = function '"' -> 2 | _ -> 1 in
   let set_char b i = function
-  | '"' -> Bytes.set b i '\\'; Bytes.set b (i+1) '"'; 2
+  | '"' -> Bytes.set b i '\\'; Bytes.set b (i+1) '"'; i + 2
   | c -> Bytes.set b i c; i + 1
   in
-  String.byte_escaper char_len set_char
+  String.byte_escaper char_len set_char s
 ]}
 *)
 
@@ -1692,8 +1692,8 @@ module Cmd : sig
   val empty : t
   (** [empty] is an empty list of arguments. *)
 
-  val arg : string -> t
-  (** [arg a] is the argument [a]. *)
+  val atom : string -> t
+  (** [atom a] is the atomic argument [a]. *)
 
   val append : t -> t -> t
   (** [append l1 l2] appends arguments [l2] to [l1]. *)
@@ -1717,24 +1717,27 @@ module Cmd : sig
   val path : Fpath.t -> t
   (** [path p] is [arg (Fpath.to_string p)]. *)
 
-  val args : ?slip:string -> string list -> t
-  (** [args ?slip l] is a command line from the list of arguments [l].
+  val list : ?slip:string -> string list -> t
+  (** [list ?slip l] is a command line from the list of arguments [l].
       If [slip] is specified it is added on the command line before
       each element of [l]. *)
-
-  val rev_args : ?slip:string -> string list -> t
-  (** [rev_args ?slip l] is {!args}[ ?slip (List.rev l)]. *)
-
-  val of_list : ?slip:string -> ('a -> string) -> 'a list -> t
-  (** [of_list ?slip conv l] is {!args}[ ?slip (List.map conv l)]. *)
-
-  val of_rev_list : ?slip:string -> ('a -> string) -> 'a list -> t
-  (** [of_rev_list ?slip conv l] is {!args}[ ?slip (List.rev_map conv l)]. *)
 
   val paths : ?slip:string -> Fpath.t list -> t
   (** [paths ?slip ps] is {!of_list}[ ?slip Fpath.to_string ps]. *)
 
+  val of_list : ?slip:string -> ('a -> string) -> 'a list -> t
+  (** [of_list ?slip conv l] is {!args}[ ?slip (List.map conv l)]. *)
+
+  val rev_list : ?slip:string -> string list -> t
+  [@@ocaml.deprecated]
+  (** [rev_list ?slip l] is {!list}[ ?slip (List.rev l)]. *)
+
+  val of_rev_list : ?slip:string -> ('a -> string) -> 'a list -> t
+  [@@ocaml.deprecated]
+  (** [of_rev_list ?slip conv l] is {!args}[ ?slip (List.rev_map conv l)]. *)
+
   val rev_paths : ?slip:string -> Fpath.t list -> t
+  [@@ocaml.deprecated]
   (** [rev_paths ?slip ps] is {!of_rev_list}[ ?slip Fpath.to_string ps]. *)
 
   (** {1:tool Tools} *)
@@ -1828,21 +1831,22 @@ v}
 
   (** {1:examples Examples}
 {[
-let ls p = Cmd.(arg "ls" % "-a" % path p)
+let ls p = Cmd.(atom "ls" % "-a" % path p)
 let tar archive dir =
-  Cmd.(arg "tar" % "-cvf" %% unstamp (path archive) %% path dir)
+  Cmd.(atom "tar" % "-cvf" %% unstamp (path archive) %% path dir)
 
-let opam cmd = Cmd.(arg "opam" % cmd)
-let opam_install pkgs = Cmd.(opam "install" %% args pkgs)
+let opam cmd = Cmd.(atom "opam" % cmd)
+let opam_install pkgs = Cmd.(opam "install" %% list pkgs)
 
 let ocamlc ?(debug = false) file =
-  Cmd.(arg "ocamlc" % "-c" % if' debug (arg "-g") %% path file)
+  Cmd.(atom "ocamlc" % "-c" % if' debug (atom "-g") %% path file)
 
 let ocamlopt ?(profile = false) ?(debug = false) incs file =
-  let profile = Cmd.(if' profile (arg "-p")) in
-  let debug = Cmd.(if' debug (arg "-g")) in
+  let profile = Cmd.(if' profile (atom "-p")) in
+  let debug = Cmd.(if' debug (atom "-g")) in
   let incs = Cmd.(unstamp (paths ~slip:"-I" incs)) in
-  Cmd.(arg "ocamlopt" % "-c" %% debug %% profile %% incs %% unstamp (path file))
+  Cmd.(atom "ocamlopt" % "-c" %% debug %% profile %% incs %%
+       unstamp (path file))
 ]} *)
 end
 

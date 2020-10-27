@@ -64,7 +64,7 @@ let meta
 
 let get_mod_srcs b ~srcs =
   let build_dir = B0_build.current_build_dir b in
-  let src_root = B0_build.current_root_dir b in
+  let src_root = B0_build.current_scope_dir b in
   Mod.Src.map_of_files (B0_build.memo b) ~build_dir ~src_root ~srcs
 
 let get_link_objs ~code ~resolver ~requires ~mod_srcs =
@@ -96,12 +96,12 @@ let byte_exe ~mod_srcs ~o b =
   let o = Fpath.(o + B00_ocaml.Conf.exe_ext conf) in
   let* resolver = B0_build.get b B0_ocaml.lib_resolver in
   let toplevel = Option.value ~default:false (B0_meta.find toplevel meta) in
-  let global_opts = Cmd.(arg "-g") (* TODO *) in
+  let global_opts = Cmd.(atom "-g") (* TODO *) in
   let opts = global_opts in
   let m = B0_build.memo b in
   let* () = compile_byte m ~opts ~resolver ~requires ~mod_srcs in
   let opts =
-    Cmd.(global_opts %% if' toplevel (arg "-linkall") % "-no-check-prims")
+    Cmd.(global_opts %% if' toplevel (atom "-linkall") % "-no-check-prims")
   in
   let* () = link_byte m ~conf ~opts ~resolver ~requires ~mod_srcs ~o in
   Fut.return o
@@ -125,7 +125,7 @@ let js_of_byte_objs ~jss ~mod_srcs ~o b =
   let* conf = B0_build.get b B0_ocaml.conf in
   let* resolver = B0_build.get b B0_ocaml.lib_resolver in
   let m = B0_build.memo b in
-  let global_opts = Cmd.(arg "-g") (* TODO *) in
+  let global_opts = Cmd.(atom "-g") (* TODO *) in
   let opts = global_opts in
   let* () = compile_byte m ~opts ~resolver ~requires ~mod_srcs in
   let code = `Byte in
@@ -154,7 +154,7 @@ let js_of_byte_objs ~jss ~mod_srcs ~o b =
       (* FIXME this won't work with lib convention we need to
          remember the lib_name and mangle. *)
       let o = Fpath.(build_dir / (Fpath.basename obj ^ ".js")) in
-      let opts = Cmd.(opts %% arg "-I" %% path (Fpath.parent obj)) in
+      let opts = Cmd.(opts %% atom "-I" %% path (Fpath.parent obj)) in
       B00_jsoo.compile m ~opts ~source_map ~jss:[] ~byte:obj ~o;
       o
     in
@@ -249,7 +249,7 @@ let web_exe ~srcs ~js ~o b =
   let assets_root =
     match B0_meta.find assets_root (B0_build.current_meta b) with
     | None -> None
-    | Some r -> Some (Fpath.(B0_build.current_root_dir b // r))
+    | Some r -> Some (Fpath.(B0_build.current_scope_dir b // r))
   in
   let assets = copy_assets m srcs ~assets_root ~dst:build_dir in
   if Fpath.Set.mem o assets then Fut.return () else
@@ -268,7 +268,7 @@ let web_proc set_exe_path set_mod_srcs srcs b =
 
 (* FIXME lots to factorize *)
 
-let node_action build u ~args:argl =
+let node_action build u ~args =
   let err e = Log.err (fun m -> m "%s" e); Fut.return B00_cli.Exit.some_error in
   match B0_unit.get_meta B0_meta.exe_file u with
   | Error e -> err e
@@ -278,10 +278,10 @@ let node_action build u ~args:argl =
       match Os.Cmd.get_tool (* FIXME first search in build *) node with
       | Error e -> err e
       | Ok node_exe ->
-          let cmd = Cmd.(path node %% path exe_file %% args argl) in
+          let cmd = Cmd.(path node %% path exe_file %% list args) in
           B0_unit.Action.exec_file build u node_exe cmd
 
-let show_uri_action build u ~args:argl =
+let show_uri_action build u ~args =
   let err e = Log.err (fun m -> m "%s" e); Fut.return B00_cli.Exit.some_error in
   match B0_unit.get_meta B0_meta.exe_file u with
   | Error e -> err e
@@ -291,7 +291,7 @@ let show_uri_action build u ~args:argl =
       match Os.Cmd.get_tool (* FIXME search in build *) show_uri with
       | Error e -> err e
       | Ok show_uri_exe ->
-          let cmd = Cmd.(path show_uri %% path exe_file %% args argl) in
+          let cmd = Cmd.(path show_uri %% path exe_file %% list args) in
           B0_unit.Action.exec_file build u show_uri_exe cmd
 
 let unit_meta ~meta ~name ~mod_srcs ~exe_name ~exe_path =

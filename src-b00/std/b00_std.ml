@@ -2071,12 +2071,8 @@ module Cmd = struct
   | Rseq of t list (* Sequence is reversed; only empty at toplevel *)
 
   let empty = Rseq []
-  let rec is_empty = function
-  | Rseq [] -> true
-  | _ -> false
-
-  let arg a = A a
-
+  let rec is_empty = function Rseq [] -> true | _ -> false
+  let atom a = A a
   let append l0 l1 = match l0, l1 with
   | Rseq [], l1 -> l1
   | l0, Rseq [] -> l0
@@ -2087,20 +2083,19 @@ module Cmd = struct
   | Rseq [] -> empty
   | l -> Unstamp l
 
-  let ( % ) l a = append l (arg a)
+  let ( % ) l a = append l (atom a)
   let ( %% ) = append
 
   (* Derived combinators *)
 
   let if' cond l = if cond then l else empty
   let path p = A (Fpath.to_string p)
-
-  let args ?slip l = match slip with
-  | None -> Rseq (List.rev_map arg l)
+  let list ?slip l = match slip with
+  | None -> Rseq (List.rev_map atom l)
   | Some slip -> Rseq (List.fold_left (fun acc v -> A v :: A slip :: acc) [] l)
 
-  let rev_args ?slip l = match slip with
-  | None -> Rseq (List.map arg l)
+  let rev_list ?slip l = match slip with
+  | None -> Rseq (List.map atom l)
   | Some slip -> Rseq (List.fold_right (fun v acc -> A v :: A slip :: acc) l [])
 
   let of_list ?slip conv l = match slip with
@@ -2226,8 +2221,8 @@ module Cmd = struct
   let to_string l = String.concat " " (List.map Filename.quote @@ to_list l)
   let pp ppf l = Fmt.pf ppf "@[%a@]" Fmt.(list ~sep:sp string) (to_list l)
   let pp_dump ppf l =
-    let pp_arg ppf a = Fmt.string ppf (Filename.quote a) in
-    Fmt.pf ppf "@[<h>%a@]" Fmt.(list ~sep:sp pp_arg) (to_list l)
+    let pp_atom ppf a = Fmt.string ppf (Filename.quote a) in
+    Fmt.pf ppf "@[<h>%a@]" Fmt.(list ~sep:sp pp_atom) (to_list l)
 
   let rec fold ~arg ~unstamp ~append ~empty = function
   | A a -> arg a
@@ -3453,7 +3448,7 @@ module Os = struct
     let rec realpath p =
       try Fpath.of_string (_realpath (Fpath.to_string p)) with
       | Unix.Unix_error (Unix.EINTR, _, _) -> realpath p
-      | Unix.Unix_error (e, _, _) -> ferr p (err_doing "Resolving" (uerr e))
+      | Unix.Unix_error (e, _, _) -> ferr p (err_doing "realpath" (uerr e))
 
     (* Copying *)
 

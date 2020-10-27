@@ -5,8 +5,14 @@
 
 open B00_std
 
-type cmd = [ `Cmd of t -> argv:string list -> Os.Exit.t ]
-and t = { def : B0_def.t; cmd : cmd }
+type t = { def : B0_def.t; cmd : cmd }
+and cmd = env -> Cmd.t -> Os.Exit.t
+and env =
+  { cwd : Fpath.t;
+    scope_dir : Fpath.t;
+    root_dir : Fpath.t;
+    b0_dir : Fpath.t;
+    cmdlet : t }
 
 module T = struct
   type nonrec t = t
@@ -23,24 +29,52 @@ let v ?doc ?meta n cmd =
 
 let cmd c = c.cmd
 
-module Cli = struct
-  open Cmdliner
+module Env = struct
+  type cmdlet = t
+  type t = env
+  let v ~cwd ~scope_dir ~root_dir ~b0_dir ~cmdlet =
+    { cwd; scope_dir; root_dir; b0_dir; cmdlet }
 
-  let info ?man_xrefs ?man ?envs ?exits ?sdocs ?docs ?doc:d ?version cmdlet =
-    let doc = Option.value ~default:(doc cmdlet) d in
-    let exits = Option.value ~default:B00_cli.Exit.infos exits in
-    let name = name cmdlet in
-    Term.info ?man_xrefs ?man ?envs ~exits ?sdocs ?docs ?version name ~doc
-
-  let run ?info:i cmdlet ~argv t =
-    let argv = Array.of_list argv in
-    let info = match i with None -> info cmdlet | Some info -> info in
-    B00_cli.Exit.of_eval_result @@ Term.eval ~argv (t, info)
-
-  let run_cmds cmdlet ~argv main cmds =
-    let argv = Array.of_list argv in
-    B00_cli.Exit.of_eval_result @@ Term.eval_choice ~argv main cmds
+  let cwd e = e.cwd
+  let scope_dir e = e.scope_dir
+  let root_dir e = e.root_dir
+  let b0_dir e = e.b0_dir
+  let scratch_dir e = B0_dir.scratch_dir ~b0_dir:e.b0_dir
+  let cmdlet e = e.cmdlet
 end
+
+(* Shortcuts *)
+
+let exit_of_result = function
+| Ok _ -> B00_cli.Exit.ok
+| Error e -> Log.err (fun m -> m "@[%a@]" Fmt.lines e); B00_cli.Exit.some_error
+
+let in_scope_dir env p = Fpath.(Env.scope_dir env // p)
+let in_root_dir env p = Fpath.(Env.root_dir env // p)
+let in_scratch_dir env p = Fpath.(Env.scratch_dir env // p)
+
+(* Script execution *)
+
+let exec ?env:e ?cwd exe env args =
+  let scope_dir = Env.scope_dir env in
+  let exe = Fpath.(scope_dir // exe) in
+  let cwd = Option.value ~default:scope_dir cwd in
+  Os.Exit.exec ?env:e ~cwd exe Cmd.(path exe %% args)
+
+(* N.B. that signature could be twisted around to teturn a `cmd` value
+   but the way it is now encourages the term definition to occur behind
+   a thunk rather at toplevel init. *)
+
+let eval ?man_xrefs ?man ?envs ?exits ?sdocs ?docs ?doc:d ?version e cmd t =
+  let cmdlet = Env.cmdlet e in
+  let name = name cmdlet in
+  let doc = Option.value ~default:(doc cmdlet) d in
+  let exits = Option.value ~default:B00_cli.Exit.infos exits in
+  let info = Cmdliner.Term.info
+      ?man_xrefs ?man ?envs ~exits ?sdocs ?docs ?version name ~doc
+  in
+  let argv = Array.of_list (name :: Cmd.to_list cmd) in
+  B00_cli.Exit.of_eval_result @@ Cmdliner.Term.eval ~argv (t, info)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

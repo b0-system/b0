@@ -162,18 +162,18 @@ module Httpr = struct
 
   let perform ?(insecure = false) ?(follow = true) curl r =
     let rec loop follow visited r =
-      let meth = Cmd.(arg "-X" % Http.(meth_to_string (req_meth r))) in
+      let meth = Cmd.(atom "-X" % Http.(meth_to_string (req_meth r))) in
       let headers =
         Cmd.of_list ~slip:"-H" Http.header_to_string Http.(req_headers r)
       in
       let body =
-        Cmd.if' (Http.req_has_body r) Cmd.(arg "--data-binary" % "@-")
+        Cmd.if' (Http.req_has_body r) Cmd.(atom "--data-binary" % "@-")
       in
       let stdin = match Http.req_has_body r with
       | true -> Os.Cmd.in_string r.req_body
       | false -> Os.Cmd.in_stdin
       in
-      let insecure = Cmd.(if' insecure (arg "--insecure")) in
+      let insecure = Cmd.(if' insecure (atom "--insecure")) in
       let out =
         Os.Cmd.run_out ~trim:false ~stdin @@
         Cmd.(curl %% insecure % "-s" % "-i" %% meth %% headers %% body %
@@ -196,7 +196,7 @@ module Httpr = struct
     let open Cmdliner in
     let doc = "The curl command $(docv) to use." in
     let cmd = B00_cli.cmd in
-    let default = Cmd.arg "curl" in
+    let default = Cmd.atom "curl" in
     Arg.(value & opt cmd default & info ["curl"] ~doc ?docs ?env ~docv:"CMD")
 
   let find_curl ?search ~curl () = Os.Cmd.get ?search curl

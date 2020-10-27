@@ -89,8 +89,8 @@ val file : t -> Fpath.t option
 (** [file d] is the absolute file path in which [d] is defined, if
     defined in a file. *)
 
-val dir : t -> Fpath.t option
-(** [dir] is the parent of [file d]. *)
+val scope_dir : t -> Fpath.t option
+(** [scope_dir] is the parent of [file d]. *)
 
 val name : t -> string
 (** [name d] is the qualified name of [d]. *)
@@ -158,6 +158,9 @@ module type S = sig
 
   val name : t -> string
   (** [name v] is [v]'s name. *)
+
+  val basename : t -> string
+  (** [basename v] is [v]'s name without the scope. *)
 
   val doc : t -> string
   (** [doc v] is [v]'s documentation string. *)

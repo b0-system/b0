@@ -42,7 +42,7 @@ module Compile = struct
     let write m cobj ~o =
       let odoc = Memo.tool m tool in
       Memo.spawn m ~reads:[cobj] ~writes:[o] ~stdout:(`File o) @@
-      odoc Cmd.(arg "compile-deps" %% path cobj)
+      odoc Cmd.(atom "compile-deps" %% path cobj)
 
     let read m file =
       let parse lines = B00_lines.fold ~file (String.trim lines) parse_dep [] in
@@ -54,7 +54,7 @@ module Compile = struct
     let write m cobj ~to_odoc ~o =
       let odoc = Memo.tool m tool in
       Memo.spawn m ~reads:[cobj] ~writes:[o] ~stdout:(`File o) @@
-      odoc Cmd.(arg "compile-targets" % "-o" %% path to_odoc %% path cobj)
+      odoc Cmd.(atom "compile-targets" % "-o" %% path to_odoc %% path cobj)
 
     let read = read_path_writes
   end
@@ -66,8 +66,8 @@ module Compile = struct
     let odoc = Memo.tool m tool in
     let incs = files_to_includes odoc_deps in
     Memo.spawn m ~reads:(cobj :: odoc_deps) ~writes @@
-    odoc Cmd.(arg "compile" % "--pkg" % pkg %% if' hidden (arg "--hidden") %%
-              if' resolve_forward_deps (arg "--resolve-fwd-refs") %
+    odoc Cmd.(atom "compile" % "--pkg" % pkg %% if' hidden (atom "--hidden") %%
+              if' resolve_forward_deps (atom "--resolve-fwd-refs") %
               "-o" %% path o %% path cobj %% incs)
 
   let to_odoc m ?hidden ~pkg ~odoc_deps obj ~o:odoc =
@@ -100,7 +100,7 @@ module Html = struct
     let write m ~odoc_files pkg_odoc_dir ~o =
       let odoc = Memo.tool m tool in
       Memo.spawn m ~reads:odoc_files ~writes:[o] ~stdout:(`File o) @@
-      odoc Cmd.(arg "html-deps" %% path pkg_odoc_dir)
+      odoc Cmd.(atom "html-deps" %% path pkg_odoc_dir)
 
     let read m file =
       let parse lines = B00_lines.fold ~file (String.trim lines) parse_dep [] in
@@ -114,7 +114,7 @@ module Html = struct
       let incs = files_to_includes odoc_deps in
       let reads = odoc_file :: odoc_deps in
       Memo.spawn m ~reads ~writes:[o] ~stdout:(`File o) @@
-      odoc Cmd.(arg "html-targets" %% incs % "-o" %% path to_dir %%
+      odoc Cmd.(atom "html-targets" %% incs % "-o" %% path to_dir %%
                 path odoc_file)
 
     let read = read_path_writes
@@ -125,10 +125,10 @@ module Html = struct
     let incs = files_to_includes odoc_deps in
     let theme_uri = match theme_uri with
     | None -> Cmd.empty
-    | Some u -> Cmd.(arg "--theme-uri" % u)
+    | Some u -> Cmd.(atom "--theme-uri" % u)
     in
     Memo.spawn m ~reads:(odoc_file :: odoc_deps) ~writes @@
-    odoc Cmd.(arg "html" %% if' hidden (arg "--hidden") %% theme_uri % "-o" %%
+    odoc Cmd.(atom "html" %% if' hidden (atom "--hidden") %% theme_uri % "-o" %%
               path to_dir %% path odoc_file %% incs)
 
   let write m ?theme_uri ~html_dir ~odoc_deps odoc =
@@ -156,7 +156,7 @@ module Html_fragment = struct
     let odoc = Memo.tool m tool in
     let incs = files_to_includes odoc_deps in
     Memo.spawn m ~reads:(mld_file :: odoc_deps) ~writes:[o] @@
-    odoc Cmd.(arg "html-fragment" % "-o" %% path o %% path mld_file %% incs)
+    odoc Cmd.(atom "html-fragment" % "-o" %% path o %% path mld_file %% incs)
 end
 
 module Support_files = struct
@@ -164,17 +164,18 @@ module Support_files = struct
     let write ?(without_theme = false) m ~to_dir ~o =
       let odoc = Memo.tool m tool in
       Memo.spawn m ~reads:[] ~writes:[o] ~stdout:(`File o) @@
-      odoc Cmd.(arg "support-files-targets" %%
-                if' without_theme (arg "--without-theme") % "-o" %% path to_dir)
+      odoc Cmd.(atom "support-files-targets" %%
+                if' without_theme (atom "--without-theme") % "-o" %%
+                path to_dir)
 
     let read = read_path_writes
   end
 
   let cmd ?(without_theme = false) m ~writes ~to_dir =
     let odoc = Memo.tool m tool in
-    let theme = Cmd.(if' without_theme (arg "--without-theme")) in
+    let theme = Cmd.(if' without_theme (atom "--without-theme")) in
     Memo.spawn m ~reads:[] ~writes @@
-    odoc Cmd.(arg "support-files" %% theme % "-o" %% path to_dir)
+    odoc Cmd.(atom "support-files" %% theme % "-o" %% path to_dir)
 
   let write m ~without_theme ~html_dir ~build_dir =
     ignore @@ (* FIXME maybe remove that *)

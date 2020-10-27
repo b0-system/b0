@@ -34,7 +34,7 @@ let find ?win_exe ?search ~don't () =
   match Os.Env.find ~empty_is_none:true Env.term with
   | Some "dumb" | None -> Ok None
   | Some _ ->
-      let cmds = [Cmd.arg "less"; Cmd.arg "more"] in
+      let cmds = [Cmd.atom "less"; Cmd.atom "more"] in
       let* cmds =
         match Os.Env.find' ~empty_is_none:true Cmd.of_string Env.pager with
         | Error _ as e -> e

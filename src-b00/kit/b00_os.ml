@@ -68,7 +68,7 @@ let uname = (* gets system name, release version, machine arch *)
   | None -> Fut.return None
   | Some uname ->
       let file = Fpath.(Store.dir s / mark) in
-      let uname = uname Cmd.(arg "-s" % "-r" % "-m") in
+      let uname = uname Cmd.(atom "-s" % "-r" % "-m") in
       let* s = read_spawn_stdout m file uname in
       match String.split_on_char ' ' s with
       | [sys; rel; mach] -> Fut.return (Some (sys, rel, mach))
@@ -100,14 +100,14 @@ let name =
 
 let freebsd_version s m file =
   let file = Fpath.(Store.dir s / file) in
-  let uname = (Memo.tool m Tool.uname) (Cmd.arg "-U") in
+  let uname = (Memo.tool m Tool.uname) (Cmd.atom "-U") in
   read_spawn_stdout m file uname
 
 let try_android_version s m file = match Memo.tool_opt m Tool.getprop with
 | None -> Fut.return None
 | Some getprop ->
     let file = Fpath.(Store.dir s / file) in
-    let getprop = getprop (Cmd.arg "ro.build.version.release") in
+    let getprop = getprop (Cmd.atom "ro.build.version.release") in
     Fut.map Option.some (read_spawn_stdout m file getprop)
 
 let linux_version s m file =
@@ -121,12 +121,12 @@ let linux_version s m file =
 
 let macos_version s m file =
   let file = Fpath.(Store.dir s / file) in
-  let sw_vers = (Memo.tool m Tool.sw_vers) (Cmd.arg "-productVersion") in
+  let sw_vers = (Memo.tool m Tool.sw_vers) (Cmd.atom "-productVersion") in
   read_spawn_stdout m file sw_vers
 
 let windows_version s m file =
   let file = Fpath.(Store.dir s / file) in
-  let cmd_exe = (Memo.tool m Tool.cmd_exe) Cmd.(arg "/c" % "ver") in
+  let cmd_exe = (Memo.tool m Tool.cmd_exe) Cmd.(atom "/c" % "ver") in
   let* s = read_spawn_stdout m file cmd_exe in
   (* Format is 'Product [Version XXXX]', we parse the XXX *)
   let err m s =

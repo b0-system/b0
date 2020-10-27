@@ -12,7 +12,7 @@ let () =
   let to_fpath p = Fpath.of_string p |> Result.to_failure in
   let files = List.tl (Array.to_list Sys.argv) in
   try
-    let objinfo = Cmd.(arg "ocamlobjinfo" % "-no-code" % "-no-approx") in
+    let objinfo = Cmd.(atom "ocamlobjinfo" % "-no-code" % "-no-approx") in
     let files = List.map to_fpath files in
     Result.to_failure @@
     Result.bind (Os.Cmd.run_out ~trim:true

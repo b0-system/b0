@@ -5,20 +5,20 @@
 
 open B00_std
 
-let ls p = Cmd.(arg "ls" % "-a" %% path p)
-let tar file dir = Cmd.(arg "tar" % "-cvf" %% path file %% path dir)
+let ls p = Cmd.(atom "ls" % "-a" %% path p)
+let tar file dir = Cmd.(atom "tar" % "-cvf" %% path file %% path dir)
 
-let opam cmd = Cmd.(arg "opam" % cmd)
-let opam_install pkgs = Cmd.(opam "install" %% args pkgs)
+let opam cmd = Cmd.(atom "opam" % cmd)
+let opam_install pkgs = Cmd.(opam "install" %% list pkgs)
 
 let ocamlc ?(debug = false) file =
-  Cmd.(arg "ocamlc" % "-c" %% if' debug (arg "-g") %% unstamp (path file))
+  Cmd.(atom "ocamlc" % "-c" %% if' debug (atom "-g") %% unstamp (path file))
 
 let ocamlopt ?(profile = false) ?(debug = false) incs file =
-  let profile = Cmd.(if' profile (arg "-p")) in
-  let debug = Cmd.(if' debug (arg "-g")) in
+  let profile = Cmd.(if' profile (atom "-p")) in
+  let debug = Cmd.(if' debug (atom "-g")) in
   let incs = Cmd.(unstamp (paths ~slip:"-I" incs)) in
-  Cmd.(arg "ocamlopt" % "-c" %% debug %% profile %% incs %% (path file))
+  Cmd.(atom "ocamlopt" % "-c" %% debug %% profile %% incs %% (path file))
 
 let test_stamp () =
   let test cl cmd wit =

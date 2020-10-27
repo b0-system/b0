@@ -11,14 +11,11 @@ open B00
 
 (* FIXME we should gather sets or sorted lists for build repo *)
 
-type fpath = string
-let fpath = Fpath.to_string
-
 type sel =
-[ `Dir of fpath
-| `Dir_rec of fpath
-| `X of fpath
-| `File of fpath
+[ `Dir of Fpath.t
+| `Dir_rec of Fpath.t
+| `X of Fpath.t
+| `File of Fpath.t
 | `Fut of B0_build.t -> Fpath.Set.t Fut.t ]
 
 type sels = sel list
@@ -91,8 +88,8 @@ let select b sels =
   let open B00_std.Fut.Syntax in
   let m = B0_build.memo b in
   let u = B0_build.current b in
-  let root = B0_build.current_root_dir b in
-  let abs d = Fpath.(root // v d) in
+  let scope = B0_build.current_scope_dir b in
+  let abs d = Fpath.(scope // d) in
   let fs, ds, xs, futs =
     let rec loop fs ds xs futs = function
     | [] -> fs, ds, xs, futs

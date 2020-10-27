@@ -49,7 +49,7 @@ module Tool = struct
   let response_file_of to_file cli = { to_file; cli }
   let args0 =
     let to_file cmd = String.concat "\x00" (Cmd.to_list cmd) ^ "\x00" in
-    let cli f = Cmd.(arg "-args0" %% path f) in
+    let cli f = Cmd.(atom "-args0" %% path f) in
     { to_file; cli }
 
   type t =

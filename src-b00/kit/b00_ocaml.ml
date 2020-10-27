@@ -116,7 +116,7 @@ module Conf = struct
   let write m ~comp ~o =
     let comp = Memo.tool m comp in
     Memo.spawn m ~writes:[o] ~stdout:(`File o) @@
-    comp (Cmd.arg "-config")
+    comp (Cmd.atom "-config")
 
   let read m file =
     let* s = Memo.read m file in
@@ -270,7 +270,7 @@ module Mod = struct
             srcs, None
         in
         Memo.spawn m ?cwd ~reads:srcs ~writes:[o] ~stdout:(`File o) @@
-        ocamldep Cmd.(arg "-slash" % "-modules" %% paths srcs')
+        ocamldep Cmd.(atom "-slash" % "-modules" %% paths srcs')
 
       let read ?src_root m file =
         let* s = Memo.read m file in
@@ -563,7 +563,7 @@ module Cobj = struct
     (* FIXME add [src_root] so that we can properly unstamp. *)
     let ocamlobjinfo = Memo.tool m Tool.ocamlobjinfo in
     Memo.spawn m ~reads:cobjs ~writes:[o] ~stdout:(`File o) @@
-    ocamlobjinfo Cmd.(arg "-no-approx" % "-no-code" %% paths cobjs)
+    ocamlobjinfo Cmd.(atom "-no-approx" % "-no-code" %% paths cobjs)
 
   let read m file =
     let* s = B00.Memo.read m file in
@@ -807,7 +807,7 @@ module Lib = struct
         in
         let stdout = `File o in
         Memo.spawn m ~success_exits ~reads:[] ~writes:[o] ~stdout ~post_exec @@
-        ocamlfind Cmd.(arg "query" % lib % "-predicates" % "byte,native" %
+        ocamlfind Cmd.(atom "query" % lib % "-predicates" % "byte,native" %
                        "-format" % info)
 
       let read_info m clib_ext name file =
@@ -934,7 +934,7 @@ module Compile = struct
     in
     let incs = incs_of_files reads in
     Memo.spawn m ?post_exec ?k ~reads:(c :: reads) ~writes:[o] ~cwd @@
-    (Memo.tool m comp) Cmd.(arg "-c" %% opts %% unstamp (incs %% path c))
+    (Memo.tool m comp) Cmd.(atom "-c" %% opts %% unstamp (incs %% path c))
 
   let mli_to_cmi ?post_exec ?k ~and_cmti m ~comp ~opts ~reads ~mli ~o =
     let base = Fpath.rem_ext o in
@@ -942,10 +942,10 @@ module Compile = struct
     let reads = mli :: reads in
     let writes = o :: if and_cmti then [Fpath.(base + ".cmti")] else [] in
     let incs = incs_of_files reads in
-    let bin_annot = Cmd.if' and_cmti (Cmd.arg "-bin-annot") in
+    let bin_annot = Cmd.if' and_cmti (Cmd.atom "-bin-annot") in
     let io = Cmd.(unstamp (path o %% incs %% path mli)) in
     Memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
-    (Memo.tool m comp) Cmd.(arg "-c" %% bin_annot %% opts % "-o" %% io)
+    (Memo.tool m comp) Cmd.(atom "-c" %% bin_annot %% opts % "-o" %% io)
 
   let ml_to_cmo ?post_exec ?k ~and_cmt m ~opts ~reads ~has_cmi ~ml ~o =
     let ocamlc = Memo.tool m Tool.ocamlc in
@@ -957,10 +957,10 @@ module Compile = struct
             add_if (not has_cmi) Fpath.(base + ".cmi") [])
     in
     let incs = incs_of_files reads in
-    let bin_annot = Cmd.if' and_cmt (Cmd.arg "-bin-annot") in
+    let bin_annot = Cmd.if' and_cmt (Cmd.atom "-bin-annot") in
     let io = Cmd.(unstamp (path o %% incs %% path ml)) in
     Memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
-    ocamlc Cmd.(arg "-c" %% bin_annot %% opts % "-o" %% io)
+    ocamlc Cmd.(atom "-c" %% bin_annot %% opts % "-o" %% io)
 
   let ml_to_cmx ?post_exec ?k ~and_cmt m ~opts ~reads ~has_cmi ~ml ~o =
     let ocamlopt = Memo.tool m Tool.ocamlopt in
@@ -973,10 +973,10 @@ module Compile = struct
        add_if (not has_cmi) Fpath.(base + ".cmi") [])
     in
     let incs = incs_of_files reads in
-    let bin_annot = Cmd.if' and_cmt (Cmd.arg "-bin-annot") in
+    let bin_annot = Cmd.if' and_cmt (Cmd.atom "-bin-annot") in
     let io = Cmd.(unstamp (path o %% incs %% path ml)) in
     Memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
-    ocamlopt Cmd.(arg "-c" %% bin_annot %% opts % "-o" %% io)
+    ocamlopt Cmd.(atom "-c" %% bin_annot %% opts % "-o" %% io)
 
   let ml_to_impl ?post_exec ?k m ~code ~opts ~reads ~has_cmi ~ml ~o ~and_cmt =
     let ml_to_obj = match code with `Byte -> ml_to_cmo | `Native -> ml_to_cmx in
@@ -1058,19 +1058,19 @@ module Archive = struct
     in
     Memo.spawn ?post_exec ?k m ~reads:c_objs ~writes @@
     ocamlmklib
-      Cmd.(arg "-o" %% unstamp (path o) %% opts %% unstamp (paths c_objs))
+      Cmd.(atom "-o" %% unstamp (path o) %% opts %% unstamp (paths c_objs))
 
   let byte ?post_exec ?k m ~conf ~opts ~has_cstubs ~cobjs ~odir ~oname =
     let ocamlc = Memo.tool m Tool.ocamlc in
     let cstubs_opts =
       if not has_cstubs then Cmd.empty else
       let lib = Fmt.str "-l%s" (cstubs_name oname) in
-      Cmd.(arg "-cclib" % lib %%
-           if' (Conf.has_dynlink conf) (arg "-dllib" % lib))
+      Cmd.(atom "-cclib" % lib %%
+           if' (Conf.has_dynlink conf) (atom "-dllib" % lib))
     in
     let cma = Fpath.(odir / Fmt.str "%s.cma" oname) in
     Memo.spawn m ~reads:cobjs ~writes:[cma] @@
-    ocamlc Cmd.(arg "-a" % "-o" %% unstamp (path cma) %% opts %% cstubs_opts %%
+    ocamlc Cmd.(atom "-a" % "-o" %% unstamp (path cma) %% opts %% cstubs_opts %%
                 unstamp (paths cobjs))
 
   let native ?post_exec ?k m ~conf ~opts ~has_cstubs ~cobjs ~odir ~oname =
@@ -1079,14 +1079,14 @@ module Archive = struct
     let obj_ext = Conf.obj_ext conf in
     let cstubs_opts =
       if not has_cstubs then Cmd.empty else
-      Cmd.(arg "-cclib" % Fmt.str "-l%s" (cstubs_name oname))
+      Cmd.(atom "-cclib" % Fmt.str "-l%s" (cstubs_name oname))
     in
     let cmxa = Fpath.(odir / Fmt.str "%s.cmxa" oname) in
     let cmxa_clib = Fpath.(odir / Fmt.str "%s%s" oname lib_ext) in
     let c_objs = List.rev_map (Fpath.set_ext obj_ext) cobjs in
     let reads = List.rev_append c_objs cobjs in
     Memo.spawn m ?post_exec ?k ~reads ~writes:[cmxa; cmxa_clib] @@
-    ocamlopt Cmd.(arg "-a" % "-o" %% unstamp (path cmxa) %% opts %%
+    ocamlopt Cmd.(atom "-a" % "-o" %% unstamp (path cmxa) %% opts %%
                   cstubs_opts %% unstamp (paths cobjs))
 
   let code ?post_exec ?k m ~conf ~opts ~code ~has_cstubs ~cobjs ~odir ~oname =
@@ -1103,11 +1103,11 @@ module Archive = struct
       let oname = Fpath.basename ~no_ext:true cmxa in
       let cstubs_dir = Fpath.(parent cmxa) in
       let cstubs = Fpath.(cstubs_dir / cstubs_clib oname lib_ext) in
-      let inc = Cmd.(arg "-I" %% unstamp (path cstubs_dir)) in
+      let inc = Cmd.(atom "-I" %% unstamp (path cstubs_dir)) in
       Cmd.(inc %% unstamp (path cstubs)), [cstubs; cmxa; cmxa_clib]
     in
     Memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
-    ocamlopt Cmd.(arg "-shared" % "-linkall" % "-o" %% unstamp (path o) %%
+    ocamlopt Cmd.(atom "-shared" % "-linkall" % "-o" %% unstamp (path o) %%
                   opts %% cstubs_opts %% unstamp (path cmxa))
 end
 
@@ -1126,7 +1126,7 @@ module Link = struct
     let reads = List.rev_append cobjs c_objs in
     let incs = cstubs_incs cobjs in
     Memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
-    ocamlc Cmd.(arg "-o" %% unstamp (path o) %% opts %%
+    ocamlc Cmd.(atom "-o" %% unstamp (path o) %% opts %%
                 unstamp (incs %% paths c_objs %% paths cobjs))
 
   let native ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~o =
@@ -1143,7 +1143,7 @@ module Link = struct
       List.rev_append cobjs (List.rev_append sides c_objs)
     in
     Memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
-    ocamlopt Cmd.(arg "-o" %% unstamp (path o) %% opts %%
+    ocamlopt Cmd.(atom "-o" %% unstamp (path o) %% opts %%
                   unstamp (incs %% paths c_objs %% paths cobjs))
 
   let code ?post_exec ?k m ~conf ~opts ~code ~c_objs ~cobjs ~o =

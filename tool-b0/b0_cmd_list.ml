@@ -4,51 +4,48 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
-open B00_std.Result.Syntax
+open Result.Syntax
 
-let cmd cmdlet_name cmdlet_args c =
-  Log.if_error ~use:B00_cli.Exit.no_such_name @@
-  let* cmdlet = B0_cmdlet.get_or_hint cmdlet_name in
-  let cmd = B0_cmdlet.cmd cmdlet in
-  let cwd = B0_driver.Conf.cwd c in
-  let root_dir = Fpath.parent @@ Option.get @@ B0_driver.Conf.b0_file c in
-  let scope_dir = B0_def.scope_dir (B0_cmdlet.def cmdlet) in
-  let scope_dir = Option.value scope_dir ~default:root_dir in
-  let b0_dir = B0_driver.Conf.b0_dir c in
-  let exec = B0_cmdlet.Env.v ~cwd ~scope_dir ~root_dir ~b0_dir ~cmdlet in
-  Ok (cmd exec (Cmd.list cmdlet_args))
+let list format args c = B0_b0.Def.list (module B0_unit) c format args
 
 (* Command line interface *)
 
 open Cmdliner
 
-let cmdlet =
-  let doc = "The cmdlet to execute." in
-  Arg.(required & pos 0 (some string) None & info [] ~doc ~docv:"CMDLET")
-
-let cmdlet_args =
-  let doc =
-    "Argument for the cmdlet. Specify arguments after the $(b,--) token \
-     otherwise command line options will be interpreted by $(mname) $(tname)."
+let action =
+  let action =
+    ["action", `Action; "build-dir", `Build_dir; "edit", `Edit; "get", `Get;
+     "list", `List; "show", `Show]
   in
-  Arg.(value & pos_right 0 string [] & info [] ~doc ~docv:"ARG")
+  let doc =
+    let alts = Arg.doc_alts_enum action in
+    Fmt.str "The action to perform. $(docv) must be one of %s." alts
+  in
+  let action = Arg.enum action in
+  Arg.(required & pos 0 (some action) None & info [] ~doc ~docv:"ACTION")
+
+let unit_args =
+  let doc = "Units to list or all if unspecified." in
+  Arg.(value & pos_all string [] & info [] ~doc ~docv:"UNIT")
 
 let cmd =
-  let doc = "Execute cmdlets" in
+  let doc = "List build units" in
   let sdocs = Manpage.s_common_options in
   let exits = B0_driver.Exit.infos in
+  let envs = List.rev_append (B00_editor.envs ()) (B00_pager.envs ()) in
   let man_xrefs = [ `Main ] in
   let man = [
-    `S Manpage.s_synopsis;
-    `P "$(mname) $(tname) [$(i,OPTION)]... $(i,CMDLET) $(b,--) $(i,ARG)...";
     `S Manpage.s_description;
-    `P "$(tname) executes cmdlets.";
+    `P "$(tname) lists build units, an alias for $(tname) $(b, unit list)";
     `S Manpage.s_arguments;
+    `S Manpage.s_options;
     B0_b0.Cli.man_see_manual; ]
   in
-  let cmd_cmd = Term.(const cmd $ cmdlet $ cmdlet_args) in
-  B0_driver.with_b0_file ~driver:B0_b0.driver cmd_cmd,
-  Term.info "cmd" ~doc ~sdocs ~exits ~man ~man_xrefs
+  let list_cmd =
+    Term.(const list $ B00_cli.Arg.output_details () $ unit_args)
+  in
+  B0_driver.with_b0_file ~driver:B0_b0.driver list_cmd,
+  Term.info "list" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

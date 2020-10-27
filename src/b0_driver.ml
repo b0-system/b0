@@ -329,7 +329,7 @@ module Compile = struct
     List.iter (B00.Memo.file_ready m) ars;
     let reads = src_file :: ars in
     B00.Memo.spawn m ~reads ~writes @@
-    comp Cmd.(arg "-linkall" % "-g" % "-o" %% unstamp (path exe) % "-opaque" %%
+    comp Cmd.(atom "-linkall" % "-g" % "-o" %% unstamp (path exe) % "-opaque" %%
               incs %% (unstamp @@ (paths archives %% path src_file)));
     Fut.return ()
 

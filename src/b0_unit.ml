@@ -107,12 +107,12 @@ module Action = struct
     let* env = get_exec_meta (find_meta exec_env u) in
     Fut.return (Os.Exit.exec ?env ?cwd exe_file cmd)
 
-  let exec build u ~args:argl = match get_meta B0_meta.exe_file u with
+  let exec build u ~args = match get_meta B0_meta.exe_file u with
   | Error e -> Log.err (fun m -> m "%s" e); Fut.return B00_cli.Exit.some_error
   | Ok exe_file ->
       let* exe_file = exe_file in
       let exe = Fpath.basename exe_file in
-      let cmd = Cmd.(arg exe %% args argl) in
+      let cmd = Cmd.(atom exe %% list args) in
       exec_file build u exe_file cmd
 end
 
@@ -148,11 +148,11 @@ module Build = struct
 
   (* Directories *)
 
-  let root_dir b u = match B0_def.dir (def u) with
+  let scope_dir b u = match B0_def.scope_dir (def u) with
   | None -> b.b.root_dir
   | Some dir -> dir
 
-  let current_root_dir b = root_dir b (current b)
+  let current_scope_dir b = scope_dir b (current b)
   let build_dir b u =
     B0_dir.unit_build_dir ~build_dir:b.b.build_dir ~name:(name u)
 

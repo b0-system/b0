@@ -11,7 +11,7 @@ let echo = Tool.by_name "echo"
 
 let cache_no_write build_dir m =
   let echo = Memo.tool m echo in
-  Memo.spawn m @@ echo Cmd.(arg "Ha!")
+  Memo.spawn m @@ echo Cmd.(atom "Ha!")
 
 let test_cache_no_write () =
   with_memo cache_no_write;

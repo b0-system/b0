@@ -39,13 +39,13 @@ val current_meta : t -> B0_meta.t
 
 (** {1:dir Directories} *)
 
-val root_dir : t -> B0_unit.t -> Fpath.t
-(** [root_dir b u] is the directory of the B0 file in which [u] was
+val scope_dir : t -> B0_unit.t -> Fpath.t
+(** [scope_dir b u] is the directory of the B0 file in which [u] was
     defined. This is were unit relative paths like source files
     should be resolved. *)
 
-val current_root_dir : t -> Fpath.t
-(** [current_root_dir b] is [root_dir b current]. *)
+val current_scope_dir : t -> Fpath.t
+(** [current_scope_dir b] is [root_dir b current]. *)
 
 val build_dir : t -> B0_unit.t -> Fpath.t
 (** [build_dir b u] is the build directory for the build unit [u].

@@ -17,9 +17,9 @@ module Scope = struct
   let current = ref Nil
   let sealed = ref false
 
-  (* Library scopes *)
+  (* Library scopes (.libname) *)
 
-  let lib lib = current := Lib (String.concat "." ["lib"; lib; ""])
+  let lib lib = current := Lib (String.concat "." [""; lib; ""])
 
   (* File scopes *)
 
@@ -103,6 +103,7 @@ module Scope = struct
 
   let close () = match !current with
   | File (s :: ss) -> current := File ss
+  | Lib _ -> current := Nil
   | _ -> invalid_arg "no scope to close"
 
   let qualify_name n =
@@ -124,13 +125,19 @@ end
 
 (* Names *)
 
-type t = { scope : Scope.t; name : string; doc : string; meta : B0_meta.t }
+type t =
+  { scope : Scope.t;
+    name : string;
+    basename : string;
+    doc : string;
+    meta : B0_meta.t }
 
 type def = t
 let scope d = d.scope
 let file d = Scope.file d.scope
-let dir d = Scope.dir d.scope
+let scope_dir d = Scope.dir d.scope
 let name d = d.name
+let basename d = d.basename
 let doc d = d.doc
 let meta d = d.meta
 
@@ -149,6 +156,7 @@ module type S = sig
   val def_kind : string
   val def : t -> def
   val name : t -> string
+  val basename : t -> string
   val doc : t -> string
   val equal : t -> t -> bool
   val compare : t -> t -> int
@@ -178,6 +186,7 @@ module Make (V : VALUE) = struct
   let def_kind = V.def_kind
   let def = V.def
   let name v = name (V.def v)
+  let basename v = basename (V.def v)
   let doc v = doc (V.def v)
 
   let scope v = scope (V.def v)
@@ -229,7 +238,7 @@ module Make (V : VALUE) = struct
         let name = qualify_name n in
         match String.Map.mem name !defs with
         | true -> raise (Err (duplicate_error n))
-        | false -> { scope; name; doc; meta }
+        | false -> { scope; name; basename = n; doc; meta }
 
   let scoped_find n = match String.Map.find (Scope.qualify_name n) !defs with
   | exception Not_found -> None

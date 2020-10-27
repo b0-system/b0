@@ -8,6 +8,7 @@
     {b FIXME.} This will need a few more design rounds. Here
     are a few things:
     {ul
+    {- Review w.r.t. [b0].}
     {- We likely want combinators represenging {!sel}s and
     producing {!t} and ways union [t]s (for `Fut users).}
     {- The [`Fut] case should return a {!t}.}
@@ -19,7 +20,9 @@
 
     In a nutshell the declaration:
 {[
-let srcs = [ `Dir "src-exe"; `Dir_rec "src"; `X "src/not.ml"; `X "src/not"]
+let srcs =
+  Fpath.[ `Dir (v "src-exe"); `Dir_rec (v "src"); `X (v "src/not.ml");
+          `X (v "src/not")]
 ]}
     instructs to:
     {ul
@@ -30,7 +33,7 @@ let srcs = [ `Dir "src-exe"; `Dir_rec "src"; `X "src/not.ml"; `X "src/not"]
        segments are prefixed by [src/not.ml] and [src/not].}}
 
     Relative file paths are expressed relative to the build unit's
-    {{!B0_build.Unit.root_dir}root directory}.
+    {{!B0_build.Unit.scope_dir}scope directory}.
 
     The prefix relation for exclusions respects path segments
     boundaries. In the example any file whose path matches
@@ -53,24 +56,11 @@ open B00_std
 
 (** {1:sel Source selection} *)
 
-type fpath = string
-(** The type for file paths. Must be convertible with
-    {!B00_std.Fpath.of_string}. We do not use {!B00_std.Fpath} directly
-    to allow for a lighter syntax in B0 files.
-
-    {b Important.} Use only ["/"] as the directory separator even on
-    Windows® platforms. Don't be upset the UI gives them back to you
-    using the local platform separator. *)
-
-val fpath : Fpath.t -> fpath
-(** [fpath] is {!B00_std.Fpath.to_string}. If you prefer to specify your paths
-    the clean way. TODO remove ? *)
-
 type sel =
-[ `Dir of fpath
-| `Dir_rec of fpath
-| `X of fpath
-| `File of fpath
+[ `Dir of Fpath.t
+| `Dir_rec of Fpath.t
+| `X of Fpath.t
+| `File of Fpath.t
 | `Fut of B0_build.t -> Fpath.Set.t Fut.t ]
 (** The type for file selectors.
     {ul

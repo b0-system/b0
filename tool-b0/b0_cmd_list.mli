@@ -3,13 +3,10 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
+(** B0 [list] command. *)
 
-let build_dir ~b0_dir ~variant = Fpath.(b0_dir / "b" / variant)
-let shared_build_dir ~build_dir = Fpath.(build_dir / "_shared")
-let store_dir ~build_dir = Fpath.(build_dir / "_store")
-let unit_build_dir ~build_dir ~name = Fpath.(build_dir / name)
-let scratch_dir ~b0_dir = Fpath.(b0_dir / "_scratch")
+val cmd : B00_std.Os.Exit.t Cmdliner.Term.t * Cmdliner.Term.info
+(** [cmd] is the command line for [list]. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

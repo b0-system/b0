@@ -62,13 +62,21 @@ module File = struct
 
   (* Package file generation *)
 
-  let opam_file_addendum =
+  let name_field =
+    let doc = "opam file name: field" in
+    B0_meta.Key.v "opam-name" ~doc ~pp_value:Fmt.string
+
+  let file_addendum =
     let doc = "opam file fragment added at the end" in
     B0_meta.Key.v "opam-file-addendum" ~doc ~pp_value:pp
 
   let build_field =
     let doc = "opam file build: field" in
     B0_meta.Key.v "opam-build" ~doc ~pp_value:Fmt.string
+
+  let depends_field =
+    let doc = "opam file depends: field" in
+    B0_meta.Key.v "opam-depends" ~doc ~pp_value:Fmt.string
 
   let install_field =
     let doc = "opam file install: field" in
@@ -81,53 +89,66 @@ module File = struct
     let string_raw field k m acc = match B0_meta.find k m with
     | None -> acc | Some s -> `Field (field, `Raw s) :: acc
     in
-    let string_list ~vert field k m acc = match B0_meta.find k m with
+    let string_list ~by_line:l field k m acc = match B0_meta.find k m with
     | None -> acc
-    | Some ms -> `Field (field, `L (vert, List.map (fun s -> `S s) ms)) :: acc
+    | Some ms -> `Field (field, `L (l, List.map (fun s -> `S s) ms)) :: acc
+    in
+    let triple_string ~nl field k m acc = match B0_meta.find k m with
+    | None -> acc | Some s ->
+        let nl = if nl then "\n" else "" in
+        let tri = "\"\"\"" in
+        `Field (field, `Raw (String.concat "" [tri; nl; s; tri])) :: acc
     in
     let fields =
-      [ string_list ~vert:true "maintainer" B0_meta.maintainers;
-        string_list ~vert:true "authors" B0_meta.authors;
+      [ string_list ~by_line:true "maintainer" B0_meta.maintainers;
+        string_list ~by_line:true "authors" B0_meta.authors;
         string "homepage" B0_meta.homepage;
         string "doc" B0_meta.online_doc;
         string "dev-repo" B0_meta.repo;
         string "bug-reports" B0_meta.issues;
-        string_list ~vert:false "tags" B0_meta.description_tags;
-        string_list ~vert:false "license" B0_meta.licenses;
+        string_list ~by_line:false "tags" B0_meta.description_tags;
+        string_list ~by_line:false "license" B0_meta.licenses;
+        string_raw "depends" depends_field;
         string_raw "build" build_field;
         string_raw "install" install_field;
-        string "synopsis" B0_meta.synopsis;
-        string "description" B0_meta.description; ]
+        triple_string ~nl:false "synopsis" B0_meta.synopsis;
+        triple_string ~nl:true "description" B0_meta.description; ]
     in
     let add_field m acc f = f m acc in
     let (fs : item list) = List.fold_left (add_field m) [] fields in
-    let add = Option.value ~default:[] (B0_meta.find opam_file_addendum m) in
+    let add = Option.value ~default:[] (B0_meta.find file_addendum m) in
     List.rev_append fs add
 
   (* Opam file generation *)
 
-  let synopsis_of_title t = (* Get $DESCR in "$NAME $SEP $DESCR" *)
-    let ws = Char.Ascii.is_white and tok c = not @@ Char.Ascii.is_white c in
-    let skip = String.lose_left in
-    let d = t |> skip ws |> skip tok |> skip ws |> skip tok |> skip ws in
-    if d <> "" then Some d else None
-
   let synopsis_and_description_of_cmark file =
+    let syn_of_title t = (* Get $SYN in "$NAME $SEP $SYN" *)
+      let ws = Char.Ascii.is_white and tok c = not @@ Char.Ascii.is_white c in
+      let skip = String.lose_left in
+      let d = t |> skip ws |> skip tok |> skip ws |> skip tok |> skip ws in
+      if d <> "" then Some d else None
+    in
+    let descr_of_section s =
+      (* This is only here because of the person who wrote this.
+         This shouldn't exist. *)
+      let sub = "\x25%VERSION%%" in
+      if not (String.starts_with ~sub s) then String.trim s else
+      String.trim (String.subrange ~first:(String.length sub) s)
+    in
     let contents = Os.File.read file |> Log.if_error ~use:"" in
-    let convert (t, d) = synopsis_of_title t, d in
+    let convert (t, d) = syn_of_title t, descr_of_section d in
     Option.map convert (B00_cmark.first_section ~preamble:true contents)
 
-  let of_pack p =
-    (* For now this uses only meta so could be melded into of_meta.
-       In the future we might derive things like deps from units though. *)
-    let m = B0_pack.meta p in
-    let m = match B0_meta.(mem synopsis m, mem description m) with
+  let derive_synopsis_and_description p m =
+    match B0_meta.(mem synopsis m, mem description m) with
     | true, true -> m
     | has_syn, has_descr ->
-        let readme = (* FIXME scope/root/meta *) Fpath.v "README.md" in
-        let extracted = match Fpath.get_ext readme with
-        | ".md" -> synopsis_and_description_of_cmark readme
-        | _ -> None
+        let extracted = match B0_def.scope_dir (B0_pack.def p) with
+        | None -> None
+        | Some scope_dir ->
+            let readme = Fpath.(scope_dir / "README.md") in
+            let exists = Os.File.exists readme |> Log.if_error ~use:false in
+            if exists then synopsis_and_description_of_cmark readme else None
         in
         match extracted with
         | None -> m
@@ -136,12 +157,16 @@ module File = struct
             let m = if has_syn then m else B0_meta.(add synopsis syn m) in
             let m = if has_descr then m else B0_meta.(add description d m) in
             m
-    in
-    let m =
-      if B0_meta.mem build_field m then m else
-      let build = Fmt.str {|[[ "b0" "--lock" "-p" "%s" ]]|} (B0_pack.name p) in
-      B0_meta.add build_field build m
-    in
+
+  let derive_build p m =
+    if B0_meta.mem build_field m then m else
+    let b = Fmt.str {|[[ "b0" "--lock" "-p" "%s" ]]|} (B0_pack.basename p) in
+    B0_meta.add build_field b m
+
+  let of_pack p =
+    let m = B0_pack.meta p in
+    let m = derive_synopsis_and_description p m in
+    let m = derive_build p m in
     gen_by_b0 :: v2 :: of_meta m
 end
 
@@ -150,45 +175,130 @@ end
 let tag = B0_meta.Key.tag "opam" ~doc:"opam related entity"
 
 module Meta = struct
-  let opam_file_addendum = File.opam_file_addendum
   let build = File.build_field
+  let depends = File.depends_field
+  let file_addendum = File.file_addendum
   let install = File.install_field
-  let package =
-    let pp_value = Fmt.string in
-    B0_meta.Key.v "opam-package" ~doc:"Defined opam package name" ~pp_value
+  let name = File.name_field
 end
+
+let name_of_pack p = match B0_meta.find Meta.name (B0_pack.meta p) with
+| Some n -> n
+| None ->
+    let n = B0_pack.basename p in
+    if not (String.equal n "default") then n else
+    match B0_def.scope_dir (B0_pack.def p) with
+    | None -> "unknown" (* unlikely, libraries should not do this. *)
+    | Some d -> Fpath.basename d
 
 (* Cmdlets *)
 
-let file ps =
+let rec write_opam_files ~dst ps =
+  let warn_seen fst snd n = Log.warn @@ fun m ->
+    m "@[<v>Packs %a and %a both define opam package %s@,\
+       %a's definition ignored@]"
+      B0_pack.pp_name fst B0_pack.pp_name snd n B0_pack.pp_name snd
+  in
+  let warn_no_scope p n = Log.warn @@ fun m ->
+    m "@[<v>Pack %a (opam package %s) has no scope, ignored.@]"
+      B0_pack.pp_name p n
+  in
+  let rec loop seen ~dst = function
+  | [] -> Ok ()
+  | p :: ps ->
+      let n = name_of_pack p in
+      match String.Map.find_opt n seen with
+      | Some p' -> warn_seen p p' n; loop seen ~dst ps
+      | None ->
+          let seen = String.Map.add n p seen in
+          let file = File.of_pack p in
+          let write ~dir n file =
+            let d = File.to_string file in
+            let force = true and make_path = true in
+            Os.File.write ~force ~make_path Fpath.(dir / (n ^ ".opam")) d |>
+            Result.to_failure
+          in
+          begin match dst with
+          | `Stdout ->
+              let f = List.hd file :: `Field ("name", `S n) :: List.tl file in
+              Log.app (fun m -> m "@[%a@]" File.pp f)
+          | `Dir dir -> write ~dir n file
+          | `In_scope ->
+              match B0_def.scope_dir (B0_pack.def p) with
+              | None -> warn_no_scope p n
+              | Some s -> write ~dir:Fpath.(s / "opam") n file
+          end;
+          loop seen ~dst ps
+  in
+  try loop String.Map.empty ~dst ps with Failure e -> Error e
+
+let file_cmdlet env ps dst in_scope =
   Log.if_error ~use:B00_cli.Exit.no_such_name @@
   let* ps = B0_pack.get_list_or_hint ~empty_means_all:true ps in
   match List.filter (B0_pack.has_meta tag) ps with
-  | [] -> Ok B00_cli.Exit.ok
+  | [] ->
+      Log.warn (fun m -> m "No opam packages found in pack(s).");
+      Ok B00_cli.Exit.ok
   | ps ->
-      let files = List.map File.of_pack ps in
-      let sep = Fmt.(cut ++ cut) in
-      Log.app (fun m -> m "@[<v>%a@]" Fmt.(list ~sep File.pp) files);
+      Log.if_error' ~use:B00_cli.Exit.some_error @@
+      let dst = match in_scope with
+      | true -> `In_scope
+      | false -> match dst with None -> `Stdout | Some d -> `Dir d
+      in
+      let* () = write_opam_files ~dst ps in
       Ok B00_cli.Exit.ok
 
-let file_cmd cmdlet ~argv =
-  let open Cmdliner in
-  let packs =
-    let doc =
-      "Use pack $(docv). If unspecified all of them with a $(b,B0_opam.tag)"
-    in
-    B0_cli.Arg.packs ~doc ()
-  in
-  let term = Term.(const file $ packs) in
-  B0_cmdlet.Cli.run cmdlet ~argv term
-
-let file_cmdlet =
-  let doc = "Generate opam files from build packs" in
-  B0_cmdlet.v "file" ~doc (`Cmd file_cmd)
-
 module Cmdlet = struct
-  let file = file_cmdlet
+  let file =
+    B0_cmdlet.v "file" ~doc:"Generate opam files from build packs" @@
+    fun env args ->
+    let open Cmdliner in
+    let dst =
+      let doc = "Write files in directory $(docv)." in
+      Arg.(value & opt (some ~none:"stdout" B00_cli.fpath) None &
+           info ["d"; "dir"] ~doc ~docv:"DIR")
+    in
+    let packs =
+      let doc =
+        "Use pack $(docv). Defaults to all packs with a $(b,B0_opam.tag)." in
+      B0_cli.Arg.packs ~doc ()
+    in
+    let in_scope =
+      let doc =
+        "Write files in the scope directories of build packs in a directory \
+         named $(b,opam) for opam pinning."
+      in
+      Arg.(value & flag & info ["s"; "in-scope-dir"] ~doc)
+    in
+    B0_cmdlet.eval env args
+      Term.(const file_cmdlet $ const env $ packs $ dst $ in_scope)
+
+  let list = (* XXX maybe merge with file *)
+    B0_cmdlet.v "list" ~doc:"List opam packages defined by build packs" @@
+    fun env args ->
+    let open Cmdliner in
+    let packs =
+      let doc =
+        "Use pack $(docv). Defaults to all packs with a $(b,B0_opam.tag)." in
+      B0_cli.Arg.packs ~doc ()
+    in
+    let list_cmdlet env ps =
+      Log.if_error ~use:B00_cli.Exit.no_such_name @@
+      let* ps = B0_pack.get_list_or_hint ~empty_means_all:true ps in
+      match List.filter (B0_pack.has_meta tag) ps with
+      | [] -> Ok B00_cli.Exit.ok
+      | ps ->
+          let ns = List.map name_of_pack ps in
+          Log.app (fun m -> m "@[<v>%a@]" Fmt.(list string) ns);
+          Ok B00_cli.Exit.ok
+    in
+    B0_cmdlet.eval env args
+      Term.(const list_cmdlet $ const env $ packs)
+
+
 end
+
+let () = B0_def.Scope.close ()
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

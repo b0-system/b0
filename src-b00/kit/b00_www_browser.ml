@@ -76,7 +76,7 @@ let find ?search ~browser () =
       match browser with
       | Some cmd -> find_browser_cmd cmd
       | None ->
-          Result.bind (Os.Cmd.find Cmd.(arg "xdg-open")) @@ function
+          Result.bind (Os.Cmd.find Cmd.(atom "xdg-open")) @@ function
           | None -> Ok None
           | Some xdg -> Ok (Some (Cmd xdg))
 
@@ -86,14 +86,14 @@ let show_cmd ~background ~prefix cmd uri = Os.Cmd.run Cmd.(cmd % uri)
 let show_macos_open ~background ~prefix:_ open_tool ~appid uri =
   let appid = match appid with
   | None -> Cmd.empty
-  | Some appid -> Cmd.(arg "-b" % appid)
+  | Some appid -> Cmd.(atom "-b" % appid)
   in
-  let cmd = Cmd.(path open_tool %% if' background (arg "-g") %% appid) in
+  let cmd = Cmd.(path open_tool %% if' background (atom "-g") %% appid) in
   Os.Cmd.run Cmd.(cmd % uri)
 
 let show_macos_jxa name  ~background ~prefix jxa uri script =
   let bool = string_of_bool in
-  let args = Cmd.(arg (bool background) %% arg (bool prefix) % uri) in
+  let args = Cmd.(atom (bool background) %% atom (bool prefix) % uri) in
   match macos_jxa_run jxa script args with
   | Ok _ -> Ok ()
   | Error e -> Fmt.error "%s jxa: %s" name e

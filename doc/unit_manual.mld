@@ -1,16 +1,15 @@
-{0 B0 build unit manual}
+{0 Build unit manual}
 
 This manual shows how to deal with B0 build units and create your own.
 
-{1:custom Custom build unit tutorial}
+{1:custom Custom unit tutorial}
 
 We show how to devise a custom unit that compiles a [.ml] file to a
 bytecode executable.
 
 To create a custom unit from scratch it is better not to clutter your
-B0 file too much and develop it in its own file.
-
-At the root of your project issue:
+B0 file too much and develop it in its own file. At the root of your
+project issue:
 
 {[
 mkdir B0

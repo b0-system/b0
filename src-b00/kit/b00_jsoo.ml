@@ -14,26 +14,26 @@ let tool = Tool.by_name ~vars:env_vars "js_of_ocaml"
 let build_runtime m ~opts ~jss ~o =
   let jsoo = Memo.tool m tool in
   Memo.spawn m ~reads:jss ~writes:[o] @@
-  jsoo Cmd.(arg "build-runtime" % "-o" %% (unstamp @@ path o) %% opts %%
+  jsoo Cmd.(atom "build-runtime" % "-o" %% (unstamp @@ path o) %% opts %%
             unstamp (paths jss))
 
 let handle_source_map ~o = function
 | None -> [o], Cmd.empty
-| Some `Inline -> [o], Cmd.(arg "--source-map-inline")
-| Some `File -> [o; Fpath.(o -+ ".map")], Cmd.(arg "--source-map")
+| Some `Inline -> [o], Cmd.(atom "--source-map-inline")
+| Some `File -> [o; Fpath.(o -+ ".map")], Cmd.(atom "--source-map")
 
 let compile m ~opts ~source_map ~jss ~byte ~o =
   let jsoo = Memo.tool m tool in
   let writes, source_map = handle_source_map ~o source_map in
   Memo.spawn m ~reads:(byte :: jss) ~writes @@
-  jsoo Cmd.(arg "compile" % "-o" %% (unstamp @@ path o) %% opts %% source_map %%
-            (unstamp @@ paths jss %% path byte))
+  jsoo Cmd.(atom "compile" % "-o" %% (unstamp @@ path o) %% opts %%
+            source_map %% (unstamp @@ paths jss %% path byte))
 
 let link m ~opts ~source_map ~jss ~o =
   let jsoo = Memo.tool m tool in
   let writes, source_map = handle_source_map ~o source_map in
   Memo.spawn m ~reads:jss ~writes @@
-  jsoo Cmd.(arg "link" % "-o" %% (unstamp @@ path o) %% opts %% source_map %%
+  jsoo Cmd.(atom "link" % "-o" %% (unstamp @@ path o) %% opts %% source_map %%
             (unstamp @@ paths jss))
 
 let write_page

@@ -55,25 +55,35 @@ module File : sig
       {!B0_opam.Meta} keys.
       {ul
       {- ["authors:"], {!B0_meta.authors}.}
-      {- ["build:"], {!B0_opam.build}.}
+      {- ["build:"], {!B0_opam.Meta.build}.}
       {- ["bug-report:"], {!B0_meta.issues}.}
       {- ["description:"], {!B0_meta.description}.}
+      {- ["depends:"], {!B0_opam.Meta.depends}.}
       {- ["dev-repo:"], {!B0_meta.repo}.}
       {- ["doc:"], {!B0_meta.online_doc}.}
       {- ["homepage:"], {!B0_meta.homepage}.}
-      {- ["install:"], {!B0_build.install}.}
+      {- ["install:"], {!B0_opam.Meta.install}.}
       {- ["license:"], {!B0_meta.licenses}.}
       {- ["maintainer:"], {!B0_meta.maintainers}.}
       {- ["synopsis:"], {!B0_meta.synopsis}.}
       {- ["tags:"], {!B0_meta.description_tags}.}
       }
-      Besides the contents of {!B0_opam.Meta.append_file} is appended
-      after the definition of these fields. *)
+      Besides the contents of {!B0_opam.Meta.file_addendum} is appended
+      after the definition of these fields. Using {!of_pack} infers
+      some of the field if undefined. *)
 
   val of_pack : B0_pack.t -> t
-  (** [of_pack u] XXX explain the details of field inference. For
-      derivation could be done meta only but we might use a pack's
-      units at some point. *)
+  (** [of_pack p] is an opam file for pack [p]. This starts by using [p]'s
+      metadata as described in {!of_meta} to define the file fields.
+      After this with missing:
+      {ul
+      {- ["synopsis:"] or [description:]. The fields are tentatively
+         derived from an existing [README.md] in the scope directory of
+         [p]. The first marked up section of the file is extracted, its title
+         is parsed according to the pattern '$(NAME) $(SEP) $(SYNOPSIS)' to
+         get a synopsis line and the body of the section defines
+         the description.}
+      {- ["build:"], a locked b0 build of the pack is defined.}} *)
 end
 
 val tag : unit B0_meta.key
@@ -82,30 +92,47 @@ val tag : unit B0_meta.key
 (** [opam] B0 metadata. *)
 module Meta : sig
 
-  val opam_file_addendum : File.t B0_meta.key
-  (** [opam_file_addendum] is an [opam] file fragment appended at the
-      end of a generated [opam] file. See {!B0_opam.File.of_meta}. *)
-
   val build : string B0_meta.key
   (** [build] is an opam [build:] field value. Used to override automatic
       opam file generation. This is a raw string in opam syntax that
       defines the whole field. See {!B0_opam.File.of_meta}. *)
 
+  val depends : string B0_meta.key
+  (** [depends] is an opam [depends:] field value. Used to override
+      automatic opam file dependency generation. This is a raw string
+      in opam syntax that defines the whole field. See
+      {!B0_opam.File.of_pack}. *)
+
+  val file_addendum : File.t B0_meta.key
+  (** [file_addendum] is an [opam] file fragment appended at the
+      end of a generated [opam] file. See {!B0_opam.File.of_meta}. *)
+
   val install : string B0_meta.key
   (** [install] is an opam [install:] field value. Used to override
       automatic opam file generation. This is a raw string in opam
       syntax that defines the whole field. See
-      {!B0_opam.File.of_meta}. *)
+      {!B0_opam.File.of_pack}. *)
 
-  val package : string B0_meta.key
-  (** [package] on a build pack specifies that the pack defines the
-      package with the given name. *)
+  val name : string B0_meta.key
+  (** [name] is an [opam] [name:] field value. Use to override
+      automatic opam package name generation, see {!B0_opam.name_of_pack}. *)
 end
 
-(** [opam.*] Cmdlets *)
+val name_of_pack : B0_pack.t -> string
+(** [name_of_pack p] derives an opam package name for [p].
+    This is either in order:
+    {ol
+    {- The {!Meta.name} field of [p]'s meta, if defined.}
+    {- The {!B0_meta.basename} of [p] if not equal to ["default"].}
+    {- The basename of [p]'s scope directory.}} *)
+
+(** [.opam.*] Cmdlets *)
 module Cmdlet : sig
   val file : B0_cmdlet.t
-  (** [file] is the [opam.file] cmdlet. *)
+  (** [file] is the [.opam.file] cmdlet. *)
+
+  val list : B0_cmdlet.t
+  (** [list] is the [.opam.list] cmdlet. *)
 end
 
 (*---------------------------------------------------------------------------
