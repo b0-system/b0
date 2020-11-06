@@ -29,6 +29,7 @@ type require = B00_ocaml.Lib.Name.t * smeta
 type mod_use = Fpath.t * smeta
 type t =
   { file : Fpath.t;
+    cwd : Fpath.t; (* Fpath.parent of [file] *)
     b0_boots : b0_boot list;
     b0_includes : b0_include list;
     requires : require list;
@@ -36,6 +37,7 @@ type t =
     ocaml_unit : string * smeta; }
 
 let file f = f.file
+let cwd f = f.cwd
 let b0_includes f = f.b0_includes
 let b0_boots f = f.b0_boots
 let requires f = f.requires
@@ -232,7 +234,8 @@ let of_string ~file src =
     let b0_boots, b0_includes, requires, mod_uses = parse_preamble d in
     let rest = String.subrange ~first:(Tdec.pos d) src in
     let ocaml_unit = rest, smeta ~loc:(Tdec.loc_here d) in
-    Ok { file; b0_boots; b0_includes; requires; ocaml_unit; mod_uses }
+    let cwd = Fpath.parent file in
+    Ok { file; cwd; b0_boots; b0_includes; requires; ocaml_unit; mod_uses }
   with Tdec.Err (loc, e) -> loc_error loc "%a" (Fmt.vbox Fmt.lines) e
 
 (* Expansion *)
@@ -250,9 +253,9 @@ let expanded_b0_includes e = e.expanded_b0_includes
 let expanded_requires e = e.expanded_requires
 let expanded_src e = e.expanded_src
 
-let get_include_src cwd (p, smeta) =
+let get_include_src b0_file (p, smeta) =
   let src =
-    let* file = Os.Path.realpath Fpath.(cwd // p) in
+    let* file = Os.Path.realpath Fpath.((cwd b0_file) // p) in
     let* src = Os.File.read file in
     Ok (file, src)
   in
@@ -262,20 +265,20 @@ let get_include_src cwd (p, smeta) =
       (* We could do a bit better with e here *)
       loc_err_fmt Fmt.failwith_notrace smeta "%s" e
 
-let get_mod_use_srcs cwd files (p, smeta) =
-  let file_impl = Fpath.(cwd // p) in
+let get_mod_use_srcs b0_file manif (p, smeta) =
+  let file_impl = Fpath.((cwd b0_file) // p) in
   let file_intf = Fpath.(file_impl -+ ".mli") in
   let res =
     (* XXX maybe we should rather add non realpathed paths to files
         e.g. if people play with symlinks. Sort that out. *)
     let* file_impl = Os.Path.realpath file_impl in
     let* src_impl = Os.File.read file_impl in
-    let files = file_impl :: files in
+    let manif = file_impl :: manif in
     let* exists = Os.File.exists file_intf in
-    if not exists then Ok (files, None, (file_impl, src_impl)) else
+    if not exists then Ok (manif, None, (file_impl, src_impl)) else
     let* file_intf = Os.Path.realpath file_intf in
     let* src_intf = Os.File.read file_intf in
-    Ok (file_intf :: files, Some (file_intf, src_intf), (file_impl, src_impl))
+    Ok (file_intf :: manif, Some (file_intf, src_intf), (file_impl, src_impl))
   in
   match res with
   | Ok (files, intf, impl) -> files, intf, impl
@@ -290,11 +293,10 @@ let w acc l = l :: acc [@@ocaml.inline]
 
 let w_src b (file, src) =
   let b = w b (Fmt.str "#1 %S" (Fpath.to_string file)) in
-  let b = w b src in
-  b
+  let b = w b src in b
 
-let w_mod_use b cwd files (p, _ as mod_use) =
-  let files, intf, impl = get_mod_use_srcs cwd files mod_use in
+let w_mod_use b b0_file manif (p, _ as mod_use) =
+  let manif, intf, impl = get_mod_use_srcs b0_file manif mod_use in
   let mod_name = B00_ocaml.Mod.Name.of_mangled_filename (Fpath.basename p) in
   let b = match intf with
   | None -> w b (Fmt.str "module %s = struct" mod_name)
@@ -307,42 +309,44 @@ let w_mod_use b cwd files (p, _ as mod_use) =
   let b = w_src b impl in
   let b = w b "end" in
   let b = w b nil_loc in
-  b, files
+  b, manif
 
-let rec w_mod_uses b cwd files = function
-| [] -> b, files
-| mod_use :: mod_uses ->
-    let b, files = w_mod_use b cwd files mod_use in
-    w_mod_uses b cwd files mod_uses
+let rec w_mod_uses b b0_file manif =
+  let rec loop b file files = function
+  | [] -> b, files
+  | mod_use :: mod_uses ->
+      let b, manif = w_mod_use b file manif mod_use in
+      loop b file manif mod_uses
+  in
+  loop b b0_file manif (mod_uses b0_file)
 
 let w_ocaml_unit b (src, src_meta) =
   let b = w b (lineno src_meta) in
-  let b = w b src in
-  b
+  let b = w b src in b
 
-let rec w_include b cwd id npre files boots incs reqs ((n, nm), inc_file) =
-  let src = get_include_src cwd inc_file in
+let rec w_include b b0_file id npre manif boots incs reqs ((n, nm), inc_file) =
+  let b0_file = get_include_src b0_file inc_file in
   let b = w b nil_loc in
   let b = w b (Fmt.str "module Inc_%03d : sig end = struct" id) in
   let b =
-    let f = Fpath.to_string (file src) in
+    let f = Fpath.to_string (file b0_file) in
     w b (Fmt.str "let () = B0_def.Scope.open' %S (B00_std.Fpath.v %S)" n f)
   in
-  let b, id, files, boots, incs, reqs =
+  let b, id, manif, boots, incs, reqs =
     let id = id + 1 in
-    let file = file src in
+    let file = file b0_file in
     let npre = if npre = "" then n else String.concat "." [npre; n] in
     let incs = ((npre, nm), (file, snd inc_file)) :: incs in
-    w_includes b id npre files boots incs reqs src
+    w_includes b b0_file id npre manif boots incs reqs
   in
-  let b, files = w_mod_uses b cwd files (mod_uses src) in
-  let b = w_ocaml_unit b (ocaml_unit src) in
+  let b, manif = w_mod_uses b b0_file manif in
+  let b = w_ocaml_unit b (ocaml_unit b0_file) in
   let b = w b nil_loc in
   let b = w b "let () = B0_def.Scope.close ()" in
   let b = w b "end" in
-  b, id, files, boots, incs, reqs
+  b, id, manif, boots, incs, reqs
 
-and w_includes b id npre files boots incs reqs src =
+and w_includes b b0_file id npre manif boots incs reqs =
   let check_scope_unique (n, smeta) nmap = match String.Map.find n nmap with
   | exception Not_found -> String.Map.add n smeta nmap
   | smeta' ->
@@ -350,37 +354,34 @@ and w_includes b id npre files boots incs reqs src =
         smeta "@[<v>Scope name %a already defined.@,\
                Previous definition:@,%a:@]" Fmt.(code string) n pp_loc smeta'
   in
-  let rec loop cwd id nmap npre b files boots incs reqs = function
+  let rec loop b0_file id nmap npre b files boots incs reqs = function
   | (name, _ as i) :: todo ->
       let nmap = check_scope_unique name nmap in
       let b, id, files, boots, incs, reqs =
-        w_include b cwd id npre files boots incs reqs i
+        w_include b b0_file id npre files boots incs reqs i
       in
-      loop cwd id nmap npre b files boots incs reqs todo
+      loop b0_file id nmap npre b files boots incs reqs todo
   | [] ->
       b, id, files, boots, incs, reqs
   in
-  let file = file src in
-  let cwd = Fpath.parent file in
-  let files = file :: files in
-  let boots = List.rev_append (b0_boots src) boots in
-  let reqs = List.rev_append (requires src) reqs in
-  loop cwd id String.Map.empty npre b files boots incs reqs (b0_includes src)
+  let manif = file b0_file :: manif in
+  let boots = List.rev_append (b0_boots b0_file) boots in
+  let reqs = List.rev_append (requires b0_file) reqs in
+  loop b0_file id String.Map.empty npre b manif boots incs reqs
+    (b0_includes b0_file)
 
-let expand src =
+let expand b0_file =
   try
     let b = w [] nil_loc in
-    let file = file src in
-    let cwd = Fpath.parent file in
-    let r = Fpath.to_string file in
+    let r = Fpath.to_string (file b0_file) in
     let b = w b (Fmt.str "let () = B0_def.Scope.root (B00_std.Fpath.v %S)" r) in
-    let b, _, files, boots, incs, reqs = w_includes b 0 "" [] [] [] [] src in
-    let b, files = w_mod_uses b cwd files (mod_uses src) in
-    let b = w_ocaml_unit b (ocaml_unit src) in
+    let b, _, manif, boots, incs, reqs = w_includes b b0_file 0 "" [] [] [][] in
+    let b, mani = w_mod_uses b b0_file manif in
+    let b = w_ocaml_unit b (ocaml_unit b0_file) in
     let b = w b nil_loc in
     let b = w b "let () = B0_def.Scope.seal ()" in
     let b = w b "let () = B0_driver.run ~has_b0_file:true" in
-    Ok { expanded_file_manifest = List.rev files;
+    Ok { expanded_file_manifest = List.rev manif;
          expanded_b0_boots = List.rev boots;
          expanded_b0_includes = List.rev incs;
          expanded_requires = List.rev reqs;
