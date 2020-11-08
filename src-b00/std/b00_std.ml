@@ -1289,8 +1289,8 @@ module List = struct
 
   let classify
       (type a) (type b)
-      ?(cmp_elts : a -> a -> int = compare)
-      ?(cmp_classes : b -> b -> int = compare)
+      ?(cmp_elts : a -> a -> int = Stdlib.compare)
+      ?(cmp_classes : b -> b -> int = Stdlib.compare)
       ~classes:(classes : (a -> b list)) els
     =
     let module S = Set.Make (struct type t = a let compare = cmp_elts end) in
