@@ -139,19 +139,19 @@ module Memo : sig
 
   (** {1:lookup Tool lookup} *)
 
-  type tool_lookup = t -> Cmd.tool -> (Fpath.t, string) result
+  type tool_lookup = t -> Cmd.tool -> (Fpath.t, string) result Fut.t
   (** The type for tool lookups. Given a command line tool
       {{!type:B00_std.Cmd.tool}specification} returns a file path to
       the tool executable or an error message mentioning the tool if
       it cannot be found. *)
 
-  val tool_lookup_of_env :
-    ?sep:string -> ?var:string -> Env.t -> tool_lookup
+  val tool_lookup_of_os_env :
+    ?sep:string -> ?var:string -> Os.Env.t -> tool_lookup
   (** [env_tool_lookup ~sep ~var env] is a tool lookup that gets the
       value of the [var] variable in [env] treats it as a [sep]
       separated {{!B00_std.Fpath.list_of_search_path}search path} and
-      uses the result to lookup with {!B00_std.Os.Cmd.must_find}.
-      [var] defaults to [PATH] and [sep] to
+      uses the result to lookup with {!B00_std.Os.Cmd.get} with
+      the memo's {!win_exe}. [var] defaults to [PATH] and [sep] to
       {!B00_std.Fpath.search_path_sep}. *)
 
   (** {1:memo Memoizer} *)
@@ -165,12 +165,13 @@ module Memo : sig
   val create :
     ?clock:Time.counter -> ?cpu_clock:Time.cpu_counter ->
     feedback:(feedback -> unit) -> cwd:Fpath.t ->
-    ?tool_lookup:tool_lookup -> Env.t -> B000.Guard.t ->
+    ?win_exe:bool -> ?tool_lookup:tool_lookup -> Env.t -> B000.Guard.t ->
     B000.Reviver.t -> B000.Exec.t -> t
 
   val memo :
-    ?hash_fun:(module Hash.T) -> ?env:Os.Env.t -> ?cwd:Fpath.t ->
-    ?cache_dir:Fpath.t -> ?trash_dir:Fpath.t -> ?jobs:int ->
+    ?hash_fun:(module Hash.T) -> ?win_exe:bool -> ?tool_lookup:tool_lookup ->
+    ?env:Os.Env.t -> ?cwd:Fpath.t -> ?cache_dir:Fpath.t ->
+    ?trash_dir:Fpath.t -> ?jobs:int ->
     ?feedback:([feedback | B000.Exec.feedback] -> unit) -> unit ->
     (t, string) result
   (** [memo] is a simpler {!create}
@@ -188,6 +189,10 @@ module Memo : sig
 
   val cpu_clock : t -> Time.cpu_counter
   (** [cpu_clock m] is [m]'s cpu clock. *)
+
+  val win_exe : t -> bool
+  (** [win_exe m] is [true] if we spawn windows executables. This
+      affects tool lookups. Defaults to {!Sys.win32}. *)
 
   val tool_lookup : t -> tool_lookup
   (** [tool_lookup m] is [m]'s tool lookup function. *)
@@ -328,7 +333,9 @@ module Memo : sig
       when all [files] are ready in [m]. {b FIXME} Unclear whether
       we really want this. *)
 
-  (** {1:spawn Memoizing tool spawns} *)
+  (** {1:spawn Memoizing tool spawns}
+
+      {b TODO.} Can't we simplify the cmd/tool/tool_lookup dance ?. *)
 
   type cmd
   (** The type for memoized tool invocations. *)
@@ -338,9 +345,15 @@ module Memo : sig
 
   val tool : t -> Tool.t -> (Cmd.t -> cmd)
   (** [tool m t] is tool [t] memoized. Use the resulting function
-      to spawn the tool with the given arguments. *)
+      to spawn the tool with the given arguments.
 
-  val tool_opt : t -> Tool.t -> (Cmd.t -> cmd) option
+      {b TODO} explain better how this all works. If the path given
+      to [Tool.t] is not made of a single path segment it is not
+      search in the environmet and it is the duty of the client
+      to ensure it gets ready at some point. Either by a direct
+      call to {!file_ready} or by another file write. *)
+
+  val tool_opt : t -> Tool.t -> (Cmd.t -> cmd) option Fut.t
   (** [tool_opt m t] is like {!tool}, except [None] is returned
       if the tool cannot be found. *)
 

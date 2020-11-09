@@ -4,6 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open Result.Syntax
 open B000
 
 module Tool = struct
@@ -49,7 +50,7 @@ module Tool = struct
 end
 
 module Env = struct
-  (** TODO does it still make sense to have that separate ? *)
+  (** Does it still make sense to have that separate ? *)
 
   type t = { env : Os.Env.t; forced_env : Os.Env.t; }
   let v ?(forced_env = String.Map.empty) env = { env; forced_env }
@@ -64,12 +65,13 @@ module Memo = struct
 
   type t = { c : ctx; m : memo }
   and ctx = { mark : Op.mark }
-  and tool_lookup = t -> Cmd.tool -> (Fpath.t, string) result
+  and tool_lookup = t -> Cmd.tool -> (Fpath.t, string) result Fut.t
   and memo =
     { clock : Time.counter;
       cpu_clock : Time.cpu_counter;
       feedback : feedback -> unit;
       cwd : Fpath.t;
+      win_exe : bool;
       tool_lookup : tool_lookup;
       env : Env.t ;
       guard : Guard.t;
@@ -82,6 +84,18 @@ module Memo = struct
 
   (* Tool lookup *)
 
+  let file_ready m p =
+    (* XXX Maybe we should really test for file existence here and notify
+       a failure if it doesn't exist. But also maybe we should
+       introduce a stat cache and propagate it everywhere in B000.
+
+       XXX maybe it would be better to have this as a build op but then
+       we might not be that interested in repeated file_ready, e.g.
+       done by multiple resolvers. Fundamentally ready_roots had
+       to be added for correct "never became ready" error reports. *)
+    Guard.set_file_ready m.m.guard p;
+    m.m.ready_roots <- Fpath.Set.add p m.m.ready_roots
+
   let cache_lookup lookup =
     let cache = Hashtbl.create 91 in
     fun m tool -> match Hashtbl.find cache tool with
@@ -89,34 +103,40 @@ module Memo = struct
     | exception Not_found ->
         let p = lookup m tool in Hashtbl.add cache tool p; p
 
-  let tool_lookup_of_env ?sep ?(var = "PATH") env =
-    let search_path = match String.Map.find var (Env.env env) with
+  let tool_lookup_of_os_env ?sep ?(var = "PATH") env =
+    let search_path = match String.Map.find var env with
     | exception Not_found -> "" | s -> s
     in
     match Fpath.list_of_search_path ?sep search_path with
-    | Error _ as e -> fun _ _ -> e
-    | Ok search -> fun m tool -> Os.Cmd.get_tool ~search tool
+    | Error _ as e -> fun _ _ -> Fut.return e
+    | Ok search ->
+        fun m t -> match Os.Cmd.get_tool ~win_exe:m.m.win_exe ~search t with
+        | Error _ as e -> Fut.return e
+        | Ok file as tool -> file_ready m file; Fut.return tool
 
   let create
-      ?clock ?cpu_clock:cc ~feedback ~cwd ?tool_lookup env guard reviver exec
+      ?clock ?cpu_clock:cc ~feedback ~cwd ?(win_exe = Sys.win32)
+      ?tool_lookup env guard reviver exec
     =
     let clock = match clock with None -> Time.counter () | Some c -> c in
     let cpu_clock = match cc with None -> Time.cpu_counter () | Some c -> c in
     let tool_lookup = cache_lookup @@ match tool_lookup with
-    | None -> tool_lookup_of_env env
+    | None -> tool_lookup_of_os_env (Env.env env)
     | Some l -> l
     in
     let op_id = 0 and ops = [] in
     let c = { mark = "" } in
     let m =
-      { clock; cpu_clock; feedback; cwd; tool_lookup; env; guard; reviver;
-        exec; has_failures = false; op_id; ops; ready_roots = Fpath.Set.empty }
+      { clock; cpu_clock; feedback; cwd; win_exe; tool_lookup; env; guard;
+        reviver; exec; has_failures = false; op_id; ops;
+        ready_roots = Fpath.Set.empty }
     in
     { c; m }
 
   let memo
-      ?(hash_fun = (module Hash.Xxh_64 : Hash.T)) ?env ?cwd ?cache_dir
-      ?trash_dir ?(jobs = B00_std.Os.Cpu.logical_count ()) ?feedback ()
+      ?(hash_fun = (module Hash.Xxh_64 : Hash.T)) ?win_exe ?tool_lookup
+      ?env ?cwd ?cache_dir ?trash_dir
+      ?(jobs = B00_std.Os.Cpu.logical_count ()) ?feedback ()
     =
     let feedback = match feedback with | Some f -> f | None -> fun _ -> () in
     let fb_exec = (feedback :> Exec.feedback -> unit) in
@@ -139,10 +159,12 @@ module Memo = struct
     let reviver = Reviver.create clock hash_fun cache in
     let trash = Trash.create trash_dir in
     let exec = Exec.create ~clock ~feedback:fb_exec ~trash ~jobs () in
-    Ok (create ~clock ~feedback:fb_memo ~cwd env guard reviver exec)
+    Ok (create ~clock ~feedback:fb_memo ~cwd ?win_exe ?tool_lookup env
+          guard reviver exec)
 
   let clock m = m.m.clock
   let cpu_clock m = m.m.cpu_clock
+  let win_exe m = m.m.win_exe
   let tool_lookup m = m.m.tool_lookup
   let env m = m.m.env
   let reviver m = m.m.reviver
@@ -289,18 +311,6 @@ module Memo = struct
 
   (* Files *)
 
-  let file_ready m p =
-    (* XXX Maybe we should really test for file existence here and notify
-       a failure if it doesn't exist. But also maybe we should
-       introduce a stat cache and propagate it everywhere in B000.
-
-       XXX maybe it would be better to have this as a build op but then
-       we might not be that interested in repeated file_ready, e.g.
-       done by multiple resolvers. Fundamentally ready_roots had
-       to be added for correct "never became ready" error reports. *)
-    Guard.set_file_ready m.m.guard p;
-    m.m.ready_roots <- Fpath.Set.add p m.m.ready_roots
-
   let read m file =
     let id = new_op_id m and created = timestamp m in
     let r, set = Fut.create () in
@@ -344,11 +354,9 @@ module Memo = struct
     add_op_and_stir m o;
     r
 
-  (* FIXME better strategy to deal with builded tools. If the tool is a
-     path check for readyness if not add it to the operations reads.
-     I also suspect the tool lookup approach is not exactly right at
-     the moment. Maybe this will clear up when we get the configuration
-     story in. *)
+  (* FIXME That whole lookup approach stills seems quite involved.
+     Try to simplify. *)
+
   type _tool =
   { tool : Tool.t;
     tool_file : Fpath.t;
@@ -359,7 +367,7 @@ module Memo = struct
   | Miss of Tool.t * string
   | Tool of _tool
 
-  type cmd = { cmd_tool : tool; cmd_args : Cmd.t }
+  type cmd = { cmd_tool : tool Fut.t; cmd_args : Cmd.t }
 
   let tool_env m t =
     let env = Env.env m.m.env in
@@ -382,29 +390,50 @@ module Memo = struct
       Os.Env.to_assignments tool_env, Os.Env.to_assignments stamped
 
   let tool m tool =
-    let cmd_tool = match m.m.tool_lookup m (Tool.name tool) with
-    | Error e -> Miss (tool, e)
-    | Ok tool_file ->
-        let tool_env, tool_stamped_env = tool_env m tool in
-        let tool_env = Os.Env.to_assignments tool_env in
-        let tool_stamped_env = Os.Env.to_assignments tool_stamped_env in
-        Tool { tool; tool_file; tool_env; tool_stamped_env }
+    let cmd_tool =
+      let name, is_path =
+        let name = Fpath.to_string (Tool.name tool) in
+        let name =
+          let suffix = ".exe" in
+          if not m.m.win_exe || String.ends_with ~sub:suffix name then name else
+          (name ^ suffix)
+        in
+        Fpath.v name, String.contains name Fpath.dir_sep_char
+      in
+      let tool_file = match is_path with
+      | true -> Fut.return (Ok name)
+      | false -> m.m.tool_lookup m name
+      in
+      Fut.bind tool_file @@ function
+      | Error e -> Fut.return (Miss (tool, e))
+      | Ok tool_file ->
+          let tool_env, tool_stamped_env = tool_env m tool in
+          let tool_env = Os.Env.to_assignments tool_env in
+          let tool_stamped_env = Os.Env.to_assignments tool_stamped_env in
+          Fut.return @@
+          Tool { tool; tool_file; tool_env; tool_stamped_env }
     in
     fun cmd_args -> { cmd_tool; cmd_args }
 
-  let tool_opt m t = match m.m.tool_lookup m (Tool.name t) with
-  | Error e (* FIXME distinguish no lookup from errors *) -> None
-  | Ok _ -> Some (tool m t)
+  let tool_opt m t = (* FIXME this does not do the same business as tool *)
+    Fut.bind (m.m.tool_lookup m (Tool.name t)) @@ function
+    | Error e (* FIXME distinguish no lookup from errors *) ->
+        Fut.return None
+    | Ok _ -> Fut.return (Some (tool m t))
 
   let _spawn
       m ?(stamp = "") ?(reads = []) ?(writes = []) ?writes_manifest_root ?env
       ?cwd ?stdin ?(stdout = `Ui) ?(stderr = `Ui) ?(success_exits = [0])
       ?post_exec ?k cmd
     =
-    match cmd.cmd_tool with
+    Fut.await cmd.cmd_tool @@ function
     | Miss (tool, e) -> m.m.feedback (`Miss_tool (tool, e))
     | Tool tool ->
         let id = new_op_id m and created = timestamp m in
+        let reads =
+          (* XXX should we do this at a lower level ? *)
+          tool.tool_file :: reads
+        in
         let env, stamped_env = spawn_env m tool env in
         let cwd = match cwd with None -> m.m.cwd | Some d -> d in
         let k = match k with

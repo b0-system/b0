@@ -287,16 +287,17 @@ module Compile = struct
     Fut.return (all_libs, seen_libs)
 
   let find_compiler c m = match Conf.code c with
-  | Some (`Byte as c) -> B00_ocaml.Tool.ocamlc, c
-  | Some (`Native as c) -> B00_ocaml.Tool.ocamlopt, c
+  | Some (`Byte as c) -> Fut.return (B00_ocaml.Tool.ocamlc, c)
+  | Some (`Native as c) -> Fut.return (B00_ocaml.Tool.ocamlopt, c)
   | None ->
-      match B00.Memo.tool_opt m B00_ocaml.Tool.ocamlopt with
-      | None -> B00_ocaml.Tool.ocamlc, `Byte
-      | Some comp -> B00_ocaml.Tool.ocamlopt, `Native
+      let* ocamlopt = B00.Memo.tool_opt m B00_ocaml.Tool.ocamlopt in
+      match ocamlopt with
+      | None -> Fut.return (B00_ocaml.Tool.ocamlc, `Byte)
+      | Some comp -> Fut.return (B00_ocaml.Tool.ocamlopt, `Native)
 
   let compile_src m c ~driver ~build_dir src ~exe =
     let ocaml_conf = Fpath.(build_dir / "ocaml.conf") in
-    let comp, code = find_compiler c m in
+    let* comp, code = find_compiler c m in
     B00_ocaml.Conf.write m ~comp ~o:ocaml_conf;
     let* ocaml_conf = B00_ocaml.Conf.read m ocaml_conf in
     let obj_ext = B00_ocaml.Conf.obj_ext ocaml_conf in

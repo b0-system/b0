@@ -8,7 +8,47 @@ open B00_std.Result.Syntax
 
 (* Running the build *)
 
-let memo c =
+let warn_dup_tool u u' n =
+  Log.warn @@ fun m ->
+  m "@[<v>Tool %a defined both by unit %a and %a.@,\
+          Using the former in the build (if needed)."
+    Fmt.(code string) n B0_unit.pp_name u B0_unit.pp_name u'
+
+let warn_no_exe_file u n =
+  Log.warn @@ fun m ->
+  m "[@<v>Tool %a defined by unit %a does not specify a@,\
+     B0_meta.exe_file key. It will not be used in the build (if needed)."
+    Fmt.(code string) n B0_unit.pp_name u
+
+(* Look for tools in the build first. XXX cross *)
+
+let tool_lookup ~may_build ~must_build ~env =
+  let tool_name_map =
+    let add_unit u acc =
+      (* FIXME we likely want some kind of scoped based visibility control.
+         Add B0_meta.install or B0_meta.tool or B0_meta.public. *)
+      match B0_meta.find B0_meta.exe_name (B0_unit.meta u) with
+      | None -> acc
+      | Some t ->
+          match String.Map.find_opt t acc with
+          | Some u' -> warn_dup_tool u u' t; acc
+          | None ->
+              if B0_meta.mem B0_meta.exe_file (B0_unit.meta u)
+              then (warn_no_exe_file u t; acc)
+              else String.Map.add t u acc
+    in
+    String.Map.empty
+    |> B0_unit.Set.fold add_unit may_build
+    |> B0_unit.Set.fold add_unit must_build
+  in
+  let lookup = B00.Memo.tool_lookup_of_os_env env in
+  (* We first look into the build and then in [m]'s environment. *)
+  fun m t -> match String.Map.find_opt (Fpath.to_string t) tool_name_map with
+  | None -> lookup m t
+  | Some u ->
+      Fut.map Result.ok (B0_meta.get B0_meta.exe_file (B0_unit.meta u))
+
+let memo c ~may_build ~must_build =
   let hash_fun = B0_driver.Conf.hash_fun c in
   let cwd = B0_driver.Conf.cwd c in
   let cache_dir = B0_driver.Conf.cache_dir c in
@@ -21,6 +61,7 @@ let memo c =
     B00_cli.Memo.pp_leveled_feedback ~op_howto ~show_op ~show_ui ~level
       Fmt.stderr
   in
+  let* env = Os.Env.current () in
   B00.Memo.memo ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs ~feedback ()
 
 let units_of ~units ~packs =
@@ -95,7 +136,7 @@ let build_run lock ~units ~packs ~x_units ~x_packs action args c =
       let root_dir = Fpath.parent b0_file in
       let b0_dir = B0_driver.Conf.b0_dir c in
       Log.if_error' ~use:B0_driver.Exit.build_error @@
-      let* m = memo c in
+      let* m = memo c ~may_build ~must_build in
       let variant = "user" in
       let build =
         B0_build.create ~root_dir ~b0_dir ~variant  m ~may_build ~must_build

@@ -5,7 +5,10 @@
 
 (** B0 [build] command. *)
 
-val memo : B0_driver.Conf.t -> (B00.Memo.t, string) result
+val memo :
+  B0_driver.Conf.t ->
+  may_build:B0_unit.Set.t -> must_build:B0_unit.Set.t ->
+  (B00.Memo.t, string) result
 
 val cmd : B00_std.Os.Exit.t Cmdliner.Term.t * Cmdliner.Term.info
 (** [build] is the command line for [build]. *)

@@ -87,7 +87,6 @@ let pp ppf v =
 (* Predefined actions *)
 
 module Action = struct
-
   let exec_cwd =
     let doc = "Current working directory for outcome action." in
     let pp_value = Fmt.any "<built value>" in

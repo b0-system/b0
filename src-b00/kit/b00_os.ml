@@ -64,18 +64,20 @@ let os_release =
 
 let uname = (* gets system name, release version, machine arch *)
   let mark = "b00_os.uname" in
-  let det s m = match Memo.tool_opt m Tool.uname with
-  | None -> Fut.return None
-  | Some uname ->
-      let file = Fpath.(Store.dir s / mark) in
-      let uname = uname Cmd.(atom "-s" % "-r" % "-m") in
-      let* s = read_spawn_stdout m file uname in
-      match String.split_on_char ' ' s with
-      | [sys; rel; mach] -> Fut.return (Some (sys, rel, mach))
-      | _ ->
-          Memo.notify m
-            `Warn "Could not parse %a output %S." Fmt.(code string) "uname" s;
-          Fut.return None
+  let det s m =
+    let* tool = Memo.tool_opt m Tool.uname in
+    match tool with
+    | None -> Fut.return None
+    | Some uname ->
+        let file = Fpath.(Store.dir s / mark) in
+        let uname = uname Cmd.(atom "-s" % "-r" % "-m") in
+        let* s = read_spawn_stdout m file uname in
+        match String.split_on_char ' ' s with
+        | [sys; rel; mach] -> Fut.return (Some (sys, rel, mach))
+        | _ ->
+            Memo.notify m
+              `Warn "Could not parse %a output %S." Fmt.(code string) "uname" s;
+            Fut.return None
   in
   Store.key ~mark det
 
@@ -103,9 +105,11 @@ let freebsd_version s m file =
   let uname = (Memo.tool m Tool.uname) (Cmd.atom "-U") in
   read_spawn_stdout m file uname
 
-let try_android_version s m file = match Memo.tool_opt m Tool.getprop with
-| None -> Fut.return None
-| Some getprop ->
+let try_android_version s m file =
+  let* getprop = Memo.tool_opt m Tool.getprop in
+  match getprop with
+  | None -> Fut.return None
+  | Some getprop ->
     let file = Fpath.(Store.dir s / file) in
     let getprop = getprop (Cmd.atom "ro.build.version.release") in
     Fut.map Option.some (read_spawn_stdout m file getprop)
@@ -162,12 +166,15 @@ let linux_distribution s m =
   | None -> Fut.return "unknown"
   | Some v -> Fut.return v
 
-let macos_distribution s m = match Memo.tool_opt m Tool.brew with
-| Some _ -> Fut.return "homebrew"
-| None ->
-    match Memo.tool_opt m Tool.port with
-    | Some _ -> Fut.return "macports"
-    | None -> Fut.return "macos"
+let macos_distribution s m =
+  let* brew = Memo.tool_opt m Tool.brew in
+  match brew with
+  | Some _ -> Fut.return "homebrew"
+  | None ->
+      let* port = Memo.tool_opt m Tool.port in
+      match port with
+      | Some _ -> Fut.return "macports"
+      | None -> Fut.return "macos"
 
 let distribution =
   let det s m = Fut.bind (Store.get s name) @@ function

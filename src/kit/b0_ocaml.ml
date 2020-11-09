@@ -65,11 +65,11 @@ let built_code =
   | #built_code as v -> Fut.return v
   | `Auto ->
       let* need = needed_code s m in
-      Fut.return @@
       match need with
-      | None when Option.is_some (Memo.tool_opt m Tool.ocamlopt) -> `Native
-      | None -> `Byte
-      | Some need -> need
+      | Some need -> Fut.return need
+      | None ->
+          let* ocamlopt = Memo.tool_opt m Tool.ocamlopt in
+          Fut.return @@ if Option.is_some ocamlopt then `Native else `Byte
   in
   let det s m =
     let* wanted = Store.get s wanted_code in

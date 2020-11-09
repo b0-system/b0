@@ -28,7 +28,7 @@ let build_unit c u k =
     let root_dir = Fpath.parent b0_file in
     let b0_dir = B0_driver.Conf.b0_dir c in
     Log.if_error ~use:B0_driver.Exit.build_error @@
-    let* m = B0_cmd_build.memo c in
+    let* m = B0_cmd_build.memo c ~may_build ~must_build in
     let build =
       let variant = "user" in
       B0_build.create ~root_dir ~b0_dir ~variant m ~may_build ~must_build
