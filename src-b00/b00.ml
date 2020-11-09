@@ -6,38 +6,6 @@
 open B00_std
 open B000
 
-module Env = struct
-  type tool_lookup = Cmd.tool -> (Fpath.t, string) result
-
-  let env_tool_lookup ?sep ?(var = "PATH") env =
-    let search_path = match String.Map.find var env with
-    | exception Not_found -> "" | s -> s
-    in
-    match Fpath.list_of_search_path ?sep search_path with
-    | Error _ as e -> fun _ -> e
-    | Ok search -> fun tool -> Os.Cmd.get_tool ~search tool
-
-  type t =
-    { env : Os.Env.t;
-      forced_env : Os.Env.t;
-      lookup : tool_lookup }
-
-  let memo lookup =
-    let memo = Hashtbl.create 91 in
-    fun tool -> match Hashtbl.find memo tool with
-    | exception Not_found -> let p = lookup tool in Hashtbl.add memo tool p; p
-    | p -> p
-
-  let v ?lookup ?(forced_env = String.Map.empty) env =
-    let lookup = match lookup with None -> env_tool_lookup env | Some l -> l in
-    let lookup = memo lookup in
-    { env; forced_env; lookup }
-
-  let env e = e.env
-  let forced_env e = e.forced_env
-  let tool e l = e.lookup l
-end
-
 module Tool = struct
   type env_vars = string list
   let tmp_vars = ["TMPDIR"; "TEMP"; "TMP"]
@@ -80,6 +48,15 @@ module Tool = struct
     all, stamped
 end
 
+module Env = struct
+  (** TODO does it still make sense to have that separate ? *)
+
+  type t = { env : Os.Env.t; forced_env : Os.Env.t; }
+  let v ?(forced_env = String.Map.empty) env = { env; forced_env }
+  let env e = e.env
+  let forced_env e = e.forced_env
+end
+
 module Memo = struct
   type feedback =
   [ `Miss_tool of Tool.t * string
@@ -87,11 +64,13 @@ module Memo = struct
 
   type t = { c : ctx; m : memo }
   and ctx = { mark : Op.mark }
+  and tool_lookup = t -> Cmd.tool -> (Fpath.t, string) result
   and memo =
     { clock : Time.counter;
       cpu_clock : Time.cpu_counter;
       feedback : feedback -> unit;
       cwd : Fpath.t;
+      tool_lookup : tool_lookup;
       env : Env.t ;
       guard : Guard.t;
       reviver : Reviver.t;
@@ -101,14 +80,37 @@ module Memo = struct
       mutable ops : Op.t list;
       mutable ready_roots : Fpath.Set.t; }
 
-  let create ?clock ?cpu_clock:cc ~feedback ~cwd env guard reviver exec =
+  (* Tool lookup *)
+
+  let cache_lookup lookup =
+    let cache = Hashtbl.create 91 in
+    fun m tool -> match Hashtbl.find cache tool with
+    | p -> p
+    | exception Not_found ->
+        let p = lookup m tool in Hashtbl.add cache tool p; p
+
+  let tool_lookup_of_env ?sep ?(var = "PATH") env =
+    let search_path = match String.Map.find var (Env.env env) with
+    | exception Not_found -> "" | s -> s
+    in
+    match Fpath.list_of_search_path ?sep search_path with
+    | Error _ as e -> fun _ _ -> e
+    | Ok search -> fun m tool -> Os.Cmd.get_tool ~search tool
+
+  let create
+      ?clock ?cpu_clock:cc ~feedback ~cwd ?tool_lookup env guard reviver exec
+    =
     let clock = match clock with None -> Time.counter () | Some c -> c in
     let cpu_clock = match cc with None -> Time.cpu_counter () | Some c -> c in
-    let op_id = 0 and  ops = [] in
+    let tool_lookup = cache_lookup @@ match tool_lookup with
+    | None -> tool_lookup_of_env env
+    | Some l -> l
+    in
+    let op_id = 0 and ops = [] in
     let c = { mark = "" } in
     let m =
-      { clock; cpu_clock; feedback; cwd; env; guard; reviver; exec;
-        has_failures = false; op_id; ops; ready_roots = Fpath.Set.empty }
+      { clock; cpu_clock; feedback; cwd; tool_lookup; env; guard; reviver;
+        exec; has_failures = false; op_id; ops; ready_roots = Fpath.Set.empty }
     in
     { c; m }
 
@@ -141,6 +143,7 @@ module Memo = struct
 
   let clock m = m.m.clock
   let cpu_clock m = m.m.cpu_clock
+  let tool_lookup m = m.m.tool_lookup
   let env m = m.m.env
   let reviver m = m.m.reviver
   let guard m = m.m.guard
@@ -379,7 +382,7 @@ module Memo = struct
       Os.Env.to_assignments tool_env, Os.Env.to_assignments stamped
 
   let tool m tool =
-    let cmd_tool = match Env.tool m.m.env (Tool.name tool) with
+    let cmd_tool = match m.m.tool_lookup m (Tool.name tool) with
     | Error e -> Miss (tool, e)
     | Ok tool_file ->
         let tool_env, tool_stamped_env = tool_env m tool in
@@ -389,7 +392,7 @@ module Memo = struct
     in
     fun cmd_args -> { cmd_tool; cmd_args }
 
-  let tool_opt m t = match Env.tool m.m.env (Tool.name t) with
+  let tool_opt m t = match m.m.tool_lookup m (Tool.name t) with
   | Error e (* FIXME distinguish no lookup from errors *) -> None
   | Ok _ -> Some (tool m t)
 

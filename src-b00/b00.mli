@@ -9,54 +9,6 @@
 
 open B00_std
 
-(** Build environment.
-
-    Build environments control tool lookup and the environment
-    of tool spawns. *)
-module Env : sig
-
-  (** {1:lookup Tool lookup} *)
-
-  type tool_lookup = Cmd.tool -> (Fpath.t, string) result
-  (** The type for tool lookups. Given a command line tool
-      {{!type:B00_std.Cmd.tool}specification} returns a file path to
-      the tool executable or an error message mentioning the tool if
-      it cannot be found. *)
-
-  val env_tool_lookup :
-    ?sep:string -> ?var:string -> Os.Env.t -> tool_lookup
-  (** [env_tool_lookup ~sep ~var env] is a tool lookup that gets the
-      value of the [var] variable in [env] treats it as a [sep]
-      separated {{!B00_std.Fpath.list_of_search_path}search path} and
-      uses the result to lookup with {!B00_std.Os.Cmd.must_find}.
-      [var] defaults to [PATH] and [sep] to
-      {!B00_std.Fpath.search_path_sep}. *)
-
-  (** {1:env Environment} *)
-
-  type t
-  (** The type for build environments. *)
-
-  val v : ?lookup:tool_lookup -> ?forced_env:Os.Env.t -> Os.Env.t -> t
-  (** [v ~lookup ~forced_env env] is a build environment with:
-      {ul
-      {- [lookup] used to find build tools. Defaults to
-         [env_tool_lookup env].}
-      {- [forced_env] is environment forced on any tool despite
-         what it declared to access, defaults to {!Os.Env.empty}}
-      {- [env] the environment read by the tools' declared environment
-         variables.}} *)
-
-  val env : t -> Os.Env.t
-  (** [env e] is [e]'s available spawn environment. *)
-
-  val forced_env : t -> Os.Env.t
-  (** [forced_env e] is [e]'s forced spawn environment. *)
-
-  val tool : t -> Cmd.tool -> (Fpath.t, string) result
-  (** [tool e t] looks up tool [t] in [e]. *)
-end
-
 (** Command line tools.
 
     A tool is specified either by name, to be looked up via an
@@ -147,11 +99,60 @@ module Tool : sig
       and [unstamped_vars t] and [stamped] those of [vars t] only. *)
 end
 
+(** Build environment.
+
+    Build environments specify the environment of tool spawns.
+
+    {b TODO} Now that tool lookup moved to Memo,
+    is it still worth sense to have that separate ? *)
+module Env : sig
+
+  (** {1:env Environment} *)
+
+  type t
+  (** The type for build environments. *)
+
+  val v : ?forced_env:Os.Env.t -> Os.Env.t -> t
+  (** [v ~lookup ~forced_env env] is a build environment with:
+      {ul
+      {- [forced_env] is environment forced on any tool despite
+         what it declared to access, defaults to {!Os.Env.empty}}
+      {- [env] the environment read by the tools' declared environment
+         variables.}} *)
+
+  val env : t -> Os.Env.t
+  (** [env e] is [e]'s available spawn environment. *)
+
+  val forced_env : t -> Os.Env.t
+  (** [forced_env e] is [e]'s forced spawn environment. *)
+end
+
 (** Build memoizer.
 
     A memoizer ties together and environment, an operation cache, a guard
     and an executor. *)
 module Memo : sig
+
+  type t
+  (** The type for memoizers. This ties together an environment, a
+      guard, an operation cache and an executor. *)
+
+  (** {1:lookup Tool lookup} *)
+
+  type tool_lookup = t -> Cmd.tool -> (Fpath.t, string) result
+  (** The type for tool lookups. Given a command line tool
+      {{!type:B00_std.Cmd.tool}specification} returns a file path to
+      the tool executable or an error message mentioning the tool if
+      it cannot be found. *)
+
+  val tool_lookup_of_env :
+    ?sep:string -> ?var:string -> Env.t -> tool_lookup
+  (** [env_tool_lookup ~sep ~var env] is a tool lookup that gets the
+      value of the [var] variable in [env] treats it as a [sep]
+      separated {{!B00_std.Fpath.list_of_search_path}search path} and
+      uses the result to lookup with {!B00_std.Os.Cmd.must_find}.
+      [var] defaults to [PATH] and [sep] to
+      {!B00_std.Fpath.search_path_sep}. *)
 
   (** {1:memo Memoizer} *)
 
@@ -161,13 +162,10 @@ module Memo : sig
   (** The type for memoizer feedback. FIXME remove `Miss_tool now
       that we have notify operations. *)
 
-  type t
-  (** The type for memoizers. This ties together an environment, a
-      guard, an operation cache and an executor. *)
-
   val create :
     ?clock:Time.counter -> ?cpu_clock:Time.cpu_counter ->
-    feedback:(feedback -> unit) -> cwd:Fpath.t -> Env.t -> B000.Guard.t ->
+    feedback:(feedback -> unit) -> cwd:Fpath.t ->
+    ?tool_lookup:tool_lookup -> Env.t -> B000.Guard.t ->
     B000.Reviver.t -> B000.Exec.t -> t
 
   val memo :
@@ -190,6 +188,9 @@ module Memo : sig
 
   val cpu_clock : t -> Time.cpu_counter
   (** [cpu_clock m] is [m]'s cpu clock. *)
+
+  val tool_lookup : t -> tool_lookup
+  (** [tool_lookup m] is [m]'s tool lookup function. *)
 
   val env : t -> Env.t
   (** [env m] is [m]'s environment. *)
@@ -329,11 +330,11 @@ module Memo : sig
 
   (** {1:spawn Memoizing tool spawns} *)
 
-  type tool
-  (** The type for memoized tools. *)
-
   type cmd
   (** The type for memoized tool invocations. *)
+
+  type tool
+  (** The type for memoized tools. *)
 
   val tool : t -> Tool.t -> (Cmd.t -> cmd)
   (** [tool m t] is tool [t] memoized. Use the resulting function
