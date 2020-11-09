@@ -559,20 +559,20 @@ module String : sig
   val is_empty : string -> bool
   (** [is_empty s] is [equal empty s]. *)
 
-  val starts_with : sub:string -> string -> bool
-  (** [starts_with ~sub s] is [true] iff [sub.[i] = s.[i]] for
+  val starts_with : prefix:string -> string -> bool
+  (** [starts_with ~prefix s] is [true] iff [sub.[i] = s.[i]] for
       all indices [i] of [prefix].
 
       {b Note.} Available in 4.12. *)
 
-  val ends_with : sub:string -> string -> bool
-  (** [eds_with ~sub s] is true iff [sub.[i] = s.[m - i]] for all
-      indices [i] of [affix] and with [m = String.length s - 1].
+  val ends_with : suffix:string -> string -> bool
+  (** [eds_with ~suffix s] is true iff [sub.[i] = s.[m - i]] for all
+      indices [i] of [sufix] and with [m = String.length s - 1].
 
       {b Note.} Available in 4.12. *)
 
-  val includes : sub:string -> string -> bool
-  (** [includes ~sub s] is [true] iff there exists an index [j]
+  val includes : affix:string -> string -> bool
+  (** [includes ~affix s] is [true] iff there exists an index [j]
       such that for all indices [i] of [affix], [sub.[i] = s.[j+ 1]]. *)
 
   val for_all : (char -> bool) -> string -> bool
@@ -1713,6 +1713,12 @@ module Cmd : sig
 
   val if' : bool -> t -> t
   (** [if' cond l] is [l] if [cond] is [true] and {!empty} otherwise. *)
+
+  val int : int -> t
+  (** [int i] is [arg (string_of_int i)]. *)
+
+  val float : float -> t
+  (** [float f] is [arg (float_of_int f)]. *)
 
   val path : Fpath.t -> t
   (** [path p] is [arg (Fpath.to_string p)]. *)

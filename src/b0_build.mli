@@ -37,27 +37,39 @@ val current : t -> B0_unit.t
 val current_meta : t -> B0_meta.t
 (** [current_meta b] is [B0_unit.meta (current b)]. *)
 
-(** {1:dir Directories} *)
+(** {1:dir Directories}
+
+    {b FIXME} Unify the directory story with {!B0_cmdlet}.
+    We likely want to get rid of a few of the functions below. *)
 
 val scope_dir : t -> B0_unit.t -> Fpath.t
 (** [scope_dir b u] is the directory of the B0 file in which [u] was
     defined. This is were unit relative paths like source files
     should be resolved. *)
 
-val current_scope_dir : t -> Fpath.t
-(** [current_scope_dir b] is [root_dir b current]. *)
-
 val build_dir : t -> B0_unit.t -> Fpath.t
 (** [build_dir b u] is the build directory for the build unit [u].
     This is where [u] should write is build artefacts. *)
-
-val current_build_dir : t -> Fpath.t
-(** [current_unit_build_dir b] is [build_dir b current]. *)
 
 val shared_build_dir : t -> Fpath.t
 (** [shared_build_dir] is a build directory shared by all units of the
      build. This is used by computations shared by units, most of the
      time one should rather use {!current_build_dir}. *)
+
+val current_scope_dir : t -> Fpath.t
+(** [current_scope_dir b] is [root_dir b current]. *)
+
+val current_build_dir : t -> Fpath.t
+(** [current_unit_build_dir b] is [build_dir b current]. *)
+
+val in_build_dir : t -> Fpath.t -> Fpath.t
+(** [in_build_dir b p] is [Fpath.(build_dir b current // p)]). *)
+
+val in_scope_dir : t -> Fpath.t -> Fpath.t
+(** [in_scope_dir b p] is [Fpath.(scope_dir b current // p)]). *)
+
+val in_shared_build_dir : t -> Fpath.t -> Fpath.t
+(** [in_shared_build_dir b p] is [Fpath.(shared_build_dir b // p)]). *)
 
 (** {1:store Store} *)
 

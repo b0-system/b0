@@ -106,6 +106,9 @@ module Build : sig
   val shared_build_dir : t -> Fpath.t
   val scope_dir : t -> build_unit -> Fpath.t
   val build_dir : t -> build_unit -> Fpath.t
+  val in_build_dir : t -> Fpath.t -> Fpath.t
+  val in_scope_dir : t -> Fpath.t -> Fpath.t
+  val in_shared_build_dir : t -> Fpath.t -> Fpath.t
   val create :
     root_dir:Fpath.t -> b0_dir:Fpath.t -> variant:string -> B00.Memo.t ->
     may_build:Set.t -> must_build:Set.t -> t

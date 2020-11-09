@@ -8,16 +8,17 @@ open B00_std.Result.Syntax
 
 (* Running the build *)
 
-let warn_dup_tool u u' n =
+let warn_dup_tool use ign n =
   Log.warn @@ fun m ->
   m "@[<v>Tool %a defined both by unit %a and %a.@,\
-          Using the former in the build (if needed)."
-    Fmt.(code string) n B0_unit.pp_name u B0_unit.pp_name u'
+     Ignoring definition in unit %a.@]"
+    Fmt.(code string) n B0_unit.pp_name use
+    B0_unit.pp_name ign B0_unit.pp_name ign
 
 let warn_no_exe_file u n =
   Log.warn @@ fun m ->
-  m "[@<v>Tool %a defined by unit %a does not specify a@,\
-     B0_meta.exe_file key. It will not be used in the build (if needed)."
+  m "@[<v>Tool %a defined by unit %a does not specify a@,\
+     B0_meta.exe_file key. It will not be used in the build (if needed).@]"
     Fmt.(code string) n B0_unit.pp_name u
 
 (* Look for tools in the build first. XXX cross *)
@@ -34,18 +35,20 @@ let tool_lookup ~may_build ~must_build ~env =
           | Some u' -> warn_dup_tool u u' t; acc
           | None ->
               if B0_meta.mem B0_meta.exe_file (B0_unit.meta u)
-              then (warn_no_exe_file u t; acc)
-              else String.Map.add t u acc
+              then String.Map.add t u acc
+              else (warn_no_exe_file u t; acc)
     in
+    B0_unit.Set.fold add_unit (B0_unit.Set.union may_build must_build)
     String.Map.empty
-    |> B0_unit.Set.fold add_unit may_build
-    |> B0_unit.Set.fold add_unit must_build
   in
   let lookup = B00.Memo.tool_lookup_of_os_env env in
   (* We first look into the build and then in [m]'s environment. *)
   fun m t -> match String.Map.find_opt (Fpath.to_string t) tool_name_map with
   | None -> lookup m t
   | Some u ->
+      (* FIXME, not there yet we need to require that to build !
+         we need to push the whole [memo c] thing into B0_build so that
+         we can access the store to get B0_build.t *)
       Fut.map Result.ok (B0_meta.get B0_meta.exe_file (B0_unit.meta u))
 
 let memo c ~may_build ~must_build =
@@ -62,7 +65,9 @@ let memo c ~may_build ~must_build =
       Fmt.stderr
   in
   let* env = Os.Env.current () in
-  B00.Memo.memo ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs ~feedback ()
+  let tool_lookup = tool_lookup ~may_build ~must_build ~env in
+  B00.Memo.memo
+    ~hash_fun ~cwd ~tool_lookup ~env ~cache_dir ~trash_dir ~jobs ~feedback ()
 
 let units_of ~units ~packs =
   let pack_units = List.concat_map B0_pack.units packs in

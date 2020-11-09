@@ -131,9 +131,9 @@ module File = struct
     let descr_of_section s =
       (* This is only here because of the person who wrote this.
          This shouldn't exist. *)
-      let sub = "\x25%VERSION%%" in
-      if not (String.starts_with ~sub s) then String.trim s else
-      String.trim (String.subrange ~first:(String.length sub) s)
+      let prefix = "\x25%VERSION%%" in
+      if not (String.starts_with ~prefix s) then String.trim s else
+      String.trim (String.subrange ~first:(String.length prefix) s)
     in
     let contents = Os.File.read file |> Log.if_error ~use:"" in
     let convert (t, d) = syn_of_title t, descr_of_section d in

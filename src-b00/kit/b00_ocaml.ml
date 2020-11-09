@@ -785,7 +785,11 @@ module Lib = struct
       let write_info m n ~o =
         (* FIXME better [n] not found error *)
         let ocamlfind = Memo.tool m tool in
-        let lib = Name.to_string n in
+        let lib, predicates = match Name.to_string n with
+        | "ocaml.threads" | "threads" | "threads.posix" ->
+            "threads.posix", "byte,native,mt,mt_posix"
+        | n -> n, "byte,native"
+        in
         let post_exec op = match B000.Op.status op with
         | B000.Op.Done ->
             begin match Option.get (B000.Op.Spawn.exit (B000.Op.Spawn.get op))
@@ -807,7 +811,7 @@ module Lib = struct
         in
         let stdout = `File o in
         Memo.spawn m ~success_exits ~reads:[] ~writes:[o] ~stdout ~post_exec @@
-        ocamlfind Cmd.(atom "query" % lib % "-predicates" % "byte,native" %
+        ocamlfind Cmd.(atom "query" % lib % "-predicates" % predicates %
                        "-format" % info)
 
       let read_info m clib_ext name file =

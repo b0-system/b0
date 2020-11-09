@@ -395,8 +395,8 @@ module Memo = struct
         let name = Fpath.to_string (Tool.name tool) in
         let name =
           let suffix = ".exe" in
-          if not m.m.win_exe || String.ends_with ~sub:suffix name then name else
-          (name ^ suffix)
+          if not m.m.win_exe || String.ends_with ~suffix name then name else
+          name ^ suffix
         in
         Fpath.v name, String.contains name Fpath.dir_sep_char
       in

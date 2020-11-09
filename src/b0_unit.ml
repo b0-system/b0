@@ -158,6 +158,10 @@ module Build = struct
   let current_build_dir b = build_dir b (current b)
   let shared_build_dir b = b.b.shared_build_dir
 
+  let in_build_dir b p = Fpath.(build_dir b (current b) // p)
+  let in_shared_build_dir b p = Fpath.(b.b.shared_build_dir // p)
+  let in_scope_dir b p = Fpath.(scope_dir b (current b) // p)
+
   (* Store *)
 
   let self =

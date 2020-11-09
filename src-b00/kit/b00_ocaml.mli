@@ -688,14 +688,17 @@ v}
         and caches the result in [cache_dir].
 
         A few simplyifing assumptions are made by the resolver, which
-      basically boil down to query the library name [LIB] with:
+        basically boil down to query the library name [LIB] with:
 {[
 ocamlfind query LIB -predicates byte,native -format "%m:%d:%A:%(requires)"
 ]}
       to derive a {!Lib.t} value. This may fail on certain libraries. In
       particular it assumes a one-to-one map between [ocamlfind] package
       names and library names and that the archives are in the library
-      directory. *)
+      directory. Also the [ocaml.threads], [threads] and [threads.posix]
+      libraries are treated specially, the all lookup the latter and
+      [mt,mt_posix] is added to the predicates. [threads.vm] is unsupported
+      (but deprecated anyways). *)
 
     (** {1:resolver Resolver} *)
 

@@ -600,7 +600,7 @@ module String = struct
   (* Predicates *)
 
   let is_empty s = equal empty s
-  let starts_with ~sub:prefix s =
+  let starts_with ~prefix s =
     let len_a = String.length prefix in
     let len_s = String.length s in
     if len_a > len_s then false else
@@ -611,7 +611,7 @@ module String = struct
     in
     loop 0
 
-  let ends_with ~sub:suffix s =
+  let ends_with ~suffix s =
     let len_a = String.length suffix in
     let len_s = String.length s in
     if len_a > len_s then false else
@@ -629,13 +629,13 @@ module String = struct
     in
     loop 0 0
 
-  let includes ~sub s =
-    let max_idx_sub = String.length sub - 1 in
+  let includes ~affix s =
+    let max_idx_sub = String.length affix - 1 in
     let max_idx_s = String.length s - 1 in
     if max_idx_sub > max_idx_s then false else
     let rec loop i =
       if i > max_idx_sub then true else
-      if unsafe_get sub (max_idx_sub - i) <> unsafe_get s (max_idx_s - i)
+      if unsafe_get affix (max_idx_sub - i) <> unsafe_get s (max_idx_s - i)
       then false
       else loop (i + 1)
     in
@@ -2090,6 +2090,8 @@ module Cmd = struct
 
   let if' cond l = if cond then l else empty
   let path p = A (Fpath.to_string p)
+  let int i = A (string_of_int i)
+  let float f = A (string_of_float f)
   let list ?slip l = match slip with
   | None -> Rseq (List.rev_map atom l)
   | Some slip -> Rseq (List.fold_left (fun acc v -> A v :: A slip :: acc) [] l)
@@ -3533,7 +3535,7 @@ module Os = struct
     let find_tool ?(win_exe = Sys.win32) ?search tool =
       let tool =
         let suffix = ".exe" in
-        if not win_exe || String.ends_with ~sub:suffix tool then tool else
+        if not win_exe || String.ends_with ~suffix tool then tool else
         (tool ^ suffix)
       in
       match tool_is_path tool with
