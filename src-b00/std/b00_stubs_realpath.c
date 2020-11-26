@@ -28,22 +28,24 @@ CAMLprim value ocaml_b00_realpath (value p)
 
 #elif defined(OCAML_B00_WINDOWS)
 
-#include <windows.h>
 #include <stdio.h>
+#include <windows.h>
+#include <fileapi.h>
+#include <stdio.h>
+
 #include <caml/osdeps.h>
 
-CAMLPrim value ocaml_b00_realpath (value p)
+CAMLprim value ocaml_b00_realpath (value p)
 {
   HANDLE h;
   wchar_t *wp;
   wchar_t *wr;
   DWORD wr_len;
-  value wp;
-
+  value rp;
 
   wp = caml_stat_strdup_to_utf16 (String_val (p));
   h = CreateFileW (wp, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                   FILE_ATTRIBUTE_NORMAL, NULL);
+                   FILE_FLAG_BACKUP_SEMANTICS, NULL);
   caml_stat_free (wp);
 
   if (h == INVALID_HANDLE_VALUE)
@@ -60,7 +62,7 @@ CAMLPrim value ocaml_b00_realpath (value p)
     uerror ("realpath", p);
   }
 
-  wr = caml_stat_alloc ((wr_len + 1) * sizeof (w_char_t));
+  wr = caml_stat_alloc ((wr_len + 1) * sizeof (wchar_t));
   wr_len = GetFinalPathNameByHandleW (h, wr, wr_len, VOLUME_NAME_DOS);
 
   if (wr_len == 0)
