@@ -376,7 +376,7 @@ let expand b0_file =
     let r = Fpath.to_string (file b0_file) in
     let b = w b (Fmt.str "let () = B0_def.Scope.root (B00_std.Fpath.v %S)" r) in
     let b, _, manif, boots, incs, reqs = w_includes b b0_file 0 "" [] [] [][] in
-    let b, mani = w_mod_uses b b0_file manif in
+    let b, manif = w_mod_uses b b0_file manif in
     let b = w_ocaml_unit b (ocaml_unit b0_file) in
     let b = w b nil_loc in
     let b = w b "let () = B0_def.Scope.seal ()" in
