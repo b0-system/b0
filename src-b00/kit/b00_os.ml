@@ -235,7 +235,8 @@ let arch_normalized =
   | "x86_64" | "amd64" -> "x86_64"
   | "powerpc" | "ppc" | "ppcle" -> "ppc32"
   | "ppc64" | "ppc64le" -> "ppc64"
-  | "aarch64_be" | "aarch64" | "armv8b" | "armv8l" -> "arm64"
+  | "aarch64_be" | "aarch64" -> "arm64"
+  | "armv8b" | "armv8l" -> "arm32"
   | a when String.(starts_with "armv5" a ||
                    starts_with "armv6" a || starts_with "earmv6" a ||
                    starts_with "armv7" a || starts_with "earmv7" a) -> "arm32"
