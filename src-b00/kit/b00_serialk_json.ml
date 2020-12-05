@@ -230,8 +230,12 @@ module Json = struct
 
   let parse_string d =
     let parse_escape d = match byte d with
-    | (0x22 | 0x5C | 0x2F | 0x62 | 0x66 | 0x6E | 0x72 | 0x74 as b) ->
-        taddc d (Char.chr b); accept d;
+    | (0x22 | 0x5C | 0x2F as b) -> taddc d (Char.chr b); accept d;
+    | 0x62 -> taddc d '\x08'; accept d;
+    | 0x66 -> taddc d '\x0C'; accept d;
+    | 0x6E -> taddc d '\x0A'; accept d;
+    | 0x72 -> taddc d '\x0D'; accept d;
+    | 0x74 -> taddc d '\x09'; accept d;
     | 0x75 ->
         accept d; parse_uescape d None 0 4
     | _ -> err d "expected escape found: %a" pp_byte d
