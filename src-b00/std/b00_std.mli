@@ -859,6 +859,9 @@ let escape_dquotes s =
         the string which is not a hexadecimal digit or the length of
         [h] if it there is a missing digit at the end. *)
 
+    val of_hex' : string -> (string, string) result
+    (** [of_hex'] is {!of_hex} but errors with an english error message. *)
+
     (** {1:escunesc Converting to printable US-ASCII characters} *)
 
     val escape : string -> string

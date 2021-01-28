@@ -1005,6 +1005,13 @@ module String = struct
           let s = Bytes.create s_len in
           try loop (s_len - 1) s 0 h 0 with Illegal_escape i -> Error i
 
+    let of_hex' h = match of_hex h with
+    | Ok _ as v -> v
+    | Error i ->
+        match i = String.length h with
+        | true -> Error "Missing final hex digit"
+        | false -> Fmt.error "Byte %d: not an ASCII hexadecimal digit" i
+
     (* Converting to printable US-ASCII characters *)
 
     let set_ascii_unicode_escape b k c = (* for c <= 0x7F *)
