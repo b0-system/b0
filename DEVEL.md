@@ -37,11 +37,11 @@ There is one OCaml library per directory. We distinguish two levels:
 This is the core infrastructure that can be used on its own to devise
 build tools (e.g. `odig`, `brzo`).
 
-* [`src-b00/std`](src-b00/std) has the `b0.b00.std` library. This has
+* [`src/b00/std`](src/b00/std) has the `b0.b00.std` library. This has
   a few things that should be in the stdlib and a few others that shouldn't 
   but are useful for `b00` based programs.
-* [`src-b00`](src-b00) is the core `b0.b00` build library.
-* [`src-b00/kit`](src-b00/kit) is the `b0.b00.kit` library. An
+* [`src/b00`](src/b00) is the core `b0.b00` build library.
+* [`src/b00/kit`](src/b00/kit) is the `b0.b00.kit` library. An
    end-user toolkit for working with the `b00` API.
 * [`tools`](tools) has a few b00 low-level tools. 
 

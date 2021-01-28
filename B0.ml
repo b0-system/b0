@@ -16,19 +16,19 @@ let b0_b0 = B0_ocaml.libname "b0.b0"
 
 let b00_std_lib =
   let srcs =
-    Fpath.[`Dir_rec (v "src-b00/std");
-           `X (v "src-b00/std/b0_b00_std_top_init.ml")]
+    Fpath.[`Dir_rec (v "src/b00/std");
+           `X (v "src/b00/std/b0_b00_std_top_init.ml")]
   in
   let requires = [unix] in
   B0_ocaml.lib b00_std ~doc:"B00 Stdlib extensions" ~srcs ~requires
 
 let b00_lib =
-  let srcs = Fpath.[`Dir (v "src-b00")] in
+  let srcs = Fpath.[`Dir (v "src/b00")] in
   let requires = [unix; b00_std] in
   B0_ocaml.lib b00 ~doc:"B00 build API" ~srcs ~requires
 
 let b00_kit_lib =
-  let srcs = Fpath.[`Dir (v "src-b00/kit")] in
+  let srcs = Fpath.[`Dir (v "src/b00/kit")] in
   let requires = [unix; cmdliner; b00_std; b00] in
   B0_ocaml.lib b00_kit ~doc:"B00 toolkit API" ~srcs ~requires
 

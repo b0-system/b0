@@ -5,12 +5,12 @@ true : package(unix)
 <b0wl> : -traverse
 
 # B00
-<src-b00/std> : include
-<src-b00/std/b0_b00_std.{cma,cmxa}> : record_b00_stubs
-<src-b00/std/b0_b00_std.cmxs> : link_b00_stubs
-<src-b00> : include
-<src-b00/kit> : include
-<src-b00/kit/**> : package(cmdliner)
+<src/b00/std> : include
+<src/b00/std/b0_b00_std.{cma,cmxa}> : record_b00_stubs
+<src/b00/std/b0_b00_std.cmxs> : link_b00_stubs
+<src/b00> : include
+<src/b00/kit> : include
+<src/b00/kit/**> : package(cmdliner)
 
 # B0
 <src> : include

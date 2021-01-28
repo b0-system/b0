@@ -1,6 +1,5 @@
 PKG unix cmdliner
 S src/**
-S src-b00/**
 S tool-b0/**
 S tools/**
 S test/**
