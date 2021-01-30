@@ -3,7 +3,11 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-(** Version control system (VCS) repositories. *)
+(** Version control system (VCS) repositories.
+
+    {b XXX.} This likely needs a cleanup design round. Also
+    make clear that this is not command oriented but repo oriented
+    should make things more clear. *)
 
 open B00_std
 
@@ -27,16 +31,17 @@ val repo_dir : t -> Fpath.t
 (** [repo_dir r] is [r]'s repository directory (not the working directory). *)
 
 val work_dir : t -> Fpath.t
-(** [work_dir r] is [r]'s working directory. *)
+(** [work_dir r] is [r]'s working directory. On a git bare repo this
+    may be {!Fpath.null}. *)
 
-val cmd : t -> Cmd.t
-(** [cmd r] is the base command to use to act on [r]. Use only if you
+val repo_cmd : t -> Cmd.t
+(** [repo_cmd r] is the base command to use to act on [r]. Use only if you
     need VCS specific functionality not provided by the module. *)
 
 val pp : t Fmt.t
 (** [pp] formats a repository. *)
 
-(** {1:get Finding repositories} *)
+(** {1:get Finding local repositories} *)
 
 val find : ?dir:Fpath.t -> unit -> (t option, string) result
 (** [find ~dir ()] finds, using VCS functionality, a repository
@@ -83,7 +88,9 @@ val tracked_files : t -> tree_ish:string -> (Fpath.t list, string) result
 (** [tracked_files ~tree_ish r] are the files tracked by the tree
     object [tree_ish]. *)
 
-val commit_files : ?msg:string -> t -> Fpath.t list -> (unit, string) result
+val commit_files :
+  ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo -> ?msg:string -> t ->
+  Fpath.t list -> (unit, string) result
 (** [commit_files r ~msg files] commits the file [files] with message
     [msg] (if unspecified the VCS should prompt). *)
 
@@ -106,8 +113,8 @@ val checkout : ?and_branch:string -> t -> commit_ish -> (unit, string) result
     if provided. This fails if the current working directory
     {!is_dirty}. *)
 
-val clone : t -> dir:Fpath.t -> (t, string) result
-(** [clone r ~dir] clones [r] to a working directory [dir] and returns
+val local_clone : t -> dir:Fpath.t -> (t, string) result
+(** [local_clone r ~dir] clones [r] to a working directory [dir] and returns
     a repo to operate on it. *)
 
 (** {1:tags Tags} *)
@@ -131,11 +138,14 @@ val delete_tag : t -> tag -> (unit, string) result
 (** [delete_tag r t] deletes tag [t] in repo [r]. *)
 
 val describe : t -> dirty_mark:bool -> commit_ish -> (string, string) result
-(** [describe r dirty_mark commit_ish] identifies [commit_ish]
-    (defaults to ["HEAD"]) using tags from the repository [r]. If
-    [commit_ish] is ["HEAD"] and [dirty_mark] is [true] (default) and
-    the working tree of [r] {!is_dirty}, a mark gets appended to the
-    description. *)
+(** [describe r dirty_mark commit_ish] identifies [commit_ish] using
+    tags from the repository [r]. If [commit_ish] is ["HEAD"] and
+    [dirty_mark] is [true] (default) and the working tree of [r]
+    {!is_dirty}, a mark gets appended to the description. *)
+
+val latest_tag : t -> commit_ish -> (tag option, string) result
+(** [latest_tag r commit_ish] finds the latest tag in the current branch
+    describing [commit_ish]. *)
 
 (** {1:git Git specific operations} *)
 
@@ -145,6 +155,10 @@ val describe : t -> dirty_mark:bool -> commit_ish -> (string, string) result
     Use {!check_kind} to assert this first otherwise the operations
     will fail in a non-user friendly way. *)
 module Git : sig
+
+  val get_cmd :
+    ?search:Fpath.t list -> ?cmd:Cmd.t -> unit -> (Cmd.t, string) result
+  (** [cmd ()] looks for [git] with {!Os.Cmd.get}. *)
 
   val find : ?dir:Fpath.t -> unit -> (t option, string) result
   (** [find ~dir ()] finds, using VCS functionality, a git repository
@@ -169,20 +183,22 @@ module Git : sig
   (** [pp_remote_branch] formats a remote branch like colorized [git] would. *)
 
   val remote_branch_exists :
+    ?env:Os.Env.assignments ->
     t -> remote:remote -> branch:branch -> (bool, string) result
   (** [remote_branch_exists r remote branch] asserts whether [branch]
       exists on [remote]. *)
 
   val remote_branch_fetch :
-    ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo -> t -> remote:remote ->
-    branch:branch -> (unit, string) result
+    ?env:Os.Env.assignments -> ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo ->
+    t -> remote:remote -> branch:branch -> (unit, string) result
   (** [remote_branch_fetch r remote branch] fetches [branch] of [remote].
       [stderr] and [stdout] indicates where they should be redirected,
       defaults to the values of {!Os.Cmd.run_status}. *)
 
   val remote_branch_push :
-    ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo -> t -> force:bool ->
-    src:branch -> remote:remote -> dst:remote -> (unit, string) result
+    ?env:Os.Env.assignments -> ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo ->
+    t -> force:bool -> src:branch -> remote:remote -> dst:remote ->
+    (unit, string) result
   (** [remote_branch_push r ~force ~local ~remote ~dst] pushes branch
       [src] on [dst] of [remote]. If [dst] does not exist on [remote]
       a new branch is created. If [force] is [true] this is a forced
@@ -190,15 +206,15 @@ module Git : sig
       defaults to the values of {!Os.Cmd.run_status}. *)
 
   val remote_branch_delete :
-    ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo -> t -> force:bool ->
-    remote:remote -> branch:branch -> (unit, string) result
+    ?env:Os.Env.assignments -> ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo ->
+    t -> force:bool -> remote:remote -> branch:branch -> (unit, string) result
   (** [remote_branch_delete r ~remote ~branch] deletes [branch] on
       [remote]. If [force] is [true] this is a forced update.
       [stderr] and [stdout] indicates where they should be redirected,
       defaults to the values of {!Os.Cmd.run_status}. *)
 
   val branch_delete :
-    ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo ->
+    ?env:Os.Env.assignments -> ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo ->
     t -> force:bool -> branch:branch -> (unit, string) result
   (** [branch_delete r ~force ~branch] deletes [branch] in [r]. If
       [force] is [true] this is a forced deletion.  [stderr] and
@@ -214,8 +230,8 @@ module Git : sig
       can the be pushed on other branches and then deleted. *)
 
   val transient_checkout :
-    t -> force:bool -> branch:branch -> Fpath.t -> commit_ish option ->
-    (t, string) result
+    ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo -> t -> force:bool ->
+    branch:branch -> Fpath.t -> commit_ish option -> (t, string) result
   (** [checkout_tmp_branch r ~force ~branch dir commit_ish] creates
       and checkouts and a branch [branch] in [dir] that points to
       [commit_ish] (if [None] an empty orphan branch is
@@ -224,13 +240,16 @@ module Git : sig
       with the checkout. Once finished it should be disposed with
       {!transient_checkout_delete}. *)
 
-  val transient_checkout_delete : t -> force:bool -> (unit, string) result
+  val transient_checkout_delete :
+    ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo -> t -> force:bool ->
+    (unit, string) result
   (** [transient_checkout_delete r] deletes a transient checkout.
       The branch created by {!transient_checkout} is not deleted
       by the operation, only the corresponding working tree. If [force]
       will delete even if the checkout is dirty. *)
 
   val with_transient_checkout :
+    ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo ->
     ?dir:Fpath.t -> t -> force:bool -> branch:branch -> commit_ish option ->
     (t -> 'a) -> ('a, string) result
   (** [with_transient_checkout r ~force ~branch ~dir commit_ish f]
@@ -276,6 +295,9 @@ module Git : sig
 end
 
 module Hg : sig
+  val get_cmd :
+    ?search:Fpath.t list -> ?cmd:Cmd.t -> unit -> (Cmd.t, string) result
+  (** [get_cmd ()] looks for [hg] with {!Os.Cmd.get}. *)
 
   val find : ?dir:Fpath.t -> unit -> (t option, string) result
   (** [find ~dir ()] finds, using VCS functionality, an hg repository

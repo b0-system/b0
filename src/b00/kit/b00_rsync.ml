@@ -6,12 +6,14 @@
 open B00_std
 open Result.Syntax
 
-let rsync = Os.Cmd.get (Cmd.atom "rsync")
+let get_cmd ?search ?(cmd = Cmd.atom "rsync") () = Os.Cmd.get ?search cmd
+let rsync = lazy (get_cmd ())
+
 let copy
     ?(opts = Cmd.atom "-azh") ?(stats = true) ~delete
     ?(src_host = "") ~src ?(dst_host = "") dst
   =
-  let* rsync = Os.Cmd.get (Cmd.atom "rsync") in
+  let* rsync = Lazy.force rsync in
   (* XXX force slashes ?  *)
   let src = src_host ^ Fpath.to_string src in
   let dst = dst_host ^ Fpath.to_string dst in

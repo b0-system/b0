@@ -108,7 +108,7 @@ let default =
   let meta =
     let open B0_meta in
     empty
-    |> add authors ["The B0 programmers"]
+    |> add authors ["The b0 programmers"]
     |> add maintainers ["Daniel Bünzli <daniel.buenzl i@erratique.ch>"]
     |> add homepage "https://erratique.ch/software/b0"
     |> add online_doc "https://erratique.ch/software/b0/doc"
@@ -118,6 +118,12 @@ let default =
     |> add description_tags ["dev"; "org:erratique"; "org:b0-system"; "build"]
     |> add B0_opam.Meta.build
       {|[["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]]|}
+    |> add B0_opam.Meta.depends [
+      "ocaml", {|>= "4.08.0"|};
+      "ocamlfind", {|build|};
+      "ocamlbuild", {|build|};
+      "topkg", {|build & >= "1.0.3"|};
+      "cmdliner", {|build &>= "1.0.2"|}; ]
     |> tag B0_opam.tag
   in
   B0_pack.v "default" ~doc:"The B0 system" ~meta ~locked:true @@

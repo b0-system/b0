@@ -4,7 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
-open B00_std.Result.Syntax
+open Result.Syntax
 
 let parse_changes lines =
   try
@@ -41,9 +41,8 @@ type r =
     work_dir : Fpath.t }
 
 module type VCS = sig
-  val vcs_cmd : (B00_std.Cmd.t option, string) result Lazy.t
   val find : ?dir:Fpath.t -> unit -> (r option, string) result
-  val cmd : r -> Cmd.t
+  val repo_cmd : r -> Cmd.t
 
   (* Commits *)
 
@@ -57,14 +56,16 @@ module type VCS = sig
     ((string * string) list, string) result
 
   val tracked_files : r -> tree_ish:string -> (Fpath.t list, string) result
-  val commit_files : ?msg:string -> r -> Fpath.t list -> (unit, string) result
+  val commit_files :
+    ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo ->
+    ?msg:string -> r -> Fpath.t list -> (unit, string) result
 
   (* Working directory *)
 
   val is_dirty : r -> (bool, string) result
   val file_is_dirty : r -> Fpath.t -> (bool, string) result
   val checkout : ?and_branch:string -> r -> commit_ish -> (unit, string) result
-  val clone : r -> dir:Fpath.t -> (r, string) result
+  val local_clone : r -> dir:Fpath.t -> (r, string) result
 
   (* Tags *)
 
@@ -74,14 +75,10 @@ module type VCS = sig
     (unit, string) result
 
   val delete_tag : r -> tag -> (unit, string) result
+  val latest_tag : r -> commit_ish -> (tag option, string) result
 end
 
 type t = r * (module VCS)
-
-let get_vcs ?search default_cmd var =
-  let cmd = Os.Env.find' ~empty_is_none:true Cmd.of_string var in
-  Result.bind cmd @@ fun cmd ->
-  Os.Cmd.find ?search (Option.value ~default:(Cmd.atom default_cmd) cmd)
 
 let err cmd status = Fmt.error "%a" Os.Cmd.pp_cmd_status (cmd, status)
 let run ?stderr r cmd_args =
@@ -90,44 +87,51 @@ let run ?stderr r cmd_args =
   | `Exited 0, v -> Ok v
   | status, _ -> err vcs status
 
-let run_out_stdout r cmd_args =
+let run_status ?stdout ?stderr r cmd_args =
   let vcs = Cmd.(r.cmd %% cmd_args) in
-  Result.bind (Os.Cmd.run_status vcs) @@ function
+  Result.bind (Os.Cmd.run_status ?stdout ?stderr vcs) @@ function
   | `Exited 0 -> Ok ()
   | status -> err vcs status
 
 (* Git support *)
 
-module Git_vcs : VCS = struct
-  let vcs_cmd = lazy (get_vcs "git" "B0_GIT")
+module Git_vcs = struct
+  let git = lazy (Os.Cmd.find (Cmd.atom "git"))
   let repo_cmd git repo_dir work_dir =
     Cmd.(git % "--git-dir" %% path repo_dir % "--work-tree" %% path work_dir)
-  let find ?dir () = Result.bind (Lazy.force vcs_cmd) @@ function
-  | None -> Ok None
-  | Some git ->
-      let get_path ~must cmd =
-        let stderr = `Stdo Os.Cmd.out_null in
-        Result.bind (Os.Cmd.run_status_out ~stderr ~trim:true cmd) @@ function
-        | `Exited 0, repo_dir ->
-            Result.map Option.some (Fpath.of_string repo_dir)
-        | status, _ when must -> err cmd status
-        | status, _ -> Ok None
-      in
-      let cwd = match dir with
-      | Some d -> Cmd.(atom "-C" %% path d)
-      | None -> Cmd.empty
-      in
-      let repo_dir = Cmd.(git %% cwd % "rev-parse" % "--absolute-git-dir") in
-      let work_dir = Cmd.(git %% cwd % "rev-parse" % "--show-toplevel") in
-      Result.bind (get_path ~must:false repo_dir) @@ function
-      | None -> Ok None
-      | Some repo_dir ->
-          Result.bind (get_path ~must:true work_dir) @@ fun work_dir ->
-          let work_dir = Option.get work_dir in
-          let cmd = repo_cmd git repo_dir work_dir in
-          Ok (Some { kind = Git; cmd; repo_dir; work_dir })
 
-  let cmd r = r.cmd
+  let find ?dir () =
+    let get_vcs_path cmd =
+      let stderr = `Stdo Os.Cmd.out_null in
+      let* status, repo_dir = Os.Cmd.run_status_out ~stderr ~trim:true cmd in
+      match status with
+      | `Exited 0 ->
+          if repo_dir = "" (* that seems to be returned on bare repos *)
+          then Ok None
+          else Result.map Option.some (Fpath.of_string repo_dir)
+      | status -> Ok None
+    in
+    let* git = Lazy.force git in
+    match git with
+    | None -> Ok None
+    | Some git ->
+        let cwd = match dir with
+        | Some d -> Cmd.(atom "-C" %% path d)
+        | None -> Cmd.empty
+        in
+        let repo_dir = Cmd.(git %% cwd % "rev-parse" % "--absolute-git-dir") in
+        let work_dir = Cmd.(git %% cwd % "rev-parse" % "--show-toplevel") in
+        let* repo_dir = get_vcs_path repo_dir in
+        match repo_dir with
+        | None -> Ok None
+        | Some repo_dir ->
+            let* work_dir = get_vcs_path work_dir in
+            let default = Fpath.null (* for bare repos *) in
+            let work_dir = Option.value ~default work_dir in
+            let cmd = repo_cmd git repo_dir work_dir in
+            Ok (Some { kind = Git; cmd; repo_dir; work_dir })
+
+  let repo_cmd r = r.cmd
   let work_tree r = Cmd.(atom "--work-tree" %% path (Fpath.parent r.repo_dir))
 
   let is_dirty r =
@@ -164,10 +168,10 @@ module Git_vcs : VCS = struct
     let args = Cmd.(atom "ls-tree" % "--name-only" % "-r" % tree_ish) in
     Result.bind (run r args) (parse_files ~err:"tracked files")
 
-  let commit_files ?msg:m r files =
+  let commit_files ?stdout ?stderr ?msg:m r files =
     let msg = match m with None -> Cmd.empty | Some m -> Cmd.(atom "-m" % m) in
     let args = Cmd.(atom "commit" %% msg %% paths files) in
-    run_out_stdout r args
+    run_status ?stdout ?stderr r args
 
   (* Working directory *)
 
@@ -186,11 +190,11 @@ module Git_vcs : VCS = struct
     let b = match b with None -> Cmd.empty | Some b -> Cmd.(atom "-b" % b) in
     let work_tree = work_tree r in
     let args = Cmd.(work_tree % "checkout" % "--quiet" %% b % commit_ish) in
-    run_out_stdout r args
+    run_status r args
 
-  let clone r ~dir =
+  let local_clone r ~dir =
     let args = Cmd.(atom "clone" % "--local" %% path r.repo_dir %% path dir) in
-    Result.bind (run_out_stdout r args) @@ fun () ->
+    Result.bind (run_status r args) @@ fun () ->
     Result.bind (find ~dir ()) @@ function
     | Some r -> Ok r
     | None -> Fmt.error "%a: no clone found" Fpath.pp_quoted dir
@@ -205,22 +209,32 @@ module Git_vcs : VCS = struct
     let msg = match m with None -> Cmd.empty | Some m -> Cmd.(atom "-m" % m) in
     let flags = Cmd.(if' force (atom "-f") %% if' sign (atom "-s")) in
     let args = Cmd.(atom "tag" % "-a" %% flags %% msg % tag % commit_ish) in
-    run_out_stdout r args
+    run_status r args
 
   let delete_tag r tag =
     let args = Cmd.(atom "tag" % "-d" % tag) in
-    run_out_stdout r args
+    run_status r args
 
   let describe r ~dirty_mark commit_ish =
     let args = Cmd.(atom "describe" % "--always" % commit_ish) in
     Result.bind (run r args) (handle_dirt ~dirty_mark commit_ish r)
+
+  let latest_tag r commit_ish =
+    let stderr = `Stdo Os.Cmd.out_null in
+    let args = Cmd.(atom "describe" % "--abbrev=0" % commit_ish) in
+    let cmd = Cmd.(r.cmd %% args) in
+    Result.bind (Os.Cmd.run_status_out ~stderr ~trim:true cmd) @@ function
+    | `Exited 0,  v -> Ok (Some v)
+    | `Exited 128, _ -> Ok None
+    | status, _  -> err cmd status
 end
 
 (* Hg support *)
 
-module Hg_vcs : VCS = struct
-  let vcs_cmd = lazy (get_vcs "hg" "B0_HG")
+module Hg_vcs = struct
+  let hg = lazy (Os.Cmd.find (Cmd.atom "hg"))
   let repo_cmd hg repo_dir = Cmd.(hg % "--repository" %% path repo_dir)
+
   let find ?dir () = match dir with
   | Some dir ->
       begin
@@ -229,7 +243,7 @@ module Hg_vcs : VCS = struct
         Result.bind (Os.Dir.exists repo_dir) @@ function
         | false -> Ok None
         | true ->
-            Result.bind (Lazy.force vcs_cmd) @@ function
+            Result.bind (Lazy.force hg) @@ function
             | Some hg ->
                 Ok (Some { kind = Hg; cmd = repo_cmd hg repo_dir; repo_dir;
                            work_dir})
@@ -238,7 +252,7 @@ module Hg_vcs : VCS = struct
                 Fpath.pp_quoted repo_dir
       end
   | None ->
-      Result.bind (Lazy.force vcs_cmd) @@ function
+      Result.bind (Lazy.force hg) @@ function
       | None -> Ok None
       | Some hg ->
           let hg_root = Cmd.(hg % "root") in
@@ -252,12 +266,11 @@ module Hg_vcs : VCS = struct
                          work_dir })
           | _ -> Ok None
 
-  let cmd r = r.cmd
+  let repo_cmd r = r.cmd
   let revision commit_ish = match commit_ish with "HEAD" -> "tip" | c -> c
 
   let id r ~rev =
-    let args = Cmd.(atom "id" % "-i" % "--rev" % rev) in
-    Result.bind (run r args) @@ fun id ->
+    let* id = run r Cmd.(atom "id" % "-i" % "--rev" % rev) in
     let len = String.length id in
     let is_dirty = String.length id > 0 && id.[len - 1] = '+' in
     let id = if is_dirty then String.sub id 0 (len - 1) else id in
@@ -301,10 +314,10 @@ module Hg_vcs : VCS = struct
     let args = Cmd.(atom "manifest" % "--rev" % rev) in
     Result.bind (run r args) (parse_files ~err:"tracked files")
 
-  let commit_files ?msg:m r files =
+  let commit_files ?stdout ?stderr ?msg:m r files =
     let msg = match m with None -> Cmd.empty | Some m -> Cmd.(atom "-m" % m) in
     let args = Cmd.(atom "commit" %% msg %% paths files) in
-    run_out_stdout r args
+    run_status ?stdout ?stderr r args
 
   (* Working directory *)
 
@@ -322,9 +335,9 @@ module Hg_vcs : VCS = struct
         let args = Cmd.(atom "branch" % branch) in
         Result.bind (run r args) @@ fun _ -> Ok ()
 
-  let clone r ~dir =
+  let local_clone r ~dir =
     let args = Cmd.(atom "clone" %% path r.repo_dir %% path dir) in
-    Result.bind (run_out_stdout r args) @@ fun _ ->
+    Result.bind (run_status r args) @@ fun _ ->
     Result.bind (find ~dir ()) @@ function
     | Some r -> Ok r
     | None -> Fmt.error "%a: no clone found" Fpath.pp_quoted dir
@@ -341,11 +354,11 @@ module Hg_vcs : VCS = struct
     let msg = match m with None -> Cmd.empty | Some m -> Cmd.(atom "-m" % m) in
     let may_force = Cmd.(if' force (atom "-f")) in
     let args = Cmd.(atom "tag" %% may_force %% msg % "--rev" % rev % tag) in
-    run_out_stdout r args
+    run_status r args
 
   let delete_tag r tag =
     let args = Cmd.(atom "tag" % "--remove" % tag) in
-    run_out_stdout r args
+    run_status r args
 
   let describe r ~dirty_mark commit_ish =
     let get_distance s = try Ok (int_of_string s) with
@@ -362,12 +375,19 @@ module Hg_vcs : VCS = struct
     | n -> "{latesttag}-{latesttagdistance}-{node|short}"
     in
     Result.bind (run r (parent template)) (handle_dirt ~dirty_mark commit_ish r)
+
+  let latest_tag r commit_ish =
+    let rev = revision commit_ish in
+    let args = Cmd.(atom "parent" % "--rev" % rev % "--template" %
+                    "{latesttag}")
+    in
+    Result.map Option.some (run r args)
 end
 
 let kind (r, _) = r.kind
 let repo_dir (r, _) = r.repo_dir
 let work_dir (r, _) = r.work_dir
-let cmd (r, (module Vcs : VCS)) = Vcs.cmd r
+let repo_cmd (r, (module Vcs : VCS)) = Vcs.repo_cmd r
 let pp ppf (r, _) =
   Fmt.pf ppf "(%a, %a)" pp_kind r.kind Fpath.pp_quoted r.repo_dir
 
@@ -393,7 +413,8 @@ let commit_id (r, (module Vcs : VCS)) = Vcs.commit_id r
 let commit_ptime_s (r, (module Vcs : VCS)) = Vcs.commit_ptime_s r
 let changes (r, (module Vcs : VCS)) = Vcs.changes r
 let tracked_files (r, (module Vcs : VCS)) = Vcs.tracked_files r
-let commit_files ?msg (r, (module Vcs : VCS)) = Vcs.commit_files ?msg r
+let commit_files ?stdout ?stderr ?msg (r, (module Vcs : VCS)) =
+  Vcs.commit_files ?stdout ?stderr ?msg r
 
 (* Working directory *)
 
@@ -404,8 +425,8 @@ let not_dirty r = Result.bind (is_dirty r) @@ function
 
 let file_is_dirty (r, (module Vcs : VCS)) = Vcs.file_is_dirty r
 let checkout ?and_branch (r, (module Vcs : VCS)) = Vcs.checkout ?and_branch r
-let clone (r, (module Vcs : VCS)) ~dir =
-  Result.bind (Vcs.clone r ~dir) @@ fun r -> Ok (r, (module Vcs : VCS))
+let local_clone (r, (module Vcs : VCS)) ~dir =
+  Result.bind (Vcs.local_clone r ~dir) @@ fun r -> Ok (r, (module Vcs : VCS))
 
 (* Tags *)
 
@@ -413,11 +434,12 @@ let tags (r, (module Vcs : VCS)) = Vcs.tags r
 let tag ?msg (r, (module Vcs : VCS)) = Vcs.tag ?msg r
 let delete_tag (r, (module Vcs : VCS)) = Vcs.delete_tag r
 let describe (r, (module Vcs : VCS)) = Vcs.describe r
+let latest_tag (r, (module Vcs : VCS)) = Vcs.latest_tag r
 
 (* Git specific *)
 
 module Git = struct
-
+  let get_cmd ?search ?(cmd = Cmd.atom "git") () = Os.Cmd.get ?search cmd
   let find ?dir () =
     let* vcs = Git_vcs.find ?dir () in
     Ok (Option.map (fun r -> r, (module Git_vcs : VCS)) vcs)
@@ -435,67 +457,70 @@ module Git = struct
   let pp_remote_branch =
     Fmt.tty [`Fg `Red; `Bold] (fun ppf (r, b) -> Fmt.pf ppf "%s/%s" r b)
 
-  let remote_branch_exists (r, _) ~remote ~branch =
+  let remote_branch_exists ?env (r, _) ~remote ~branch =
     let ui = Cmd.(atom "--exit-code" % "--quiet") in
     let stdout = Os.Cmd.out_null (* not so quiet *) in
     let ls_remote = Cmd.(r.cmd % "ls-remote" %% ui % remote % branch) in
-    Result.bind (Os.Cmd.run_status ~stdout ls_remote) @@ function
+    Result.bind (Os.Cmd.run_status ?env ~stdout ls_remote) @@ function
     | `Exited 0 -> Ok true
     | `Exited 2 -> Ok false
     | status -> Fmt.error "%a" Os.Cmd.pp_cmd_status (ls_remote, status)
 
-  let remote_branch_fetch ?stdout ?stderr (r, _) ~remote ~branch =
+  let remote_branch_fetch ?env ?stdout ?stderr (r, _) ~remote ~branch =
     let fetch = Cmd.(r.cmd % "fetch" % remote % branch) in
-    Os.Cmd.run ?stdout ?stderr fetch
+    Os.Cmd.run ?env ?stdout ?stderr fetch
 
-  let remote_branch_push ?stdout ?stderr (r, _) ~force ~src ~remote ~dst =
+  let remote_branch_push ?env ?stdout ?stderr (r, _) ~force ~src ~remote ~dst =
     let refspec = Fmt.str "%s:%s" src dst in
     let force = Cmd.(if' force (atom "--force")) in
     let push = Cmd.(r.cmd % "push" %% force % remote % refspec) in
-    Os.Cmd.run ?stdout ?stderr push
+    Os.Cmd.run ?env ?stdout ?stderr push
 
-  let remote_branch_delete ?stdout ?stderr (r, _) ~force ~remote ~branch =
+  let remote_branch_delete ?env ?stdout ?stderr (r, _) ~force ~remote ~branch =
     let force = Cmd.(if' force (atom "--force")) in
     let push = Cmd.(r.cmd % "push" % "--delete" %% force % remote % branch) in
-    Os.Cmd.run push
+    Os.Cmd.run ?env ?stdout ?stderr push
 
-  let branch_delete ?stdout ?stderr (r, _) ~force ~branch =
+  let branch_delete ?env ?stdout ?stderr (r, _) ~force ~branch =
     let force = Cmd.(if' force (atom "--force")) in
     let del = Cmd.(r.cmd % "branch" % "-d" %% force % branch) in
-    Os.Cmd.run ?stdout ?stderr del
+    Os.Cmd.run ?env ?stdout ?stderr del
 
   (* Transient checkouts *)
 
-  let transient_checkout (r, _) ~force ~branch dir = function
+  let transient_checkout ?stdout ?stderr (r, _) ~force ~branch dir = function
   | Some cish ->
       let b = if force then "-B" else "-b" in
       let add = Cmd.(atom "worktree" % "add" % b % branch %% path dir % cish) in
-      Result.bind (Os.Cmd.run Cmd.(r.cmd %% add)) @@ fun () ->
+      let* () = Os.Cmd.run ?stdout ?stderr Cmd.(r.cmd %% add) in
       get ~dir ()
   | None ->
       (* worktree add has no --orphan option... The following is a contrived
          way of getting an empty branch. *)
       let add = Cmd.(r.cmd % "worktree" % "add" % "--detach" %% path dir) in
-      Result.bind (Os.Cmd.run add) @@ fun () ->
-      Result.bind (get ~dir ()) @@ fun repo ->
+      let* () = Os.Cmd.run ?stdout ?stderr add in
+      let* repo = get ~dir () in
       let orphan = Cmd.(r.cmd % "checkout" % "--orphan" % branch) in
-      Result.bind (Os.Cmd.run orphan) @@ fun () ->
-      Result.bind (Os.Cmd.run Cmd.(r.cmd % "rm" % "-rf" % ".")) @@ fun () ->
+      let* () = Os.Cmd.run ?stdout ?stderr orphan in
+      let* () = Os.Cmd.run ?stdout ?stderr Cmd.(r.cmd % "rm" % "-rf" % ".") in
       Ok repo
 
-  let transient_checkout_delete (r, _) ~force =
+  let transient_checkout_delete ?stdout ?stderr (r, _) ~force =
     let force = Cmd.(if' force (atom "--force")) in
     let rem = Cmd.(atom "worktree" % "remove" %% force %% path r.work_dir) in
-    Os.Cmd.run Cmd.(r.cmd %% rem)
+    Os.Cmd.run ?stdout ?stderr Cmd.(r.cmd %% rem)
 
-  let with_transient_checkout ?dir r ~force ~branch cish f =
-    let cleanup r = transient_checkout_delete r ~force in
-    let dir = match dir with None -> Os.Path.tmp () | Some d -> Ok d in
-    Result.bind dir @@ fun dir ->
-    Result.bind (transient_checkout r ~force ~branch dir cish) @@ fun r ->
+  let with_transient_checkout ?stdout ?stderr ?dir r ~force ~branch cish f =
+    let* dir = match dir with None -> Os.Path.tmp () | Some d -> Ok d in
+    let* tr = transient_checkout r ?stdout ?stderr ~force ~branch dir cish in
+    let cleanup () =
+      Log.if_error ~use:() (transient_checkout_delete ?stdout ?stderr tr ~force)
+    in
     try
-      let v = f r in Result.bind (cleanup r) @@ fun () -> Ok v
-    with e -> ignore (cleanup r); raise e
+      Os.Exit.on_sigint ~hook:cleanup @@ fun () ->
+      let v = f tr in
+      (cleanup (); Ok v)
+    with e -> cleanup (); raise e
 
   (* Working dir *)
 
@@ -538,10 +563,13 @@ module Git = struct
 end
 
 module Hg = struct
+  let get_cmd ?search ?(cmd = Cmd.atom "hg") () = Os.Cmd.get ?search cmd
   let find ?dir () =
     let* vcs = Hg_vcs.find ?dir () in
     Ok (Option.map (fun r -> r, (module Hg_vcs : VCS)) vcs)
 end
+
+
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2019 The b0 programmers

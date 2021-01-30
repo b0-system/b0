@@ -329,7 +329,8 @@ Here are example of pack usage in the system:
    These builds can then be easily triggered via the [-p] option
    of [b0 build].}
 {- Define metadata and build units to create a distribution package. For
-   example opam package descriptions can be generated from build packs.}
+   example opam package files can be generated from build packs,
+   see the {{!page-opam}B0 [opam] manual}.}
 {- Define build prerequisites for actions and deployments}}
 
 {3:default_pack The [default] pack}

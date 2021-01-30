@@ -53,4 +53,6 @@ let () =
     Pkg.doc "doc/cmdlet_manual.mld" ~dst:"odoc-pages/cmdlet_manual.mld";
     Pkg.doc "doc/rationale.mld" ~dst:"odoc-pages/rationale.mld";
     Pkg.doc "doc/todo.mld" ~dst:"odoc-pages/todo.mld";
+    Pkg.doc "doc/opam.mld" ~dst:"odoc-pages/opam.mld";
+    Pkg.doc "doc/release.mld" ~dst:"odoc-pages/release.mld";
   ]

@@ -106,14 +106,11 @@ module Httpr : sig
   val curl :
     ?docs:string -> ?env:Cmdliner.Arg.env -> unit -> Cmd.t Cmdliner.Term.t
   (** [curl] is a cli interface for specifying the curl command
-      line tool.
+      line tool. *)
 
-      which is looked up
-      in the PATH or in the environment variable [B0_CURL]. *)
-
-  val find_curl :
-    ?search:Fpath.t list -> curl:Cmd.t -> unit -> (t, string) result
-
+  val get_curl :
+    ?search:Fpath.t list -> ?curl:Cmd.t -> unit -> (t, string) result
+  (** [get_curl ()] looks for [curl] (defaults to "curl") in [search]. *)
 end
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 The b0 programmers

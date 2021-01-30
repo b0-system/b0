@@ -4,62 +4,148 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
+open Result.Syntax
 open B00_serialk_json
 open B00_http
 
-let jsonq_int = Jsonq.(map truncate float) (* FIXME *)
+(* GitHub authentication. *)
+
+module Auth = struct
+
+  let conf_dir () =
+    let* c = Os.Dir.config () in
+    Ok Fpath.(c / "b0" / "github")
+
+  (* Token *)
+
+  let token_scope = "repo"
+  let token_env = "B0_GITHUB_TOKEN"
+  let token_help_uri =
+    "https://docs.github.com/en/github/authenticating-to-github/\
+     creating-a-personal-access-token"
+
+  type token_src = [ `Env | `File of Fpath.t ]
+  let pp_token_src ppf = function
+  | `Env -> Fmt.pf ppf "environment variable %s" token_env
+  | `File file -> Fmt.pf ppf "file %a" Fpath.pp_quoted file
+
+  let parse_token s = match String.trim s with
+  | "" -> Error "Token can't be empty."
+  | s -> Ok s
+
+  let get_tokens conf_dir =
+    let is_token_file n = String.ends_with ~suffix:".token" n in
+    let add _ fname p acc = if is_token_file fname then p :: acc else acc in
+    Os.Dir.fold_files ~recurse:false add conf_dir []
+
+  let get_token conf_dir ~user =
+    match Os.Env.find ~empty_is_none:true token_env with
+    | Some token -> Result.map (fun t -> t, `Env) (parse_token token)
+    | None ->
+        let tokfile = Fpath.(conf_dir / Fmt.str "%s.token" user) in
+        let* exists = Os.File.exists tokfile in
+        match exists with
+        | false ->
+            (* We could bother using oauth to create one here but with 2FA
+               it seems more trouble and some people will anyway prefer to
+               handle this themselves rather than trust a random cli tool. *)
+            Fmt.error
+              "@[<v>No GitHub personal access token found for user '%s' in@,\
+               environment variable %s or in file@,%a@,@,\
+               Create a GitHub personal access token with scope '%s' by@,\
+               following the instructions here:@,@,  %s@,@,\
+               Save the token in the file above e.g. by running:@,@,\
+               \ \ # Make sure the directory exists@,\
+               \ \ mkdir -p %a@,@,\
+               \ \ # Paste the token from clipboard@,\
+               \ \ cat - > %a@,@,\
+               \ \ # Restrict access to yourself@,\
+               \ \ chmod 600 %a@,"
+              user token_env Fpath.pp_quoted tokfile token_scope token_help_uri
+              Fpath.pp_quoted conf_dir Fpath.pp_quoted tokfile Fpath.pp_quoted
+              tokfile
+        | true ->
+            Result.map_error (Fmt.str "%a: %s" Fpath.pp_quoted tokfile) @@
+            let* tok = Result.bind (Os.File.read tokfile) parse_token  in
+            Ok (tok, `File tokfile)
+
+  (* User *)
+
+  let user_env = "B0_GITHUB_USER"
+  let default_user_file = "default-user"
+
+  let parse_user s = match String.trim s with
+  | "" -> Error "User can't be empty."
+  | s when String.exists Char.Ascii.is_blank s -> Error "User can't have space."
+  | s -> Ok s
+
+  let user_of_default_file default_user_file =
+    Result.map_error (Fmt.str "%a: %s" Fpath.pp_quoted default_user_file) @@
+    Result.bind (Os.File.read default_user_file) parse_user
+
+  let user_of_token_file f =
+    Result.map_error (Fmt.str "%a: %s" Fpath.pp_quoted f) @@
+    parse_user (Fpath.basename ~no_ext:true f)
+
+  let get_user conf_dir ~user =
+    let err default_file =
+      Fmt.error "@[<v>Could not determine a default GitHub user.@,\
+                 Write the user to use in the file %a@]" Fpath.pp_unquoted
+        default_file
+    in
+    match user with
+    | Some user -> Ok user
+    | None ->
+        match Os.Env.find ~empty_is_none:true user_env with
+        | Some user -> Ok user
+        | None ->
+            let default_user_file = Fpath.(conf_dir / default_user_file) in
+            let* dir_exists = Os.Dir.exists conf_dir in
+            let* file_exists = Os.File.exists default_user_file in
+            if not dir_exists then err default_user_file else
+            if file_exists then user_of_default_file default_user_file else
+            let* tokens = get_tokens conf_dir in
+            match tokens with
+            | [] -> err default_user_file
+            | [t] -> user_of_token_file t
+            | ts -> err default_user_file
+
+  type t = { user : string; token : string; token_src : token_src }
+  let user a = a.user
+  let token a = a.token
+  let v ~user () =
+    let* conf_dir = conf_dir () in
+    let* user = get_user conf_dir ~user in
+    let* token, token_src = get_token conf_dir ~user in
+    Ok { user; token; token_src }
+
+  let envs =
+    [ Cmdliner.Arg.env_var user_env ~doc:"The GitHub user.";
+      Cmdliner.Arg.env_var token_env ~doc:"The GitHub personal access token." ]
+
+  let cli ?opts:(o = ["u";"github-user"]) ()  =
+    let auth user = v ~user () in
+    let doc = "The GitHub $(docv). If unspecified this is, \
+               in order, the value of the $(b,B0_GITHUB_USER) variable, \
+               the contents of $(b,XDG_CONFIG_HOME/b0/github/default-user), \
+               $(docv) if a single file path has the form
+               $(b,XDG_CONFIG_HOME/b0/github/)$(docv)$(b,.token).\n\n\
+               The password for $(docv) is, in order, the value of the \
+               $(b,B0_GITHUB_TOKEN) variable, the contents of the \
+               $(b,XDG_CONFIG_HOME/b0/github/)$(docv)$(b,.token) \
+               file."
+    in
+    let none = "See below" and docv = "USER" in
+    let user =
+      Cmdliner.Arg.(value & opt (some ~none string) None & info o ~doc ~docv)
+    in
+    Cmdliner.Term.(const auth $ user)
+end
+
+(* GitHub API queries *)
 
 let v4_api_uri = "https://api.github.com/graphql"
 let v3_api_uri = "https://api.github.com"
-
-(* GitHub authentication. *)
-
-let token_help_uri =
-  "https://help.github.com/articles/\
-   creating-a-personal-access-token-for-the-command-line"
-
-let token_scope = "repo"
-let token_env = "B0_GITHUB_TOKEN"
-
-type auth =
-  { user : string;
-    token : string;
-    token_src : [ `Env | `File of Fpath.t ] }
-
-let pp_token_src ppf = function
-| `Env -> Fmt.pf ppf "environment variable %s" token_env
-| `File file -> Fmt.pf ppf "file %a" Fpath.pp_quoted file
-
-let github_conf_dir () =
-  Result.bind (Os.Dir.config ()) (fun config -> Ok Fpath.(config / "github"))
-
-let auth ~user () = match Os.Env.find ~empty_is_none:true token_env with
-| Some token -> Ok { user; token; token_src = `Env }
-| None ->
-    Result.bind (github_conf_dir ()) @@ fun ghdir ->
-    let tokfile = Fpath.(ghdir / Fmt.str "b0-%s.token" user) in
-    Result.bind (Os.File.exists tokfile) @@ function
-    | false ->
-        (* We could bother using oauth to create one here but with 2FA
-           it seems more trouble and some people will anyway prefer to
-           handle this themselves rather than trust a random cli tool. *)
-        Fmt.error
-          "No GitHub token found for user '%s' in file %a@\n\
-           or in the environment variable %s.@\n@\n\
-           Create a GitHub personal access token with scope '%s' for b0@\n\
-           by following the instructions here:\n\n  %s@\n@\n\
-           and paste the token in the above file e.g. by running:@\n@\n\
-           \ \ mkdir -p %a  # Make sure the directory exists@\n\
-           \ \ cat - > %a   # Paste the token@\n\
-           \ \ chmod 600 %a # Make that readable only by yourself@\n"
-          user Fpath.pp_quoted tokfile token_env token_scope token_help_uri
-          Fpath.pp_quoted ghdir Fpath.pp_quoted tokfile Fpath.pp_quoted tokfile
-    | true ->
-        Result.bind (Os.File.read tokfile) @@ function
-        | "" -> Fmt.error "token file %a is empty" Fpath.pp_quoted tokfile
-        | token -> Ok { user; token; token_src = `File tokfile }
-
-(* GitHub API queries *)
 
 let resp_success auth req resp = match Http.resp_status resp with
 | 200 | 201 -> Json.of_string (Http.resp_body resp)
@@ -67,7 +153,8 @@ let resp_success auth req resp = match Http.resp_status resp with
     Fmt.error "GitHub authentication failure on %s.\n\
                Are you sure the token in %a\n\
                is valid for user '%s' and has scope '%s' ?\n"
-      (Http.req_uri req) pp_token_src auth.token_src auth.user token_scope
+      (Http.req_uri req) Auth.pp_token_src auth.Auth.token_src
+      auth.Auth.user Auth.token_scope
 | st ->
     Fmt.error "GitHub API request returned unexpected status %d for %s on %s"
       st (Http.meth_to_string @@ Http.req_meth req) (Http.req_uri req)
@@ -80,7 +167,7 @@ type v3_body =
 
 let req_json_v3 ?(headers = []) http auth ~path m body =
   let req_v3_headers auth =
-    ("Authorization", Fmt.str "token %s" auth.token) ::
+    ("Authorization", Fmt.str "token %s" auth.Auth.token) ::
     ("Accept", "application/vnd.github.v3+json") :: headers
   in
   let headers = req_v3_headers auth in
@@ -95,7 +182,8 @@ let req_json_v3 ?(headers = []) http auth ~path m body =
   Result.bind resp @@ fun resp -> resp_success auth req resp
 
 let query_v4 http auth q =
-  let req_v4_headers auth = ["Authorization", Fmt.str "bearer %s" auth.token] in
+  let req_v4_headers auth = ["Authorization",
+                             Fmt.str "bearer %s" auth.Auth.token] in
   let query = Jsong.(obj |> mem "query" (string q) |> obj_end) in
   let headers = req_v4_headers auth in
   let body = Jsong.to_string query in
@@ -108,6 +196,15 @@ let query_v4 http auth q =
 module Repo = struct
   type t = { owner : string; name : string }
   let v ~owner name = { owner; name }
+  let of_url url =
+    let err () = Fmt.error "%S: Can't parse GitHub owner and repo." url in
+    match Uri.parse_path_and_query url with
+    | None -> err ()
+    | Some p ->
+        match String.split_on_char '/' p with
+        | ("" :: owner :: repo :: _ ) -> Ok (v ~owner repo)
+        | _ -> err ()
+
   let owner r = r.owner
   let name r = r.name
   let query_v4 http auth repo q =
@@ -149,16 +246,16 @@ module Issue = struct
   let issue_list_q =
     let open Jsonq in
     let issue =
-      succeed v $ mem "number" jsonq_int
+      succeed v $ mem "number" int
       $ mem "title" string $ mem "bodyText" string $ mem "url" string
     in
     mem "data" @@ mem "repository" @@ mem "issues" @@
     (succeed (fun count is -> count, is)
-       $ mem "totalCount" jsonq_int $ mem "edges" (array (mem "node" issue)))
+       $ mem "totalCount" int $ mem "edges" (array (mem "node" issue)))
 
   let issue_id_q =
     let issue n uri = n, uri in
-    Jsonq.(succeed issue $ mem "number" jsonq_int $ mem "url" string)
+    Jsonq.(succeed issue $ mem "number" int $ mem "url" string)
 
   let create_g ~title ~body =
     Jsong.(obj |> mem "title" (string title) |> mem "body" (string body) |>
@@ -210,7 +307,7 @@ module Release = struct
   (* JSON *)
 
   let release_q =
-    Jsonq.(succeed v $ mem "id" jsonq_int $ mem "tag_name" string $
+    Jsonq.(succeed v $ mem "id" int $ mem "tag_name" string $
            mem "body" string $ mem "html_url" string $ mem "assets_url" string)
 
   let create_g ~tag_name ~body =
@@ -278,7 +375,8 @@ module Pages = struct
     Log.msg log (fun m -> m ~header "Copying updates.");
     let rm p = (* This makes sure [p] is in the repo *)
       let stdout = Os.Cmd.out_null in
-      B00_vcs.Git.rm r ~stdout ~force:true ~recurse:true ~ignore_unmatch:true [p]
+      B00_vcs.Git.rm r ~stdout ~force:true ~recurse:true ~ignore_unmatch:true
+        [p]
     in
     let cp r ~follow_symlinks src dst =
       let dst = Fpath.(B00_vcs.(work_dir r) // dst) in
