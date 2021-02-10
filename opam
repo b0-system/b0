@@ -1,22 +1,38 @@
 opam-version: "2.0"
-maintainer: "Daniel Bünzli <daniel.buenzl i@erratique.ch>"
+name: "b0"
+synopsis: """Software construction and deployment kit"""
+maintainer: ["Daniel Bünzli <daniel.buenzl i@erratique.ch>"]
 authors: ["The b0 programmers"]
 homepage: "https://erratique.ch/software/b0"
 doc: "https://erratique.ch/software/b0/doc"
-license: ["ISC" "BSD2"]
 dev-repo: "git+https://erratique.ch/repos/b0.git"
 bug-reports: "https://github.com/b0-system/b0/issues"
-tags: ["dev" "org:erratique" "org:b0-system" "build" ]
-depends:
-[
-  "ocaml" {>= "4.08.0"}
-  "ocamlfind" {build}
-  "ocamlbuild" {build}
-  "topkg" {build & >= "1.0.3"}
-  "cmdliner" {build &>= "1.0.2"}
-]
-depopts: []
-build:
-[[
-  "ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"
-]]
+license: ["ISC" "BSD2"]
+tags: ["dev" "org:erratique" "org:b0-system" "build"]
+depends: ["ocaml" {>= "4.08.0"}
+          "ocamlfind" {build}
+          "ocamlbuild" {build}
+          "topkg" {build & >= "1.0.3"}
+          "cmdliner" {build &>= "1.0.2"}]
+build: [["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]]
+description: """
+WARNING this package is unstable and work in progress, do not depend on it. 
+
+B0 describes software construction and deployments using modular and
+customizable definitions written in OCaml.
+
+B0 describes:
+
+* Build environments.
+* Software configuration, build and testing.
+* Source and binary deployments.
+* Software life-cycle procedures.
+
+B0 also provides the B00 build library which provides abitrary build
+abstraction with reliable and efficient incremental rebuilds. The B00
+library can be – and has been – used on its own to devise domain
+specific build systems.
+
+B0 is distributed under the ISC license. It depends on [cmdliner][cmdliner].
+
+[cmdliner]: https://erratique.ch/software/cmdliner"""
