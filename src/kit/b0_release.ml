@@ -52,7 +52,9 @@ let src_archive_ext_of_pack p =
   match B0_pack.find_meta Meta.src_archive_ext p with
   | None -> ".tbz" | Some ext -> ext
 
-let default_archive = "%%ARCHIVE_NAME%%-%%VERSION_NUM%%%%ARCHIVE_EXT%%"
+let default_archive =
+  "\x25%ARCHIVE_NAME%\x25-\x25%VERSION_NUM%\x25\x25%ARCHIVE_EXT%\x25"
+
 let default_src_archive_url homepage =
   let drop_final_slash s =
     let max = String.length s - 1 in
@@ -68,7 +70,7 @@ let default_github_src_archive_url repo =
   let repo = match String.cut_right ~sep:"." repo with
   | Some (repo, _) -> repo | _ -> repo
   in
-  Fmt.str "%s/releases/download/%%%%VERSION%%%%/%s" repo default_archive
+  Fmt.str "%s/releases/download/\x25\x25VERSION\x25\x25/%s" repo default_archive
 
 let src_archive_url_of_pack ~version p =
   let archive_name = src_archive_name_of_pack p in

@@ -10,8 +10,8 @@ automated package publication on the OCaml [opam] repository.
 [opam] packages are represented in [B0] by {{!page-manual.packs}build
 packs} tagged with the {!B0_opam.tag}. The name of the defined [opam]
 package is the basename of the pack or the value of the
-{!B0_opam.Meta.name} metadata key; see {!B0_opam.pkg_name_of_pack} for the
-full details.
+{!B0_opam.Meta.name} metadata key; see {!B0_opam.pkg_name_of_pack} for
+the full details.
 
 The metadata of the [opam] package is defined by the pack's
 {{!B0_meta.std}standard} and {{!B0_opam.Meta}[opam] specific} metadata
@@ -82,7 +82,7 @@ In order to be able to make a pull request on the OCaml [opam]
 package repository in the name of your GitHub [$USER] you need
 to:
 
-{ul
+{ol
 {- Create a personal access token for [$USER] with [repo] permission
    by following {{:https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token}these instructions}. Paste
    the token in the file [~/.config/b0/github/$USER.token] and:
@@ -99,7 +99,7 @@ to:
 {2:basic Basics}
 
 [opam] package publication happens after the software source archive
-has been released on the WWW; to get help for releasing your software
+has been released on the WWW. To get help for releasing your software
 with B0 see the {{!page-release}B0 release manual}.
 
 The publication process depends on the current work tree of the VCSes
@@ -144,7 +144,8 @@ If everything worked well it continues with:
 
 {ol
 {- Clones or updates the OCaml [opam] repository to the shallow
-   and bare repository [~/.caches/opam-repository.git]}
+   and bare repository [~/.caches/opam-repository.git] (the
+   {{!B00_std.Os.Dir.cache}XDG spec} is honoured).}
 {- Creates a branch for the publication, adds a commit with
    the generated files and constraints on incompatible packages.}
 {- Pushes the branch on your fork of the OCaml [opam] repository on GitHub.}
@@ -153,7 +154,7 @@ If everything worked well it continues with:
 
 Invoking the cmdlet with [--check-only] outputs on stdout the various
 bits that are being derived and performs various checks; e.g. it lints
-opam files and checks that download archives are not 404.
+[opam] files and HTTP HEADs archives to checks that they are not 404.
 
 {2:det_version Version determination}
 

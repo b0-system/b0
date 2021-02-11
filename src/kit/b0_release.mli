@@ -20,8 +20,8 @@ module Meta : sig
 
   val src_archive_url : string B0_meta.key
   (** [src_archive_url] is an URL pattern that specifies a source release on
-      the WWW. The following variables are to be subsituted [%%ARCHIVE_NAME%%],
-      [%%ARCHIVE_EXT%%], [%%VERSION%%], [%%VERSION_NUM%%],
+      the WWW. The following variables are to be subsituted [%‌%ARCHIVE_NAME%‌%],
+      [%‌%ARCHIVE_EXT%‌%], [%‌%VERSION%‌%], [%‌%VERSION_NUM%‌%],
       see {!src_archive_url_of_pack} for more details. *)
 end
 
@@ -52,10 +52,10 @@ val src_archive_url_of_pack :
     This looks up {!Meta.src_archive_url} [p] and substitute the variables
     as follows:
     {ul
-    {- [%%ARCHIVE_NAME%%] with the value of {!src_archive_name_of_pack}.}
-    {- [%%ARCHIVE_EXT%%] with the value of {!src_archive_name_of_ext}.}
-    {- [%%VERSION%%] with the value of [version]}
-    {- [%%VERSION_NUM%%] with the value of [version] with an initial [v]
+    {- [%‌%ARCHIVE_NAME%‌%] with the value of {!src_archive_name_of_pack}.}
+    {- [%‌%ARCHIVE_EXT%‌%] with the value of {!src_archive_name_of_ext}.}
+    {- [%‌%VERSION%‌%] with the value of [version]}
+    {- [%‌%VERSION_NUM%‌%] with the value of [version] with an initial [v]
        or [V] chopped.}}
 
     If {!Meta.src_archive_url} is absent, let [%%HOMEPAGE%%] be the value of
@@ -65,13 +65,13 @@ val src_archive_url_of_pack :
     {- If the hostname of {!B0_meta.homepage} is github the following
        URL pattern is used:
        {v
-%%REPO%%/releases/download/%%VERSION%%/\
-%%ARCHIVE_NAME%%-%%VERSION_NUM%%%%ARCHIVE_EXT%%
+%‌%REPO%‌%/releases/download/%‌%VERSION%‌%/\
+%‌%ARCHIVE_NAME%‌%-%‌%VERSION_NUM%‌%‌%‌%ARCHIVE_EXT%‌%
        v}}
     {- Otherwise the following URL pattern is used:
       {v
-%%HOMEPAGE%%/releases/\
-%%ARCHIVE_NAME%%-%%VERSION_NUM%%%%ARCHIVE_EXT%%
+%‌%HOMEPAGE%‌%/releases/\
+%‌%ARCHIVE_NAME%‌%-%‌%VERSION_NUM%‌%‌%‌%ARCHIVE_EXT%‌%
        v}}} *)
 
 (** {1:changes Change logs} *)

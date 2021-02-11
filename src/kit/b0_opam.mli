@@ -9,6 +9,13 @@
 
 open B00_std
 
+(** {1:tool [opam] tool} *)
+
+val get_cmd :
+  ?search:Fpath.t list -> ?cmd:B00_std.Cmd.t -> unit ->
+  (Cmd.t, string) result
+(** [get_cmd ()] looks for [opam] wih {!B00_std.Os.Cmd.get}. *)
+
 (** {1:file [opam] files} *)
 
 (** [opam] file generation. *)
@@ -17,9 +24,14 @@ module File : sig
   (** {1:gen Generic representation} *)
 
   type value =
-    [ `Raw of string | `B of bool | `S of string | `L of bool * value list ]
-  (** The type for opam values. In [`L] the boolean indicates whether
-      line-by-line rendering should be forced. *)
+    [ `Raw of string (** A raw, unescaped value *)
+    | `B of bool (** A boolean. *)
+    | `S of string (** A string. *)
+    | `L of bool * value list (** A list of values, the boolean indicates
+                                  whether line-by-line rendering should be
+                                  forced. *)
+    ]
+  (** The type for opam values. *)
 
   type field = string * value
   (** The type for opam fields. The field name and its value. *)
@@ -51,8 +63,9 @@ module File : sig
   (** {1:package_files Package files} *)
 
   val pkg_of_meta : with_name:bool -> B0_meta.t -> t
-  (** [pkg_of_meta ~with_name m] is a package file from [m]. Here's an
-      account of how opam fields are populated by metadata keys.
+  (** [pkg_of_meta ~with_name m] is an [opam] package file from
+      [m]. Here's an account of how opam fields are populated by
+      metadata keys.
       {ul
       {- ["authors:"], {!B0_meta.authors}.}
       {- ["build:"], {!B0_opam.Meta.build}.}
@@ -79,12 +92,25 @@ end
 
 (** {1:meta [opam] Metadata} *)
 
-(** [opam] metadata.  *)
+val tag : unit B0_meta.key
+(** [tag] indicates the entity is related to [opam]. *)
+
+val pkg_name_of_pack : B0_pack.t -> string
+(** [pkg_name_of_pack p] derives an opam package name for [p].
+    This is either in order:
+    {ol
+    {- The {!Meta.name} field of [p]'s meta, if defined.}
+    {- The {!B0_pack.basename} of [p] if not equal to ["default"].}
+    {- The basename of [p]'s scope directory.}} *)
+
+(** [opam] metadata.
+
+    Some of the metadata is covered by {{!B0_meta.std}standard keys}. *)
 module Meta : sig
 
   type pkg_spec = string * string
   (** The type for package specifications. A package name and
-      followed by a
+      a
       {{:http://opam.ocaml.org/doc/Manual.html#Filtered-package-formulas}
       filtered package formula}, use [""] if you don't have any constraint. *)
 
@@ -115,19 +141,19 @@ module Meta : sig
 
   val name : string B0_meta.key
   (** [name] is an [opam] [name:] field value. Use to override
-      automatic opam package name generation, see {!pkg_of_pack}. *)
+      automatic [opam] package name generation, see {!pkg_of_pack}. *)
 
   (** {1:pkg_derivation Package derivation} *)
 
   val pkg_of_pack : B0_pack.t -> B0_meta.t
-  (** [pkg_of_pack p] is opam package metadata for pack [p] ready
+  (** [pkg_of_pack p] is [opam] package metadata for pack [p] ready
       to be used with {!File.pkg_of_meta} to derive an opam package
       file.
 
       This is [p]'s metadata with the following fields added if they
       are unspecified:
       {ul
-      {- {!name}, the value of {!name_of_pack}[ p].}
+      {- {!name}, the value of {!B0_opam.pkg_name_of_pack}[ p].}
       {- {!B0_meta.synopsis} and {!B0_meta.description}. The fields
          are tentatively derived from an existing [README.md] in the
          {{!page-manual.scope_dir} scope directory} of [p]. The first
@@ -143,21 +169,20 @@ module Meta : sig
          names.}} *)
 end
 
-val tag : unit B0_meta.key
-(** [tag] indicates the entity is related to [opam]. *)
-
-val pkg_name_of_pack : B0_pack.t -> string
-(** [pkg_name_of_pack p] derives an opam package name for [p].
-    This is either in order:
-    {ol
-    {- The {!Meta.name} field of [p]'s meta, if defined.}
-    {- The {!B0_pack.basename} of [p] if not equal to ["default"].}
-    {- The basename of [p]'s scope directory.}} *)
-
 (** {1:cmdlets Cmdlets} *)
 
-(** [.opam.*] Cmdlets *)
+(** [.opam.*] cmdlets.
+
+   See the {!page-b0_opam} manual and:
+{v
+b0 cmd -- .opam.list --help
+b0 cmd -- .opam.file --help
+b0 cmd -- .opam.publish --help
+v}
+  for more information.
+ *)
 module Cmdlet : sig
+
   val file : B0_cmdlet.t
   (** [file] is the [.opam.file] cmdlet. *)
 
