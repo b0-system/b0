@@ -202,7 +202,11 @@ module Repo = struct
     | None -> err ()
     | Some p ->
         match String.split_on_char '/' p with
-        | ("" :: owner :: repo :: _ ) -> Ok (v ~owner repo)
+        | ("" :: owner :: repo :: _ ) ->
+            let repo = match String.cut_right "." repo with
+            | Some (r, "git") -> r | _ -> repo
+            in
+            Ok (v ~owner repo)
         | _ -> err ()
 
   let owner r = r.owner

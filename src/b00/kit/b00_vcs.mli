@@ -260,7 +260,9 @@ module Git : sig
 
   (** {1:working_dir Working directory} *)
 
-  val add : t -> force:bool -> Fpath.t list -> (unit, string) result
+  val add :
+    ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo -> t -> force:bool ->
+    Fpath.t list -> (unit, string) result
   (** [add t ~force fs] adds [fs] to [r]'s staged changes. If [force]
       bypasses the [.gitignore]s. *)
 

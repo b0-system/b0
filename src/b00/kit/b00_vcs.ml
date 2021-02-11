@@ -524,10 +524,10 @@ module Git = struct
 
   (* Working dir *)
 
-  let add (r, _) ~force fs =
+  let add ?stdout ?stderr (r, _) ~force fs =
     let force = Cmd.(if' force (atom "--force")) in
     let add = Cmd.(r.cmd % "add" %% force % "--" %% paths fs) in
-    Os.Cmd.run add
+    Os.Cmd.run ?stdout ?stderr add
 
   let has_staged_changes (r, _) =
     let diff = Cmd.(r.cmd % "diff" % "--exit-code"% "--quiet" % "--staged") in

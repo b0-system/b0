@@ -758,6 +758,7 @@ module Publish = struct
        use appropriately with _incs, see
        https://github.com/ocaml/opam/issues/3077 *)
     let msg = msg_title is in
+    let* () = B00_vcs.Git.add ?stdout ?stderr r ~force:false files in
     let* () = B00_vcs.commit_files ?stdout ?stderr ~msg r files in
     Ok ()
 
@@ -785,7 +786,7 @@ module Publish = struct
 
   let pkgs
       ~pkgs_dir ~pkgs_repo ~fork_repo ~local_repo ~github_auth pkgs incompats
-      check_only
+      check_only no_pr
     =
     if incompats <> [] then begin Log.warn @@ fun m ->
        m "@[<v>Incompatibility statements unsupported for now. Ignored.@,\
@@ -804,6 +805,7 @@ module Publish = struct
     let* () = commit ~local_repo ~branch ~pkgs_dir is incompats in
     let* () = push_branch ~github_auth ~local_repo ~branch ~fork_repo in
     let* () =
+      if no_pr then Ok () else
       let dst_repo = pkgs_repo and dst_branch = "master" in
       let src_repo = fork_repo and src_branch = branch in
       let auth = github_auth in
@@ -815,7 +817,7 @@ end
 
 let publish_cmdlet
     env pkgs_dir pkgs_repo fork_repo local_repo github_auth
-    constraints pkgs incompats check_only
+    constraints pkgs incompats check_only no_pr
   =
   Log.if_error ~use:B00_cli.Exit.no_such_name @@
   let pkgs = List.map Publish.split_version pkgs in
@@ -843,7 +845,7 @@ let publish_cmdlet
       in
       let* () =
         Publish.pkgs ~pkgs_dir ~pkgs_repo ~fork_repo ~local_repo ~github_auth
-          pkgs incompats check_only
+          pkgs incompats check_only no_pr
       in
       Ok B00_cli.Exit.ok
 
@@ -952,10 +954,16 @@ module Cmdlet = struct
       let docv = "PKG[.VERSION]" in
       Arg.(value & opt_all string [] & info ["i"; "incompatible"] ~doc ~docv)
     in
+    let no_pr =
+      let doc = "Do not open (or update) the pull request. All the other \
+                 steps, including pushing on the fork repo are done."
+      in
+      Arg.(value & flag & info ["no-pr"; "no-pull-request"] ~doc)
+    in
     let publish =
       Term.(const publish_cmdlet $ const env $ pkgs_dir $ pkgs_repo $
             fork_repo $ local_repo $ github_auth $ constraints () $
-            pkgs $ incompats $ check_only)
+            pkgs $ incompats $ check_only $ no_pr)
     in
     let envs = B00_github.Auth.envs in
     B0_cmdlet.eval ~envs ~man env args publish
