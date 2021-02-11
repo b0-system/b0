@@ -1,5 +1,4 @@
 opam-version: "2.0"
-name: "b0"
 synopsis: """Software construction and deployment kit"""
 maintainer: ["Daniel Bünzli <daniel.buenzl i@erratique.ch>"]
 authors: ["The b0 programmers"]
