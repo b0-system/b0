@@ -27,7 +27,7 @@ CAMLprim value ocaml_b00_cpu_logical_count (value unit)
 
 #include <windows.h>
 
-CAMLPrim value ocaml_b00_cpu_logical_count (value unit)
+CAMLprim value ocaml_b00_cpu_logical_count (value unit)
 {
   SYSTEM_INFO i;
   GetSystemInfo (&i);
@@ -41,7 +41,7 @@ CAMLPrim value ocaml_b00_cpu_logical_count (value unit)
 #else
 #warning OCaml B00 library: unsupported platform, cpu count will always be 1
 
-CAMLPrim value ocaml_b00_cpu_logical_count (value unit)
+CAMLprim value ocaml_b00_cpu_logical_count (value unit)
 {
   return Val_int (1);
 }
