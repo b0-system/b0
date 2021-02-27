@@ -630,16 +630,22 @@ module String = struct
     loop 0 0
 
   let includes ~affix s =
-    let max_idx_sub = String.length affix - 1 in
-    let max_idx_s = String.length s - 1 in
-    if max_idx_sub > max_idx_s then false else
-    let rec loop i =
-      if i > max_idx_sub then true else
-      if unsafe_get affix (max_idx_sub - i) <> unsafe_get s (max_idx_s - i)
-      then false
-      else loop (i + 1)
+    let len_a = String.length affix in
+    let len_s = String.length s in
+    if len_a > len_s then false else
+    let max_idx_a = len_a - 1 in
+    let max_idx_s = len_s - len_a in
+    let rec loop i k =
+      if i > max_idx_s then false else
+      if k > max_idx_a then true else
+      if k > 0 then
+        if unsafe_get affix k = unsafe_get s (i + k)
+        then loop i (k + 1) else loop (i + 1) 0
+      else
+      if unsafe_get affix 0 = unsafe_get s i
+      then loop i 1 else loop (i + 1) 0
     in
-    loop 0
+    loop 0 0
 
   let for_all sat s =
     let max_idx = String.length s - 1 in
