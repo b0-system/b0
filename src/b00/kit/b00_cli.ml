@@ -97,7 +97,7 @@ module B00_std = struct
     in
     let color = Arg.conv ~docv:"WHEN" (parse, pp) in
     let doc =
-      "Colorize the output. $(docv) must be $(b,auto), $(b,always)\
+      "Colorize the output. $(docv) must be $(b,auto), $(b,always) \
        or $(b,never)."
     in
     let docv = "WHEN" in
