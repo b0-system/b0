@@ -309,7 +309,7 @@ module Compile = struct
     let src_file = Fpath.(build_dir / "src.ml") in
     write_src m c src ~src_file;
     let writes =
-      let base = Fpath.rem_ext src_file in
+      let base = Fpath.strip_ext src_file in
       let base ext = Fpath.(base + ext) in
       match code with
       | `Byte -> [base ".cmo"; exe ]

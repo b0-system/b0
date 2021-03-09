@@ -254,7 +254,7 @@ let web_exe ~srcs ~js ~o b =
   let assets = copy_assets m srcs ~assets_root ~dst:build_dir in
   if Fpath.Set.mem o assets then Fut.return () else
   let css = Fpath.Set.filter (Fpath.has_ext ".css") assets in
-  let base f = Fpath.to_string (Option.get (Fpath.rem_prefix build_dir f)) in
+  let base f = Fpath.to_string (Option.get (Fpath.strip_prefix build_dir f)) in
   let styles = List.map base (Fpath.Set.elements css) in
   B00_jsoo.write_page m ~styles ~scripts:[Fpath.basename js] ~o;
   Fut.return ()

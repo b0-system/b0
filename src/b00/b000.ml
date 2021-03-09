@@ -207,7 +207,7 @@ module File_cache = struct
 
   let create dir =
     Result.bind (Os.Dir.create ~make_path:true dir) @@ fun _ ->
-    let dir = Fpath.to_dir_path dir (* assumed e.g. by key_dir *) in
+    let dir = Fpath.add_dir_sep dir (* assumed e.g. by key_dir *) in
     Ok { dir = Fpath.to_string dir }
 
   (* Constructing file paths into the cache *)
@@ -250,7 +250,7 @@ module File_cache = struct
   (* Manifest files *)
 
   let key_manifest_to_string ~root fs =
-    let rel root f = match Fpath.rem_prefix root f with
+    let rel root f = match Fpath.strip_prefix root f with
     | Some rel -> Fpath.to_string rel
     | None ->
         Fmt.failwith_notrace "%a: not a prefix of %a"

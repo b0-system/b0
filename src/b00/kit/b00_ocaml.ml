@@ -941,7 +941,7 @@ module Compile = struct
     (Memo.tool m comp) Cmd.(atom "-c" %% opts %% unstamp (incs %% path c))
 
   let mli_to_cmi ?post_exec ?k ~and_cmti m ~comp ~opts ~reads ~mli ~o =
-    let base = Fpath.rem_ext o in
+    let base = Fpath.strip_ext o in
     let stamp = Fpath.basename base in
     let reads = mli :: reads in
     let writes = o :: if and_cmti then [Fpath.(base + ".cmti")] else [] in
@@ -953,7 +953,7 @@ module Compile = struct
 
   let ml_to_cmo ?post_exec ?k ~and_cmt m ~opts ~reads ~has_cmi ~ml ~o =
     let ocamlc = Memo.tool m Tool.ocamlc in
-    let base = Fpath.rem_ext o in
+    let base = Fpath.strip_ext o in
     let stamp = Fpath.basename base (* output depends on mod name *) in
     let reads = ml :: reads in
     let writes =
@@ -968,7 +968,7 @@ module Compile = struct
 
   let ml_to_cmx ?post_exec ?k ~and_cmt m ~opts ~reads ~has_cmi ~ml ~o =
     let ocamlopt = Memo.tool m Tool.ocamlopt in
-    let base = Fpath.rem_ext o in
+    let base = Fpath.strip_ext o in
     let stamp = Fpath.basename base (* output depends on mod name *) in
     let reads = ml :: reads in
     let writes =

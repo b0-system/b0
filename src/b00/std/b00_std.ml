@@ -1606,9 +1606,9 @@ module Fpath = struct
         end
     | _ -> false
 
-  let to_dir_path p = add_seg p ""
+  let add_dir_sep p = add_seg p ""
 
-  let rem_empty_seg p = match String.length p with
+  let strip_dir_sep p = match String.length p with
   | 1 -> p
   | 2 ->
       if p.[0] <> dir_sep_char && p.[1] = dir_sep_char
@@ -1632,7 +1632,7 @@ module Fpath = struct
       (* Check the prefix is segment based *)
       (pre.[suff_start - 1] = dir_sep_char || p.[suff_start] = dir_sep_char)
 
-  let rem_prefix pre p = match is_prefix pre p with
+  let strip_prefix pre p = match is_prefix pre p with
   | false -> None
   | true ->
       let len = String.length pre in
@@ -1645,7 +1645,7 @@ module Fpath = struct
     List.filter (not_prefixed ~by:dirs) dirs
 
   let reroot ~root ~dst src =
-    let rel_file = Option.get (rem_prefix root src) in
+    let rel_file = Option.get (strip_prefix root src) in
     append dst rel_file
 
   (* Predicates and comparisons *)
@@ -1743,11 +1743,11 @@ module Fpath = struct
         Bytes.set n (nlen - 1) dir_sep_char;
         Bytes.unsafe_to_string n
 
-  let rem_ext ?multi p = match ext_range ?multi p with
+  let strip_ext ?multi p = match ext_range ?multi p with
   | exception Not_found -> p
   | efirst, elast -> _rem_ext efirst elast p
 
-  let set_ext ?multi e p = add_ext e (rem_ext ?multi p)
+  let set_ext ?multi e p = add_ext e (strip_ext ?multi p)
 
   let cut_ext ?multi p = match ext_range ?multi p with
   | exception Not_found -> p, ""
@@ -1811,13 +1811,13 @@ module Fpath = struct
        to handle that  *)
     if String.includes ".." p
     then Fmt.invalid_arg "%s: not dotdot allowed" p;
-    let to_dir = to_dir_path to_dir in
-    match rem_prefix to_dir p with
+    let to_dir = add_dir_sep to_dir in
+    match strip_prefix to_dir p with
     | Some q -> q
     | None ->
         let rec loop loc dir =
           if is_current_dir dir then p else
-          match rem_prefix dir p with
+          match strip_prefix dir p with
           | Some q -> append loc q
           | None -> loop (add_seg loc "..") (parent dir)
         in
@@ -2797,7 +2797,7 @@ module Os = struct
       | true -> tmp_from_env "TEMP" ~default:Fpath.(v "./")
       | false -> tmp_from_env "TMPDIR" ~default:(Fpath.v "/tmp/")
       in
-      ref (Fpath.to_dir_path dir)
+      ref (Fpath.add_dir_sep dir)
 
     type name = (string -> string, unit, string) format
     let default_name = format_of_string "tmp-%s"
@@ -2821,7 +2821,7 @@ module Os = struct
         ?(mode = 0o600) ?(make_path = true) ?dir ?(name = default_name) ()
       =
       let dir = match dir with None -> !default_dir | Some d -> d in
-      let dir_str = Fpath.to_string (Fpath.to_dir_path dir) in
+      let dir_str = Fpath.to_string (Fpath.add_dir_sep dir) in
       let rec loop n = match n with
       | 0 -> err_too_many dir name
       | n ->
@@ -3248,7 +3248,7 @@ module Os = struct
         f dir acc
 
     let path_list stat _ f acc = match stat.Unix.st_kind with
-    | Unix.S_DIR -> Fpath.to_dir_path f :: acc
+    | Unix.S_DIR -> Fpath.add_dir_sep f :: acc
     | _ -> f :: acc
 
     (* copy *)
@@ -3337,7 +3337,7 @@ module Os = struct
 
     (* Default temporary directory *)
 
-    let set_default_tmp p = Tmp.default_dir := Fpath.to_dir_path p
+    let set_default_tmp p = Tmp.default_dir := Fpath.add_dir_sep p
     let default_tmp () = !Tmp.default_dir
 
     (* Temporary directories *)

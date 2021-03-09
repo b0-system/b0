@@ -28,11 +28,11 @@ let find_dirname i n = match String.Map.find n i.dirs_by_name with
 | dirs -> dirs | exception Not_found -> []
 
 let dir_files i d =
-  match Fpath.Map.find (Fpath.to_dir_path d) i.files_by_dir with
+  match Fpath.Map.find (Fpath.add_dir_sep d) i.files_by_dir with
   | files -> files | exception Not_found -> []
 
 let dir_dirs i d =
-  match Fpath.Map.find (Fpath.to_dir_path d) i.dirs_by_dir with
+  match Fpath.Map.find (Fpath.add_dir_sep d) i.dirs_by_dir with
   | dirs -> dirs | exception Not_found -> []
 
 let files i = i.files

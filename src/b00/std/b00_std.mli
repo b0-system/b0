@@ -1157,13 +1157,13 @@ module Fpath : sig
       a directory. This means that [p] is [.], [..] or ends
       with [/], [/.] or [/..]. *)
 
-  val to_dir_path : t -> t
-  (** [to_dir_path p] is [add_seg p ""]. It ensures that the resulting
+  val add_dir_sep : t -> t
+  (** [add_dir_sep p] is [add_seg p ""]. It ensures that the resulting
       path syntactically represents a {{!is_dir_path}directory} and thus,
       if converted to a string, that it ends with a {!dir_sep}. *)
 
-  val rem_empty_seg : t -> t
-  (** [rem_empty_seg p] is [p] without an existing last empty segment
+  val strip_dir_sep : t -> t
+  (** [strip_dir_sep p] is [p] without an existing last empty segment
       when [p] is not a root path, ensuring the result has no trailing
       {!dir_sep} when converted to a string. *)
 
@@ -1200,8 +1200,8 @@ module Fpath : sig
       also that the prefix relation does not entail directory
       containement; for example [is_prefix (v "..")  (v "../..")]  holds. *)
 
-  val rem_prefix : t -> t -> t option
-  (** [rem_prefix prefix p] is:
+  val strip_prefix : t -> t -> t option
+  (** [strip_prefix prefix p] is:
       {ul
       {- [None] if {!is_prefix}[ prefix p] is [false].}
       {- [Some q] otherwise where [q] is [p] without the string prefix
@@ -1210,7 +1210,7 @@ module Fpath : sig
          {{!is_dir_path}directoryness} and that [Fpath.(equal (prefix
          // q) p)] holds.}}
 
-      {b Warning.} By definition [rem_prefix p p] is [None]. *)
+      {b Warning.} By definition [strip_prefix p p] is [None]. *)
 
   val drop_prefixed : t list -> t list
   (** [drop_prefixed ps] is [ps] without elements that have a
@@ -1290,16 +1290,16 @@ module Fpath : sig
   (** [add_ext ext p] is [p] with [ext] concatenated to [p]'s
       {{!basename}basename}. *)
 
-  val rem_ext : ?multi:bool -> t -> t
-  (** [rem_ext ?multi p] is [p] with the extension of [p]'s
+  val strip_ext : ?multi:bool -> t -> t
+  (** [strip_ext ?multi p] is [p] with the extension of [p]'s
       {{!basename}basename} removed. If [multi] is [true] (defaults to
       [false]), the multiple file extension is removed. *)
 
   val set_ext : ?multi:bool -> ext -> t -> t
-  (** [set_ext ?multi p] is [add_ext ext (rem_ext ?multi p)]. *)
+  (** [set_ext ?multi p] is [add_ext ext (strip_ext ?multi p)]. *)
 
   val cut_ext : ?multi:bool -> t -> t * ext
-  (** [cut_ext ?multi p] is [(rem_ext ?multi p, get_ext ?multi p)]. *)
+  (** [cut_ext ?multi p] is [(strip_ext ?multi p, get_ext ?multi p)]. *)
 
   val ( + ) : t -> ext -> t
   (** [p + ext] is [add_ext p ext]. Left associative. *)
