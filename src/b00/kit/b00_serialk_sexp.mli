@@ -422,7 +422,7 @@ module Sexpq : sig
   (** [sexp] queries any s-expression and returns its generic representation. *)
 
   val sexp_with_path : (Sexp.t * path) t
-  (** [sexp_with_path] is like {!sexp} but also returns the path to
+  (** [sexp_with_path] is like {!val-sexp} but also returns the path toy
       s-expression. *)
 
   (** {1:qatom Atom queries}
@@ -508,7 +508,7 @@ module Sexpq : sig
 
   (** {1:qdict Dictionary queries}
 
-      Queries for s-expression {{!sexp}dictionaries}. These queries
+      Queries for s-expression {{!sex_dictionaries}dictionaries}. These queries
       fail on atoms. *)
 
   val key : ?absent:'a -> string -> 'a t -> 'a t

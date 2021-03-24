@@ -115,7 +115,7 @@ exception Err of string
 (** The type for values to be named.
 
     This just indicates an identifier for the kind of names, how to
-    retreive the {!def} value in a value and how to format the names. *)
+    retreive the {!VALUE.def} value in a value and how to format the names. *)
 module type VALUE = sig
 
   (** {1:value Values} *)

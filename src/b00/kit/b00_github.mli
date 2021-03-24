@@ -95,8 +95,8 @@ module Repo : sig
   val req_json_v3 :
     ?headers:Http.headers -> Httpr.t -> Auth.t -> t -> path:string ->
     Http.meth -> v3_body -> (Json.t, string) result
-  (** [req_json_v3] is like {!req_json_v3} but performs given the root
-      subpath on the given repo. *)
+  (** [req_json_v3] is like {!B00_github.req_json_v3} but performs given
+      the root subpath on the given repo. *)
 
   val query_v4 : Httpr.t -> Auth.t -> t -> string -> (Json.t, string) result
   (** [query_v4 auth r q] performs the subgraph query [q] on repo [r]
@@ -252,7 +252,7 @@ module Pages : sig
          a temporary workdir in {!Os.Dir.default_tmp}
          and a branch called [_b0-update-gh-pages] reset to [remote/branch].}
       {- Commits changes with message [msg] according to [us] which
-         are applied in order, see {!update}.}
+         are applied in order, see {!val:update}.}
       {- Destroys the transient checkout}
       {- Pushes [_b0-update-gh-pages] on [remote/branch]}
       {- Destroys the branch [_b0-update-gh-pages]}}

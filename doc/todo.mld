@@ -31,7 +31,7 @@ For now we used ['a Fut B0_beta.key].
 {2:unit_action Unit actions}
 
 The current implementations raises a few questions. It will need to be
-refined, see {!B0_unit.action}.
+refined, see {!B0_unit.type-action}.
 
 {ul
 {- action/cmdlet overlap}
@@ -55,3 +55,12 @@ refined, see {!B0_unit.action}.
 {- Should [?meta] be the initial or override an initial meta done by
    the combinator. initial ensures [get]s do not blow, but it could
    be nice to be able to override auto-derivations}}
+
+{2:fragments Build fragments}
+
+At the B0 level we need to expose build fragments. It seems the build
+procedures of units is a good candidate but for now it's a bit unconvient
+to do that. We need to clarify the configuration store and dynamic
+metadata see {!unit_meta}.
+
+For now as a temporary hack we add the [wrap] parameter to units.

@@ -9,7 +9,7 @@
     are a few things:
     {ul
     {- Review w.r.t. [b0].}
-    {- We likely want combinators represenging {!sel}s and
+    {- We likely want combinators represenging {!type-sel}s and
     producing {!t} and ways union [t]s (for `Fut users).}
     {- The [`Fut] case should return a {!t}.}
     {- Support for watermaking should likely occur here.}}
@@ -44,7 +44,7 @@ let srcs =
     matter, the semantics is to select all the files via [`Dir] and
     [`Dir_rec] and then apply the exclusion [`X] on the resulting
     set. Exclusions affect only directory selections, not file [`File]
-    and future [`Future] {{!sel}selections}.
+    and future [`Future] {{!type-sel}selections}.
 
     When a directory is selected via [`Dir] or [`Dir_rec], all its files
     are, modulo exclusions.  It is expected that build units

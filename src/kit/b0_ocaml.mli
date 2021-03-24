@@ -61,8 +61,8 @@ val version : B0_build.t -> (int * int * int * string option) Fut.t
     In a build it is desirable to know which code is being produced
     because if both are produced the compilers may compete to
     produce some of the shared build artefacts. The following store
-    keys allow to express build code {{!wanted_code}desires} and
-    determine the actual {{!built_code}decision}. Note the desires
+    keys allow to express build code {{!val-wanted_code}desires} and
+    determine the actual {{!val-built_code}decision}. Note the desires
     may actually be altered units that may build FIXME maybe we
     should stick to must. *)
 
@@ -70,7 +70,7 @@ type built_code = [ `Byte | `Native | `All ]
 (** The type indicating which code is being built. *)
 
 val pp_built_code : built_code Fmt.t
-(** [pp_built_code] formats {!built_code} values. *)
+(** [pp_built_code] formats {!type-built_code} values. *)
 
 val wanted_code : [ built_code | `Auto ] Store.key
 (** [wanted_code] indicates which code should be built, default

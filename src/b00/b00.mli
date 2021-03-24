@@ -179,7 +179,7 @@ module Memo : sig
       {- [hash_fun] defaults to {!B00_std.Hash.Xxh_64}.}
       {- [jobs] defaults to {!B00_std.Os.Cpu.logical_count}.}
       {- [env] defaults to {!B00_std.Os.Env.current}}
-      {- [cwd] defaults to {!B00_std.Os.Dir.cwd}}
+      {- [cwd] defaults to {!val:B00_std.Os.Dir.cwd}}
       {- [cache_dir] defaults to [Fpath.(cwd / "_b0" / ".cache")]}
       {- [trash_dir] defaults to [Fpath.(cwd / "_b0" / ".trash")]}
       {- [feedback] defaults to a nop.}} *)
@@ -354,8 +354,8 @@ module Memo : sig
       call to {!file_ready} or by another file write. *)
 
   val tool_opt : t -> Tool.t -> (Cmd.t -> cmd) option Fut.t
-  (** [tool_opt m t] is like {!tool}, except [None] is returned
-      if the tool cannot be found. *)
+  (** [tool_opt m t] is like {!val:tool}, except [None] is returned
+      if the tool cannot be found. y*)
 
   val spawn :
     t -> ?stamp:string -> ?reads:Fpath.t list -> ?writes:Fpath.t list ->

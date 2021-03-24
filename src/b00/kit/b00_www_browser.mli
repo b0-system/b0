@@ -65,7 +65,7 @@ val browser : ?docs:string -> ?opts:string list -> unit -> Cmd.t option Term.t
 
 val prefix :  ?docs:string -> ?opts:string list -> unit -> bool Term.t
 (** [prefix] is option to use the with [prefix] argument of
-    {!show}. [opts] are the cli options and default to
+    {!val-show}. [opts] are the cli options and default to
     [["prefix"]]. *)
 
 val background : ?docs:string -> ?opts:string list -> unit -> bool Term.t

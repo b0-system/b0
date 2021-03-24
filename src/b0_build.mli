@@ -82,7 +82,7 @@ val get : t -> 'a B00.Store.key -> 'a Fut.t
 
 val self : t B00.Store.key
 (** [self] is a store key that holds the build itself. The store
-    returned by {!store} has this key bound to the build. *)
+    returned by {!val-store} has this key bound to the build. *)
 
 (** {1:run Creating and running} *)
 

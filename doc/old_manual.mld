@@ -630,7 +630,7 @@ and/or forward with `--d-dir`).
 However we also want to keep the current style for e.g. `ssh` proxies
 where we don't want to rsync all the local variants.
 
-{2 Variants}
+{2:variants'y Variants}
 
 {ul
 {- Do we want a configuration API ? Also should we really namespace

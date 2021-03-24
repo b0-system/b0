@@ -136,7 +136,7 @@ module Html : sig
         contains the odoc files [odoc_files] to [o]. *)
 
     val read : Memo.t -> Fpath.t -> t list Fut.t
-    (** [read m file] reads the result of a {!write} from [file] and
+    (** [read m file] reads the result of a {!Dep.write} from [file] and
         continues with the dependencies. *)
   end
 
@@ -160,7 +160,7 @@ module Html : sig
            of {!Dep} on the package odoc directory of [odoc].}} *)
 
     val read : Memo.t -> Fpath.t -> Fpath.t list Fut.t
-    (** [read m file] reads the result of a {!write} from [file] and
+    (** [read m file] reads the result of a {!Writes.write} from [file] and
         continues with the files that will be written. *)
   end
 
@@ -218,7 +218,7 @@ module Support_files : sig
         corresponding [odoc] option. *)
 
     val read : Memo.t -> Fpath.t -> Fpath.t list Fut.t
-    (** [read m file] reads the result of a {!write} from [file]
+    (** [read m file] reads the result of a {!Writes.write} from [file]
         and continues with the files that will be written. *)
   end
 

@@ -387,7 +387,7 @@ module Fmt : sig
 
   val set_tty_styling_cap : Tty.cap -> unit
   (** [set_tty_styling_cap c] sets the global styling capabilities to
-      [c]. Affects the output of {!tty_str} and {!tty}. *)
+      [c]. Affects the output of {!tty_str} and {!val-tty}. *)
 
   val tty_styling_cap : unit -> Tty.cap
   (** [tty_styling_cap ()] is the global styling capability. *)
@@ -839,11 +839,11 @@ let escape_dquotes s =
         to ['a'] to ['z']. *)
 
     val capitalize : string -> string
-    (** [capitalize s] is like {!uppercase} but performs the map only
+    (** [capitalize s] is like {!Ascii.uppercase} but performs the map only
         on [s.[0]]. *)
 
     val uncapitalize : string -> string
-    (** [uncapitalize s] is like {!lowercase} but performs the map only
+    (** [uncapitalize s] is like {!Ascii.lowercase} but performs the map only
         on [s.[0]]. *)
 
     (** {1:hex Converting to US-ASCII hexadecimal characters} *)
@@ -1763,14 +1763,14 @@ module Cmd : sig
 
   val tool : t -> tool option
   (** [tool l] is [l]'s first element. This is [None] if the line is
-      {!empty} or if the first element can't be parsed to a {!tool}. *)
+      {!empty} or if the first element can't be parsed to a {!type-tool}. *)
 
   val set_tool : tool -> t -> t option
   (** [set_tool tool l] replaces [l]'s first element with [tool]. This
       is [None] if [l] is {!empty}. *)
 
   val get_tool : t -> tool
-  (** [get_tool] is like {!tool} but raises {!Invalid_argument} in case
+  (** [get_tool] is like {!val-tool} but raises {!Invalid_argument} in case
       of error. *)
 
   val pp_tool : tool Fmt.t
@@ -1959,7 +1959,7 @@ module Os : sig
     (** [override env ~by:o] overrides the definitions in [env] by [o]. *)
 
     val add : string -> string -> t -> t
-    (** [add] is {!String.Map.add}. *)
+    (** [add] is {!String.Map.val-add}. *)
 
     val current : unit -> (t, string) result
     (** [current ()] is the current process environment. *)
@@ -2046,12 +2046,12 @@ module Os : sig
     (** [copy ~make_path ~recurse ~src dst] copies the file or file
         hierarchy rooted at [src] to [dst]. The function errors if
         [dst] exists. The semantics and arguments correspond to those
-        of {!Os.Dir.copy}, except this function also works if [src] is
+        of {!Os.Dir.val-copy}, except this function also works if [src] is
         not a directory. Note that [prune] is never called on [src]
         itself {b FIXME is that a good idea ?} also {b FIXME} this should
         error if [src] is a directory and [recurse] is false.
 
-        See also {!Os.Dir.copy} and {!Os.File.copy}. *)
+        See also {!Os.Dir.val-copy} and {!Os.File.val-copy}. *)
 
     (** {1:stat_mode File mode and stat}
 
@@ -2600,12 +2600,12 @@ module Os : sig
     val find : ?win_exe:bool -> ?search:Fpath.t list -> Cmd.t ->
       (Cmd.t option, string) result
     (** [find cmd] is like {!find_tool} but looks and replaces
-        [cmd]'s {!Cmd.tool}. *)
+        [cmd]'s {!B00_std.Cmd.val-tool}. *)
 
     val get : ?win_exe:bool -> ?search:Fpath.t list -> Cmd.t ->
       (Cmd.t, string) result
     (** [get cmd] is like {!get_tool} but looks and replaces [cmd]'s
-        {!Cmd.tool}. *)
+        {!B00_std.Cmd.val-tool}. *)
 
     (** {1:statuses Process completion statuses} *)
 
@@ -2690,7 +2690,7 @@ module Os : sig
         [stdout] and [stderr].
         {ul
         {- [env] defaults to {!Env.current_assignments}[ ()]}
-        {- [cwd] defaults to {!Dir.cwd}[ ()]}
+        {- [cwd] defaults to {!Dir.val-cwd}[ ()]}
         {- [stdin] defaults to {!in_stdin}}
         {- [stdout] defaults to {!out_stdout}}
         {- [stderr] defaults to {!out_stderr}}} *)
@@ -2738,7 +2738,7 @@ module Os : sig
     (** [spawn ~env ~cwd ~stdin ~stdout ~stderr cmd] spawns command
         [cmd] in environment [env] with current directory [cwd] and
         standard IO connections [stdin], [stdout] and [stderr]. [env]
-        defaults to {!Env.current_assignments}[ ()], [cwd] to {!Dir.cwd}[
+        defaults to {!Env.current_assignments}[ ()], [cwd] to {!Dir.val-cwd}[
         ()], [stdin] to {!in_stdin}, [stdout] to {!out_stdout} and
         [stderr] to {!out_stderr}. *)
 
@@ -2798,7 +2798,7 @@ module Os : sig
         [cwd] to {!B00_std.Dir.cwd}[ ()]. *)
 
     type t = Cmd.t
-    (** {!Exit} needs that alias to refer to {!Cmd.t}. *)
+    (** {!Exit} needs that alias to refer to {!B00_std.Cmd.t}. *)
   end
 
   (** Program exit. *)
@@ -2810,14 +2810,14 @@ module Os : sig
     | Code : int -> t (** [exit] with code. *)
     | Exec : (unit -> ('a, string) result) -> t (** exit with [execv] *)
     (** The type for specifying program exits. Either an exit code or a
-        function (should be) calling {!Cmd.execv}. *)
+        function (should be) calling {!B00_std.Cmd.execv}. *)
 
     val code : int -> t
     (** [code c] is [Code c]. *)
 
     val exec : ?env:Env.assignments -> ?cwd:Fpath.t -> Fpath.t -> Cmd.t -> t
     (** [exec ?env ?cwd file argv] is an [Exec _]. That has a call to
-        {!Cmd.execv} with the corresponding arguments. *)
+        {!Os.Cmd.execv} with the corresponding arguments. *)
 
     val get_code : t -> int
     (** [get_code e] is the exit code of [e]. Raises [Invalid_argument] if

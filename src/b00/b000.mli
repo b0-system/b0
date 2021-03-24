@@ -308,8 +308,7 @@ module Op : sig
       id:id -> mark:mark -> created:Time.span -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> kind -> string -> op
     (** [v_op] declares a notification operation see the corresponding
-        accessors in {!Notify} for the semantics of the various
-        arguments. *)
+        accessors for the semantics of the various arguments. *)
 
     val v : kind:kind -> msg:string -> t
     (** [v] constructs a notification operation. *)
@@ -337,8 +336,7 @@ module Op : sig
       id:id -> mark:mark -> created:Time.span -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> Fpath.t -> op
     (** [v_op] declares a file read operation, see the corresponding
-        accessors in {!Read} for the semantics of the various
-        arguments. *)
+        accessors for the semantics of the various arguments. *)
 
     val v : file:Fpath.t -> data:string -> t
     (** [v] constructs a bare read operation. *)
@@ -392,7 +390,7 @@ module Op : sig
       stdin:Fpath.t option -> stdout:stdo -> stderr:stdo ->
       success_exits:success_exits -> Cmd.tool -> Cmd.t -> op
     (** [v_op] declares a spawn build operation, see the corresponding
-        accessors in {!Spawn} for the semantics of the various arguments. *)
+        accessors for the semantics of the various arguments. *)
 
     val v :
       env:Os.Env.assignments -> stamped_env:Os.Env.assignments ->
@@ -461,7 +459,7 @@ module Op : sig
     val exit_to_status : t -> status
     (** [exit_to_status s] assumes [s] has been executed and
         determines an operation status according to {!exit}
-        and {!success_exits}. *)
+        and {!val:success_exits}. *)
   end
 
   (** Waiting on files.
@@ -494,7 +492,7 @@ module Op : sig
       ?k:(op -> unit) -> stamp:string -> reads:Fpath.t list -> mode:int ->
       write:Fpath.t -> (unit -> (string, string) result) -> op
     (** [write] declares a file write operations, see the corresponding
-        accessors in {!Write} for the semantics of the various arguments. *)
+        accessors for the semantics of the various arguments. *)
 
     val v :
       stamp:string -> mode:int -> file:Fpath.t ->
@@ -617,7 +615,7 @@ module Op : sig
   (** [exec_post_exec o] invokes and discards [o]'s post execution
       hook. This hook called is right after the operation execution
       and, if applicable, {b before} reviver recording. It is always
-      called even if the operation fails or is revived (use {!status}
+      called even if the operation fails or is revived (use {!val:status}
       and {!revived} to check these conditions). Note that if the hook
       unexpectedly raises this turns [o] in to a failure. *)
 
@@ -846,7 +844,7 @@ module Guard : sig
 
   val allowed : t -> Op.t option
   (** [allowed g] is an operation that is either ready or aborted
-      in [g] (if any). In the second case the {!Op.status} is
+      in [g] (if any). In the second case the {!val:Op.status} is
       {!Op.Aborted}. *)
 end
 
@@ -873,14 +871,14 @@ module Exec : sig
   (** [create ~clock ~rand ~tmp_dir ~feedback ~trash ~jobs] with:
       {ul
       {- [clock], the clock used to timestamp build operations;
-         defaults to {!B00_std.Time.counter}[ ()].}
+         defaults to {!val:B00_std.Time.counter}[ ()].}
       {- [rand] random state used for internal queues; defaults to
          {!Random.State.make_self_init}.}
       {- [tmp_dir] is a directory for temporary files, it must exist;
           defaults to {!B00_std.Os.Dir.default_tmp}[ ()].}
       {- [feedback] a function called with each {{!schedule}scheduled}
          operation when it starts executing. Default is a nop.}
-      {- [trash], the trash used to execute {!Op.Delete} build
+      {- [trash], the trash used to execute {!Op.constructor-Delete} build
          operations.}
       {- [jobs] the maximal number of processes spawn simultaneously.}}
  *)

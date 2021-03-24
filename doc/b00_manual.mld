@@ -44,8 +44,8 @@ Concepts dropped and to be seen how we can recover them at a higher level:
 {- Memo.spawn redirections, consider supporting all the options
    of {!B0_std.Os.Cmd.spawn}}
 {- The concept of response file in {!B00.Tool} should likely appear at
-   the {!B000.Op.Spawn} level aswell so that we can simply have the sequence
-   of {!B000.Op.t} value for a potential build log
+   the {!B000.Op.module-Spawn} level aswell so that we can simply have the
+   sequence of {!B000.Op.t} value for a potential build log
    (otherwise {!B000.Op.Spawn.args}
    becomes the line with the response file which is not meanigfull)}}
 

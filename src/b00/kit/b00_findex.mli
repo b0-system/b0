@@ -48,11 +48,11 @@ val find_dirname : t -> string -> Fpath.t list
 
 val dir_files : t -> Fpath.t -> Fpath.t list
 (** [dir_files i d] are the files in directory [d]. If [d] is not
-    a root directory or a member of {!dirs} this is the empty list. *)
+    a root directory or a member of {!val:dirs} this is the empty list. *)
 
 val dir_dirs : t -> Fpath.t -> Fpath.t list
 (** [dir_dirs i d] are the directories in directory [d] of [i]. If [d] is not
-    a root directory or a member of {!dirs} this is the empty list. *)
+    a root directory or a member of {!val:dirs} this is the empty list. *)
 
 (** {1:files Files} *)
 
