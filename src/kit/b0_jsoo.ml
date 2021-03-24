@@ -197,9 +197,9 @@ let build_setup ~srcs b = (* return a record maybe ? *)
   let jss = B00_fexts.find_files B00_fexts.js srcs in
   let build_dir = B0_build.current_build_dir b in
   let exe_name = B0_meta.get B0_meta.exe_name (B0_build.current_meta b) in
-  let js = Fpath.(build_dir / (exe_name ^ ".js")) in
-  let exe_html = exe_name ^ ".html" in
-  let html = Fpath.(build_dir / exe_html) in
+  let js = Fpath.(build_dir / exe_name) in
+  let html = Fpath.(js -+ ".html") in
+  let exe_html = Fpath.basename html in
   let htmls = B00_fexts.find_files B00_fexts.html srcs in
   let html = match htmls with
   | [] -> html (* This will be generated *)
@@ -309,7 +309,10 @@ let exe
     ?doc ?(meta = B0_meta.empty) ?(action = show_uri_action) ?name exe_name
     ~srcs
   =
-  let name = Option.value ~default:exe_name name in
+  let name = match name with
+  | None -> String.map (function '.' -> '-' | c -> c) exe_name
+  | Some name -> name
+  in
   let mod_srcs, set_mod_srcs = Fut.create () in
   let exe_path, set_exe_path = Fut.create () in
   let meta = unit_meta ~meta ~name ~mod_srcs ~exe_name ~exe_path in

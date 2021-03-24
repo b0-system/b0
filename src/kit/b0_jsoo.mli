@@ -55,13 +55,13 @@ val meta :
 val exe :
   ?doc:string -> ?meta:B0_meta.t -> ?action:B0_unit.action ->
   ?name:string -> string -> srcs:B0_srcs.sels -> B0_unit.t
-(** [exe n] is a JavaScript "executable" file named [n] (without
-    the [.js] extension).
+(** [exe n] is a JavaScript "executable" file named [n].
     {ul
     {- [doc] is the unit doc string.}
     {- [meta] is the initial metadata.}
     {- [requires] are the OCaml libraries required to compile the JavaScript.}
-    {- [name] is the name of the unit (defaults to [n]).}
+    {- [name] is the name of the unit (defaults to [n] with [.] replaced
+       by [-]).}
     {- [srcs] are the executable sources. All files with extension [.ml],
        [.mli] and [.js] are considered for compiling and linked in the
        JavaScript file.}} *)
@@ -69,7 +69,8 @@ val exe :
 val web :
   ?doc:string -> ?meta:B0_meta.t -> ?action:B0_unit.action ->
   ?name:string -> string -> srcs:B0_srcs.sels -> B0_unit.t
-(** [web n] is an HTML page named [n] (without the [.html] extension).
+(** [web n] is an HTML page named [n] (without the [.html] extension FIXME
+    review that).
     {ul
     {- [doc] is the unit doc string.}
     {- [meta] is the initial metadata.}
