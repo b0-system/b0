@@ -914,6 +914,13 @@ module Link : sig
   (** [code] is {!byte} or {!native} according to [code]. *)
 end
 
+(** Crunching data into OCaml values. *)
+module Crunch : sig
+  val string_to_string : id:string -> data:string -> string
+  (** [string_to_string ~id ~data] let binds binary [data] to [id] using
+      a string. *)
+end
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2019 The b0 programmers
 

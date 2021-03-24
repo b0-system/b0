@@ -1155,6 +1155,24 @@ module Link = struct
     linker ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~o
 end
 
+module Crunch = struct
+  let string_to_string ~id ~data:s =
+    let len = String.length s in
+    let len = len * 4 + (len / 18) * (3 + 2) in
+    let b = Buffer.create (len + String.length id + 3) in
+    let adds = Buffer.add_string in
+    adds b "let "; adds b id; adds b " =\n  \"";
+    for i = 0 to String.length s - 1 do
+      if i mod 18 = 0 && i <> 0 then adds b "\\\n   ";
+      let c = Char.code (String.get s i) in
+      adds b "\\x";
+      Buffer.add_char b (Char.Ascii.lower_hex_digit ((c lsr 4) land 0xF));
+      Buffer.add_char b (Char.Ascii.lower_hex_digit (c land 0xF))
+    done;
+    adds b "\"\n";
+    Buffer.contents b
+end
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2019 The b0 programmers
 
