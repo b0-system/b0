@@ -284,7 +284,8 @@ let lib_proc set_mod_srcs srcs b =
   Fut.return ()
 
 let exe
-    ?doc ?(meta = B0_meta.empty) ?action ?(requires = []) ?name exe_name ~srcs
+    ?(wrap = fun proc b -> proc b) ?doc ?(meta = B0_meta.empty) ?action
+    ?(requires = []) ?name exe_name ~srcs
   =
   let name = Option.value ~default:exe_name name in
   let mod_srcs, set_mod_srcs = Fut.create () in
@@ -299,10 +300,12 @@ let exe
     |> B0_meta.add B0_meta.exe_file exe_path
   in
   let action = match action with None -> B0_unit.Action.exec | Some a -> a in
-  B0_unit.v ?doc ~meta ~action name (exe_proc set_exe_path set_mod_srcs srcs)
+  let proc = wrap (exe_proc set_exe_path set_mod_srcs srcs) in
+  B0_unit.v ?doc ~meta ~action name proc
 
 let lib
-    ?doc ?(meta = B0_meta.empty) ?action ?(requires = []) ?name lib_name ~srcs
+    ?(wrap = fun proc b -> proc b) ?doc ?(meta = B0_meta.empty) ?action
+    ?(requires = []) ?name lib_name ~srcs
   =
   let name = match name with
   | None -> Lib.Name.undot ~rep:'-' lib_name
@@ -317,7 +320,8 @@ let lib
     |> B0_meta.add Meta.requires requires
     |> B0_meta.add Meta.mod_srcs mod_srcs
   in
-  B0_unit.v ?doc ~meta ?action name (lib_proc set_mod_srcs srcs)
+  let proc = wrap (lib_proc set_mod_srcs srcs) in
+  B0_unit.v ?doc ~meta ?action name proc
 
 let () = B0_def.Scope.close ()
 

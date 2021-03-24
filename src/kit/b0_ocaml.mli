@@ -18,9 +18,9 @@ val libname : string -> Lib.Name.t
     This is shortcut for {!B00_ocaml.Lib.Name.v}. *)
 
 val exe :
-  ?doc:string -> ?meta:B0_meta.t -> ?action:B0_unit.action ->
-  ?requires:Lib.Name.t list -> ?name:string -> string -> srcs:B0_srcs.sels ->
-  B0_unit.t
+  ?wrap:(B0_unit.proc -> B0_unit.proc) -> ?doc:string -> ?meta:B0_meta.t ->
+  ?action:B0_unit.action -> ?requires:Lib.Name.t list -> ?name:string ->
+  string -> srcs:B0_srcs.sels -> B0_unit.t
 (** [exe n] is a build unit for an executable named [n] (without
     the platform specific extension).
     {ul
@@ -30,12 +30,14 @@ val exe :
     {- [name] is the name of the unit (defaults to [n]).}
     {- [srcs] are the executable sources. All files with extension [.ml],
        [.mli], [.c] and [.h] are considered for compiling and linking the
-       executable.}} *)
+       executable.}
+    {- [wrap] allows to extend the build procedure you must call the given
+       build procedure. TODO maybe remove once we have good {!frag}.}} *)
 
 val lib :
-  ?doc:string -> ?meta:B0_meta.t -> ?action:B0_unit.action ->
-  ?requires:Lib.Name.t list -> ?name:string -> Lib.Name.t ->
-  srcs:B0_srcs.sels -> B0_unit.t
+  ?wrap:(B0_unit.proc -> B0_unit.proc) -> ?doc:string -> ?meta:B0_meta.t ->
+  ?action:B0_unit.action -> ?requires:Lib.Name.t list -> ?name:string ->
+  Lib.Name.t -> srcs:B0_srcs.sels -> B0_unit.t
 (** [lib n ~srcs] is a built unit for a library named [l] made of
     sources [src].
     {ul
@@ -46,7 +48,9 @@ val lib :
         substituted by [-])}
     {- [srcs] are the library sources. extension [.ml],
        [.mli], [.c] and [.h] are considered for compiling and linking the
-       executable.}} *)
+       executable.}
+    {- [wrap] allows to extend the build procedure you must call the given
+       build procedure. TODO maybe remove once we have good {!frag}.}} *)
 
 (** {1:build_conf Build configuration} *)
 
@@ -83,8 +87,9 @@ val built_code : built_code Store.key
 (** [build_code] is a memo key indicating the built code. By default
     determines by consulting [wanted_code]. *)
 
-(** {1:frag Build fragments} *)
+(** {1:frag Build fragments}
 
+    See {{!page-TODO.frag}TODO}. *)
 
 (** {1:metadata Metadata} *)
 

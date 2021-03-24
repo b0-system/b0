@@ -38,9 +38,10 @@ val link : Cmd.t B0_meta.key
 (** [link] are options added to the [js_of_ocaml] [link] subcommand. *)
 
 val assets_root : Fpath.t B0_meta.key
-(** [assets_root] indicates the path w.r.t. to which assets are
-    are {!Fpath.reroot}ed. Assets that are not prefoxied by [assets_root]
-    are simply copied at the toplevel of the build dir. *)
+(** [assets_root] indicates the path w.r.t. to which assets are are
+    {!B00_std.Fpath.reroot}ed. Assets that are not prefixed by
+    [assets_root] are simply copied at the toplevel of the build
+    dir. *)
 
 val meta :
   ?meta:B0_meta.t -> ?assets_root:Fpath.t -> ?comp:Cmd.t ->
@@ -53,6 +54,7 @@ val meta :
 (** {1:units Build units} *)
 
 val exe :
+  ?wrap:(B0_unit.proc -> B0_unit.proc) ->
   ?doc:string -> ?meta:B0_meta.t -> ?action:B0_unit.action ->
   ?name:string -> string -> srcs:B0_srcs.sels -> B0_unit.t
 (** [exe n] is a JavaScript "executable" file named [n].
@@ -64,9 +66,12 @@ val exe :
        by [-]).}
     {- [srcs] are the executable sources. All files with extension [.ml],
        [.mli] and [.js] are considered for compiling and linked in the
-       JavaScript file.}} *)
+       JavaScript file.}
+    {- [wrap] allows to extend the build procedure you must call the given
+       build procedure. TODO maybe remove once we have good {!frag}.}} *)
 
 val web :
+  ?wrap:(B0_unit.proc -> B0_unit.proc) ->
   ?doc:string -> ?meta:B0_meta.t -> ?action:B0_unit.action ->
   ?name:string -> string -> srcs:B0_srcs.sels -> B0_unit.t
 (** [web n] is an HTML page named [n] (without the [.html] extension FIXME
@@ -86,13 +91,30 @@ val web :
        {b FIXME.} A competing idea was to have a notion of root induced
         by {!B0_srcs} selection. See the commented stuff there. This
         is likely something that will play better with generated assets.
-        It's also sligthly borderline with deployements.}}
+        It's also sligthly borderline with deployements.}
+    {- [wrap] allows to extend the build procedure you must call the given
+       build procedure. TODO maybe remove once we have good {!frag}.}}
 
     {b TODO document.} The js file is [n.js], if there's no [.html] source
     in the srcs a minimal HTML file is generated in which [n.js]
     is linked as a script and any css file in [srcs] as a stylesheet.*)
 
-(** {1:frag Build fragments} *)
+(** {1:frag Build fragments}
+
+    See {{!page-TODO.fragments}TODO}. *)
+
+
+val copy_assets :
+  B00.Memo.t -> B00_fexts.map -> exts:B00_fexts.t ->
+  assets_root:Fpath.t option -> dst:B00_std.Fpath.t -> Fpath.Set.t
+(** [copy_assets m srcs ~exts ~assets_root ~dst] copies [srcs] with
+    extensions in [exts] to [dst]. If [assets_root] is specified
+    indicates the path w.r.t. which assets are {!B00_std.Fpath.reroot}ed.
+    Assets that are not prefixed by [assets_root] are simply copied
+    at the toplevel of [dst].
+
+    {b FIXME.} Not a good idea to ready them inside. But all
+    this needs a good review. *)
 
 
 (*---------------------------------------------------------------------------

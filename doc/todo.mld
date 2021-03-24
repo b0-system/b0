@@ -64,3 +64,22 @@ to do that. We need to clarify the configuration store and dynamic
 metadata see {!unit_meta}.
 
 For now as a temporary hack we add the [wrap] parameter to units.
+
+{1:b00 B00}
+
+The signature of {!B00.Memo.write} looks wrong you want a fut. E.g.
+we don't want to the [Fut.sync] here.
+
+{[
+let crunch_file m file ~in_dir =
+  let open Fut.Syntax in
+  let mn = B00_ocaml.Mod.Name.of_mangled_filename (Fpath.basename file) in
+  let out = Fpath.(in_dir / String.Ascii.uncapitalize mn + ".ml") in
+  B00.Memo.write m out ~reads:[file] begin fun () ->
+  (* FIXME b0 the sig of write is wrong *)
+  let data = Fut.sync (B00.Memo.read m file) in
+  Ok (B00_ocaml.Crunch.string_to_string ~id:"file" ~data)
+  end;
+  Fut.return out
+
+]}

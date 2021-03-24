@@ -8,6 +8,8 @@ open B00_std.Fut.Syntax
 open B00
 open B00_ocaml
 
+let () = B0_def.Scope.lib "jsoo"
+
 (* Metadata keys *)
 
 let tag = B0_meta.Key.tag "jsoo" ~doc:"js_of_ocaml related entity"
@@ -229,8 +231,7 @@ let exe_proc set_exe_path set_mod_srcs srcs b =
 
 (* Build html webs *)
 
-let copy_assets m srcs ~assets_root ~dst =
-  let exts = String.Set.remove ".js" B00_fexts.www in
+let copy_assets m srcs ~exts ~assets_root ~dst =
   let assets = B00_fexts.find_files exts srcs in
   let copy acc src =
     let dst = match assets_root with
@@ -251,7 +252,8 @@ let web_exe ~srcs ~js ~o b =
     | None -> None
     | Some r -> Some (Fpath.(B0_build.current_scope_dir b // r))
   in
-  let assets = copy_assets m srcs ~assets_root ~dst:build_dir in
+  let exts = String.Set.remove ".js" B00_fexts.www in
+  let assets = copy_assets m srcs ~exts ~assets_root ~dst:build_dir in
   if Fpath.Set.mem o assets then Fut.return () else
   let css = Fpath.Set.filter (Fpath.has_ext ".css") assets in
   let base f = Fpath.to_string (Option.get (Fpath.strip_prefix build_dir f)) in
@@ -306,8 +308,8 @@ let unit_meta ~meta ~name ~mod_srcs ~exe_name ~exe_path =
   |> B0_meta.add B0_ocaml.Meta.needs_code `Byte
 
 let exe
-    ?doc ?(meta = B0_meta.empty) ?(action = show_uri_action) ?name exe_name
-    ~srcs
+    ?(wrap = fun proc b -> proc b) ?doc ?(meta = B0_meta.empty)
+    ?(action = show_uri_action) ?name exe_name ~srcs
   =
   let name = match name with
   | None -> String.map (function '.' -> '-' | c -> c) exe_name
@@ -316,17 +318,22 @@ let exe
   let mod_srcs, set_mod_srcs = Fut.create () in
   let exe_path, set_exe_path = Fut.create () in
   let meta = unit_meta ~meta ~name ~mod_srcs ~exe_name ~exe_path in
-  B0_unit.v ?doc ~action ~meta name (exe_proc set_exe_path set_mod_srcs srcs)
+  let proc = wrap (exe_proc set_exe_path set_mod_srcs srcs) in
+  B0_unit.v ?doc ~action ~meta name proc
 
 let web
-    ?doc ?(meta = B0_meta.empty) ?(action = show_uri_action) ?name page ~srcs
+    ?(wrap = fun proc b -> proc b) ?doc ?(meta = B0_meta.empty)
+    ?(action = show_uri_action) ?name page ~srcs
   =
   let name = Option.value ~default:page name in
   let mod_srcs, set_mod_srcs = Fut.create () in
   let exe_path, set_exe_path = Fut.create () in
   let exe_name = page in
   let meta = unit_meta ~meta ~name ~mod_srcs ~exe_name ~exe_path in
-  B0_unit.v ?doc ~action ~meta name (web_proc set_exe_path set_mod_srcs srcs)
+  let proc = wrap (web_proc set_exe_path set_mod_srcs srcs) in
+  B0_unit.v ?doc ~action ~meta name proc
+
+let () = B0_def.Scope.close ()
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers
