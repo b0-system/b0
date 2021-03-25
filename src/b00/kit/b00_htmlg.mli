@@ -13,7 +13,7 @@
 
 open B00_std
 
-(** Attributes. *)
+(** DOM element attributes. *)
 module At : sig
 
   (** {1:atts Attributes} *)
@@ -28,11 +28,12 @@ module At : sig
   (** [v n value] is an attribute named [n] with value [value]. *)
 
   val true' : name -> t
-  (** [true' n] is [v n ""], the {{:https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#boolean-attributes}boolean attribute} [n] set to true
-      (the attribute must be omitted to be false). *)
+  (** [true' n] is [v n Jstr.empty]. This sets the
+      {{:https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#boolean-attributes}boolean attribute}
+      [n] to true. The attribute must be omitted to be false. *)
 
   val int : name -> int -> t
-  (** [int n i] is [v n (string_of_int i)]. *)
+  (** [int n i] is [v n (Jstr.of_int i)]. *)
 
   val add_if : bool -> t -> t list -> t list
   (** [add_if c att atts] is [att :: atts] if [c] is [true] and [atts]
@@ -42,7 +43,10 @@ module At : sig
   (** [add_if_some n o atts] is [(v n value) :: atts] if [o] is [Some
       value] and [atts] otherwise. *)
 
-  (** {1:predef Predefined attribute constructors}
+  val to_pair : t -> string * string
+  (** [to_pair at] is [(n,v)] the name and value of the attribute. *)
+
+  (** {1:names_cons Attribute names and constructors}
 
       See the
       {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes}MDN
@@ -51,8 +55,38 @@ module At : sig
       {b Convention.} Whenever an attribute name conflicts with
       an OCaml keyword we prime it, see for example {!class'}. *)
 
+  (** Attribute names. *)
+  module Name : sig
+    val autofocus : name
+    val charset : name
+    val checked : name
+    val class' : name
+    val content : name
+    val defer : name
+    val disabled : name
+    val for' : name
+    val height : name
+    val href : name
+    val id : name
+    val lang : name
+    val media : name
+    val name : name
+    val placeholder : name
+    val rel : name
+    val src : name
+    val tabindex : name
+    val title : name
+    val type' : name
+    val value : name
+    val wrap : name
+    val width : name
+  end
+
   type 'a cons = 'a -> t
   (** The type for attribute constructors with value of type ['a]. *)
+
+  val accesskey : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/accesskey}accesskey} *)
 
   val autofocus : t
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/autofocus}
@@ -74,6 +108,12 @@ module At : sig
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/content}
       content} *)
 
+  val contenteditable : bool cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/contenteditable}contenteditable} *)
+
+  val cols : int cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/textarea#attr-cols}cols} *)
+
   val defer : t
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/defer}
       defer} *)
@@ -81,6 +121,12 @@ module At : sig
   val disabled : t
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/disabled}
       disabled} *)
+
+  val dir : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/dir}dir} *)
+
+  val draggable : bool cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/draggable}draggable} *)
 
   val for' : string cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/for'}
@@ -93,6 +139,9 @@ module At : sig
   val href : string cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/href}
       href} *)
+
+  val hidden : t
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/hidden}hidden} *)
 
   val id : string cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/id}
@@ -118,6 +167,12 @@ module At : sig
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/rel}
       rel} *)
 
+  val rows : int cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/textarea#attr-rows}rows} *)
+
+  val spellcheck : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/spellcheck}spellcheck} *)
+
   val src : string cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/src}
       src} *)
@@ -137,6 +192,9 @@ module At : sig
   val value : string cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/value}
       value} *)
+
+  val wrap : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/textarea#attr-wrap}wrap} *)
 
   val width : int cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/width}
