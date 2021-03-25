@@ -13,7 +13,7 @@
 
 open B00_std
 
-(** DOM element attributes. *)
+(** Element attributes. *)
 module At : sig
 
   (** {1:atts Attributes} *)
@@ -28,12 +28,12 @@ module At : sig
   (** [v n value] is an attribute named [n] with value [value]. *)
 
   val true' : name -> t
-  (** [true' n] is [v n Jstr.empty]. This sets the
+  (** [true' n] is [v n ""]. This sets the
       {{:https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#boolean-attributes}boolean attribute}
       [n] to true. The attribute must be omitted to be false. *)
 
   val int : name -> int -> t
-  (** [int n i] is [v n (Jstr.of_int i)]. *)
+  (** [int n i] is [v n (string_of_int i)]. *)
 
   val add_if : bool -> t -> t list -> t list
   (** [add_if c att atts] is [att :: atts] if [c] is [true] and [atts]
@@ -213,8 +213,8 @@ module El : sig
   (** The type for HTML fragments. A fragment is either character data or
       a single element or a sequence of elements. *)
 
-  val v : name -> ?at:At.t list -> frag list -> frag
-  (** [v n ~at cs] is an element with name [n], attributes [at]
+  val v : ?at:At.t list -> name -> frag list -> frag
+  (** [v ?at n cs] is an element with name [n], attributes [at]
       (defaults to [[]]) and children [cs].
 
       Except for {!At.class'} the list [at] must not define an
@@ -225,6 +225,12 @@ module El : sig
 
   val txt : string -> frag
   (** [txt d] is character data [d]. *)
+
+  val sp : frag
+  (** [sp] is [El.txt " "]. *)
+
+  val nbsp : frag
+  (** [nbsp] is [El.txt "\u{00A0}"]. *)
 
   val splice : ?sep:frag -> frag list -> frag
   (** [splice ?sep fs] when added to a list of children in {!v} splices
@@ -305,7 +311,7 @@ module El : sig
   (** The type for element constructors. This is simply {!v} with a
       pre-applied element name. *)
 
-  type void_cons = at:At.t list -> frag
+  type void_cons = ?at:At.t list -> unit -> frag
   (** The type for void element constructors. This is simply {!el}
       with a pre-applied element name and without children. *)
 
