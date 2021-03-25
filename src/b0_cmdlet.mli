@@ -74,8 +74,8 @@ val cmd : t -> cmd
 
 (** {1:shortcuts Shortcuts} *)
 
-val exit_of_result : ('a, string) result -> Os.Exit.t
-(** [exit_of_result v] exits with {!B00_cli.Exit.ok} if [v] is [Ok _] and
+val exit_of_result : (unit, string) result -> Os.Exit.t
+(** [exit_of_result v] exits with {!B00_cli.Exit.ok} if [v] is [Ok ()] and
     logs the Error and exits with {!B00_cli.Exit.some_error} if [v]
     is [Error _]. *)
 

@@ -73,6 +73,7 @@ module At : sig
     val name : name
     val placeholder : name
     val rel : name
+    val required : name
     val src : name
     val tabindex : name
     val title : name
@@ -166,6 +167,10 @@ module At : sig
   val rel : string cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/rel}
       rel} *)
+
+  val required : t
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/required}
+      required} *)
 
   val rows : int cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/textarea#attr-rows}rows} *)

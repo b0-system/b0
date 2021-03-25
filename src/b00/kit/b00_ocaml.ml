@@ -363,6 +363,8 @@ module Mod = struct
       Name.Map.merge mod' mlis mls
 
     let sort ?stable ~deps name_map =
+      (* FIXME do something better, on cycles this lead to link failure
+         we should detect it. *)
       let rec loop seen acc = function
       | [] -> seen, acc
       | src :: srcs ->
