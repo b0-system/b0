@@ -144,4 +144,4 @@ let b0wl =
 
 let strap =
   B0_cmdlet.v "strap" ~doc:"Run b00t/strap" @@
-  B0_cmdlet.exec (Fpath.v "b00t/strap")
+  B0_cmdlet.exec_file (Fpath.v "b00t/strap")

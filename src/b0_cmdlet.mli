@@ -63,7 +63,7 @@ end
 type cmd = Env.t -> Cmd.t -> Os.Exit.t
 (** The type for cmdlet implementations. A function that given an execution
     context and command line arguments for the cmdlet should eventually
-    exit in some way. *)
+    specify a way to exit. *)
 
 val v : ?doc:string -> ?meta:B0_meta.t -> string -> cmd -> t
 (** [v n ~doc ~meta cmd] is a cmdlet named [n] implemented by [cmd]
@@ -79,6 +79,11 @@ val exit_of_result : (unit, string) result -> Os.Exit.t
     logs the Error and exits with {!B00_cli.Exit.some_error} if [v]
     is [Error _]. *)
 
+val exit_of_result' : (Os.Exit.t, string) result -> Os.Exit.t
+(** [exit_of_result' v] exits with {e} if [v] is [Ok e] and
+    logs the Error and exits with {!B00_cli.Exit.some_error} if [v]
+    is [Error _]. *)
+
 val in_scope_dir : Env.t -> Fpath.t -> Fpath.t
 (** [in_scope_dir env p] is [Fpath.(Env.root_dir env // p)]). *)
 
@@ -90,10 +95,17 @@ val in_scratch_dir : Env.t -> Fpath.t -> Fpath.t
 
 (** {1:script Script execution} *)
 
-val exec : ?env:Os.Env.assignments -> ?cwd:Fpath.t -> Fpath.t -> cmd
-(** [exec exe env cmd] executes the file [exe] with arguments [cmd].
+val exec_file : ?env:Os.Env.assignments -> ?cwd:Fpath.t -> Fpath.t -> cmd
+(** [exec_file exe e args] executes the file [exe] with arguments [cmd].
     The {{!Env.scope_dir}scope directory} is used as the default [cwd]
     and to resolve relative [exe] paths. *)
+
+val exec_tool : ?env:Os.Env.assignments -> ?cwd:Fpath.t -> Cmd.tool -> cmd
+(** [exec_tool tool e args] executes the tool [exe] with arguments [cmd]
+    The {{!Env.scope_dir}scope directory} is used as the default [cwd].
+    [exe] is looked up using {!B00_std.Os.Cmd.get_tool}, if that fails
+    the error is logged and we exit we and exits
+    with {!B00_cli.Exit.some_error}. *)
 
 (** {1:cli Command line interaction}
 

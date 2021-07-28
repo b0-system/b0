@@ -45,21 +45,33 @@ end
 
 (* Shortcuts *)
 
+let exit_some_error e =
+  Log.err (fun m -> m "@[%a@]" Fmt.lines e); B00_cli.Exit.some_error
+
 let exit_of_result = function
-| Ok _ -> B00_cli.Exit.ok
-| Error e -> Log.err (fun m -> m "@[%a@]" Fmt.lines e); B00_cli.Exit.some_error
+| Ok _ -> B00_cli.Exit.ok | Error e -> exit_some_error e
+
+let exit_of_result' = function Ok e -> e | Error e -> exit_some_error e
 
 let in_scope_dir env p = Fpath.(Env.scope_dir env // p)
 let in_root_dir env p = Fpath.(Env.root_dir env // p)
 let in_scratch_dir env p = Fpath.(Env.scratch_dir env // p)
 
-(* Script execution *)
+(* Script and tool execution *)
 
-let exec ?env:e ?cwd exe env args =
+let exec_file ?env:e ?cwd exe env args =
   let scope_dir = Env.scope_dir env in
   let exe = Fpath.(scope_dir // exe) in
   let cwd = Option.value ~default:scope_dir cwd in
   Os.Exit.exec ?env:e ~cwd exe Cmd.(path exe %% args)
+
+let exec_tool ?env:e ?cwd tool env args =
+  let scope_dir = Env.scope_dir env in
+  match Os.Cmd.get_tool tool with
+  | Error e -> exit_some_error e
+  | Ok exe ->
+      let cwd = Option.value ~default:scope_dir cwd in
+      Os.Exit.exec ?env:e ~cwd exe Cmd.(path exe %% args)
 
 (* N.B. that signature could be twisted around to teturn a `cmd` value
    but the way it is now encourages the term definition to occur behind
