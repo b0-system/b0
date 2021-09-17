@@ -49,7 +49,7 @@ module File = struct
   let escape =
     let char_len = function '"' -> 2 | _ -> 1 in
     let set_char b i = function
-    | '"' -> Bytes.set b i '\\'; Bytes.set b (i+1) '"'; 2
+    | '"' -> Bytes.set b i '\\'; Bytes.set b (i+1) '"'; i + 2
     | c -> Bytes.set b i c; i + 1
     in
     String.byte_escaper char_len set_char
