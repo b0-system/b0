@@ -735,7 +735,7 @@ module Publish = struct
 
   let commit ~local_repo:repo ~branch ~pkgs_dir is _incs =
     let stdout, stderr = stdout_logging () in
-    let master = Some "master" and force = true in
+    let master = Some "origin/master" and force = true in
     Log.app (fun m -> m "Branching %s…" branch);
     Result.join @@
     B00_vcs.Git.with_transient_checkout
