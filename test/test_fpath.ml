@@ -15,17 +15,17 @@ let test_double_sep () =
   test "a///bc//c///////////////d" "a/bc/c/d";
   ()
 
-let test_is_prefix_rem_prefix () =
+let test_is_prefix_strip_prefix () =
   let test p q r =
     let p = Fpath.v p and q = Fpath.v q in
     match r with
     | None ->
         assert (not (Fpath.is_prefix p q));
-        assert (Fpath.rem_prefix p q = None);
+        assert (Fpath.strip_prefix p q = None);
     | Some r ->
         let r = Fpath.v r in
         assert (Fpath.is_prefix p q);
-        match Fpath.rem_prefix p q with
+        match Fpath.strip_prefix p q with
         | None -> assert false
         | Some r' ->
             assert (Fpath.equal r r');
@@ -123,7 +123,7 @@ let test_parent () =
 
 let test () =
   test_double_sep ();
-  test_is_prefix_rem_prefix ();
+  test_is_prefix_strip_prefix ();
   test_parent ();
   test_basename ();
   ()
