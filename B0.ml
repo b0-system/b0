@@ -123,7 +123,7 @@ let default =
       "ocamlfind", {|build|};
       "ocamlbuild", {|build|};
       "topkg", {|build & >= "1.0.3"|};
-      "cmdliner", {|build &>= "1.0.2"|}; ]
+      "cmdliner", {|>= "1.0.2"|}; ]
     |> tag B0_opam.tag
   in
   B0_pack.v "default" ~doc:"The B0 system" ~meta ~locked:true @@

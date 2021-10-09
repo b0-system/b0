@@ -13,7 +13,7 @@ depends: ["ocaml" {>= "4.08.0"}
           "ocamlfind" {build}
           "ocamlbuild" {build}
           "topkg" {build & >= "1.0.3"}
-          "cmdliner" {build &>= "1.0.2"}]
+          "cmdliner" {>= "1.0.2"}]
 build: [["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]]
 description: """
 WARNING this package is unstable and work in progress, do not depend on it. 
