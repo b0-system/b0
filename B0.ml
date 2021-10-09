@@ -112,7 +112,7 @@ let default =
     |> add maintainers ["Daniel Bünzli <daniel.buenzl i@erratique.ch>"]
     |> add homepage "https://erratique.ch/software/b0"
     |> add online_doc "https://erratique.ch/software/b0/doc"
-    |> add licenses ["ISC"; "BSD2"]
+    |> add licenses ["ISC"; "BSD-2-Clause"]
     |> add repo "git+https://erratique.ch/repos/b0.git"
     |> add issues "https://github.com/b0-system/b0/issues"
     |> add description_tags ["dev"; "org:erratique"; "org:b0-system"; "build"]
