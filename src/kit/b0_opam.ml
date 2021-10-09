@@ -713,7 +713,7 @@ module Publish = struct
     if Log.level () >= Log.Info then None, None else
     Some Os.Cmd.out_null, Some Os.Cmd.out_null
 
-  let get_updated_local_repo git ~pkgs_repo ~local_repo:dir =
+  let rec get_updated_local_repo git ~pkgs_repo ~local_repo:dir =
     let stdout, stderr = stdout_logging () in
     let master = "master" in
     let* local = B00_vcs.Git.find ~dir () in
@@ -721,17 +721,19 @@ module Publish = struct
     | Some repo ->
         Log.app (fun m -> m "Updating %a" Fpath.pp_unquoted dir);
         let git = B00_vcs.repo_cmd repo in
-        let fetch = Cmd.(atom "fetch" % "origin" % master % "--depth=1") in
+        let fetch = Cmd.(atom "fetch" % "origin" % master) in
         let* () = Os.Cmd.run ?stdout ?stderr Cmd.(git %% fetch) in
         Ok repo
     | None ->
         Log.app (fun m -> m "Cloning %s to %a" pkgs_repo Fpath.pp_unquoted dir);
         let clone =
-          Cmd.(atom "clone" % "--bare" % "--depth=1" % "--single-branch" %
+          Cmd.(atom "clone" % "--bare" % "--single-branch" %
                "--branch" % master % pkgs_repo %% path dir)
         in
         let* () = Os.Cmd.run ?stdout ?stderr Cmd.(git %% clone) in
-        B00_vcs.get ~dir ()
+        (* We do that so that we end up in the other branch
+           fetch and FETCH_HEAD becomes defined *)
+        get_updated_local_repo git ~pkgs_repo ~local_repo:dir
 
   let commit ~local_repo:repo ~branch ~pkgs_dir is _incs =
     let stdout, stderr = stdout_logging () in

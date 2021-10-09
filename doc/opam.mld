@@ -143,8 +143,8 @@ given on the command line it:
 If everything worked well it continues with:
 
 {ol
-{- Clones or updates the OCaml [opam] repository to the shallow
-   and bare repository [~/.caches/opam-repository.git] (the
+{- Clones or updates the OCaml [opam] repository to the
+   bare repository [~/.caches/opam-repository.git] (the
    {{!B00_std.Os.Dir.cache}XDG spec} is honoured).}
 {- Creates a branch for the publication, adds a commit with
    the generated files and constraints on incompatible packages.}
