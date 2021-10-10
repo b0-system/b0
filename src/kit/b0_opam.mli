@@ -86,14 +86,14 @@ module File : sig
       Finally the contents of {!B0_opam.Meta.file_addendum} is appended
       after the definition of these fields.
 
-      See {!Meta.pkg_of_pack} for
-      deriving metadata from build packs. *)
+      See {!Meta.pkg_of_pack} for deriving metadata from build packs. *)
 end
 
 (** {1:meta [opam] Metadata} *)
 
 val tag : unit B0_meta.key
-(** [tag] indicates the entity is related to [opam]. *)
+(** [tag] indicates the entity is related to [opam]. Adding this tag
+    to a pack makes it represent an opam package for B0's opam tooling. *)
 
 val pkg_name_of_pack : B0_pack.t -> string
 (** [pkg_name_of_pack p] derives an opam package name for [p].
@@ -115,33 +115,50 @@ module Meta : sig
       filtered package formula}, use [""] if you don't have any constraint. *)
 
   val build : string B0_meta.key
-  (** [build] is an opam [build:] field value. This is a raw string in
+  (** [build] is an opam
+      {{:https://opam.ocaml.org/doc/Manual.html#opamfield-build}
+      [build:]} field value. This is a raw string in
       opam syntax that defines the whole field. Used to override
       automatic opam file generation, see {!pkg_of_pack}.  *)
 
   val depends : pkg_spec list B0_meta.key
-  (** [depends] is an opam [depends:] field value. Used to override
+  (** [depends] is an opam
+      {{:https://opam.ocaml.org/doc/Manual.html#opamfield-depends}
+      [depends:]} field value. Used to override
       automatic opam file dependency generation, see
       {!pkg_of_pack}. *)
 
   val depopts : pkg_spec list B0_meta.key
-  (** [depopts] is an opam [depopts:] field value. *)
+  (** [depopts] is an opam
+      {{:https://opam.ocaml.org/doc/Manual.html#opamfield-depopts}
+      [depopts:]} field value. *)
 
   val conflicts : pkg_spec list B0_meta.key
-  (** [conflicts] is an opam [conflicts:] field value. *)
+  (** [conflicts] is an opam
+      {{:https://opam.ocaml.org/doc/Manual.html#opamfield-conflicts}
+      [conflicts:]} field value. *)
 
   val file_addendum : File.t B0_meta.key
   (** [file_addendum] is an [opam] file fragment appended at the end
       of a generated [opam] file. See {!B0_opam.File.pkg_of_meta}. *)
 
   val install : string B0_meta.key
-  (** [install] is an opam [install:] field value. This is a raw
+  (** [install] is an opam
+      {{:https://opam.ocaml.org/doc/Manual.html#opamfield-install}
+      [install:]} field value. This is a raw
       string in opam syntax that defines the whole field. Used to
       override automatic opam file generation, see {!pkg_of_pack}. *)
 
   val name : string B0_meta.key
-  (** [name] is an [opam] [name:] field value. Use to override
+  (** [name] is an [opam]
+      {{:https://opam.ocaml.org/doc/Manual.html#opamfield-name}
+      [name:]} field value. Use to override
       automatic [opam] package name generation, see {!pkg_of_pack}. *)
+
+  val pin_depends : (string * string) list B0_meta.key
+  (** [pin_depends] is an opam
+      {{:https://opam.ocaml.org/doc/Manual.html#opamfield-pindepends}
+      [pin-depends:]} field value. *)
 
   (** {1:pkg_derivation Package derivation} *)
 
@@ -173,7 +190,7 @@ end
 
 (** [.opam.*] cmdlets.
 
-   See the {!page-b0_opam} manual and:
+   See the {{!page-opam}B0 [opam] manual} and:
 {v
 b0 cmd -- .opam.list --help
 b0 cmd -- .opam.file --help

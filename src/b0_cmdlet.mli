@@ -80,7 +80,7 @@ val exit_of_result : (unit, string) result -> Os.Exit.t
     is [Error _]. *)
 
 val exit_of_result' : (Os.Exit.t, string) result -> Os.Exit.t
-(** [exit_of_result' v] exits with {e} if [v] is [Ok e] and
+(** [exit_of_result' v] exits with [e] if [v] is [Ok e] and
     logs the Error and exits with {!B00_cli.Exit.some_error} if [v]
     is [Error _]. *)
 

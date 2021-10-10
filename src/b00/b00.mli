@@ -431,9 +431,10 @@ end
 
     The value of a key in a store is defined either:
     {ul
-    {- Explicitly when the store is {{!create}created}.}
-    {- Lazily on the first key {{!get}access} via a key determination function
-       specified at {{!val-key}key creation time}.}}
+    {- Explicitly when the store is {{!Store.create}created}.}
+    {- Lazily on the first key {{!Store.get}access} via a key determination
+       function
+       specified at {{!Store.val-key}key creation time}.}}
     Once determined the value of a key in the store never changes.
 
     {b XXX.} Maybe move that at the B0 level. *)

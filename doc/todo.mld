@@ -83,3 +83,9 @@ let crunch_file m file ~in_dir =
   Fut.return out
 
 ]}
+
+{1:opam opam}
+
+{ul
+{- Worfklow to easily check opam file in sync.
+   Part of more general workflow ?}}

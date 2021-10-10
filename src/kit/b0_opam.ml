@@ -87,7 +87,10 @@ module File = struct
     let pp_formula ppf = function "" -> () | f -> Fmt.pf ppf " {%s}" f in
     Fmt.pf ppf "%s%a" n pp_formula f
 
+  let pp_pkg_url ppf (n, u) = Fmt.pf ppf "@[%s %s@]" n u
+
   let pp_pkg_spec_list = Fmt.vbox @@ Fmt.list pp_pkg_spec
+  let pp_pkg_url_list = Fmt.vbox @@ Fmt.list pp_pkg_url
 
   let name_field =
     let doc = "opam file name: field" in
@@ -117,6 +120,10 @@ module File = struct
     let doc = "opam file install: field" in
     B0_meta.Key.v "opam-install" ~doc ~pp_value:Fmt.string
 
+  let pin_depends =
+    let doc = "opam file pin-depends: field" in
+    B0_meta.Key.v "opam-pin-depends" ~doc ~pp_value:pp_pkg_url_list
+
   let pkg_of_meta ~with_name m =
     let string field k m acc = match B0_meta.find k m with
     | None -> acc | Some s -> `Field (field, `S s) :: acc
@@ -141,6 +148,11 @@ module File = struct
         in
         `Field (field, `L (true, List.map pkg pkgs)) :: acc
     in
+    let string_pair_list ~by_line:l field k m acc = match B0_meta.find k m with
+    | None -> acc | Some ps ->
+        let pair (f, s) = `L (false, [`S f; `S s]) in
+        `Field (field, `L (l, List.map pair ps)) :: acc
+    in
     let fields =
       [ triple_string ~nl:false "synopsis" B0_meta.synopsis;
         string_list ~by_line:true "maintainer" B0_meta.maintainers;
@@ -152,6 +164,7 @@ module File = struct
         string_list ~by_line:false "license" B0_meta.licenses;
         string_list ~by_line:false "tags" B0_meta.description_tags;
         pkg_spec_list "depends" depends_field;
+        string_pair_list ~by_line:true "pin-depends" pin_depends;
         pkg_spec_list "depopts" depopts_field;
         pkg_spec_list "conflicts" conflicts_field;
         string_raw "build" build_field;
@@ -189,6 +202,7 @@ module Meta = struct
   let file_addendum = File.file_addendum
   let install = File.install_field
   let name = File.name_field
+  let pin_depends = File.pin_depends
 
   (* Metadata derivation *)
 
