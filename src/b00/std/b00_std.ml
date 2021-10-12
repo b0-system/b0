@@ -1721,7 +1721,7 @@ module Fpath = struct
   let mem_ext exts p = List.exists (fun ext -> has_ext ext p) exts
 
   let add_ext e p =
-    let plen = String.length p - 1 in
+    let plen = String.length p in
     match last_is_dir_sep p with
     | false -> p ^ e
     | true ->
