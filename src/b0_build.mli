@@ -39,8 +39,9 @@ val current_meta : t -> B0_meta.t
 
 (** {1:dir Directories}
 
-    {b FIXME} Unify the directory story with {!B0_cmdlet}.
-    We likely want to get rid of a few of the functions below. *)
+    {b FIXME} Unify the directory story with {!B0_cmdlet} and
+    {!B0_unit.Action}. We likely want to get rid of a few of the functions
+    below. *)
 
 val scope_dir : t -> B0_unit.t -> Fpath.t
 (** [scope_dir b u] is the directory of the B0 file in which [u] was

@@ -92,8 +92,15 @@ module Action = struct
     let pp_value = Fmt.any "<built value>" in
     B0_meta.Key.v "action-cwd" ~doc ~pp_value
 
+  let scope_cwd b u =
+    (* FIXME c&p with B0_build.scope_dir *)
+    Fut.return @@
+    match B0_def.scope_dir (def u) with
+    | None -> b.Build_def.b.root_dir
+    | Some dir -> dir
+
   let exec_env =
-    let doc = "Process environement for outcome action." in
+    let doc = "Process environment for outcome action." in
     let pp_value = Fmt.any "<built value>" in
     B0_meta.Key.v "action-env" ~doc ~pp_value
 

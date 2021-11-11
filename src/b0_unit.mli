@@ -60,6 +60,9 @@ module Action : sig
   (** [exec_cwd] is a function to determine a current working directory
       for {!exec} actions. *)
 
+  val scope_cwd : build -> t -> Fpath.t Fut.t
+  (** [scope_cwd] is function that determines the unit's scope. *)
+
   val exec_env : (build -> t -> Os.Env.assignments Fut.t) B0_meta.key
   (** [exec_env] is a function to determine an environement for {!exec}
       actions. *)
