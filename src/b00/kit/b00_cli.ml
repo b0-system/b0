@@ -514,7 +514,7 @@ module Op = struct
         Arg.(value & flag & info ["e"; "errors"] ~doc ?docs)
       in
       let sts statuses errs = if errs then `Failed :: statuses else statuses in
-      Term.(pure sts $ statuses $ errors)
+      Term.(const sts $ statuses $ errors)
     in
     let kinds =
       let kind_enum =

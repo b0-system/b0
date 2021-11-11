@@ -153,7 +153,7 @@ let parse_cli =
       end
   | `Keys | `Delete | `Path -> `Ok (action, log_file_opt, args)
   in
-  Term.(ret (pure parse $ action $ log_file_opt $ args))
+  Term.(ret (const parse $ action $ log_file_opt $ args))
 
 let tool =
   Term.(const cache_cmd $ B00_cli.B00_std.tty_cap ~docs:sdocs () $

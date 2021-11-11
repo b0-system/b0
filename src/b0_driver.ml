@@ -380,7 +380,7 @@ let with_b0_file ~driver cmd =
       let argv = Cmd.of_list (fun x -> x) (Array.to_list Sys.argv) in
       Ok (Os.Exit.exec exe argv)
   in
-  Cmdliner.Term.(pure run $ Cli.conf $ cmd)
+  Cmdliner.Term.(const run $ Cli.conf $ cmd)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers
