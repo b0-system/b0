@@ -481,17 +481,23 @@ module Fmt = struct
      where capability was associated to formatters and hence could
      distinguish between stdout/stderr, maybe we should do that again. *)
 
-  let _tty_styling_cap = ref `None
-  let set_tty_styling_cap cap = _tty_styling_cap := cap
-  let tty_styling_cap () = !_tty_styling_cap
+  let _tty_cap = ref `None
+  let set_tty_cap ?cap () =
+    let cap = match cap with
+    | None -> Tty.(cap (of_fd Unix.stdout))
+    | Some cap -> cap
+    in
+    _tty_cap := cap
 
-  let tty_string styles ppf s = match !_tty_styling_cap with
+  let tty_cap () = !_tty_cap
+
+  let tty_string styles ppf s = match !_tty_cap with
   | `None -> Format.pp_print_string ppf s
   | `Ansi ->
       Format.fprintf ppf "@<0>%s%s@<0>%s"
         (Printf.sprintf "\027[%sm" @@ Tty.sgrs_of_styles styles) s "\027[m"
 
-  let tty styles pp_v ppf v = match !_tty_styling_cap with
+  let tty styles pp_v ppf v = match !_tty_cap with
   | `None -> pp_v ppf v
   | `Ansi ->
       (* XXX This doesn't compose well, we should get the current state

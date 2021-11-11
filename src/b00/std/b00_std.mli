@@ -385,12 +385,13 @@ module Fmt : sig
 
   (** {1:tty ANSI TTY styling} *)
 
-  val set_tty_styling_cap : Tty.cap -> unit
-  (** [set_tty_styling_cap c] sets the global styling capabilities to
-      [c]. Affects the output of {!tty_str} and {!val-tty}. *)
+  val set_tty_cap : ?cap:Tty.cap -> unit -> unit
+  (** [set_tty_cap ?cap ()] sets the global TTY formatting capabilities to
+      [cap] if specified and to [Tty.(cap (of_fd Unix.stdout))] otherwise.
+      . Affects the output of {!tty_str} and {!val-tty}. *)
 
-  val tty_styling_cap : unit -> Tty.cap
-  (** [tty_styling_cap ()] is the global styling capability. *)
+  val tty_cap : unit -> Tty.cap
+  (** [tty_cap ()] is the global styling capability. *)
 
   val tty_string : Tty.style list -> string t
   (** [tty_string styles ppf s] prints [s] on [ppf] according to [styles]

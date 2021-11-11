@@ -73,7 +73,7 @@ module B00_std = struct
   let get_log_level level = Option.value ~default:Log.Warning level
 
   let setup cap level ~log_spawns =
-    Fmt.set_tty_styling_cap cap;
+    Fmt.set_tty_cap ~cap ();
     Log.set_level level;
     if level >= log_spawns
     then Os.Cmd.set_spawn_tracer (Log.spawn_tracer log_spawns)

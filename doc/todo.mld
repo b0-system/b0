@@ -42,7 +42,11 @@ refined, see {!B0_unit.type-action}.
 {- If we get a fast up-to-date check. How to we get the dynamic meta.
    (serialize ?).}
 {- Should actions be definitions to apply on units ? Seems to
-   get into testing territory.}}
+   get into testing territory.}
+{- Action cwd. Often we want scope. But maybe it's better to leave
+   it free-weeling and define a cmdlet that invokes it with a cwd
+   with the scope. Should we distinguish a `-a` (honours cwd) and `-e` ?
+   or a `--cwd` option to override the action ?}}
 
 {1:design_b0_tool [b0] tool}
 

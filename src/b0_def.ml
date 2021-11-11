@@ -85,7 +85,7 @@ module Scope = struct
       (* XXX we want style ! But we didn't setup the driver config yet :-(
          We should look Sys.argv for --color and the B0_COLOR env var. Forcing
          for now, this will be set again later by B0_driver.Cli.conf. *)
-      Fmt.set_tty_styling_cap `Ansi
+      Fmt.set_tty_cap ~cap:`Ansi ()
     in
     current := File (["", file, Fpath.parent file]);
     setup_fmt ();
