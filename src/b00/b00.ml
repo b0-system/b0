@@ -518,9 +518,9 @@ module Store = struct
   let memo s = s.Store.memo
   let dir s = s.Store.dir
 
-  let key_uid = let id = ref (-1) in fun () -> incr id; !id
+  let key_uid = (* FIXME atomic *)  let id = ref (-1) in fun () -> incr id; !id
   let key ?(mark = "") det =
-    let uid = key_uid () and tid = Tid.create () in
+    let uid = key_uid () and tid = Tid.v () in
     let rec k = { Key.uid; tid; mark; det; untyped }
     and untyped = Key.V k in k
 

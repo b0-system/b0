@@ -35,7 +35,7 @@ module Key = struct
 
   let uid = let id = ref (-1) in fun () -> incr id; !id
   let v ?(doc = "undocumented") ~pp_value name =
-    let uid = uid () and tid = Tid.create () and name = ensure_unique name in
+    let uid = uid () and tid = Tid.v () and name = ensure_unique name in
     let rec k = { uid; tid; name; doc; pp_value; untyped } and untyped = V k in
     by_name := String.Map.add name untyped !by_name; k
 

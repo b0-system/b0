@@ -23,8 +23,8 @@ module Tid : sig
   type 'a t
   (** The type for type identifiers for a type ['a]. *)
 
-  val create : unit -> 'a t
-  (** [create ()] is a new type identifier. *)
+  val v : unit -> 'a t
+  (** [v ()] is a new type identifier. *)
 
   type ('a, 'b) eq = Eq : ('a, 'a) eq (** *)
   (** The type for type identifier equality testing. *)
