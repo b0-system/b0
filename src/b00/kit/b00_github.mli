@@ -19,13 +19,10 @@ module Auth : sig
   val v : user:string option -> unit -> (t, string) result
   (** [auth ~http ~user ()] determines authentication via personal
       access token for user [user]. It the latter is unspecified it
-      first starts
-      by determining [user] by looking the []
-
-      It first looks up the contents of the [B0_GITHUB_TOKEN]
-      environment variable if that fails it looks up for an existing
-      token in the {!B00_std.Os.Dir.config}[ () /b0/github/$USER.token] file.
-      If that fails instructions are printed on how to setup the
+      first looks up the contents of the [B0_GITHUB_TOKEN] environment
+      variable if that fails it looks up for an existing token in the
+      {!B00_std.Os.Dir.config}[ () /b0/github/$USER.token] file.  If
+      that fails instructions are printed on how to setup the
       token. *)
 
   val user : t -> string

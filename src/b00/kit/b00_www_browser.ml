@@ -54,7 +54,8 @@ let find_with_macos_jxa ?search ~browser jxa = match browser with
 | Some cmd ->
     begin match String.Ascii.lowercase @@ List.hd (Cmd.to_list cmd) with
     | "chrome" -> Ok (Some (Macos_chrome jxa))
-    | "firefox" -> find_macos_open ?search ~appid:(Some "org.mozilla.firefox") ()
+    | "firefox" ->
+        find_macos_open ?search ~appid:(Some "org.mozilla.firefox") ()
     | "open" -> find_macos_open ?search ~appid:None ()
     | "safari" -> Ok (Some (Macos_safari jxa))
     | _ -> find_browser_cmd ?search cmd

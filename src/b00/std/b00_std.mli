@@ -2251,7 +2251,9 @@ module Os : sig
         of [src] (or {!stdin} if [src] is {!dash}) to [file]. [mode] defaults
         to the permissions of [src] if available and [0o644] otherwise. *)
 
-    (** {1:tmpfiles Temporary files} *)
+    (** {1:tmpfiles Temporary files}
+
+        See also {!B00_std.Os.Path.tmppath}temporary paths}. *)
 
     val with_tmp_fd :
       ?flags:Unix.open_flag list -> ?mode:int -> ?make_path:bool ->
