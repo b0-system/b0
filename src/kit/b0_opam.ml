@@ -365,7 +365,6 @@ module Pkg = struct
     | st, _ -> Fmt.error "%a" Os.Cmd.pp_cmd_status (opam_lint, st)
 end
 
-
 (* .opam.list cmdlet *)
 
 let list_cmdlet env pkgs details =

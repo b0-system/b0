@@ -4,7 +4,6 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
-open Cmdliner
 
 (* macOS JavaScript automation *)
 
@@ -172,6 +171,8 @@ let show ~background ~prefix browser uri =
           show_macos_open ~background ~prefix open_tool ~appid uri
 
 (* Cli interaction *)
+
+open Cmdliner
 
 let browser ?docs ?(opts = ["browser"]) () =
   let env = Arg.env_var Env.browser in

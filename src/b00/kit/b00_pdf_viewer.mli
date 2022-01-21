@@ -6,7 +6,6 @@
 (** PDF viewer interaction. *)
 
 open B00_std
-open Cmdliner
 
 (** {1:env Environment variables} *)
 
@@ -35,7 +34,7 @@ val show : t option -> Fpath.t -> (unit, string) result
 (** {1:cli Cli interaction} *)
 
 val pdf_viewer :
-  ?docs:string -> ?opts:string list -> unit -> Cmd.t option Term.t
+  ?docs:string -> ?opts:string list -> unit -> Cmd.t option Cmdliner.Term.t
 (** [pdf_viewer ~docs ~opts ()] is an option and [PDFVIEWER]
     environment variable to use with [pdf_viewer] argument of
     {!find}. [opts] are the cli options and default to

@@ -11,7 +11,6 @@
     are, if requested, prefixed by the URI. *)
 
 open B00_std
-open Cmdliner
 
 (** {1:env Environment variables} *)
 
@@ -58,17 +57,20 @@ val show :
 
 (** {1:cli Cli interaction} *)
 
-val browser : ?docs:string -> ?opts:string list -> unit -> Cmd.t option Term.t
+val browser :
+  ?docs:string -> ?opts:string list -> unit -> Cmd.t option Cmdliner.Term.t
 (** [browser] is an option and [BROWSER] environment variable to use
     with the [browser] argument of {!find}. [opts] are the cli options
     and default to [["browser"]]. *)
 
-val prefix :  ?docs:string -> ?opts:string list -> unit -> bool Term.t
+val prefix :
+  ?docs:string -> ?opts:string list -> unit -> bool Cmdliner.Term.t
 (** [prefix] is option to use the with [prefix] argument of
     {!val-show}. [opts] are the cli options and default to
     [["prefix"]]. *)
 
-val background : ?docs:string -> ?opts:string list -> unit -> bool Term.t
+val background :
+  ?docs:string -> ?opts:string list -> unit -> bool Cmdliner.Term.t
 (** [background] is an option to use with the [background] argument of
     [!show]. [opts] are the cli options and default to
     [["background"]] *)

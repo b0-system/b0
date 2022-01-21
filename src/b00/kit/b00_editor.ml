@@ -34,12 +34,13 @@ let find ?win_exe ?search () =
   let parse_env cmds env = match cmds with
   | Error _ as e -> e
   | Ok cmds as r ->
-      match Os.Env.find' ~empty_is_none:true Cmd.of_string env with
+      let empty_is_none = true in
+      match Os.Env.find' ~empty_is_none B00_std.Cmd.of_string env with
       | Error _ as e -> e
       | Ok None -> r
       | Ok (Some cmd) -> Ok (cmd :: cmds)
   in
-  let cmds = Ok [Cmd.atom "nano"] in
+  let cmds = Ok [B00_std.Cmd.atom "nano"] in
   let cmds = parse_env cmds Env.editor in
   let* cmds = parse_env cmds Env.visual in
   let rec loop = function
@@ -53,7 +54,7 @@ let find ?win_exe ?search () =
 
 let edit_files editor fs = match editor with
 | None -> Error "No runnable editor found in VISUAL or EDITOR"
-| Some editor -> Os.Cmd.run_status Cmd.(editor %% paths fs)
+| Some editor -> Os.Cmd.run_status B00_std.Cmd.(editor %% paths fs)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 The b0 programmers

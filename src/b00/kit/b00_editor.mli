@@ -6,7 +6,6 @@
 (** Editor interaction.  *)
 
 open B00_std
-open Cmdliner
 
 (** {1:env Environment variables} *)
 
@@ -19,7 +18,7 @@ module Env : sig
   (** [editor] is [EDITOR]. *)
 end
 
-val envs : unit -> Term.env_info list
+val envs : unit -> Cmdliner.Term.env_info list
 (** [envs ()] describe the [VISUAL] and [EDITOR] environment variables. *)
 
 (** {1:edit Editing} *)

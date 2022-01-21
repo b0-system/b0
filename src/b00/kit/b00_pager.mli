@@ -6,7 +6,6 @@
 (** Pager interaction. *)
 
 open B00_std
-open Cmdliner
 
 (** {1:env Environment variables} *)
 
@@ -22,7 +21,7 @@ module Env : sig
   (** [term] is [TERM]. *)
 end
 
-val envs : unit -> Term.env_info list
+val envs : unit -> Cmdliner.Term.env_info list
 (** [envs ()] describe the [PAGER] and [TERM] environment variable for
     cmdliner. *)
 
@@ -65,7 +64,7 @@ val page_files : Cmd.t option -> Fpath.t list -> (unit, string) result
 
 (** {1:cli Cli interaction} *)
 
-val don't : ?docs:string -> unit -> bool Term.t
+val don't : ?docs:string -> unit -> bool Cmdliner.Term.t
 (** [don't ~docs ()] is a [--no-pager] command line option to
     unconditionally request not use a pager. [docs] is the manual
     section where the option is documented. *)

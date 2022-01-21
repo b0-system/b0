@@ -34,9 +34,10 @@ let find ?win_exe ?search ~don't () =
   match Os.Env.find ~empty_is_none:true Env.term with
   | Some "dumb" | None -> Ok None
   | Some _ ->
-      let cmds = [Cmd.atom "less"; Cmd.atom "more"] in
+      let cmds = B00_std.[Cmd.atom "less"; Cmd.atom "more"] in
       let* cmds =
-        match Os.Env.find' ~empty_is_none:true Cmd.of_string Env.pager with
+        let empty_is_none = true in
+        match Os.Env.find' ~empty_is_none B00_std.Cmd.of_string Env.pager with
         | Error _ as e -> e
         | Ok None -> Ok cmds
         | Ok (Some cmd) -> Ok (cmd :: cmds)
@@ -98,7 +99,7 @@ let page_stdout = function
 
 let page_files pager files = match pager with
 | Some pager when files = [] -> Ok ()
-| Some pager -> Os.Cmd.run Cmd.(pager %% paths files)
+| Some pager -> Os.Cmd.run B00_std.Cmd.(pager %% paths files)
 | None ->
     let rec loop = function
     | [] -> Ok ()

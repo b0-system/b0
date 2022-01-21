@@ -4,7 +4,6 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
-open Cmdliner
 
 (* Environment variables. *)
 
@@ -40,6 +39,8 @@ let show pdf_viewer file =
   | Some cmd -> Os.Cmd.run Cmd.(cmd %% path file)
 
 (* Cli interaction. *)
+
+open Cmdliner
 
 let pdf_viewer ?docs ?(opts = ["pdf-viewer"]) () =
   let env = Arg.env_var Env.pdfviewer in

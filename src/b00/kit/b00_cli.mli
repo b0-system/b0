@@ -6,7 +6,6 @@
 (** Command line user interface fragments. *)
 
 open B00_std
-open Cmdliner
 
 (** {1:exit Exits} *)
 
@@ -25,14 +24,14 @@ module Exit : sig
   (** [some_error] (123) indicates an indiscriminate error reported on
       stdout. *)
 
-  val infos : Term.exit_info list
+  val infos : Cmdliner.Term.exit_info list
   (** [infos] has the infos of {!Cmdliner.Term.default_exits},
       {!no_such_name}, {!some_error} and those above.  *)
 
   (** {1:cmdliner Evaluating and exiting} *)
 
   val of_eval_result :
-    ?term_error:Os.Exit.t -> Os.Exit.t Term.result -> Os.Exit.t
+    ?term_error:Os.Exit.t -> Os.Exit.t Cmdliner.Term.result -> Os.Exit.t
   (** [of_eval_result ~term_error r] is:
       {ul
       {- [e] if [r] is [Ok e]}
@@ -49,11 +48,11 @@ end
 
 (** {1:conv Argument converters} *)
 
-val fpath : Fpath.t Arg.conv
+val fpath : Fpath.t Cmdliner.Arg.conv
 (** [fpath] is a converter for file paths. No existence checks are
         performed on the path. *)
 
-val cmd : Cmd.t Arg.conv
+val cmd : Cmd.t Cmdliner.Arg.conv
 (** [cmd] is a converter for commands. *)
 
 (** {1:fragments Cli commands and fragments} *)
@@ -68,7 +67,7 @@ module Arg : sig
 
   val output_details :
     ?docs:string -> ?short_opts:string list -> ?long_opts:string list ->
-    unit -> output_details Term.t
+    unit -> output_details Cmdliner.Term.t
   (** [output_details ~short_opts ~long_opts ()] are mutually
       exclusive options to specify short and long output details,
       without options this is [`Normal]. [short_opts] defaults to
@@ -119,7 +118,7 @@ module B00_std : sig
 
   val tty_cap :
     ?docs:string -> ?env:Cmdliner.Arg.env -> unit ->
-    Tty.cap option option Term.t
+    Tty.cap option option Cmdliner.Term.t
   (** [tty_cap ~docs ~env ()] is a cli interface for specifiying a TTY
       capability with a [--color] option. [docs] is where
       the options are documented. [env], if provided, is an
@@ -129,7 +128,7 @@ module B00_std : sig
 
   val log_level :
     ?none:Log.level -> ?docs:string -> ?env:Cmdliner.Arg.env -> unit ->
-    Log.level option Term.t
+    Log.level option Cmdliner.Term.t
    (** [log_level ~none ~docs ~env ()] is a cli interface for
        specifiying a logging level with various options. [docs] is
        where the options are documented. [env], if provided, is an
@@ -185,7 +184,7 @@ module File_cache : sig
 
   val keys_none_is_all :
     ?pos_right:int -> unit ->
-    [ `All | `Keys of B000.File_cache.key list ] Term.t
+    [ `All | `Keys of B000.File_cache.key list ] Cmdliner.Term.t
    (** [keys_none_is_all ~pos_right ()] are the keys at the right
        of position [pos_right] (defaults is all positional arguments).
        If none is specified this is [`All]. *)
@@ -193,7 +192,7 @@ module File_cache : sig
   val trim_cli :
     ?mb_opts:string list ->
     ?pct_opts:string list ->
-    ?docs:string -> unit -> (int * int) Term.t
+    ?docs:string -> unit -> (int * int) Cmdliner.Term.t
   (** [trim_cli ~docs ()] are command line options to specify a maximal
       byte size and percentage to give to {!trim}. *)
 end
@@ -269,21 +268,21 @@ module Op : sig
 
   val marks :
     ?opts:string list -> ?docs:string -> ?doc:string -> ?docv:string -> unit ->
-    string list Term.t
+    string list Cmdliner.Term.t
 
   val select_cli :
     ?docs:string ->
-    ?marks:string list Term.t ->
-    unit -> (B000.Op.t -> bool) Term.t
+    ?marks:string list Cmdliner.Term.t ->
+    unit -> (B000.Op.t -> bool) Cmdliner.Term.t
 
   val select_deps_cli :
     ?docs:string -> unit ->
-    (dom:B000.Op.t list -> B000.Op.t list -> B000.Op.t list) Term.t
-  val filter_cli : ?docs:string -> unit -> (B000.Op.t -> bool) Term.t
+    (dom:B000.Op.t list -> B000.Op.t list -> B000.Op.t list) Cmdliner.Term.t
+  val filter_cli : ?docs:string -> unit -> (B000.Op.t -> bool) Cmdliner.Term.t
   val order_cli :
-    ?docs:string -> unit -> (B000.Op.t list -> B000.Op.t list) Term.t
-  val query_cli : ?docs:string -> unit -> query Term.t
-  val query_man : Manpage.block list
+    ?docs:string -> unit -> (B000.Op.t list -> B000.Op.t list) Cmdliner.Term.t
+  val query_cli : ?docs:string -> unit -> query Cmdliner.Term.t
+  val query_man : Cmdliner.Manpage.block list
 end
 
 (** {!B00.Memo} interaction. *)
@@ -322,7 +321,7 @@ module Memo : sig
 
   val b0_dir :
     ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
-    ?env:Cmdliner.Arg.env -> unit -> Fpath.t option Term.t
+    ?env:Cmdliner.Arg.env -> unit -> Fpath.t option Cmdliner.Term.t
   (** [b0_dir ~doc_none ~docs ~doc ~env] is a cli interface for specifying
       a b0 directory.
       {ul
@@ -357,7 +356,7 @@ module Memo : sig
 
   val cache_dir :
     ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
-    ?env:Cmdliner.Arg.env -> unit -> Fpath.t option Term.t
+    ?env:Cmdliner.Arg.env -> unit -> Fpath.t option Cmdliner.Term.t
   (** [cache_dir ~doc_none ~docs ~doc ~env] is a cli interface for specifying
       a b0 cache directory.
       {ul
@@ -400,7 +399,7 @@ module Memo : sig
 
   val log_file :
     ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
-    ?env:Cmdliner.Arg.env -> unit -> Fpath.t option Term.t
+    ?env:Cmdliner.Arg.env -> unit -> Fpath.t option Cmdliner.Term.t
   (** [log_file ~doc_none ~docs ~doc ~env] is a cli interface for
       specifing a b0 log file.
       {ul
@@ -428,7 +427,7 @@ module Memo : sig
 
   val jobs :
     ?opts:string list ->  ?docs:string -> ?doc:string -> ?doc_none:string ->
-    ?env:Cmdliner.Arg.env -> unit -> int option Term.t
+    ?env:Cmdliner.Arg.env -> unit -> int option Cmdliner.Term.t
   (** [jobs] is a cli interface for specifying the maximal number of
       commands to spawn concurrently.
       {ul
@@ -452,7 +451,7 @@ module Memo : sig
 
   val hash_fun :
     ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
-    ?env:Cmdliner.Arg.env -> unit -> (module Hash.T) option Term.t
+    ?env:Cmdliner.Arg.env -> unit -> (module Hash.T) option Cmdliner.Term.t
   (** [hash_fun] is a cli interface for specfiying hash function
       used for caching.
       {ul
@@ -542,7 +541,7 @@ module Memo : sig
 
     (** {1:cli Command line interface} *)
 
-    val out_format_cli : ?docs:string -> unit -> out_format Term.t
+    val out_format_cli : ?docs:string -> unit -> out_format Cmdliner.Term.t
     (** [out_format_cli ~docs ()] are mutually exclusive options to specify
         alternate output formats. *)
   end
