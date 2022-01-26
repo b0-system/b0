@@ -948,7 +948,7 @@ let escape_dquotes s =
       {[
         "[v|V]major.minor[.patchlevel][(+|~)additional-info]"
       ]}
-      into [(major, minor, patch, additional_info)] tuples. If no
+      into [(major, minor, patch, (+|~)additional_info)] tuples. If no
       [patchlevel] is found [0] is used. *)
 
   val drop_initial_v : string -> string

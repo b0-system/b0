@@ -1183,7 +1183,7 @@ module String = struct
       in
       match cut with
       | None -> None
-      | Some i -> Some (subrange ~last:(i - 1) s, subrange ~first:(i + 1) s)
+      | Some i -> Some (subrange ~last:(i - 1) s, subrange ~first:i s)
     in
     try match cut_left ~sep:"." s with
     | None -> None
