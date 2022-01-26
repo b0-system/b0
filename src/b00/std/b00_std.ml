@@ -1175,10 +1175,15 @@ module String = struct
 
   let to_version s =
     if s = "" then None else
-    let cut_left_plus_or_tilde s = (* we should have find_{left,right}. *)
-      match cut_left ~sep:"+" s with
-      | None -> cut_left ~sep:"~" s
-      | Some _ as v -> v
+    let cut_left_plus_or_tilde s =
+      let cut = match String.index_opt s '+', String.index_opt s '~' with
+      | None, None -> None
+      | (Some _ as i), None | None, (Some _ as i) -> i
+      | Some i, Some i' -> Some (if i < i' then i else i')
+      in
+      match cut with
+      | None -> None
+      | Some i -> Some (subrange ~last:(i - 1) s, subrange ~first:(i + 1) s)
     in
     try match cut_left ~sep:"." s with
     | None -> None
