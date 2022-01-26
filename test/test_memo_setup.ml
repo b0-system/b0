@@ -12,7 +12,7 @@ let feedback =
     Fmt.stderr
 
 let with_memo ?jobs f =
-  let () = B00_std.Fmt.set_tty_styling_cap `Ansi in
+  let () = B00_std.Fmt.set_tty_cap () in
   Result.to_failure @@
   Result.bind (Os.Dir.cwd ()) @@ fun cwd ->
   let tmp_dir = (* Os.Dir.default_tmp () *) Fpath.v "/tmp" in
