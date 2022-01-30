@@ -260,7 +260,12 @@ let web_exe ~srcs ~js ~o b =
   Fut.return ()
 
 let web_proc set_exe_path set_mod_srcs srcs b =
-  let* srcs, mod_srcs, jss, js, html = build_setup srcs b in
+  let* srcs, mod_srcs, jss, js, html = build_setup ~srcs b in
+  (* FIXME review all this. It's a mess. web_proc is called
+     by web which sets the executable to the page name. build_setup
+     use it to define `js` which means it has no extension. So we readd
+     it here *)
+  let js = Fpath.(js + ".js") in
   set_mod_srcs mod_srcs;
   set_exe_path html;
   let* () = js_exe ~mod_srcs ~jss ~o:js b in
