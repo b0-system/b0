@@ -102,9 +102,7 @@ let byte_exe ~mod_srcs ~o b =
   let opts = global_opts in
   let m = B0_build.memo b in
   let* () = compile_byte m ~opts ~resolver ~requires ~mod_srcs in
-  let opts =
-    Cmd.(global_opts %% if' toplevel (atom "-linkall") % "-no-check-prims")
-  in
+  let opts = Cmd.(global_opts %% if' toplevel (atom "-linkall")) in
   let* () = link_byte m ~conf ~opts ~resolver ~requires ~mod_srcs ~o in
   Fut.return o
 
