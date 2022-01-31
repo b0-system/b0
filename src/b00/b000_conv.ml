@@ -79,7 +79,7 @@ module Op = struct
     | a :: args ->
         pp_sep ppf ~last;
         if String.equal last "-o" then pp_o_arg ppf a else pp_arg ppf a;
-        pp_args a ppf args
+        pp_args ~last:a ppf args
     in
     let pp_stdin ppf = function
     | None -> () | Some file -> Fmt.pf ppf "< %s" (pquote file)

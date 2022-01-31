@@ -203,7 +203,7 @@ module Repo = struct
     | Some p ->
         match String.split_on_char '/' p with
         | ("" :: owner :: repo :: _ ) ->
-            let repo = match String.cut_right "." repo with
+            let repo = match String.cut_right ~sep:"." repo with
             | Some (r, "git") -> r | _ -> repo
             in
             Ok (v ~owner repo)

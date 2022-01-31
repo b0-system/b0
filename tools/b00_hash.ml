@@ -20,7 +20,7 @@ let hash tty_cap log_level hash_fun details files =
   let tty_cap = B00_cli.B00_std.get_tty_cap tty_cap in
   let log_level = B00_cli.B00_std.get_log_level log_level in
   B00_cli.B00_std.setup tty_cap log_level ~log_spawns:Log.Debug;
-  let hash_fun = B00_cli.Memo.get_hash_fun hash_fun in
+  let hash_fun = B00_cli.Memo.get_hash_fun ~hash_fun in
   Log.if_error ~use:err_unknown @@ match files with
   | [] -> Ok 0
   | files ->

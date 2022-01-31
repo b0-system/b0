@@ -269,8 +269,8 @@ module Make (V : VALUE) = struct
       let add _ v vs = v :: vs in
       String.Map.fold add !defs []
   | false ->
-      let pre = Scope.qualify_name "" in
-      let add k v vs = if String.starts_with pre k then v :: vs else vs in
+      let prefix = Scope.qualify_name "" in
+      let add k v vs = if String.starts_with ~prefix k then v :: vs else vs in
       String.Map.fold add !defs []
 
   let get_list_or_hint ?(empty_means_all = false) ns =

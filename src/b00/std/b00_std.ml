@@ -1393,7 +1393,7 @@ module Fpath = struct
       let valid c = c <> dir_sep_char && c <> '/' && c <> '\x00' in
       String.for_all valid s
 
-    let is_unc_path p = String.starts_with "\\\\" p
+    let is_unc_path p = String.starts_with ~prefix:"\\\\" p
     let has_drive p = String.exists (Char.equal ':') p
     let non_unc_path_start p = match String.rindex p ':' with
     | exception Not_found -> 0
@@ -1634,7 +1634,7 @@ module Fpath = struct
 
   (* Strict prefixes *)
 
-  let is_prefix pre p = match String.starts_with pre p with
+  let is_prefix pre p = match String.starts_with ~prefix:pre p with
   | false -> false
   | true ->
       let suff_start = String.length pre in
@@ -1822,7 +1822,7 @@ module Fpath = struct
   let relative ~to_dir p =
     (* XXX dirty, need a normalization function and/or a better parent
        to handle that  *)
-    if String.includes ".." p
+    if String.includes ~affix:".." p
     then Fmt.invalid_arg "%s: not dotdot allowed" p;
     let to_dir = add_dir_sep to_dir in
     match strip_prefix to_dir p with
@@ -2059,7 +2059,10 @@ module Time = struct
   let cpu_span ~cpu_utime ~cpu_stime ~cpu_children_utime ~cpu_children_stime =
     { cpu_utime; cpu_stime; cpu_children_utime; cpu_children_stime }
 
-  let cpu_zero = cpu_span 0L 0L 0L 0L
+  let cpu_zero = cpu_span
+      ~cpu_utime:0L ~cpu_stime:0L
+      ~cpu_children_utime:0L ~cpu_children_stime:0L
+
   let cpu_utime c = c.cpu_utime
   let cpu_stime c = c.cpu_stime
   let cpu_children_utime c = c.cpu_children_utime
@@ -3064,7 +3067,7 @@ module Os = struct
           fun fd -> Ok (Fd.apply ~close:Unix.close fd f)
 
     let write_with_oc_atomic ~mode ~force ~make_path ~file f =
-      Result.bind (Fs_base.handle_force force file) @@ fun () ->
+      Result.bind (Fs_base.handle_force ~force file) @@ fun () ->
       let do_write tmp tmp_oc = match f tmp_oc with
       | Error _ as v -> Ok v
       | Ok _ as v -> Result.map (fun () -> v) (rename_tmp tmp file)
@@ -3100,7 +3103,7 @@ module Os = struct
       Result.map_error err @@ Result.join @@
       read_with_fd src @@ fun fdi ->
       try match is_dash file with
-      | true -> Ok (Fd.copy fdi Unix.stdout)
+      | true -> Ok (Fd.copy ~src:fdi Unix.stdout)
       | false ->
           let mode = match mode with
           | None -> Fs_base.path_get_mode src
@@ -3108,7 +3111,7 @@ module Os = struct
           in
           Result.join @@ Result.bind mode @@ fun mode ->
           write_with_fd ?atomic ~mode ~force ~make_path file @@ fun fdo ->
-          Ok (Fd.copy fdi fdo)
+          Ok (Fd.copy ~src:fdi fdo)
       with
       | Unix.Unix_error (e, _, arg) -> Fmt.error "%s: %s" arg (uerr e)
   end
@@ -3297,7 +3300,7 @@ module Os = struct
             Result.join @@
             File.write_with_fd
               ~atomic:true ~mode ~force:false ~make_path:false dst @@
-            fun fdo -> Ok (Fd.copy fdi fdo)
+            fun fdo -> Ok (Fd.copy ~src:fdi fdo)
           in
           if prune st name p () then acc else
           let mode = st.Unix.st_perm in
@@ -3738,7 +3741,7 @@ module Os = struct
             in
             if change_cwd then chdir old_cwd; (* XXX pid zombie on fail. *)
             Fd.Set.close_all fds;
-            !_spawn_tracer (Some pid) env cwd cmd;
+            !_spawn_tracer (Some pid) env ~cwd cmd;
             pid
           with
           | e ->
@@ -3867,7 +3870,7 @@ module Os = struct
             chdir cwd; fun () -> try chdir old_cwd with Failure _ -> ()
         in
         Fun.protect ~finally:reset_cwd @@ fun () ->
-        !_spawn_tracer None env cwd cmd;
+        !_spawn_tracer None env ~cwd cmd;
         _execv ~env file (Array.of_list @@ Cmd.to_list cmd)
       with
       | Failure e -> err_execv file e

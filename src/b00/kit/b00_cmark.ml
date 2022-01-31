@@ -31,8 +31,8 @@ let first_section ~preamble md =
   in
   let setex_heading s (* trimmed *) =
     (* approximate https://spec.commonmark.org/0.29/#setext-headings *)
-    if String.starts_with "==" s then Some 1 else
-    if String.starts_with "--" s then Some 2 else
+    if String.starts_with ~prefix:"==" s then Some 1 else
+    if String.starts_with ~prefix:"--" s then Some 2 else
     None
   in
   let nl = "\n" in
