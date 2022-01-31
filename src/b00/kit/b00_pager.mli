@@ -21,7 +21,7 @@ module Env : sig
   (** [term] is [TERM]. *)
 end
 
-val envs : unit -> Cmdliner.Term.env_info list
+val envs : unit -> Cmdliner.Cmd.Env.info list
 (** [envs ()] describe the [PAGER] and [TERM] environment variable for
     cmdliner. *)
 

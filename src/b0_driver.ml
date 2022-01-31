@@ -14,7 +14,7 @@ module Exit = struct
   let b0_file_error = Os.Exit.Code 120
   let no_b0_file = Os.Exit.Code 121
 
-  let e c doc = Term.exit_info (Os.Exit.get_code c) ~doc
+  let e c doc = Cmd.Exit.info (Os.Exit.get_code c) ~doc
   let info_deploy_error = e deploy_error "on deploy error."
   let info_build_error = e build_error "on build error."
   let info_b0_file_error = e b0_file_error "on B0 file error."
@@ -132,7 +132,7 @@ module Cli = struct
   let docs = Manpage.s_common_options
   let b0_dir = B00_cli.Memo.b0_dir ~docs ()
   let b0_file =
-    let env = Arg.env_var Env.b0_file in
+    let env = Cmd.Env.info Env.b0_file in
     let doc = "Use $(docv) as the B0 file." and docv = "PATH" in
     let none = "B0.ml file in cwd or first upwards" in
     Arg.(value & opt (Arg.some ~none B00_cli.fpath) None &
@@ -140,7 +140,7 @@ module Cli = struct
 
   let cache_dir = B00_cli.Memo.cache_dir ~docs ()
   let code =
-    let env = Arg.env_var Env.code in
+    let env = Cmd.Env.info Env.code in
     let code_enum = ["byte", Some `Byte; "native", Some `Native; "auto", None]in
     let code = Arg.enum code_enum in
     let docv = "CODE" in
@@ -153,9 +153,9 @@ module Cli = struct
   let hash_fun = B00_cli.Memo.hash_fun ~docs ()
   let jobs = B00_cli.Memo.jobs ~docs ()
   let log_level =
-    B00_cli.B00_std.log_level ~docs ~env:(Arg.env_var Env.verbosity) ()
+    B00_cli.B00_std.log_level ~docs ~env:(Cmd.Env.info Env.verbosity) ()
 
-  let tty_cap = B00_cli.B00_std.tty_cap ~docs ~env:(Arg.env_var Env.color) ()
+  let tty_cap = B00_cli.B00_std.tty_cap ~docs ~env:(Cmd.Env.info Env.color) ()
   let no_pager = B00_pager.don't ~docs ()
   let conf =
     let conf
@@ -173,7 +173,9 @@ end
 
 (* Drivers *)
 
-type main = unit -> Os.Exit.t Cmdliner.Term.result
+type main =
+  unit -> (Os.Exit.t Cmdliner.Cmd.eval_ok, Cmdliner.Cmd.eval_error) result
+
 type t =
   { name : string;
     version : string;
@@ -209,7 +211,7 @@ let run ~has_b0_file:b0_file =
            by memo protection. At least make a good error msg. *)
         let bt = Printexc.get_raw_backtrace () in
         Log.err (fun m -> m ~header:"" "@[<v>%a@,@[%s@]@]" Fmt.backtrace bt e);
-        `Ok Exit.b0_file_error
+        Ok (`Ok Exit.b0_file_error)
 
 let has_b0_file () = !has_b0_file
 

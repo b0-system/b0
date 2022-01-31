@@ -175,7 +175,7 @@ let show ~background ~prefix browser uri =
 open Cmdliner
 
 let browser ?docs ?(opts = ["browser"]) () =
-  let env = Arg.env_var Env.browser in
+  let env = Cmd.Env.info Env.browser in
   let doc =
     "The WWW browser command $(docv) to use. The value may be interpreted \
      and massaged depending on the OS. On macOS: the names $(b,firefox), \

@@ -115,7 +115,7 @@ val exec_tool : ?env:Os.Env.assignments -> ?cwd:Fpath.t -> Cmd.tool -> cmd
 
 val eval :
   ?man_xrefs:Cmdliner.Manpage.xref list -> ?man:Cmdliner.Manpage.block list ->
-  ?envs:Cmdliner.Term.env_info list -> ?exits:Cmdliner.Term.exit_info list ->
+  ?envs:Cmdliner.Cmd.Env.info list -> ?exits:Cmdliner.Cmd.Exit.info list ->
   ?sdocs:string -> ?docs:string -> ?doc:string -> ?version:string ->
   Env.t -> Cmd.t -> Os.Exit.t Cmdliner.Term.t -> Os.Exit.t
 (** [eval e cmd t] defines a cmdlet command by evaluating the cmdliner

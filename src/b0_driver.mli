@@ -30,8 +30,8 @@ module Exit : sig
   val no_b0_file : Os.Exit.t
   (** [no_b0_file] indicates no B0 file could be found. *)
 
-  val infos : Cmdliner.Term.exit_info list
-  (** [infos] has the infos of {!Cmdliner.Term.default_exits},
+  val infos : Cmdliner.Cmd.Exit.info list
+  (** [infos] has the infos of {!Cmdliner.Cmd.Exit.defaults},
        {!Os.Exit.ok}, {!Os.Exit.some_error} and those above.  *)
 end
 
@@ -148,7 +148,8 @@ end
 
 (** {1:driver Drivers} *)
 
-type main = unit -> Os.Exit.t Cmdliner.Term.result
+type main =
+  unit -> (Os.Exit.t Cmdliner.Cmd.eval_ok, Cmdliner.Cmd.eval_error) result
 (** The type for driver main functions. A function that returns
     a Cmdliner evaluation result. This evaluation result is used
     by {!run} to handle program termination. Note that the driver

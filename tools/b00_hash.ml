@@ -5,8 +5,6 @@
 
 open B00_std
 
-let err_unknown = 1
-
 let hash_file (module H : Hash.T) f = match Fpath.equal f Fpath.dash with
 | false -> Result.bind (H.file f) @@ fun h -> Ok (f, h)
 | true -> Result.bind (Os.File.read f) @@ fun data -> Ok (f, H.string data)
@@ -21,10 +19,10 @@ let hash tty_cap log_level hash_fun details files =
   let log_level = B00_cli.B00_std.get_log_level log_level in
   B00_cli.B00_std.setup tty_cap log_level ~log_spawns:Log.Debug;
   let hash_fun = B00_cli.Memo.get_hash_fun ~hash_fun in
-  Log.if_error ~use:err_unknown @@ match files with
+  let pp_hash = pp_hash details in
+  Log.if_error ~use:Cmdliner.Cmd.Exit.some_error @@ match files with
   | [] -> Ok 0
   | files ->
-      let pp_hash = pp_hash details in
       let rec loop = function
       | [] -> Fmt.pr "@]"; Fmt.flush Fmt.stdout (); Ok 0
       | f :: fs ->
@@ -42,9 +40,6 @@ let version = "%%VERSION%%"
 let doc = "Hash like b0"
 let docs = Manpage.s_options
 let sdocs = Manpage.s_common_options
-let exits =
-  Term.exit_info err_unknown ~doc:"unknown error reported on stderr." ::
-  Term.default_exits
 
 let man_xrefs = [`Tool "b0"; `Tool "b00-cache"; `Tool "b00-log"]
 let man = [
@@ -58,13 +53,13 @@ let files =
   Arg.(value & pos_all B00_cli.fpath [] & info [] ~doc ~docv:"FILE")
 
 let tool =
-  Term.(const hash $ B00_cli.B00_std.tty_cap ~docs:sdocs () $
-        B00_cli.B00_std.log_level ~docs:sdocs () $
-        B00_cli.Memo.hash_fun ~opts:["H"; "hash-fun"]~docs () $
-        B00_cli.Arg.output_details ~docs () $ files),
-  Term.info "b00-hash" ~version ~doc ~sdocs ~exits ~man ~man_xrefs
+  Cmd.v (Cmd.info "b00-hash" ~version ~doc ~sdocs ~man ~man_xrefs)
+    Term.(const hash $ B00_cli.B00_std.tty_cap ~docs:sdocs () $
+          B00_cli.B00_std.log_level ~docs:sdocs () $
+          B00_cli.Memo.hash_fun ~opts:["H"; "hash-fun"]~docs () $
+          B00_cli.Arg.output_details ~docs () $ files)
 
-let main () = Term.(exit_status @@ eval tool)
+let main () = exit (Cmd.eval' tool)
 let () = if !Sys.interactive then () else main ()
 
 (*---------------------------------------------------------------------------

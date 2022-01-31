@@ -5,7 +5,6 @@
 
 open B00_std
 
-
 let test_trip d e =
   let e' = B00_base64.encode d in
   let d' = B00_base64.decode e |> Result.get_ok in

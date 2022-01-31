@@ -9,7 +9,10 @@ open B00_std
 
 (** {1:exit Exits} *)
 
-(** Program exits. *)
+(** Program exits.
+
+    Support for {!B00_std.Os.Exit} exits which are more evolved
+    than those provided by cmdliner. *)
 module Exit : sig
 
   (** {1:codes Common exit codes} *)
@@ -24,21 +27,24 @@ module Exit : sig
   (** [some_error] (123) indicates an indiscriminate error reported on
       stdout. *)
 
-  val infos : Cmdliner.Term.exit_info list
+  val infos : Cmdliner.Cmd.Exit.info list
   (** [infos] has the infos of {!Cmdliner.Term.default_exits},
       {!no_such_name}, {!some_error} and those above.  *)
 
   (** {1:cmdliner Evaluating and exiting} *)
 
   val of_eval_result :
-    ?term_error:Os.Exit.t -> Os.Exit.t Cmdliner.Term.result -> Os.Exit.t
+    ?term_error:Os.Exit.t ->
+    (Os.Exit.t Cmdliner.Cmd.eval_ok, Cmdliner.Cmd.eval_error) result ->
+    Os.Exit.t
   (** [of_eval_result ~term_error r] is:
       {ul
-      {- [e] if [r] is [Ok e]}
-      {- [Code c] otherwise with [c] defined by using
-         {!Term.exit_status_of_status_result}
-         using [term_error] for term errors or {!Term.exit_status_cli_error}
-         if unspecified.}} *)
+      {- [e] if [r] is [Ok (`Ok e)]}
+      {- {!ok} if [r] is [Ok _]}
+      {- [Os.Exit.Code Cmdliner.Exit.cli_error] if [r] is [Error `Parse].}
+      {- [Os.Exit.Code Cmdliner.Exit.internal_error] if [r] is [Error `Exn].}
+      {- [Os.Exit.code term_error] if [r] is [Error `Term]. [term_error]
+         (defaults to [Os.Exit.Code Cmdliner.Exit.cli_error]).}} *)
 
   val exit : exec_error:Os.Exit.t -> Os.Exit.t -> 'a
   (** [exit e] exits with [e]. This uses {!B00_std.Os.Exit.exit} and
@@ -117,7 +123,7 @@ module B00_std : sig
       {- ["never"] into [Some `None]}} *)
 
   val tty_cap :
-    ?docs:string -> ?env:Cmdliner.Arg.env -> unit ->
+    ?docs:string -> ?env:Cmdliner.Cmd.Env.info -> unit ->
     Tty.cap option option Cmdliner.Term.t
   (** [tty_cap ~docs ~env ()] is a cli interface for specifiying a TTY
       capability with a [--color] option. [docs] is where
@@ -127,7 +133,7 @@ module B00_std : sig
       on the cli or via the env var. *)
 
   val log_level :
-    ?none:Log.level -> ?docs:string -> ?env:Cmdliner.Arg.env -> unit ->
+    ?none:Log.level -> ?docs:string -> ?env:Cmdliner.Cmd.Env.info -> unit ->
     Log.level option Cmdliner.Term.t
    (** [log_level ~none ~docs ~env ()] is a cli interface for
        specifiying a logging level with various options. [docs] is
@@ -321,7 +327,7 @@ module Memo : sig
 
   val b0_dir :
     ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
-    ?env:Cmdliner.Arg.env -> unit -> Fpath.t option Cmdliner.Term.t
+    ?env:Cmdliner.Cmd.Env.info -> unit -> Fpath.t option Cmdliner.Term.t
   (** [b0_dir ~doc_none ~docs ~doc ~env] is a cli interface for specifying
       a b0 directory.
       {ul
@@ -356,7 +362,7 @@ module Memo : sig
 
   val cache_dir :
     ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
-    ?env:Cmdliner.Arg.env -> unit -> Fpath.t option Cmdliner.Term.t
+    ?env:Cmdliner.Cmd.Env.info -> unit -> Fpath.t option Cmdliner.Term.t
   (** [cache_dir ~doc_none ~docs ~doc ~env] is a cli interface for specifying
       a b0 cache directory.
       {ul
@@ -399,7 +405,7 @@ module Memo : sig
 
   val log_file :
     ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
-    ?env:Cmdliner.Arg.env -> unit -> Fpath.t option Cmdliner.Term.t
+    ?env:Cmdliner.Cmd.Env.info -> unit -> Fpath.t option Cmdliner.Term.t
   (** [log_file ~doc_none ~docs ~doc ~env] is a cli interface for
       specifing a b0 log file.
       {ul
@@ -427,7 +433,7 @@ module Memo : sig
 
   val jobs :
     ?opts:string list ->  ?docs:string -> ?doc:string -> ?doc_none:string ->
-    ?env:Cmdliner.Arg.env -> unit -> int option Cmdliner.Term.t
+    ?env:Cmdliner.Cmd.Env.info -> unit -> int option Cmdliner.Term.t
   (** [jobs] is a cli interface for specifying the maximal number of
       commands to spawn concurrently.
       {ul
@@ -451,7 +457,7 @@ module Memo : sig
 
   val hash_fun :
     ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
-    ?env:Cmdliner.Arg.env -> unit -> (module Hash.T) option Cmdliner.Term.t
+    ?env:Cmdliner.Cmd.Env.info -> unit -> (module Hash.T) option Cmdliner.Term.t
   (** [hash_fun] is a cli interface for specfiying hash function
       used for caching.
       {ul

@@ -2253,7 +2253,7 @@ module Os : sig
 
     (** {1:tmpfiles Temporary files}
 
-        See also {!B00_std.Os.Path.tmppath}temporary paths}. *)
+        See also {{!B00_std.Os.Path.tmppath}temporary paths}. *)
 
     val with_tmp_fd :
       ?flags:Unix.open_flag list -> ?mode:int -> ?make_path:bool ->

@@ -18,7 +18,7 @@ module Env : sig
   (** [editor] is [EDITOR]. *)
 end
 
-val envs : unit -> Cmdliner.Term.env_info list
+val envs : unit -> Cmdliner.Cmd.Env.info list
 (** [envs ()] describe the [VISUAL] and [EDITOR] environment variables. *)
 
 (** {1:edit Editing} *)

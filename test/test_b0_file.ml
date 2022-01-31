@@ -21,10 +21,11 @@ let main () =
       Arg.(required & pos 0 (some B00_cli.fpath) None &
            info [] ~doc ~docv:"PATH")
     in
-    Term.(const b0_file_read $ path),
-    Term.info "test-b0-file" ~sdocs:Manpage.s_common_options
+    Cmd.v
+      (Cmd.info "test-b0-file" ~sdocs:Manpage.s_common_options)
+      Term.(const b0_file_read $ path)
   in
-  Term.exit_status (Term.eval cmd)
+  exit (Cmd.eval' cmd)
 
 let () = if !Sys.interactive then () else main ()
 

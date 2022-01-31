@@ -119,8 +119,8 @@ let cmd =
   let unit_cmd =
     Term.(const unit $ action $ B00_cli.Arg.output_details () $ action_args)
   in
-  B0_driver.with_b0_file ~driver:B0_b0.driver unit_cmd,
-  Term.info "unit" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs
+  let unit_cmd = B0_driver.with_b0_file ~driver:B0_b0.driver unit_cmd in
+  Cmd.v (Cmd.info "unit" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs) unit_cmd
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

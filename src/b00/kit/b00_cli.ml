@@ -12,22 +12,22 @@ module Exit = struct
 
   let ok = Os.Exit.Code 0
   let no_such_name = Os.Exit.Code 122
-  let some_error = Os.Exit.Code 123
+  let some_error = Os.Exit.Code Cmd.Exit.some_error
+  let cli_error = Os.Exit.Code Cmd.Exit.cli_error
+  let internal_error = Os.Exit.Code Cmd.Exit.internal_error
 
-  let e c doc = Term.exit_info (Os.Exit.get_code c) ~doc
-  let info_no_such_name = e no_such_name "if a specified name does not exist."
-  let info_some_error =
-    e some_error "on indiscriminate errors reported on stderr."
+  let e c doc = Cmd.Exit.info (Os.Exit.get_code c) ~doc
 
-  let infos = info_no_such_name :: info_some_error :: Term.default_exits
-  let of_eval_result ?term_error = function
-  | `Ok c -> c
-  | (`Error _ | `Version | `Help as e) ->
-      let term_err = match term_error with
-      | None -> Term.exit_status_cli_error
-      | Some c -> Os.Exit.get_code c
-      in
-      Os.Exit.Code (Term.exit_status_of_status_result ~term_err e)
+  let infos =
+    e no_such_name "if a specified name does not exist." ::
+    Cmd.Exit.defaults
+
+  let of_eval_result ?(term_error = cli_error) = function
+  | Ok (`Ok e) -> e
+  | Ok _ -> ok
+  | Error `Term -> term_error
+  | Error `Parse -> cli_error
+  | Error `Exn -> internal_error
 
   let rec exit ~exec_error e =
     exit ~exec_error (Log.if_error ~use:exec_error (Os.Exit.exit e))
@@ -606,7 +606,7 @@ module Memo = struct
       ?(docs = Manpage.s_common_options)
       ?(doc = "Use $(docv) for the b0 directory.")
       ?(doc_none = "$(b,_b0) in root directory")
-      ?(env = Cmdliner.Arg.env_var b0_dir_env) ()
+      ?(env = Cmdliner.Cmd.Env.info b0_dir_env) ()
     =
     Arg.(value & opt (some ~none:doc_none fpath) None &
          info opts ~env ~doc ~docs ~docv:"DIR")
@@ -638,7 +638,7 @@ module Memo = struct
       ?(docs = Manpage.s_common_options)
       ?(doc = "Use $(docv) for the build cache directory.")
       ?(doc_none = "$(b,.cache) in b0 directory")
-      ?(env = Cmdliner.Arg.env_var cache_dir_env) ()
+      ?(env = Cmdliner.Cmd.Env.info cache_dir_env) ()
     =
     Arg.(value & opt (some ~none:doc_none fpath) None &
          info opts ~env ~doc ~docs ~docv:"DIR")
@@ -660,7 +660,7 @@ module Memo = struct
       ?(opts = ["log-file"]) ?docs
       ?(doc = "Use $(docv) for the build log file.")
       ?(doc_none = "$(b,.log) in b0 directory")
-      ?(env = Cmdliner.Arg.env_var log_file_env) ()
+      ?(env = Cmdliner.Cmd.Env.info log_file_env) ()
     =
     Arg.(value & opt (some ~none:doc_none fpath) None &
          info opts ~env ~doc ?docs ~docv:"FILE")
@@ -675,7 +675,7 @@ module Memo = struct
       ?(opts = ["j"; "jobs"]) ?docs
       ?(doc = "Maximal number of commands to spawn concurrently.")
       ?(doc_none = "Number of CPUs available")
-      ?(env = Cmdliner.Arg.env_var jobs_env) ()
+      ?(env = Cmdliner.Cmd.Env.info jobs_env) ()
     =
     Arg.(value & opt (some ~none:doc_none int) None &
          info opts ~env ~doc ?docs ~docv:"COUNT")
@@ -693,7 +693,7 @@ module Memo = struct
   let hash_fun_env = "B0_HASH_FUN"
   let hash_fun
       ?(opts = ["hash-fun"]) ?docs ?doc ?(doc_none = "xxh64")
-      ?(env = Cmdliner.Arg.env_var hash_fun_env) ()
+      ?(env = Cmdliner.Cmd.Env.info hash_fun_env) ()
     =
     let doc = match doc with
     | Some doc -> doc

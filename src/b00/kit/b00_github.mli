@@ -39,7 +39,7 @@ module Auth : sig
   val token_env : string
   (** [user_env] is ["B0_GITHUB_TOKEN"]. *)
 
-  val envs : Cmdliner.Arg.env list
+  val envs : Cmdliner.Cmd.Env.info list
   (** [envs] describe {!user_env} and {!token_env}. *)
 
   val cli : ?opts:string list -> unit -> (t, string) result Cmdliner.Term.t

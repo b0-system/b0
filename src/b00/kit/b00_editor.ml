@@ -17,10 +17,10 @@ end
 
 let envs =
   let vars = lazy begin
-    Term.env_info Env.visual
+    Cmd.Env.info Env.visual
       ~doc:"The editor used to edit files. This is a command invocation given \
             to execvp(3) and is used before EDITOR." ::
-    Term.env_info Env.editor
+    Cmd.Env.info Env.editor
       ~doc:"The editor used to edit files. This is a command invocation given \
             to execvp(3) and is used after VISUAL." ::
     []

@@ -120,8 +120,8 @@ module Auth = struct
     Ok { user; token; token_src }
 
   let envs =
-    [ Cmdliner.Arg.env_var user_env ~doc:"The GitHub user.";
-      Cmdliner.Arg.env_var token_env ~doc:"The GitHub personal access token." ]
+    [ Cmdliner.Cmd.Env.info user_env ~doc:"The GitHub user.";
+      Cmdliner.Cmd.Env.info token_env ~doc:"The GitHub personal access token." ]
 
   let cli ?opts:(o = ["u";"github-user"]) ()  =
     let auth user = v ~user () in

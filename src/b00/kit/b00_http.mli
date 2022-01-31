@@ -104,7 +104,7 @@ module Httpr : sig
   (** {1:curl [curl] requestor} *)
 
   val curl :
-    ?docs:string -> ?env:Cmdliner.Arg.env -> unit -> Cmd.t Cmdliner.Term.t
+    ?docs:string -> ?env:Cmdliner.Cmd.Env.info -> unit -> Cmd.t Cmdliner.Term.t
   (** [curl] is a cli interface for specifying the curl command
       line tool. *)
 

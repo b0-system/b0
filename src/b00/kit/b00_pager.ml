@@ -18,10 +18,10 @@ end
 let envs =
   let vars =
     lazy begin
-      Term.env_info Env.pager
+      Cmd.Env.info Env.pager
         ~doc:"The pager used to display content. This is a command invocation \
               given to execvp(3)." ::
-      Term.env_info Env.term
+      Cmd.Env.info Env.term
         ~doc:"See options $(b,--color) and $(b,--no-pager)." :: []
     end
   in

@@ -34,10 +34,11 @@ let cmds =
     B0_cmd_unit.cmd ]
 
 let b0 =
-  fst B0_cmd_build.cmd,
-  Term.info "b0" ~version:"%%VERSION%%" ~doc ~sdocs ~exits ~man
+  let info = Cmd.info "b0" ~version:"%%VERSION%%" ~doc ~sdocs ~exits ~man in
+  Cmd.group info ~default:B0_cmd_build.term cmds
 
-let main () = Term.eval_choice b0 cmds
+
+let main () = Cmd.eval_value b0
 let () = B0_driver.set ~driver:B0_b0.driver ~main
 
 (*---------------------------------------------------------------------------

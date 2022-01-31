@@ -10,7 +10,7 @@ open B000
 
 let err_no_cache = 1
 let err_no_log_file = 2
-let err_unknown = 123
+let err_unknown = Cmdliner.Cmd.Exit.some_error
 
 let with_cache_dir cache_dir k = match Os.Dir.exists cache_dir with
 | Ok true -> k cache_dir
@@ -86,10 +86,9 @@ let version = "%%VERSION%%"
 let doc = "Operate on b0 caches"
 let sdocs = Manpage.s_common_options
 let exits =
-  Term.exit_info err_no_cache ~doc:"no cache directory found." ::
-  Term.exit_info err_no_log_file ~doc:"no log file found." ::
-  Term.exit_info err_unknown ~doc:"unknown error reported on stderr." ::
-  Term.default_exits
+  Cmd.Exit.info err_no_cache ~doc:"no cache directory found." ::
+  Cmd.Exit.info err_no_log_file ~doc:"no log file found." ::
+  Cmd.Exit.defaults
 
 let man_xrefs = [`Tool "b0"; `Tool "b00-log"; `Tool "b00-hash"]
 let man = [
@@ -156,16 +155,17 @@ let parse_cli =
   Term.(ret (const parse $ action $ log_file_opt $ args))
 
 let tool =
-  Term.(const cache_cmd $ B00_cli.B00_std.tty_cap ~docs:sdocs () $
-        B00_cli.B00_std.log_level ~docs:sdocs () $
-        B00_pager.don't ~docs:sdocs () $
-        B00_cli.Memo.b0_dir ~docs:sdocs () $
-        B00_cli.Memo.cache_dir ~docs:sdocs () $
-        B00_cli.File_cache.trim_cli () $
-        parse_cli),
-  Term.info "b00-cache" ~version ~doc ~sdocs ~exits ~man ~man_xrefs
+  let info = Cmd.info "b00-cache" ~version ~doc ~sdocs ~exits ~man ~man_xrefs in
+  Cmd.v info
+    Term.(const cache_cmd $ B00_cli.B00_std.tty_cap ~docs:sdocs () $
+          B00_cli.B00_std.log_level ~docs:sdocs () $
+          B00_pager.don't ~docs:sdocs () $
+          B00_cli.Memo.b0_dir ~docs:sdocs () $
+          B00_cli.Memo.cache_dir ~docs:sdocs () $
+          B00_cli.File_cache.trim_cli () $
+          parse_cli)
 
-let main () = Term.(exit_status @@ eval tool)
+let main () = exit (Cmd.eval' tool)
 let () = if !Sys.interactive then () else main ()
 
 (*---------------------------------------------------------------------------

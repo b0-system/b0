@@ -82,11 +82,12 @@ let eval ?man_xrefs ?man ?envs ?exits ?sdocs ?docs ?doc:d ?version e cmd t =
   let name = name cmdlet in
   let doc = Option.value ~default:(doc cmdlet) d in
   let exits = Option.value ~default:B00_cli.Exit.infos exits in
-  let info = Cmdliner.Term.info
+  let info = Cmdliner.Cmd.info
       ?man_xrefs ?man ?envs ~exits ?sdocs ?docs ?version name ~doc
   in
   let argv = Array.of_list (name :: Cmd.to_list cmd) in
-  B00_cli.Exit.of_eval_result @@ Cmdliner.Term.eval ~argv (t, info)
+  let cmd = Cmdliner.Cmd.v info t in
+  B00_cli.Exit.of_eval_result @@ Cmdliner.Cmd.eval_value ~argv cmd
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

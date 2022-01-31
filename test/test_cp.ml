@@ -35,10 +35,10 @@ let main () =
       Arg.(required & pos 1 (some B00_cli.fpath) None &
            info [] ~doc ~docv:"DST")
     in
-    Term.(const cp_cmd $ follow_symlinks $ recurse $ src $ dst),
-    Term.info "test-cp" ~sdocs:Manpage.s_common_options
+    Cmd.v (Cmd.info "test-cp" ~sdocs:Manpage.s_common_options)
+      Term.(const cp_cmd $ follow_symlinks $ recurse $ src $ dst)
   in
-  Term.exit_status (Term.eval cmd)
+  exit (Cmd.eval' cmd)
 
 let () = if !Sys.interactive then () else main ()
 

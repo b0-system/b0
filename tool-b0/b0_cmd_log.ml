@@ -42,11 +42,12 @@ let man = [
   B0_b0.Cli.man_see_manual; ]
 
 let cmd =
+  Cmd.v (Cmd.info "log" ~doc ~sdocs ~exits ~man ~man_xrefs)
   Term.(const log $ B0_driver.Cli.conf $
         B00_cli.Arg.output_details ~docs:docs_details () $
         B00_cli.Memo.Log.out_format_cli ~docs:docs_format () $
-        B00_cli.Op.query_cli ~docs:docs_select ()),
-  Term.info "log" ~doc ~sdocs ~exits ~man ~man_xrefs
+        B00_cli.Op.query_cli ~docs:docs_select ())
+
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

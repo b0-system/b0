@@ -41,8 +41,9 @@ let clean =
   Arg.(value & flag & info ["c"; "clean"] ~doc)
 
 let cmd =
-  Term.(const delete $ B0_driver.Cli.conf $ clean),
-  Term.info "delete" ~doc ~sdocs ~exits ~man ~man_xrefs
+  Cmd.v (Cmd.info "delete" ~doc ~sdocs ~exits ~man ~man_xrefs)
+    Term.(const delete $ B0_driver.Cli.conf $ clean)
+
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

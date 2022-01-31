@@ -43,7 +43,7 @@ let show pdf_viewer file =
 open Cmdliner
 
 let pdf_viewer ?docs ?(opts = ["pdf-viewer"]) () =
-  let env = Arg.env_var Env.pdfviewer in
+  let env = Cmd.Env.info Env.pdfviewer in
   let doc =
     "The PDF viewer command $(docv) to use. If absent either one \
      of $(b,xdg-open(1)) or $(b,open(1)) is used. If not found and \

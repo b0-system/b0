@@ -168,10 +168,10 @@ let man = [
   B0_b0.Cli.man_see_manual; ]
 
 let cmd =
-  Term.(const scope $ B0_driver.Cli.conf $ B00_cli.Arg.output_details () $
-        path $ root $ excludes $ all $ full_cmd $ keep_going $ action $
-        action_args),
-  Term.info "scope" ~doc ~sdocs ~exits ~man ~man_xrefs
+  Cmd.v (Cmd.info "scope" ~doc ~sdocs ~exits ~man ~man_xrefs)
+    Term.(const scope $ B0_driver.Cli.conf $ B00_cli.Arg.output_details () $
+          path $ root $ excludes $ all $ full_cmd $ keep_going $ action $
+          action_args)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

@@ -256,6 +256,12 @@ let args =
   in
   Arg.(value & pos_all string [] & info [] ~doc ~docv:"ARG")
 
+
+let term =
+  B0_driver.with_b0_file ~driver:B0_b0.driver
+    Term.(const build $ what $ lock $ units $ packs $ x_units $ x_packs $
+          action $ args)
+
 let cmd =
   let doc = "Build (default)" in
   let sdocs = Manpage.s_common_options in
@@ -287,12 +293,7 @@ let cmd =
         see $(b,odig doc b0).";
     B0_b0.Cli.man_see_manual; ]
   in
-  let build_cmd =
-    Term.(const build $ what $ lock $ units $ packs $ x_units $ x_packs $
-          action $ args)
-  in
-  B0_driver.with_b0_file ~driver:B0_b0.driver build_cmd,
-  Term.info "build" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs
+  Cmd.v (Cmd.info "build" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs) term
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

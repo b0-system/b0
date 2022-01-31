@@ -64,8 +64,8 @@ let cmd =
   let cmdlet_cmd =
     Term.(const cmdlet $ action $ B00_cli.Arg.output_details () $ action_args)
   in
-  B0_driver.with_b0_file ~driver:B0_b0.driver cmdlet_cmd,
-  Term.info "cmdlet" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs
+  let cmdlet_cmd = B0_driver.with_b0_file ~driver:B0_b0.driver cmdlet_cmd in
+  Cmd.v (Cmd.info "cmdlet" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs) cmdlet_cmd
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

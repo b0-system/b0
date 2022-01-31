@@ -192,11 +192,12 @@ let man = [
   B0_b0.Cli.man_see_manual; ]
 
 let cmd =
-  Term.(const file $ B0_driver.Cli.conf $ root $ all $
-        B00_cli.Arg.output_details ~docs:docs_details () $
-        B00_cli.Memo.Log.out_format_cli ~docs:docs_format () $
-        B00_cli.Op.query_cli ~docs:docs_select () $ action),
-  Term.info "file" ~doc ~sdocs ~envs ~exits ~man ~man_xrefs
+  Cmd.v (Cmd.info "file" ~doc ~sdocs ~envs ~exits ~man ~man_xrefs)
+    Term.(const file $ B0_driver.Cli.conf $ root $ all $
+          B00_cli.Arg.output_details ~docs:docs_details () $
+          B00_cli.Memo.Log.out_format_cli ~docs:docs_format () $
+          B00_cli.Op.query_cli ~docs:docs_select () $ action)
+
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

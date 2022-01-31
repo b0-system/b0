@@ -64,8 +64,8 @@ let cmd =
   let pack_cmd =
     Term.(const pack $ action $ B00_cli.Arg.output_details () $ action_args)
   in
-  B0_driver.with_b0_file ~driver:B0_b0.driver pack_cmd,
-  Term.info "pack" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs
+  let pack_cmd = B0_driver.with_b0_file ~driver:B0_b0.driver pack_cmd in
+  Cmd.v (Cmd.info "pack" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs) pack_cmd
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

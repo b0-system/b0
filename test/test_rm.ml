@@ -23,10 +23,10 @@ let main () =
       Arg.(required & pos 0 (some B00_cli.fpath) None &
            info [] ~doc ~docv:"PATH")
     in
-    Term.(const rm_cmd $ recurse $ path),
-    Term.info "test-rm" ~sdocs:Manpage.s_common_options
+    Cmd.v (Cmd.info "test-rm" ~sdocs:Manpage.s_common_options)
+      Term.(const rm_cmd $ recurse $ path)
   in
-  Term.exit_status (Term.eval cmd)
+  exit (Cmd.eval' cmd)
 
 let () = if !Sys.interactive then () else main ()
 

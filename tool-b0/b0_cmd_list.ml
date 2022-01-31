@@ -44,8 +44,8 @@ let cmd =
   let list_cmd =
     Term.(const list $ B00_cli.Arg.output_details () $ unit_args)
   in
-  B0_driver.with_b0_file ~driver:B0_b0.driver list_cmd,
-  Term.info "list" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs
+  let list_cmd = B0_driver.with_b0_file ~driver:B0_b0.driver list_cmd in
+  Cmd.v (Cmd.info "list" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs) list_cmd
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

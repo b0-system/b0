@@ -47,8 +47,8 @@ let cmd =
     B0_b0.Cli.man_see_manual; ]
   in
   let cmd_cmd = Term.(const cmd $ cmdlet $ cmdlet_args) in
-  B0_driver.with_b0_file ~driver:B0_b0.driver cmd_cmd,
-  Term.info "cmd" ~doc ~sdocs ~exits ~man ~man_xrefs
+  let cmd_cmd = B0_driver.with_b0_file ~driver:B0_b0.driver cmd_cmd in
+  Cmd.v (Cmd.info "cmd" ~doc ~sdocs ~exits ~man ~man_xrefs) cmd_cmd
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

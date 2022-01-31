@@ -27,8 +27,9 @@ let cmd =
     `P "$(tname) shows the b0 root directory.";
     B0_b0.Cli.man_see_manual; ]
   in
-  Term.(const root $ B0_driver.Cli.conf),
-  Term.info "root" ~doc ~sdocs ~exits ~man ~man_xrefs
+  Cmd.v (Cmd.info "root" ~doc ~sdocs ~exits ~man ~man_xrefs)
+    Term.(const root $ B0_driver.Cli.conf)
+
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers
