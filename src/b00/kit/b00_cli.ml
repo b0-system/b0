@@ -100,8 +100,9 @@ module B00_std = struct
       "Colorize the output. $(docv) must be $(b,auto), $(b,always) \
        or $(b,never)."
     in
-    let docv = "WHEN" in
-    Arg.(value & opt (some color) None & info ["color"] ?env ~doc ~docv ~docs)
+    let docv = "WHEN" and none = None in
+    Arg.(value & opt (some' ~none color) None &
+         info ["color"] ?env ~doc ~docv ~docs)
 
   let log_level
       ?(none = Log.Warning) ?(docs = Manpage.s_common_options) ?env () =
@@ -124,8 +125,7 @@ module B00_std = struct
         "Be more or less verbose. $(docv) must be $(b,quiet), $(b,app), \
          $(b,error), $(b,warning), $(b,info) or $(b,debug)."
       in
-      let none = Log.level_to_string none in
-      Arg.(value & opt (some ~none level) None &
+      Arg.(value & opt (some ~none:"warning" level) None &
            info ["verbosity"] ?env ~docv:"LEVEL" ~doc ~docs)
     in
     let quiet =
@@ -605,11 +605,11 @@ module Memo = struct
       ?(opts = ["b0-dir"])
       ?(docs = Manpage.s_common_options)
       ?(doc = "Use $(docv) for the b0 directory.")
-      ?(doc_none = "$(b,_b0) in root directory")
+      ?doc_none:(absent = "$(b,_b0) in root directory")
       ?(env = Cmdliner.Cmd.Env.info b0_dir_env) ()
     =
-    Arg.(value & opt (some ~none:doc_none fpath) None &
-         info opts ~env ~doc ~docs ~docv:"DIR")
+    Arg.(value & opt (some fpath) None &
+         info opts ~env ~absent ~doc ~docs ~docv:"DIR")
 
   let get_b0_dir ~cwd ~root ~b0_dir = match b0_dir with
   | None -> Fpath.(root / b0_dir_name)
@@ -637,11 +637,11 @@ module Memo = struct
       ?(opts = ["cache-dir"])
       ?(docs = Manpage.s_common_options)
       ?(doc = "Use $(docv) for the build cache directory.")
-      ?(doc_none = "$(b,.cache) in b0 directory")
+      ?doc_none:(absent = "$(b,.cache) in b0 directory")
       ?(env = Cmdliner.Cmd.Env.info cache_dir_env) ()
     =
-    Arg.(value & opt (some ~none:doc_none fpath) None &
-         info opts ~env ~doc ~docs ~docv:"DIR")
+    Arg.(value & opt (some fpath) None &
+         info opts ~env ~absent ~doc ~docs ~docv:"DIR")
 
   let get_cache_dir ~cwd ~b0_dir ~cache_dir =
     get_b0_dir_path ~cwd ~b0_dir cache_dir_name cache_dir
@@ -659,11 +659,11 @@ module Memo = struct
   let log_file
       ?(opts = ["log-file"]) ?docs
       ?(doc = "Use $(docv) for the build log file.")
-      ?(doc_none = "$(b,.log) in b0 directory")
+      ?doc_none:(absent = "$(b,.log) in b0 directory")
       ?(env = Cmdliner.Cmd.Env.info log_file_env) ()
     =
-    Arg.(value & opt (some ~none:doc_none fpath) None &
-         info opts ~env ~doc ?docs ~docv:"FILE")
+    Arg.(value & opt (some fpath) None &
+         info opts ~absent ~env ~doc ?docs ~docv:"FILE")
 
   let get_log_file ~cwd ~b0_dir ~log_file =
     get_b0_dir_path ~cwd ~b0_dir log_file_name log_file
@@ -674,11 +674,11 @@ module Memo = struct
   let jobs
       ?(opts = ["j"; "jobs"]) ?docs
       ?(doc = "Maximal number of commands to spawn concurrently.")
-      ?(doc_none = "Number of CPUs available")
+      ?doc_none:(absent = "Number of CPUs available")
       ?(env = Cmdliner.Cmd.Env.info jobs_env) ()
     =
-    Arg.(value & opt (some ~none:doc_none int) None &
-         info opts ~env ~doc ?docs ~docv:"COUNT")
+    Arg.(value & opt (some int) None &
+         info opts ~env ~absent ~doc ?docs ~docv:"COUNT")
 
   let get_jobs ~jobs = match jobs with
   | Some max -> max | None -> Os.Cpu.logical_count ()

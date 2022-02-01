@@ -134,9 +134,9 @@ module Cli = struct
   let b0_file =
     let env = Cmd.Env.info Env.b0_file in
     let doc = "Use $(docv) as the B0 file." and docv = "PATH" in
-    let none = "B0.ml file in cwd or first upwards" in
-    Arg.(value & opt (Arg.some ~none B00_cli.fpath) None &
-         info ["b0-file"] ~doc ~docv ~docs ~env)
+    let absent = "$(b,B0.ml) file in cwd or first upwards" in
+    Arg.(value & opt (Arg.some B00_cli.fpath) None &
+         info ["b0-file"] ~absent ~doc ~docv ~docs ~env)
 
   let cache_dir = B00_cli.Memo.cache_dir ~docs ()
   let code =
