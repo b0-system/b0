@@ -6,121 +6,90 @@
 open B00_std
 open B00_std.Result.Syntax
 
-let get c format args = match args with
-| k :: us -> B0_b0.Def.get_meta_key (module B0_unit) c format k us
-| [] ->
-    Log.err (fun m -> m "No metadata key specified");
-    B00_cli.Exit.some_error
-
-let get_unit args k = match args with
-| [] -> Log.err (fun m -> m "No unit name specified"); B00_cli.Exit.some_error
-| u :: args ->
-    Log.if_error ~use:B00_cli.Exit.no_such_name @@
-    let* u = B0_unit.get_or_hint u in
-    Ok (k u args)
-
-let build_unit c u k =
-    (* FIXME cut and paste with build. Also we likely want to
-       control the same way build does *)
-    let may_build = B0_unit.Set.of_list (B0_unit.list ()) in
-    let must_build = B0_unit.Set.singleton u in
-    let b0_file = Option.get (B0_driver.Conf.b0_file c) in
-    let root_dir = Fpath.parent b0_file in
-    let b0_dir = B0_driver.Conf.b0_dir c in
-    Log.if_error ~use:B0_driver.Exit.build_error @@
-    let* m = B0_cmd_build.memo c ~may_build ~must_build in
-    let build =
-      let variant = "user" in
-      B0_build.create ~root_dir ~b0_dir ~variant m ~may_build ~must_build
-    in
-    match B0_build.run build with
-    | Error () -> Ok B0_driver.Exit.build_error
-    | Ok () -> Ok (k build)
-
-let action c args =
-  get_unit args @@ fun u args ->
-  match B0_unit.action u with
-  | None ->
-      Log.err (fun m -> m "Unit %a has no outcome action." B0_unit.pp_name u);
-      B00_cli.Exit.some_error
-  | Some action ->
-      build_unit c u @@ fun build ->
-      Fut.sync (action build u ~args)
-
-let build_dir c args =
+let list format us c = B0_b0.Def.list (module B0_unit) c format us
+let edit us c = B0_b0.Def.edit (module B0_unit) c us
+let get format k us c = B0_b0.Def.get_meta_key (module B0_unit) c format k us
+let build_dir us c =
   Log.if_error ~use:B00_cli.Exit.no_such_name @@
-  let* us = B0_unit.get_list_or_hint ~empty_means_all:true args in
+  let* us = B0_unit.get_list_or_hint ~empty_means_all:true us in
   let b0_dir = B0_driver.Conf.b0_dir c in
-  let build_dir = B0_dir.build_dir ~b0_dir ~variant:"user" in
+  let build_dir = B0_dir.build_dir ~b0_dir ~variant:"user" (* FIXME *) in
   let unit_dir u = B0_dir.unit_build_dir ~build_dir ~name:(B0_unit.name u) in
   let dirs = List.map unit_dir us in
   Log.app (fun m -> m "@[<v>%a@]" (Fmt.list Fpath.pp_unquoted) dirs);
   Ok B00_cli.Exit.ok
 
-let unit act format args c = match act with
-| `Action -> action c args
-| `Build_dir -> build_dir c args
-| `Edit -> B0_b0.Def.edit (module B0_unit) c args
-| `Get -> get c format args
-| `List -> B0_b0.Def.list (module B0_unit) c format args
-| `Show ->
-    let format = if format = `Normal then `Long else format in
-    B0_b0.Def.list (module B0_unit) c format args
-
 (* Command line interface *)
 
 open Cmdliner
 
-let action =
-  let action =
-    ["action", `Action; "build-dir", `Build_dir; "edit", `Edit; "get", `Get;
-     "list", `List; "show", `Show]
-  in
-  let doc =
-    let alts = Arg.doc_alts_enum action in
-    Fmt.str "The action to perform. $(docv) must be one of %s." alts
-  in
-  let action = Arg.enum action in
-  Arg.(required & pos 0 (some action) None & info [] ~doc ~docv:"ACTION")
+let editor_envs = B00_editor.envs ()
+let pager_envs = B00_pager.envs ()
+let format = B00_cli.Arg.output_details ()
+let units ~right:r =
+  let doc = "The $(docv) to act on. All of them if unspecified." in
+  Arg.(value & pos_right r string [] & info [] ~doc ~docv:"UNIT")
 
-let action_args =
-  let doc = "Positional arguments for the action." in
-  Arg.(value & pos_right 0 string [] & info [] ~doc ~docv:"ARG")
+let units_all = units ~right:(-1)
+
+let sub_cmd name ~doc ~descr ~envs term =
+  let sdocs = Manpage.s_common_options in
+  let exits = B0_driver.Exit.infos in
+  let man = [`S Manpage.s_description; `P descr; B0_b0.Cli.man_see_manual] in
+  let term = B0_driver.with_b0_file ~driver:B0_b0.driver term in
+  Cmd.v (Cmd.info name ~doc ~sdocs ~exits ~envs ~man) term
+
+(* Sub commands *)
+
+let list_term = Term.(const list $ format $ units_all)
+let list =
+  let doc = "List units (default command)" in
+  let descr = "$(tname) lists build units. Use with $(b,-l) to output their \
+               metadata."
+  in
+  sub_cmd "list" ~doc ~descr ~envs:pager_envs list_term
+
+let edit =
+  let doc = "Edit B0 files of units" in
+  let descr = "$(tname) opens in your editor the B0 files of build units." in
+  let term = Term.(const edit $ units_all) in
+  sub_cmd "edit" ~doc ~descr ~envs:editor_envs term
+
+let get =
+  let doc = "Get metadata key values of units" in
+  let descr = "$(tname) outputs the value of metadata $(i,KEY) of given or all \
+               units."
+  in
+  let key =
+    let doc = "The metadata key $(docv) to get" and docv = "KEY" in
+    Arg.(required & pos 0 (some string) None & info [] ~doc ~docv)
+  in
+  let term = Term.(const get $ format $ key $ units ~right:0) in
+  sub_cmd "get" ~doc ~descr ~envs:pager_envs term
+
+let build_dir =
+  let doc = "Output build directories of units" in
+  let descr = "$(tname) outputs unit build directories. The paths may not \
+               exist."
+  in
+  let term = Term.(const build_dir $ units_all) in
+  sub_cmd "build-dir" ~doc ~descr ~envs:[] term
+
+let subs = [list; edit; get; build_dir]
+
+(* Command *)
 
 let cmd =
   let doc = "Operate on build units" in
+  let descr = "$(tname) operates on build units. Invoked without arguments \
+               this simply lists known build units."
+  in
   let sdocs = Manpage.s_common_options in
   let exits = B0_driver.Exit.infos in
-  let envs = List.rev_append (B00_editor.envs ()) (B00_pager.envs ()) in
-  let man_xrefs = [ `Main ] in
-  let man = [
-    `S Manpage.s_description;
-    `P "$(tname) operates on build units.";
-    `S "ACTIONS";
-    `I ("$(b,action) $(i,UNIT) -- $(i,ARG)...",
-        "Builds $(i,UNIT) and execute its outcome action with arguments \
-         $(i,ARG)... (if any).");
-    `I ("$(b,build-dir) [$(i,UNIT)]...",
-        "Show build directory of given $(i,UNIT). The path may not exist.");
-    `I ("$(b,edit) [$(i,UNIT)]...",
-        "Edit in your editor the B0 file(s) in which all or the given units \
-         are defined.");
-    `I ("$(b,get) $(i,KEY) [$(i,UNIT)]...",
-        "Get metadata key $(i,KEY) of given or all units.");
-    `I ("$(b,list) [$(i,UNIT)]...",
-        "List all or given units. Use with $(b,-l) to get more info on \
-         unit metadata.");
-    `I ("$(b,show) [$(i,UNIT)]...",
-        "Show is an alias for $(b,list -l).");
-    `S Manpage.s_arguments;
-    `S Manpage.s_options;
-    B0_b0.Cli.man_see_manual; ]
-  in
-  let unit_cmd =
-    Term.(const unit $ action $ B00_cli.Arg.output_details () $ action_args)
-  in
-  let unit_cmd = B0_driver.with_b0_file ~driver:B0_b0.driver unit_cmd in
-  Cmd.v (Cmd.info "unit" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs) unit_cmd
+  let man = [`S Manpage.s_description; `P descr; B0_b0.Cli.man_see_manual] in
+  let default = B0_driver.with_b0_file ~driver:B0_b0.driver list_term in
+  let info = Cmd.info "unit" ~doc ~sdocs ~exits ~envs:pager_envs ~man in
+  Cmd.group info ~default subs
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers
