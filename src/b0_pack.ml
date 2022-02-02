@@ -35,9 +35,8 @@ let pp_units ppf p =
   Fmt.field ~label "units" Fmt.id pp ppf p
 
 let pp ppf p =
-  Fmt.pf ppf "@[<v>@[%a %a@]@, @[<v>%a%a@]@]"
-    pp_name p pp_doc p
-    pp_units p B0_meta.pp_non_empty (meta p)
+  Fmt.pf ppf "@[<v>@[%a@]@, @[<v>%a%a@]@]"
+    pp_synopsis p pp_units p B0_meta.pp_non_empty (meta p)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

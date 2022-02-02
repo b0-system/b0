@@ -72,12 +72,17 @@ let action u = u.Unit_def.action
 
 let pp_synopsis ppf v =
   let pp_tag ppf u =
-    Fmt.string ppf
-      (if has_meta B0_meta.exe u then "exe" else
-       if has_meta B0_meta.lib u then "lib" else
-       if has_meta B0_meta.doc u then "doc" else "   ")
+    let tag, style =
+      (if has_meta B0_meta.exe u then "exe", [`Fg `Green] else
+       if has_meta B0_meta.lib u then "lib", [`Fg `Magenta] else
+       if has_meta B0_meta.doc u then "doc", [`Fg `Yellow] else
+       "   ", [`Fg `Cyan])
+    in
+    Fmt.tty_string style ppf "[";
+    Fmt.string ppf tag;
+    Fmt.tty_string style ppf "]";
   in
-  Fmt.pf ppf "@[[%a] %a %a@]" pp_tag v pp_name v pp_doc v
+  Fmt.pf ppf "@[%a %a@]" pp_tag v pp_synopsis v
 
 let pp ppf v =
   let pp_non_empty ppf m = match B0_meta.is_empty m with

@@ -290,11 +290,11 @@ module Make (V : VALUE) = struct
   let pp_name_str = V.pp_name_str
   let pp_name = Fmt.using name pp_name_str
   let pp_doc = Fmt.using doc (Fmt.tty_string [(* Hear DKM *) `Faint])
-  let pp_synopsis ppf v = Fmt.pf ppf "%a %a" pp_name v pp_doc v
+  let pp_synopsis ppf v = Fmt.pf ppf "%a  %a" pp_name v pp_doc v
   let pp ppf v =
     let pp_non_empty ppf m = match B0_meta.is_empty m with
     | true -> () | false -> Fmt.pf ppf "@, %a" B0_meta.pp m in
-    Fmt.pf ppf "@[<v>@[%a %a@]%a@]" pp_name v pp_doc v pp_non_empty (meta v)
+    Fmt.pf ppf "@[<v>@[%a@]%a@]" pp_synopsis v pp_non_empty (meta v)
 
   module T = struct type nonrec t = t let compare = compare end
   module Set = Set.Make(T)
