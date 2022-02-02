@@ -11,7 +11,6 @@ let driver =
   B0_driver.create ~name:"b0" ~version:"%%VERSION%%" ~libs
 
 module Def = struct
-
   let list (module Def : B0_def.S) c format ds =
     let pp, sep = match format with
     | `Short -> Def.pp_name, Fmt.cut
@@ -83,6 +82,56 @@ module Cli = struct
   let man_see_manual = `Blocks
       [ `S Manpage.s_see_also;
         `P "Consult $(b,odig doc b0) for manuals and more details."]
+
+  let man_with_descr ?synopsis descr =
+    let man = [`S Manpage.s_description; descr; man_see_manual] in
+    match synopsis with
+    | None -> man
+    | Some syn -> `S Manpage.s_synopsis :: syn :: man
+
+
+  let editor_envs = B00_editor.envs ()
+  let pager_envs = B00_pager.envs ()
+  let format = B00_cli.Arg.output_details ()
+  let pos_key =
+    let doc = "The metadata key $(docv) to get." and docv = "KEY" in
+    Arg.(required & pos 0 (some string) None & info [] ~doc ~docv)
+
+  let subcmd_with_b0_file
+      ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
+      term
+    =
+    let sdocs = Manpage.s_common_options in
+    let man = man_with_descr ?synopsis descr in
+    let term = B0_driver.with_b0_file ~driver term in
+    Cmd.v (Cmd.info name ~doc ~sdocs ~exits ~envs ~man) term
+
+  let cmd_group_with_b0_file
+      ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
+      ~default subs
+    =
+    let sdocs = Manpage.s_common_options in
+    let man = man_with_descr ?synopsis descr in
+    let default = B0_driver.with_b0_file ~driver default in
+    Cmd.group (Cmd.info name ~doc ~sdocs ~exits ~envs ~man) ~default subs
+
+  let subcmd_with_driver_conf
+      ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
+      term
+    =
+    let sdocs = Manpage.s_common_options in
+    let man = man_with_descr ?synopsis descr in
+    let term = Term.(term $ B0_driver.Cli.conf) in
+    Cmd.v (Cmd.info name ~doc ~sdocs ~exits ~envs ~man) term
+
+  let cmd_group_with_driver_conf
+      ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
+      ~default subs
+    =
+    let sdocs = Manpage.s_common_options in
+    let man = man_with_descr ?synopsis descr in
+    let default = Term.(default $ B0_driver.Cli.conf) in
+    Cmd.group (Cmd.info name ~doc ~sdocs ~exits ~envs ~man) ~default subs
 end
 
 (*---------------------------------------------------------------------------

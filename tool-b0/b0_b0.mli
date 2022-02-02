@@ -41,7 +41,35 @@ module Def : sig
 end
 
 module Cli : sig
-  val man_see_manual : Cmdliner.Manpage.block
+  open Cmdliner
+
+  val man_see_manual : Manpage.block
+  val editor_envs : Cmd.Env.info list
+  val pager_envs : Cmd.Env.info list
+  val format : [ `Long | `Normal | `Short ] Term.t
+  val pos_key : string Term.t
+
+  val subcmd_with_b0_file :
+    ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
+    ?synopsis:Manpage.block -> string -> doc:string -> descr:Manpage.block ->
+    (B0_driver.Conf.t -> Os.Exit.t) Term.t -> Os.Exit.t Cmd.t
+
+  val subcmd_with_driver_conf :
+    ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
+    ?synopsis:Manpage.block -> string -> doc:string -> descr:Manpage.block ->
+    (B0_driver.Conf.t -> Os.Exit.t) Term.t -> Os.Exit.t Cmd.t
+
+  val cmd_group_with_b0_file :
+    ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
+    ?synopsis:Manpage.block ->  string -> doc:string -> descr:Manpage.block ->
+    default:(B0_driver.Conf.t -> Os.Exit.t) Term.t ->
+    Os.Exit.t Cmd.t list -> Os.Exit.t Cmd.t
+
+  val cmd_group_with_driver_conf :
+    ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
+    ?synopsis:Manpage.block -> string -> doc:string -> descr:Manpage.block ->
+    default:(B0_driver.Conf.t -> Os.Exit.t) Term.t ->
+    Os.Exit.t Cmd.t list -> Os.Exit.t Cmd.t
 end
 
 (*---------------------------------------------------------------------------

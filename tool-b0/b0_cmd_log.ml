@@ -10,7 +10,8 @@ let log c details format op_selector =
   Log.if_error ~use:B00_cli.Exit.some_error @@
   let don't = B0_driver.Conf.no_pager c || format = `Trace_event in
   let b0_dir = B0_driver.Conf.b0_dir c in
-  (* FIXME *)
+  (* FIXME
+     This should also be fixed b00-cache / B00_cli.Memo.log_file *)
   let log_file = Fpath.(b0_dir / "b" / "user" / "_log") in
   let* pager = B00_pager.find ~don't () in
   let* () = B00_pager.page_stdout pager in
@@ -33,7 +34,6 @@ let man = [
   `S Manpage.s_description;
   `P "The $(tname) command shows build information and operations in \
       various formats.";
-  `S Manpage.s_options;
   `S docs_format;
   `S docs_details;
   `P "If applicable.";
@@ -43,11 +43,10 @@ let man = [
 
 let cmd =
   Cmd.v (Cmd.info "log" ~doc ~sdocs ~exits ~man ~man_xrefs)
-  Term.(const log $ B0_driver.Cli.conf $
-        B00_cli.Arg.output_details ~docs:docs_details () $
-        B00_cli.Memo.Log.out_format_cli ~docs:docs_format () $
-        B00_cli.Op.query_cli ~docs:docs_select ())
-
+    Term.(const log $ B0_driver.Cli.conf $
+          B00_cli.Arg.output_details ~docs:docs_details () $
+          B00_cli.Memo.Log.out_format_cli ~docs:docs_format () $
+          B00_cli.Op.query_cli ~docs:docs_select ())
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

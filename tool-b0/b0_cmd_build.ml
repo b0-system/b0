@@ -263,7 +263,7 @@ let term =
           action $ args)
 
 let cmd =
-  let doc = "Build (default)" in
+  let doc = "Build (default command)" in
   let sdocs = Manpage.s_common_options in
   let exits = B0_driver.Exit.infos in
   let envs = B00_pager.envs () in

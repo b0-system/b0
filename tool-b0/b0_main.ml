@@ -12,9 +12,11 @@ let man = [
   `S Manpage.s_description;
   `P "B0 describes software construction and deployments using modular and \
       customizable definitions written in OCaml.";
-  `Pre "Use $(mname) or $(mname) $(b,build) to build.";
-  `Noblank;
-  `Pre "Use $(mname) [$(i,COMMAND)] $(b,--help) for basic help.";
+  `Pre "Use $(mname) $(b,unit) to see what can be built."; `Noblank;
+  `Pre "Use $(mname) $(b,--what) to see what gets built."; `Noblank;
+  `Pre "Use $(mname) to build."; `Noblank;
+  `Pre "Use $(mname) [$(i,COMMAND)]… $(b,--help) for help about any \
+        command.";
   `P "More information is available in the manuals, see $(b,odig doc b0).";
   B0_b0.Cli.man_see_manual;
   `S Manpage.s_bugs;
@@ -26,7 +28,6 @@ let cmds =
     B0_cmd_cmd.cmd;
     B0_cmd_delete.cmd;
     B0_cmd_file.cmd;
-    B0_cmd_list.cmd;
     B0_cmd_log.cmd;
     B0_cmd_pack.cmd;
     B0_cmd_root.cmd;

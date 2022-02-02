@@ -4,68 +4,73 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
-open B00_std.Result.Syntax
+open Result.Syntax
 
-let get c format args = match args with
-| k :: ps -> B0_b0.Def.get_meta_key (module B0_pack) c format k ps
-| [] ->
-    Log.err (fun m -> m "No metadata key specified");
-    B00_cli.Exit.some_error
+let edit clets c = B0_b0.Def.edit (module B0_cmdlet) c clets
+let get format k clets c =
+  B0_b0.Def.get_meta_key (module B0_cmdlet) c format k clets
 
-let cmdlet action format args c = match action with
-| `Edit -> B0_b0.Def.edit (module B0_cmdlet) c args
-| `Get -> get c format args
-| `List -> B0_b0.Def.list (module B0_cmdlet) c format args
-| `Show ->
-    let format = if format = `Normal then `Long else format in
-    B0_b0.Def.list (module B0_cmdlet) c format args
+let list format clets c = B0_b0.Def.list (module B0_cmdlet) c format clets
+let show format cs c =
+  let format = if format = `Normal then `Long else format in
+  B0_b0.Def.list (module B0_cmdlet) c format cs
 
 (* Command line interface *)
 
 open Cmdliner
 
-let action =
-  let action = ["edit", `Edit; "get", `Get; "list", `List; "show", `Show] in
-  let doc =
-    let alts = Arg.doc_alts_enum action in
-    Fmt.str "The action to perform. $(docv) must be one of %s." alts
+let clets ~right:r =
+  let doc = "The $(docv) to act on. All of them if unspecified." in
+  Arg.(value & pos_right r string [] & info [] ~doc ~docv:"CMDLET")
+
+let clets_all = clets ~right:(-1)
+
+let list_term = Term.(const list $ B0_b0.Cli.format $ clets_all)
+
+(* Commands *)
+
+let edit =
+  let doc = "Edit cmdlets" in
+  let descr = `P "$(tname) opens in your editor the B0 files of given \
+                  cmdlets are defined." in
+  let envs = B0_b0.Cli.editor_envs in
+  let term = Term.(const edit $ clets_all) in
+  B0_b0.Cli.subcmd_with_b0_file "edit" ~doc ~descr ~envs term
+
+let get =
+  let doc = "Get cmdlet metadata" in
+  let descr = `P "$(tname) outputs the value of metadata $(i,KEY) of given \
+                  cmdlets."
   in
-  let action = Arg.enum action in
-  Arg.(required & pos 0 (some action) None & info [] ~doc ~docv:"ACTION")
+  let envs = B0_b0.Cli.pager_envs in
+  let clets = clets ~right:0 in
+  let term = Term.(const get $ B0_b0.Cli.format $ B0_b0.Cli.pos_key $ clets) in
+  B0_b0.Cli.subcmd_with_b0_file "get" ~doc ~descr ~envs term
 
-let action_args =
-  let doc = "Positional arguments for the action." in
-  Arg.(value & pos_right 0 string [] & info [] ~doc ~docv:"ARG")
+let list =
+  let doc = "List cmdlets (default command)" in
+  let descr = `P "$(tname) lists given cmdlets." in
+  let envs = B0_b0.Cli.pager_envs in
+  B0_b0.Cli.subcmd_with_b0_file "list" ~doc ~descr ~envs list_term
 
-let doc = "Operate on cmdlets"
-let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.infos
-let envs = B00_editor.envs ()
-let man_xrefs = [`Main; `Cmd "cmd"]
-let man = [
-  `S Manpage.s_description;
-  `P "$(tname) operates on cmdlets. Use $(mname) $(b,cmd) to execute them.";
-  `S "ACTIONS";
-  `I ("$(b,edit) [$(i,CMDLET)]...",
-      "Edit in your editor the B0 file(s) in which all or the given cmdlets \
-       are defined.");
-  `I ("$(b,get) $(i,KEY) [$(i,CMDLET)]...",
-      "Get metadata key $(i,KEY) of given or all cmdlets.");
-  `I ("$(b,list) [$(i,CMDLET)]...",
-      "List all or given cmdlets. Use with $(b,-l) to get more info on \
-       cmdlet metadata.");
-  `I ("$(b,show) [$(i,CMDLET)]...",
-      "Show is an alias for $(b,list -l)");
-  `S Manpage.s_arguments;
-  `S Manpage.s_options;
-  B0_b0.Cli.man_see_manual]
+let show =
+  let doc = "Show cmdlet metadata." in
+  let descr = `P "$(tname) is $(b,list -l), it outputs metadata of given \
+                  cmdlets."
+  in
+  let envs = B0_b0.Cli.pager_envs in
+  let term = Term.(const show $ B0_b0.Cli.format $ clets_all) in
+  B0_b0.Cli.subcmd_with_b0_file "show" ~doc ~descr ~envs term
+
+let subs = [edit; get; list; show]
 
 let cmd =
-  let cmdlet_cmd =
-    Term.(const cmdlet $ action $ B00_cli.Arg.output_details () $ action_args)
+  let doc = "Operate on cmdlets" in
+  let descr = `P "$(tname) operates on cmdlets. The default command is \
+                  $(tname) $(b,list)."
   in
-  let cmdlet_cmd = B0_driver.with_b0_file ~driver:B0_b0.driver cmdlet_cmd in
-  Cmd.v (Cmd.info "cmdlet" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs) cmdlet_cmd
+  let envs = B0_b0.Cli.pager_envs and default = list_term in
+  B0_b0.Cli.cmd_group_with_b0_file "cmdlet" ~doc ~descr ~envs ~default subs
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

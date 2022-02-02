@@ -663,7 +663,7 @@ module Memo = struct
       ?(env = Cmdliner.Cmd.Env.info log_file_env) ()
     =
     Arg.(value & opt (some fpath) None &
-         info opts ~absent ~env ~doc ?docs ~docv:"FILE")
+         info opts ~absent ~env ~doc ?docs ~docv:"LOGFILE")
 
   let get_log_file ~cwd ~b0_dir ~log_file =
     get_b0_dir_path ~cwd ~b0_dir log_file_name log_file

@@ -14,7 +14,7 @@ let get_b0_file_src c k =
   let* b0_file = B0_file.of_string ~file:b0_file s in
   k b0_file
 
-let boot c root =
+let boot root c =
   let pp_boots = Fmt.(list @@ hbox @@ list ~sep:sp (using fst string)) in
   get_b0_file_src c @@ fun src ->
   let* boots =
@@ -31,7 +31,7 @@ let compile c =
   let* _ = B0_driver.Compile.compile c ~driver:B0_b0.driver f in
   Ok B00_cli.Exit.ok
 
-let edit c all =
+let edit all c =
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
   let* b0_file = B0_driver.Conf.get_b0_file c in
   Log.if_error' ~use:B00_cli.Exit.some_error @@
@@ -51,8 +51,8 @@ let edit c all =
   | `Exited 0 -> Ok B00_cli.Exit.ok
   | _ -> Ok B00_cli.Exit.some_error
 
-let includes c root details =
-  let pp_inc = match details with
+let includes root format c =
+  let pp_inc = match format with
   | `Short -> fun ppf (_, (p, _)) -> Fpath.pp_unquoted ppf p
   | `Normal | `Long ->
       fun ppf ((n, _), (p, _)) ->
@@ -68,14 +68,15 @@ let includes c root details =
   if incs <> [] then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_inc) incs);
   Ok B00_cli.Exit.ok
 
-let log c format details op_selector =
+let log format log_format op_selector c =
   Log.if_error ~use:B00_cli.Exit.some_error @@
-  let don't = B0_driver.Conf.no_pager c || format = `Trace_event in
+  let don't = B0_driver.Conf.no_pager c || log_format = `Trace_event in
   let log_file = B0_driver.Compile.build_log c ~driver:B0_b0.driver in
   let* pager = B00_pager.find ~don't () in
   let* () = B00_pager.page_stdout pager in
   let* l = B00_cli.Memo.Log.read log_file in
-  B00_cli.Memo.Log.out Fmt.stdout format details op_selector ~path:log_file l;
+  B00_cli.Memo.Log.out Fmt.stdout log_format format
+    op_selector ~path:log_file l;
   Ok B00_cli.Exit.ok
 
 let path c =
@@ -84,7 +85,20 @@ let path c =
   Log.app (fun m -> m "%a" Fpath.pp_unquoted b0_file);
   Ok B00_cli.Exit.ok
 
-let source c root =
+let requires root c =
+  let pp_require = Fmt.using fst B00_ocaml.Lib.Name.pp in
+  get_b0_file_src c @@ fun src ->
+  let* reqs = match root with
+  | true -> Ok (B0_file.requires src)
+  | false ->
+      let* exp = B0_file.expand src in
+      Ok (B0_file.expanded_requires exp)
+  in
+  if reqs <> []
+  then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_require) reqs);
+  Ok B00_cli.Exit.ok
+
+let source root c =
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
   let* b0_file = B0_driver.Conf.get_b0_file c in
   Log.if_error' ~header:"" ~use:B0_driver.Exit.b0_file_error @@
@@ -100,104 +114,105 @@ let source c root =
       Log.app (fun m -> m "%s" esrc);
       Ok B00_cli.Exit.ok
 
-let requires c root =
-  let pp_require = Fmt.using fst B00_ocaml.Lib.Name.pp in
-  get_b0_file_src c @@ fun src ->
-  let* reqs = match root with
-  | true -> Ok (B0_file.requires src)
-  | false ->
-      let* exp = B0_file.expand src in
-      Ok (B0_file.expanded_requires exp)
-  in
-  if reqs <> []
-  then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_require) reqs);
-  Ok B00_cli.Exit.ok
-
-let file c root all details format op_selector = function
-| `Boot -> boot c root
-| `Compile -> compile c
-| `Edit -> edit c all
-| `Includes -> includes c root details
-| `Log -> log c format details op_selector
-| `Path -> path c
-| `Requires -> requires c root
-| `Source -> source c root
-
 (* Command line interface *)
 
 open Cmdliner
 
-let action =
-  let action =
-    [ "boot", `Boot; "compile", `Compile; "edit", `Edit; "includes", `Includes;
-      "log", `Log; "path", `Path; "requires", `Requires; "source", `Source; ]
-  in
-  let doc =
-    let alts = Arg.doc_alts_enum action in
-    Fmt.str "The action to perform. $(docv) must be one of %s." alts
-  in
-  let action = Arg.enum action in
-  Arg.(required & pos 0 (some action) None & info [] ~doc ~docv:"ACTION")
-
 let root =
-  let doc = "Apply on the root B0 file only rather than on its expansion." in
+  let doc = "Apply operation on the root B0 file only rather than on \
+             its expansion."
+  in
   Arg.(value & flag & info ["root"] ~doc)
 
-let all =
-  let doc = "Edit the B0 file and all its includes." in
-  Arg.(value & flag & info ["all"] ~doc)
+let path_term = Term.(const path)
 
-let doc = "Operate on the B0 file"
-let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.infos
-let envs = B00_editor.envs ()
-let man_xrefs = [ `Main ]
-let docs_format = "LOG OUTPUT FORMATS"
-let docs_details = "LOG OUTPUT DETAILS"
-let docs_select = "OPTIONS FOR SELECTING LOG OPERATIONS"
-let man = [
-  `S Manpage.s_description;
-  `P "$(tname) operates on the B0 file.";
-  `S "ACTIONS";
-  `I ("$(b,boot)",
-      "Install libraries needed for the B0 file.");
-  `I ("$(b,compile)",
-      "Compile the driver for the B0 file.");
-  `I ("$(b,edit) [$(b,--all)]",
-      "Edit the B0 file in your editor. If $(b,--all) is specified \
-       also edits all includes.");
-  `I ("$(b,includes) [$(b,--root)]",
-      "Show the scope name and file path of included B0 files. If $(b,--root) \
-       is specified only shows the includes of the root B0 file.");
-  `I ("$(b,log) [$(b,--path)] [$(i,LOG ARGS)...]",
-      "Show the driver compilation log. If $(b,--path) is specified \
-       shows the path to the log. See the various section below for \
-       the other arguments and $(b,b0 log) for more information.");
-  `I ("$(b,path)",
-      "Show the file path to the B0 file.");
-  `I ("$(b,requires) [$(b,--root)]",
-      "Show the OCaml libraries required. If $(b,--root) is specified \
-       only shows the requires of the root B0 file.");
-  `I ("$(b,source) [$(b,--root)]",
-      "Show the expanded B0 file source the driver compiles. \
-       If $(b,--root) is specified shows the non-expanded source of \
-       the root B0 file.");
-  `S Manpage.s_arguments;
-  `S Manpage.s_options;
-  `S docs_format;
-  `S docs_details;
-  `P "If applicable.";
-  `S docs_select;
-  `Blocks B00_cli.Op.query_man;
-  B0_b0.Cli.man_see_manual; ]
+(* Commands *)
 
-let cmd =
-  Cmd.v (Cmd.info "file" ~doc ~sdocs ~envs ~exits ~man ~man_xrefs)
-    Term.(const file $ B0_driver.Cli.conf $ root $ all $
+let boot =
+  let doc = "Install libraries needed for the B0 file" in
+  let descr = `P "$(tname) install libraries needed to compile the B0 file." in
+  B0_b0.Cli.subcmd_with_driver_conf "boot" ~doc ~descr Term.(const boot $ root)
+
+let compile =
+  let doc = "Compile the driver for the B0 file" in
+  let descr = `P "$(tname) compiles the driver for the B0 file." in
+  B0_b0.Cli.subcmd_with_driver_conf "compile" ~doc ~descr Term.(const compile)
+
+let edit =
+  let doc = "Edit the B0 file" in
+  let descr = `P "$(tname) opens the B0 file in your editor. If $(b,--all) \
+                  is specified also opens all includes."
+  in
+  let all =
+    let doc = "Edit the B0 file and all its includes." in
+    Arg.(value & flag & info ["all"] ~doc)
+  in
+  B0_b0.Cli.subcmd_with_driver_conf "edit" ~doc ~descr
+    Term.(const edit $ all)
+
+let includes =
+  let doc = "Output scope name and paths of included B0 files" in
+  let descr = `P "$(tname) outputs the scope name and paths of included B0 \
+                  files. If $(b,--root) is specified only shows the includes \
+                  of the root B0 file."
+  in
+  B0_b0.Cli.subcmd_with_driver_conf "includes" ~doc ~descr
+    Term.(const includes $ root $ B0_b0.Cli.format)
+
+let log =
+  let doc = "Show driver compilation log" in
+  let docs_details = "OUTPUT DETAILS" in
+  let docs_format = "OUTPUT FORMATS" in
+  let docs_select = "OPTIONS FOR SELECTING LOG OPERATIONS" in
+  let descr = `Blocks [
+      `P "$(tname) shows the driver compilation operations \
+          in various formats. If $(b,--path) \
+          is specified, shows the path to the log.";
+      `S docs_format;
+      `S docs_details;
+      `P "If applicable.";
+      `S docs_select;
+      `Blocks B00_cli.Op.query_man; ]
+  in
+  let envs = B0_b0.Cli.pager_envs in
+  B0_b0.Cli.subcmd_with_driver_conf "log" ~doc ~descr ~envs
+    Term.(const log $
           B00_cli.Arg.output_details ~docs:docs_details () $
           B00_cli.Memo.Log.out_format_cli ~docs:docs_format () $
-          B00_cli.Op.query_cli ~docs:docs_select () $ action)
+          B00_cli.Op.query_cli ~docs:docs_select ())
 
+let path =
+  let doc = "Output the B0 file path (default command)" in
+  let descr = `P "$(mname) outputs the B0 file path." in
+  B0_b0.Cli.subcmd_with_driver_conf "path" ~doc ~descr path_term
+
+let requires =
+  let doc = "Output the OCaml libraries required by the B0 file" in
+  let descr = `P "$(tname) outputs the OCaml libraries required to compile \
+                  the B0 file. If $(b,--root) is specified only shows the \
+                  requires of the root B0 file."
+  in
+  B0_b0.Cli.subcmd_with_driver_conf "requires" ~doc ~descr
+    Term.(const requires $ root)
+
+let source =
+  let doc = "Output the expanded B0 source file" in
+  let descr = `P "$(tname) outputs the expanded B0 source file compiled
+                  by the driver. If $(b,--root) is specified shows the \
+                  non-expanded source of the root B0 file."
+  in
+  B0_b0.Cli.subcmd_with_driver_conf "source" ~doc ~descr
+    Term.(const source $ root)
+
+let subs = [boot; compile; edit; includes; log; path; requires; source ]
+
+let cmd =
+  let doc = "Operate on the B0 file" in
+  let descr =
+    `P "$(tname) operates on the B0 file. The default command is $(b,path).";
+  in
+  let default = path_term in
+  B0_b0.Cli.cmd_group_with_driver_conf "file" ~doc ~descr ~default subs
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

@@ -4,11 +4,8 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
-open B00_std.Result.Syntax
+open Result.Syntax
 
-let list format us c = B0_b0.Def.list (module B0_unit) c format us
-let edit us c = B0_b0.Def.edit (module B0_unit) c us
-let get format k us c = B0_b0.Def.get_meta_key (module B0_unit) c format k us
 let build_dir us c =
   Log.if_error ~use:B00_cli.Exit.no_such_name @@
   let* us = B0_unit.get_list_or_hint ~empty_means_all:true us in
@@ -19,77 +16,77 @@ let build_dir us c =
   Log.app (fun m -> m "@[<v>%a@]" (Fmt.list Fpath.pp_unquoted) dirs);
   Ok B00_cli.Exit.ok
 
+let edit us c = B0_b0.Def.edit (module B0_unit) c us
+let get format k us c = B0_b0.Def.get_meta_key (module B0_unit) c format k us
+let list format us c = B0_b0.Def.list (module B0_unit) c format us
+let show format us c =
+  let format = if format = `Normal then `Long else format in
+  B0_b0.Def.list (module B0_unit) c format us
+
 (* Command line interface *)
 
 open Cmdliner
 
-let editor_envs = B00_editor.envs ()
-let pager_envs = B00_pager.envs ()
-let format = B00_cli.Arg.output_details ()
 let units ~right:r =
   let doc = "The $(docv) to act on. All of them if unspecified." in
   Arg.(value & pos_right r string [] & info [] ~doc ~docv:"UNIT")
 
 let units_all = units ~right:(-1)
 
-let sub_cmd name ~doc ~descr ~envs term =
-  let sdocs = Manpage.s_common_options in
-  let exits = B0_driver.Exit.infos in
-  let man = [`S Manpage.s_description; `P descr; B0_b0.Cli.man_see_manual] in
-  let term = B0_driver.with_b0_file ~driver:B0_b0.driver term in
-  Cmd.v (Cmd.info name ~doc ~sdocs ~exits ~envs ~man) term
+let list_term = Term.(const list $ B0_b0.Cli.format $ units_all)
 
-(* Sub commands *)
-
-let list_term = Term.(const list $ format $ units_all)
-let list =
-  let doc = "List units (default command)" in
-  let descr = "$(tname) lists build units. Use with $(b,-l) to output their \
-               metadata."
-  in
-  sub_cmd "list" ~doc ~descr ~envs:pager_envs list_term
-
-let edit =
-  let doc = "Edit B0 files of units" in
-  let descr = "$(tname) opens in your editor the B0 files of build units." in
-  let term = Term.(const edit $ units_all) in
-  sub_cmd "edit" ~doc ~descr ~envs:editor_envs term
-
-let get =
-  let doc = "Get metadata key values of units" in
-  let descr = "$(tname) outputs the value of metadata $(i,KEY) of given or all \
-               units."
-  in
-  let key =
-    let doc = "The metadata key $(docv) to get" and docv = "KEY" in
-    Arg.(required & pos 0 (some string) None & info [] ~doc ~docv)
-  in
-  let term = Term.(const get $ format $ key $ units ~right:0) in
-  sub_cmd "get" ~doc ~descr ~envs:pager_envs term
+(* Commands *)
 
 let build_dir =
   let doc = "Output build directories of units" in
-  let descr = "$(tname) outputs unit build directories. The paths may not \
-               exist."
+  let descr = `P "$(tname) outputs build directories of given build units. \
+                  The paths may not exist."
   in
   let term = Term.(const build_dir $ units_all) in
-  sub_cmd "build-dir" ~doc ~descr ~envs:[] term
+  B0_b0.Cli.subcmd_with_b0_file "build-dir" ~doc ~descr term
 
-let subs = [list; edit; get; build_dir]
+let edit =
+  let doc = "Edit build units" in
+  let descr = `P "$(tname) opens in your editor the B0 files in which given \
+                  build units are defined." in
+  let envs = B0_b0.Cli.editor_envs in
+  let term = Term.(const edit $ units_all) in
+  B0_b0.Cli.subcmd_with_b0_file "edit" ~doc ~descr ~envs term
 
-(* Command *)
+let get =
+  let doc = "Get build unit metadata" in
+  let descr = `P "$(tname) outputs the value of metadata $(i,KEY) of given \
+                  build units."
+  in
+  let envs = B0_b0.Cli.pager_envs in
+  let units = units ~right:0 in
+  let term = Term.(const get $ B0_b0.Cli.format $ B0_b0.Cli.pos_key $ units) in
+  B0_b0.Cli.subcmd_with_b0_file "get" ~doc ~descr ~envs term
+
+let list =
+  let doc = "List build units (default command)" in
+  let descr = `P "$(tname) lists given build units." in
+  let envs = B0_b0.Cli.pager_envs in
+  B0_b0.Cli.subcmd_with_b0_file "list" ~doc ~descr ~envs list_term
+
+let show =
+  let doc = "Show build unit metadata." in
+  let descr = `P "$(tname) is $(b,list -l), it outputs metadata of \
+                  given build units."
+  in
+  let envs = B0_b0.Cli.pager_envs in
+  let term = Term.(const show $ B0_b0.Cli.format $ units_all) in
+  B0_b0.Cli.subcmd_with_b0_file "show" ~doc ~descr ~envs term
+
+let subs = [build_dir; edit; get; list; show]
 
 let cmd =
   let doc = "Operate on build units" in
-  let descr = "$(tname) operates on build units. Invoked without arguments \
-               this simply lists known build units."
+  let descr = `P "$(tname) operates on build units. The default command \
+                  is $(tname) $(b,list)."
   in
-  let sdocs = Manpage.s_common_options in
-  let exits = B0_driver.Exit.infos in
-  let man = [`S Manpage.s_description; `P descr; B0_b0.Cli.man_see_manual] in
-  let default = B0_driver.with_b0_file ~driver:B0_b0.driver list_term in
-  let info = Cmd.info "unit" ~doc ~sdocs ~exits ~envs:pager_envs ~man in
-  Cmd.group info ~default subs
+  let envs = B0_b0.Cli.pager_envs and default = list_term in
+  B0_b0.Cli.cmd_group_with_b0_file "unit" ~doc ~descr ~envs ~default subs
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

@@ -4,68 +4,74 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
-open B00_std.Result.Syntax
+open Result.Syntax
 
-let get c format args = match args with
-| k :: ps -> B0_b0.Def.get_meta_key (module B0_pack) c format k ps
-| [] ->
-    Log.err (fun m -> m "No metadata key specified");
-    B00_cli.Exit.some_error
 
-let pack action format args c = match action with
-| `Edit -> B0_b0.Def.edit (module B0_pack) c args
-| `Get -> get c format args
-| `List -> B0_b0.Def.list (module B0_pack) c format args
-| `Show ->
-    let format = if format = `Normal then `Long else format in
-    B0_b0.Def.list (module B0_pack) c format args
+let edit clets c = B0_b0.Def.edit (module B0_pack) c clets
+let get format k clets c =
+  B0_b0.Def.get_meta_key (module B0_pack) c format k clets
+
+let list format clets c = B0_b0.Def.list (module B0_pack) c format clets
+let show format cs c =
+  let format = if format = `Normal then `Long else format in
+  B0_b0.Def.list (module B0_pack) c format cs
 
 (* Command line interface *)
 
 open Cmdliner
 
-let action =
-  let action = [ "edit", `Edit; "get", `Get; "list", `List; "show", `Show] in
-  let doc =
-    let alts = Arg.doc_alts_enum action in
-    Fmt.str "The action to perform. $(docv) must be one of %s." alts
+let packs ~right:r =
+  let doc = "The $(docv) to act on. All of them if unspecified." in
+  Arg.(value & pos_right r string [] & info [] ~doc ~docv:"CMDLET")
+
+let packs_all = packs ~right:(-1)
+
+let list_term = Term.(const list $ B0_b0.Cli.format $ packs_all)
+
+(* Commands *)
+
+let edit =
+  let doc = "Edit build packs" in
+  let descr = `P "$(tname) opens in your editor the B0 files of given \
+                  build packs are defined." in
+  let envs = B0_b0.Cli.editor_envs in
+  let term = Term.(const edit $ packs_all) in
+  B0_b0.Cli.subcmd_with_b0_file "edit" ~doc ~descr ~envs term
+
+let get =
+  let doc = "Get build pack metadata" in
+  let descr = `P "$(tname) outputs the value of metadata $(i,KEY) of given \
+                  build packs."
   in
-  let action = Arg.enum action in
-  Arg.(required & pos 0 (some action) None & info [] ~doc ~docv:"ACTION")
+  let envs = B0_b0.Cli.pager_envs in
+  let packs = packs ~right:0 in
+  let term = Term.(const get $ B0_b0.Cli.format $ B0_b0.Cli.pos_key $ packs) in
+  B0_b0.Cli.subcmd_with_b0_file "get" ~doc ~descr ~envs term
 
-let action_args =
-  let doc = "Positional arguments for the action." in
-  Arg.(value & pos_right 0 string [] & info [] ~doc ~docv:"ARG")
+let list =
+  let doc = "List build packs (default command)" in
+  let descr = `P "$(tname) lists given build packs." in
+  let envs = B0_b0.Cli.pager_envs in
+  B0_b0.Cli.subcmd_with_b0_file "list" ~doc ~descr ~envs list_term
 
-let doc = "Operate on build packs"
-let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.infos
-let envs = B00_editor.envs ()
-let man_xrefs = [ `Main ]
-let man = [
-  `S Manpage.s_description;
-  `P "$(tname) operates on build pack.";
-  `S "ACTIONS";
-  `I ("$(b,edit) [$(i,PACK)]...",
-      "Edit in your editor the B0 file(s) in which all or the given packs \
-       are defined.");
-  `I ("$(b,get) $(i,KEY) [$(i,PACK)]...",
-      "Get metadata key $(i,KEY) of given or all packs.");
-  `I ("$(b,list) [$(i,PACK)]...",
-      "List all or given packs. Use with $(b,-l) to get more info on \
-       pack metadata.");
-  `I ("$(b,show) [$(i,PACK)]...",
-      "Show is an alias for $(b,list -l)");
-  `S Manpage.s_arguments;
-  `S Manpage.s_options;
-  B0_b0.Cli.man_see_manual; ]
+let show =
+  let doc = "Show build pack metadata." in
+  let descr = `P "$(tname) is $(b,list -l), it outputs metadata of given \
+                  build packs."
+  in
+  let envs = B0_b0.Cli.pager_envs in
+  let term = Term.(const show $ B0_b0.Cli.format $ packs_all) in
+  B0_b0.Cli.subcmd_with_b0_file "show" ~doc ~descr ~envs term
+
+let subs = [edit; get; list; show]
 
 let cmd =
-  let pack_cmd =
-    Term.(const pack $ action $ B00_cli.Arg.output_details () $ action_args)
+  let doc = "Operate on build packs" in
+  let descr = `P "$(tname) operates on build packs. The default command is \
+                  $(tname) $(b,list)."
   in
-  let pack_cmd = B0_driver.with_b0_file ~driver:B0_b0.driver pack_cmd in
-  Cmd.v (Cmd.info "pack" ~doc ~sdocs ~exits ~envs ~man ~man_xrefs) pack_cmd
+  let envs = B0_b0.Cli.pager_envs and default = list_term in
+  B0_b0.Cli.cmd_group_with_b0_file "pack" ~doc ~descr ~envs ~default subs
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers
