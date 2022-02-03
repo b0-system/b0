@@ -185,8 +185,9 @@ let browser ?docs ?(opts = ["browser"]) () =
      $(b,xdg-open\\(1\\)) is found in $(b,PATH) this is the program used by
      default."
   in
-  let cmd = Arg.some ~none:"OS dependent fallback" B00_cli.cmd in
-  Arg.(value & opt cmd None & info opts ~env ~doc ?docs ~docv:"CMD")
+  let absent = "OS dependent fallback" in
+  let cmd = Arg.some B00_cli.cmd in
+  Arg.(value & opt cmd None & info opts ~absent ~env ~doc ?docs ~docv:"CMD")
 
 let prefix ?docs ?(opts = ["prefix"]) () =
   let doc =
