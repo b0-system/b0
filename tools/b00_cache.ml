@@ -51,7 +51,6 @@ let find_dirs ~b0_dir ~cache_dir =
 let delete setup b0_dir cache_dir keys =
   let* (_cwd, _b0_dir, cache_dir) = find_dirs ~b0_dir ~cache_dir in
   with_cache_dir cache_dir @@ fun dir ->
-  let keys = match keys with [] -> `All | keys -> `Keys keys in
   let* _ = B00_cli.File_cache.delete ~dir keys in
   Ok 0
 
@@ -134,10 +133,7 @@ let info ?(man = []) name ~doc =
 
 let delete =
   let doc = "Delete cache or given keys" in
-  let keys =
-    let doc = "The $(docv) to delete. All of them if unspecified." in
-    Arg.(value & pos_all string [] & info [] ~doc ~docv:"KEY")
-  in
+  let keys = B00_cli.File_cache.keys_none_is_all ~pos_right:(-1) () in
   Cmd.v (info "delete" ~doc)
     Term.(const delete $ setup $ b0_dir $ cache_dir $ keys)
 
