@@ -89,7 +89,6 @@ module Cli = struct
     | None -> man
     | Some syn -> `S Manpage.s_synopsis :: syn :: man
 
-
   let editor_envs = B00_editor.envs ()
   let pager_envs = B00_pager.envs ()
   let format = B00_cli.Arg.output_details ()
@@ -101,37 +100,33 @@ module Cli = struct
       ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
       term
     =
-    let sdocs = Manpage.s_common_options in
     let man = man_with_descr ?synopsis descr in
     let term = B0_driver.with_b0_file ~driver term in
-    Cmd.v (Cmd.info name ~doc ~sdocs ~exits ~envs ~man) term
+    Cmd.v (Cmd.info name ~doc ~exits ~envs ~man) term
 
   let cmd_group_with_b0_file
       ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
       ~default subs
     =
-    let sdocs = Manpage.s_common_options in
     let man = man_with_descr ?synopsis descr in
     let default = B0_driver.with_b0_file ~driver default in
-    Cmd.group (Cmd.info name ~doc ~sdocs ~exits ~envs ~man) ~default subs
+    Cmd.group (Cmd.info name ~doc ~exits ~envs ~man) ~default subs
 
   let subcmd_with_driver_conf
       ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
       term
     =
-    let sdocs = Manpage.s_common_options in
     let man = man_with_descr ?synopsis descr in
     let term = Term.(term $ B0_driver.Cli.conf) in
-    Cmd.v (Cmd.info name ~doc ~sdocs ~exits ~envs ~man) term
+    Cmd.v (Cmd.info name ~doc ~exits ~envs ~man) term
 
   let cmd_group_with_driver_conf
       ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
       ~default subs
     =
-    let sdocs = Manpage.s_common_options in
     let man = man_with_descr ?synopsis descr in
     let default = Term.(default $ B0_driver.Cli.conf) in
-    Cmd.group (Cmd.info name ~doc ~sdocs ~exits ~envs ~man) ~default subs
+    Cmd.group (Cmd.info name ~doc ~exits ~envs ~man) ~default subs
 end
 
 (*---------------------------------------------------------------------------
