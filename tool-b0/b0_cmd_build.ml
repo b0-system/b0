@@ -271,8 +271,9 @@ let cmd =
   let man = [
     `S Manpage.s_synopsis;
     `P "$(mname) $(tname) \
-        [$(b,-u) $(i,UNIT) | $(b,-p) $(i,PACK) | $(i,OPTION)]... \
-        [$(b,--) ARG...]";
+        [$(b,-a) $(i,UNIT)]
+        [$(b,-u) $(i,UNIT)]…  [$(b,-p) $(i,PACK)]… [$(i,OPTION)]… \
+        $(b,--) [$(i,ARG)]…";
     `S Manpage.s_description;
     `P "The $(tname) command runs your builds.";
     `P "To build a unit use the $(b,-u) option. To build all the units of \

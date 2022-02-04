@@ -183,7 +183,7 @@ let log =
 
 let path =
   let doc = "Output the B0 file path (default command)" in
-  let descr = `P "$(mname) outputs the B0 file path." in
+  let descr = `P "$(tname) outputs the B0 file path." in
   B0_b0.Cli.subcmd_with_driver_conf "path" ~doc ~descr path_term
 
 let requires =

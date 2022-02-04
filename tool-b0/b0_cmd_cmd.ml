@@ -40,7 +40,7 @@ let cmd =
   let man_xrefs = [ `Main ] in
   let man = [
     `S Manpage.s_synopsis;
-    `P "$(mname) $(tname) [$(i,OPTION)]... $(i,CMDLET) $(b,--) $(i,ARG)...";
+    `P "$(mname) $(tname) [$(i,OPTION)]… $(b,--) $(i,CMDLET) [$(i,ARG)]…";
     `S Manpage.s_description;
     `P "$(tname) executes cmdlets.";
     `S Manpage.s_arguments;
