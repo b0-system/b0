@@ -4,7 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B00_std
-open B00_std.Result.Syntax
+open Result.Syntax
 
 let driver =
   let libs = [B00_ocaml.Lib.Name.v "b0.b0"] in
@@ -79,19 +79,30 @@ end
 
 module Cli = struct
   open Cmdliner
+
+  let s_output_format = "OUTPUT FORMAT OPTIONS"
+
   let man_see_manual = `Blocks
       [ `S Manpage.s_see_also;
         `P "Consult $(b,odig doc b0) for manuals and more details."]
 
   let man_with_descr ?synopsis descr =
-    let man = [`S Manpage.s_description; descr; man_see_manual] in
+    let man = [`S Manpage.s_description;
+               descr;
+               `S Manpage.s_commands;
+               `S Manpage.s_arguments;
+               `S Manpage.s_options;
+               `S s_output_format;
+               `S Manpage.s_common_options;
+               man_see_manual]
+    in
     match synopsis with
     | None -> man
     | Some syn -> `S Manpage.s_synopsis :: syn :: man
 
   let editor_envs = B00_editor.envs ()
   let pager_envs = B00_pager.envs ()
-  let format = B00_cli.Arg.output_details ()
+  let format = B00_cli.Arg.output_details ~docs:s_output_format ()
   let pos_key =
     let doc = "The metadata key $(docv) to get." and docv = "KEY" in
     Arg.(required & pos 0 (some string) None & info [] ~doc ~docv)
