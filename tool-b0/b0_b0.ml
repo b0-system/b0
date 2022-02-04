@@ -80,8 +80,6 @@ end
 module Cli = struct
   open Cmdliner
 
-  let s_output_format = "OUTPUT FORMAT OPTIONS"
-
   let man_see_manual = `Blocks
       [ `S Manpage.s_see_also;
         `P "Consult $(b,odig doc b0) for manuals and more details."]
@@ -92,7 +90,7 @@ module Cli = struct
                `S Manpage.s_commands;
                `S Manpage.s_arguments;
                `S Manpage.s_options;
-               `S s_output_format;
+               `S B00_cli.s_output_format_options;
                `S Manpage.s_common_options;
                man_see_manual]
     in
@@ -102,7 +100,7 @@ module Cli = struct
 
   let editor_envs = B00_editor.envs ()
   let pager_envs = B00_pager.envs ()
-  let format = B00_cli.Arg.output_details ~docs:s_output_format ()
+  let format = B00_cli.Arg.output_format ()
   let pos_key =
     let doc = "The metadata key $(docv) to get." and docv = "KEY" in
     Arg.(required & pos 0 (some string) None & info [] ~doc ~docv)

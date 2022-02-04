@@ -23,30 +23,22 @@ let log c details format op_selector =
 
 open Cmdliner
 
-let doc = "Show build logs"
-let sdocs = Manpage.s_common_options
-let exits = B0_driver.Exit.infos
-let man_xrefs = [ `Main ]
-let docs_format = "OUTPUT FORMATS"
-let docs_details = "OUTPUT DETAILS"
-let docs_select = "OPTIONS FOR SELECTING OPERATIONS"
-let man = [
-  `S Manpage.s_description;
-  `P "The $(tname) command shows build information and operations in \
-      various formats.";
-  `S docs_format;
-  `S docs_details;
-  `P "If applicable.";
-  `S docs_select;
-  `Blocks B00_cli.Op.query_man;
-  B0_b0.Cli.man_see_manual; ]
-
 let cmd =
-  Cmd.v (Cmd.info "log" ~doc ~sdocs ~exits ~man ~man_xrefs)
-    Term.(const log $ B0_driver.Cli.conf $
-          B00_cli.Arg.output_details ~docs:docs_details () $
-          B00_cli.Memo.Log.out_format_cli ~docs:docs_format () $
-          B00_cli.Op.query_cli ~docs:docs_select ())
+  let doc = "Show build logs" in
+  let exits = B0_driver.Exit.infos in
+  let man = [
+    `S Manpage.s_description;
+    `P "The $(tname) command shows build information and operations in \
+        various formats.";
+    `S Manpage.s_options;
+    `S B00_cli.s_output_format_options;
+    `S B00_cli.Op.s_selection_options;
+    `Blocks B00_cli.Op.query_man;
+    B0_b0.Cli.man_see_manual; ]
+  in
+  Cmd.v (Cmd.info "log" ~doc ~exits ~man)
+    Term.(const log $ B0_driver.Cli.conf $ B00_cli.Arg.output_format () $
+          B00_cli.Memo.Log.out_format_cli () $ B00_cli.Op.query_cli ())
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers

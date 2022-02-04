@@ -67,7 +67,8 @@ val page_files : Cmd.t option -> Fpath.t list -> (unit, string) result
 val don't : ?docs:string -> unit -> bool Cmdliner.Term.t
 (** [don't ~docs ()] is a [--no-pager] command line option to
     unconditionally request not use a pager. [docs] is the manual
-    section where the option is documented. *)
+    section where the option is documented, defaults to
+    {!Manpage.s_common_options}. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 The b0 programmers

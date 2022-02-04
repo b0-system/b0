@@ -161,25 +161,19 @@ let includes =
 
 let log =
   let doc = "Show driver compilation log" in
-  let docs_details = "OUTPUT DETAILS" in
-  let docs_format = "OUTPUT FORMATS" in
-  let docs_select = "OPTIONS FOR SELECTING LOG OPERATIONS" in
   let descr = `Blocks [
       `P "$(tname) shows the driver compilation operations \
           in various formats. If $(b,--path) \
           is specified, shows the path to the log.";
-      `S docs_format;
-      `S docs_details;
-      `P "If applicable.";
-      `S docs_select;
+      `S Manpage.s_options;
+      `S B00_cli.s_output_format_options;
+      `S B00_cli.Op.s_selection_options;
       `Blocks B00_cli.Op.query_man; ]
   in
   let envs = B0_b0.Cli.pager_envs in
   B0_b0.Cli.subcmd_with_driver_conf "log" ~doc ~descr ~envs
-    Term.(const log $
-          B00_cli.Arg.output_details ~docs:docs_details () $
-          B00_cli.Memo.Log.out_format_cli ~docs:docs_format () $
-          B00_cli.Op.query_cli ~docs:docs_select ())
+    Term.(const log $ B00_cli.Arg.output_format () $
+          B00_cli.Memo.Log.out_format_cli () $ B00_cli.Op.query_cli ())
 
 let path =
   let doc = "Output the B0 file path (default command)" in

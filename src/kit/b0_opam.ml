@@ -367,7 +367,7 @@ end
 
 (* .opam.list cmdlet *)
 
-let list_cmdlet env pkgs details =
+let list_cmdlet env pkgs format =
   Log.if_error ~use:B00_cli.Exit.no_such_name @@
   let* pkg_packs = Pkg.get_list_or_hints pkgs in
   match pkg_packs with
@@ -376,7 +376,7 @@ let list_cmdlet env pkgs details =
       let pp_normal ppf pkg =
         Fmt.pf ppf "@[<h>%a %s@]" Pkg.pp_name pkg (B0_pack.name (Pkg.pack pkg))
       in
-      let pp_pkg = match details with
+      let pp_pkg = match format with
       | `Short -> Pkg.pp_name | `Normal | `Long -> pp_normal
       in
       Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_pkg) ps);
@@ -887,8 +887,8 @@ module Cmdlet = struct
     B0_cmdlet.v "list" ~doc:"List opam packages and their defining packs" @@
     fun env args ->
     let pkgs = pkgs ~doc:"Only list opam package $(docv) (repeatable)." () in
-    let details = B00_cli.Arg.output_details () in
-    let list = Term.(const list_cmdlet $ const env $ pkgs $ details) in
+    let format = B00_cli.Arg.output_format () in
+    let list = Term.(const list_cmdlet $ const env $ pkgs $ format) in
     B0_cmdlet.eval ~man env args list
 
   let file =

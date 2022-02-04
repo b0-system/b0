@@ -36,31 +36,33 @@ end
 (* Argument converters *)
 
 let err_msg of_string s = Result.map_error (fun e -> `Msg e) (of_string s)
+
+let cmd = Cmdliner.Arg.conv ~docv:"CMD" (err_msg Cmd.of_string, Cmd.pp_dump)
 let fpath =
   Cmdliner.Arg.conv ~docv:"PATH" (err_msg Fpath.of_string, Fpath.pp_quoted)
-let cmd =
-  Cmdliner.Arg.conv ~docv:"CMD" (err_msg Cmd.of_string, Cmd.pp_dump)
+
+let s_output_format_options = "OUTPUT FORMAT OPTIONS"
 
 module Arg = struct
   open Cmdliner
 
   (* Specifying output detail *)
 
-  type output_details = [ `Normal | `Short | `Long ]
-  let output_details
-      ?docs ?(short_opts = ["s"; "short"]) ?(long_opts = ["l"; "long"]) ()
+  type output_format = [ `Normal | `Short | `Long ]
+  let output_format
+      ?(docs = s_output_format_options) ?(short_opts = ["s"; "short"])
+      ?(long_opts = ["l"; "long"]) ()
     =
     let short =
       let doc = "Short output. Line based output with only relevant data." in
-      Arg.info short_opts ~doc ?docs
+      Arg.info short_opts ~doc ~docs
     in
     let long =
       let doc = "Long output. Outputs as much information as possible." in
-      Arg.info long_opts ~doc ?docs
+      Arg.info long_opts ~doc ~docs
     in
     Arg.(value & vflag `Normal [`Short, short; `Long, long])
 end
-
 
 (* B00_std setup *)
 
@@ -269,14 +271,13 @@ module File_cache = struct
 
   let key_arg =
     let of_string s = match Fpath.is_seg s with
-    | true -> Ok s
-    | false -> Error (`Msg "Not a valid key (not a path segment)")
+    | true -> Ok s | false -> Error ("Not a valid key (not a path segment)")
     in
-    Arg.conv (of_string, String.pp) ~docv:"KEY"
+    Arg.conv' (of_string, String.pp) ~docv:"KEY"
 
   let keys_none_is_all ?(pos_right = -1) () =
     let doc =
-      "Select key $(docv) (repeatable). If unspecified selects all keys."
+      "Select $(docv) (repeatable). If unspecified selects all keys."
     in
     let keys = Arg.(value & pos_right 0 key_arg [] & info [] ~doc ~docv:"KEY")in
     Term.(const (function [] -> `All | ks -> `Keys ks) $ keys)
@@ -416,14 +417,13 @@ module Op = struct
 
   let hash =
     let of_string s =
-      let err = Fmt.str "Could not parse hash from %S" in
-      Result.map_error (fun _ -> `Msg (err s)) @@ Hash.of_hex s
+      let err _ = Fmt.str "Could not parse hash from %S" s in
+      Result.map_error err (Hash.of_hex s)
     in
-    Arg.conv ~docv:"HASH" (of_string, Hash.pp)
+    Arg.conv' ~docv:"HASH" (of_string, Hash.pp)
 
   let marks
-      ?(opts = ["m"; "mark"])
-      ?docs
+      ?(opts = ["m"; "mark"]) ?docs
       ?(doc = "Select operations marked by $(docv). Repeatable.")
       ?(docv = "MARK")
       ()
@@ -555,13 +555,14 @@ module Op = struct
     in
     Term.(const order $ order_by $ by_dur)
 
-  let query_cli ?docs () =
+  let s_selection_options = "BUILD OPERATION SELECTION OPTIONS"
+  let query_cli ?(docs = s_selection_options) () =
     let open Cmdliner in
     let query select select_deps filter order =
       query ~select ~select_deps ~filter ~order
     in
-    Term.(const query $ select_cli ?docs () $ select_deps_cli ?docs () $
-          filter_cli ?docs () $ order_cli ?docs ())
+    Term.(const query $ select_cli ~docs () $ select_deps_cli ~docs () $
+          filter_cli ~docs () $ order_cli ~docs ())
 
   let query_man =
     [ `P "Options are provided to select and filter operations. \
@@ -663,7 +664,7 @@ module Memo = struct
       ?(env = Cmdliner.Cmd.Env.info log_file_env) ()
     =
     Arg.(value & opt (some fpath) None &
-         info opts ~absent ~env ~doc ?docs ~docv:"LOGFILE")
+         info opts ~absent ~env ~doc ?docs ~docv:"LOG_FILE")
 
   let get_log_file ~cwd ~b0_dir ~log_file =
     get_b0_dir_path ~cwd ~b0_dir log_file_name log_file
@@ -948,8 +949,8 @@ module Memo = struct
         if Fpath.Map.is_empty l.file_hashes then () else
         Fmt.pf ppf "@[<v>%a@]@." pp_hashed_files l.file_hashes
 
-    let out_format_cli ?docs () =
-      let a opt doc = Cmdliner.Arg.info [opt] ~doc ?docs in
+    let out_format_cli ?(docs = s_output_format_options) () =
+      let a opt doc = Cmdliner.Arg.info [opt] ~doc ~docs in
       let fmts =
         [ `Hashed_files, a "hashed-files"
             "Output the path of every hashed file.";

@@ -14,12 +14,12 @@ let pp_hash = function
 | `Normal | `Long ->
     fun ppf (f, h) -> Hash.pp ppf h; Fmt.char ppf ' '; Fpath.pp_unquoted ppf f
 
-let hash tty_cap log_level hash_fun details files =
+let hash tty_cap log_level hash_fun format files =
   let tty_cap = B00_cli.B00_std.get_tty_cap tty_cap in
   let log_level = B00_cli.B00_std.get_log_level log_level in
   B00_cli.B00_std.setup tty_cap log_level ~log_spawns:Log.Debug;
   let hash_fun = B00_cli.Memo.get_hash_fun ~hash_fun in
-  let pp_hash = pp_hash details in
+  let pp_hash = pp_hash format in
   Log.if_error ~use:Cmdliner.Cmd.Exit.some_error @@ match files with
   | [] -> Ok 0
   | files ->
@@ -36,28 +36,28 @@ let hash tty_cap log_level hash_fun details files =
 
 open Cmdliner
 
-let version = "%%VERSION%%"
-let doc = "Hash like b0"
-let docs = Manpage.s_options
-let sdocs = Manpage.s_common_options
-
-let man_xrefs = [`Tool "b0"; `Tool "b00-cache"; `Tool "b00-log"]
-let man = [
-  `S Manpage.s_description;
-  `P "The $(tname) command hashes files like b0 does.";
-  `S Manpage.s_bugs;
-  `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ]
-
 let files =
   let doc = "File to hash. Use $(b,-) for stdin." in
   Arg.(value & pos_all B00_cli.fpath [] & info [] ~doc ~docv:"FILE")
 
+let hash_fun =
+  B00_cli.Memo.hash_fun ~opts:["H"; "hash-fun"] ~docs:Manpage.s_options ()
+
 let tool =
-  Cmd.v (Cmd.info "b00-hash" ~version ~doc ~sdocs ~man ~man_xrefs)
-    Term.(const hash $ B00_cli.B00_std.tty_cap ~docs:sdocs () $
-          B00_cli.B00_std.log_level ~docs:sdocs () $
-          B00_cli.Memo.hash_fun ~opts:["H"; "hash-fun"]~docs () $
-          B00_cli.Arg.output_details ~docs () $ files)
+  let doc = "Hash like b0" in
+  let man_xrefs = [`Tool "b0"; `Tool "b00-cache"; `Tool "b00-log"] in
+  let man = [
+    `S Manpage.s_description;
+    `P "The $(tname) command hashes files like b0 does.";
+    `S Manpage.s_options;
+    `S B00_cli.s_output_format_options;
+    `S Manpage.s_bugs;
+    `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ]
+  in
+  Cmd.v (Cmd.info "b00-hash" ~version:"%%VERSION%%" ~doc ~man ~man_xrefs)
+    Term.(const hash $ B00_cli.B00_std.tty_cap () $
+          B00_cli.B00_std.log_level () $ hash_fun $
+          B00_cli.Arg.output_format () $ files)
 
 let main () = exit (Cmd.eval' tool)
 let () = if !Sys.interactive then () else main ()

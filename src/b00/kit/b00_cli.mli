@@ -63,23 +63,27 @@ val cmd : Cmd.t Cmdliner.Arg.conv
 
 (** {1:fragments Cli commands and fragments} *)
 
+val s_output_format_options : string
+(** [s_output_format_options] is a manual section called
+    ["OUTPUT FORMAT OPTIONS"] *)
+
 (** Command line arguments. *)
 module Arg : sig
 
-  (** {1:output_details Specifying output details} *)
+  (** {1:output_format Specifying output format} *)
 
-  type output_details = [ `Normal | `Short | `Long ]
-  (** The type for specifying output detail level. *)
+  type output_format = [ `Normal | `Short | `Long ]
+  (** The type for specifying output format. *)
 
-  val output_details :
+  val output_format :
     ?docs:string -> ?short_opts:string list -> ?long_opts:string list ->
-    unit -> output_details Cmdliner.Term.t
-  (** [output_details ~short_opts ~long_opts ()] are mutually
-      exclusive options to specify short and long output details,
+    unit -> output_format Cmdliner.Term.t
+  (** [output_format ~short_opts ~long_opts ()] are mutually
+      exclusive options to specify short and long output format,
       without options this is [`Normal]. [short_opts] defaults to
       [["s"; "short"]] and [long_opts] default to [["l";
       "long"]]. [docs] is the manual section in which options are
-      documented. *)
+      documented, defaults to {!s_output_format_options}. *)
 end
 
 (** Fragments for setting up {!B00_std}.  *)
@@ -127,7 +131,8 @@ module B00_std : sig
     Tty.cap option option Cmdliner.Term.t
   (** [tty_cap ~docs ~env ()] is a cli interface for specifiying a TTY
       capability with a [--color] option. [docs] is where
-      the options are documented. [env], if provided, is an
+      the options are documented (defaults to
+      {!Cmdliner.Manpage.s_common_options}). [env], if provided, is an
       environment variable to set the value (use something like
       ["MYPROGRAM_COLOR"]). [None] is returned if the value is not set
       on the cli or via the env var. *)
@@ -137,7 +142,8 @@ module B00_std : sig
     Log.level option Cmdliner.Term.t
    (** [log_level ~none ~docs ~env ()] is a cli interface for
        specifiying a logging level with various options. [docs] is
-       where the options are documented. [env], if provided, is an
+       where the options are documented (defaults to
+      {!Cmdliner.Manpage.s_common_options}). [env], if provided, is an
        environment variable to set the value (use something like
        ["MYPROGRAM_VERBOSITY"]). [none] is used to document the level
        when the log level is unspecified (defaults to
@@ -287,8 +293,18 @@ module Op : sig
   val filter_cli : ?docs:string -> unit -> (B000.Op.t -> bool) Cmdliner.Term.t
   val order_cli :
     ?docs:string -> unit -> (B000.Op.t list -> B000.Op.t list) Cmdliner.Term.t
+
+  val s_selection_options : string
+  (** [s_selection_options] is a section name for build operation selection
+      options. *)
+
   val query_cli : ?docs:string -> unit -> query Cmdliner.Term.t
+  (** [query_cli ~docs ()] is a command line interface to select
+      build operations. [docs] is where the option are documented, defaults to
+      {!Cmdliner.Manpage.s_options}} *)
+
   val query_man : Cmdliner.Manpage.block list
+  (** [query_man] is a manual fragment for {!query_cli}. *)
 end
 
 (** {!B00.Memo} interaction. *)
@@ -540,7 +556,7 @@ module Memo : sig
     (** The type for output format. *)
 
     val out :
-      Format.formatter -> out_format -> Arg.output_details -> Op.query ->
+      Format.formatter -> out_format -> Arg.output_format -> Op.query ->
       path:Fpath.t -> t -> unit
     (** [out] formats a log on the given formatter. [path] is used when
         [`Path] is requested. *)
@@ -549,7 +565,8 @@ module Memo : sig
 
     val out_format_cli : ?docs:string -> unit -> out_format Cmdliner.Term.t
     (** [out_format_cli ~docs ()] are mutually exclusive options to specify
-        alternate output formats. *)
+        alternate output formats. [docs] is the manual section in which
+        options are documented, defaults to {!s_output_format_options} *)
   end
 end
 
