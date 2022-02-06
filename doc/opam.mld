@@ -210,7 +210,17 @@ make a separate request manually to state the incompatibilities and
 have it merged before your pull request and/or manually tweak the
 automated pull request.
 
-If you know that some existing [opam] package [PKG] of the repository
+For the latter the simplest is to clone your github opam-repository
+checkout the branch of publication and push changes on it.
+
+{v
+   git clone git@github.com:$(GHUSER)/opam-repository.git
+   git checkout $B0-PUBLISH-BRANCH
+   … # Edit
+   git commit -m 'Handle first round of failures'
+   git push # This will automatically update the PR.
+v}
+
 fails because of the new releases. You can state the incompatibility
 with the repeatable [-i PKG[.version]] option. This will add an upper
 bound on [PKG] as needed.
