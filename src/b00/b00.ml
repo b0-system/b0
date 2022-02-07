@@ -67,7 +67,7 @@ module Memo = struct
   and ctx = { mark : Op.mark }
   and tool_lookup = t -> Cmd.tool -> (Fpath.t, string) result Fut.t
   and memo =
-    { clock : Time.counter;
+    { clock : Os.Mtime.counter;
       cpu_clock : Time.cpu_counter;
       feedback : feedback -> unit;
       cwd : Fpath.t;
@@ -118,7 +118,7 @@ module Memo = struct
       ?clock ?cpu_clock:cc ~feedback ~cwd ?(win_exe = Sys.win32)
       ?tool_lookup env guard reviver exec
     =
-    let clock = match clock with None -> Time.counter () | Some c -> c in
+    let clock = match clock with None -> Os.Mtime.counter () | Some c -> c in
     let cpu_clock = match cc with None -> Time.cpu_counter () | Some c -> c in
     let tool_lookup = cache_lookup @@ match tool_lookup with
     | None -> tool_lookup_of_os_env (Env.env env)
@@ -141,7 +141,7 @@ module Memo = struct
     let feedback = match feedback with | Some f -> f | None -> fun _ -> () in
     let fb_exec = (feedback :> Exec.feedback -> unit) in
     let fb_memo = (feedback :> feedback -> unit) in
-    let clock = Time.counter () in
+    let clock = Os.Mtime.counter () in
     let env = match env with None -> Os.Env.current () | Some env -> Ok env in
     let cwd = match cwd with None -> Os.Dir.cwd () | Some cwd -> Ok cwd in
     Result.bind env @@ fun env ->
@@ -175,7 +175,7 @@ module Memo = struct
   let hash_string m s = Reviver.hash_string m.m.reviver s
   let hash_file m f = Reviver.hash_file m.m.reviver f
   let ops m = m.m.ops
-  let timestamp m = Time.count m.m.clock
+  let timestamp m = Os.Mtime.count m.m.clock
   let new_op_id m = let id = m.m.op_id in m.m.op_id <- id + 1; id
   let mark m = m.c.mark
   let with_mark m mark = { c = { mark }; m = m.m }

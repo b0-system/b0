@@ -512,10 +512,10 @@ module Memo : sig
     val file_hashes : t -> Hash.t Fpath.Map.t
     (** [file_hashes l] has all the files that were hashed through the memo. *)
 
-    val hash_dur : t -> Time.span
+    val hash_dur : t -> Mtime.span
     (** [hash_dur l] is the time span spent hashing. *)
 
-    val total_dur : t -> Time.span
+    val total_dur : t -> Mtime.span
     (** [total_dur l] is the time spanning from {!B00.Memo.create} to
         {!of_memo}. *)
 

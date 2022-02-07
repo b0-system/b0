@@ -145,7 +145,7 @@ module Op = struct
     | "" -> () | g -> Fmt.sp ppf (); Fmt.(code string) ppf g
     in
     let pp_dur ppf o = match Op.status o with
-    | Op.Failed _ | Op.Done -> Fmt.sp ppf (); Time.Span.pp ppf (Op.duration o)
+    | Op.Failed _ | Op.Done -> Fmt.sp ppf (); Mtime.Span.pp ppf (Op.duration o)
     | _ -> ()
     in
     Fmt.pf ppf "[%a%a:%a%a%a%a]"
@@ -243,8 +243,8 @@ module Op = struct
   let pp_reads = Fmt.vbox (Fmt.list pp_file_read)
   let pp_writes = Fmt.vbox (Fmt.list pp_file_write)
   let pp_timings =
-    let pp_span = Time.Span.pp in
-    let wait o = Time.Span.abs_diff (Op.time_created o) (Op.time_started o) in
+    let pp_span = Mtime.Span.pp in
+    let wait o = Mtime.Span.abs_diff (Op.time_created o) (Op.time_started o) in
     Fmt.field "timings" Fmt.id @@
     Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
     [ pp_subfield "duration" Op.duration pp_span;
@@ -254,10 +254,10 @@ module Op = struct
 
   let pp_timing_created =
     Fmt.field "timings" Fmt.id @@
-    Fmt.box @@ pp_subfield "created" Op.time_created Time.Span.pp
+    Fmt.box @@ pp_subfield "created" Op.time_created Mtime.Span.pp
 
   let pp_timings ppf o =
-    match Time.Span.equal (Op.time_started o) Time.Span.max_span with
+    match Mtime.Span.equal (Op.time_started o) Mtime.Span.max_span with
     | true -> pp_timing_created ppf o
     | false -> pp_timings ppf o
 

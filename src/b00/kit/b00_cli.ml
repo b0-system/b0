@@ -396,11 +396,11 @@ module Op = struct
   let order ~by ops =
     let order_by_field cmp f o0 o1 = cmp (f o0) (f o1) in
     let order = match by with
-    | `Create -> order_by_field Time.Span.compare Op.time_created
-    | `Start -> order_by_field Time.Span.compare Op.time_started
-    | `Wait -> order_by_field Time.Span.compare Op.waited
+    | `Create -> order_by_field Mtime.Span.compare Op.time_created
+    | `Start -> order_by_field Mtime.Span.compare Op.time_started
+    | `Wait -> order_by_field Mtime.Span.compare Op.waited
     | `Dur ->
-        let rev_compare t0 t1 = Time.Span.compare t1 t0 in
+        let rev_compare t0 t1 = Mtime.Span.compare t1 t0 in
         order_by_field rev_compare Op.duration
     in
     List.sort order ops
@@ -724,8 +724,8 @@ module Memo = struct
     type t =
       { hash_fun : string;
         file_hashes : Hash.t Fpath.Map.t;
-        hash_dur : Time.span;
-        total_dur : Time.span;
+        hash_dur : Mtime.span;
+        total_dur : Mtime.span;
         cpu_dur : Time.cpu_span;
         jobs : int;
         ops : B000.Op.t list; }
@@ -735,7 +735,7 @@ module Memo = struct
       let module H = (val (B000.Reviver.hash_fun r)) in
       let file_hashes = B000.Reviver.file_hashes r in
       let hash_dur = B000.Reviver.file_hash_dur r in
-      let total_dur = Time.count (B00.Memo.clock m) in
+      let total_dur = Os.Mtime.count (B00.Memo.clock m) in
       let cpu_dur = Time.cpu_count (B00.Memo.cpu_clock m) in
       let jobs = B000.Exec.jobs (B00.Memo.exec m) in
       let ops = B00.Memo.ops m in
@@ -817,7 +817,7 @@ module Memo = struct
 
     let pp_stats ~hashed_size sel ppf l =
       let sc, st, sd, wc, wt, wd, cc, ct, cd, rt, rd, ot, od =
-        let ( ++ ) = Time.Span.add in
+        let ( ++ ) = Mtime.Span.add in
         let rec loop sc st sd wc wt wd cc ct cd rt rd ot od = function
         | [] -> sc, st, sd, wc, wt, wd, cc, ct, cd, rt, rd, ot, od
         | o :: os ->
@@ -839,10 +839,10 @@ module Memo = struct
                 loop sc st sd wc wt wd cc ct cd rt rd ot od os
         in
         loop
-          0 0 Time.Span.zero 0 0 Time.Span.zero 0 0 Time.Span.zero
-          0 Time.Span.zero 0 Time.Span.zero (sel l.ops)
+          0 0 Mtime.Span.zero 0 0 Mtime.Span.zero 0 0 Mtime.Span.zero
+          0 Mtime.Span.zero 0 Mtime.Span.zero (sel l.ops)
       in
-      let pp_totals ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
+      let pp_totals ppf (ot, od) = Fmt.pf ppf "%a %d" Mtime.Span.pp od ot in
       let pp_hashes ppf l =
         let hc, hd = Fpath.Map.cardinal l.file_hashes, l.hash_dur in
         let hs = if not hashed_size then 0 else hashed_byte_size l.file_hashes
@@ -857,8 +857,8 @@ module Memo = struct
       in
       let pp_xtime ppf (self, children) =
         let label = Fmt.tty_string [`Italic] in
-        Fmt.pf ppf "%a %a" Time.Span.pp self
-          (Fmt.field ~label "children" (fun c -> c) Time.Span.pp)
+        Fmt.pf ppf "%a %a" Mtime.Span.pp self
+          (Fmt.field ~label "children" (fun c -> c) Mtime.Span.pp)
           children
       in
       let pp_stime ppf l =
@@ -870,9 +870,11 @@ module Memo = struct
         pp_xtime ppf t
       in
       let pp_op ppf (oc, ot, od) =
-        Fmt.pf ppf "%a %d (%d revived)" Time.Span.pp od ot oc
+        Fmt.pf ppf "%a %d (%d revived)" Mtime.Span.pp od ot oc
       in
-      let pp_op_no_cache ppf (ot, od) = Fmt.pf ppf "%a %d" Time.Span.pp od ot in
+      let pp_op_no_cache ppf (ot, od) =
+        Fmt.pf ppf "%a %d" Mtime.Span.pp od ot
+      in
       let pp_sec s ppf _ = Fmt.tty_string [`Bold] ppf s in
       (Fmt.record @@
        [ pp_sec "selected operations";
@@ -886,7 +888,7 @@ module Memo = struct
          Fmt.field "hashes" Fmt.id pp_hashes;
          Fmt.field "utime" Fmt.id pp_utime;
          Fmt.field "stime" Fmt.id pp_stime;
-         Fmt.field "real" (fun _ -> l.total_dur) Time.Span.pp ]) ppf l
+         Fmt.field "real" (fun _ -> l.total_dur) Mtime.Span.pp ]) ppf l
 
     type out_format =
     [ `Hashed_files | `Op_hashes | `Ops | `Path | `Stats | `Root_hashed_files

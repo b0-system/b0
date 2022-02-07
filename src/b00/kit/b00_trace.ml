@@ -13,7 +13,7 @@ let jsong_cmd c = Jsong.(list string (Cmd.to_list c))
 module Trace_event = struct
   let str pp get o = Jsong.strf "%a" pp (get o)
   let span_us s =
-    let span_us = Int64.(to_int @@ div (Time.Span.to_uint64_ns s) 1000L) in
+    let span_us = Int64.(to_int @@ div (Mtime.Span.to_uint64_ns s) 1000L) in
     Jsong.int span_us
 
   let result ~ok = function

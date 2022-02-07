@@ -509,9 +509,9 @@ module Op = struct
   type t =
     { id : id;
       mark : mark;
-      time_created : Time.span;
-      mutable time_started : Time.span;
-      mutable duration : Time.span;
+      time_created : Mtime.span;
+      mutable time_started : Mtime.span;
+      mutable duration : Mtime.span;
       mutable revived : bool;
       mutable status : status;
       mutable reads : Fpath.t list;
@@ -534,7 +534,7 @@ module Op = struct
       ~id ~mark ~created ~reads ~writes ?writes_manifest_root ?post_exec ?k
       kind
     =
-    let time_started = Time.Span.max_span and duration = Time.Span.zero in
+    let time_started = Mtime.Span.max_span and duration = Mtime.Span.zero in
     let revived = false and status = Waiting and hash = Hash.nil in
     { id; mark; time_created = created; time_started; duration; revived;
       status; reads; writes; writes_manifest_root; hash; post_exec; k; kind }
@@ -544,8 +544,8 @@ module Op = struct
   let kind o = o.kind
   let time_created o = o.time_created
   let time_started o = o.time_started
-  let time_ended o = Time.Span.add o.time_created o.duration
-  let waited o = Time.Span.abs_diff o.time_started o.time_created
+  let time_ended o = Mtime.Span.add o.time_created o.duration
+  let waited o = Mtime.Span.abs_diff o.time_started o.time_created
   let duration o = o.duration
   let revived o = o.revived
   let status o = o.status
@@ -575,7 +575,7 @@ module Op = struct
   let equal o0 o1 = o0.id = o1.id
   let compare o0 o1 = (compare : int -> int -> int) o0.id o1.id
   let set_time_started o t = o.time_started <- t
-  let set_time_ended o t = o.duration <- Time.Span.abs_diff t o.time_started
+  let set_time_ended o t = o.duration <- Mtime.Span.abs_diff t o.time_started
   let set_revived o b = o.revived <- b
   let set_status o s = o.status <- s
   let set_reads o fs = o.hash <- Hash.nil; o.reads <- fs
@@ -867,23 +867,23 @@ module Reviver = struct
   (* Operation reviver *)
 
   type t =
-    { clock : Time.counter;
+    { clock : Os.Mtime.counter;
       hash_fun : (module Hash.T);
       cache : File_cache.t;
       buffer : Buffer.t; (* buffer to encode metadata *)
       mutable file_hashes : Hash.t Fpath.Map.t; (* file hash cache *)
-      mutable file_hash_dur : Time.span; (* total file hash duration *) }
+      mutable file_hash_dur : Mtime.span; (* total file hash duration *) }
 
   let create clock hash_fun cache =
     let buffer = Buffer.create 1024 in
     let file_hashes = Fpath.Map.empty in
-    let file_hash_dur = Time.Span.zero in
+    let file_hash_dur = Mtime.Span.zero in
     { clock; hash_fun; buffer; cache; file_hashes; file_hash_dur }
 
   let clock r = r.clock
   let hash_fun r = r.hash_fun
   let file_cache r = r.cache
-  let timestamp r = Time.count r.clock
+  let timestamp r = Os.Mtime.count r.clock
 
   (* Hashing *)
 
@@ -897,8 +897,8 @@ module Reviver = struct
       let module H = (val r.hash_fun : Hash.T) in
       let t = timestamp r in
       let h = H.file f in
-      let dur = Time.Span.abs_diff (timestamp r) t in
-      r.file_hash_dur <- Time.Span.add r.file_hash_dur dur;
+      let dur = Mtime.Span.abs_diff (timestamp r) t in
+      r.file_hash_dur <- Mtime.Span.add r.file_hash_dur dur;
       match h with
       | Ok h -> r.file_hashes <- Fpath.Map.add f h r.file_hashes; h
       | Error e -> failwith e
@@ -1142,7 +1142,7 @@ end
 module Exec = struct
   type feedback = [ `Exec_start of Os.Cmd.pid option * Op.t ]
   type t =
-    { clock : Time.counter;
+    { clock : Os.Mtime.counter;
       tmp_dir : Fpath.t;
       feedback : feedback -> unit;
       trash : Trash.t;
@@ -1155,7 +1155,7 @@ module Exec = struct
 
   let create ?clock ?rand ?tmp_dir:tmp ?feedback ~trash ~jobs () =
     let feedback = match feedback with None -> fun _ -> () | Some f -> f in
-    let clock = match clock with None -> Time.counter () | Some c -> c in
+    let clock = match clock with None -> Os.Mtime.counter () | Some c -> c in
     let tmp_dir = match tmp with None -> Os.Dir.default_tmp () | Some t -> t in
     let todo = Rqueue.empty ?rand () in
     let collectable = Queue.create () in
@@ -1169,7 +1169,7 @@ module Exec = struct
   let jobs c = c.jobs
   let incr_spawn_count e = e.spawn_count <- e.spawn_count + 1
   let decr_spawn_count e = e.spawn_count <- e.spawn_count - 1
-  let timestamp e = Time.count e.clock
+  let timestamp e = Os.Mtime.count e.clock
 
   (* Operation execution *)
 

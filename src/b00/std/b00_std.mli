@@ -1718,76 +1718,8 @@ end
 
 (** Measuring time.
 
-    Support to measure monotonic wall-clock time, CPU
-    user and CPU system time. *)
+    Support to measure CPU user and CPU system time. *)
 module Time : sig
-
-  (** {1:span Monotonic time spans} *)
-
-  type span
-  (** The type for non-negative monotonic time spans. They represent
-      the difference between two clock readings with nanosecond precision
-      (1e-9s). *)
-
-  (** Time spans *)
-  module Span : sig
-
-    (** {1:span Time spans} *)
-
-    type t = span
-    (** See {!type:span}. *)
-
-    val zero : span
-    (** [zero] is a span of 0ns. *)
-
-    val one : span
-    (** [one] is a span of 1ns. *)
-
-    val max_span : span
-    (** [max_span] is a span of [2^64-1]ns. *)
-
-    val add : span -> span -> span
-    (** [add s0 s1] is [s0] + [s1]. {b Warning.} Rolls over on overflow. *)
-
-    val abs_diff : span -> span -> span
-    (** [abs_diff s0 s1] is the absolute difference between [s0] and [s1]. *)
-
-    (** {1:preds Predicates and comparisons} *)
-
-    val equal : span -> span -> bool
-    (** [equal s0 s1] is [s0 = s1]. *)
-
-    val compare : span -> span -> int
-    (** [compare s0 s1] orders span by increasing duration. *)
-
-    (** {1:conv Conversions} *)
-
-    val to_uint64_ns : span -> int64
-    (** [to_uint64_ns s] is [s] as an {e unsigned} 64-bit integer nanosecond
-        span. *)
-
-    val of_uint64_ns : int64 -> span
-    (** [of_uint64_ns u] is the {e unsigned} 64-bit integer nanosecond span [u]
-        as a span. *)
-
-    val pp : span Fmt.t
-    (** [pp] formats with {!Fmt.uint64_ns_span}. *)
-
-    val pp_ns : span Fmt.t
-    (** [pp_ns ppf s] prints [s] as an unsigned 64-bit integer nanosecond
-        span. *)
-  end
-
-  (** {1:monotonic_counters Monotonic wall-clock time counters} *)
-
-  type counter
-  (** The type for monotonic wall-clock time counters. *)
-
-  val counter : unit -> counter
-  (** [counter ()] is a counter counting from now on. *)
-
-  val count : counter -> span
-  (** [count c] is the monotonic time span elapsed since [c] was created. *)
 
   (** {1:cpu_span CPU time spans} *)
 
@@ -1795,8 +1727,9 @@ module Time : sig
   (** The type for CPU execution time spans. *)
 
   val cpu_span :
-    cpu_utime:span -> cpu_stime:span -> cpu_children_utime:span ->
-    cpu_children_stime:span -> cpu_span
+    cpu_utime:Mtime.span -> cpu_stime:Mtime.span ->
+    cpu_children_utime:Mtime.span ->
+    cpu_children_stime:Mtime.span -> cpu_span
   (** [cpu_span ~cpu_utime ~cpu_stime ~cpu_children_utime
       ~cpu_children_stime] is a cpu span with the given fields. See
       accessors for semantics. *)
@@ -1804,17 +1737,17 @@ module Time : sig
   val cpu_zero : cpu_span
   (** [cpu_zero] is zero CPU times. *)
 
-  val cpu_utime : cpu_span -> span
+  val cpu_utime : cpu_span -> Mtime.span
   (** [cpu_utime_s cpu] is [cpu]'s user time in seconds. *)
 
-  val cpu_stime : cpu_span -> span
+  val cpu_stime : cpu_span -> Mtime.span
   (** [cpu_stime_s cpu] is [cpu]'s system time in seconds. *)
 
-  val cpu_children_utime : cpu_span -> span
+  val cpu_children_utime : cpu_span -> Mtime.span
   (** [cpu_utime_s cpu] is [cpu]'s user time in seconds for children
       processes. *)
 
-  val cpu_children_stime : cpu_span -> span
+  val cpu_children_stime : cpu_span -> Mtime.span
   (** [cpu_utime_s cpu] is [cpu]'s system time in seconds for children
       processes. *)
 
@@ -3487,14 +3420,14 @@ module Bincode : sig
 
   (** {2:time_span [Time.span]} *)
 
-  val enc_time_span : Time.span enc
-  (** [enc_time_span] encodes a {!type:Time.span}. *)
+  val enc_time_span : Mtime.span enc
+  (** [enc_time_span] encodes a {Mtime.type-span}. *)
 
-  val dec_time_span : Time.span dec
-  (** [dec_time_span] decodes a {!type:Time.span}. *)
+  val dec_time_span : Mtime.span dec
+  (** [dec_time_span] decodes a {Mtime.type-span}. *)
 
-  val time_span : Time.span t
-  (** [time_span] is a codec for {!type:Time.span}. *)
+  val time_span : Mtime.span t
+  (** [time_span] is a codec for {Mtime.type-span}. *)
 
   (** {2:time_span [Time.cpu_span]} *)
 
