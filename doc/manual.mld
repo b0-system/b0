@@ -64,7 +64,7 @@ allows to find out which root B0 file is determined by [b0] and
 provides a few actions on it:
 
 {v
-b0 file path    # Show the absolute path to the root B0 file
+b0 file         # Show the absolute path to the root B0 file
 b0 file edit    # Edit the root B0 file.
 b0 file --help  # See all actions available on the B0 file
 v}

@@ -33,15 +33,15 @@ let () =
 
     (* Tests *)
     Pkg.test "test/test";
+    Pkg.test "test/test_b0_file";
     Pkg.test "test/test_cp";
-    Pkg.test "test/test_rm";
+    Pkg.test "test/test_findex";
     Pkg.test "test/test_memo_failures";
     Pkg.test "test/test_memo_no_write";
     Pkg.test "test/test_memo_redir";
     Pkg.test "test/test_memo_store";
-    Pkg.test "test/test_findex";
     Pkg.test "test/test_ocaml_cobj_defs";
-    Pkg.test "test/test_b0_file";
+    Pkg.test "test/test_rm";
 
     (* Doc *)
     Pkg.doc "doc/index.mld" ~dst:"odoc-pages/index.mld";
