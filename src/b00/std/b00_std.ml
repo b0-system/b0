@@ -1249,14 +1249,14 @@ module String = struct
     in
     loop Set.empty [] ss
 
-  let unique ~exists n =
-    let rec loop i n = match i > 1_000_000_000 with
-    | true -> Fmt.error "Could not uniquify %s after 1e9 retries." n
+  let unique ?(limit = 1_000_000_000) ~exists n =
+    let rec loop i n = match i > limit with
+    | true -> Fmt.invalid_arg "Could not uniquify %s after %d retries." n limit
     | false ->
         let r = Fmt.str "%s~%d" n i in
-        if exists r then loop (i + 1) n else Ok r
+        if exists r then loop (i + 1) n else r
     in
-    if exists n then loop 1 n else Ok n
+    if exists n then loop 1 n else n
 
   (* Substituting *)
 

@@ -712,11 +712,11 @@ module String : sig
       preserved. *)
 
   val unique :
-    exists:(string -> bool) -> string -> (string, string) result
+    ?limit:int -> exists:(string -> bool) -> string -> string
   (** [unique ~exist n] is [n] if [exists n] is [false] or [r = strf
-      "%s~%d" n d] with [d] the smallest integer in \[[1];[1e9]\] such
-      that [exists r] is [false] or an error if there is no such
-      string. *)
+      "%s~%d" n d] with [d] the smallest integer such that exists [r]
+      if [false]. If no [d] in \[[1];[1e9]\] satisfies the condition
+      [Invalid_argument] is raised, [limit] defaults to [1e9]. *)
 
   (** {1:suggesting Suggesting} *)
 
