@@ -110,7 +110,7 @@ let test =
 
 let test_cp = test_exe "test_cp.ml" ~doc:"Test for Os.Path.copy"
 let test_rm = test_exe "test_rm.ml" ~doc:"Test for Os.Path.delete"
-
+let test_findex = test_exe "test_findex.ml" ~doc:"Test for B00_findex"
 let test_memo_failure =
   test_memo "test_memo_failures.ml" ~doc:"Tests some failures of B00.Memo."
 

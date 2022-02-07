@@ -10,9 +10,9 @@ let () =
     let dirs = List.tl (Array.to_list Sys.argv) in
     let dirs = List.map Fpath.of_string dirs in
     let dirs = List.map Result.to_failure dirs in
-    let c = Time.counter () in
+    let c = Os.Mtime.counter () in
     let _index = B00_findex.of_dirs dirs |> Result.to_failure in
-    Fmt.pr "@[%a@]@." Time.Span.pp (Time.count c);
+    Fmt.pr "@[%a@]@." Mtime.Span.pp (Os.Mtime.count c);
     exit 0;
   with
   | Failure e -> Fmt.epr "%s@." e; exit 1
