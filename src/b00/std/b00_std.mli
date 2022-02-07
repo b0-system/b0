@@ -1553,6 +1553,169 @@ module Hash : sig
       error message. *)
 end
 
+(** Monotonic time stamps and spans.
+
+    This module provides support for representing monotonic wall-clock time.
+    This time increases monotonically and is not subject to operating
+    system calendar time adjustement. Its absolute value is meaningless.
+
+    To obtain monotonic time stamps and measure it use {!Os.Mtime}. *)
+module Mtime : sig
+
+  (** {1:span Monotonic time spans} *)
+
+  type span
+  (** The type for non-negative monotonic time spans. They represent
+      the difference between two monotonic clock readings with
+      nanosecond precision (1e-9s) and can measure up to
+      approximatevely 584 Julian year spans before silently rolling
+      over (unlikely since this is in a single program run). *)
+
+    (** Monotonic time spans *)
+  module Span : sig
+
+    (** {1:span Time spans} *)
+
+    type t = span
+    (** See {!type:span}. *)
+
+    val zero : span
+    (** [zero] is a span of 0ns. *)
+
+    val one : span
+    (** [one] is a span of 1ns. *)
+
+    val max_span : span
+    (** [max_span] is a span of [2^64-1]ns. *)
+
+    val add : span -> span -> span
+    (** [add s0 s1] is [s0] + [s1]. {b Warning.} Rolls over on overflow. *)
+
+    val abs_diff : span -> span -> span
+    (** [abs_diff s0 s1] is the absolute difference between [s0] and [s1]. *)
+
+    (** {1:preds Predicates and comparisons} *)
+
+    val equal : span -> span -> bool
+    (** [equal s0 s1] is [s0 = s1]. *)
+
+    val compare : span -> span -> int
+    (** [compare s0 s1] orders span by increasing duration. *)
+
+    (** {1:const Durations} *)
+
+    val ( * ) : int -> span -> span
+    (** [n * dur] is [n] times duration [n]. Does not check for
+        overflow or that [n] is positive. *)
+
+    val ns : span
+    (** [ns] is a nanosecond duration, 1·10{^-9}s. *)
+
+    val us : span
+    (** [us] is a microsecond duration, 1·10{^-6}s. *)
+
+    val ms : span
+    (** [ms] is a millisecond duration, 1·10{^-3}s. *)
+
+    val s : span
+    (** [s] is a second duration, 1s. *)
+
+    val min : span
+    (** [min] is a minute duration, 60s. *)
+
+    val hour : span
+    (** [hour] is an hour duration, 3600s. *)
+
+    val day : span
+    (** [day] is a day duration, 86'400s. *)
+
+    val year : span
+    (** [year] is a Julian year duration (365.25 days), 31'557'600s. *)
+
+    (** {1:conv Conversions} *)
+
+
+      (** {1:conv Conversions} *)
+
+    val to_uint64_ns : span -> int64
+    (** [to_uint64_ns s] is [s] as an {e unsigned} 64-bit integer nanosecond
+        span. *)
+
+    val of_uint64_ns : int64 -> span
+    (** [of_uint64_ns u] is the {e unsigned} 64-bit integer nanosecond span [u]
+        as a span. *)
+
+    (** {1:fmt Formatting} *)
+
+    val pp : span Fmt.t
+    (** [pp] formats with {!Fmt.uint64_ns_span}. *)
+
+    val pp_ns : span Fmt.t
+    (** [pp_ns ppf s] prints [s] as an unsigned 64-bit integer nanosecond
+        span. *)
+  end
+
+  (** {1:timestamp Monotonic timestamps}
+
+      {b Note.} Only use timestamps if you need inter-process time
+      correlation,  otherwise prefer {!Os.Mtime.elapsed} and
+      {{!B00_std.Os.Mtime.monotonic_counters}counters} to measure time. *)
+
+  type t
+  (** The type for monotonic timestamps relative to an indeterminate
+      system-wide event (e.g. last startup). Their absolute value has no
+      meaning but can be used for inter-process time correlation. *)
+
+  val to_uint64_ns : t -> int64
+  (** [to_uint64_ns t] is [t] as an {e unsigned} 64-bit integer
+      nanosecond timestamp. The absolute value is meaningless. *)
+
+  val of_uint64_ns : int64 -> t
+  (** [to_uint64_ns t] is [t] is an {e unsigned} 64-bit integer
+      nanosecond timestamp as a timestamp.
+
+      {b Warning.} Timestamps returned by this function should only be
+      used with other timestamp values that are know to come from the
+      same operating system run. *)
+
+  val min_stamp : t
+  (** [min_stamp] is the earliest timestamp. *)
+
+  val max_stamp : t
+  (** [max_stamp] is the latest timestamp. *)
+
+   val pp : t Fmt.t
+  (** [pp] is a formatter for timestamps. *)
+
+  (** {1:preds Predicates} *)
+
+  val equal : t -> t -> bool
+  (** [equal t t'] is [true] iff [t] and [t'] are equal. *)
+
+  val compare : t -> t -> int
+  (** [compare t t'] orders timestamps by increasing time. *)
+
+  val is_earlier : t -> than:t -> bool
+  (** [is_earlier t ~than] is [true] iff [t] occurred before [than]. *)
+
+  val is_later : t -> than:t -> bool
+  (** [is_later t ~than] is [true] iff [t] occurred after [than]. *)
+
+  (** {1:arith Arithmetic} *)
+
+  val span : t -> t -> span
+  (** [span t t'] is the span between [t] and [t'] regardless of the
+      order between [t] and [t']. *)
+
+  val add_span : t -> span -> t option
+  (** [add_span t s] is the timestamp [s] units later than [t] or [None] if
+      the result overflows. *)
+
+  val sub_span : t -> span -> t option
+  (** [sub_span t s] is the timestamp [s] units earlier than [t] or
+      [None] if overflows. *)
+end
+
 (** Measuring time.
 
     Support to measure monotonic wall-clock time, CPU
@@ -1580,7 +1743,7 @@ module Time : sig
     val one : span
     (** [one] is a span of 1ns. *)
 
-    val max : span
+    val max_span : span
     (** [max_span] is a span of [2^64-1]ns. *)
 
     val add : span -> span -> span

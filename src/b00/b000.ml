@@ -534,7 +534,7 @@ module Op = struct
       ~id ~mark ~created ~reads ~writes ?writes_manifest_root ?post_exec ?k
       kind
     =
-    let time_started = Time.Span.max and duration = Time.Span.zero in
+    let time_started = Time.Span.max_span and duration = Time.Span.zero in
     let revived = false and status = Waiting and hash = Hash.nil in
     { id; mark; time_created = created; time_started; duration; revived;
       status; reads; writes; writes_manifest_root; hash; post_exec; k; kind }

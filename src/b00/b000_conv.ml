@@ -257,7 +257,7 @@ module Op = struct
     Fmt.box @@ pp_subfield "created" Op.time_created Time.Span.pp
 
   let pp_timings ppf o =
-    match Time.Span.equal (Op.time_started o) Time.Span.max with
+    match Time.Span.equal (Op.time_started o) Time.Span.max_span with
     | true -> pp_timing_created ppf o
     | false -> pp_timings ppf o
 
