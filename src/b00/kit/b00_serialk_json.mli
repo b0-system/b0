@@ -94,27 +94,27 @@ module Json : sig
       is returned. *)
 
   val get_null : t -> unit
-  (** [get_null j] is like {!to_null} but raises {!Invalid_argument}
+  (** [get_null j] is like {!to_null} but raises [Invalid_argument]
       if [j] is not a null. *)
 
   val get_bool : t -> bool
-  (** [get_bool j] is like {!to_bool} but raises {!Invalid_argument}
+  (** [get_bool j] is like {!to_bool} but raises [Invalid_argument]
       if [j] is not a bool. *)
 
   val get_float : t -> float
-  (** [get_float j] is like {!to_float} but raises {!Invalid_argument}
+  (** [get_float j] is like {!to_float} but raises [Invalid_argument]
       if [j] is not a float. *)
 
   val get_string : t -> string
-  (** [get_string j] is like {!to_string} but raises {!Invalid_argument}
+  (** [get_string j] is like {!to_string} but raises [Invalid_argument]
       if [j] is not a string. *)
 
   val get_array : t -> t list
-  (** [get_array j] is like {!to_array} but raises {!Invalid_argument}
+  (** [get_array j] is like {!to_array} but raises [Invalid_argument]
       if [j] is not a array. *)
 
   val get_obj : t -> mem list
-  (** [get_obj j] is like {!to_obj} but raises {!Invalid_argument}
+  (** [get_obj j] is like {!to_obj} but raises [Invalid_argument]
       if [j] is not a array. *)
 
   (** {1:fmt Formatters} *)

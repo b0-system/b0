@@ -5,7 +5,7 @@
 
 (** World Wide Web interaction.
 
-    Toys to interact with the World Wide Web. See also {!B00_json}. *)
+    Toys to interact with the World Wide Web. *)
 
 (** {1:www WWW} *)
 

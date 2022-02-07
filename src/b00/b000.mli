@@ -162,7 +162,7 @@ module File_cache : sig
       until the cache either weights at most [max_byte_size] or is
       [pct] of its current size; whichever is the smaller. The
       function deletes by order of increasing key access time (see
-      {!key_stats}) but unused keys determined by {!is_unused} are deleted
+      {!key_stats}) but unused keys determined by [is_unused] are deleted
       first (defaults to [fun _ -> false]). *)
 end
 
@@ -222,7 +222,7 @@ module Op : sig
     (** [v] constructs a bare copy operation. *)
 
     val get : op -> t
-    (** [get o] is the copy operation [o]. Raises {!Invalid_argument} if [o]
+    (** [get o] is the copy operation [o]. Raises [Invalid_argument] if [o]
         is not a copy. *)
 
     val src : t -> Fpath.t
@@ -257,7 +257,7 @@ module Op : sig
     (** [v] constructs a bare deletion operation. *)
 
     val get : op -> t
-    (** [get o] is the delete operation [o]. Raises {!Invalid_argument} if [o]
+    (** [get o] is the delete operation [o]. Raises [Invalid_argument] if [o]
         is not a delete. *)
 
     val path : t -> Fpath.t
@@ -283,7 +283,7 @@ module Op : sig
     (** [v] constructs a bare mkdir operation. *)
 
     val get : op -> t
-    (** [get o] is the mkdir [o]. Raises {!Invalid_argument} if [o] is not
+    (** [get o] is the mkdir [o]. Raises [Invalid_argument] if [o] is not
         a mkdir. *)
 
     val dir : t -> Fpath.t
@@ -314,7 +314,7 @@ module Op : sig
     (** [v] constructs a notification operation. *)
 
     val get : op -> t
-    (** [get o] is the notification [o]. Raise {!Invalid_argument} if [o]
+    (** [get o] is the notification [o]. Raise [Invalid_argument] if [o]
         is not a notification. *)
 
     val kind : t -> kind
@@ -342,7 +342,7 @@ module Op : sig
     (** [v] constructs a bare read operation. *)
 
     val get : op -> t
-    (** [get o] is the read [o]. Raise {!Invalid_argument} if [o]
+    (** [get o] is the read [o]. Raise [Invalid_argument] if [o]
         is not a read. *)
 
     val file : t -> Fpath.t
@@ -401,7 +401,7 @@ module Op : sig
     (** [v] constructs a bare spawn operation. *)
 
     val get : op -> t
-    (** [get o] is the spawn [o]. Raises {!Invalid_argument} if [o] is
+    (** [get o] is the spawn [o]. Raises [Invalid_argument] if [o] is
         not a spawn. *)
 
     val env : t -> Os.Env.assignments
@@ -500,7 +500,7 @@ module Op : sig
     (** [v] constructs a bare write operation. *)
 
     val get : op -> t
-    (** [geo o] is the write [o]. Raises {!Invalid_argument} if [o] is
+    (** [geo o] is the write [o]. Raises [Invalid_argument] if [o] is
         not a write. *)
 
     val stamp : t -> string
@@ -567,7 +567,7 @@ module Op : sig
       been submitted for execution. *)
 
   val time_ended : t -> Time.span
-  (** [exec_end_time o] is [o]'s execution end time. This is different
+  (** [time_ended o] is [o]'s execution end time. This is different
       from {!B00_std.Time.Span.max} once the operation has been completed
       and collected. *)
 
@@ -579,7 +579,7 @@ module Op : sig
 
   val revived : t -> bool
   (** [revived o] is [true] iff [o] was revived from a cache. Only
-      relevant if {!hash} is not {!Hash.nil}. *)
+      relevant if {!hash} is not {!B00_std.Hash.nil}. *)
 
   val status : t -> status
   (** [status o] is [o] execution status. *)
@@ -596,9 +596,9 @@ module Op : sig
       [root] are stored along-side the cache key. *)
 
   val hash : t -> Hash.t
-  (** [hash o] is the operation's hash. This is {!Hash.nil} before the
+  (** [hash o] is the operation's hash. This is {!B00_std.Hash.nil} before the
       operation hash has been effectively computed and set via
-      {!set_hash}. This remains {!Hash.nil} for operations that are
+      {!set_hash}. This remains {!B00_std.Hash.nil} for operations that are
       not revivable. *)
 
   (** {1:upd Updating the build operation} *)
@@ -720,7 +720,7 @@ module Op : sig
     ready_roots:Fpath.Set.t -> t list -> (unit, aggregate_error) result
   (** [find_aggregate_error ~ready_roots os] finds an aggregate error among
       the list of operation [os], assuming files [ready_roots] were made
-      ready. This is [Ok ()] if all operations [os] {!Executed}. *)
+      ready. This is [Ok ()] if all operations [os] {!B000.Op.Done}. *)
 end
 
 (** Build operation revivers.
@@ -730,7 +730,7 @@ end
     {{!Op}build operations}.
 
     {b Note.} Hashes performed on files by this module are
-    {{!file_hashes}cached}. *)
+    {{!Reviver.file_hashes}cached}. *)
 module Reviver : sig
 
   (** {1:reviver Operation reviver} *)
@@ -742,7 +742,7 @@ module Reviver : sig
   (** [create clock hash_fun cache] is a reviver with
       {ul
       {- [clock] the clock used to {{!file_hash_dur}measure} file hashing
-         time and {{!Op.set_exec_start_time}timestamp} revived operations.}
+         time and {{!B000.Op.set_time_started}timestamp} revived operations.}
       {- [hash_fun] the hash function used to hash files and build operations.}
       {- [cache] the file cache used to record build operations.}} *)
 
@@ -780,7 +780,7 @@ module Reviver : sig
   val record : t -> Op.t -> (bool, string) result
   (** [record r o] records operation [o] in the reviver [r]. This
       associates the [Op.writes o] of [o] to the key [Op.hash o]
-      (i.e. this function assume [o] has gone through {!set_op_hash}
+      (i.e. this function assume [o] has gone through {!B000.Op.set_hash}
       before) and stores operation output information of [o] in the
       key's metadata hunk. The semantics of the result is like
       {!File_cache.add}; in particular in case of [Ok false] it means
@@ -790,7 +790,7 @@ module Reviver : sig
   val revive : t -> Op.t -> (bool, string) result
   (** [revive r o] tries to revive operation [o] from [r] using the key
       [Op.hash o] (i.e. this function assume [o] has gone through
-      {!set_op_hash} before). In particular:
+      {!B000.Op.set_hash} before). In particular:
       {ol
       {- Recreates the files [Op.writes o]}
       {- Sets [o]'s execution information using the metadata hunk
@@ -802,8 +802,8 @@ module Reviver : sig
       is returned then nothing was revived and the file system is
       kept unchanged. Nothing is guaranteed in case of [Error _].
 
-      {b Warning.} The fields {!Op.exec_start_time},
-      {!Op.exec_end_time} of [o] get set regardless of the result.
+      {b Warning.} The fields {!Op.time_started},
+      {!Op.time_ended} of [o] get set regardless of the result.
       This may be overwritten later by {!Exec}. *)
 end
 
@@ -814,12 +814,12 @@ end
     {ul
     {- It is {e ready} and can be submitted for execution. This
        happens once all the files the operation {{!Op.reads}reads} are
-       {{!set_file_ready}ready}: they exist and are up-to-date.}
+       {{!Guard.set_file_ready}ready}: they exist and are up-to-date.}
     {- It is {e aborted}. This happens if a file it needs to
-       read {{!set_file_never}never} becomes ready.}}
+       read {{!Guard.set_file_never}never} becomes ready.}}
 
     {b Note.} This module does not access the file system it trusts
-    clients that call {!set_file_ready} not to lie about its existence
+    clients that call {!Guard.set_file_ready} not to lie about its existence
     on the file system. *)
 module Guard : sig
 
@@ -878,7 +878,7 @@ module Exec : sig
           defaults to {!B00_std.Os.Dir.default_tmp}[ ()].}
       {- [feedback] a function called with each {{!schedule}scheduled}
          operation when it starts executing. Default is a nop.}
-      {- [trash], the trash used to execute {!Op.constructor-Delete} build
+      {- [trash], the trash used to execute {!B000.Op.module-Delete} build
          operations.}
       {- [jobs] the maximal number of processes spawn simultaneously.}}
  *)

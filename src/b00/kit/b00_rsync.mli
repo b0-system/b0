@@ -9,7 +9,7 @@ open B00_std
 
 val get_cmd :
   ?search:Fpath.t list -> ?cmd:Cmd.t -> unit -> (Cmd.t, string) result
-(** [get_cmd ()] looks for [rsync] with {!Os.Cmd.get}. *)
+(** [get_cmd ()] looks for [rsync] with {!B00_std.Os.Cmd.get}. *)
 
 val copy :
   ?opts:Cmd.t -> ?stats:bool -> delete:bool ->

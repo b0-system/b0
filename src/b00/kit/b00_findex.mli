@@ -23,7 +23,7 @@ val of_dirs :
   ?prune:(Unix.stats -> string -> Fpath.t -> bool) ->
   Fpath.t list -> (t, string) result
 (** [of_dirs dirs] returns a file index for the files in [dirs] whose
-    prefixes may be reduced see {!root_root_dir}. See
+    prefixes may be reduced see {!root_root_dirs}. See
     {!B00_std.Os.Dir.fold} for the semantics of optional arguments. *)
 
 (** {1:root Root directories} *)

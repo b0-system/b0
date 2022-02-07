@@ -21,7 +21,7 @@ open B00_std
     spawns. If an environment variable is accessed by the tool but
     does not influence its output it should be declared as
     unstamped. Variables specifying the location of
-    {{!tmp_vars}temporary file directories} are good examples of
+    {{!Tool.tmp_vars}temporary file directories} are good examples of
     unstamped variables.
 
     {b Portability.} In order to maximize portability no [.exe]
@@ -116,7 +116,7 @@ module Env : sig
   (** [v ~lookup ~forced_env env] is a build environment with:
       {ul
       {- [forced_env] is environment forced on any tool despite
-         what it declared to access, defaults to {!Os.Env.empty}}
+         what it declared to access, defaults to {!B00_std.Os.Env.empty}}
       {- [env] the environment read by the tools' declared environment
          variables.}} *)
 
@@ -278,8 +278,8 @@ module Memo : sig
     ?k:(unit -> unit) -> t -> [ `Fail | `Warn | `Start | `End | `Info ] ->
     ('a, Format.formatter, unit, unit) format4 -> 'a
   (** [notify m kind msg] is a notification [msg] of kind [kind]. Note that
-      a [`Fail] notification will entail a {!finish_error}, see also {!fail}
-      and {!fail_if_error}. *)
+      a [`Fail] notification will entail an an {!has_failures} on the memo,
+      see also {!fail} and {!fail_if_error}. *)
 
   val notify_if_error :
     t -> [ `Fail | `Warn | `Start | `End | `Info ] -> use:'a ->
@@ -287,7 +287,7 @@ module Memo : sig
   (** [notify_if_error m kind ~use r] is [v] if [r] is [Ok v]. If [r]
       is [Error e], a notification of kind [kind] is added to [m]
       and [use] is returned. Note that a [`Fail] notification will entail
-      a {!finish_error}, see also {!fail} and {!fail_if_error}. *)
+      an {!has_failures} on the memo, see also {!fail} and {!fail_if_error}. *)
 
   (** {1:files Files and directories} *)
 
@@ -322,7 +322,7 @@ module Memo : sig
   (** [mkdir m dir p] is a future that determines with [()] when the
       directory path [p] has been created with mode [mode] (defaults
       to [0o755]). The behaviour with respect to file permission
-      of intermediate path segments matches {!Os.Dir.create}. *)
+      of intermediate path segments matches {!B00_std.Os.Dir.create}. *)
 
   val delete : t -> Fpath.t -> unit Fut.t
   (** [delete m p] is a future that determines with [()] when path [p]
@@ -372,12 +372,12 @@ module Memo : sig
       {- [stdin] reads input from the given file. If unspecified reads
          from the standard input of the program running the build.  {b
          Warning.} The file is not automatically added to [reads],
-         this allows for example to use {!B00_std.Os.File.null}.}
+         this allows for example to use {!B00_std.Fpath.null}.}
       {- [stdout] and [stderr], the redirections for the standard
-         outputs of the command, see {!stdo}. Path to files are
+         outputs of the command, see {!B000.Op.Spawn.stdo}. Path to files are
          created if needed. {b Warning.} File redirections
          are not automatically added to [writes]; this allows for example
-         to use {!B00_std.Os.File.null}.}
+         to use {!B00_std.Fpath.null}.}
       {- [success_exits] the exit codes that determine if the build operation
          is successful (defaults to [0], use [[]] to always succeed)}
       {- [env], environment variables added to the build environment.
@@ -385,11 +385,10 @@ module Memo : sig
          build environment except for forced one. It also allows to
          specify environment that may not be mentioned by the running
          tool's {{!Tool.v}environment specification}.}
-      {- [cwd] the current working directory. Default is {!cwd}. In
+      {- [cwd] the current working directory. Default is the memo's [cwd]. In
          general it's better to avoid using relative file paths and
-         tweaking the [cwd]. Construct your paths using the absolute
-         {{!dirs}directory functions} and make your invocations
-         independent from the [cwd].}
+         tweaking the [cwd]. Construct make your paths absolute
+         and invocations independent from the [cwd].}
       {- [post_exec], if specified is called with the build operation
          after it has been executed or revived. If it was executed
          this is called before the operation gets recorded. It can

@@ -33,10 +33,10 @@ val exists_file : t -> map -> bool
 (** [exists_file exts fm s] is [true] iff [find_file fm s] is not empty. *)
 
 val ( + ) : t -> t -> t
-(** [( + )] is {!String.Set.union}. *)
+(** [( + )] is {!B00_std.String.Set.union}. *)
 
 val ( - ) : t -> t -> t
-(** [( - )] is {!String.Set.diff}. *)
+(** [( - )] is {!B00_std.String.Set.diff}. *)
 
 (** {1:cst Constant sets} *)
 

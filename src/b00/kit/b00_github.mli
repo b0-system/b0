@@ -241,12 +241,12 @@ module Pages : sig
          exists) and the author reset rather than a new commit added}
       {- If [force] is [true], the various git operations are forced.}
       {- [log] indicates a logging level used to
-         monitor progress (defaults to {!Log.app}).}}
+         monitor progress (defaults to {!B00_std.Log.app}).}}
       More precisely this:
       {ol
       {- Fetches [remote/branch] if it exists.}
       {- Creates a {{!B00_vcs.Git.transient_checkout}transient checkout} with
-         a temporary workdir in {!Os.Dir.default_tmp}
+         a temporary workdir in {!B00_std.Os.Dir.default_tmp}
          and a branch called [_b0-update-gh-pages] reset to [remote/branch].}
       {- Commits changes with message [msg] according to [us] which
          are applied in order, see {!val:update}.}

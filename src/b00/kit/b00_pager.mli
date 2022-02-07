@@ -49,9 +49,9 @@ val page_stdout : Cmd.t option -> (unit, string) result
     {- If the environment variable [LESS] is undefined in the
        current environment it is set to [LESS=FRX] for the spawn of
        [cmd].}
-    {- A {!Pervasive.at_exit} function is installed that flushes
-       {!Fmt.stdout} and {!stdout}, closes [Unix.stdout] and waits
-       upon the [cmd] spawn termination.}}
+    {- A {!Stdlib.at_exit} function is installed that flushes
+       {!B00_std.Fmt.stdout} and {!Stdlib.stdout}, closes [Unix.stdout] and
+       waits upon the [cmd] spawn termination.}}
     If [pager] is [None] this function has no effect. *)
 
 val page_files : Cmd.t option -> Fpath.t list -> (unit, string) result
@@ -68,7 +68,7 @@ val don't : ?docs:string -> unit -> bool Cmdliner.Term.t
 (** [don't ~docs ()] is a [--no-pager] command line option to
     unconditionally request not use a pager. [docs] is the manual
     section where the option is documented, defaults to
-    {!Manpage.s_common_options}. *)
+    {!Cmdliner.Manpage.s_common_options}. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 The b0 programmers

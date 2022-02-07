@@ -301,7 +301,7 @@ module Op : sig
   val query_cli : ?docs:string -> unit -> query Cmdliner.Term.t
   (** [query_cli ~docs ()] is a command line interface to select
       build operations. [docs] is where the option are documented, defaults to
-      {!Cmdliner.Manpage.s_options}} *)
+      {!Cmdliner.Manpage.s_options} *)
 
   val query_man : Cmdliner.Manpage.block list
   (** [query_man] is a manual fragment for {!query_cli}. *)
@@ -329,7 +329,7 @@ module Memo : sig
       {- [show_op] is the level at which any completed operation gets
          logged with {!B000_conv.Op.pp_short_ui}}}
       The formatter [op_howto] should format a way to got more information
-      about an operation, default to {!nop}. *)
+      about an operation, default to {!B00_std.Fmt.nop}. *)
 
   (** {1:dirs_files Directories and files} *)
 
@@ -455,7 +455,7 @@ module Memo : sig
       {ul
       {- [opts] are the cli options to specify it, defaults to [["j";"jobs"]].}
       {- [docs] is where the option is documented, defaults to
-         {!Manpage.s_options}}
+         {!Cmdliner.Manpage.s_options}}
       {- [doc] is a doc string.}
       {- [doc_none] describes how the value is determined if the term is
          evaluates to [None].}
@@ -479,7 +479,7 @@ module Memo : sig
       {ul
       {- [opts] are the cli options to specify it, defaults to [["hash-fun"]].}
       {- [docs] is where the option is documented, defaults to
-         {!Manpage.s_common_options}}
+         {!Cmdliner.Manpage.s_common_options}}
       {- [doc] is a doc string.}
       {- [doc_none] describes how the value is determined if the term is
          evaluates to [None].}
