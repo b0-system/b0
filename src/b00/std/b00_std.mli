@@ -1231,9 +1231,11 @@ module Fpath : sig
       In particular note that [p] cannot be [root]. *)
 
   val relative : to_dir:t -> t -> t
-  (** [relative to_dir p] is [q] such that [to_dir // q] represents
+  (** [relative ~to_dir p] is [q] such that [to_dir // q] represents
       the same path as [p]. Note that [q] is not necessarily relative:
       if [to_dir] is relative and [p] is absolute [p] is returned.
+
+      {b Warning.} This function is mostly broken at the moment.
 
       @raise Invalid_argument if path [to_dir] contains "..". *)
 

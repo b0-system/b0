@@ -5,6 +5,13 @@
 
 open B00_std
 
+let assert_eq' eq pp fnd exp =
+  if eq fnd exp then () else
+  (Fmt.pr "@[<v3>Expected: @[%a@]@,Found: @[%a@]@]@."
+     pp exp pp fnd; assert false)
+
+let assert_fpath = assert_eq' Fpath.equal Fpath.pp_unquoted
+
 let test_double_sep () =
   let test p q = assert (String.equal (Fpath.to_string (Fpath.v p)) q) in
   test "/////////" "//";
@@ -121,11 +128,23 @@ let test_parent () =
   test "/a/.." "/a/../../";
   ()
 
+let test_relative () =
+  let test p ~to_dir  q =
+    let to_dir = Fpath.v to_dir and p = Fpath.v p and q = Fpath.v q in
+    assert_fpath (Fpath.relative ~to_dir p) q
+  in
+  test "/a/b" ~to_dir:"/a/b/c" "../../b";
+  test "/a/b" ~to_dir:"a" "/a/b";
+  test "a/b" ~to_dir:"/a/b/c" "a/b";
+  test "a/b" ~to_dir:"a/b" "../b";
+  ()
+
 let test () =
   test_double_sep ();
   test_is_prefix_strip_prefix ();
   test_parent ();
   test_basename ();
+  test_relative ();
   ()
 
 (*---------------------------------------------------------------------------

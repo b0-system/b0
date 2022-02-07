@@ -1820,16 +1820,17 @@ module Fpath = struct
     String.equal (basename p0) (basename p1)
 
   let relative ~to_dir p =
+    (* FIXME this function needs to be rewritten *)
     (* XXX dirty, need a normalization function and/or a better parent
-       to handle that  *)
-    if String.includes ~affix:".." p
-    then Fmt.invalid_arg "%s: not dotdot allowed" p;
+       to handle that. Also the results should be normalized again.  *)
+    if String.includes ~affix:".." to_dir (* cmon that's obvi..ously wrong *)
+    then Fmt.invalid_arg "%s: no dotdot allowed" p;
     let to_dir = add_dir_sep to_dir in
     match strip_prefix to_dir p with
     | Some q -> q
     | None ->
         let rec loop loc dir =
-          if is_current_dir dir then p else
+          if is_current_dir dir || is_root dir then p else
           match strip_prefix dir p with
           | Some q -> append loc q
           | None -> loop (add_seg loc "..") (parent dir)
