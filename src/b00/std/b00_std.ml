@@ -2450,6 +2450,22 @@ module Os = struct
     external logical_count : unit -> int = "ocaml_b00_cpu_logical_count"
   end
 
+  module Mtime = struct
+    external mtime_now_ns : unit -> Mtime.t = "ocaml_b00_monotonic_now_ns"
+
+    (* Monotonic clock *)
+
+    let origin = mtime_now_ns ()
+    let elapsed () = Int64.sub (mtime_now_ns ()) origin
+    let now = mtime_now_ns
+
+    (* Monotonic time counter *)
+
+    type counter = Mtime.t
+    let counter = mtime_now_ns
+    let count c = Int64.sub (mtime_now_ns ()) c
+  end
+
   module Env = struct
 
     (* Variables *)

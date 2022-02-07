@@ -2098,6 +2098,54 @@ module Os : sig
         on the running machine. *)
   end
 
+  (** Monotonic time clock.
+
+      See {!B00_std.Mtime} for a discussion about monotonic time. *)
+  module Mtime : sig
+
+    (** {1:monotonic_clock Monotonic clock} *)
+
+    val now : unit -> Mtime.t
+    (** [now ()] is the current system-relative monotonic timestamp. Its
+        absolute value is meaningless. *)
+
+    val elapsed : unit -> Mtime.span
+    (** [elapsed ()] is the monotonic time span elapsed since the
+        beginning of the program. *)
+
+    (** {1:monotonic_counters Monotonic wall-clock time counters} *)
+
+    type counter
+    (** The type for monotonic wall-clock time counters. *)
+
+    val counter : unit -> counter
+    (** [counter ()] is a counter counting from now on. *)
+
+    val count : counter -> Mtime.span
+    (** [count c] is the monotonic time span elapsed since [c] was created. *)
+
+    (** {1:err Error handling}
+
+        The functions {!elapsed}, {!now}, {!val-counter},
+        raise [Sys_error] whenever they can't determine the
+        current time or that it doesn't fit in [Mtime]'s range. Usually
+        this exception should only be catched at the toplevel of your
+        program to log it and abort the program. It indicates a serious
+        error condition in the system.
+
+        {1:platform_support Platform support}
+
+        {ul
+        {- Platforms with a POSIX clock (includes Linux) use
+        {{:http://pubs.opengroup.org/onlinepubs/9699919799/functions/clock_gettime.html}[clock_gettime]}
+        with CLOCK_MONOTONIC.}
+        {- Darwin uses
+        {{:https://developer.apple.com/library/mac/qa/qa1398/_index.html}[mach_absolute_time]}.}
+        {- Windows uses
+        {{:https://msdn.microsoft.com/en-us/library/windows/desktop/aa373083%28v=vs.85%29.aspx}Performance counters}.}} *)
+  end
+
+
   (** Environment variables. *)
   module Env : sig
 
