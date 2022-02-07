@@ -163,7 +163,7 @@ module Memo : sig
       that we have notify operations. *)
 
   val create :
-    ?clock:Os.Mtime.counter -> ?cpu_clock:Time.cpu_counter ->
+    ?clock:Os.Mtime.counter -> ?cpu_clock:Os.Cpu.Time.counter ->
     feedback:(feedback -> unit) -> cwd:Fpath.t ->
     ?win_exe:bool -> ?tool_lookup:tool_lookup -> Env.t -> B000.Guard.t ->
     B000.Reviver.t -> B000.Exec.t -> t
@@ -187,7 +187,7 @@ module Memo : sig
   val clock : t -> Os.Mtime.counter
   (** [clock m] is [m]'s clock. *)
 
-  val cpu_clock : t -> Time.cpu_counter
+  val cpu_clock : t -> Os.Cpu.Time.counter
   (** [cpu_clock m] is [m]'s cpu clock. *)
 
   val win_exe : t -> bool

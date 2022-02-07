@@ -519,7 +519,7 @@ module Memo : sig
     (** [total_dur l] is the time spanning from {!B00.Memo.create} to
         {!of_memo}. *)
 
-    val cpu_dur : t -> Time.cpu_span
+    val cpu_dur : t -> Os.Cpu.Time.span
     (** [cpu_dur l] is the CPU time spanning from {!B00.Memo.create} to
         {!of_memo}. *)
 

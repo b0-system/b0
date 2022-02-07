@@ -726,7 +726,7 @@ module Memo = struct
         file_hashes : Hash.t Fpath.Map.t;
         hash_dur : Mtime.span;
         total_dur : Mtime.span;
-        cpu_dur : Time.cpu_span;
+        cpu_dur : Os.Cpu.Time.span;
         jobs : int;
         ops : B000.Op.t list; }
 
@@ -736,7 +736,7 @@ module Memo = struct
       let file_hashes = B000.Reviver.file_hashes r in
       let hash_dur = B000.Reviver.file_hash_dur r in
       let total_dur = Os.Mtime.count (B00.Memo.clock m) in
-      let cpu_dur = Time.cpu_count (B00.Memo.cpu_clock m) in
+      let cpu_dur = Os.Cpu.Time.count (B00.Memo.cpu_clock m) in
       let jobs = B000.Exec.jobs (B00.Memo.exec m) in
       let ops = B00.Memo.ops m in
       { hash_fun = H.id; hash_dur; file_hashes; total_dur; cpu_dur; jobs; ops }
@@ -775,7 +775,7 @@ module Memo = struct
       enc_file_hashes b l.file_hashes;
       Bincode.enc_time_span b l.hash_dur;
       Bincode.enc_time_span b l.total_dur;
-      Bincode.enc_time_cpu_span b l.cpu_dur;
+      Bincode.enc_cpu_time_span b l.cpu_dur;
       Bincode.enc_int b l.jobs;
       Bincode.enc_list (Bincode.enc B000_conv.Op.bincode) b l.ops
 
@@ -786,7 +786,7 @@ module Memo = struct
       let i, file_hashes = dec_file_hashes s i in
       let i, hash_dur = Bincode.dec_time_span s i in
       let i, total_dur = Bincode.dec_time_span s i in
-      let i, cpu_dur = Bincode.dec_time_cpu_span s i in
+      let i, cpu_dur = Bincode.dec_cpu_time_span s i in
       let i, jobs = Bincode.dec_int s i in
       let i, ops = Bincode.dec_list (Bincode.dec (B000_conv.Op.bincode)) s i in
       i, { hash_fun; file_hashes; hash_dur; total_dur; cpu_dur; jobs; ops; }
@@ -862,11 +862,11 @@ module Memo = struct
           children
       in
       let pp_stime ppf l =
-        let t = Time.(cpu_stime l.cpu_dur, cpu_children_stime l.cpu_dur) in
+        let t = Os.Cpu.Time.(stime l.cpu_dur, children_stime l.cpu_dur) in
         pp_xtime ppf t
       in
       let pp_utime ppf l =
-        let t = Time.(cpu_utime l.cpu_dur, cpu_children_utime l.cpu_dur) in
+        let t = Os.Cpu.Time.(utime l.cpu_dur, children_utime l.cpu_dur) in
         pp_xtime ppf t
       in
       let pp_op ppf (oc, ot, od) =

@@ -68,7 +68,7 @@ module Memo = struct
   and tool_lookup = t -> Cmd.tool -> (Fpath.t, string) result Fut.t
   and memo =
     { clock : Os.Mtime.counter;
-      cpu_clock : Time.cpu_counter;
+      cpu_clock : Os.Cpu.Time.counter;
       feedback : feedback -> unit;
       cwd : Fpath.t;
       win_exe : bool;
@@ -119,7 +119,9 @@ module Memo = struct
       ?tool_lookup env guard reviver exec
     =
     let clock = match clock with None -> Os.Mtime.counter () | Some c -> c in
-    let cpu_clock = match cc with None -> Time.cpu_counter () | Some c -> c in
+    let cpu_clock = match cc with
+    | None -> Os.Cpu.Time.counter () | Some c -> c
+    in
     let tool_lookup = cache_lookup @@ match tool_lookup with
     | None -> tool_lookup_of_os_env (Env.env env)
     | Some l -> l

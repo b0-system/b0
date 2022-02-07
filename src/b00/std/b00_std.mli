@@ -1716,53 +1716,6 @@ module Mtime : sig
       [None] if overflows. *)
 end
 
-(** Measuring time.
-
-    Support to measure CPU user and CPU system time. *)
-module Time : sig
-
-  (** {1:cpu_span CPU time spans} *)
-
-  type cpu_span
-  (** The type for CPU execution time spans. *)
-
-  val cpu_span :
-    cpu_utime:Mtime.span -> cpu_stime:Mtime.span ->
-    cpu_children_utime:Mtime.span ->
-    cpu_children_stime:Mtime.span -> cpu_span
-  (** [cpu_span ~cpu_utime ~cpu_stime ~cpu_children_utime
-      ~cpu_children_stime] is a cpu span with the given fields. See
-      accessors for semantics. *)
-
-  val cpu_zero : cpu_span
-  (** [cpu_zero] is zero CPU times. *)
-
-  val cpu_utime : cpu_span -> Mtime.span
-  (** [cpu_utime_s cpu] is [cpu]'s user time in seconds. *)
-
-  val cpu_stime : cpu_span -> Mtime.span
-  (** [cpu_stime_s cpu] is [cpu]'s system time in seconds. *)
-
-  val cpu_children_utime : cpu_span -> Mtime.span
-  (** [cpu_utime_s cpu] is [cpu]'s user time in seconds for children
-      processes. *)
-
-  val cpu_children_stime : cpu_span -> Mtime.span
-  (** [cpu_utime_s cpu] is [cpu]'s system time in seconds for children
-      processes. *)
-
-  (** {1:cpu_counter CPU time counters} *)
-
-  type cpu_counter
-  (** The type for CPU time counters. *)
-
-  val cpu_counter : unit -> cpu_counter
-  (** [cpu_counter ()] is a counter counting from now on. *)
-
-  val cpu_count : cpu_counter -> cpu_span
-  (** [cpu_count c] are CPU times since [c] was created. *)
-end
-
 (** Command lines.
 
     Command line values specify the command line arguments given to
@@ -2024,11 +1977,54 @@ end
 (** OS interaction. *)
 module Os : sig
 
-  (** CPU information. *)
+  (** CPU time and information. *)
   module Cpu : sig
     val logical_count : unit -> int
     (** [logical_count ()] is the number of logical CPUs available
         on the running machine. *)
+
+    (** Measuring CPU user and system time. *)
+    module Time : sig
+
+      (** {1:cpu_span CPU time spans} *)
+
+      type span
+      (** The type for CPU execution time spans. *)
+
+      val span :
+        utime:Mtime.span -> stime:Mtime.span ->
+        children_utime:Mtime.span ->
+        children_stime:Mtime.span -> span
+      (** [span ~utime ~stime ~children_utime
+          ~children_stime] is a cpu span with the given fields. See
+          accessors for semantics. *)
+
+      val zero : span
+      (** [zero] is zero CPU times. *)
+
+      val utime : span -> Mtime.span
+      (** [utime cpu] is [cpu]'s user time. *)
+
+      val stime : span -> Mtime.span
+      (** [stime cpu] is [cpu]'s system time. *)
+
+      val children_utime : span -> Mtime.span
+      (** [children_utime cpu] is [cpu]'s user time for children processes. *)
+
+      val children_stime : span -> Mtime.span
+      (** [children_stime cpu] is [cpu]'s system time for children processes. *)
+
+      (** {1:counter CPU time counters} *)
+
+      type counter
+      (** The type for CPU time counters. *)
+
+      val counter : unit -> counter
+      (** [counter ()] is a counter counting from now on. *)
+
+      val count : counter -> span
+      (** [count c] are CPU times since [c] was created. *)
+    end
   end
 
   (** Monotonic time clock.
@@ -3421,24 +3417,24 @@ module Bincode : sig
   (** {2:time_span [Time.span]} *)
 
   val enc_time_span : Mtime.span enc
-  (** [enc_time_span] encodes a {Mtime.type-span}. *)
+  (** [enc_time_span] encodes a {!Mtime.type-span}. *)
 
   val dec_time_span : Mtime.span dec
-  (** [dec_time_span] decodes a {Mtime.type-span}. *)
+  (** [dec_time_span] decodes a {!Mtime.type-span}. *)
 
   val time_span : Mtime.span t
-  (** [time_span] is a codec for {Mtime.type-span}. *)
+  (** [time_span] is a codec for {!Mtime.type-span}. *)
 
   (** {2:time_span [Time.cpu_span]} *)
 
-  val enc_time_cpu_span : Time.cpu_span enc
-  (** [enc_time_cpu_span] encodes a {!type:Time.cpu_span}. *)
+  val enc_cpu_time_span : Os.Cpu.Time.span enc
+  (** [enc_cpu_time_span] encodes a {!Os.Cpu.Time.type-span}. *)
 
-  val dec_time_cpu_span : Time.cpu_span dec
-  (** [dec_time_cpu_span] decodes a {!type:Time.cpu_span}. *)
+  val dec_cpu_time_span : Os.Cpu.Time.span dec
+  (** [dec_cpu_time_span] decodes a {!Os.Cpu.Time.type-span}. *)
 
-  val time_cpu_span : Time.cpu_span t
-  (** [time_span] is a codec for {!type:Time.cpu_span}. *)
+  val cpu_time_span : Os.Cpu.Time.span t
+  (** [cpu_time_span] is a codec for {!Os.Cpu.Time.type-span}. *)
 end
 
 (*---------------------------------------------------------------------------

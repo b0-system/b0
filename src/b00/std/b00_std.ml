@@ -2082,67 +2082,6 @@ module Mtime = struct
     if compare t s < 0 then None else Some (Int64.sub t s)
 end
 
-(* Measuring time *)
-
-module Time = struct
-  type uint64 = int64
-
-
-  (* Time spans
-
-     Represented by a nanosecond magnitude stored in an unsigned 64-bit
-     integer. Allows to represent spans for ~584.5 Julian years. *)
-
-  type span = Mtime.span
-  module Span = Mtime.Span
-
-  (* Monotonic time counter *)
-
-  type counter = uint64
-  external now_ns : unit -> uint64 = "ocaml_b00_monotonic_now_ns"
-  let counter = now_ns
-  let count c = Int64.sub (now_ns ()) c
-
-  (* CPU time spans *)
-
-  let sec_to_span sec = Int64.of_float (sec *. 1e9)
-
-  type cpu_span =
-    { cpu_utime : span; cpu_stime : span;
-      cpu_children_utime : span; cpu_children_stime : span; }
-
-  let cpu_span ~cpu_utime ~cpu_stime ~cpu_children_utime ~cpu_children_stime =
-    { cpu_utime; cpu_stime; cpu_children_utime; cpu_children_stime }
-
-  let cpu_zero = cpu_span
-      ~cpu_utime:0L ~cpu_stime:0L
-      ~cpu_children_utime:0L ~cpu_children_stime:0L
-
-  let cpu_utime c = c.cpu_utime
-  let cpu_stime c = c.cpu_stime
-  let cpu_children_utime c = c.cpu_children_utime
-  let cpu_children_stime c = c.cpu_children_stime
-
-  (* CPU counters *)
-
-  type cpu_counter = cpu_span
-  let cpu_counter () =
-    let now = Unix.times () in
-    { cpu_utime = sec_to_span now.Unix.tms_utime;
-      cpu_stime = sec_to_span now.Unix.tms_stime;
-      cpu_children_utime = sec_to_span now.Unix.tms_cutime;
-      cpu_children_stime = sec_to_span now.Unix.tms_cstime; }
-
-  let cpu_count c =
-    let now = Unix.times () in
-    { cpu_utime = Int64.sub (sec_to_span now.Unix.tms_utime) c.cpu_utime;
-      cpu_stime = Int64.sub (sec_to_span now.Unix.tms_stime) c.cpu_stime;
-      cpu_children_utime =
-        Int64.sub (sec_to_span now.Unix.tms_cutime) c.cpu_children_utime;
-      cpu_children_stime =
-        Int64.sub (sec_to_span now.Unix.tms_cstime) c.cpu_children_stime; }
-end
-
 (* Command lines *)
 
 module Cmd = struct
@@ -2448,6 +2387,49 @@ module Os = struct
 
   module Cpu = struct
     external logical_count : unit -> int = "ocaml_b00_cpu_logical_count"
+
+    (* Measuring CPU time *)
+
+    module Time = struct
+
+      (* CPU time spans *)
+
+      let sec_to_span sec = Int64.of_float (sec *. 1e9)
+
+      type span =
+        { utime : Mtime.span; stime : Mtime.span;
+          children_utime : Mtime.span; children_stime : Mtime.span; }
+
+      let span ~utime ~stime ~children_utime ~children_stime =
+        { utime; stime; children_utime; children_stime }
+
+      let zero =
+        span ~utime:0L ~stime:0L ~children_utime:0L ~children_stime:0L
+
+      let utime c = c.utime
+      let stime c = c.stime
+      let children_utime c = c.children_utime
+      let children_stime c = c.children_stime
+
+      (* CPU counters *)
+
+      type counter = span
+      let counter () =
+        let now = Unix.times () in
+        { utime = sec_to_span now.Unix.tms_utime;
+          stime = sec_to_span now.Unix.tms_stime;
+          children_utime = sec_to_span now.Unix.tms_cutime;
+          children_stime = sec_to_span now.Unix.tms_cstime; }
+
+      let count c =
+        let now = Unix.times () in
+        { utime = Int64.sub (sec_to_span now.Unix.tms_utime) c.utime;
+          stime = Int64.sub (sec_to_span now.Unix.tms_stime) c.stime;
+          children_utime =
+            Int64.sub (sec_to_span now.Unix.tms_cutime) c.children_utime;
+          children_stime =
+            Int64.sub (sec_to_span now.Unix.tms_cstime) c.children_stime; }
+    end
   end
 
   module Mtime = struct
@@ -4113,12 +4095,12 @@ module Log = struct
   (* Timing logging *)
 
   let time ?(level = Info) m f =
-    let time = Time.counter () in
+    let time = Os.Mtime.counter () in
     let r = f () in
-    let span = Time.count time in
+    let span = Os.Mtime.count time in
     !_kmsg.kmsg (fun () -> r) level
       (fun w ->
-         let header = Format.asprintf "%a" Time.Span.pp span in
+         let header = Format.asprintf "%a" Mtime.Span.pp span in
          m r (w ~header))
 
   (* Spawn logging *)
@@ -4419,29 +4401,29 @@ module Bincode = struct
 
   (* Time.span *)
 
-  let enc_time_span b s = enc_int64 b (Time.Span.to_uint64_ns s)
+  let enc_time_span b s = enc_int64 b (Mtime.Span.to_uint64_ns s)
   let dec_time_span s i =
-    let i, s = dec_int64 s i in i, Time.Span.of_uint64_ns s
+    let i, s = dec_int64 s i in i, Mtime.Span.of_uint64_ns s
 
   let time_span = v enc_time_span dec_time_span
 
   (* Time.cpu_span *)
 
-  let enc_time_cpu_span b c =
-    enc_time_span b (Time.cpu_utime c);
-    enc_time_span b (Time.cpu_stime c);
-    enc_time_span b (Time.cpu_children_utime c);
-    enc_time_span b (Time.cpu_children_stime c)
+  let enc_cpu_time_span b c =
+    enc_time_span b (Os.Cpu.Time.utime c);
+    enc_time_span b (Os.Cpu.Time.stime c);
+    enc_time_span b (Os.Cpu.Time.children_utime c);
+    enc_time_span b (Os.Cpu.Time.children_stime c)
 
-  let dec_time_cpu_span s i  =
-    let i, cpu_utime = dec_time_span s i in
-    let i, cpu_stime = dec_time_span s i in
-    let i, cpu_children_utime = dec_time_span s i in
-    let i, cpu_children_stime = dec_time_span s i in
+  let dec_cpu_time_span s i  =
+    let i, utime = dec_time_span s i in
+    let i, stime = dec_time_span s i in
+    let i, children_utime = dec_time_span s i in
+    let i, children_stime = dec_time_span s i in
     i,
-    Time.cpu_span ~cpu_utime ~cpu_stime ~cpu_children_utime ~cpu_children_stime
+    Os.Cpu.Time.span ~utime ~stime ~children_utime ~children_stime
 
-  let time_cpu_span = v enc_time_cpu_span dec_time_cpu_span
+  let cpu_time_span = v enc_cpu_time_span dec_cpu_time_span
 end
 
 (*---------------------------------------------------------------------------
