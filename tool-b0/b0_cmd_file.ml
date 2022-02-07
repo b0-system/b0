@@ -51,6 +51,37 @@ let edit all c =
   | `Exited 0 -> Ok B00_cli.Exit.ok
   | _ -> Ok B00_cli.Exit.some_error
 
+let gather rel keep_symlinks dirs c =
+  Log.if_error ~use:B00_cli.Exit.some_error @@
+  let rec gather seen b0s = function
+  | d :: dirs ->
+      let cwd = B0_driver.Conf.cwd c in
+      let b0_file = Fpath.(d / B0_driver.Conf.b0_file_name) in
+      let* b0_file' = Os.Path.realpath b0_file in
+      let b0_file = match keep_symlinks with
+      | true when rel -> Fpath.relative b0_file ~to_dir:cwd
+      | true -> Fpath.(cwd // b0_file)
+      | false when rel -> Fpath.relative b0_file' ~to_dir:cwd
+      | false -> b0_file'
+      in
+      let scope = Fpath.(basename @@ parent b0_file) in
+      let scope, seen = match String.Set.mem scope seen with
+      | false -> scope, String.Set.add scope seen
+      | true ->
+          let exists s = String.Set.mem s seen in
+          let scope' = String.unique ~exists scope in
+          scope', String.Set.add scope' seen
+      in
+      gather seen ((scope, b0_file) :: b0s) dirs
+  | [] -> Ok (List.sort Stdlib.compare b0s)
+  in
+  let* incs = gather String.Set.empty [] dirs in
+  let pp_inc ppf (s, f) =
+    Fmt.pf ppf {|@[[@@@@@@B0.include "%s" "%a"]@]|} s Fpath.pp_unquoted f
+  in
+  Log.app (fun m -> m "@[<v>%a@]" (Fmt.list pp_inc) incs);
+  Ok B00_cli.Exit.ok
+
 let includes root format c =
   let pp_inc = match format with
   | `Short -> fun ppf (_, (p, _)) -> Fpath.pp_unquoted ppf p
@@ -150,6 +181,32 @@ let edit =
   B0_b0.Cli.subcmd_with_driver_conf "edit" ~doc ~descr
     Term.(const edit $ all)
 
+let gather =
+  let doc = "Gathers B0 files from directories into a single one" in
+  let descr = `Blocks [
+      `P "$(tname) outputs a B0 file that includes the B0 files
+           in given $(i,DIR) directories. Typical usage:";
+      `P "$(b,mkdir aggregate)"; `Noblank;
+      `P "$(mname) $(b,file) $(tname) $(b,myproject repos/mylib > \
+          aggregate/B0.ml)";
+      `Noblank;
+      `P "$(b,cd aggregate) && $(mname)" ]
+  in
+  let dirs =
+    let doc = "Gather the $(docv)$(b,/B0.ml) file" in
+    Arg.(non_empty & pos_all B00_cli.fpath [] & info [] ~doc ~docv:"DIR")
+  in
+  let rel =
+    let doc = "Make file paths relative to the cwd." in
+    Arg.(value & flag & info ["relative"] ~doc)
+  in
+  let keep_symlinks =
+    let doc = "Don't resolve symlinks." in
+    Arg.(value & flag & info ["s"; "keep-symlinks"] ~doc)
+  in
+  B0_b0.Cli.subcmd_with_driver_conf "gather" ~doc ~descr
+    Term.(const gather $ rel $ keep_symlinks $ dirs)
+
 let includes =
   let doc = "Output scope name and paths of included B0 files" in
   let descr = `P "$(tname) outputs the scope name and paths of included B0 \
@@ -198,7 +255,7 @@ let source =
   B0_b0.Cli.subcmd_with_driver_conf "source" ~doc ~descr
     Term.(const source $ root)
 
-let subs = [boot; compile; edit; includes; log; path; requires; source ]
+let subs = [boot; compile; edit; gather; includes; log; path; requires; source ]
 
 let cmd =
   let doc = "Operate on the B0 file" in

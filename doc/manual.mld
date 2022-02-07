@@ -124,6 +124,9 @@ other B0 files:
 [@@@B0.include "projects/proj/B0.ml"]
 ]}
 
+See the [b0 file gather] command if you need to quickly gather
+a bunch of B0 files.
+
 {3:scope Scopes}
 
 An included B0 file defines a named {e scope} to which its definitions
