@@ -54,7 +54,7 @@ module File = struct
     in
     String.byte_escaper char_len set_char
 
-  let pp ppf file =
+  let _pp ppf file =
     let rec pp_value ppf = function
     | `Raw r -> Fmt.string ppf r
     | `B b -> Fmt.bool ppf b
@@ -75,9 +75,13 @@ module File = struct
     and pp_file ppf file = (Fmt.vbox (Fmt.list pp_item)) ppf file in
     pp_file ppf file
 
-  let to_string file =
+  let to_string ~normalize file =
     let b = Buffer.create (10 * 1024) in
-    pp (Format.formatter_of_buffer b) file; Buffer.contents b
+    let file = _pp (Format.formatter_of_buffer b) file; Buffer.contents b in
+    if not normalize then Ok file else
+    let stdin = Os.Cmd.in_string file in
+    let* opam = Lazy.force opam in
+    Os.Cmd.run_out ~stdin ~trim:true Cmd.(opam % "lint" % "-" % "--normalise")
 
   (* Package file generation *)
 
@@ -98,7 +102,7 @@ module File = struct
 
   let file_addendum =
     let doc = "opam file fragment added at the end" in
-    B0_meta.Key.v "opam-file-addendum" ~doc ~pp_value:pp
+    B0_meta.Key.v "opam-file-addendum" ~doc ~pp_value:_pp
 
   let build_field =
     let doc = "opam file build: field" in
@@ -347,7 +351,7 @@ module Pkg = struct
     | _, errs -> Error (String.concat "\n" (List.rev errs))
 
   let write_opam_file pkg ~version file ~dir =
-    let file = File.to_string file in
+    let* file = File.to_string ~normalize:true file in
     let fname = match version with
     | None -> name pkg ^ ".opam"
     | Some v -> String.concat "." [name pkg; v]
@@ -356,8 +360,9 @@ module Pkg = struct
 
   let lint_opam_file pkg file =
     let* opam = Lazy.force opam in
-    let opam_lint = Cmd.(opam % "lint" % "-") in
-    let stdin = Os.Cmd.in_string (File.to_string file) in
+    let opam_lint = Cmd.(opam % "lint" % "-" % "--normalise") in
+    let* file = File.to_string ~normalize:false file in
+    let stdin = Os.Cmd.in_string file in
     let* e = Os.Cmd.run_status_out ~trim:false ~stdin opam_lint in
     match e with
     | `Exited 0, _ -> Ok ()
@@ -408,8 +413,11 @@ let gen_files pkgs ~with_name ~dst =
     in
     let _, file = Pkg.file ~with_name pkg in
     match dir with
-    | None -> Log.app (fun m -> m "@[%a@]" File.pp file); Ok ()
-    | Some dir -> Pkg.write_opam_file pkg ~version:None file ~dir
+    | None ->
+        let* file = File.to_string ~normalize:true file in
+        Log.app (fun m -> m "@[%s@]" file); Ok ()
+    | Some dir ->
+        Pkg.write_opam_file pkg ~version:None file ~dir
   in
   let* () = list_iter_stop_on_error (gen_file ~with_name ~dst) pkgs in
   Ok B00_cli.Exit.ok
@@ -762,7 +770,7 @@ module Publish = struct
         let file =
           Fpath.(base_dir / Pkg.name i.pkg / versioned_name i / "opam")
         in
-        let contents = File.to_string i.file in
+        let* contents = File.to_string ~normalize:true i.file in
         match Os.File.write ~force:true ~make_path:true file contents with
         | Error _ as e -> e
         | Ok () -> add_pkgs ~base_dir (file :: acc) is

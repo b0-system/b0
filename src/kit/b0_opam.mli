@@ -52,13 +52,9 @@ module File : sig
   val v2 : item
   (** [v2] is [opam-version: "2.0"]. *)
 
-  (** {1:formatting Formatting} *)
-
-  val pp : t Fmt.t
-  (** [pp] formats file contents. *)
-
-  val to_string : t -> string
-  (** [to_string] formats file contents to a string. *)
+  val to_string : normalize:bool -> t -> (string, string) result
+  (** [to_string] formats file contents to a string. If [normalize]
+      is [true] this calls [opam] to lint and normalize the result. *)
 
   (** {1:package_files Package files} *)
 
