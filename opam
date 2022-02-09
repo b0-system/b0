@@ -1,21 +1,7 @@
 opam-version: "2.0"
 name: "b0"
-synopsis: """Software construction and deployment kit"""
-maintainer: ["Daniel Bünzli <daniel.buenzl i@erratique.ch>"]
-authors: ["The b0 programmers"]
-homepage: "https://erratique.ch/software/b0"
-doc: "https://erratique.ch/software/b0/doc"
-dev-repo: "git+https://erratique.ch/repos/b0.git"
-bug-reports: "https://github.com/b0-system/b0/issues"
-license: ["ISC" "BSD-2-Clause"]
-tags: ["dev" "org:erratique" "org:b0-system" "build"]
-depends: ["ocaml" {>= "4.08.0"}
-          "ocamlfind" {build}
-          "ocamlbuild" {build}
-          "topkg" {build & >= "1.0.3"}
-          "cmdliner" {>= "1.0.2"}]
-build: [["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]]
-description: """
+synopsis: "Software construction and deployment kit"
+description: """\
 WARNING this package is unstable and work in progress, do not depend on it. 
 
 B0 describes software construction and deployments using modular and
@@ -36,3 +22,19 @@ specific build systems.
 B0 is distributed under the ISC license. It depends on [cmdliner][cmdliner].
 
 [cmdliner]: https://erratique.ch/software/cmdliner"""
+maintainer: "Daniel Bünzli <daniel.buenzl i@erratique.ch>"
+authors: "The b0 programmers"
+license: ["ISC" "BSD-2-Clause"]
+tags: ["dev" "org:erratique" "org:b0-system" "build"]
+homepage: "https://erratique.ch/software/b0"
+doc: "https://erratique.ch/software/b0/doc"
+bug-reports: "https://github.com/b0-system/b0/issues"
+depends: [
+  "ocaml" {>= "4.08.0"}
+  "ocamlfind" {build}
+  "ocamlbuild" {build}
+  "topkg" {build & >= "1.0.3"}
+  "cmdliner" {>= "1.1.0"}
+]
+build: ["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]
+dev-repo: "git+https://erratique.ch/repos/b0.git"
