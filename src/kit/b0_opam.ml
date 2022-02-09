@@ -989,6 +989,12 @@ module Cmdlet = struct
             pkgs $ incompats $ check_only $ no_pr)
     in
     let envs = B00_github.Auth.envs in
+    let man = [ `S Cmdliner.Manpage.s_description;
+                `P "$(mname) publishes opam package on GitHub.";
+                `P "If you want to inspect the $(b,opam) file before \
+                    use $(b,b0 cmd --) $(b,.opam.file) $(i,PKG)….";
+                `Blocks man]
+    in
     B0_cmdlet.eval ~envs ~man env args publish
 end
 
