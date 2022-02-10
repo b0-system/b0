@@ -232,13 +232,18 @@ let exe_proc set_exe_path set_mod_srcs srcs b =
   let* c_objs = compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs in
   let mod_srcs = Mod.Src.sort (* for link *) ~deps:Mod.Src.ml_deps mod_srcs in
   let* link_requires = Lib.Resolver.get_list_and_deps resolver requires in
-  let archive ~code = match code with `Native -> Lib.cmxa | `Byte -> Lib.cma in
-  let lib_objs = List.filter_map (archive ~code) link_requires in
+  let archive ~code lib = match code with
+  | `Byte -> (match Lib.cma lib with None -> [] | Some cma -> [cma])
+  | `Native ->
+      let add v l = match v with None -> l | Some v -> v :: l in
+      add (Lib.cmxa lib) (add (Lib.c_archive lib) [])
+  in
+  let lib_objs = List.concat_map (archive ~code) link_requires in
   let cobjs = List.filter_map (Mod.Src.impl_file ~code) mod_srcs  in
   Link.code m ~conf ~code ~opts ~c_objs ~cobjs:(lib_objs @ cobjs) ~o;
   if all_code then begin
     let o = Fpath.(build_dir / (exe_name ^ ".byte" ^ exe_ext)) in
-    let lib_objs = List.filter_map (archive ~code:`Byte) link_requires in
+    let lib_objs = List.concat_map (archive ~code:`Byte) link_requires in
     let cobjs = List.filter_map (Mod.Src.impl_file ~code:`Byte) mod_srcs in
     Link.code m ~conf ~code:`Byte ~opts ~c_objs ~cobjs:(lib_objs @ cobjs) ~o
   end;

@@ -631,7 +631,8 @@ v}
 
   val c_archive : t -> Fpath.t option
   (** [c_archive l] is the library's [cmxa]'s companion C archive. Must
-      exist if the [cmxa] exists. *)
+      exist if the [cmxa] exists and, since 4.12 if [cmxa] is not
+      empty. *)
 
   val c_stubs : t -> Fpath.t list
   (** [c_stubs l] is the library's C stubs archives (if any). *)
@@ -904,8 +905,10 @@ module Link : sig
     o:Fpath.t -> unit
   (** [byte_exe m ~opts ~c_objs ~cobjs ~o] links the C objects
       [c_objs] and the OCaml compilation object files [cobjs] into a
-      native code executable [o]. An include is added to each element
-      of [cobjs] in order to lookup potential C stubs. *)
+      native code executable [o], in [cobjs] you need to add the C [lib_ext]
+      file of `cmxa` files if they exist (since 4.12 they may not exist).
+      An include is added to each element of [cobjs] in order to
+      lookup potential C stubs. *)
 
   val code :
     ?post_exec:(B000.Op.t -> unit) -> ?k:(int -> unit) -> Memo.t ->

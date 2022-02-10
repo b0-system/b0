@@ -1087,11 +1087,16 @@ module Archive = struct
       if not has_cstubs then Cmd.empty else
       Cmd.(atom "-cclib" % Fmt.str "-l%s" (cstubs_name oname))
     in
+    let cmxa_clib =
+      if cobjs = [] && Conf.version conf >= (4, 13, 0, None)
+      then []
+      else [Fpath.(odir / Fmt.str "%s%s" oname lib_ext)]
+    in
     let cmxa = Fpath.(odir / Fmt.str "%s.cmxa" oname) in
-    let cmxa_clib = Fpath.(odir / Fmt.str "%s%s" oname lib_ext) in
+    let writes = cmxa :: cmxa_clib in
     let c_objs = List.rev_map (Fpath.set_ext obj_ext) cobjs in
     let reads = List.rev_append c_objs cobjs in
-    Memo.spawn m ?post_exec ?k ~reads ~writes:[cmxa; cmxa_clib] @@
+    Memo.spawn m ?post_exec ?k ~reads ~writes @@
     ocamlopt Cmd.(atom "-a" % "-o" %% unstamp (path cmxa) %% opts %%
                   cstubs_opts %% unstamp (paths cobjs))
 
@@ -1138,15 +1143,27 @@ module Link = struct
   let native ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~o =
     let ocamlopt = Memo.tool m Tool.ocamlopt in
     let obj_ext = Conf.obj_ext conf in
-    let lib_ext = Conf.lib_ext conf in
-    let cobj_side_obj cobj =
-      let ext = if Fpath.has_ext ".cmx" cobj then obj_ext else lib_ext in
-      Fpath.set_ext ext cobj
-    in
     let incs = cstubs_incs cobjs in
-    let reads =
-      let sides = List.rev_map cobj_side_obj cobjs in
-      List.rev_append cobjs (List.rev_append sides c_objs)
+    let reads, cobjs =
+      let rec loop rsides rcobjs = function
+      | [] ->
+          List.rev_append rcobjs (List.rev_append rsides c_objs),
+          List.rev rcobjs
+      | cobj :: cobjs ->
+          match Fpath.has_ext ".cmx" cobj with
+          | true ->
+              (* Add the side `.o` C object to read files. *)
+              let rsides = Fpath.set_ext obj_ext cobj :: rsides in
+              loop rsides (cobj :: rcobjs) cobjs
+          | false ->
+              match Fpath.has_ext ".cmxa" cobj with
+              | true ->
+                  loop rsides (cobj :: rcobjs) cobjs
+              | false ->
+                  (* This should be the `cmxa`s C library archives *)
+                  loop (cobj :: rsides) rcobjs cobjs
+      in
+      loop [] [] cobjs
     in
     Memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
     ocamlopt Cmd.(atom "-o" %% unstamp (path o) %% opts %%
