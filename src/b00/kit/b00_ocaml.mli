@@ -586,7 +586,7 @@ v}
     name:Name.t -> requires:Name.t list -> dir:Fpath.t ->
     cmis:Fpath.t list -> cmxs:Fpath.t list -> cma:Fpath.t option ->
     cmxa:Fpath.t option -> c_archive:Fpath.t option ->
-    c_stubs:Fpath.t list -> t
+    c_stubs:Fpath.t list -> js_stubs:Fpath.t list -> t
   (** [v ~name ~cmis ~cmxs ~cma ~cmxa] is a library named [name] which
       requires libraries [requires], and library directory [dir], has
       [cmis] cmi files, [cmxs] cmx files, [cma] bytecode archive,
@@ -636,6 +636,9 @@ v}
 
   val c_stubs : t -> Fpath.t list
   (** [c_stubs l] is the library's C stubs archives (if any). *)
+
+  val js_stubs : t -> Fpath.t list
+  (** [js_stubs l] is the library's JavaScript stubs (if any). *)
 
   (** Library resolvers. *)
   module Resolver : sig

@@ -649,14 +649,19 @@ module Lib = struct
       cma : Fpath.t option;
       cmxa : Fpath.t option;
       c_archive : Fpath.t option;
-      c_stubs : Fpath.t list; }
+      c_stubs : Fpath.t list;
+      js_stubs : Fpath.t list;  }
 
-  let v ~name ~requires ~dir ~cmis ~cmxs ~cma ~cmxa ~c_archive ~c_stubs =
-    { name; requires; dir; cmis; cmxs; cma; cmxa; c_archive; c_stubs }
+  let v
+      ~name ~requires ~dir ~cmis ~cmxs ~cma ~cmxa ~c_archive ~c_stubs ~js_stubs
+    =
+    { name; requires; dir; cmis; cmxs; cma; cmxa; c_archive; c_stubs; js_stubs }
 
   let of_dir m ~clib_ext ~name ~requires ~dir ~archive =
-    let rec loop cmis cmxs cma cmxa c_archive c_stubs = function
-    | [] -> v ~name ~requires ~dir ~cmis ~cmxs ~cma ~cmxa ~c_archive ~c_stubs
+    let rec loop cmis cmxs cma cmxa c_archive c_stubs js_stubs = function
+    | [] ->
+        v ~name ~requires ~dir ~cmis ~cmxs ~cma ~cmxa ~c_archive ~c_stubs
+          ~js_stubs
     | f :: fs ->
         let is_lib_archive f = match archive with
         | None -> false
@@ -665,36 +670,39 @@ module Lib = struct
         match Fpath.get_ext f with
         | ".cmi" ->
             Memo.file_ready m f;
-            loop (f :: cmis) cmxs cma cmxa c_archive c_stubs fs
+            loop (f :: cmis) cmxs cma cmxa c_archive c_stubs js_stubs fs
         | ".cmx" ->
             Memo.file_ready m f;
-            loop cmis (f :: cmxs) cma cmxa c_archive c_stubs fs
+            loop cmis (f :: cmxs) cma cmxa c_archive c_stubs js_stubs fs
         | ".cma" ->
             let cma = match is_lib_archive f with
             | true -> Memo.file_ready m f; Some f
             | false -> cma
             in
-            loop cmis cmxs cma cmxa c_archive c_stubs fs
+            loop cmis cmxs cma cmxa c_archive c_stubs js_stubs fs
         | ".cmxa" ->
             let cmxa = match is_lib_archive f with
             | true -> Memo.file_ready m f; Some f
             | false -> cmxa
             in
-            loop cmis cmxs cma cmxa c_archive c_stubs fs
+            loop cmis cmxs cma cmxa c_archive c_stubs js_stubs fs
+        | ".js" ->
+            Memo.file_ready m f;
+            loop cmis cmxs cma cmxa c_archive c_stubs (f :: js_stubs) fs
         | ext when String.equal ext clib_ext ->
             Memo.file_ready m f;
             let c_archive, c_stubs = match is_lib_archive f with
             | true -> Some f, c_stubs
             | false -> c_archive, (f :: c_stubs)
             in
-            loop cmis cmxs cma cmxa c_archive c_stubs fs
+            loop cmis cmxs cma cmxa c_archive c_stubs js_stubs fs
         | _ ->
-            loop cmis cmxs cma cmxa c_archive c_stubs fs
+            loop cmis cmxs cma cmxa c_archive c_stubs js_stubs fs
     in
     Fut.return @@
     Result.map_error (fun e -> Fmt.str "library %a: %s" Name.pp name e) @@
     Result.bind (Os.Dir.fold_files ~recurse:false Os.Dir.path_list dir []) @@
-    fun fs -> Ok (loop [] [] None None None [] fs)
+    fun fs -> Ok (loop [] [] None None None [] [] fs)
 
   let name l = l.name
   let requires l = l.requires
@@ -705,6 +713,7 @@ module Lib = struct
   let cmxa l = l.cmxa
   let c_archive l = l.c_archive
   let c_stubs l = l.c_stubs
+  let js_stubs l = l.js_stubs
 
   (* Resolvers *)
 

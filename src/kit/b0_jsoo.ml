@@ -74,7 +74,8 @@ let get_link_objs ~code ~resolver ~requires ~mod_srcs =
   let mod_objs = List.filter_map (Mod.Src.impl_file ~code) mod_srcs  in
   let* link_requires = Lib.Resolver.get_list_and_deps resolver requires in
   let lib_objs = List.filter_map Lib.cma link_requires in
-  Fut.return (lib_objs, mod_objs)
+  let lib_jss = List.concat_map Lib.js_stubs link_requires in
+  Fut.return (lib_objs, mod_objs, lib_jss)
 
 let compile_byte m ~opts ~resolver ~requires ~mod_srcs =
   let code = `Byte in
@@ -86,10 +87,12 @@ let compile_byte m ~opts ~resolver ~requires ~mod_srcs =
 
 let link_byte m ~conf ~opts ~resolver ~requires ~mod_srcs ~o =
   let code = `Byte in
-  let* lib_objs, mod_objs = get_link_objs ~code ~resolver ~requires ~mod_srcs in
+  let* lib_objs, mod_objs, lib_jss =
+    get_link_objs ~code ~resolver ~requires ~mod_srcs
+  in
   let cobjs = lib_objs @ mod_objs in
   Link.code m ~conf ~code ~opts ~c_objs:[] ~cobjs ~o;
-  Fut.return ()
+  Fut.return lib_jss
 
 let byte_exe ~mod_srcs ~o b =
   let meta = B0_build.current_meta b in
@@ -103,11 +106,11 @@ let byte_exe ~mod_srcs ~o b =
   let m = B0_build.memo b in
   let* () = compile_byte m ~opts ~resolver ~requires ~mod_srcs in
   let opts = Cmd.(global_opts %% if' toplevel (atom "-linkall")) in
-  let* () = link_byte m ~conf ~opts ~resolver ~requires ~mod_srcs ~o in
-  Fut.return o
+  let* lib_jss = link_byte m ~conf ~opts ~resolver ~requires ~mod_srcs ~o in
+  Fut.return (o, lib_jss)
 
 let js_of_byte_exe ~jss ~mod_srcs ~o b =
-  let* byte = byte_exe ~mod_srcs ~o:Fpath.(o -+ ".byte") b in
+  let* byte, lib_jss = byte_exe ~mod_srcs ~o:Fpath.(o -+ ".byte") b in
   let meta = B0_build.current_meta b in
   let source_map = Option.join (B0_meta.find source_map meta) in
   let opts = Option.value ~default:Cmd.empty (B0_meta.find comp meta) in
@@ -116,6 +119,7 @@ let js_of_byte_exe ~jss ~mod_srcs ~o b =
   | true -> Cmd.(opts % "--toplevel" % "+toplevel.js" % "+dynlink.js")
   | false -> opts
   in
+  let jss = List.append lib_jss jss in
   B00_jsoo.compile (B0_build.memo b) ~opts ~source_map ~jss ~byte ~o;
   Fut.return ()
 
@@ -129,7 +133,10 @@ let js_of_byte_objs ~jss ~mod_srcs ~o b =
   let opts = global_opts in
   let* () = compile_byte m ~opts ~resolver ~requires ~mod_srcs in
   let code = `Byte in
-  let* lib_objs, mod_objs = get_link_objs ~code ~resolver ~requires ~mod_srcs in
+  let* lib_objs, mod_objs, lib_jss =
+    get_link_objs ~code ~resolver ~requires ~mod_srcs
+  in
+  let jss = List.append lib_jss jss in
   let source_map = Option.join (B0_meta.find source_map meta) in
   let toplevel = Option.value ~default:false (B0_meta.find toplevel meta) in
   let ocamlrt_js =

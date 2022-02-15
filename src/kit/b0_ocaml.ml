@@ -122,9 +122,10 @@ let lib_of_unit b ocaml_conf u =
     in
     loop [] [] (Mod.Name.Map.fold (fun _ v acc -> v :: acc) srcs [])
   in
+  let js_stubs = [] (* FIXME *) in
   Fut.return @@
   Some (Lib.v ~name ~requires ~dir:build_dir ~cmis ~cmxs ~cma ~cmxa ~c_archive
-          ~c_stubs)
+          ~c_stubs ~js_stubs)
 
 let libs_in_build
     b ~conf : (B0_unit.t * (Lib.t option Fut.t Lazy.t)) Lib.Name.Map.t
