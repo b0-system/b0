@@ -701,8 +701,15 @@ module Lib = struct
     in
     Fut.return @@
     Result.map_error (fun e -> Fmt.str "library %a: %s" Name.pp name e) @@
-    Result.bind (Os.Dir.fold_files ~recurse:false Os.Dir.path_list dir []) @@
-    fun fs -> Ok (loop [] [] None None None [] [] fs)
+    Result.bind (Os.Dir.exists dir) @@ function
+    | false ->
+        Memo.notify m `Warn "library %a: no directory %a"
+          Name.pp name Fpath.pp_unquoted dir;
+        Ok (v ~name ~requires ~dir ~cmis:[] ~cmxs:[] ~cma:None ~cmxa:None
+              ~c_archive:None ~c_stubs:[] ~js_stubs:[])
+    | true ->
+        Result.bind (Os.Dir.fold_files ~recurse:false Os.Dir.path_list dir [])
+        @@ fun fs -> Ok (loop [] [] None None None [] [] fs)
 
   let name l = l.name
   let requires l = l.requires
