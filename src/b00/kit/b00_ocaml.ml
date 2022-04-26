@@ -21,10 +21,11 @@ module Tool = struct
       "OCAML_SPACETIME_INTERVAL"; "OCAML_SPACETIME_SNAPSHOT_DIR"; "PATH";
       "TERM"; "__AFL_SHM_ID";
 
-      (* XXX These are Windows specific and needed by cl.exe
-         For cc is likely that we need to add LD_LIBRARY_PATH,
-         C_INCLUDE_PATH, LIBRARY_PATH. Either we add them in bulk
-         or we make them depend on the configuration. *)
+      (* XXX For cc for now we add them in bulk but we could make
+         them depend on the conffiguration. *)
+      "LD_LIBRARY_PATH"; "LIBRARY_PATH"; "C_INCLUDE_PATH";
+
+      (* XXX These are Windows specific and needed by cl.exe *)
       "SystemRoot"; "INCLUDE"; "LIB"; ]
 
   let ocamlc = Tool.by_name ~vars:comp_env_vars "ocamlc"

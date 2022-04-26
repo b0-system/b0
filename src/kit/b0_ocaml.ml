@@ -21,6 +21,11 @@ let pp_built_code ppf c = Fmt.string ppf (match c with
 let tag = B0_meta.Key.tag "ocaml" ~doc:"OCaml related entity"
 
 module Meta = struct
+  let c_requires =
+    let doc = "Required C libraries" in
+    let pp_value = Cmd.pp in
+    B0_meta.Key.v "c-requires" ~doc ~pp_value
+
   let requires =
     let doc = "Required OCaml libraries" in
     let pp_value = Fmt.(box @@ list ~sep:sp B00_ocaml.Lib.Name.pp) in
@@ -240,7 +245,11 @@ let exe_proc set_exe_path set_mod_srcs srcs b =
       add (Lib.cmxa lib) (add (Lib.c_archive lib) [])
   in
   let lib_objs = List.concat_map (archive ~code) link_requires in
-  let cobjs = List.filter_map (Mod.Src.impl_file ~code) mod_srcs  in
+  let cobjs = List.filter_map (Mod.Src.impl_file ~code) mod_srcs in
+  let opts =
+    let c_requires = B0_meta.get Meta.c_requires meta in
+    Cmd.(opts %% (Cmd.list ~slip:"-ccopt" (Cmd.to_list c_requires)))
+  in
   Link.code m ~conf ~code ~opts ~c_objs ~cobjs:(lib_objs @ cobjs) ~o;
   if all_code then begin
     let o = Fpath.(build_dir / (exe_name ^ ".byte" ^ exe_ext)) in
@@ -282,6 +291,10 @@ let lib_proc set_mod_srcs srcs b =
   let odir = build_dir and oname = archive_name in
   let has_cstubs = c_objs <> [] in
   if has_cstubs then Archive.cstubs m ~conf ~opts ~c_objs ~odir ~oname;
+  let opts =
+    let c_requires = B0_meta.get Meta.c_requires meta in
+    Cmd.(opts %% (Cmd.list ~slip:"-ccopt" (Cmd.to_list c_requires)))
+  in
   Archive.code m ~conf ~code ~opts ~has_cstubs ~cobjs ~odir ~oname;
   if all_code then begin
     let cobjs = List.filter_map (Mod.Src.impl_file ~code:`Byte) mod_srcs in
@@ -291,7 +304,7 @@ let lib_proc set_mod_srcs srcs b =
 
 let exe
     ?(wrap = fun proc b -> proc b) ?doc ?(meta = B0_meta.empty) ?action
-    ?(requires = []) ?name exe_name ~srcs
+    ?(c_requires = Cmd.empty) ?(requires = []) ?name exe_name ~srcs
   =
   let name = Option.value ~default:exe_name name in
   let mod_srcs, set_mod_srcs = Fut.create () in
@@ -301,6 +314,7 @@ let exe
     |> B0_meta.tag tag
     |> B0_meta.tag B0_meta.exe
     |> B0_meta.add B0_meta.exe_name exe_name
+    |> B0_meta.add Meta.c_requires c_requires
     |> B0_meta.add Meta.requires requires
     |> B0_meta.add Meta.mod_srcs mod_srcs
     |> B0_meta.add B0_meta.exe_file exe_path
@@ -311,7 +325,7 @@ let exe
 
 let lib
     ?(wrap = fun proc b -> proc b) ?doc ?(meta = B0_meta.empty) ?action
-    ?(requires = []) ?name lib_name ~srcs
+    ?(c_requires = Cmd.empty) ?(requires = []) ?name lib_name ~srcs
   =
   let name = match name with
   | None -> Lib.Name.undot ~rep:'-' lib_name
@@ -323,6 +337,7 @@ let lib
     |> B0_meta.tag tag
     |> B0_meta.tag B0_meta.lib
     |> B0_meta.add Meta.library lib_name
+    |> B0_meta.add Meta.c_requires c_requires
     |> B0_meta.add Meta.requires requires
     |> B0_meta.add Meta.mod_srcs mod_srcs
   in

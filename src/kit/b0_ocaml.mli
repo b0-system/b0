@@ -19,13 +19,15 @@ val libname : string -> Lib.Name.t
 
 val exe :
   ?wrap:(B0_unit.proc -> B0_unit.proc) -> ?doc:string -> ?meta:B0_meta.t ->
-  ?action:B0_unit.action -> ?requires:Lib.Name.t list -> ?name:string ->
-  string -> srcs:B0_srcs.sels -> B0_unit.t
+  ?action:B0_unit.action -> ?c_requires:Cmd.t -> ?requires:Lib.Name.t list ->
+  ?name:string -> string -> srcs:B0_srcs.sels -> B0_unit.t
 (** [exe n] is a build unit for an executable named [n] (without
     the platform specific extension).
     {ul
     {- [doc] is the unit doc string.}
     {- [meta] is the initial metadata.}
+    {- [c_requires] FIXME hack, something more sensitive should be done.
+       This each of these options are passed as [-cclib] options.}
     {- [requires] are the OCaml libraries required to compile the executable.}
     {- [name] is the name of the unit (defaults to [n]).}
     {- [srcs] are the executable sources. All files with extension [.ml],
@@ -36,13 +38,16 @@ val exe :
 
 val lib :
   ?wrap:(B0_unit.proc -> B0_unit.proc) -> ?doc:string -> ?meta:B0_meta.t ->
-  ?action:B0_unit.action -> ?requires:Lib.Name.t list -> ?name:string ->
+  ?action:B0_unit.action -> ?c_requires:Cmd.t ->
+  ?requires:Lib.Name.t list -> ?name:string ->
   Lib.Name.t -> srcs:B0_srcs.sels -> B0_unit.t
 (** [lib n ~srcs] is a built unit for a library named [l] made of
     sources [src].
     {ul
     {- [doc] is the unit doc string.}
     {- [meta] is the initial metadata.}
+    {- [c_requires] FIXME hack, something more sensitive should be done.
+       This each of these options are passed as [-cclib] options.}
     {- [requires] are the OCaml libraries required to compile the library.}
     {- [name] is the name of the build unit (default to [n] with [.]
         substituted by [-])}
@@ -98,6 +103,10 @@ val tag : unit B0_meta.key
 
 (** Metadata keys *)
 module Meta : sig
+
+  val c_requires : Cmd.t B0_meta.key
+  (** [c_requires] hack for now this simply passes these options as
+      [-cclib] options. *)
 
   val requires : Lib.Name.t list B0_meta.key
   (** [requires] on a build unit specifies the OCaml libraries needed to

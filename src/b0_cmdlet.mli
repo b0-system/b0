@@ -124,7 +124,6 @@ val eval :
     the docs there. By default [doc] is derived from the cmdlet's doc string
     and [exits] is {!B00_cli.Exit.infos}. *)
 
-
 (** {1:b0_def B0 definition API} *)
 
 include B0_def.S with type t := t
