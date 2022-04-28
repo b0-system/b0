@@ -3854,9 +3854,12 @@ module Os = struct
 
     let run_out ?env ?cwd ?stdin ?stderr ~trim cmd =
       match run_status_out ?env ?cwd ?stdin ?stderr ~trim cmd with
-      | Ok (`Exited 0, v) -> Ok v
-      | Ok (st, _) -> Fmt.error "%a" pp_cmd_status (cmd, st)
       | Error _ as e -> e
+      | Ok (`Exited 0, v) -> Ok v
+      | Ok (st, "") -> Fmt.error "%a" pp_cmd_status (cmd, st)
+      | Ok (st, o) ->
+          Fmt.error "@[<v>%a after outputing:@, @[%a@]@]"
+            pp_cmd_status (cmd, st) Fmt.lines o
 
     (* Non-blocking command *)
 

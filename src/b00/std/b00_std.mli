@@ -2762,10 +2762,14 @@ module Os : sig
     (** The type for process exit statuses. *)
 
     val pp_status : status Fmt.t
-    (** [pp_status] is a formatter for process exit statuses. *)
+    (** [pp_status] is a formatter for process exit statuses of the form:
+        {ul
+        {- ["exited %d"] for [`Exited _] values}a
+        {- ["signaled %s"] for [`Signaled _] value}} *)
 
     val pp_cmd_status : (Cmd.t * status) Fmt.t
-    (** [pp_cmd_status] is a formatter for command process exit statuses. *)
+    (** [pp_cmd_status] is a formatter for command process exit statuses
+        of the form: ["cmd [%a]: %a"]. *)
 
     (** {1:stdis Process standard inputs} *)
 
@@ -2864,8 +2868,9 @@ module Os : sig
       ?env:Env.assignments -> ?cwd:Fpath.t -> ?stdin:stdi ->
       ?stderr:[`Stdo of stdo | `Out] -> trim:bool -> Cmd.t ->
       (string, string) result
-    (** [run] is {!run_status_out} with non-[`Exited 0] statuses
-        turned into errors via {!pp_cmd_status}. *)
+    (** [run_out] is {!run_status_out} with non-[`Exited 0] statuses
+        reporting the captured output (if any) prefixed by
+        {!pp_cmd_status}. *)
 
     (** {2:spawn Non-blocking}
 
