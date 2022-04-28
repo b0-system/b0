@@ -76,12 +76,14 @@ module File = struct
     pp_file ppf file
 
   let to_string ~normalize file =
+    (* The way this fun works on normalize errors is not optimal. *)
     let b = Buffer.create (10 * 1024) in
     let file = _pp (Format.formatter_of_buffer b) file; Buffer.contents b in
     if not normalize then Ok file else
     let stdin = Os.Cmd.in_string file in
     let* opam = Lazy.force opam in
-    Os.Cmd.run_out ~stdin ~trim:true Cmd.(opam % "lint" % "-" % "--normalise")
+    Os.Cmd.run_out ~stdin ~trim:true @@
+    Cmd.(opam % "lint" % "-" % "--normalise")
 
   (* Package file generation *)
 
@@ -350,18 +352,18 @@ module Pkg = struct
     | pkg_packs, [] -> Ok pkg_packs
     | _, errs -> Error (String.concat "\n" (List.rev errs))
 
-  let write_opam_file pkg ~version file ~dir =
-    let* file = File.to_string ~normalize:true file in
+  let write_opam_file ~normalize pkg ~version file ~dir =
+    let* file = File.to_string ~normalize file in
     let fname = match version with
     | None -> name pkg ^ ".opam"
     | Some v -> String.concat "." [name pkg; v]
     in
     Os.File.write ~force:true ~make_path:true Fpath.(dir / fname) file
 
-  let lint_opam_file pkg file =
+  let lint_opam_file ~normalize pkg file =
     let* opam = Lazy.force opam in
     let opam_lint = Cmd.(opam % "lint" % "-" % "--normalise") in
-    let* file = File.to_string ~normalize:false file in
+    let* file = File.to_string ~normalize file in
     let stdin = Os.Cmd.in_string file in
     let* e = Os.Cmd.run_status_out ~trim:false ~stdin opam_lint in
     match e with
@@ -389,17 +391,17 @@ let list_cmdlet env pkgs format =
 
 (* .opam.file cmdlet *)
 
-let lint_files pkgs =
+let lint_files ~normalize pkgs =
   let lint pkg =
     Result.map_error (Fmt.str "%a: %s" Pkg.pp_err_pack pkg) @@
-    Pkg.lint_opam_file pkg (snd (Pkg.file ~with_name:false pkg))
+    Pkg.lint_opam_file ~normalize pkg (snd (Pkg.file ~with_name:false pkg))
   in
   let* _ = collect_results (List.map lint pkgs) in
   Log.app (fun m -> m "%a" (Fmt.tty_string [`Fg `Green]) "Passed.");
   Ok B00_cli.Exit.ok
 
-let gen_files pkgs ~with_name ~dst =
-  let gen_file ~with_name ~dst pkg =
+let gen_files pkgs ~normalize ~with_name ~dst =
+  let gen_file ~normalize ~with_name ~dst pkg =
     Result.map_error (Fmt.str "%a: %s" Pkg.pp_err_pack pkg) @@
     let* dir = match dst with
     | `Stdout -> Ok None
@@ -414,15 +416,16 @@ let gen_files pkgs ~with_name ~dst =
     let _, file = Pkg.file ~with_name pkg in
     match dir with
     | None ->
-        let* file = File.to_string ~normalize:true file in
+        let* file = File.to_string ~normalize file in
         Log.app (fun m -> m "@[%s@]" file); Ok ()
     | Some dir ->
-        Pkg.write_opam_file pkg ~version:None file ~dir
+        Pkg.write_opam_file ~normalize pkg ~version:None file ~dir
   in
-  let* () = list_iter_stop_on_error (gen_file ~with_name ~dst) pkgs in
+  let gen = gen_file ~normalize ~with_name ~dst in
+  let* () = list_iter_stop_on_error gen pkgs in
   Ok B00_cli.Exit.ok
 
-let file_cmdlet env constraints pkgs lint dst in_scope no_name =
+let file_cmdlet env constraints pkgs lint raw dst in_scope no_name =
   Log.if_error ~use:B00_cli.Exit.no_such_name @@
   let action =
     if lint then `Lint else
@@ -439,11 +442,12 @@ let file_cmdlet env constraints pkgs lint dst in_scope no_name =
       Ok B00_cli.Exit.ok
   | ps ->
       Log.if_error' ~use:B00_cli.Exit.some_error @@
+      let normalize = not raw in
       match action with
-      | `Lint -> lint_files pkgs
+      | `Lint -> lint_files ~normalize pkgs
       | `Gen dst ->
           let with_name = action = `Gen `Stdout && not no_name in
-          gen_files pkgs ~with_name ~dst
+          gen_files pkgs ~normalize ~with_name ~dst
 
 (* .opam.publish cmdlet *)
 
@@ -555,7 +559,7 @@ module Publish = struct
     in
     let* file_meta, file =
       let file_meta, file = Pkg.file ~with_name:false pkg in
-      let* () = Pkg.lint_opam_file pkg file in
+      let* () = Pkg.lint_opam_file ~normalize:true pkg file in
       Ok (file_meta, file)
     in
     let* changes_file = B0_release.changes_file_of_pack (Pkg.pack pkg) in
@@ -919,16 +923,20 @@ module Cmdlet = struct
       Arg.(value & flag & info ["s"; "in-scope-dir"] ~doc)
     in
     let lint =
-      let doc = "Do not generate files, lint them with $(b,opam lint)." in
+      let doc = "Do not write files, lint them with $(b,opam lint)." in
       Arg.(value & flag & info ["lint"] ~doc)
+    in
+    let raw =
+      let doc = "Do not normalize files on file generation." in
+      Arg.(value & flag & info ["raw"] ~doc)
     in
     let no_name =
       let doc = "On stdout, do not add the $(b,name:) field." in
       Arg.(value & flag & info ["no-name"] ~doc)
     in
     let file =
-      Term.(const file_cmdlet $ const env $ constraints () $ pkgs $ lint $ dst $
-            in_scope $ no_name)
+      Term.(const file_cmdlet $ const env $ constraints () $ pkgs $ lint $
+            raw $ dst $ in_scope $ no_name)
     in
     B0_cmdlet.eval ~man env args file
 
