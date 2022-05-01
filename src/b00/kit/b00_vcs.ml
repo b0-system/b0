@@ -132,11 +132,10 @@ module Git_vcs = struct
             Ok (Some { kind = Git; cmd; repo_dir; work_dir })
 
   let repo_cmd r = r.cmd
-  let work_tree r = Cmd.(atom "--work-tree" %% path (Fpath.parent r.repo_dir))
 
   let is_dirty r =
     let stderr = `Stdo Os.Cmd.out_null in
-    let status = Cmd.(work_tree r % "status" % "--porcelain") in
+    let status = Cmd.(atom "status" % "--porcelain") in
     Result.bind (run ~stderr r status) @@ function
     | "" -> Ok false | _ -> Ok true
 
@@ -177,10 +176,7 @@ module Git_vcs = struct
 
   let file_is_dirty r file =
     let stderr = Os.Cmd.out_null in
-    let cmd =
-      Cmd.(r.cmd %% work_tree r % "diff-index" % "--quiet" % "HEAD" %%
-           path file)
-    in
+    let cmd = Cmd.(r.cmd % "diff-index" % "--quiet" % "HEAD" %% path file) in
     Result.bind (Os.Cmd.run_status ~stderr cmd) @@ function
     | `Exited 0 -> Ok false
     | `Exited 1 -> Ok true
@@ -188,8 +184,7 @@ module Git_vcs = struct
 
   let checkout ?and_branch:b r commit_ish =
     let b = match b with None -> Cmd.empty | Some b -> Cmd.(atom "-b" % b) in
-    let work_tree = work_tree r in
-    let args = Cmd.(work_tree % "checkout" % "--quiet" %% b % commit_ish) in
+    let args = Cmd.(atom "checkout" % "--quiet" %% b % commit_ish) in
     run_status r args
 
   let local_clone r ~dir =
