@@ -252,11 +252,17 @@ module Fmt : sig
   val int : int t
   (** [int] is {!Format.pp_print_int}. *)
 
+  val uint32 : int32 t
+  (** [uint32] is [pf ppf "%lu"]. *)
+
   val int32 : int32 t
   (** [int32] is [pf ppf "%ld"]. *)
 
   val int64 : int64 t
   (** [int64] is [pf ppf "%Ld"]. *)
+
+  val uint64 : int64 t
+  (** [uint64] is [pf ppf "%Lu"]. *)
 
   val float : float t
   (** [float] is [pf ppf "%g"]. *)
