@@ -1640,9 +1640,6 @@ module Mtime : sig
 
     (** {1:conv Conversions} *)
 
-
-      (** {1:conv Conversions} *)
-
     val to_uint64_ns : span -> int64
     (** [to_uint64_ns s] is [s] as an {e unsigned} 64-bit integer nanosecond
         span. *)
