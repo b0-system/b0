@@ -236,7 +236,9 @@ let exe_proc set_exe_path set_mod_srcs srcs b =
       ~and_cmt:false m ~code:`Byte ~opts ~requires:comp_requires ~mod_srcs;
   end;
   let* c_objs = compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs in
-  let mod_srcs = Mod.Src.sort (* for link *) ~deps:Mod.Src.ml_deps mod_srcs in
+  let mod_srcs =
+    Mod.Src.sort (* for link *) ~deps:Mod.Src.ml_deps mod_srcs
+  in
   let* link_requires = Lib.Resolver.get_list_and_deps resolver requires in
   let archive ~code lib = match code with
   | `Byte -> (match Lib.cma lib with None -> [] | Some cma -> [cma])
