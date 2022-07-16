@@ -180,8 +180,7 @@ let js_of_byte_objs ~jss ~mod_srcs ~o b =
       B00_jsoo.compile m ~opts ~source_map ~jss:[] ~byte:obj ~o;
       o :: acc
     in
-    let objs = List.rev (List.fold_left compile_obj [] mod_objs) in
-    List.rev objs
+    List.rev (List.fold_left compile_obj [] mod_objs)
   in
   let jss = ocamlrt_js :: (lib_jss @ mod_obj_jss @ [std_exit_js]) in
   let opts = Option.value ~default:Cmd.empty (B0_meta.find link meta) in
