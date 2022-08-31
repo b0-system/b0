@@ -414,7 +414,7 @@ end
 (** Result values *)
 module Result : sig
 
-  include module type of Stdlib.Result
+  include module type of Stdlib.Result (** @closed *)
 
   val retract : ('a, 'a) result -> 'a
   (** [retract r] is [v] if [r] is [Ok v] or [Error v]. *)
@@ -449,7 +449,7 @@ module Char : sig
 
   (** {1:stdlib_char Stdlib [Char]} *)
 
-  include module type of Char
+  include module type of Char (** @closed *)
 
   (** {1:ascii Bytes as US-ASCII characters} *)
 
@@ -552,7 +552,7 @@ module String : sig
 
   (** {1:stdlib_string Stdlib [String]} *)
 
-  include module type of String
+  include module type of String (** @closed *)
 
   (** {1:strings Strings} *)
 
@@ -1043,7 +1043,7 @@ module List : sig
 
   (** {1:stdlib_list Stdlib [List]} *)
 
-  include module type of List
+  include module type of List (** @closed *)
 
   (** {1:adds Additions} *)
 
