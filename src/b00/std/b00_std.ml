@@ -1331,6 +1331,24 @@ module List = struct
     in
     let classes = List.fold_left add_classes M.empty els in
     List.rev (M.fold (fun c els acc -> (c, S.elements els) :: acc) classes [])
+
+  let rec fold_stop_on_error f l acc = match l with
+  | [] -> Ok acc
+  | v :: vs ->
+      match f v acc with
+      | Ok acc -> fold_stop_on_error f vs acc
+      | Error _ as e -> e
+
+  let rec iter_stop_on_error f = function
+  | [] -> Ok ()
+  | v :: vs ->
+      match f v with Error _ as e -> e | Ok v -> iter_stop_on_error f vs
+
+  let rec iter_iter_on_error ~error f = function
+  | [] -> ()
+  | v :: vs ->
+      (match f v with Error _ as e -> error e | Ok _ -> ());
+      iter_iter_on_error ~error f vs
 end
 
 (* File paths *)
