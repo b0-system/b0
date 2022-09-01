@@ -227,8 +227,7 @@ module Compile = struct
   let exe c ~driver =
     Fpath.(Conf.b0_dir c / Conf.drivers_dir_name / name driver / "exe")
 
-  let write_src m c src ~src_file  =
-    let esrc = Memo.fail_if_error m (B0_file.expand src) in
+  let write_src m c esrc ~src_file  =
     let reads = B0_file.expanded_file_manifest esrc in
     List.iter (Memo.file_ready m) reads;
     Memo.write m ~reads src_file @@ fun () ->
@@ -304,12 +303,13 @@ module Compile = struct
     let* ocaml_conf = B00_ocaml.Conf.read m ocaml_conf in
     let obj_ext = B00_ocaml.Conf.obj_ext ocaml_conf in
     let comp = B00.Memo.tool m comp in
-    let requires = B0_file.requires src in
+    let esrc = Memo.fail_if_error m (B0_file.expand src) in
+    let requires = B0_file.expanded_requires esrc in
     let* all_libs, seen_libs =
       find_libs m ocaml_conf ~build_dir ~driver ~requires
     in
     let src_file = Fpath.(build_dir / "src.ml") in
-    write_src m c src ~src_file;
+    write_src m c esrc ~src_file;
     let writes =
       let base = Fpath.strip_ext src_file in
       let base ext = Fpath.(base + ext) in
