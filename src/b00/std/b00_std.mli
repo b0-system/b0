@@ -1370,16 +1370,18 @@ module Fpath : sig
       {{:https://dev.w3.org/html5/spec-LC/urls.html#parsing-urls}
       definition} of URI parsing. *)
 
-(*
+  (** {1:fmt Formatting} *)
+
   val pp : t Fmt.t
-  (** [pp ppf p] prints path [p] on [ppf] using {!Filename.quote}. *)
-*)
+  (** [pp ppf p] prints path [p] on [ppf]. The path is quoted with
+      {!Filename.quote} if needed. For now this means if it contains
+      spaces (U+0020). *)
 
   val pp_quoted : t Fmt.t
   (** [pp_quoted ppf p] prints path [p] on [ppf] using {!Filename.quote}. *)
 
   val pp_unquoted : t Fmt.t
-  (** [pp_unquoted p] prints path [p] on [ppf] using {!to_string}. *)
+  (** [pp_unquoted ppf p] prints path [p] on [ppf] using {!to_string}. *)
 
   val pp_dump : t Fmt.t
   (** [pp_dump ppf p] prints path [p] on [ppf] using {!String.dump}. *)

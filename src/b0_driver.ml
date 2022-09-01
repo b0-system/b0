@@ -365,7 +365,7 @@ module Compile = struct
         B000_conv.Op.pp_aggregate_error
           ~read_howto ~write_howto () Fmt.stderr e;
         Fmt.error "Could not compile B0 file %a"
-          Fmt.(code Fpath.pp_unquoted) (B0_file.file src)
+          Fmt.(code Fpath.pp) (B0_file.file src)
 end
 
 let with_b0_file ~driver cmd =

@@ -340,7 +340,7 @@ module Mod = struct
         | Some f' ->
             Memo.notify m `Warn
               "@[<v>%a:@,File ignored. %a's module %s defined by file:@,%a:@]"
-              Fpath.pp_unquoted f Name.pp mname kind Fpath.pp_unquoted f';
+              Fpath.pp f Name.pp mname kind Fpath.pp f';
             acc
       in
       List.fold_left add Name.Map.empty files
@@ -705,7 +705,7 @@ module Lib = struct
     Result.bind (Os.Dir.exists dir) @@ function
     | false ->
         Memo.notify m `Warn "library %a: no directory %a"
-          Name.pp name Fpath.pp_unquoted dir;
+          Name.pp name Fpath.pp dir;
         Ok (v ~name ~requires ~dir ~cmis:[] ~cmxs:[] ~cma:None ~cmxa:None
               ~c_archive:None ~c_stubs:[] ~js_stubs:[])
     | true ->
@@ -795,7 +795,7 @@ module Lib = struct
               Ok (meta, requires, dir, archive)
           | _ -> Fmt.failwith "could not parse %S" s
         with
-        | Failure e -> Fmt.error "@[<v>%a: %s@]" Fpath.pp_unquoted file e
+        | Failure e -> Fmt.error "@[<v>%a: %s@]" Fpath.pp file e
 
       (* FIXME need to solve the META file read.
          FIXME post exec is still super messy, check if we can make it

@@ -13,7 +13,7 @@ let build_dir us c =
   let build_dir = B0_dir.build_dir ~b0_dir ~variant:"user" (* FIXME *) in
   let unit_dir u = B0_dir.unit_build_dir ~build_dir ~name:(B0_unit.name u) in
   let dirs = List.map unit_dir us in
-  Log.app (fun m -> m "@[<v>%a@]" (Fmt.list Fpath.pp_unquoted) dirs);
+  Log.app (fun m -> m "@[<v>%a@]" (Fmt.list Fpath.pp) dirs);
   Ok B00_cli.Exit.ok
 
 let edit us c = B0_b0.Def.edit (module B0_unit) c us

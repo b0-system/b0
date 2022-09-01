@@ -10,7 +10,7 @@ module Trash = struct
   let create dir = { dir }
   let dir t = t.dir
   let trash t p =
-    Result.map_error (Fmt.str "trashing %a: %s" Fpath.pp_unquoted p) @@
+    Result.map_error (Fmt.str "trashing %a: %s" Fpath.pp p) @@
     Result.bind (Os.Path.exists p) @@ function
     | false -> Ok ()
     | true ->
@@ -19,7 +19,7 @@ module Trash = struct
         fun garbage -> Os.Path.rename ~force ~make_path ~src:p garbage
 
   let err_delete t err =
-    Fmt.str "delete trash %a: %s" Fpath.pp_unquoted t.dir err
+    Fmt.str "delete trash %a: %s" Fpath.pp t.dir err
 
   let delete_blocking t =
     Result.map_error (err_delete t) @@
@@ -253,8 +253,7 @@ module File_cache = struct
     let rel root f = match Fpath.strip_prefix root f with
     | Some rel -> Fpath.to_string rel
     | None ->
-        Fmt.failwith_notrace "%a: not a prefix of %a"
-          Fpath.pp_unquoted f Fpath.pp_unquoted root
+        Fmt.failwith_notrace "%a: not a prefix of %a" Fpath.pp f Fpath.pp root
     in
     String.concat "\n" (List.rev_map (rel root) fs)
 
@@ -262,7 +261,7 @@ module File_cache = struct
     let path root rel =
       let p = Fpath.of_string rel |> Result.to_failure in
       if Fpath.is_rel p then Fpath.(root // p) else
-      Fmt.failwith_notrace "%a: path is not relative" Fpath.pp_unquoted p
+      Fmt.failwith_notrace "%a: path is not relative" Fpath.pp p
     in
     List.rev_map (path root) (String.split_on_char '\n' s)
 
@@ -371,7 +370,7 @@ module File_cache = struct
       | Unix.Unix_error (Unix.EINTR, _, _) ->
           revive_file ~did_path cfile ~dst
       | Unix.Unix_error (e, _, arg) ->
-          Fmt.failwith_notrace "%a: %s: %s" Fpath.pp_unquoted dst arg (uerr e)
+          Fmt.failwith_notrace "%a: %s: %s" Fpath.pp dst arg (uerr e)
     in
     let fs_len = List.length fs in
     let filenum_width = filenum_width fs_len in

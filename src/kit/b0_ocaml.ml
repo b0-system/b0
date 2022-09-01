@@ -192,7 +192,7 @@ let compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs =
           B00.Memo.notify m `Warn
             "@[<v>%a:@,File ignored. %s's compilation unit already defined \
              by file:@,%a:@]"
-            Fpath.pp_unquoted c cname Fpath.pp_unquoted f;
+            Fpath.pp c cname Fpath.pp f;
           loop os cunits hs cs
   in
   let hs = B00_fexts.(find_files (ext ".h") srcs) in

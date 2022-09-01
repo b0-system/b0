@@ -90,7 +90,7 @@ module Auth = struct
   let get_user conf_dir ~user =
     let err default_file =
       Fmt.error "@[<v>Could not determine a default GitHub user.@,\
-                 Write the user to use in the file %a@]" Fpath.pp_unquoted
+                 Write the user to use in the file %a@]" Fpath.pp
         default_file
     in
     match user with

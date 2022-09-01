@@ -27,7 +27,7 @@ let version_of_pack ?(commit_ish = "HEAD") p =
   | Some dir ->
       let* vcs = B00_vcs.find ~dir () in
       match vcs with
-      | None -> Fmt.error "No VCS found in %a" Fpath.pp_unquoted dir
+      | None -> Fmt.error "No VCS found in %a" Fpath.pp dir
       | Some vcs ->
           let* tag = B00_vcs.latest_tag vcs commit_ish in
           match tag with

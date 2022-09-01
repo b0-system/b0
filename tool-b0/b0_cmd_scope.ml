@@ -32,7 +32,7 @@ let get_scopes c root excludes k =
 
 let exec_when cond c root excludes keep_going cmd =
   let err (_, dir) e =
-    Log.err (fun m -> m "@[%a: %s@]" Fpath.pp_unquoted dir e);
+    Log.err (fun m -> m "@[%a: %s@]" Fpath.pp dir e);
     Ok B00_cli.Exit.some_error
   in
   get_scopes c root excludes @@ function scopes ->
@@ -45,7 +45,7 @@ let exec_when cond c root excludes keep_going cmd =
       | Ok true ->
           Log.app begin fun m ->
             m "@[%a: %a@]"
-              Fmt.(code string) n (Fmt.tty [`Faint] Fpath.pp_unquoted) p
+              Fmt.(code string) n (Fmt.tty [`Faint] Fpath.pp) p
           end;
           match Os.Cmd.run ~cwd:p cmd with
           | Error e when not keep_going -> err s e

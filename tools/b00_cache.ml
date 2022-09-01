@@ -18,7 +18,7 @@ let with_cache_dir cache_dir k = match Os.Dir.exists cache_dir with
 | Ok true -> k cache_dir
 | Ok false ->
     Log.err begin fun m ->
-      m "@[<v>%a:@,No such cache directory.@]" Fpath.pp_unquoted cache_dir
+      m "@[<v>%a:@,No such cache directory.@]" Fpath.pp cache_dir
     end;
     Ok err_no_cache
 
@@ -30,7 +30,7 @@ let find_used_keys ~err ~cwd ~b0_dir ~log_file k =
   | false when implicit_file && err ->
       Log.err begin fun m ->
         m "@[<v>%a:@,No such log file, specify one explicity.@]"
-          Fpath.pp_unquoted file
+          Fpath.pp file
       end;
       Ok err_no_log_file
   | false when implicit_file && not err -> k String.Set.empty
@@ -69,7 +69,7 @@ let keys setup b0_dir cache_dir =
 
 let path setup b0_dir cache_dir =
   let* (_cwd, _b0_dir, cache_dir) = find_dirs ~b0_dir ~cache_dir in
-  Log.app (fun m -> m "%a" Fpath.pp_unquoted cache_dir);
+  Log.app (fun m -> m "%a" Fpath.pp cache_dir);
   Ok 0
 
 let stats setup b0_dir cache_dir log_file  =

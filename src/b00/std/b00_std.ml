@@ -1862,7 +1862,11 @@ module Fpath = struct
   let to_uri_path = if Sys.win32 then Windows.to_uri_path else Posix.to_uri_path
   let pp_quoted ppf p = String.pp ppf (Filename.quote p)
   let pp_unquoted = String.pp
-  let pp = pp_quoted
+  let pp ppf p =
+    if String.exists (Char.equal ' ') p
+    then pp_quoted ppf p
+    else String.pp ppf p
+
   let pp_dump = String.pp_dump
 
   (* Uniqueness *)
@@ -3665,9 +3669,9 @@ module Os = struct
     let rec get_first_tool ?win_exe ?search tools =
       let rec loop = function
       | [] ->
-          Fmt.error "%a:@[<v> No such tool find in %a@,@[as %a@]@]"
-            Fpath.pp_unquoted (List.hd tools)
-            pp_search search (Fmt.or_enum Fpath.pp_unquoted) tools
+          Fmt.error "%a:@[<v> No such tool found in %a@,@[as %a@]@]"
+            Fpath.pp (List.hd tools) pp_search search
+            (Fmt.or_enum Fpath.pp) tools
       | tool :: tools ->
           match find_tool ?win_exe ?search tool with
           | Ok (Some t) -> Ok t
@@ -4215,7 +4219,7 @@ module Bincode = struct
 
   let of_string ?(file = Fpath.dash) c s =
     try let i, v = c.dec s 0 in dec_eoi s i; Ok v with
-    | Failure e -> Fmt.error "%a:%s" Fpath.pp_unquoted file e
+    | Failure e -> Fmt.error "%a: %s" Fpath.pp file e
 
   (* Magic numbers *)
 

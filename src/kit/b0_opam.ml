@@ -549,7 +549,7 @@ module Publish = struct
         | None ->
             warn @@
             Fmt.str "@[<v>Could not parse latest changes from:@, %a@]"
-              Fpath.pp_unquoted f
+              Fpath.pp f
 
   let info_of_pkg (pkg, version) =
     Result.map_error (Fmt.str "%a: %s" Pkg.pp_err_pack pkg) @@
@@ -744,13 +744,13 @@ module Publish = struct
     let* local = B00_vcs.Git.find ~dir () in
     match local with
     | Some repo ->
-        Log.app (fun m -> m "Updating %a" Fpath.pp_unquoted dir);
+        Log.app (fun m -> m "Updating %a" Fpath.pp dir);
         let git = B00_vcs.repo_cmd repo in
         let fetch = Cmd.(atom "fetch" % "origin" % master) in
         let* () = Os.Cmd.run ?stdout ?stderr Cmd.(git %% fetch) in
         Ok repo
     | None ->
-        Log.app (fun m -> m "Cloning %s to %a" pkgs_repo Fpath.pp_unquoted dir);
+        Log.app (fun m -> m "Cloning %s to %a" pkgs_repo Fpath.pp dir);
         let clone =
           Cmd.(atom "clone" % "--bare" % "--single-branch" %
                "--branch" % master % pkgs_repo %% path dir)
