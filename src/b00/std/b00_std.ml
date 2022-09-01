@@ -3552,7 +3552,9 @@ module Os = struct
     let rec realpath p =
       try Fpath.of_string (_realpath (Fpath.to_string p)) with
       | Unix.Unix_error (Unix.EINTR, _, _) -> realpath p
-      | Unix.Unix_error (e, _, _) -> ferr p (err_doing "realpath" (uerr e))
+      | Unix.Unix_error (Unix.ENOTDIR, _, _) ->
+          ferr p "A segment of the path is not a directory"
+      | Unix.Unix_error (e, _, _) -> ferr p (uerr e)
 
     (* Copying *)
 
