@@ -2403,6 +2403,9 @@ module Os = struct
 
   (* Error handling *)
 
+  let doing_exist_test = "Existence test:"
+  let err_seg_not_dir = "A segment of the path is not a directory"
+
   let uerr = Unix.error_message
   let err_doing doing e = Fmt.str "%s: %s" doing e
   let ferr file e = Fmt.error "%a: %s" Fpath.pp file e
@@ -2753,9 +2756,10 @@ module Os = struct
       if force then Ok () else
       try ignore (Unix.lstat (Fpath.to_string file)); err_force file with
       | Unix.Unix_error (Unix.ENOENT, _, _) -> Ok ()
+      | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ferr file err_seg_not_dir
       | Unix.Unix_error (Unix.EINTR, _, _) -> handle_force ~force file
       | Unix.Unix_error (e, _, _) ->
-          ferr file (err_doing "Testing existence" (uerr e))
+          ferr file (err_doing doing_exist_test (uerr e))
 
     let rec handle_force_open_fdout
       ?(flags = Unix.[O_WRONLY; O_CREAT; O_SHARE_DELETE; O_CLOEXEC; O_TRUNC])
@@ -2781,13 +2785,15 @@ module Os = struct
     let rec path_exists p =
       try (ignore (Unix.stat (Fpath.to_string p)); Ok true) with
       | Unix.Unix_error (Unix.ENOENT, _, _) -> Ok false
+      | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ferr p err_seg_not_dir
       | Unix.Unix_error (Unix.EINTR, _, _) -> path_exists p
       | Unix.Unix_error (e, _, _) ->
-          ferr p (err_doing "Testing existence" (uerr e))
+          ferr p (err_doing doing_exist_test (uerr e))
 
     let rec path_get_mode p =
       try Ok ((Unix.stat @@ Fpath.to_string p).Unix.st_perm) with
       | Unix.Unix_error (Unix.EINTR, _, _) -> path_get_mode p
+      | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ferr p err_seg_not_dir
       | Unix.Unix_error (e, _, _) ->
           ferr p (err_doing "Getting file mode" (uerr e))
 
@@ -2822,6 +2828,7 @@ module Os = struct
 
     let rec path_stat p = try Ok (Unix.stat (Fpath.to_string p)) with
     | Unix.Unix_error (Unix.EINTR, _, _) -> path_stat p
+    | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ferr p err_seg_not_dir
     | Unix.Unix_error (e, _, _) -> ferr p (err_doing "stat" (uerr e))
 
     (* Links *)
@@ -2857,6 +2864,7 @@ module Os = struct
 
     let rec symlink_stat p = try Ok (Unix.lstat (Fpath.to_string p)) with
     | Unix.Unix_error (Unix.EINTR, _, _) -> symlink_stat p
+    | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ferr p err_seg_not_dir
     | Unix.Unix_error (e, _, _) -> ferr p (err_doing "lstat" (uerr e))
 
     let copy_symlink ~force ~make_path ~src dst =
@@ -2999,21 +3007,23 @@ module Os = struct
       | Unix.S_REG -> Ok true
       | _ -> Ok false
       | exception Unix.Unix_error (Unix.ENOENT, _, _) -> Ok false
+      | exception Unix.Unix_error (Unix.ENOTDIR, _, _) ->
+          ferr file err_seg_not_dir
       | exception Unix.Unix_error (Unix.EINTR, _, _) -> exists file
       | exception Unix.Unix_error (e, _, _) ->
-          ferr file (err_doing "Testing existence" (uerr e))
+          ferr file (err_doing doing_exist_test (uerr e))
 
     let rec must_exist file =
       match (Unix.stat (Fpath.to_string file)).Unix.st_kind with
       | Unix.S_REG -> Ok ()
-      | _ ->
-          ferr file "File must exist but not a regular file"
-      | exception Unix.Unix_error (Unix.ENOENT, _, _) ->
-          ferr file "File must exist but no such file"
-      | exception Unix.Unix_error (Unix.EINTR, _, _) ->
-          must_exist file
+      | _ -> ferr file "Path exists but not a regular file"
+      | exception Unix.Unix_error (Unix.ENOENT, _,_) ->
+          ferr file "No such file"
+      | exception Unix.Unix_error (Unix.ENOTDIR, _, _) ->
+          ferr file err_seg_not_dir
+      | exception Unix.Unix_error (Unix.EINTR, _, _) -> must_exist file
       | exception Unix.Unix_error (e, _, _) ->
-          ferr file (err_doing "Testing existence" (uerr e))
+          ferr file (err_doing doing_exist_test (uerr e))
 
     let is_executable file = match Unix.access file [Unix.X_OK] with
     | () -> true
@@ -3202,21 +3212,24 @@ module Os = struct
       | Unix.S_DIR -> Ok true
       | _ -> Ok false
       | exception Unix.Unix_error (Unix.ENOENT, _, _) -> Ok false
+      | exception Unix.Unix_error (Unix.ENOTDIR, _, _) ->
+          ferr dir err_seg_not_dir
       | exception Unix.Unix_error (Unix.EINTR, _, _) -> exists dir
       | exception Unix.Unix_error (e, _, _) ->
-          ferr dir (err_doing "Testing existence" (uerr e))
+          ferr dir (err_doing doing_exist_test (uerr e))
 
     let rec must_exist dir =
       match (Unix.stat @@ Fpath.to_string dir).Unix.st_kind with
       | Unix.S_DIR -> Ok ()
       | _ ->
-          ferr dir "Directory must exist but not a directory"
+          ferr dir "Path exists but not a directory"
       | exception Unix.Unix_error (Unix.ENOENT, _, _) ->
-          ferr dir "Directory must exist but no such directory"
-      | exception Unix.Unix_error (Unix.EINTR, _, _) ->
-          must_exist dir
+          ferr dir "No such directory"
+      | exception Unix.Unix_error (Unix.ENOTDIR, _, _) ->
+          ferr dir err_seg_not_dir
+      | exception Unix.Unix_error (Unix.EINTR, _, _) -> must_exist dir
       | exception Unix.Unix_error (e, _, _) ->
-          ferr dir (err_doing "Testing existence" (uerr e))
+          ferr dir (err_doing doing_exist_test (uerr e))
 
     (* Creating, deleting and renaming. *)
 
@@ -3539,11 +3552,11 @@ module Os = struct
 
     let rec must_exist p =
       try (Ok (ignore (Unix.stat (Fpath.to_string p)))) with
-      | Unix.Unix_error (Unix.ENOENT, _, _) ->
-          ferr p "Path must exist but no such path"
+      | Unix.Unix_error (Unix.ENOENT, _, _) -> ferr p "No such path"
       | Unix.Unix_error (Unix.EINTR, _, _) -> must_exist p
+      | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ferr p err_seg_not_dir
       | Unix.Unix_error (e, _, _) ->
-          ferr p (err_doing "Testing existence" (uerr e))
+          ferr p (err_doing doing_exist_test (uerr e))
 
     (* Deleting and renaming *)
 
@@ -3556,8 +3569,7 @@ module Os = struct
     let rec realpath p =
       try Fpath.of_string (_realpath (Fpath.to_string p)) with
       | Unix.Unix_error (Unix.EINTR, _, _) -> realpath p
-      | Unix.Unix_error (Unix.ENOTDIR, _, _) ->
-          ferr p "A segment of the path is not a directory"
+      | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ferr p err_seg_not_dir
       | Unix.Unix_error (e, _, _) -> ferr p (uerr e)
 
     (* Copying *)
