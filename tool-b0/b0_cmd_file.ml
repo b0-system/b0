@@ -51,12 +51,17 @@ let edit all c =
   | `Exited 0 -> Ok B00_cli.Exit.ok
   | _ -> Ok B00_cli.Exit.some_error
 
-let gather rel keep_symlinks dirs c =
+let gather rel keep_symlinks keep_going dirs c =
   Log.if_error ~use:B00_cli.Exit.some_error @@
   let rec gather seen b0s = function
   | d :: dirs ->
       let cwd = B0_driver.Conf.cwd c in
+      let* exists = Os.Dir.exists d in
+      if not exists && keep_going then gather seen b0s dirs else
+      let* () = Os.Dir.must_exist d in
       let b0_file = Fpath.(d / B0_driver.Conf.b0_file_name) in
+      let* exists = Os.File.exists b0_file in
+      if not exists && keep_going then gather seen b0s dirs else
       let* b0_file' = Os.Path.realpath b0_file in
       let b0_file = match keep_symlinks with
       | true when rel -> Fpath.relative b0_file ~to_dir:cwd
@@ -65,6 +70,7 @@ let gather rel keep_symlinks dirs c =
       | false -> b0_file'
       in
       let scope = Fpath.(basename @@ parent b0_file) in
+      let scope = String.map (function '.' -> '_' | c -> c) scope in
       let scope, seen = match String.Set.mem scope seen with
       | false -> scope, String.Set.add scope seen
       | true ->
@@ -188,12 +194,17 @@ let gather =
            in given $(i,DIR) directories. Typical usage:";
       `P "$(b,mkdir aggregate)"; `Noblank;
       `P "$(mname) $(b,file) $(tname) $(b,myproject repos/mylib > \
-          aggregate/B0.ml)";
-      `Noblank;
-      `P "$(b,cd aggregate) && $(mname)" ]
+          aggregate/B0.ml)"; `Noblank;
+      `P "$(b,cd aggregate) && $(mname)";
+      `P "Use option $(b,-k) to avoid erroring on files or directories \
+          that have no B0 file:";
+      `P "$(mname) $(b,file) $(tname) $(b,-k repos/* > aggregate/B0.ml)"; ]
   in
   let dirs =
-    let doc = "Gather the $(docv)$(b,/B0.ml) file" in
+    let doc = "Gather the $(docv)$(b,/B0.ml) file. Errors if the B0 file \
+               does not exist or if $(docv) is not a directory, use \
+               option $(b,-k) to prevent that."
+    in
     Arg.(non_empty & pos_all B00_cli.fpath [] & info [] ~doc ~docv:"DIR")
   in
   let rel =
@@ -204,8 +215,12 @@ let gather =
     let doc = "Don't resolve symlinks." in
     Arg.(value & flag & info ["s"; "keep-symlinks"] ~doc)
   in
+  let keep_going =
+    let doc = "Do not error on files or directories without B0 files." in
+    Arg.(value & flag & info ["k"; "keep-going"] ~doc)
+  in
   B0_b0.Cli.subcmd_with_driver_conf "gather" ~doc ~descr
-    Term.(const gather $ rel $ keep_symlinks $ dirs)
+    Term.(const gather $ rel $ keep_symlinks $ keep_going $ dirs)
 
 let includes =
   let doc = "Output scope name and paths of included B0 files" in
