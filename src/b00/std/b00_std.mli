@@ -713,8 +713,8 @@ module String : sig
 
   (** {1:unique Uniqueness} *)
 
-  val uniquify : string list -> string list
-  (** [uniquify ss] is [ss] without duplicates, the list order is
+  val distinct : string list -> string list
+  (** [distinct ss] is [ss] without duplicates, the list order is
       preserved. *)
 
   val unique :
@@ -1388,8 +1388,8 @@ module Fpath : sig
 
   (** {1:unique Uniqueness} *)
 
-  val uniquify : t list -> t list
-  (** [uniquify ps] is [ps] without duplicates, the list order is
+  val distinct : t list -> t list
+  (** [distinct ps] is [ps] without duplicates, the list order is
       preserved. *)
 
   (** {1:setmap Paths map and sets} *)

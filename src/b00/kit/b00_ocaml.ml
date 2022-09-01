@@ -947,7 +947,7 @@ module Compile = struct
   type code = [ `Byte | `Native ]
 
   let incs_of_files files =
-    Cmd.paths ~slip:"-I" @@ Fpath.uniquify @@ List.map Fpath.parent files
+    Cmd.paths ~slip:"-I" @@ Fpath.distinct @@ List.map Fpath.parent files
 
   let c_to_o ?post_exec ?k m ~comp ~opts ~reads ~c ~o =
     let cwd = Fpath.parent o

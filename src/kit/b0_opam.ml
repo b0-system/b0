@@ -266,7 +266,7 @@ module Meta = struct
         List.rev_map (fun l -> B00_ocaml.Lib.Name.last l) libs
     in
     let pkg_deps = List.concat_map unit_pkg_deps (B0_pack.units p) in
-    let pkg_deps = List.map (fun n -> n, "") (String.uniquify pkg_deps) in
+    let pkg_deps = List.map (fun n -> n, "") (String.distinct pkg_deps) in
     B0_meta.add depends pkg_deps m
 
   let derive_name p m =

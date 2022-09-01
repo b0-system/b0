@@ -1243,7 +1243,7 @@ module String = struct
 
   (* Uniqueness *)
 
-  let uniquify ss =
+  let distinct ss =
     let rec loop seen acc = function
     | [] -> List.rev acc
     | s :: ss when Set.mem s seen -> loop seen acc ss
@@ -1253,7 +1253,8 @@ module String = struct
 
   let unique ?(limit = 1_000_000_000) ~exists n =
     let rec loop i n = match i > limit with
-    | true -> Fmt.invalid_arg "Could not uniquify %s after %d retries." n limit
+    | true ->
+        Fmt.invalid_arg "Could not make %s unique after %d retries." n limit
     | false ->
         let r = Fmt.str "%s~%d" n i in
         if exists r then loop (i + 1) n else r
@@ -1871,7 +1872,7 @@ module Fpath = struct
 
   (* Uniqueness *)
 
-  let uniquify = String.uniquify
+  let distinct = String.distinct
 
   (* Path and sets *)
 

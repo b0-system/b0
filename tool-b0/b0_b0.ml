@@ -28,7 +28,7 @@ module Def = struct
 
   let edit (module Def : B0_def.S) c ds =
     let rec find_files not_found fs = function
-    | [] -> not_found, Fpath.uniquify fs
+    | [] -> not_found, Fpath.distinct fs
     | d :: ds ->
         match B0_def.file (Def.def d) with
         | None -> find_files (Def.Set.add d not_found) fs ds
