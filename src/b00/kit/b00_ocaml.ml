@@ -688,8 +688,13 @@ module Lib = struct
             in
             loop cmis cmxs cma cmxa c_archive c_stubs js_stubs fs
         | ".js" ->
-            Memo.file_ready m f;
-            loop cmis cmxs cma cmxa c_archive c_stubs (f :: js_stubs) fs
+            (* FIXME these hacks are not viable. We do this here
+               because when we get js_of_ocaml-compiler as a dependency
+               we endup linking all the .js files there which are redundant
+               with the runtime system which leads to hundreds of warnings. *)
+            if Name.to_string name = "js_of_ocaml-compiler"
+            then loop cmis cmxs cma cmxa c_archive c_stubs js_stubs fs
+            else loop cmis cmxs cma cmxa c_archive c_stubs (f :: js_stubs) fs
         | ext when String.equal ext clib_ext ->
             Memo.file_ready m f;
             let c_archive, c_stubs = match is_lib_archive f with
