@@ -147,7 +147,7 @@ let exec =
     Term.(const exec $ root $ excludes $ keep_going $ tool $ tool_args)
 
 let hg =
-  let doc = "Execute $(b,hg) in Mercurial managed scopes" in
+  let doc = "Execute $(b,hg) in dirty Mercurial managed scopes" in
   let synopsis = `P vcs_syn in
   let descr = `P "$(tname) works exactly like $(b,b0 scope git) but with the \
                   Mercurial VCS, see $(mname) $(b,scope git --help) for
@@ -158,7 +158,7 @@ let hg =
           vcs_subcmd $ tool_args)
 
 let git =
-  let doc = "Execute $(b,git) in Git managed scopes" in
+  let doc = "Execute $(b,git) in dirty Git managed scopes" in
   let synopsis = `P vcs_syn in
   let descr = `Blocks [
       `P "$(tname) executes the Git subcommand $(i,SUBCMD) \
@@ -190,14 +190,16 @@ let cmd =
       `P "$(tname) operates on scopes. The default command is $(tname) \
           $(b,list).";
       `P "$(tname) can fold over scope directories and bulk operate \
-          their VCSs (if applicable). Typical usage:";
+          their VCSs (if applicable) when repositories are dirty. \
+          Typical usage:";
       `P "$(b,> b0)"; `Noblank;
       `P "Error: ..."; `Noblank;
       `P "$(b,> ... # Fix errors)"; `Noblank;
       `P "$(b,> b0)"; `Noblank;
       `P "$(b,> b0 scope git -- status)"; `Noblank;
       `P "$(b,> b0 scope git -- add -p)"; `Noblank;
-      `P "$(b,> b0 scope git -- commit -m 'Cope with changes!')";
+      `P "$(b,> b0 scope git -- commit -m 'Cope with changes!')"; `Noblank;
+      `P "$(b,> b0 scope git --all -- push)";
       `P "To invoke arbitrary tools in scopes use $(b,b0 scope exec). Options
           $(b,--root) and $(b,-x) allow to prune the list of scopes.";
     ]
