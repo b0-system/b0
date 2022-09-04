@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
+open B0_std
 
 type t = { def : B0_def.t; units : B0_unit.t list; locked : bool; }
 

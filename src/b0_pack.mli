@@ -7,7 +7,7 @@
 
     A build pack gathers a set of build units and attaches metadata to it. *)
 
-open B00_std
+open B0_std
 
 (** {1:packs Packs} *)
 

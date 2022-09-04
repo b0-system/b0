@@ -10,10 +10,10 @@ val memo :
   may_build:B0_unit.Set.t -> must_build:B0_unit.Set.t ->
   (B00.Memo.t, string) result
 
-val term : B00_std.Os.Exit.t Cmdliner.Term.t
+val term : B0_std.Os.Exit.t Cmdliner.Term.t
 (** [term] is the command term for [build]. *)
 
-val cmd : B00_std.Os.Exit.t Cmdliner.Cmd.t
+val cmd : B0_std.Os.Exit.t Cmdliner.Cmd.t
 (** [build] is the command line for [build]. *)
 
 (*---------------------------------------------------------------------------

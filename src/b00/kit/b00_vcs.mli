@@ -9,7 +9,7 @@
     make clear that this is not command oriented but repo oriented
     should make things more clear. *)
 
-open B00_std
+open B0_std
 
 (** {1:kind VCS kinds} *)
 
@@ -256,7 +256,7 @@ module Git : sig
       calls {!transient_checkout} and then [f r] with [r] the repo to
       act on the checkout. Once [f r] returns normally or via an
       exception {!transient_checkout_delete} is called.  [dir]
-      defaults to a temporary directory given by {!B00_std.Os.Path.tmp}. *)
+      defaults to a temporary directory given by {!B0_std.Os.Path.tmp}. *)
 
   (** {1:working_dir Working directory} *)
 

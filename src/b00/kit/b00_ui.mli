@@ -7,7 +7,7 @@
 
     User interaction fragments for devising build tools. *)
 
-open B00_std
+open B0_std
 open Cmdliner
 
 

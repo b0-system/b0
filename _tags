@@ -5,9 +5,9 @@ true : package(unix)
 <b0wl> : -traverse
 
 # B00
-<src/b00/std> : include
-<src/b00/std/b0_b00_std.{cma,cmxa}> : record_b00_stubs
-<src/b00/std/b0_b00_std.cmxs> : link_b00_stubs
+<src/std> : include
+<src/std/b0_std.{cma,cmxa}> : record_b0_stubs
+<src/std/b0_std.cmxs> : link_b0_stubs
 <src/b00> : include
 <src/b00/kit> : include
 <src/b00/kit/**> : package(cmdliner)
@@ -21,13 +21,13 @@ true : package(unix)
 # b0 & d0 tools
 <tool-b0> : include
 <tool-b0/**> : package(cmdliner)
-<tool-b0/b0_main_run.*> : use_b00_stubs
+<tool-b0/b0_main_run.*> : use_b0_stubs
 
 <tools> : include
-<tools/**> : use_b00_stubs, package(cmdliner)
+<tools/**> : use_b0_stubs, package(cmdliner)
 
 <examples> : include
-<examples/**> : use_b00_stubs, not_hygienic
+<examples/**> : use_b0_stubs, not_hygienic
 
 <test> : include
-<test/**> : use_b00_stubs, package(cmdliner)
+<test/**> : use_b0_stubs, package(cmdliner)

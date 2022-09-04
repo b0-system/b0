@@ -11,7 +11,7 @@
 
 (** {1:attsels HTML attributes and elements} *)
 
-open B00_std
+open B0_std
 
 (** Element attributes. *)
 module At : sig

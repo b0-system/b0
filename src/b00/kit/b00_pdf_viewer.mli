@@ -5,7 +5,7 @@
 
 (** PDF viewer interaction. *)
 
-open B00_std
+open B0_std
 
 (** {1:env Environment variables} *)
 

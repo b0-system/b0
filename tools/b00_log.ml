@@ -3,12 +3,12 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
+open B0_std
 
 let log tty_cap log_level no_pager format details query log_file =
-  let tty_cap = B00_cli.B00_std.get_tty_cap tty_cap in
-  let log_level = B00_cli.B00_std.get_log_level log_level in
-  B00_cli.B00_std.setup tty_cap log_level ~log_spawns:Log.Debug;
+  let tty_cap = B00_cli.B0_std.get_tty_cap tty_cap in
+  let log_level = B00_cli.B0_std.get_log_level log_level in
+  B00_cli.B0_std.setup tty_cap log_level ~log_spawns:Log.Debug;
   Log.if_error ~use:Cmdliner.Cmd.Exit.some_error @@
   let don't = no_pager || format = `Trace_event in
   Result.bind (B00_pager.find ~don't ()) @@ fun pager ->
@@ -42,8 +42,8 @@ let tool =
     `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ]
   in
   Cmd.v (Cmd.info "b00-log" ~version:"%%VERSION%%" ~doc ~envs ~man ~man_xrefs)
-    Term.(const log $ B00_cli.B00_std.tty_cap () $
-          B00_cli.B00_std.log_level () $ B00_pager.don't () $
+    Term.(const log $ B00_cli.B0_std.tty_cap () $
+          B00_cli.B0_std.log_level () $ B00_pager.don't () $
           B00_cli.Memo.Log.out_format_cli () $
           B00_cli.Arg.output_format () $
           B00_cli.Op.query_cli () $ log_file)

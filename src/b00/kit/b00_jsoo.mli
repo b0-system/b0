@@ -8,7 +8,7 @@
     This models the {{:http://ocsigen.org/js_of_ocaml/}[js_of_ocaml]}
     tool. *)
 
-open B00_std
+open B0_std
 open B00
 
 (** {1:jsoo Js_of_ocaml} *)
@@ -40,7 +40,7 @@ val link :
 val write_page :
   ?lang:string -> ?generator:string -> ?styles:string list ->
   ?scripts:string list -> ?title:string -> B00.Memo.t ->
-  o:B00_std.Fpath.t -> unit
+  o:B0_std.Fpath.t -> unit
 (** [write_page m ~title ~o] writes to file [o] a full HTML document
     whose body contains only a {!B00_htmlg.El.noscript} element that
     entices the user, in english, to enable JavaScript. [title]

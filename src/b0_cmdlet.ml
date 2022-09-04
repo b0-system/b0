@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
+open B0_std
 
 type t = { def : B0_def.t; cmd : cmd }
 and cmd = env -> Cmd.t -> Os.Exit.t

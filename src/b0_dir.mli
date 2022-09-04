@@ -5,7 +5,7 @@
 
 (** [B0_dir] directory structured access. *)
 
-open B00_std
+open B0_std
 
 (** {1:build Builds} *)
 

@@ -5,7 +5,7 @@
 
 (** [js_of_ocaml] B0 file support *)
 
-open B00_std
+open B0_std
 open B00
 open B00_ocaml
 
@@ -39,7 +39,7 @@ val link : Cmd.t B0_meta.key
 
 val assets_root : Fpath.t B0_meta.key
 (** [assets_root] indicates the path w.r.t. to which assets are are
-    {!B00_std.Fpath.reroot}ed. Assets that are not prefixed by
+    {!B0_std.Fpath.reroot}ed. Assets that are not prefixed by
     [assets_root] are simply copied at the toplevel of the build
     dir. *)
 
@@ -106,10 +106,10 @@ val web :
 
 val copy_assets :
   B00.Memo.t -> B00_fexts.map -> exts:B00_fexts.t ->
-  assets_root:Fpath.t option -> dst:B00_std.Fpath.t -> Fpath.Set.t
+  assets_root:Fpath.t option -> dst:B0_std.Fpath.t -> Fpath.Set.t
 (** [copy_assets m srcs ~exts ~assets_root ~dst] copies [srcs] with
     extensions in [exts] to [dst]. If [assets_root] is specified
-    indicates the path w.r.t. which assets are {!B00_std.Fpath.reroot}ed.
+    indicates the path w.r.t. which assets are {!B0_std.Fpath.reroot}ed.
     Assets that are not prefixed by [assets_root] are simply copied
     at the toplevel of [dst].
 

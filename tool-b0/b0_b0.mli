@@ -7,7 +7,7 @@
 
     FIXME cleanup and move to [B0_cli], cmdlets may be interested. *)
 
-open B00_std
+open B0_std
 
 val driver : B0_driver.t
 (** [driver] is the driver definition. *)
@@ -20,21 +20,21 @@ module Def : sig
 
   val list :
     (module B0_def.S) -> B0_driver.Conf.t -> B00_cli.Arg.output_format ->
-    string list -> B00_std.Os.Exit.t
+    string list -> B0_std.Os.Exit.t
   (** [list (module Def) c details ns] lists definition [Def] named
       [ns] with details [details]. If [ns] is empty all definitions
       are listed. *)
 
   val edit :
     (module B0_def.S) -> B0_driver.Conf.t -> string list ->
-    B00_std.Os.Exit.t
+    B0_std.Os.Exit.t
   (** [edit (module Def) c ns] edits the B0 files which define [Def]s
       named [ns]. If [ns] is empty all the B0 files that have
       definitions of kind [Def] are edited. *)
 
   val get_meta_key :
     (module B0_def.S) -> B0_driver.Conf.t -> B00_cli.Arg.output_format ->
-    string -> string list -> B00_std.Os.Exit.t
+    string -> string list -> B0_std.Os.Exit.t
   (** [get (module Def) k ns] gets key [k] in the metadata of
       definitions named [ns] with details [details]. If [ns] is empty
       all definitions are listed. *)

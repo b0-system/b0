@@ -3,8 +3,8 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
-open B00_std.Result.Syntax
+open B0_std
+open B0_std.Result.Syntax
 
 let cmd cmdlet_name cmdlet_args c =
   Log.if_error ~use:B00_cli.Exit.no_such_name @@

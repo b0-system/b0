@@ -4,18 +4,18 @@
    %%NAME%% release %%VERSION%%
    --------------------------------------------------------------------------*/
 
-#include "b00_stubs.h"
+#include "b0_stubs.h"
 #include <caml/unixsupport.h>
 
 /* Portable realpath */
 
 /* Darwin and POSIX */
 
-#if defined(OCAML_B00_DARWIN) || defined(OCAML_B00_POSIX)
+#if defined(OCAML_B0_DARWIN) || defined(OCAML_B0_POSIX)
 
 #include <stdlib.h>
 
-CAMLprim value ocaml_b00_realpath (value p)
+CAMLprim value ocaml_b0_realpath (value p)
 {
   char *r = realpath (String_val (p), NULL);
   if (r == NULL) { uerror ("realpath", p); }
@@ -26,7 +26,7 @@ CAMLprim value ocaml_b00_realpath (value p)
 
 /* Windows */
 
-#elif defined(OCAML_B00_WINDOWS)
+#elif defined(OCAML_B0_WINDOWS)
 
 #include <stdio.h>
 #include <windows.h>
@@ -35,7 +35,7 @@ CAMLprim value ocaml_b00_realpath (value p)
 
 #include <caml/osdeps.h>
 
-CAMLprim value ocaml_b00_realpath (value p)
+CAMLprim value ocaml_b0_realpath (value p)
 {
   HANDLE h;
   wchar_t *wp;
@@ -82,11 +82,11 @@ CAMLprim value ocaml_b00_realpath (value p)
 /* Unsupported */
 
 #else
-#warning OCaml B00 library: unsupported platform, realpath will fail.
+#warning OCaml B0 library: unsupported platform, realpath will fail.
 
-CAMLPrim value ocaml_b00_realpath (value p)
+CAMLPrim value ocaml_b0_realpath (value p)
 {
-  OCAML_B00_RAISE_SYS_ERROR ("realpath unimplemented on this platform")
+  OCAML_B0_RAISE_SYS_ERROR ("realpath unimplemented on this platform")
 }
 #endif
 

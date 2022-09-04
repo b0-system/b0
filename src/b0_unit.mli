@@ -8,7 +8,7 @@
     A build unit is a named build procedure with metadata associated
     to it. Build units are the smallest unit of build in B0. *)
 
-open B00_std
+open B0_std
 
 (** {1:proc Build procedures} *)
 
@@ -68,26 +68,26 @@ module Action : sig
       actions. *)
 
   val exec : action
-  (** [exec] is an action that {!B00_std.Os.Exit.exec}'s a unit's outcome
+  (** [exec] is an action that {!B0_std.Os.Exit.exec}'s a unit's outcome
       as follows:
       {ul
       {- The executed file is the unit's {!B0_meta.exe_file}.}
-      {- The arguments have {!B00_std.Fpath.basename} of
+      {- The arguments have {!B0_std.Fpath.basename} of
          {!B0_meta.exe_file} as the program name and the action's [args]
          as arguments.}
       {- If the unit defines {!exec_cwd}, it is used to determine the
-         [cwd] otherwise the default of {!B00_std.Os.Exit.exec} is used.}
+         [cwd] otherwise the default of {!B0_std.Os.Exit.exec} is used.}
       {- If the unit defines {!exec_env}, it is used to determine the
-         environment otherwise the default {!B00_std.Os.Exit.exec} is used.}} *)
+         environment otherwise the default {!B0_std.Os.Exit.exec} is used.}} *)
 
   val exec_file : build -> t -> Fpath.t -> Cmd.t -> Os.Exit.t Fut.t
-  (** [exec_file u file argv] is a {!B00_std.Os.Exit.exec} with
+  (** [exec_file u file argv] is a {!B0_std.Os.Exit.exec} with
       [file] and [argv] and:
       {ul
       {- If the unit [u] defines {!exec_cwd}, it is used to determine the
-         [cwd] otherwise the default of {!B00_std.Os.Exit.exec} is used.}
+         [cwd] otherwise the default of {!B0_std.Os.Exit.exec} is used.}
       {- If the unit [u] defines {!exec_env}, it is used to determine the
-         environment otherwise the default {!B00_std.Os.Exit.exec} is used.}} *)
+         environment otherwise the default {!B0_std.Os.Exit.exec} is used.}} *)
 end
 
 (** {1:b0_def B0 definition API} *)

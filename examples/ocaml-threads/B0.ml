@@ -1,5 +1,5 @@
 open B0_kit.V000
-open B00_std
+open B0_std
 
 
 let threads = B0_ocaml.libname "threads"

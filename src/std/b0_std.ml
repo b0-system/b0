@@ -1977,9 +1977,9 @@ module Hash = struct
     type t = string
     type seed = int
     let no_seed = 0
-    external hash_fd : Unix.file_descr -> seed -> t = "ocaml_b00_murmurhash_fd"
+    external hash_fd : Unix.file_descr -> seed -> t = "ocaml_b0_murmurhash_fd"
     external hash_unsafe : string -> int -> int -> seed -> t =
-      "ocaml_b00_murmurhash"
+      "ocaml_b0_murmurhash"
 
     let id = "murmur3-128"
     let length = 16
@@ -1991,9 +1991,9 @@ module Hash = struct
   module Xxh_64 = struct
     type t = int64
     type seed = int64
-    external hash_fd : Unix.file_descr -> seed -> t = "ocaml_b00_xxhash_fd"
+    external hash_fd : Unix.file_descr -> seed -> t = "ocaml_b0_xxhash_fd"
     external hash_unsafe : string -> int -> int -> seed -> t =
-      "ocaml_b00_xxhash"
+      "ocaml_b0_xxhash"
     external set_64u : Bytes.t -> int -> int64 -> unit = "%caml_string_set64u"
     external swap_64 : int64 -> int64 = "%bswap_int64"
     external noswap : int64 -> int64 = "%identity"
@@ -2414,7 +2414,7 @@ module Os = struct
   let ffail_notrace file e = Fmt.failwith_notrace "%a: %s" Fpath.pp file e
 
   module Cpu = struct
-    external logical_count : unit -> int = "ocaml_b00_cpu_logical_count"
+    external logical_count : unit -> int = "ocaml_b0_cpu_logical_count"
 
     (* Measuring CPU time *)
 
@@ -2461,7 +2461,7 @@ module Os = struct
   end
 
   module Mtime = struct
-    external mtime_now_ns : unit -> Mtime.t = "ocaml_b00_monotonic_now_ns"
+    external mtime_now_ns : unit -> Mtime.t = "ocaml_b0_monotonic_now_ns"
 
     (* Monotonic clock *)
 
@@ -3566,7 +3566,7 @@ module Os = struct
 
     (* Resolving *)
 
-    external _realpath : string -> string = "ocaml_b00_realpath"
+    external _realpath : string -> string = "ocaml_b0_realpath"
     let rec realpath p =
       try Fpath.of_string (_realpath (Fpath.to_string p)) with
       | Unix.Unix_error (Unix.EINTR, _, _) -> realpath p

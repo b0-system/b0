@@ -41,23 +41,24 @@ For B0 programmers.
 {- The {{!page-rationale}rationale} of B0, written a long time ago but
    still relevant}}
 
+
+{1:b0_std Library [b0.std]}
+
+The [b0.std] library has a few things that should be in the stdlib
+and a few others that should not be but are useful for B0 based
+programs.
+
+{!modules: B0_std}
+
 {1:b00_libs B00}
 
 B00 is the build model used by B0. It can be used for its own good to
 devise domain specific build system – see for example the [brzo] or
 [odig] tools.
 
-The {{!b00_std}[b0.b00.std]} and {{!b00_kit}[b0.b00.kit]} libraries also
+The {{!b0_std}[b0.std]} and {{!b00_kit}[b0.b00.kit]} libraries also
 provide sharp tools for quick "scripts" and command line tools even if you
 are not using {{!b00}[b0.b00]}.
-
-{2:b00_std Library [b0.b00.std]}
-
-The [b0.b00.std] library has a few things that should be in the stdlib
-and a few others that should not be but are useful for B0 and B00
-based programs.
-
-{!modules: B00_std}
 
 {2:b00 Library [b0.b00]}
 

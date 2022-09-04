@@ -7,14 +7,14 @@
 
     See the {{!page-opam}B0 [opam] manual} for more details. *)
 
-open B00_std
+open B0_std
 
 (** {1:tool [opam] tool} *)
 
 val get_cmd :
-  ?search:Fpath.t list -> ?cmd:B00_std.Cmd.t -> unit ->
+  ?search:Fpath.t list -> ?cmd:B0_std.Cmd.t -> unit ->
   (Cmd.t, string) result
-(** [get_cmd ()] looks for [opam] wih {!B00_std.Os.Cmd.get}. *)
+(** [get_cmd ()] looks for [opam] wih {!B0_std.Os.Cmd.get}. *)
 
 (** {1:file [opam] files} *)
 

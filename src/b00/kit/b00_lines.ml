@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
+open B0_std
 
 let of_string s = (* adapted from the stdlib's String.split_on_char *)
   let r = ref [] in

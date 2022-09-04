@@ -8,7 +8,7 @@
     This module exposes a first low-level abtraction layer over the
     OCaml toolchain. *)
 
-open B00_std
+open B0_std
 open B00
 
 (** Tools. *)
@@ -66,7 +66,7 @@ module Conf : sig
   val of_string : ?file:Fpath.t -> string -> (t, string) result
   (** [of_string ~file data] parses toolchain configuration from [data]
       as output by the compiler's [-config] option assuming it was read
-      from file [file] (defaults to {!B00_std.Fpath.dash}). *)
+      from file [file] (defaults to {!B0_std.Fpath.dash}). *)
 
   val write : B00.Memo.t -> comp:B00.Tool.t -> o:Fpath.t -> unit
   (** [write m ~o] writes the toolchain configuration to [o] by
@@ -252,7 +252,7 @@ v} *)
           [v :: find k m] if [k] was bound in [m] and [[v]] otherwise. *)
 
       val add_to_set :
-        (module B00_std.Stdlib_set.S with type elt = 'a and type t = 'set) ->
+        (module B0_std.Stdlib_set.S with type elt = 'a and type t = 'set) ->
         key -> 'a -> 'set t -> 'set t
       (** [add (module S) k v m] is [m] with [k] mapping to [s] such that [s] is
           [S.add v (find k m)] if [k] was bound in [m] and [S.singleton [v]]
@@ -493,7 +493,7 @@ module Cobj : sig
   val of_string : ?file:Fpath.t -> string -> (t list, string) result
   (** [of_string ~file data] parses compilation object information from
       [data] as output by {!Tool.ocamlobjinfo} assuming it was
-      read from [file] (defaults to {!B00_std.Os.File.dash}). *)
+      read from [file] (defaults to {!B0_std.Os.File.dash}). *)
 end
 
 (** Library information and lookup.
@@ -558,7 +558,7 @@ v}
 
     val to_fpath : t -> Fpath.t
     (** [to_fpath n] is [n] with dots replaced by
-        {!B00_std.Fpath.dir_sep_char}. *)
+        {!B0_std.Fpath.dir_sep_char}. *)
 
     val equal : t -> t -> bool
     (** [equal n0 n1] is [true] iff [n0] and [n1] are the same library name. *)
@@ -747,7 +747,7 @@ module Ocamlpath : sig
       {ol
       {- If the [OCAMLPATH] environment variable is defined in [m] and
          non-empty its content is parsed s according to
-         {!B00_std.Fpath.list_of_search_path}.}
+         {!B0_std.Fpath.list_of_search_path}.}
       {- If the [OPAM_SWITCH_PREFIX] environment variable is defined with
          a path [P] then [[P/lib]] is used.}
       {- The memo fails.}} *)

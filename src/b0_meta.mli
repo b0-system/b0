@@ -20,7 +20,7 @@ let meta =
 ]}
     {b XXX.} They used to be serializable, see if we don't want that again. *)
 
-open B00_std
+open B0_std
 
 (** {1:keys Keys} *)
 
@@ -102,7 +102,7 @@ type binding = B : 'a key * 'a -> binding (** *)
 (** The type for metadata bindings. *)
 
 val pp_binding : binding Fmt.t
-(** [pp_binding] formats a binding using {!B00_std.Fmt.field} and the
+(** [pp_binding] formats a binding using {!B0_std.Fmt.field} and the
     key's value print function. *)
 
 type t

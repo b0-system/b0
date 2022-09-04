@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
+open B0_std
 open Result.Syntax
 open B000
 
@@ -138,7 +138,7 @@ module Memo = struct
   let memo
       ?(hash_fun = (module Hash.Xxh_64 : Hash.T)) ?win_exe ?tool_lookup
       ?env ?cwd ?cache_dir ?trash_dir
-      ?(jobs = B00_std.Os.Cpu.logical_count ()) ?feedback ()
+      ?(jobs = B0_std.Os.Cpu.logical_count ()) ?feedback ()
     =
     let feedback = match feedback with | Some f -> f | None -> fun _ -> () in
     let fb_exec = (feedback :> Exec.feedback -> unit) in

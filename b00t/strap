@@ -21,13 +21,13 @@ let boot_dir = root_dir / "b00t"
 let boot_build_dir = boot_dir / "_build"
 let boot_exe = (boot_dir / "run") ^ (if Sys.win32 then ".exe" else "")
 
-let c_src_dirs = ["src"/"b00"/"std"; "src"/"b00"/"std"/"vendor"]
+let c_src_dirs = ["src"/"std"; "src"/"std"/"vendor"]
 let ml_src_dirs =
-  [ "src"/"b00"/"std"; "src"/"b00"; "src"/"b00"/"kit";
+  [ "src"/"std"; "src"/"b00"; "src"/"b00"/"kit";
     "src"; "src"/"kit"; "tool-b0"; ]
 
 let src_excludes = (* These files should not be part of the driver *)
-  [ "src"/"b00"/"std"/"b0_b00_std_top_init.ml";
+  [ "src"/"std"/"b0_std_top_init.ml";
     "tool-b0"/"b0_main_run.ml"; ]
 
 (* Read, write and collect files *)
@@ -160,7 +160,7 @@ let driver_src ~ml_srcs b0_file =
   let add_b0_file b b0_file =
     (* This mimics what B0_file.expanded_src does in a simpler manner *)
     Buffer.add_string b @@ strf
-      "let () = B0_def.Scope.root (B00_std.Fpath.v %S)\n\
+      "let () = B0_def.Scope.root (B0_std.Fpath.v %S)\n\
        #1 %S\n\
        %s\n\
        #1 \"-\"\n\

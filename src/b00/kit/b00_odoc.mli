@@ -10,7 +10,7 @@
     abstract it via a few functions and provide a full driver
     story. *)
 
-open B00_std
+open B0_std
 open B00
 
 (** {1:odoc Odoc} *)
@@ -89,8 +89,8 @@ module Compile : sig
   (** {1:conv Convenience} *)
 
   val to_odoc :
-    Memo.t -> ?hidden:bool -> pkg:string -> odoc_deps:B00_std.Fpath.t list ->
-    B00_std.Fpath.t -> o:B00_std.Fpath.t -> unit
+    Memo.t -> ?hidden:bool -> pkg:string -> odoc_deps:B0_std.Fpath.t list ->
+    B0_std.Fpath.t -> o:B0_std.Fpath.t -> unit
   (** [to_odoc m ~hidden ~pkg ~odoc_deps obj ~o] compiles [obj] (which
       can be any of a [.cmi], [.cmt], [.cmti] or [.mld] file) to an odoc
       file [o] assuming it depends on [odoc_deps] and is part of package [pkg]. *)
@@ -182,8 +182,8 @@ module Html : sig
   (** {1:conv Convenience} *)
 
   val write :
-    Memo.t -> ?theme_uri:string -> html_dir:B00_std.Fpath.t ->
-    odoc_deps:B00_std.Fpath.t list -> B00_std.Fpath.t -> unit
+    Memo.t -> ?theme_uri:string -> html_dir:B0_std.Fpath.t ->
+    odoc_deps:B0_std.Fpath.t list -> B0_std.Fpath.t -> unit
    (** [write m ~theme_uri ~html_dir ~odoc_deps odoc] writes the [html]
        for [odoc] in [html_dir] assuming it depends on the [odoc_files]
        in [odoc_deps]. *)

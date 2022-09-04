@@ -4,17 +4,17 @@
    %%NAME%% release %%VERSION%%
    --------------------------------------------------------------------------*/
 
-#include "b00_stubs.h"
+#include "b0_stubs.h"
 
 /* Portable cpu information */
 
 /* Darwin and POSIX */
 
-#if defined(OCAML_B00_DARWIN) || defined(OCAML_B00_POSIX)
+#if defined(OCAML_B0_DARWIN) || defined(OCAML_B0_POSIX)
 
 #include <unistd.h>
 
-CAMLprim value ocaml_b00_cpu_logical_count (value unit)
+CAMLprim value ocaml_b0_cpu_logical_count (value unit)
 {
   int n = sysconf (_SC_NPROCESSORS_ONLN);
   if (n < 0) { n = 1; }
@@ -23,11 +23,11 @@ CAMLprim value ocaml_b00_cpu_logical_count (value unit)
 
 /* Windows */
 
-#elif defined(OCAML_B00_WINDOWS)
+#elif defined(OCAML_B0_WINDOWS)
 
 #include <windows.h>
 
-CAMLprim value ocaml_b00_cpu_logical_count (value unit)
+CAMLprim value ocaml_b0_cpu_logical_count (value unit)
 {
   SYSTEM_INFO i;
   GetSystemInfo (&i);
@@ -39,9 +39,9 @@ CAMLprim value ocaml_b00_cpu_logical_count (value unit)
 /* Unsupported */
 
 #else
-#warning OCaml B00 library: unsupported platform, cpu count will always be 1
+#warning OCaml B0 library: unsupported platform, cpu count will always be 1
 
-CAMLprim value ocaml_b00_cpu_logical_count (value unit)
+CAMLprim value ocaml_b0_cpu_logical_count (value unit)
 {
   return Val_int (1);
 }

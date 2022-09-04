@@ -10,7 +10,7 @@
 
 (** {1:b000 B000} *)
 
-open B00_std
+open B0_std
 
 (** Delete file hierarchies.
 
@@ -71,7 +71,7 @@ module File_cache : sig
   (** The type for keys. A key maps to a metadata hunk and an ordered
       list of file contents. The module treats keys as sequence of
       bytes however since they are used as file names they should
-      satisfy the {!B00_std.Fpath.is_seg} predicate; this is not
+      satisfy the {!B0_std.Fpath.is_seg} predicate; this is not
       checked by the module. *)
 
   type t
@@ -563,12 +563,12 @@ module Op : sig
 
   val time_started : t -> Mtime.span
   (** [time_started o] is [o]'s execution start time. This is
-      different from {!B00_std.Time.Span.max} once the operation has
+      different from {!B0_std.Time.Span.max} once the operation has
       been submitted for execution. *)
 
   val time_ended : t -> Mtime.span
   (** [time_ended o] is [o]'s execution end time. This is different
-      from {!B00_std.Time.Span.max} once the operation has been completed
+      from {!B0_std.Time.Span.max} once the operation has been completed
       and collected. *)
 
   val waited : t -> Mtime.span
@@ -579,7 +579,7 @@ module Op : sig
 
   val revived : t -> bool
   (** [revived o] is [true] iff [o] was revived from a cache. Only
-      relevant if {!hash} is not {!B00_std.Hash.nil}. *)
+      relevant if {!hash} is not {!B0_std.Hash.nil}. *)
 
   val status : t -> status
   (** [status o] is [o] execution status. *)
@@ -596,9 +596,9 @@ module Op : sig
       [root] are stored along-side the cache key. *)
 
   val hash : t -> Hash.t
-  (** [hash o] is the operation's hash. This is {!B00_std.Hash.nil} before the
+  (** [hash o] is the operation's hash. This is {!B0_std.Hash.nil} before the
       operation hash has been effectively computed and set via
-      {!set_hash}. This remains {!B00_std.Hash.nil} for operations that are
+      {!set_hash}. This remains {!B0_std.Hash.nil} for operations that are
       not revivable. *)
 
   (** {1:upd Updating the build operation} *)
@@ -726,7 +726,7 @@ end
 (** Build operation revivers.
 
     An operation reviver combines a {{!File_cache}file cache} and a
-    {{!B00_std.Hash.T}hash function} to record and revive the effect of
+    {{!B0_std.Hash.T}hash function} to record and revive the effect of
     {{!Op}build operations}.
 
     {b Note.} Hashes performed on files by this module are
@@ -871,11 +871,11 @@ module Exec : sig
   (** [create ~clock ~rand ~tmp_dir ~feedback ~trash ~jobs] with:
       {ul
       {- [clock], the clock used to timestamp build operations;
-         defaults to {!val:B00_std.Os.Mtime.counter}[ ()].}
+         defaults to {!val:B0_std.Os.Mtime.counter}[ ()].}
       {- [rand] random state used for internal queues; defaults to
          {!Random.State.make_self_init}.}
       {- [tmp_dir] is a directory for temporary files, it must exist;
-          defaults to {!B00_std.Os.Dir.default_tmp}[ ()].}
+          defaults to {!B0_std.Os.Dir.default_tmp}[ ()].}
       {- [feedback] a function called with each {{!schedule}scheduled}
          operation when it starts executing. Default is a nop.}
       {- [trash], the trash used to execute {!B000.Op.module-Delete} build

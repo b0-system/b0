@@ -23,7 +23,7 @@
 
 (** {1:def Definitions } *)
 
-open B00_std
+open B0_std
 
 (** Scopes are used to track and scope B0 definitions created
     by libraries and B0 files. *)

@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
+open B0_std
 open B00
 
 (* At a certain point we might want to cache the directory folds and
@@ -85,7 +85,7 @@ let select_files_in_dirs m u xs (seen, by_ext as acc) ds =
   loop m u xs acc ds
 
 let select b sels =
-  let open B00_std.Fut.Syntax in
+  let open B0_std.Fut.Syntax in
   let m = B0_build.memo b in
   let u = B0_build.current b in
   let scope = B0_build.current_scope_dir b in

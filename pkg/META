@@ -1,27 +1,28 @@
 description = "Software construction and deployment kit"
 version = "%%VERSION_NUM%%"
-requires = "unix cmdliner b0.b00.std b0.b00 b0.b00.kit"
+requires = "unix cmdliner b0.std b0.b00 b0.b00.kit"
 archive(byte) = "b0.cma"
 archive(native) = "b0.cmxa"
 plugin(byte) = "b0.cma"
 plugin(native) = "b0.cmxs"
 
-package "b00" (
-  package "std" (
-    directory = "std"
-    description = "B00 stdlib extensions"
-    version = "%%VERSION_NUM%%"
-    requires = "unix"
-    archive(byte) = "b0_b00_std.cma"
-    archive(native) = "b0_b00_std.cmxa"
-    plugin(byte) = "b0_b00_std.cma"
-    plugin(native) = "b0_b00_std.cmxs"
-  )
+package "std" (
+  directory = "std"
+  description = "B0 stdlib"
+  version = "%%VERSION_NUM%%"
+  requires = "unix"
+  archive(byte) = "b0_std.cma"
+  archive(native) = "b0_std.cmxa"
+  plugin(byte) = "b0_std.cma"
+  plugin(native) = "b0_std.cmxs"
+)
 
+
+package "b00" (
   directory = "b00"
   description = "B00 build abstraction"
   version = "%%VERSION_NUM%%"
-  requires = "unix b0.b00.std"
+  requires = "unix b0.std"
   archive(byte) = "b0_b00.cma"
   archive(native) = "b0_b00.cmxa"
   plugin(byte) = "b0_b00.cma"
@@ -31,7 +32,7 @@ package "b00" (
     directory = "kit"
     description = "B00 toolkit"
     version = "%%VERSION_NUM%%"
-    requires = "unix cmdliner b0.b00.std b0.b00"
+    requires = "unix cmdliner b0.std b0.b00"
     archive(byte) = "b0_b00_kit.cma"
     archive(native) = "b0_b00_kit.cmxa"
     plugin(byte) = "b0_b00_kit.cma"
@@ -43,7 +44,7 @@ package "kit" (
   directory = "kit"
   description = "B0 toolkit"
   version = "%%VERSION_NUM%%"
-  requires = "unix cmdliner b0.b00.std b0.b00 b0.b00.kit b0"
+  requires = "unix cmdliner b0.std b0.b00 b0.b00.kit b0"
   archive(byte) = "b0_kit.cma"
   archive(native) = "b0_kit.cmxa"
   plugin(byte) = "b0_kit.cma"
@@ -54,7 +55,7 @@ package "b0" (
   directory = "b0"
   description = "b0 tool driver"
   version = "%%VERSION_NUM%%"
-  requires = "unix cmdliner b0.b00.std b0.b00 b0.b00.kit b0 b0.kit"
+  requires = "unix cmdliner b0.std b0.b00 b0.b00.kit b0 b0.kit"
    archive(byte) = "b0_b0.cma"
    archive(native) = "b0_b0.cmxa"
    plugin(byte) = "b0_b0.cma"

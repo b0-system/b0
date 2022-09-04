@@ -5,13 +5,13 @@
 
 (** Command line user interface fragments. *)
 
-open B00_std
+open B0_std
 
 (** {1:exit Exits} *)
 
 (** Program exits.
 
-    Support for {!B00_std.Os.Exit} exits which are more evolved
+    Support for {!B0_std.Os.Exit} exits which are more evolved
     than those provided by cmdliner. *)
 module Exit : sig
 
@@ -47,7 +47,7 @@ module Exit : sig
          (defaults to [Os.Exit.Code Cmdliner.Exit.cli_error]).}} *)
 
   val exit : exec_error:Os.Exit.t -> Os.Exit.t -> 'a
-  (** [exit e] exits with [e]. This uses {!B00_std.Os.Exit.exit} and
+  (** [exit e] exits with [e]. This uses {!B0_std.Os.Exit.exit} and
       in case of [Error _] logs it and exits with {!exec_error} which
       {b if given an exit code} is then guaranteed to exit. *)
 end
@@ -86,14 +86,14 @@ module Arg : sig
       documented, defaults to {!s_output_format_options}. *)
 end
 
-(** Fragments for setting up {!B00_std}.  *)
-module B00_std : sig
+(** Fragments for setting up {!B0_std}.  *)
+module B0_std : sig
 
   (** {1:setup Setup}
 
-      Configure {{!B00_std.Fmt.set_tty_styling_cap}colored output} and
-      {{!B00_std.Log.set_level}log verbosity} and the
-      {!B00_std.Os.Cmd.spawn_tracer}. *)
+      Configure {{!B0_std.Fmt.set_tty_styling_cap}colored output} and
+      {{!B0_std.Log.set_level}log verbosity} and the
+      {!B0_std.Os.Cmd.spawn_tracer}. *)
 
   val get_tty_cap : Tty.cap option option -> Tty.cap
   (** [get_tty_cap cap] determines [cap] with {!Tty.cap} and
@@ -107,10 +107,10 @@ module B00_std : sig
   val setup : Tty.cap -> Log.level -> log_spawns:Log.level -> unit
   (** [setup tty_cap log_level ~log_spawns] sets:
       {ul
-      {- {!B00_std.Fmt.set_tty_styling_cap} with [tty_cap].}
-      {- {!B00_std.Log.set_level} with [log_level].}
-      {- {!B00_std.Os.Cmd.set_spawn_tracer} with
-        {!B00_std.Log.spawn_tracer}[ log_spawns]
+      {- {!B0_std.Fmt.set_tty_styling_cap} with [tty_cap].}
+      {- {!B0_std.Log.set_level} with [log_level].}
+      {- {!B0_std.Os.Cmd.set_spawn_tracer} with
+        {!B0_std.Log.spawn_tracer}[ log_spawns]
          iff [level >= log_spawn].}}
       {b Warning.} If [level < log_spawn] but {!Log.level} is
       increased after this call, the spawns won't be traced (most cli
@@ -318,10 +318,10 @@ module Memo : sig
     [B00.Memo.feedback | B000.Exec.feedback] Fmt.t
   (** [pp_leveled_feedback ~sep ~op_howto ~show_spawn_ui ~show_success ~level
       ppf] formats memo feedback on [ppf] followed by [sep] iff something
-      is printed (defaults to {!B00_std.Fmt.flush_nl}).
+      is printed (defaults to {!B0_std.Fmt.flush_nl}).
       {ul
-      {- {!B00_std.Log.Quiet} formats nothing}
-      {- {!B00_std.Log.Debug} report all operations with
+      {- {!B0_std.Log.Quiet} formats nothing}
+      {- {!B0_std.Log.Debug} report all operations with
          {!B000_conv.Op.pp_short_ui}.}}
       {ul
       {- [show_ui] is the level at which any completed operation
@@ -329,7 +329,7 @@ module Memo : sig
       {- [show_op] is the level at which any completed operation gets
          logged with {!B000_conv.Op.pp_short_ui}}}
       The formatter [op_howto] should format a way to got more information
-      about an operation, default to {!B00_std.Fmt.nop}. *)
+      about an operation, default to {!B0_std.Fmt.nop}. *)
 
   (** {1:dirs_files Directories and files} *)
 
@@ -464,7 +464,7 @@ module Memo : sig
 
   val get_jobs : jobs:int option -> int
   (** [get_jobs ~jobs] determines a maximal number of spawns. If jobs
-      is [None] then {!B00_std.Os.Cpu.logical_count} is used. *)
+      is [None] then {!B0_std.Os.Cpu.logical_count} is used. *)
 
   (** {2:hash_fun Hash function} *)
 
@@ -488,7 +488,7 @@ module Memo : sig
 
   val get_hash_fun : hash_fun:(module Hash.T) option -> (module Hash.T)
   (** [get_hash_fun ~hash_fun] determines a hash function. If [hash_fun]
-      is [None] then {!B00_std.Hash.Xxh_64} is used. *)
+      is [None] then {!B0_std.Hash.Xxh_64} is used. *)
 
   (** {1:logs Logs} *)
 

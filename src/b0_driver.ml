@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
+open B0_std
 open B00
 
 module Exit = struct
@@ -112,9 +112,9 @@ module Conf = struct
       ~b0_dir ~b0_file ~cache_dir ~code ~hash_fun ~jobs
       ~log_level ~no_pager ~tty_cap ()
     =
-    let tty_cap = B00_cli.B00_std.get_tty_cap tty_cap in
-    let log_level = B00_cli.B00_std.get_log_level log_level in
-    B00_cli.B00_std.setup tty_cap log_level ~log_spawns:Log.Debug;
+    let tty_cap = B00_cli.B0_std.get_tty_cap tty_cap in
+    let log_level = B00_cli.B0_std.get_log_level log_level in
+    B00_cli.B0_std.setup tty_cap log_level ~log_spawns:Log.Debug;
     Result.bind (Os.Dir.cwd ()) @@ fun cwd ->
     let b0_file = find_b0_file ~cwd ~b0_file in
     let root = match b0_file with Some f -> Fpath.parent f | None -> cwd  in
@@ -153,9 +153,9 @@ module Cli = struct
   let hash_fun = B00_cli.Memo.hash_fun ~docs ()
   let jobs = B00_cli.Memo.jobs ~docs ()
   let log_level =
-    B00_cli.B00_std.log_level ~docs ~env:(Cmd.Env.info Env.verbosity) ()
+    B00_cli.B0_std.log_level ~docs ~env:(Cmd.Env.info Env.verbosity) ()
 
-  let tty_cap = B00_cli.B00_std.tty_cap ~docs ~env:(Cmd.Env.info Env.color) ()
+  let tty_cap = B00_cli.B0_std.tty_cap ~docs ~env:(Cmd.Env.info Env.color) ()
   let no_pager = B00_pager.don't ~docs ()
   let conf =
     let conf
@@ -216,7 +216,7 @@ let run ~has_b0_file:b0_file =
 let has_b0_file () = !has_b0_file
 
 module Compile = struct
-  open B00_std.Fut.Syntax
+  open B0_std.Fut.Syntax
 
   let build_dir c ~driver =
     Fpath.(Conf.b0_dir c / Conf.drivers_dir_name / name driver)
@@ -238,7 +238,7 @@ module Compile = struct
       B00_ocaml.Lib.Name.v "unix"; ]
 
   let base_libs =
-    [ B00_ocaml.Lib.Name.v "b0.b00.std";
+    [ B00_ocaml.Lib.Name.v "b0.std";
       B00_ocaml.Lib.Name.v "b0.b00";
       B00_ocaml.Lib.Name.v "b0.b00.kit";
       B00_ocaml.Lib.Name.v "b0";
@@ -369,7 +369,7 @@ module Compile = struct
 end
 
 let with_b0_file ~driver cmd =
- let open B00_std.Result.Syntax in
+ let open B0_std.Result.Syntax in
   let run conf cmd = match has_b0_file () with
   | true -> cmd conf
   | false ->

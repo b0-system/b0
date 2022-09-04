@@ -7,10 +7,10 @@ let () =
   Pkg.describe "b0" @@ fun c ->
   Ok [
     (* B00 libraries *)
-    Pkg.mllib "src/b00/std/b0_b00_std.mllib" ~dst_dir:"b00/std";
-    Pkg.clib "src/b00/std/libb0_b00_stubs.clib" ~lib_dst_dir:"b00/std";
-    Pkg.lib "src/b00/std/b0_b00_std_top_init.ml"
-      ~dst:"b00/std/b0_b00_std_top_init.ml";
+    Pkg.mllib "src/std/b0_std.mllib" ~dst_dir:"std";
+    Pkg.clib "src/std/libb0_stubs.clib" ~lib_dst_dir:"std";
+    Pkg.lib "src/std/b0_std_top_init.ml"
+      ~dst:"std/b0_std_top_init.ml";
     Pkg.mllib "src/b00/b0_b00.mllib" ~dst_dir:"b00";
     Pkg.mllib "src/b00/kit/b0_b00_kit.mllib" ~dst_dir:"b00/kit";
 

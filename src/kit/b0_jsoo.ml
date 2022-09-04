@@ -3,8 +3,8 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
-open B00_std.Fut.Syntax
+open B0_std
+open B0_std.Fut.Syntax
 open B00
 open B00_ocaml
 

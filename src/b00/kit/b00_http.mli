@@ -9,7 +9,7 @@
 
 (** {1:www WWW} *)
 
-open B00_std
+open B0_std
 
 (** URIs. *)
 module Uri : sig

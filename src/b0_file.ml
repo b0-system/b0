@@ -3,8 +3,8 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
-open B00_std.Result.Syntax
+open B0_std
+open B0_std.Result.Syntax
 open B00_serialk_text
 
 (* Syntactic metadata *)
@@ -330,7 +330,7 @@ let rec w_include b b0_file id npre manif boots incs reqs ((n, nm), inc_file) =
   let b = w b (Fmt.str "module Inc_%03d : sig end = struct" id) in
   let b =
     let f = Fpath.to_string (file b0_file) in
-    w b (Fmt.str "let () = B0_def.Scope.open' %S (B00_std.Fpath.v %S)" n f)
+    w b (Fmt.str "let () = B0_def.Scope.open' %S (B0_std.Fpath.v %S)" n f)
   in
   let b, id, manif, boots, incs, reqs =
     let id = id + 1 in
@@ -374,7 +374,7 @@ let expand b0_file =
   try
     let b = w [] nil_loc in
     let r = Fpath.to_string (file b0_file) in
-    let b = w b (Fmt.str "let () = B0_def.Scope.root (B00_std.Fpath.v %S)" r) in
+    let b = w b (Fmt.str "let () = B0_def.Scope.root (B0_std.Fpath.v %S)" r) in
     let b, _, manif, boots, incs, reqs = w_includes b b0_file 0 "" [] [] [][] in
     let b, manif = w_mod_uses b b0_file manif in
     let b = w_ocaml_unit b (ocaml_unit b0_file) in

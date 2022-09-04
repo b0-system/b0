@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
+open B0_std
 
 let cp_cmd follow_symlinks recurse src dst =
   let error e = Fmt.epr "%s: %s" (Filename.basename Sys.argv.(0)) e; 1 in

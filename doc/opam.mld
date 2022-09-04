@@ -145,7 +145,7 @@ If everything worked well it continues with:
 {ol
 {- Clones or updates the OCaml [opam] repository to the
    bare repository [~/.caches/opam-repository.git] (the
-   {{!B00_std.Os.Dir.cache}XDG spec} is honoured).}
+   {{!B0_std.Os.Dir.cache}XDG spec} is honoured).}
 {- Creates a branch for the publication, adds a commit with
    the generated files and constraints on incompatible packages.}
 {- Pushes the branch on your fork of the OCaml [opam] repository on GitHub.}

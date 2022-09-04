@@ -3,8 +3,8 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
-open B00_std.Fut.Syntax
+open B0_std
+open B0_std.Fut.Syntax
 open B00
 
 let add_if c v l = if c then v :: l else l
@@ -199,7 +199,7 @@ module Mod = struct
 
       let add_to_set
           (type set) (type elt)
-          (module S : B00_std.Stdlib_set.S with type elt = elt and type t = set)
+          (module S : B0_std.Stdlib_set.S with type elt = elt and type t = set)
           k v m = match find k m with
       | exception Not_found -> add k (S.singleton v) m
       | set -> add k (S.add v set) m

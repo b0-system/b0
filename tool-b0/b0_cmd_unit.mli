@@ -5,7 +5,7 @@
 
 (** B0 [unit] command. *)
 
-val cmd : B00_std.Os.Exit.t Cmdliner.Cmd.t
+val cmd : B0_std.Os.Exit.t Cmdliner.Cmd.t
 (** [cmd] is the command line for [unit]. *)
 
 (*---------------------------------------------------------------------------

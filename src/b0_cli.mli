@@ -7,7 +7,7 @@
 
     See also {!B00_cli}. *)
 
-open B00_std
+open B0_std
 open Cmdliner
 
 module Arg : sig

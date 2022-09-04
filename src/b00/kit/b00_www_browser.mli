@@ -10,7 +10,7 @@
     of new tabs, reloading existing one which have the same URI or
     are, if requested, prefixed by the URI. *)
 
-open B00_std
+open B0_std
 
 (** {1:env Environment variables} *)
 

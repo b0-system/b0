@@ -9,7 +9,7 @@
     See {{!page-driver_dev}this manual} for an
     overview and a minimal example. *)
 
-open B00_std
+open B0_std
 
 (** {1:commonalities Commonalities} *)
 

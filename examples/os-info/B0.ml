@@ -1,6 +1,6 @@
 
 open B0_kit.V000
-open B00_std
+open B0_std
 
 let notify_info b k =
   let store = B0_build.store b in

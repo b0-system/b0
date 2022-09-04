@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
+open B0_std
 
 let exit_b0_file_error = 121 (* See B0_driver.Exit.b0_file_error *)
 let pp_error_str ppf () = Fmt.tty_string [`Fg `Red; `Bold] ppf "Error"

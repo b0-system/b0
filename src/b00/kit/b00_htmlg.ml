@@ -122,7 +122,7 @@ module El = struct
     in
     loop 0 0
 
-  let void_els = B00_std.String.Set.of_list
+  let void_els = B0_std.String.Set.of_list
       [ "area"; "base"; "br"; "col"; "embed"; "hr"; "img"; "input"; "link";
         "meta"; "param"; "source"; "track"; "wbr" ]
 
@@ -150,7 +150,7 @@ module El = struct
       end
   | El (n, atts, cs) ->
       addc b '<'; adds b n; add_ats b [] atts; addc b '>';
-      if not (B00_std.String.Set.mem n void_els)
+      if not (B0_std.String.Set.mem n void_els)
       then (List.iter (add_child b) cs; adds b "</"; adds b n; addc b '>')
 
   let add_doc_type b = adds b "<!DOCTYPE html>\n"
@@ -278,9 +278,9 @@ module El = struct
 
   (* Convenience *)
 
-  let title_of_fpath file = match B00_std.Fpath.basename ~no_ext:true file with
+  let title_of_fpath file = match B0_std.Fpath.basename ~no_ext:true file with
   | "index" | "" ->
-      let title = B00_std.Fpath.(basename ~no_ext:true (parent file)) in
+      let title = B0_std.Fpath.(basename ~no_ext:true (parent file)) in
       if title = "" then "Untitled" else title
   | title -> title
 
@@ -317,7 +317,7 @@ module El = struct
     =
     (* FIXME Ideally we would like the read to be in write.
        The write fun return a future but this has other impacts. *)
-    let open B00_std.Fut.Syntax in
+    let open B0_std.Fut.Syntax in
     ignore @@ (* FIXME maybe get rid of that. *)
     let* contents = B00.Memo.read m frag in
     let title = if title = "" then title_of_fpath o else title in
@@ -329,7 +329,7 @@ module El = struct
     let stamp = List.rev_append styles stamp in
     let stamp = List.rev_append scripts stamp in
     let stamp = String.concat "" stamp in
-    B00_std.Fut.return @@
+    B0_std.Fut.return @@
     (B00.Memo.write m ~stamp ~reads:[frag] o @@ fun () ->
     let more_head = raw more_head in
     let body = body [raw contents] in

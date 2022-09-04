@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
+open B0_std
 
 let hash_file (module H : Hash.T) f = match Fpath.equal f Fpath.dash with
 | false -> Result.bind (H.file f) @@ fun h -> Ok (f, h)
@@ -15,9 +15,9 @@ let pp_hash = function
     fun ppf (f, h) -> Hash.pp ppf h; Fmt.char ppf ' '; Fpath.pp_unquoted ppf f
 
 let hash tty_cap log_level hash_fun format files =
-  let tty_cap = B00_cli.B00_std.get_tty_cap tty_cap in
-  let log_level = B00_cli.B00_std.get_log_level log_level in
-  B00_cli.B00_std.setup tty_cap log_level ~log_spawns:Log.Debug;
+  let tty_cap = B00_cli.B0_std.get_tty_cap tty_cap in
+  let log_level = B00_cli.B0_std.get_log_level log_level in
+  B00_cli.B0_std.setup tty_cap log_level ~log_spawns:Log.Debug;
   let hash_fun = B00_cli.Memo.get_hash_fun ~hash_fun in
   let pp_hash = pp_hash format in
   Log.if_error ~use:Cmdliner.Cmd.Exit.some_error @@ match files with
@@ -55,8 +55,8 @@ let tool =
     `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ]
   in
   Cmd.v (Cmd.info "b00-hash" ~version:"%%VERSION%%" ~doc ~man ~man_xrefs)
-    Term.(const hash $ B00_cli.B00_std.tty_cap () $
-          B00_cli.B00_std.log_level () $ hash_fun $
+    Term.(const hash $ B00_cli.B0_std.tty_cap () $
+          B00_cli.B0_std.log_level () $ hash_fun $
           B00_cli.Arg.output_format () $ files)
 
 let main () = exit (Cmd.eval' tool)

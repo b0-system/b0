@@ -5,11 +5,11 @@
 
 (** [rsync] support. *)
 
-open B00_std
+open B0_std
 
 val get_cmd :
   ?search:Fpath.t list -> ?cmd:Cmd.t -> unit -> (Cmd.t, string) result
-(** [get_cmd ()] looks for [rsync] with {!B00_std.Os.Cmd.get}. *)
+(** [get_cmd ()] looks for [rsync] with {!B0_std.Os.Cmd.get}. *)
 
 val copy :
   ?opts:Cmd.t -> ?stats:bool -> ?progress:bool -> delete:bool ->

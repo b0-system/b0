@@ -5,7 +5,7 @@
 
 (** Pager interaction. *)
 
-open B00_std
+open B0_std
 
 (** {1:env Environment variables} *)
 
@@ -50,7 +50,7 @@ val page_stdout : Cmd.t option -> (unit, string) result
        current environment it is set to [LESS=FRX] for the spawn of
        [cmd].}
     {- A {!Stdlib.at_exit} function is installed that flushes
-       {!B00_std.Fmt.stdout} and {!Stdlib.stdout}, closes [Unix.stdout] and
+       {!B0_std.Fmt.stdout} and {!Stdlib.stdout}, closes [Unix.stdout] and
        waits upon the [cmd] spawn termination.}}
     If [pager] is [None] this function has no effect. *)
 

@@ -4,7 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 module V000 = struct
-  include B00_std
+  include B0_std
   module B000 = B000
   module B00 = B00
 end

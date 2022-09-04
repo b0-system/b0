@@ -5,7 +5,7 @@
 
 (** B0 software release helpers. *)
 
-open B00_std
+open B0_std
 
 (** {1:release_meta Release metadata} *)
 

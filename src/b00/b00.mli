@@ -7,7 +7,7 @@
 
 (** {1:b00 B00} *)
 
-open B00_std
+open B0_std
 
 (** Command line tools.
 
@@ -76,7 +76,7 @@ module Tool : sig
     ?vars:env_vars -> string -> t
   (** [by_name] is like {!v} but reference the tool directly via a name.
 
-      @raise Invalid_argument if {!B00_std.Fpath.is_seg} [name] is [false]. *)
+      @raise Invalid_argument if {!B0_std.Fpath.is_seg} [name] is [false]. *)
 
   val name : t -> Cmd.tool
   (** [name t] is [t]'s tool name. If this is a relative file path
@@ -116,7 +116,7 @@ module Env : sig
   (** [v ~lookup ~forced_env env] is a build environment with:
       {ul
       {- [forced_env] is environment forced on any tool despite
-         what it declared to access, defaults to {!B00_std.Os.Env.empty}}
+         what it declared to access, defaults to {!B0_std.Os.Env.empty}}
       {- [env] the environment read by the tools' declared environment
          variables.}} *)
 
@@ -141,7 +141,7 @@ module Memo : sig
 
   type tool_lookup = t -> Cmd.tool -> (Fpath.t, string) result Fut.t
   (** The type for tool lookups. Given a command line tool
-      {{!type:B00_std.Cmd.tool}specification} returns a file path to
+      {{!type:B0_std.Cmd.tool}specification} returns a file path to
       the tool executable or an error message mentioning the tool if
       it cannot be found. *)
 
@@ -149,10 +149,10 @@ module Memo : sig
     ?sep:string -> ?var:string -> Os.Env.t -> tool_lookup
   (** [env_tool_lookup ~sep ~var env] is a tool lookup that gets the
       value of the [var] variable in [env] treats it as a [sep]
-      separated {{!B00_std.Fpath.list_of_search_path}search path} and
-      uses the result to lookup with {!B00_std.Os.Cmd.get} with
+      separated {{!B0_std.Fpath.list_of_search_path}search path} and
+      uses the result to lookup with {!B0_std.Os.Cmd.get} with
       the memo's {!win_exe}. [var] defaults to [PATH] and [sep] to
-      {!B00_std.Fpath.search_path_sep}. *)
+      {!B0_std.Fpath.search_path_sep}. *)
 
   (** {1:memo Memoizer} *)
 
@@ -176,10 +176,10 @@ module Memo : sig
     (t, string) result
   (** [memo] is a simpler {!create}
       {ul
-      {- [hash_fun] defaults to {!B00_std.Hash.Xxh_64}.}
-      {- [jobs] defaults to {!B00_std.Os.Cpu.logical_count}.}
-      {- [env] defaults to {!B00_std.Os.Env.current}}
-      {- [cwd] defaults to {!val:B00_std.Os.Dir.cwd}}
+      {- [hash_fun] defaults to {!B0_std.Hash.Xxh_64}.}
+      {- [jobs] defaults to {!B0_std.Os.Cpu.logical_count}.}
+      {- [env] defaults to {!B0_std.Os.Env.current}}
+      {- [cwd] defaults to {!val:B0_std.Os.Dir.cwd}}
       {- [cache_dir] defaults to [Fpath.(cwd / "_b0" / ".cache")]}
       {- [trash_dir] defaults to [Fpath.(cwd / "_b0" / ".trash")]}
       {- [feedback] defaults to a nop.}} *)
@@ -322,7 +322,7 @@ module Memo : sig
   (** [mkdir m dir p] is a future that determines with [()] when the
       directory path [p] has been created with mode [mode] (defaults
       to [0o755]). The behaviour with respect to file permission
-      of intermediate path segments matches {!B00_std.Os.Dir.create}. *)
+      of intermediate path segments matches {!B0_std.Os.Dir.create}. *)
 
   val delete : t -> Fpath.t -> unit Fut.t
   (** [delete m p] is a future that determines with [()] when path [p]
@@ -372,12 +372,12 @@ module Memo : sig
       {- [stdin] reads input from the given file. If unspecified reads
          from the standard input of the program running the build.  {b
          Warning.} The file is not automatically added to [reads],
-         this allows for example to use {!B00_std.Fpath.null}.}
+         this allows for example to use {!B0_std.Fpath.null}.}
       {- [stdout] and [stderr], the redirections for the standard
          outputs of the command, see {!B000.Op.Spawn.stdo}. Path to files are
          created if needed. {b Warning.} File redirections
          are not automatically added to [writes]; this allows for example
-         to use {!B00_std.Fpath.null}.}
+         to use {!B0_std.Fpath.null}.}
       {- [success_exits] the exit codes that determine if the build operation
          is successful (defaults to [0], use [[]] to always succeed)}
       {- [env], environment variables added to the build environment.

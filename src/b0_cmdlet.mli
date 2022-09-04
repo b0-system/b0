@@ -14,7 +14,7 @@
     Cmdlets run in the same environment in which [b0] is invoked (XXX
     lift that restriction ?). *)
 
-open B00_std
+open B0_std
 
 (** {1:cmdlets Cmdlets} *)
 
@@ -103,7 +103,7 @@ val exec_file : ?env:Os.Env.assignments -> ?cwd:Fpath.t -> Fpath.t -> cmd
 val exec_tool : ?env:Os.Env.assignments -> ?cwd:Fpath.t -> Cmd.tool -> cmd
 (** [exec_tool tool e args] executes the tool [exe] with arguments [cmd]
     The {{!Env.scope_dir}scope directory} is used as the default [cwd].
-    [exe] is looked up using {!B00_std.Os.Cmd.get_tool}, if that fails
+    [exe] is looked up using {!B0_std.Os.Cmd.get_tool}, if that fails
     the error is logged and we exit we and exits
     with {!B00_cli.Exit.some_error}. *)
 

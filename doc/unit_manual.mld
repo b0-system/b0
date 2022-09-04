@@ -49,7 +49,7 @@ function that produces build units invoking it.
 
 {[
 open B00_kit.V000
-open B00_std
+open B0_std
 open Fut.Syntax
 open B00_memo
 

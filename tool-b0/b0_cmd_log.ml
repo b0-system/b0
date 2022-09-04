@@ -3,8 +3,8 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
-open B00_std.Result.Syntax
+open B0_std
+open B0_std.Result.Syntax
 
 let log c details format op_selector =
   Log.if_error ~use:B00_cli.Exit.some_error @@

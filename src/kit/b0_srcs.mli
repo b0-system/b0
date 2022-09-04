@@ -52,7 +52,7 @@ let srcs =
     mechanisms. Consult the documentation of build units for more
     information. *)
 
-open B00_std
+open B0_std
 
 (** {1:sel Source selection} *)
 
@@ -101,7 +101,7 @@ val select : B0_build.t -> sels -> t Fut.t
 
 val by_ext : t -> B00_fexts.map
 (** [by_ext s] are the selected files mapped by their file extension
-    (not {{!B00_std.Fpath.file_exts}multiple file extension}).  Each
+    (not {{!B0_std.Fpath.file_exts}multiple file extension}).  Each
     file is guaranteed to appear only once in the map and is absolute. *)
 
 (*

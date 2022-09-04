@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
+open B0_std
 
 (* Exit *)
 
@@ -64,9 +64,9 @@ module Arg = struct
     Arg.(value & vflag `Normal [`Short, short; `Long, long])
 end
 
-(* B00_std setup *)
+(* B0_std setup *)
 
-module B00_std = struct
+module B0_std = struct
   open Cmdliner
 
   let get_tty_cap c = match Option.join c with
@@ -586,7 +586,7 @@ module Memo = struct
     let open B000 in
     if level = Log.Quiet then () else
     match f with
-    | `Exec_start (_, _) -> () (* we have B00_std.Os spawn tracer on debug *)
+    | `Exec_start (_, _) -> () (* we have B0_std.Os spawn tracer on debug *)
     | `Op_complete o ->
         if level >= show_op || level = Log.Debug
         then (B000_conv.Op.pp_line_and_ui ppf o; sep ppf ()) else

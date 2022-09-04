@@ -3,8 +3,8 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open B00_std
-open B00_std.Result.Syntax
+open B0_std
+open B0_std.Result.Syntax
 
 let get_b0_file_src c k =
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@

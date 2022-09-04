@@ -7,7 +7,7 @@
 
     Centralizes the information to run and orchestrate a B0 build. *)
 
-open B00_std
+open B0_std
 
 (** {1:builds Build} *)
 

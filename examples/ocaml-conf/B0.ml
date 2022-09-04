@@ -1,5 +1,5 @@
 open B0_kit.V000
-open B00_std
+open B0_std
 
 let u = B0_unit.v "hey" @@ fun b k ->
   let m = B0_build.memo b in

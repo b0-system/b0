@@ -5,7 +5,7 @@
 
 (** Sets of file extension sets. *)
 
-open B00_std
+open B0_std
 
 (** {1:sets File extension sets} *)
 
@@ -33,10 +33,10 @@ val exists_file : t -> map -> bool
 (** [exists_file exts fm s] is [true] iff [find_file fm s] is not empty. *)
 
 val ( + ) : t -> t -> t
-(** [( + )] is {!B00_std.String.Set.union}. *)
+(** [( + )] is {!B0_std.String.Set.union}. *)
 
 val ( - ) : t -> t -> t
-(** [( - )] is {!B00_std.String.Set.diff}. *)
+(** [( - )] is {!B0_std.String.Set.diff}. *)
 
 (** {1:cst Constant sets} *)
 

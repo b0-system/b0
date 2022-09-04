@@ -5,7 +5,7 @@
 
 (** GitHub interaction. *)
 
-open B00_std
+open B0_std
 open B00_serialk_json
 open B00_http
 
@@ -21,7 +21,7 @@ module Auth : sig
       access token for user [user]. It the latter is unspecified it
       first looks up the contents of the [B0_GITHUB_TOKEN] environment
       variable if that fails it looks up for an existing token in the
-      {!B00_std.Os.Dir.config}[ () /b0/github/$USER.token] file.  If
+      {!B0_std.Os.Dir.config}[ () /b0/github/$USER.token] file.  If
       that fails instructions are printed on how to setup the
       token. *)
 
@@ -241,12 +241,12 @@ module Pages : sig
          exists) and the author reset rather than a new commit added}
       {- If [force] is [true], the various git operations are forced.}
       {- [log] indicates a logging level used to
-         monitor progress (defaults to {!B00_std.Log.app}).}}
+         monitor progress (defaults to {!B0_std.Log.app}).}}
       More precisely this:
       {ol
       {- Fetches [remote/branch] if it exists.}
       {- Creates a {{!B00_vcs.Git.transient_checkout}transient checkout} with
-         a temporary workdir in {!B00_std.Os.Dir.default_tmp}
+         a temporary workdir in {!B0_std.Os.Dir.default_tmp}
          and a branch called [_b0-update-gh-pages] reset to [remote/branch].}
       {- Commits changes with message [msg] according to [us] which
          are applied in order, see {!val:update}.}

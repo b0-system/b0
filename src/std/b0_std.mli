@@ -1683,7 +1683,7 @@ module Mtime : sig
 
       {b Note.} Only use timestamps if you need inter-process time
       correlation,  otherwise prefer {!Os.Mtime.elapsed} and
-      {{!B00_std.Os.Mtime.monotonic_counters}counters} to measure time. *)
+      {{!B0_std.Os.Mtime.monotonic_counters}counters} to measure time. *)
 
   type t
   (** The type for monotonic timestamps relative to an indeterminate
@@ -2053,7 +2053,7 @@ module Os : sig
 
   (** Monotonic time clock.
 
-      See {!B00_std.Mtime} for a discussion about monotonic time. *)
+      See {!B0_std.Mtime} for a discussion about monotonic time. *)
   module Mtime : sig
 
     (** {1:monotonic_clock Monotonic clock} *)
@@ -2419,7 +2419,7 @@ module Os : sig
 
     (** {1:tmpfiles Temporary files}
 
-        See also {{!B00_std.Os.Path.tmppath}temporary paths}. *)
+        See also {{!B0_std.Os.Path.tmppath}temporary paths}. *)
 
     val with_tmp_fd :
       ?flags:Unix.open_flag list -> ?mode:int -> ?make_path:bool ->
@@ -2773,12 +2773,12 @@ module Os : sig
     val find : ?win_exe:bool -> ?search:Fpath.t list -> Cmd.t ->
       (Cmd.t option, string) result
     (** [find cmd] is like {!find_tool} but looks and replaces
-        [cmd]'s {!B00_std.Cmd.val-tool}. *)
+        [cmd]'s {!B0_std.Cmd.val-tool}. *)
 
     val get : ?win_exe:bool -> ?search:Fpath.t list -> Cmd.t ->
       (Cmd.t, string) result
     (** [get cmd] is like {!get_tool} but looks and replaces [cmd]'s
-        {!B00_std.Cmd.val-tool}. *)
+        {!B0_std.Cmd.val-tool}. *)
 
     (** {1:statuses Process completion statuses} *)
 
@@ -2972,11 +2972,11 @@ module Os : sig
         process (in particular [Sys.argv.(0)] is the name of the
         program not the first argument to the program). The function
         only recturns in case of error. [env] defaults to
-        {!B00_std.Os.Env.current_assignments}[ ()],
-        [cwd] to {!B00_std.Dir.cwd}[ ()]. *)
+        {!B0_std.Os.Env.current_assignments}[ ()],
+        [cwd] to {!B0_std.Dir.cwd}[ ()]. *)
 
     type t = Cmd.t
-    (** {!Exit} needs that alias to refer to {!B00_std.Cmd.t}. *)
+    (** {!Exit} needs that alias to refer to {!B0_std.Cmd.t}. *)
   end
 
   (** Program exit. *)
@@ -2988,7 +2988,7 @@ module Os : sig
     | Code : int -> t (** [exit] with code. *)
     | Exec : (unit -> ('a, string) result) -> t (** exit with [execv] *)
     (** The type for specifying program exits. Either an exit code or a
-        function (should be) calling {!B00_std.Cmd.execv}. *)
+        function (should be) calling {!B0_std.Cmd.execv}. *)
 
     val code : int -> t
     (** [code c] is [Code c]. *)
@@ -3041,7 +3041,7 @@ end
 
     {b FIXME} This should maybe moved to B00_ui. Make the doc self
     contained (cf. references to Logs). OTOH it's nice to simply open
-    B00_std and be done. *)
+    B0_std and be done. *)
 module Log : sig
 
   (** {1:levels Reporting levels} *)
@@ -3167,9 +3167,9 @@ module Log : sig
   (** {2:spawns Spawn logging} *)
 
   val spawn_tracer : level -> Os.Cmd.spawn_tracer
-  (** [spawn_tracer level] is a {{!B00_std.Os.Cmd.tracing}spawn tracer}
+  (** [spawn_tracer level] is a {{!B0_std.Os.Cmd.tracing}spawn tracer}
       that logs with level [level]. If [level] is {!Log.Quiet} this is
-      {!B00_std.Os.Cmd.spawn_tracer_nop}. *)
+      {!B0_std.Os.Cmd.spawn_tracer_nop}. *)
 
   (** {1:monitoring Log monitoring} *)
 

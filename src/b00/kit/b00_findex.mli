@@ -8,7 +8,7 @@
     {b TODO.} Maybe move that back to brzo. At the B0 level we are trying
     something with {!B0_srcs}. *)
 
-open B00_std
+open B0_std
 
 (** {1:indexes File indexes} *)
 
@@ -24,7 +24,7 @@ val of_dirs :
   Fpath.t list -> (t, string) result
 (** [of_dirs dirs] returns a file index for the files in [dirs] whose
     prefixes may be reduced see {!root_root_dirs}. See
-    {!B00_std.Os.Dir.fold} for the semantics of optional arguments. *)
+    {!B0_std.Os.Dir.fold} for the semantics of optional arguments. *)
 
 (** {1:root Root directories} *)
 
@@ -33,8 +33,8 @@ val root_dirs : t -> Fpath.t list
     [of_dirs]. *)
 
 val root_root_dirs : t -> Fpath.t list
-(** [root_root_dirs] is {!B00_std.Fpath.drop_prefixed} and
-    {!B00_std.Fpath.uniquify} applied to {!root_dirs}. *)
+(** [root_root_dirs] is {!B0_std.Fpath.drop_prefixed} and
+    {!B0_std.Fpath.uniquify} applied to {!root_dirs}. *)
 
 (** {1:dirs Directories} *)
 

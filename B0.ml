@@ -1,11 +1,11 @@
 open B0_kit.V000
-open B00_std
+open B0_std
 
 (* OCaml library names *)
 
 let unix = B0_ocaml.libname "unix"
 let cmdliner = B0_ocaml.libname "cmdliner"
-let b00_std = B0_ocaml.libname "b0.b00.std"
+let b0_std = B0_ocaml.libname "b0.std"
 let b00 = B0_ocaml.libname "b0.b00"
 let b00_kit = B0_ocaml.libname "b0.b00.kit"
 let b0 = B0_ocaml.libname "b0"
@@ -14,34 +14,34 @@ let b0_b0 = B0_ocaml.libname "b0.b0"
 
 (* B00 libraries *)
 
-let b00_std_lib =
+let b0_std_lib =
   let srcs =
-    Fpath.[`Dir_rec (v "src/b00/std");
-           `X (v "src/b00/std/b0_b00_std_top_init.ml")]
+    Fpath.[`Dir_rec (v "src/std");
+           `X (v "src/std/b0_std_top_init.ml")]
   in
   let requires = [unix] in
-  B0_ocaml.lib b00_std ~doc:"B00 Stdlib extensions" ~srcs ~requires
+  B0_ocaml.lib b0_std ~doc:"B00 Stdlib extensions" ~srcs ~requires
 
 let b00_lib =
   let srcs = Fpath.[`Dir (v "src/b00")] in
-  let requires = [unix; b00_std] in
+  let requires = [unix; b0_std] in
   B0_ocaml.lib b00 ~doc:"B00 build API" ~srcs ~requires
 
 let b00_kit_lib =
   let srcs = Fpath.[`Dir (v "src/b00/kit")] in
-  let requires = [unix; cmdliner; b00_std; b00] in
+  let requires = [unix; cmdliner; b0_std; b00] in
   B0_ocaml.lib b00_kit ~doc:"B00 toolkit API" ~srcs ~requires
 
 (* B0 libraries *)
 
 let b0_lib =
   let srcs = Fpath.[`Dir (v "src")] in
-  let requires = [unix; cmdliner; b00_std; b00; b00_kit] in
+  let requires = [unix; cmdliner; b0_std; b00; b00_kit] in
   B0_ocaml.lib b0 ~doc:"B0 description API" ~srcs ~requires
 
 let b0_kit_lib =
   let srcs = Fpath.[`Dir (v "src/kit")] in
-  let requires = [unix; cmdliner; b00_std; b00; b00_kit; b0] in
+  let requires = [unix; cmdliner; b0_std; b00; b00_kit; b0] in
   B0_ocaml.lib b0_kit ~doc:"B0 toolkit API" ~srcs ~requires
 
 (* B0 tool *)
@@ -55,7 +55,7 @@ let bootstrap_env boot_root =
 
 let b0_b0_lib =
   let srcs = Fpath.[`Dir (v "tool-b0"); `X (v "tool-b0/b0_main_run.ml")] in
-  let requires = [unix; cmdliner; b00_std; b00; b00_kit; b0; b0_kit] in
+  let requires = [unix; cmdliner; b0_std; b00; b00_kit; b0; b0_kit] in
   B0_ocaml.lib b0_b0 ~doc:"b0 tool driver library" ~srcs ~requires
 
 let b0_tool =
@@ -74,7 +74,7 @@ let b0_tool =
 (* Low-level B00 tools units *)
 
 let b00_tool n ~doc file =
-  let requires = [cmdliner; b00_std; b00; b00_kit] in
+  let requires = [cmdliner; b0_std; b00; b00_kit] in
   let srcs = Fpath.[`File (v "tools" / file)] in
   B0_ocaml.exe n ~doc ~srcs ~requires
 
@@ -97,7 +97,7 @@ let test_exe ?(requires = []) ?(more_srcs = []) file ~doc =
   let file = Fpath.v file in
   let more_srcs = List.map (fun v -> test_src (Fpath.v v)) more_srcs in
   let srcs = (test_src file) :: more_srcs in
-  let requires = b00_std :: b00 :: b00_kit :: cmdliner :: requires in
+  let requires = b0_std :: b00 :: b00_kit :: cmdliner :: requires in
   B0_ocaml.exe (Fpath.basename ~no_ext:true file) ~doc ~srcs ~requires
 
 let test_memo ?requires ?(more_srcs = []) file ~doc =
@@ -105,7 +105,7 @@ let test_memo ?requires ?(more_srcs = []) file ~doc =
   test_exe ?requires ~more_srcs file ~doc
 
 let test =
-  test_exe "test.ml" ~doc:"Some tests for basic modules (B00_std, etc.)"
+  test_exe "test.ml" ~doc:"Some tests for basic modules (B0_std, etc.)"
     ~more_srcs:["test_fmt.ml"; "test_fpath.ml"; "test_cmd.ml"; "test_base64.ml"]
 
 let test_cp = test_exe "test_cp.ml" ~doc:"Test for Os.Path.copy"
@@ -131,7 +131,7 @@ let test_b0_file =
 
 let b00_pack =
   B0_pack.v "b00" ~doc:"The B00 subsystem" ~locked:true @@
-  [b00_std_lib; b00_lib; b00_kit_lib]
+  [b0_std_lib; b00_lib; b00_kit_lib]
 
 let tool_pack =
   B0_pack.v "b00-tools" ~doc:"The low-level B00 tools" ~locked:false @@

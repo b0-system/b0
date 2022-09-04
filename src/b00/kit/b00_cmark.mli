@@ -10,7 +10,7 @@
 
     An {{!extract}extraction} function is also provided. *)
 
-open B00_std
+open B0_std
 
 (** {1:cmark Cmark} *)
 
