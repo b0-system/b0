@@ -1,5 +1,4 @@
 open B0_kit.V000
-open B0_std
 
 (* OCaml library names *)
 
