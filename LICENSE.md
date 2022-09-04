@@ -28,7 +28,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ## xxHash 
 
 ```
-Copyright (C) 2012-2016, Yann Collet.
+Copyright (C) 2012-2020, Yann Collet.
 
 BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 

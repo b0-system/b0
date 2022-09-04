@@ -1569,6 +1569,14 @@ module Hash : sig
   (** [Xxh_64] is the {{:http://cyan4973.github.io/xxHash/}xxHash 64-bit}
       hash. *)
 
+  module Xxh3_64 : T
+  (** [Xxh3_64] is the {{:http://cyan4973.github.io/xxHash/}xxHash3 64-bit}
+      hash. *)
+
+  module Xxh3_128 : T
+  (** [Xxh3_128] is the {{:http://cyan4973.github.io/xxHash/}xxHash3 128-bit}
+      hash. *)
+
   val funs : unit -> (module T) list
   (** [funs ()] is the list of available hash functions. *)
 

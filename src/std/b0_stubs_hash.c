@@ -156,6 +156,54 @@ CAMLprim value ocaml_b0_xxhash_fd (value fdv, value seed)
   CAMLreturn (caml_copy_int64 (res));
 }
 
+CAMLprim value ocaml_b0_xxhash3_64 (value str, value ofs, value len, value seed)
+{
+  CAMLparam4 (str, ofs, len, seed);
+  CAMLreturn (caml_copy_int64
+              (XXH3_64bits_withSeed (Bp_val (str) + Int_val (ofs),
+                                     Int_val (len), Int64_val (seed))));
+}
+
+CAMLprim value ocaml_b0_xxhash3_64_fd (value fdv, value seed)
+{
+  CAMLparam2 (fdv, seed);
+  size_t size = 0;
+  b0_ctx ctx;
+  void *b = _ocaml_b0_mmap (&ctx, fdv, &size);
+  XXH64_hash_t res = XXH3_64bits_withSeed (b, size, Int64_val (seed));
+  _ocaml_b0_munmap (ctx, b, size);
+  CAMLreturn (caml_copy_int64 (res));
+}
+
+#define _BE64(v) (XXH_CPU_LITTLE_ENDIAN ? XXH_swap64(v) : v)
+
+CAMLprim value ocaml_b0_xxhash3_128(value str, value ofs, value len, value seed)
+{
+  CAMLparam4 (str, ofs, len, seed);
+  CAMLlocal1 (res);
+  res = caml_alloc_string (16);
+  XXH128_hash_t h  = XXH3_128bits_withSeed (Bp_val(str) + Int_val (ofs),
+                                            Int_val(len), Int_val(seed));
+  ((XXH64_hash_t *)Bp_val(res))[0] = _BE64 (h.high64);
+  ((XXH64_hash_t *)(Bp_val(res)))[1] = _BE64 (h.low64);
+  CAMLreturn (res);
+}
+
+CAMLprim value ocaml_b0_xxhash3_128_fd (value fdv, value seed)
+{
+  CAMLparam2 (fdv, seed);
+  CAMLlocal1 (res);
+  size_t size = 0;
+  b0_ctx ctx;
+  void *b = _ocaml_b0_mmap (&ctx, fdv, &size);
+  res = caml_alloc_string (16);
+  XXH128_hash_t h = XXH3_128bits_withSeed (b, size, Int_val (seed));
+  ((XXH64_hash_t *)Bp_val(res))[0] = _BE64 (h.high64);
+  ((XXH64_hash_t *)(Bp_val(res)))[1] = _BE64 (h.low64);
+  _ocaml_b0_munmap (ctx, b, size);
+  CAMLreturn (res);
+}
+
 /*---------------------------------------------------------------------------
    Copyright (c) 2017 The b0 programmers
 
