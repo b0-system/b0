@@ -176,7 +176,7 @@ module Memo : sig
     (t, string) result
   (** [memo] is a simpler {!create}
       {ul
-      {- [hash_fun] defaults to {!B0_std.Hash.Xxh_64}.}
+      {- [hash_fun] defaults to {!B0_std.Hash.Xxh3_64}.}
       {- [jobs] defaults to {!B0_std.Os.Cpu.logical_count}.}
       {- [env] defaults to {!B0_std.Os.Env.current}}
       {- [cwd] defaults to {!val:B0_std.Os.Dir.cwd}}

@@ -589,7 +589,7 @@ module Publish = struct
     match List.sort compare (List.map versioned_name is) with
     | [vname] -> Fmt.str "b0-publish-%s" vname
     | (vname :: _ as vnames) ->
-        let hash = Hash.Xxh_64.string (String.concat " " vnames) in
+        let hash = Hash.Xxh3_64.string (String.concat " " vnames) in
         Fmt.str "b0-publish-%s-etc-%s" vname (Hash.to_hex hash)
     | [] -> assert false
 

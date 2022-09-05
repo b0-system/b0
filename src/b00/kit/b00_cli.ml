@@ -708,7 +708,7 @@ module Memo = struct
 
   let get_hash_fun ~hash_fun = match hash_fun with
   | Some m -> m
-  | None -> (module Hash.Xxh_64 : Hash.T)
+  | None -> (module Hash.Xxh3_64 : Hash.T)
 
   (* Logs *)
 

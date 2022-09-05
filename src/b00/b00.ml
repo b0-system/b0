@@ -136,7 +136,7 @@ module Memo = struct
     { c; m }
 
   let memo
-      ?(hash_fun = (module Hash.Xxh_64 : Hash.T)) ?win_exe ?tool_lookup
+      ?(hash_fun = (module Hash.Xxh3_64 : Hash.T)) ?win_exe ?tool_lookup
       ?env ?cwd ?cache_dir ?trash_dir
       ?(jobs = B0_std.Os.Cpu.logical_count ()) ?feedback ()
     =

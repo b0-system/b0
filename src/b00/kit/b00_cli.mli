@@ -488,7 +488,7 @@ module Memo : sig
 
   val get_hash_fun : hash_fun:(module Hash.T) option -> (module Hash.T)
   (** [get_hash_fun ~hash_fun] determines a hash function. If [hash_fun]
-      is [None] then {!B0_std.Hash.Xxh_64} is used. *)
+      is [None] then {!B0_std.Hash.Xxh3_64} is used. *)
 
   (** {1:logs Logs} *)
 
