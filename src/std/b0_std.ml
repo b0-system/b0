@@ -1973,21 +1973,6 @@ module Hash = struct
             | exception Unix.Unix_error (e, _, _)  ->
                 err f (Unix.error_message e)
 
-  module Murmur3_128 = struct
-    type t = string
-    type seed = int
-    let no_seed = 0
-    external hash_fd : Unix.file_descr -> seed -> t = "ocaml_b0_murmurhash_fd"
-    external hash_unsafe : string -> int -> int -> seed -> t =
-      "ocaml_b0_murmurhash"
-
-    let id = "murmur3-128"
-    let length = 16
-    let string s = hash_unsafe s 0 (String.length s) no_seed
-    let fd fd = hash_fd fd no_seed
-    let file f = file_with_hash_fd fd f
-  end
-
   external set_64u : Bytes.t -> int -> int64 -> unit = "%caml_string_set64u"
   external swap_64 : int64 -> int64 = "%bswap_int64"
   external noswap : int64 -> int64 = "%identity"
@@ -1995,21 +1980,6 @@ module Hash = struct
   let u64_to_bytes t =
     let b = Bytes.create 8 in
     set_64u b 0 (layout t); Bytes.unsafe_to_string b
-
-  module Xxh_64 = struct
-    type t = int64
-    type seed = int64
-    external hash_fd : Unix.file_descr -> seed -> t = "ocaml_b0_xxhash_fd"
-    external hash_unsafe : string -> int -> int -> seed -> t =
-      "ocaml_b0_xxhash"
-
-    let id = "xxh64"
-    let seed = 0L
-    let length = 8
-    let string s = hash_unsafe s 0 (String.length s) seed |> u64_to_bytes
-    let fd fd = hash_fd fd seed |> u64_to_bytes
-    let file f = file_with_hash_fd fd f
-  end
 
   module Xxh3_64 = struct
     type t = int64
@@ -2041,8 +2011,7 @@ module Hash = struct
     let file f = file_with_hash_fd fd f
   end
 
-  let funs = ref [(module Murmur3_128 : T); (module Xxh_64 : T);
-                  (module Xxh3_64 : T); (module Xxh3_128 : T)]
+  let funs = ref [(module Xxh3_64 : T); (module Xxh3_128 : T)]
   let add_fun m = funs := m :: !funs
   let funs () = !funs
   let get_fun id =

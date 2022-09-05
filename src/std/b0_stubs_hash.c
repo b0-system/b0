@@ -6,7 +6,6 @@
 
 #include "b0_stubs.h"
 
-#include "vendor/MurmurHash3.h"
 #define XXH_PRIVATE_API
 #include "vendor/xxhash.h"
 
@@ -114,47 +113,6 @@ static inline void _ocaml_b0_munmap (b0_ctx c, void *b, size_t size) {}
 #endif
 
 /* Platform independent */
-
-CAMLprim value ocaml_b0_murmurhash (value str, value ofs, value len, value seed)
-{
-  CAMLparam4 (str, ofs, len, seed);
-  CAMLlocal1 (res);
-  res = caml_alloc_string (16);
-  MurmurHash3_x64_128 (Bp_val(str) + Int_val (ofs),
-                       Int_val(len), Int_val(seed), Bp_val(res));
-  CAMLreturn (res);
-}
-
-CAMLprim value ocaml_b0_murmurhash_fd (value fdv, value seed)
-{
-  CAMLparam2 (fdv, seed);
-  CAMLlocal1 (res);
-  size_t size = 0;
-  b0_ctx ctx;
-  void *b = _ocaml_b0_mmap (&ctx, fdv, &size);
-  res = caml_alloc_string (16);
-  MurmurHash3_x64_128 (b, size, Int_val (seed), Bp_val (res));
-  _ocaml_b0_munmap (ctx, b, size);
-  CAMLreturn (res);
-}
-
-CAMLprim value ocaml_b0_xxhash (value str, value ofs, value len, value seed)
-{
-  CAMLparam4 (str, ofs, len, seed);
-  CAMLreturn (caml_copy_int64 (XXH64 (Bp_val (str) + Int_val (ofs),
-                                      Int_val (len), Int64_val (seed))));
-}
-
-CAMLprim value ocaml_b0_xxhash_fd (value fdv, value seed)
-{
-  CAMLparam2 (fdv, seed);
-  size_t size = 0;
-  b0_ctx ctx;
-  void *b = _ocaml_b0_mmap (&ctx, fdv, &size);
-  XXH64_hash_t res = XXH64 (b, size, Int64_val (seed));
-  _ocaml_b0_munmap (ctx, b, size);
-  CAMLreturn (caml_copy_int64 (res));
-}
 
 CAMLprim value ocaml_b0_xxhash3_64 (value str, value ofs, value len, value seed)
 {

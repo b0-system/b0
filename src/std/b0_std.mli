@@ -1561,14 +1561,6 @@ module Hash : sig
     (** [file f] is the hash of file [f]. *)
   end
 
-  module Murmur3_128 : T
-  (** [Murmur3_128] is the
-      {{:https://github.com/aappleby/smhasher}MurmurHash3 128-bit} hash. *)
-
-  module Xxh_64 : T
-  (** [Xxh_64] is the {{:http://cyan4973.github.io/xxHash/}xxHash 64-bit}
-      hash. *)
-
   module Xxh3_64 : T
   (** [Xxh3_64] is the {{:http://cyan4973.github.io/xxHash/}xxHash3 64-bit}
       hash. *)

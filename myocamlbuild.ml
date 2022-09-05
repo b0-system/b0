@@ -17,8 +17,7 @@ let () =
 
       dep ["compile";"c"]
           ["src/std/b0_stubs.h";
-           "src/std/vendor/xxhash.h";
-           "src/std/vendor/MurmurHash3.h"];
+           "src/std/vendor/xxhash.h"];
 
       dep ["record_b0_stubs"] [lib "src/std/libb0_stubs"];
 
