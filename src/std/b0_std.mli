@@ -949,13 +949,20 @@ let escape_dquotes s =
 
   (** {1:version Version strings} *)
 
-  val to_version : string -> (int * int * int * string option) option
+  type version = int * int * int * string option
+  (** The type for version strings. Major, minor, patch and additional
+      info. *)
+
+  val to_version : string -> version option
   (** [to_version] parses version strings of the form:
       {[
         "[v|V]major.minor[.patchlevel][(+|~)additional-info]"
       ]}
       into [(major, minor, patch, (+|~)additional_info)] tuples. If no
       [patchlevel] is found [0] is used. *)
+
+  val of_version : version -> string
+  (** [of_version v] is ["major.minor.patchlevel[(+|~)additional-info]"] *)
 
   val drop_initial_v : string -> string
   (** [drop_initial_v s] drops a leading ['v'] or ['V'] from [s]. *)

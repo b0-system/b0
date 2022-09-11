@@ -1170,6 +1170,8 @@ module String = struct
 
   (* Version strings *)
 
+  type version = int * int * int * string option
+
   let drop_initial_v s =
     if s = "" then s else match s.[0] with
     | 'v' | 'V' -> subrange ~first:1 s
@@ -1205,6 +1207,9 @@ module String = struct
             end
     with
     | Failure _ -> None
+
+  let of_version (major, minor, patchlevel, info) =
+    Fmt.str "%d.%d.%d%a" major minor patchlevel Fmt.(option string) info
 
   (* String map and sets *)
 
