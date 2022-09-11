@@ -70,7 +70,7 @@ module File = struct
     | `Comment c -> pp_comment ppf c
     | `Field f -> pp_field ppf f
     | `Section (n, opt, file) ->
-        let pp_opt = Fmt.(option (parens string ++ any " " )) in
+        let pp_opt = Fmt.(option (quote ~mark:{|"|} string ++ any " " )) in
         Fmt.pf ppf "@[<v2>%s %a{@,%a}@]" n pp_opt opt pp_file file
     and pp_file ppf file = (Fmt.vbox (Fmt.list pp_item)) ppf file in
     pp_file ppf file
