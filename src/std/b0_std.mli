@@ -2426,7 +2426,7 @@ module Os : sig
 
     (** {1:tmpfiles Temporary files}
 
-        See also {{!B0_std.Os.Path.tmppath}temporary paths}. *)
+        See also {{!B0_std.Os.Path.tmppaths}temporary paths}. *)
 
     val with_tmp_fd :
       ?flags:Unix.open_flag list -> ?mode:int -> ?make_path:bool ->
@@ -2635,7 +2635,9 @@ module Os : sig
     (** [set_default_tmp p] sets the value returned by {!default_tmp} to
         [p]. *)
 
-    (** {1:tmpdirs Temporary directories} *)
+    (** {1:tmpdirs Temporary directories}
+
+        See also {{!B0_std.Os.Path.tmppaths}temporary paths}. *)
 
     val with_tmp :
       ?mode:int -> ?make_path:bool -> ?dir:Fpath.t -> ?name:Path.tmp_name ->
