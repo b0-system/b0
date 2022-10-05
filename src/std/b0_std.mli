@@ -319,8 +319,7 @@ module Fmt : sig
       its magnitude, using power of 3
       {{:https://www.bipm.org/en/publications/si-brochure/chapter3.html}
       SI prefixes} (i.e. all of them except deca, hector, deci and
-      centi). Only US-ASCII characters are used, [µ] (10{^-6}) is
-      written using [u].
+      centi). The output is UTF-8 encoded, it uses U+03BC for [µ] (10{^-6}).
 
       [scale] indicates the scale 10{^scale * 3} an integer
       represents, for example [-1] for m[unit] (10{^-3}), [0] for
@@ -336,15 +335,16 @@ module Fmt : sig
 
   val uint64_ns_span : int64 t
   (** [uint64_ns_span] formats an {e unsigned} nanosecond time span
-      according to its magnitude using
-      {{:http://www.bipm.org/en/publications/si-brochure/chapter3.html}SI
-      prefixes} on seconds and
-      {{:http://www.bipm.org/en/publications/si-brochure/table6.html}accepted
-      non-SI units}. Years are counted in Julian years (365.25
+      according to its magnitude using SI prefixes on seconds and
+      non-SI units. Years are counted in Julian years (365.25
       SI-accepted days) as
       {{:http://www.iau.org/publications/proceedings_rules/units/}defined}
-      by the International Astronomical Union (IAU). Only US-ASCII characters
-      are used ([us] is used for [µs]). *)
+      by the International Astronomical Union.
+
+      Rounds towards positive infinity, i.e. over approximates, no
+      duration is formatter shorter than it is.
+
+      The output is UTF-8 encoded, it uses U+03BC for [µs] (10{^-6}[s]). *)
 
   (** {1:text_lines Text and lines} *)
 
