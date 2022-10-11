@@ -1273,9 +1273,9 @@ module String = struct
     in
     let rec loop buf s start i max = match i > max with
     | true ->
-        if start = 0 then None else
-        if start > max then Some (Buffer.contents buf) else
-        (add buf s ~start ~last:max; Some (Buffer.contents buf))
+        if start = 0 then s else
+        if start > max then Buffer.contents buf else
+        (add buf s ~start ~last:max; Buffer.contents buf)
     | false ->
         if i + 4 > max then loop buf s start (max + 1) max else
         if s.[i] <> '%' then loop buf s start (i + 1) max else
@@ -1284,11 +1284,11 @@ module String = struct
         | None -> loop buf s start (max + 1) max
         | Some k ->
             let var = subrange ~first:(i + 2) ~last:(k - 2) s in
-            match Map.find var vars with
-            | exception Not_found -> loop buf s start (k + 1) max
-            | v ->
+            match vars var with
+            | None -> loop buf s start (k + 1) max
+            | Some value ->
                 add buf s ~start ~last:(i - 1);
-                Buffer.add_string buf v;
+                Buffer.add_string buf value;
                 loop buf s (k + 1) (k + 1) max
     in
     loop buf s 0 0 max

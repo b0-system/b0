@@ -1039,10 +1039,10 @@ let escape_dquotes s =
 
   (** {1:var_subst Variable substitution} *)
 
-  val subst_pct_vars : ?buf:Buffer.t -> string Map.t -> string -> string option
-  (** [subst_pct_vars ~buf vars s] substitutes in [s] strings of the
-      form [%%VAR%%] by the value of ["VAR"] in [vars] (if any).
-      [None] is returned if no substitution was performed. *)
+  val subst_pct_vars :
+    ?buf:Buffer.t -> (string -> string option) -> string -> string
+  (** [subst_pct_vars ~buf vars s] substitutes in [s] sub-strings of the
+      form [%%VAR%%] by the value of [vars "VAR"] (if any). *)
 end
 
 (** Lists. *)

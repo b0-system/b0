@@ -75,12 +75,12 @@ let default_github_src_archive_url repo =
 let src_archive_url_of_pack ~version p =
   let archive_name = src_archive_name_of_pack p in
   let archive_ext = src_archive_ext_of_pack p in
-  let substs =
-    String.Map.empty
-    |> String.Map.add "ARCHIVE_NAME" archive_name
-    |> String.Map.add "ARCHIVE_EXT" archive_ext
-    |> String.Map.add "VERSION" version
-    |> String.Map.add "VERSION_NUM" (String.drop_initial_v version)
+  let vars = function
+  | "ARCHIVE_NAME" -> Some archive_name
+  | "ARCHIVE_EXT" -> Some archive_ext
+  | "VERSION" -> Some version
+  | "VERSION_NUM" -> Some (String.drop_initial_v version)
+  | _ -> None
   in
   Result.map_error (Fmt.str "@[<v>Cannot determine release URL:@,%s@]") @@
   let err () = Error "See docs of B0_release.src_archive_url_of_pack." in
@@ -103,8 +103,7 @@ let src_archive_url_of_pack ~version p =
               | None -> err ()
               | Some repo -> Ok (default_github_src_archive_url repo)
   in
-  match String.subst_pct_vars substs archive_url with
-  | None -> Ok archive_url | Some url -> Ok url
+  Ok (String.subst_pct_vars vars archive_url)
 
 (* Change logs *)
 
