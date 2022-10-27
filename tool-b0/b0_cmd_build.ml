@@ -128,7 +128,20 @@ let find_outcome_action ~must_build (* not empty *) action args =
       | Some act when B0_unit.Set.mem u must_build -> Ok (Some (act, u))
       | Some _ -> warn_disable u; Ok None
 
-let build_run lock ~units ~packs ~x_units ~x_packs action args c =
+let do_output_action_path u = match B0_unit.find_meta B0_meta.exe_file u with
+| Some path ->
+    let path = Fut.sync path in
+    Log.app (fun m -> m "%a" Fpath.pp_unquoted path);
+    Ok B00_cli.Exit.ok
+| None ->
+    Log.err
+      (fun m -> m "No executable outcome path found in unit %a"
+          B0_unit.pp_name u);
+    Ok B00_cli.Exit.some_error
+
+let build_run
+    lock ~units ~packs ~x_units ~x_packs action output_action_path args c
+  =
   Log.if_error ~use:B00_cli.Exit.no_such_name @@
   let* x_units = get_excluded_units ~x_units ~x_packs in
   let* units, locked_packs = get_must_units_and_locked_packs ~units ~packs in
@@ -152,7 +165,10 @@ let build_run lock ~units ~packs ~x_units ~x_packs action args c =
       | Ok () ->
           match action with
           | None -> Ok B00_cli.Exit.ok
-          | Some (action, u) -> Ok (Fut.sync (action build u ~args))
+          | Some (action, u) ->
+              if output_action_path
+              then do_output_action_path u
+              else Ok (Fut.sync (action build u ~args))
 
 (* Explaining what gets into the build *)
 
@@ -210,11 +226,14 @@ let build_what lock ~units ~packs ~x_units ~x_packs c =
 
 (* Build command *)
 
-let build what lock units packs x_units x_packs action args c =
+let build
+    what lock units packs x_units x_packs action output_action_path args c
+  =
   let units = match action with None -> units | Some a -> a :: units in
   if what
   then build_what lock ~units ~packs ~x_units ~x_packs c
-  else build_run  lock ~units ~packs ~x_units ~x_packs action args c
+  else build_run  lock ~units ~packs ~x_units ~x_packs
+                  action output_action_path args c
 
 (* Command line interface *)
 
@@ -250,17 +269,22 @@ let action =
   let doc = "Build and perform outcome unit action of unit $(docv)." in
   Arg.(value & opt (some string) None & info ["a"; "action"] ~doc ~docv:"UNIT")
 
+let output_action_path =
+  let doc = "Rather than perform action on $(b,-a), print outcome path \
+             on $(b,stdout)."
+  in
+  Arg.(value & flag & info ["path"] ~doc)
+
 let args =
   let doc = "Arguments given as is to the outcome action. \
              Start with $(b,--) otherwise options get interpreted by $(mname)."
   in
   Arg.(value & pos_all string [] & info [] ~doc ~docv:"ARG")
 
-
 let term =
   B0_driver.with_b0_file ~driver:B0_b0.driver
     Term.(const build $ what $ lock $ units $ packs $ x_units $ x_packs $
-          action $ args)
+          action $ output_action_path $ args)
 
 let cmd =
   let doc = "Build (default command)" in
