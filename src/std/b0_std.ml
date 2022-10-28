@@ -3595,6 +3595,14 @@ module Os = struct
     let get_mode = Fs_base.path_get_mode
     let set_mode = Fs_base.path_set_mode
     let stat = Fs_base.path_stat
+    let is_mount_point p =
+      let err e = Fmt.str "is_mount_point: %s" e in
+      match Fs_base.path_stat p with
+      | Error e -> Error (err e)
+      | Ok stat ->
+          match Fs_base.path_stat Fpath.(p / "..") with
+          | Error e -> Error (err ("parent: " ^ e))
+          | Ok pstat -> Ok (stat.Unix.st_dev <> pstat.Unix.st_dev)
 
     (* Symlinks *)
 

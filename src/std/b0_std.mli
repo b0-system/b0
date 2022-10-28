@@ -2231,7 +2231,7 @@ module Os : sig
 
         See also {!Os.Dir.val-copy} and {!Os.File.val-copy}. *)
 
-    (** {1:stat_mode File mode and stat}
+    (** {1:stat_mode File mode, stat and mounts}
 
         See also {!File.is_executable}. *)
 
@@ -2244,6 +2244,11 @@ module Os : sig
 
     val stat : Fpath.t -> (Unix.stats, string) result
     (** [stat p] is [p]'s file information. Symbolic links are followed. *)
+
+    val is_mount_point : Fpath.t -> (bool, string) result
+    (** [is_mount_point p] is [true] if [p] looks like a mount point. The
+        criterion is if [p] and [p/..]'s {!stat} have a differing
+        {!Unix.stat.std_dev} field. *)
 
     (** {1:symlinks Symbolic links}
 
