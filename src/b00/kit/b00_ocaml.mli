@@ -596,13 +596,15 @@ v}
 
   val of_dir :
     Memo.t -> clib_ext:Fpath.ext -> name:Name.t -> requires:Name.t list ->
-    dir:Fpath.t -> archive:string option -> (t, string) result Fut.t
-  (** [of_dir m ~clib_ext ~name ~requires ~dir ~archive] is a library named
-      [name] which requires libraries [requires], with library
+    dir:Fpath.t -> archive:string option -> js_stubs:Fpath.t list ->
+    (t, string) result Fut.t
+  (** [of_dir m ~clib_ext ~name ~requires ~dir ~archive] is a library
+      named [name] which requires libraries [requires], with library
       directory [dir] and library archive name [archive] (without
-      extension and if any). This looks up all files other files in
-      [dir] and makes them ready in [m]. [clib_ext] is the platform
-      specific extension for C libraries.
+      extension and if any) and JavaScript stubs [js_stubs].  This
+      looks up all files other files in [dir] and makes them ready in
+      [m]. It also makes [js_stubs] files ready. [clib_ext] is the
+      platform specific extension for C libraries.
 
       {b Note.} If [dir] doesn't follow the one library per directory
       convention this over-approximate [cmis], [cmxs] and [c_stubs]

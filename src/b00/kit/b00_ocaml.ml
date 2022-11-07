@@ -658,53 +658,7 @@ module Lib = struct
     =
     { name; requires; dir; cmis; cmxs; cma; cmxa; c_archive; c_stubs; js_stubs }
 
-  let of_dir m ~clib_ext ~name ~requires ~dir ~archive =
-    let rec loop cmis cmxs cma cmxa c_archive c_stubs js_stubs = function
-    | [] ->
-        v ~name ~requires ~dir ~cmis ~cmxs ~cma ~cmxa ~c_archive ~c_stubs
-          ~js_stubs
-    | f :: fs ->
-        let is_lib_archive f = match archive with
-        | None -> false
-        | Some a -> String.equal (Fpath.basename ~no_ext:true f) a
-        in
-        match Fpath.get_ext f with
-        | ".cmi" ->
-            Memo.file_ready m f;
-            loop (f :: cmis) cmxs cma cmxa c_archive c_stubs js_stubs fs
-        | ".cmx" ->
-            Memo.file_ready m f;
-            loop cmis (f :: cmxs) cma cmxa c_archive c_stubs js_stubs fs
-        | ".cma" ->
-            let cma = match is_lib_archive f with
-            | true -> Memo.file_ready m f; Some f
-            | false -> cma
-            in
-            loop cmis cmxs cma cmxa c_archive c_stubs js_stubs fs
-        | ".cmxa" ->
-            let cmxa = match is_lib_archive f with
-            | true -> Memo.file_ready m f; Some f
-            | false -> cmxa
-            in
-            loop cmis cmxs cma cmxa c_archive c_stubs js_stubs fs
-        | ".js" ->
-            (* FIXME these hacks are not viable. We do this here
-               because when we get js_of_ocaml-compiler as a dependency
-               we endup linking all the .js files there which are redundant
-               with the runtime system which leads to hundreds of warnings. *)
-            if Name.to_string name = "js_of_ocaml-compiler"
-            then loop cmis cmxs cma cmxa c_archive c_stubs js_stubs fs
-            else loop cmis cmxs cma cmxa c_archive c_stubs (f :: js_stubs) fs
-        | ext when String.equal ext clib_ext ->
-            Memo.file_ready m f;
-            let c_archive, c_stubs = match is_lib_archive f with
-            | true -> Some f, c_stubs
-            | false -> c_archive, (f :: c_stubs)
-            in
-            loop cmis cmxs cma cmxa c_archive c_stubs js_stubs fs
-        | _ ->
-            loop cmis cmxs cma cmxa c_archive c_stubs js_stubs fs
-    in
+  let of_dir m ~clib_ext ~name ~requires ~dir ~archive ~js_stubs =
     Fut.return @@
     Result.map_error (fun e -> Fmt.str "library %a: %s" Name.pp name e) @@
     Result.bind (Os.Dir.exists dir) @@ function
@@ -715,7 +669,48 @@ module Lib = struct
               ~c_archive:None ~c_stubs:[] ~js_stubs:[])
     | true ->
         Result.bind (Os.Dir.fold_files ~recurse:false Os.Dir.path_list dir [])
-        @@ fun fs -> Ok (loop [] [] None None None [] [] fs)
+        @@ fun fs ->
+        let js_stubs = List.map (fun f -> Fpath.(dir // f)) js_stubs in
+        let () = List.iter (Memo.file_ready m) js_stubs in
+        let rec loop cmis cmxs cma cmxa c_archive c_stubs = function
+        | [] ->
+            v ~name ~requires ~dir ~cmis ~cmxs ~cma ~cmxa ~c_archive ~c_stubs
+              ~js_stubs
+        | f :: fs ->
+            let is_lib_archive f = match archive with
+            | None -> false
+            | Some a -> String.equal (Fpath.basename ~no_ext:true f) a
+            in
+            match Fpath.get_ext f with
+            | ".cmi" ->
+                Memo.file_ready m f;
+                loop (f :: cmis) cmxs cma cmxa c_archive c_stubs fs
+            | ".cmx" ->
+                Memo.file_ready m f;
+                loop cmis (f :: cmxs) cma cmxa c_archive c_stubs fs
+            | ".cma" ->
+                let cma = match is_lib_archive f with
+                | true -> Memo.file_ready m f; Some f
+                | false -> cma
+                in
+                loop cmis cmxs cma cmxa c_archive c_stubs fs
+            | ".cmxa" ->
+                let cmxa = match is_lib_archive f with
+                | true -> Memo.file_ready m f; Some f
+                | false -> cmxa
+                in
+                loop cmis cmxs cma cmxa c_archive c_stubs fs
+            | ext when String.equal ext clib_ext ->
+                Memo.file_ready m f;
+                let c_archive, c_stubs = match is_lib_archive f with
+                | true -> Some f, c_stubs
+                | false -> c_archive, (f :: c_stubs)
+                in
+                loop cmis cmxs cma cmxa c_archive c_stubs fs
+            | _ ->
+                loop cmis cmxs cma cmxa c_archive c_stubs fs
+        in
+        Ok (loop [] [] None None None [] fs)
 
   let name l = l.name
   let requires l = l.requires
@@ -787,9 +782,18 @@ module Lib = struct
           match String.cut_right ~sep:"." a with
           | None -> Some a | Some (a, _ext) -> Some a
         in
+        let parse_js_stubs js_stubs =
+          let stubs = String.cuts_left ~drop_empty:true ~sep:"," js_stubs in
+          let to_path s =
+            Result.to_failure @@
+            Result.map_error (Fmt.str "js stubs: %s") @@
+            Fpath.of_string s
+          in
+          List.map to_path stubs
+        in
         try
           match String.split_on_char ':' (String.trim s) with
-          | [meta; dir; archive; requires] ->
+          | [meta; dir; archive; requires; js_stubs] ->
               let requires = parse_requires requires in
               let archive = parse_archive archive in
               let dir =
@@ -797,7 +801,8 @@ module Lib = struct
                 Result.map_error (Fmt.str "library directory: %s") @@
                 Fpath.of_string dir
               in
-              Ok (meta, requires, dir, archive)
+              let js_stubs = parse_js_stubs js_stubs in
+              Ok (meta, requires, dir, archive, js_stubs)
           | _ -> Fmt.failwith "could not parse %S" s
         with
         | Failure e -> Fmt.error "@[<v>%a: %s@]" Fpath.pp file e
@@ -831,7 +836,7 @@ module Lib = struct
           (* We use %A otherwise whith %a we get a blank line if there's
              no archive. Technically though we only support single library
              archives *)
-          "%m:%d:%A:%(requires)"
+          "%m:%d:%A:%(requires):%(jsoo_runtime)"
         in
         let stdout = `File o in
         Memo.spawn m ~success_exits ~reads:[] ~writes:[o] ~stdout ~post_exec @@
@@ -842,8 +847,10 @@ module Lib = struct
         let* s = Memo.read m file in
         match parse_info ~file m ~name s with
         | Error _ as e -> Memo.fail_if_error m e
-        | Ok (_meta, requires, dir, archive) ->
-            let* lib = of_dir m ~clib_ext ~name ~requires ~dir ~archive in
+        | Ok (_meta, requires, dir, archive, js_stubs) ->
+            let* lib =
+              of_dir m ~clib_ext ~name ~requires ~dir ~archive ~js_stubs
+            in
             Fut.return (Some (Memo.fail_if_error m lib))
 
       let find ~cache_dir ~ocamlpath conf m n =
