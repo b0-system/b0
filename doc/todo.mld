@@ -93,3 +93,24 @@ let crunch_file m file ~in_dir =
 {ul
 {- Worfklow to easily check opam file in sync.
    Part of more general workflow ?}}
+
+{1:expect B0_expect}
+
+- More API, we likely want a bit of datastructures.
+- Default cli driver, integrate with the plans on general actions.
+- Parallel execution
+- Progress
+- VCS agnostic, i.e. fill-in the hg support
+- Full run effect spec and checks. E.g. exit code, via a dedicated machine
+  readable file that is updated by the run.
+- Get a story for binary/visual regression. First we should have a
+  good `git difftool` and `pixeldrift` setup regardless of
+  testing. Then we likely want combinators that automatically checkout
+  the rewritten path if the perception threshold is not
+  trigerred. Basically in case we detect a modified `path`, invoke a
+  perceptual tool with `path` and `git show HEAD:path`, if the tool
+  exits with 0 do a `git checkout path` to make it as if nothing
+  happened.
+- Decide on path relativisation (more generally in b0)
+- Should we automatically collect outcomes in B0_outcome.t values ?
+  Maybe add primitives and do it automatically for derived expectations.
