@@ -108,19 +108,15 @@ let get_may_must ~locked ~units ~x_units =
   may, must
 
 let find_outcome_action ~must_build (* not empty *) action args =
-  let warn_args () = Log.warn @@ fun m ->
-    m "No outcome action specified: ignoring arguments (see option %a)."
-      Fmt.(code string) "-a"
-  in
   let warn_noact u = Log.warn @@ fun m ->
-    m  "No outcome action for %a: ignoring arguments." B0_unit.pp_name u
+    m  "No action for unit %a: ignoring arguments." B0_unit.pp_name u
   in
   let warn_disable u = Log.warn @@ fun m ->
-    m "Outcome action ignored: unit %a must not build, see %a."
+    m "Unit action ignored: unit %a must not build, see %a."
       B0_unit.pp_name u Fmt.(code string) "--what"
   in
   match action with
-  | None -> (if args <> [] then warn_args ()); Ok None
+  | None -> Ok None
   | Some a ->
       let* u = B0_unit.get_or_hint a in
       match B0_unit.action u with
@@ -128,21 +124,23 @@ let find_outcome_action ~must_build (* not empty *) action args =
       | Some act when B0_unit.Set.mem u must_build -> Ok (Some (act, u))
       | Some _ -> warn_disable u; Ok None
 
-let do_output_action_path u = match B0_unit.find_meta B0_meta.exe_file u with
-| Some path ->
-    let path = Fut.sync path in
-    Log.app (fun m -> m "%a" Fpath.pp_unquoted path);
-    Ok B00_cli.Exit.ok
-| None ->
-    Log.err
-      (fun m -> m "No executable outcome path found in unit %a"
-          B0_unit.pp_name u);
-    Ok B00_cli.Exit.some_error
+let do_output_action_path u args =
+  match B0_unit.find_meta B0_meta.exe_file u with
+  | Some path ->
+      let p = Fut.sync path in
+      (* N.B. it seems there's no way of quoting to make
+         the shell notation $() work if args or p have spaces !? *)
+      Log.app (fun m -> m "%a" Cmd.pp Cmd.(path p %% of_list Fun.id args));
+      Ok B00_cli.Exit.ok
+  | None ->
+      Log.err
+        (fun m -> m "No executable outcome path found in unit %a"
+            B0_unit.pp_name u);
+      Ok B00_cli.Exit.some_error
 
-let build_run
+let build_run'
     lock ~units ~packs ~x_units ~x_packs output_action_path action args c
   =
-  Log.if_error ~use:B00_cli.Exit.no_such_name @@
   let* x_units = get_excluded_units ~x_units ~x_packs in
   let* units, locked_packs = get_must_units_and_locked_packs ~units ~packs in
   let locked = is_locked ~lock ~locked_packs in
@@ -167,8 +165,55 @@ let build_run
           | None -> Ok B00_cli.Exit.ok
           | Some (action, u) ->
               if output_action_path
-              then do_output_action_path u
+              then do_output_action_path u args
               else Ok (Fut.sync (action build u ~args))
+
+let build_run
+    lock ~units ~packs ~x_units ~x_packs output_action_path action args c
+  =
+  let find_action = function
+  | None -> Ok None
+  | Some act ->
+      (* When we get rid of unit actions, units should declare the tool name
+         they implement in their metadata and we should just look at this
+         name. *)
+      let u = B0_unit.get_or_suggest act in
+      let cmdlet = B0_cmdlet.get_or_suggest act in
+      match u, cmdlet with
+      | Ok u, Ok cmdlet ->
+          (* XXX when ww get rid  of unit actions we should disallow declaring
+             an action with the same name as a tool or unit in a given scope.
+             And tools should be available both under their name and a unit:tool
+             syntax discriminate *)
+          Fmt.error "Both a tool and cmdlet are called %a"
+            (Fmt.code Fmt.string) act
+      | Ok u, Error _ -> Ok (Some (`Unit u))
+      | Error _, Ok cmdlet -> Ok (Some (`Cmdlet cmdlet))
+      | Error us, Error cs ->
+          let us = List.map B0_unit.name us in
+          let cs = List.map B0_cmdlet.name cs in
+          let suggs = List.sort String.compare (List.rev_append us cs) in
+          let kind ppf () = Fmt.string ppf "action" in
+          let hint = Fmt.did_you_mean in
+          let pp = Fmt.unknown' ~kind (Fmt.code Fmt.string) ~hint in
+          (* XXX show how to list available actions if there's no typo *)
+          Fmt.error "@[%a@]" pp (act, suggs)
+  in
+  Log.if_error ~use:B00_cli.Exit.no_such_name @@
+  let* act = find_action action in
+  match act with
+  | Some (`Cmdlet cmdlet) ->
+      let cmd = B0_cmdlet.cmd cmdlet in
+      let cwd = B0_driver.Conf.cwd c in
+      let root_dir = Fpath.parent @@ Option.get @@ B0_driver.Conf.b0_file c in
+      let scope_dir = B0_def.scope_dir (B0_cmdlet.def cmdlet) in
+      let scope_dir = Option.value scope_dir ~default:root_dir in
+      let b0_dir = B0_driver.Conf.b0_dir c in
+      let exec = B0_cmdlet.Env.v ~cwd ~scope_dir ~root_dir ~b0_dir ~cmdlet in
+      Ok (cmd exec (Cmd.list args))
+  | None | Some (`Unit _) ->
+      build_run'
+        lock ~units ~packs ~x_units ~x_packs output_action_path action args c
 
 (* Explaining what gets into the build *)
 

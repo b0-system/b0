@@ -351,7 +351,7 @@ The [default] pack defines the build units that are built when a bare
 Cmdlets are convenience named commands you can define and directely
 invoke via
 {[
-b0 cmd NAME -- ...
+b0 -- NAME …
 ]}
 If your development practice needs a bit of shell scripting here and
 there, consider rewriting them in a decent programming language as cmdlets.

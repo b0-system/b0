@@ -661,7 +661,7 @@ module Publish = struct
     | [] -> "" | is -> String.concat "" (List.map (( ^ ) " -i ") is)
     in
     Fmt.str "\n\n---\n\n\
-             Use `b0 cmd -- .opam.publish %s%s` to update the pull request."
+             Use `b0 -- .opam.publish %s%s` to update the pull request."
       vnames incompats
 
   let msg_for_publish is incompats =
@@ -1000,7 +1000,7 @@ module Cmdlet = struct
     let man = [ `S Cmdliner.Manpage.s_description;
                 `P "$(mname) publishes opam package on GitHub.";
                 `P "If you want to inspect the $(b,opam) file before \
-                    use $(b,b0 cmd --) $(b,.opam.file) $(i,PKG)….";
+                    use $(b,b0 --) $(b,.opam.file) $(i,PKG)….";
                 `Blocks man]
     in
     B0_cmdlet.eval ~envs ~man env args publish

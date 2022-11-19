@@ -188,9 +188,9 @@ end
 
    See the {{!page-opam}B0 [opam] manual} and:
 {v
-b0 cmd -- .opam.list --help
-b0 cmd -- .opam.file --help
-b0 cmd -- .opam.publish --help
+b0 -- .opam.list --help
+b0 -- .opam.file --help
+b0 -- .opam.publish --help
 v}
   for more information.
  *)

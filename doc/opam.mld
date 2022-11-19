@@ -48,8 +48,8 @@ The [opam] packages defined in a B0 root along with the pack in which
 they are defined can be listed with the [.opam.list] cmdlet.
 
 {v
-b0 cmd -- .opam.list           # List opam packages in the B0 root
-b0 cmd -- .opam.list --help    # See more options
+b0 -- .opam.list           # List opam packages in the B0 root
+b0 -- .opam.list --help    # See more options
 v}
 
 {1:file_generation Package file generation}
@@ -60,11 +60,11 @@ The [opam] file for a package is generated from its pack metadata via
 The [.opam.file] cmdlet outputs the generated files in various ways.
 
 {v
-b0 cmd -- .opam.file mypkg             # opam file for mypkg on stdout
-b0 cmd -- .opam.file                   # All packages, on stdout
-b0 cmd -- .opam.file -d /tmp/opam/     # Write them to /tmp/opam
-b0 cmd -- .opam.file --in-scope-dir    # Write them in their scopes
-b0 cmd -- .opam.file --help            # See more options
+b0 -- .opam.file mypkg             # opam file for mypkg on stdout
+b0 -- .opam.file                   # All packages, on stdout
+b0 -- .opam.file -d /tmp/opam/     # Write them to /tmp/opam
+b0 -- .opam.file --in-scope-dir    # Write them in their scopes
+b0 -- .opam.file --help            # See more options
 v}
 
 Note that the generation differs slightly when [opam] files are
@@ -118,7 +118,7 @@ Multiple package releases and incompatibilites with existing packages
 can be stated via a single pull request. For example:
 
 {v
-b0 cmd -- .opam.publish p1 p2 p3.2.0.1 -i otherpackage
+b0 -- .opam.publish p1 p2 p3.2.0.1 -i otherpackage
 v}
 
 publishes the [opam] packages [p1] and [p2] at a version determined by
@@ -230,7 +230,7 @@ versions of [otherpack] and the version 2.1.0 of [thispack] are
 incompatible with it – provided [mypkg] is in their dependencies:
 
 {v
-b0 cmd -- .opam.publish mypkg -i otherpack -i thispack.2.1.0
+b0 -- .opam.publish mypkg -i otherpack -i thispack.2.1.0
 v}
 
 If you discover the incompatibilites only once the pull request has
