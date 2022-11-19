@@ -10,20 +10,16 @@ let sdocs = Manpage.s_common_options
 let exits = B0_driver.Exit.infos
 let man = [
   `S Manpage.s_synopsis;
-  `P "$(mname) $(i,COMMAND) …"; `Noblank;
-  `P "$(mname) \
-      [$(b,-a) $(i,UNIT)]
-      [$(b,-u) $(i,UNIT)]…  [$(b,-p) $(i,PACK)]… [$(i,OPTION)]… \
-      $(b,--) [$(i,ARG)]…";
-
+  `P "$(mname) $(b,--) [$(i,ACTION)] [$(i,ARG)]…"; `Noblank;
+  `P "$(mname) $(i,COMMAND) …";
   `S Manpage.s_description;
   `P "B0 describes software construction and deployments using modular and \
       customizable definitions written in OCaml.";
   `Pre "Use $(mname) $(b,unit) to see what can be built."; `Noblank;
   `Pre "Use $(mname) $(b,--what) to see what gets built."; `Noblank;
   `Pre "Use $(mname) to build."; `Noblank;
-  `Pre "Use $(mname) $(b,-a) $(i,UNIT) to build $(i,UNIT) and execute its \
-        outcome action.";
+  `Pre "Use $(mname) $(b,-u) $(i,UNIT) to build $(i,UNIT)."; `Noblank;
+  `Pre "Use $(mname) $(b,-p) $(i,PACK) to build pack $(i,PACK).";
   `Pre "Use $(mname) [$(i,COMMAND)]… $(b,--help) for help about any \
         command.";
   `P "More information is available in the manuals, see $(b,odig doc b0).";
@@ -46,7 +42,6 @@ let cmds =
 let b0 =
   let info = Cmd.info "b0" ~version:"%%VERSION%%" ~doc ~sdocs ~exits ~man in
   Cmd.group info ~default:B0_cmd_build.term cmds
-
 
 let main () = Cmd.eval_value b0
 let () = B0_driver.set ~driver:B0_b0.driver ~main

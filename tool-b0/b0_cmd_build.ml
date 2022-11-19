@@ -140,7 +140,7 @@ let do_output_action_path u = match B0_unit.find_meta B0_meta.exe_file u with
     Ok B00_cli.Exit.some_error
 
 let build_run
-    lock ~units ~packs ~x_units ~x_packs action output_action_path args c
+    lock ~units ~packs ~x_units ~x_packs output_action_path action args c
   =
   Log.if_error ~use:B00_cli.Exit.no_such_name @@
   let* x_units = get_excluded_units ~x_units ~x_packs in
@@ -227,13 +227,13 @@ let build_what lock ~units ~packs ~x_units ~x_packs c =
 (* Build command *)
 
 let build
-    what lock units packs x_units x_packs action output_action_path args c
+    what lock units packs x_units x_packs output_action_path action args c
   =
   let units = match action with None -> units | Some a -> a :: units in
   if what
   then build_what lock ~units ~packs ~x_units ~x_packs c
   else build_run  lock ~units ~packs ~x_units ~x_packs
-                  action output_action_path args c
+                  output_action_path action args c
 
 (* Command line interface *)
 
@@ -265,29 +265,32 @@ let lock =
   in
   Arg.(value & vflag None [lock; unlock])
 
-let action =
-  let doc = "Build and perform outcome unit action of unit $(docv)." in
-  Arg.(value & opt (some string) None & info ["a"; "action"] ~doc ~docv:"UNIT")
-
 let output_action_path =
-  let doc = "Rather than perform action on $(b,-a), print outcome path \
-             on $(b,stdout)."
+  let doc = "Rather than perform action print invocation on $(b,stdout). For \
+             simple actions this prints the path to the build executable and
+             is useful if you want to time it without timing the build."
   in
   Arg.(value & flag & info ["path"] ~doc)
 
-let args =
-  let doc = "Arguments given as is to the outcome action. \
-             Start with $(b,--) otherwise options get interpreted by $(mname)."
+let action =
+  let doc = "Action to run. Specify it after a $(b,--) otherwise
+             it gets taken for a $(mname) command when $(b,b0) is used
+             without a command."
   in
-  Arg.(value & pos_all string [] & info [] ~doc ~docv:"ARG")
+  Arg.(value & pos 0 (some string) None & info [] ~doc ~docv:"ACTION")
+
+let args =
+  let doc = "Arguments given as is to the action."
+  in
+  Arg.(value & pos_right 0 string [] & info [] ~doc ~docv:"ARG")
 
 let term =
   B0_driver.with_b0_file ~driver:B0_b0.driver
     Term.(const build $ what $ lock $ units $ packs $ x_units $ x_packs $
-          action $ output_action_path $ args)
+          output_action_path $ action $ args)
 
 let cmd =
-  let doc = "Build (default command)" in
+  let doc = "Build and run actions (default command)" in
   let sdocs = Manpage.s_common_options in
   let exits = B0_driver.Exit.infos in
   let envs = B00_pager.envs () in
@@ -295,11 +298,10 @@ let cmd =
   let man = [
     `S Manpage.s_synopsis;
     `P "$(mname) $(tname) \
-        [$(b,-a) $(i,UNIT)]
         [$(b,-u) $(i,UNIT)]…  [$(b,-p) $(i,PACK)]… [$(i,OPTION)]… \
-        $(b,--) [$(i,ARG)]…";
+        $(b,--) [$(i,ACTION)] [$(i,ARG)]…";
     `S Manpage.s_description;
-    `P "The $(tname) command runs your builds.";
+    `P "The $(tname) command builds and runs actions.";
     `P "To build a unit use the $(b,-u) option. To build all the units of \
         a pack use the $(b,-p) option. If no unit or pack is specified on \
         the command line all units build unless a pack named $(b,default) \
