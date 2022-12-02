@@ -115,10 +115,7 @@ let js_of_byte_exe ~jss ~mod_srcs ~o b =
   let source_map = Option.join (B0_meta.find source_map meta) in
   let opts = Option.value ~default:Cmd.empty (B0_meta.find comp meta) in
   let toplevel = Option.value ~default:false (B0_meta.find toplevel meta) in
-  let opts = match toplevel with
-  | true -> Cmd.(opts % "--toplevel" % "+toplevel.js" % "+dynlink.js")
-  | false -> opts
-  in
+  let opts = if toplevel then Cmd.(opts % "--toplevel") else opts in
   let jss = List.append lib_jss jss in
   B00_jsoo.compile (B0_build.memo b) ~opts ~source_map ~jss ~byte ~o;
   Fut.return ()
@@ -141,10 +138,6 @@ let js_of_byte_objs ~jss ~mod_srcs ~o b =
   let toplevel = Option.value ~default:false (B0_meta.find toplevel meta) in
   let ocamlrt_js =
     let opts = Cmd.empty in
-    let opts = match toplevel with
-    | false -> opts
-    | true -> Cmd.(opts % "+toplevel.js" % "+dynlink.js")
-    in
     let build_dir = B0_build.current_build_dir b in
     let o = Fpath.(build_dir / "ocamlrt.js") in
     B00_jsoo.build_runtime m ~opts ~jss ~o;
