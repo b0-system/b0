@@ -6,7 +6,39 @@
 open B0_std
 open B0_std.Result.Syntax
 
-let root c =
+let lock c =
+  let warn () = Log.warn @@ fun m ->
+      m "@[<v>Some environment variables are already defined.@,\
+         You may want to first issue: %a@]"
+        Fmt.(code string) "eval $(b0 root unlock)"
+  in
+  Log.if_error ~use:B0_driver.Exit.no_b0_file @@
+  let* b0_file = B0_driver.Conf.get_b0_file c in
+  let b0_dir = B0_driver.Conf.b0_dir c in
+  let bindings = [
+    B0_driver.Env.b0_file, b0_file;
+    B0_driver.Env.b0_dir, b0_dir]
+  in
+  let env_b0_file = Os.Env.find ~empty_is_none:false B0_driver.Env.b0_file in
+  let env_b0_dir = Os.Env.find ~empty_is_none:false B0_driver.Env.b0_dir in
+  let () = match env_b0_file, env_b0_dir with
+  | Some f, _ when f = Fpath.to_string b0_file -> warn ()
+  | _, Some d when d = Fpath.to_string b0_dir -> warn ()
+  | _, _ -> ()
+  in
+  let pp_binding ppf (var, path) =
+    Fmt.pf ppf "@[<h>%s=%a; export %s;@]" var Fpath.pp_quoted path var
+  in
+  Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_binding) bindings);
+  Ok B00_cli.Exit.ok
+
+let unlock c =
+  let vars = [ B0_driver.Env.b0_file; B0_driver.Env.b0_dir ] in
+  let pp_unset ppf var = Fmt.pf ppf "unset %s;" var in
+  Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_unset) vars);
+  B00_cli.Exit.ok
+
+let path c =
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
   let* b0_file = B0_driver.Conf.get_b0_file c in
   let root = Fpath.parent b0_file in
@@ -17,18 +49,45 @@ let root c =
 
 open Cmdliner
 
-let cmd =
-  let doc = "Show the root directory" in
-  let sdocs = Manpage.s_common_options in
-  let exits = B0_driver.Exit.infos in
-  let man_xrefs = [ `Main ] in
-  let man = [
-    `S Manpage.s_description;
-    `P "$(tname) shows the b0 root directory.";
-    B0_b0.Cli.man_see_manual; ]
+let path, path_term =
+  let doc = "Show the root directory (default command)" in
+  let descr = `P "$(tname) outputs the b0 root directory." in
+  let path_term = Term.(const path) in
+  B0_b0.Cli.subcmd_with_driver_conf "path" ~doc ~descr path_term, path_term
+
+let lock =
+  let doc = "Lock the root and b0 directory" in
+  let descr = `Blocks
+    [ `P "$(tname) outputs environment variable bindings to lock $(mname) \
+          invocations on the currently inferred b0 file and directory. \
+          The intended usage is:";
+      `Pre "$(b,eval \\$(b0 root lock\\))"; `Noblank;
+      `Pre "$(b,cd /where/you/want)"; `Noblank;
+      `Pre "$(b,b0) …"; `Noblank;
+      `Pre "…"; `Noblank;
+      `Pre "$(b,eval \\$(b0 root unlock\\))"; ]
   in
-  Cmd.v (Cmd.info "root" ~doc ~sdocs ~exits ~man ~man_xrefs)
-    Term.(const root $ B0_driver.Cli.conf)
+  B0_b0.Cli.subcmd_with_driver_conf "lock" ~doc ~descr Term.(const lock)
+
+let unlock =
+  let doc = "Unlock the root and b0 directory" in
+  let descr = `Blocks
+      [ `P "$(tname) outputs instructions to clear the environment bindings \
+            performed by $(b,lock). The indented usage is:";
+        `Pre "$(b,eval \\$(b0 root unlock\\))"; ]
+  in
+  B0_b0.Cli.subcmd_with_driver_conf "unlock" ~doc ~descr Term.(const unlock)
+
+let subs = [lock; path; unlock]
+
+let cmd =
+  let doc = "Show and lock the root directory" in
+  let descr =
+    `P "$(tname) operates on the root directory. The default \
+        command is $(b,path).";
+  in
+  let default = path_term in
+  B0_b0.Cli.cmd_group_with_driver_conf "root" ~doc ~descr ~default subs
 
 
 (*---------------------------------------------------------------------------
