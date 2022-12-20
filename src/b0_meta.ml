@@ -11,7 +11,7 @@ module Key = struct
   type t = V : 'a typed -> t
   and 'a typed =
     { uid : int;
-      tid : 'a Tid.t;
+      tid : 'a Type.Id.t;
       name : string;
       doc : string;
       pp_value : 'a Fmt.t;
@@ -35,7 +35,7 @@ module Key = struct
 
   let uid = let id = ref (-1) in fun () -> incr id; !id
   let v ?(doc = "undocumented") ~pp_value name =
-    let uid = uid () and tid = Tid.v () and name = ensure_unique name in
+    let uid = uid () and tid = Type.Id.make () and name = ensure_unique name in
     let rec k = { uid; tid; name; doc; pp_value; untyped } and untyped = V k in
     by_name := String.Map.add name untyped !by_name; k
 
@@ -113,9 +113,9 @@ let find : type a. a key -> t -> a option =
   fun k m -> match M.find k.Key.untyped m with
   | exception Not_found -> None
   | B (k', v) ->
-      match Tid.equal k.Key.tid k'.Key.tid with
+      match Type.Id.equal k.Key.tid k'.Key.tid with
       | None -> None
-      | Some Tid.Eq -> Some v
+      | Some Type.Equal -> Some v
 
 let find_binding k m = match M.find k.Key.untyped m with
 | exception Not_found -> None | b -> Some b

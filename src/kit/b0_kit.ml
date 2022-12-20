@@ -4,7 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 module V000 = struct
-  module Tid = B0_std.Tid
+  module Type = B0_std.Type
   module Tty = B0_std.Tty
   module Fmt = B0_std.Fmt
   module Result = B0_std.Result

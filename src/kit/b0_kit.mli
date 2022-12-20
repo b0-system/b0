@@ -11,7 +11,7 @@ module V000 : sig
   (* This is B0_std, do we gain anything in having module aliases
      here ? *)
 
-  module Tid = B0_std.Tid
+  module Type = B0_std.Type
   module Tty = B0_std.Tty
   module Fmt = B0_std.Fmt
   module Result = B0_std.Result

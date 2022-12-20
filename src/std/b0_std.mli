@@ -15,22 +15,27 @@
 module Stdlib_set = Set
 (**/**)
 
-(** Type identifiers. *)
-module Tid : sig
+(** Type introspection.
 
-  (** {1:typeids Type identifiers} *)
+    {b Note.} Available in 5.1. *)
+module Type : sig
 
-  type 'a t
-  (** The type for type identifiers for a type ['a]. *)
+  type (_, _) eq = Equal : ('a, 'a) eq (** *)
+  (** The type for type quality testing. *)
 
-  val v : unit -> 'a t
-  (** [v ()] is a new type identifier. *)
+  module Id : sig
 
-  type ('a, 'b) eq = Eq : ('a, 'a) eq (** *)
-  (** The type for type identifier equality testing. *)
+    (** {1:typeids Type identifiers} *)
 
-  val equal : 'a t -> 'b t -> ('a, 'b) eq option
-  (** [equal t0 t1] determines if [t0] and [t1] are equal. *)
+    type 'a t
+    (** The type for type identifiers for a type ['a]. *)
+
+    val make : unit -> 'a t
+    (** [make ()] is a new type identifier. *)
+
+    val equal : 'a t -> 'b t -> ('a, 'b) eq option
+    (** [equal t0 t1] determines if [t0] and [t1] are equal. *)
+  end
 end
 
 (** {{:http://www.ecma-international.org/publications/standards/Ecma-048.htm}

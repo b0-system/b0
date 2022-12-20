@@ -7,23 +7,27 @@ module Stdlib_set = Set
 
 (* Type identifiers *)
 
-module Tid = struct
-  (* See http://alan.petitepomme.net/cwn/2015.03.24.html#1 *)
+module Type = struct
+  (* See http://alan.petitepomme.net/cwn/2015.03.24.html#1
+     In the stdlib since 5.1. *)
 
-  type _ id = ..
-  module type ID = sig type t type _ id += V : t id end
-  type 'a t = (module ID with type t = 'a)
+  type ('a, 'b) eq = Equal : ('a, 'a) eq
 
-  let v () (type s) =
-    let module T = struct type t = s type _ id += V : t id end in
-    (module T : ID with type t = s)
+  module Id = struct
+    type _ id = ..
+    module type ID = sig type t type _ id += V : t id end
+    type 'a t = (module ID with type t = 'a)
 
-  type ('a, 'b) eq = Eq : ('a, 'a) eq
-  let equal (type t0) (type t1) (t0 : t0 t) (t1 : t1 t) : (t0, t1) eq option
-    =
-    let module T0 = (val t0 : ID with type t = t0) in
-    let module T1 = (val t1 : ID with type t = t1) in
-    match T0.V with T1.V -> Some Eq | _ -> None
+    let make () (type s) =
+      let module T = struct type t = s type _ id += V : t id end in
+      (module T : ID with type t = s)
+
+    let equal (type t0) (type t1) (t0 : t0 t) (t1 : t1 t) : (t0, t1) eq option
+      =
+      let module T0 = (val t0 : ID with type t = t0) in
+      let module T1 = (val t1 : ID with type t = t1) in
+      match T0.V with T1.V -> Some Equal | _ -> None
+  end
 end
 
 (* ANSI terminal interaction *)

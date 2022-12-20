@@ -486,13 +486,13 @@ module Store = struct
   module rec Key : sig
     type t = V : 'a typed -> t
     and 'a typed =
-      { uid : int; tid : 'a Tid.t; mark : string;
+      { uid : int; tid : 'a Type.Id.t; mark : string;
         det : Store.t -> Memo.t -> 'a Fut.t; untyped : t; }
     val compare : t -> t -> int
   end = struct
     type t = V : 'a typed -> t
     and 'a typed =
-      { uid : int; tid : 'a Tid.t; mark : string;
+      { uid : int; tid : 'a Type.Id.t; mark : string;
         det : Store.t -> Memo.t -> 'a Fut.t; untyped : t;}
     let compare (V l0) (V l1) = (compare : int -> int -> int) l0.uid l1.uid
   end
@@ -522,7 +522,7 @@ module Store = struct
 
   let key_uid = (* FIXME atomic *)  let id = ref (-1) in fun () -> incr id; !id
   let key ?(mark = "") det =
-    let uid = key_uid () and tid = Tid.v () in
+    let uid = key_uid () and tid = Type.Id.make () in
     let rec k = { Key.uid; tid; mark; det; untyped }
     and untyped = Key.V k in k
 
@@ -545,8 +545,8 @@ module Store = struct
       Fut.await (k.Key.det s memo) set;
       fut
   | Some (Store.B (l', fut)) ->
-      match Tid.equal k.Key.tid l'.Key.tid with
-      | Some Tid.Eq -> fut | None -> assert false
+      match Type.Id.equal k.Key.tid l'.Key.tid with
+      | Some Type.Equal -> fut | None -> assert false
 
   let set s k v = match Store.Kmap.mem k.Key.untyped s.Store.map with
   | true -> Fmt.invalid_arg "Key %s already set in store" k.Key.mark
