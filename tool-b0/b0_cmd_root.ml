@@ -8,8 +8,7 @@ open B0_std.Result.Syntax
 
 let lock c =
   let warn () = Log.warn @@ fun m ->
-      m "@[<v>Some environment variables are already defined.@,\
-         You may want to first issue: %a@]"
+      m "@[<v>Some variables unchanged. You may need to first issue:@,%a@]"
         Fmt.(code string) "eval $(b0 root unlock)"
   in
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
