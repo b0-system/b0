@@ -693,7 +693,7 @@ module Memo = struct
 
   let hash_fun_env = "B0_HASH_FUN"
   let hash_fun
-      ?(opts = ["hash-fun"]) ?docs ?doc ?(doc_none = "xxh64")
+      ?(opts = ["hash-fun"]) ?docs ?doc ?(doc_none = Hash.Xxh3_64.id)
       ?(env = Cmdliner.Cmd.Env.info hash_fun_env) ()
     =
     let doc = match doc with
