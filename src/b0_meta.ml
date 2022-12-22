@@ -10,12 +10,13 @@ open B0_std
 module Key = struct
   type t = V : 'a typed -> t
   and 'a typed =
-    { uid : int;
-      tid : 'a Type.Id.t;
+    { id : 'a Type.Id.t;
       name : string;
       doc : string;
       pp_value : 'a Fmt.t;
       untyped : t; }
+
+  let[@inline] uid k = Type.Id.uid k.id
 
   let by_name = ref String.Map.empty
   let ensure_unique n =
@@ -33,10 +34,9 @@ module Key = struct
 
   (* Typed keys *)
 
-  let uid = let id = ref (-1) in fun () -> incr id; !id
   let v ?(doc = "undocumented") ~pp_value name =
-    let uid = uid () and tid = Type.Id.make () and name = ensure_unique name in
-    let rec k = { uid; tid; name; doc; pp_value; untyped } and untyped = V k in
+    let id = Type.Id.make () and name = ensure_unique name in
+    let rec k = { id; name; doc; pp_value; untyped } and untyped = V k in
     by_name := String.Map.add name untyped !by_name; k
 
   let pp_tag = Fmt.any "true"
@@ -48,8 +48,8 @@ module Key = struct
 
   (* Existential keys *)
 
-  let equal (V k0) (V k1) = k0.uid = k1.uid
-  let compare (V k0) (V k1) = (compare : int -> int -> int) k0.uid k1.uid
+  let equal (V k0) (V k1) = Int.equal (uid k0) (uid k1)
+  let compare (V k0) (V k1) = Int.compare (uid k0) (uid k1)
   let pp_name_str = Fmt.tty_string [`Fg `Yellow]
   let pp_name ppf k = pp_name_str ppf k.name
   let pp ppf (V k) = pp_name_str ppf k.name
@@ -84,7 +84,7 @@ type 'a key = 'a Key.typed
 (* Bindings *)
 
 type binding = B : 'a key * 'a -> binding
-let pp_binding ppf (B (k, v)) = Fmt.field k.Key.name Fmt.id k.Key.pp_value ppf v
+let pp_binding ppf (B (k,v)) = Fmt.field k.Key.name Fmt.id k.Key.pp_value ppf v
 
 type bindings =
 | [] : bindings
@@ -92,37 +92,33 @@ type bindings =
 
 (* Metadata *)
 
-module M = Map.Make (Key)
+module M = Map.Make (Int)
 type t = binding M.t
 
 let v bs =
   let rec loop acc = function
   | [] -> acc
-  | (k, v) :: bs -> loop (M.add k.Key.untyped (B (k, v)) acc) bs
+  | (k, v) :: bs -> loop (M.add (Key.uid k) (B (k, v)) acc) bs
   in
   loop M.empty bs
 
 let empty = M.empty
 let is_empty = M.is_empty
-let mem k m = M.mem k.Key.untyped m
-let add k v m = M.add k.Key.untyped (B (k, v)) m
+let mem k m = M.mem (Key.uid k) m
+let add k v m = M.add (Key.uid k) (B (k, v)) m
 let add_if_some k o m = match o with None -> m | Some v -> add k v m
 let tag k m = add k () m
-let rem k m = M.remove k.Key.untyped m
+let rem k m = M.remove (Key.uid k) m
 let find : type a. a key -> t -> a option =
-  fun k m -> match M.find k.Key.untyped m with
-  | exception Not_found -> None
-  | B (k', v) ->
-      match Type.Id.equal k.Key.tid k'.Key.tid with
-      | None -> None
-      | Some Type.Equal -> Some v
-
-let find_binding k m = match M.find k.Key.untyped m with
-| exception Not_found -> None | b -> Some b
-
-let find_binding_by_name n m = match Key.find n with
+fun k m -> match M.find_opt (Key.uid k) m with
 | None -> None
-| Some k -> match M.find k m with exception Not_found -> None | b -> Some b
+| Some (B (k', v)) ->
+    match Type.Id.equal k.Key.id k'.Key.id with
+    | Some Type.Equal -> Some v | None -> assert false
+
+let find_binding k m = M.find_opt (Key.uid k) m
+let find_binding_by_name n m = match Key.find n with
+| None -> None | Some (Key.V k) -> M.find_opt (Key.uid k) m
 
 let err_no_such_key n = Fmt.invalid_arg "Key %s not found in map" n
 
