@@ -15,18 +15,23 @@ module Type = struct
 
   module Id = struct
     type _ id = ..
-    module type ID = sig type t type _ id += V : t id end
+    module type ID = sig
+      type t
+      type _ id += Id : t id
+    end
+
     type 'a t = (module ID with type t = 'a)
 
-    let make () (type s) =
-      let module T = struct type t = s type _ id += V : t id end in
-      (module T : ID with type t = s)
+    let make (type a) () : a t =
+      (module struct type t = a type _ id += Id : t id end)
 
-    let equal (type t0) (type t1) (t0 : t0 t) (t1 : t1 t) : (t0, t1) eq option
+    let equal
+        (type a b) ((module A) : a t) ((module B) : b t) : (a, b) eq option
       =
-      let module T0 = (val t0 : ID with type t = t0) in
-      let module T1 = (val t1 : ID with type t = t1) in
-      match T0.V with T1.V -> Some Equal | _ -> None
+      match A.Id with B.Id -> Some Equal | _ -> None
+
+    let uid (type a) ((module A) : a t) =
+      Obj.Extension_constructor.id (Obj.Extension_constructor.of_val A.Id)
   end
 end
 
