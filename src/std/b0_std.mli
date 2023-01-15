@@ -33,8 +33,8 @@ module Type : sig
     val make : unit -> 'a t
     (** [make ()] is a new type identifier. *)
 
-    val equal : 'a t -> 'b t -> ('a, 'b) eq option
-    (** [equal id0 id1] determines if [id0] and [id1] are equal. *)
+    val provably_equal : 'a t -> 'b t -> ('a, 'b) eq option
+    (** [provably_equal id0 id1] determines if [id0] and [id1] are equal. *)
 
     val uid : 'a t -> int
     (** [uid id] is a runtime unique identifier for [id]. *)

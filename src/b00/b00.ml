@@ -545,7 +545,7 @@ module Store = struct
       Fut.await (k.Key.det s memo) set;
       fut
   | Some (Store.B (l', fut)) ->
-      match Type.Id.equal k.Key.tid l'.Key.tid with
+      match Type.Id.provably_equal k.Key.tid l'.Key.tid with
       | Some Type.Equal -> fut | None -> assert false
 
   let set s k v = match Store.Kmap.mem k.Key.untyped s.Store.map with

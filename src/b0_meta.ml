@@ -113,7 +113,7 @@ let find : type a. a key -> t -> a option =
 fun k m -> match M.find_opt (Key.uid k) m with
 | None -> None
 | Some (B (k', v)) ->
-    match Type.Id.equal k.Key.id k'.Key.id with
+    match Type.Id.provably_equal k.Key.id k'.Key.id with
     | Some Type.Equal -> Some v | None -> assert false
 
 let find_binding k m = M.find_opt (Key.uid k) m

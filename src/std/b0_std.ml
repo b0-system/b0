@@ -25,7 +25,7 @@ module Type = struct
     let make (type a) () : a t =
       (module struct type t = a type _ id += Id : t id end)
 
-    let equal
+    let provably_equal
         (type a b) ((module A) : a t) ((module B) : b t) : (a, b) eq option
       =
       match A.Id with B.Id -> Some Equal | _ -> None
