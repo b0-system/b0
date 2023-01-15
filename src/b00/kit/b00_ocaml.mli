@@ -493,13 +493,14 @@ module Cobj : sig
   val of_string : ?file:Fpath.t -> string -> (t list, string) result
   (** [of_string ~file data] parses compilation object information from
       [data] as output by {!Tool.ocamlobjinfo} assuming it was
-      read from [file] (defaults to {!B0_std.Os.File.dash}). *)
+      read from [file] (defaults to {!B0_std.Fpath.dash}). *)
 end
 
 (** Library information and lookup.
 
     An OCaml library is a directory with interfaces and object
-    files. OCaml libraries are resolved by {{!Name}name} using a {!Resolver}. *)
+    files. OCaml libraries are resolved by {{!Name}name} using a
+    {!B00_ocaml.Resolver}. *)
 module Lib : sig
 
   (** {1:name Library names} *)
@@ -883,8 +884,7 @@ module Archive : sig
     ?post_exec:(B000.Op.t -> unit) -> ?k:(int -> unit) -> Memo.t ->
     conf:Conf.t -> opts:Cmd.t -> code:Conf.code -> has_cstubs:bool ->
     cobjs:Fpath.t list -> odir:Fpath.t -> oname:string -> unit
-  (** [archive] is {!byte_archive} or {!native_archive} according to
-      [code]. *)
+  (** [archive] is {!byte} or {!native} according to [code]. *)
 
   val native_dynlink :
     ?post_exec:(B000.Op.t -> unit) -> ?k:(int -> unit) -> Memo.t ->

@@ -96,12 +96,12 @@ module B0_std : sig
       {!B0_std.Os.Cmd.spawn_tracer}. *)
 
   val get_tty_cap : Tty.cap option option -> Tty.cap
-  (** [get_tty_cap cap] determines [cap] with {!Tty.cap} and
-      {!Tty.of_fd} on {!Unix.stdout} if [cap] is [None] or [Some
+  (** [get_tty_cap cap] determines [cap] with {!B0_std.Tty.cap} and
+      {!B0_std.Tty.of_fd} on {!Unix.stdout} if [cap] is [None] or [Some
       None]. *)
 
   val get_log_level : Log.level option -> Log.level
-  (** [get_log_level level] determines [level] with {!Log.Warning} if
+  (** [get_log_level level] determines [level] with {!B0_std.Log.Warning} if
       [level] is [None]. *)
 
   val setup : Tty.cap -> Log.level -> log_spawns:Log.level -> unit
@@ -322,12 +322,12 @@ module Memo : sig
       {ul
       {- {!B0_std.Log.Quiet} formats nothing}
       {- {!B0_std.Log.Debug} report all operations with
-         {!B000_conv.Op.pp_short_ui}.}}
+         {!B000_conv.Op.pp_line}.}}
       {ul
       {- [show_ui] is the level at which any completed operation
-         gets logged with {!B000_conv.Op.pp_ui}.}
+         gets logged with {!B000_conv.Op.ui}.}
       {- [show_op] is the level at which any completed operation gets
-         logged with {!B000_conv.Op.pp_short_ui}}}
+         logged with {!B000_conv.Op.pp_line_and_ui}}}
       The formatter [op_howto] should format a way to got more information
       about an operation, default to {!B0_std.Fmt.nop}. *)
 

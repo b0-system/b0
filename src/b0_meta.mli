@@ -199,7 +199,7 @@ val repo : string key
 val synopsis : string key
 (** [synopsis] is a one line synopsis for an entity. *)
 
-(** {2:entity Entity tags} *)
+(** {2:tags Entity tags} *)
 
 val bench : unit key
 (** [bench] tags benchmarking entities. *)

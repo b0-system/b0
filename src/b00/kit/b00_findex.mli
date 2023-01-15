@@ -34,7 +34,7 @@ val root_dirs : t -> Fpath.t list
 
 val root_root_dirs : t -> Fpath.t list
 (** [root_root_dirs] is {!B0_std.Fpath.drop_prefixed} and
-    {!B0_std.Fpath.uniquify} applied to {!root_dirs}. *)
+    {!B0_std.Fpath.distinct} applied to {!root_dirs}. *)
 
 (** {1:dirs Directories} *)
 

@@ -119,7 +119,7 @@ B00_www_browser
 B0 is the system for describing software construction and deployments
 via {{!page-manual.b0_file}B0 files}.
 
-{2:b0 Library [b0]}
+{2:b0_lib Library [b0]}
 
 {!modules:
 B0_build
@@ -159,4 +159,5 @@ B0_ocaml_eco
 B0_opam
 B0_release
 B0_srcs
+B0_expecty
 }

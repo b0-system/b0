@@ -563,12 +563,12 @@ module Op : sig
 
   val time_started : t -> Mtime.span
   (** [time_started o] is [o]'s execution start time. This is
-      different from {!B0_std.Time.Span.max} once the operation has
+      different from {!B0_std.Mtime.Span.max_span} once the operation has
       been submitted for execution. *)
 
   val time_ended : t -> Mtime.span
   (** [time_ended o] is [o]'s execution end time. This is different
-      from {!B0_std.Time.Span.max} once the operation has been completed
+      from {!B0_std.Mtime.Span.max_span} once the operation has been completed
       and collected. *)
 
   val waited : t -> Mtime.span

@@ -152,7 +152,7 @@ val latest_tag : t -> commit_ish -> (tag option, string) result
 (** Git specific operations.
 
     All the following operations assume the repository is of kind [Git].
-    Use {!check_kind} to assert this first otherwise the operations
+    Use {!Git.check_kind} to assert this first otherwise the operations
     will fail in a non-user friendly way. *)
 module Git : sig
 
@@ -219,7 +219,7 @@ module Git : sig
   (** [branch_delete r ~force ~branch] deletes [branch] in [r]. If
       [force] is [true] this is a forced deletion.  [stderr] and
       [stdout] indicates where they should be redirected, defaults to
-      the values of {!Os.Cmd.run_status}. *)
+      the values of {!B0_std.Os.Cmd.run_status}. *)
 
   (** {1:transient_checkouts Transient checkouts}
 
@@ -299,7 +299,7 @@ end
 module Hg : sig
   val get_cmd :
     ?search:Fpath.t list -> ?cmd:Cmd.t -> unit -> (Cmd.t, string) result
-  (** [get_cmd ()] looks for [hg] with {!Os.Cmd.get}. *)
+  (** [get_cmd ()] looks for [hg] with {!B0_std.Os.Cmd.get}. *)
 
   val find : ?dir:Fpath.t -> unit -> (t option, string) result
   (** [find ~dir ()] finds, using VCS functionality, an hg repository

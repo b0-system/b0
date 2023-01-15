@@ -2810,7 +2810,7 @@ module Os : sig
     val pp_status : status Fmt.t
     (** [pp_status] is a formatter for process exit statuses of the form:
         {ul
-        {- ["exited %d"] for [`Exited _] values}a
+        {- ["exited %d"] for [`Exited _] values}
         {- ["signaled %s"] for [`Signaled _] value}} *)
 
     val pp_cmd_status : (Cmd.t * status) Fmt.t

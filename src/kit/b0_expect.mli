@@ -18,11 +18,11 @@ open B0_std
 
 type t
 (** The type for expectation test runners. It represents a context
-    to run a set of expecatation tests. *)
+    to run a set of expctation tests. *)
 
 (** Expectation test outcomes.
 
-    An outcome counts as one test unit. You may somtimes
+    An outcome counts as one test unit. You may sometimes
     want to merge multiple outcomes into one. *)
 module Outcome : sig
 
@@ -88,7 +88,7 @@ val log_results : t -> Outcome.t list -> Os.Exit.t
 (** [log_results t os] logs the result [os]. [dir] is the path used
     to print VCS command for the summary or diff. *)
 
-(** {1:derived Derived expectations
+(** {1:derived Derived expectations}
 
     Note these do log outcomes. *)
 
