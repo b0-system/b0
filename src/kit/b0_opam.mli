@@ -64,6 +64,7 @@ module File : sig
       metadata keys.
       {ul
       {- ["authors:"], {!B0_meta.authors}.}
+      {- ["available:"], {!B0_opam.Meta.available}.}
       {- ["build:"], {!B0_opam.Meta.build}.}
       {- ["bug-report:"], {!B0_meta.issues}.}
       {- ["conflicts:"], {!B0_opam.Meta.conflicts}.}
@@ -109,6 +110,12 @@ module Meta : sig
       a
       {{:http://opam.ocaml.org/doc/Manual.html#Filtered-package-formulas}
       filtered package formula}, use [""] if you don't have any constraint. *)
+
+  val available : string B0_meta.key
+  (** [available] is an opam
+      {{:https://opam.ocaml.org/doc/Manual.html#opamfield-available}
+      [available:]} field value. This is a raw string in opam sntax
+      that defines the whole field. *)
 
   val build : string B0_meta.key
   (** [build] is an opam

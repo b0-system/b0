@@ -106,6 +106,10 @@ module File = struct
     let doc = "opam file fragment added at the end" in
     B0_meta.Key.v "opam-file-addendum" ~doc ~pp_value:_pp
 
+  let available_field =
+    let doc = "opam file available: field" in
+    B0_meta.Key.v "opam-available" ~doc ~pp_value:Fmt.string
+
   let build_field =
     let doc = "opam file build: field" in
     B0_meta.Key.v "opam-build" ~doc ~pp_value:Fmt.string
@@ -173,6 +177,7 @@ module File = struct
         string_pair_list ~by_line:true "pin-depends" pin_depends;
         pkg_spec_list "depopts" depopts_field;
         pkg_spec_list "conflicts" conflicts_field;
+        string_raw "available" available_field;
         string_raw "build" build_field;
         string_raw "install" install_field;
         triple_string ~nl:true "description" B0_meta.description; ]
@@ -201,6 +206,7 @@ let pkg_name_of_pack p =
 
 module Meta = struct
   type pkg_spec = string * string
+  let available = File.available_field
   let build = File.build_field
   let conflicts = File.conflicts_field
   let depends = File.depends_field
