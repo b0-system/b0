@@ -444,8 +444,8 @@ module Fmt = struct
   let truncated ~max ppf s = match String.length s <= max with
   | true -> Format.pp_print_string ppf s
   | false ->
-      for i = 0 to max - 4 do Format.pp_print_char ppf s.[i] done;
-      Format.pp_print_string ppf "..."
+      for i = 0 to max - 2 do Format.pp_print_char ppf s.[i] done;
+      Format.fprintf ppf "@<1>%s" "…"
 
   (* HCI fragments *)
 

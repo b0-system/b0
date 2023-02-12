@@ -366,7 +366,7 @@ module Fmt : sig
   val truncated : max:int -> string t
   (** [truncated ~max] formats a string using at most [max]
       characters. If the string doesn't fit, it is truncated and ended
-      with three consecutive dots which do count towards [max]. *)
+      with […] (U+2026) which does count towards [max]. *)
 
   (** {1:hci HCI fragments} *)
 
