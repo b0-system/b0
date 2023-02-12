@@ -3938,6 +3938,11 @@ module Os = struct
     | exception Unix.Unix_error (e, _, _) ->
         Fmt.error "wait_status: waitpid %d: %s" pid (uerr e)
 
+    let kill pid sg = match Unix.kill pid sg with
+    | () -> Ok ()
+    | exception Unix.Unix_error (e, _, _) ->
+        Fmt.error "kill %d with %a: %s" pid Fmt.sys_signal sg (uerr e)
+
     (* execv
 
        On Windows when Unix.execv[e] is invoked, control is returned to

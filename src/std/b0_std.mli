@@ -2951,6 +2951,11 @@ module Os : sig
     (** [spawn_wait_status] blocks and waits for [pid]'s termination status to
         become available. *)
 
+    val kill : pid -> int -> (unit, string) result
+    (** [kill pid signal] sends signal [signal] to the process [pid].
+
+        {b Windows.} Only the {!Sys.sigkill} signal is emulated. *)
+
     (** {2:tracing Tracing} *)
 
     type spawn_tracer =
