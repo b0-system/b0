@@ -2489,7 +2489,17 @@ module Os = struct
     type counter = Mtime.t
     let counter = mtime_now_ns
     let count c = Int64.sub (mtime_now_ns ()) c
+
+    (* Sleep *)
+
+    let sleep dur =
+      let measure = counter () in
+      let dur = Mtime.Span.to_float_ns dur *. 1e-9 in
+      let () = try Unix.sleepf dur with Unix.Unix_error _ -> () in
+      count measure
   end
+
+  let sleep = Mtime.sleep
 
   module Env = struct
 

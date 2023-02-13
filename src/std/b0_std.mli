@@ -2078,7 +2078,13 @@ module Os : sig
     end
   end
 
-  (** Monotonic time clock.
+  val sleep : Mtime.Span.t -> Mtime.Span.t
+  (** [sleep dur] sleeps for duration [dur] and returns the duration
+      slept. The latter may be smaller than [dur] if the call was
+      interrupted by a signal. This becomes imprecise if [dur] is
+      greater than ~104 days. *)
+
+  (** Monotonic time clock and sleep.
 
       See {!B0_std.Mtime} for a discussion about monotonic time. *)
   module Mtime : sig
@@ -2124,7 +2130,6 @@ module Os : sig
         {- Windows uses
         {{:https://msdn.microsoft.com/en-us/library/windows/desktop/aa373083%28v=vs.85%29.aspx}Performance counters}.}} *)
   end
-
 
   (** Environment variables. *)
   module Env : sig
