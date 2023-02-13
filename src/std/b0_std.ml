@@ -2072,6 +2072,19 @@ module Mtime = struct
 
     let to_uint64_ns s = s
     let of_uint64_ns ns = ns
+
+    let max_float_int = 9007199254740992. (* 2^53. *)
+    let int64_min_int_float = Int64.to_float Int64.min_int
+    let int64_max_int_float = Int64.to_float Int64.max_int
+
+    let of_float_ns sf =
+      if sf < 0. || sf >= max_float_int || not (Float.is_finite sf)
+      then None else Some (Int64.of_float sf)
+
+    let to_float_ns s =
+      if Int64.compare 0L s <= 0 then Int64.to_float s else
+      int64_max_int_float +. (-. int64_min_int_float +. Int64.to_float s)
+
     let pp = Fmt.uint64_ns_span
     let pp_ns ppf s = Fmt.pf ppf "%Luns" s
   end

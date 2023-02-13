@@ -1684,6 +1684,18 @@ module Mtime : sig
     (** [of_uint64_ns u] is the {e unsigned} 64-bit integer nanosecond span [u]
         as a span. *)
 
+    val of_float_ns : float -> span option
+    (** [of_float_ns f] is the positive floating point nanosecond span [f] as
+        a span. This is [None] if [f] is negative, non finite, or
+        larger or equal than 2{^53} (~104 days, the largest exact floating
+        point integer). *)
+
+    val to_float_ns : span -> float
+    (** [to_float_ns s] is [span] as a nanosecond floating point span.
+        Note that if [s] is larger than 2{^53} (~104 days, the largest
+        exact floating point integer) the result is an approximation
+        and will not round trip with {!of_float_ns}. *)
+
     (** {1:fmt Formatting} *)
 
     val pp : span Fmt.t
