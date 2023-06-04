@@ -1,4 +1,4 @@
-v0.0.5 2023-04-06 Zagreb
+v0.0.5 2023-06-04 Zagreb
 ------------------------
 
 * OCaml 5.1 compatibility. Fix `-strict-format` error. 
