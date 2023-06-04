@@ -1,3 +1,10 @@
+v0.0.5 2023-04-06 Zagreb
+------------------------
+
+* OCaml 5.1 compatibility. Fix `-strict-format` error. 
+  Thanks to Fabian (@copy) for the report (#10).
+
+
 v0.0.4 2022-02-09 La Forclaz (VS)
 ---------------------------------
 

@@ -166,7 +166,7 @@ module File_cache = struct
   let pp_stats ppf (total, used) =
     let row = Fmt.tty_string [`Fg `Yellow] in
     let col = Fmt.tty_string [`Italic] in
-    let pp_size ppf s = Fmt.pf ppf "% 6s" (Fmt.str "%a" Fmt.byte_size s) in
+    let pp_size ppf s = Fmt.pf ppf "%6s" (Fmt.str "%a" Fmt.byte_size s) in
     let pp_cols ppf () = Fmt.pf ppf "       %a    %a" col "total" col "used" in
     Fmt.pf ppf "@[<v>%a@,%a %6d  %6d@,%a %6d  %6d@,%a %a  %a@]"
       pp_cols ()
