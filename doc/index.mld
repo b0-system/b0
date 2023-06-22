@@ -41,7 +41,6 @@ For B0 programmers.
 {- The {{!page-rationale}rationale} of B0, written a long time ago but
    still relevant}}
 
-
 {1:b0_std Library [b0.std]}
 
 The [b0.std] library has a few things that should be in the stdlib
