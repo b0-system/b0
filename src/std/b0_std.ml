@@ -4074,10 +4074,10 @@ module Log = struct
 
   let pp_level ppf level = match level with
   | App -> ()
-  | Error -> Fmt.tty_string err_style ppf "ERROR"
-  | Warning -> Fmt.tty_string warn_style ppf "WARNING"
-  | Info -> Fmt.tty_string info_style ppf "INFO"
-  | Debug -> Fmt.tty_string debug_style ppf "DEBUG"
+  | Error -> Fmt.tty_string (`Bold :: err_style) ppf "Error"
+  | Warning -> Fmt.tty_string (`Bold :: warn_style) ppf "Warning"
+  | Info -> Fmt.tty_string (`Bold :: info_style) ppf "Info"
+  | Debug -> Fmt.tty_string (`Bold :: debug_style) ppf "Debug"
   | Quiet -> assert false
 
   let pp_header =
@@ -4086,7 +4086,7 @@ module Log = struct
     | n -> Filename.basename Sys.argv.(0)
     in
     let pp_header ppf (l, h) = match h with
-    | None -> if l = App then () else Fmt.pf ppf "%s: [%a] " x pp_level l
+    | None -> if l = App then () else Fmt.pf ppf "%s: %a: " x pp_level l
     | Some "" -> ()
     | Some h -> Fmt.pf ppf "%s: [%a] " x (pp_level_str l) h
     in

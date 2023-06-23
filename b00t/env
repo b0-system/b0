@@ -9,6 +9,6 @@ b0 ()
   if [ -e $ROOT/b0-exe/b0 ]; then
     B0_BOOTSTRAP=$ROOT B0_DRIVER_BOOTSTRAP=$ROOT $ROOT/b0-exe/b0 $@
   else
-    echo "[ERROR] No b0 bootstrap build found."
+    echo "Error: No b0 bootstrap build found."
   fi
 }
