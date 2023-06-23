@@ -39,7 +39,7 @@ let err_msg of_string s = Result.map_error (fun e -> `Msg e) (of_string s)
 
 let cmd = Cmdliner.Arg.conv ~docv:"CMD" (err_msg Cmd.of_string, Cmd.pp_dump)
 let fpath =
-  Cmdliner.Arg.conv ~docv:"PATH" (err_msg Fpath.of_string, Fpath.pp_quoted)
+  Cmdliner.Arg.conv ~docv:"PATH" (err_msg Fpath.of_string, Fpath.pp_unquoted)
 
 let s_output_format_options = "OUTPUT FORMAT OPTIONS"
 

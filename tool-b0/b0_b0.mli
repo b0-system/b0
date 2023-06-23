@@ -68,7 +68,7 @@ module Cli : sig
   val cmd_group_with_driver_conf :
     ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
     ?synopsis:Manpage.block -> string -> doc:string -> descr:Manpage.block ->
-    default:(B0_driver.Conf.t -> Os.Exit.t) Term.t ->
+    ?default:(B0_driver.Conf.t -> Os.Exit.t) Term.t ->
     Os.Exit.t Cmd.t list -> Os.Exit.t Cmd.t
 end
 

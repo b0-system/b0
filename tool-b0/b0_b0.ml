@@ -131,11 +131,14 @@ module Cli = struct
 
   let cmd_group_with_driver_conf
       ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
-      ~default subs
+      ?default subs
     =
     let man = man_with_descr ?synopsis descr in
-    let default = Term.(default $ B0_driver.Cli.conf) in
-    Cmd.group (Cmd.info name ~doc ~exits ~envs ~man) ~default subs
+    let default = match default with
+    | Some default -> Some (Term.(default $ B0_driver.Cli.conf))
+    | None -> None
+    in
+    Cmd.group (Cmd.info name ~doc ~exits ~envs ~man) ?default subs
 end
 
 (*---------------------------------------------------------------------------

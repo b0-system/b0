@@ -29,6 +29,7 @@ let man = [
 
 let cmds =
   [ B0_cmd_build.cmd;
+    B0_cmd_blueprint.cmd;
     B0_cmd_cmdlet.cmd;
     B0_cmd_cmd.cmd;
     B0_cmd_delete.cmd;
