@@ -29,29 +29,15 @@ file. After this we have usable `b0` executables and libraries in the
 
 # Source map
 
-There is one OCaml library per directory. We distinguish two levels:
-`b00` and `b0`.
-
-## B00
-
-This is the core infrastructure that can be used on its own to devise
-build tools (e.g. `odig`, `brzo`).
-
 * [`src/std`](src/std) has the `b0.std` library. This has a few things
   that should be in the stdlib and a few others that shouldn't but are
   useful for `b0` based programs.
-* [`src/b00`](src/b00) is the core `b0.b00` build library.
-* [`src/b00/kit`](src/b00/kit) is the `b0.b00.kit` library. An
-   end-user toolkit for working with the `b00` API.
-* [`tools`](tools) has a few b00 low-level tools. 
+* [`src/memo`](src/memo) is the core `b0.memo` build library.
+* [`src/file`](src/file) has the `b0.file` library which for describing 
+  software construction and deployments and provides programmatic access to 
+  the definitions of `B0.ml` files.
+* [`src/kit`](src/kit) is the `b0.kit` library. Everything but the 
+  the kitchen sink.
+* [`src/tool`](src/tool) is b0 tool driver. This implements the `b0` tool.
+* [`tools`](tools) has a few b0 low-level tools. 
 
-## B0 
-
-This is the system for describing software contruction and deployments
-via B0 files.
-
-* [`src`](src) has the `b0` library which for describing software construction 
-  and deployments and provides programmatic access to the definitions of B0 files.
-* [`src/kit`](src/kit) is the `b0.kit` library. An end-user toolkit
-  for B0 files.
-* [`tool-b0`](tool-b0) is b0 tool driver.

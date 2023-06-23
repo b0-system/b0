@@ -4,15 +4,14 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
-open B00
 open Test_memo_setup
 
-let echo = Tool.by_name "echo"
+let echo = B0_memo.Tool.by_name "echo"
 
 let redir_create_path build_dir m =
-  let echo = Memo.tool m echo in
+  let echo = B0_memo.Memo.tool m echo in
   let redir = Fpath.(build_dir / "hey" / "ho" / "out") in
-  Memo.spawn m ~stdout:(`File redir) @@ echo Cmd.(atom "Ha!")
+  B0_memo.Memo.spawn m ~stdout:(`File redir) @@ echo Cmd.(atom "Ha!")
 
 let test_memo_redir () =
   with_memo redir_create_path;

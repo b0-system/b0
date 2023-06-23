@@ -20,7 +20,7 @@ let main () =
     in
     let path =
       let doc = "$(docv) is file path to delete" in
-      Arg.(required & pos 0 (some B00_cli.fpath) None &
+      Arg.(required & pos 0 (some B0_cli.fpath) None &
            info [] ~doc ~docv:"PATH")
     in
     Cmd.v (Cmd.info "test-rm" ~sdocs:Manpage.s_common_options)

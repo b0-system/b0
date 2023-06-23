@@ -1,1 +1,8 @@
+B0_base64
+B0_bincode
+B0_html
+B0_json
+B0_sexp
 B0_std
+B0_text
+B0_text_lines

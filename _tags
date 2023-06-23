@@ -1,27 +1,24 @@
-true : bin_annot
+true : bin_annot, safe_string
 true : package(unix)
 # true : package(landmarks.ppx,landmarks)
 <_b0> : -traverse
 <b0wl> : -traverse
 
-# B00
 <src/std> : include
 <src/std/b0_std.{cma,cmxa}> : record_b0_stubs
 <src/std/b0_std.cmxs> : link_b0_stubs
-<src/b00> : include
-<src/b00/kit> : include
-<src/b00/kit/**> : package(cmdliner)
 
-# B0
-<src> : include
+<src/memo> : include
+
+<src/file> : include
 <src/**> : package(cmdliner)
+
 <src/kit> : include
 <src/kit/**> : package(cmdliner)
 
-# b0 & d0 tools
-<tool-b0> : include
-<tool-b0/**> : package(cmdliner)
-<tool-b0/b0_main_run.*> : use_b0_stubs
+<src/tool> : include
+<src/tool/**> : package(cmdliner)
+<src/tool/b0_main_run.*> : use_b0_stubs
 
 <tools> : include
 <tools/**> : use_b0_stubs, package(cmdliner)

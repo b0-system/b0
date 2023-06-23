@@ -17,8 +17,8 @@ let () =
     Result.to_failure @@
     Result.bind (Os.Cmd.run_out ~trim:true
                    Cmd.(objinfo %% paths files)) @@ fun s ->
-    Result.bind (B00_ocaml.Cobj.of_string s) @@ fun cobjs ->
-    Ok (Fmt.pr "@[<v>%a@]@." Fmt.(list B00_ocaml.Cobj.pp) cobjs)
+    Result.bind (B0_ocaml.Cobj.of_string s) @@ fun cobjs ->
+    Ok (Fmt.pr "@[<v>%a@]@." Fmt.(list B0_ocaml.Cobj.pp) cobjs)
   with Failure  e -> Fmt.epr "%s@." e; exit 1
 
 (*---------------------------------------------------------------------------

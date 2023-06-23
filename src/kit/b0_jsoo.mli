@@ -6,8 +6,50 @@
 (** [js_of_ocaml] B0 file support *)
 
 open B0_std
-open B00
-open B00_ocaml
+
+(** [js_of_ocaml] tool support.
+
+    This models the {{:http://ocsigen.org/js_of_ocaml/}[js_of_ocaml]}
+    tool. *)
+module Tool : sig
+
+(** {1:jsoo Js_of_ocaml} *)
+
+type source_map = [`Inline | `File ] option
+(** The type for specifying source maps desires. *)
+
+val tool : B0_memo.Tool.t
+(** [tool] is the [js_of_ocaml] executable. *)
+
+val build_runtime :
+  B0_memo.Memo.t -> opts:Cmd.t -> jss:Fpath.t list -> o:Fpath.t -> unit
+(** [build_runtime m ~jss o] writes a standalone runtime with JavaScript
+    files [jss] to [o]. *)
+
+val compile :
+  B0_memo.Memo.t -> opts:Cmd.t -> source_map:source_map ->
+  jss:Fpath.t list -> byte:Fpath.t -> o:Fpath.t -> unit
+(** [compile m ~source_map ~jss ~byte ~o] compiles the JavaScript
+    files [jss] and byte code object or executable [byte] to the
+    JavaScript file [o]. *)
+
+val link :
+  B0_memo.Memo.t -> opts:Cmd.t -> source_map:source_map ->
+  jss:Fpath.t list -> o:Fpath.t -> unit
+(** [link m ~opts ~jss ~o] links the JavaScript files [jss] to [o] with
+    options [opts]. *)
+
+val write_page :
+  ?lang:string -> ?generator:string -> ?styles:string list ->
+  ?scripts:string list -> ?title:string -> B0_memo.Memo.t ->
+  o:B0_std.Fpath.t -> unit
+(** [write_page m ~title ~o] writes to file [o] a full HTML document
+    whose body contains only a {!B0_html.El.noscript} element that
+    entices the user, in english, to enable JavaScript. [title]
+    defaults to the basename of [o] without its extension, for the
+    other arguments and more information see
+    {!B0_html.El.basic_page}. *)
+end
 
 (** {1:metadata Metadata} *)
 
@@ -24,7 +66,7 @@ val comp_mode : comp_mode B0_meta.key
 
     {b FIXME} this should likely be a store key. *)
 
-val source_map : B00_jsoo.source_map B0_meta.key
+val source_map : Tool.source_map B0_meta.key
 (** [source_map] is the source map option. *)
 
 val tag : unit B0_meta.key
@@ -45,8 +87,8 @@ val assets_root : Fpath.t B0_meta.key
 
 val meta :
   ?meta:B0_meta.t -> ?assets_root:Fpath.t -> ?comp:Cmd.t ->
-  ?comp_mode:comp_mode -> ?link:Cmd.t -> ?requires:Lib.Name.t list ->
-  ?source_map:B00_jsoo.source_map -> ?toplevel:bool -> unit -> B0_meta.t
+  ?comp_mode:comp_mode -> ?link:Cmd.t -> ?requires:B0_ocaml.Lib.Name.t list ->
+  ?source_map:Tool.source_map -> ?toplevel:bool -> unit -> B0_meta.t
 (** [meta] creates a base metadata dictionary for compiling with
     [js_of_ocaml]. See the corresponding keys above. FIXME defaults. *)
 
@@ -83,7 +125,7 @@ val web :
     {- [name] is the name of the unit (defaults to [n]).}
     {- [srcs] are the executable sources. All files with extension [.ml],
        [.mli] and [.js] are considered for compiling and linking the
-       executable. The files {!B00_fexts.www} in [srcs] minus [.js] files are
+       executable. The files {!B0_fexts.www} in [srcs] minus [.js] files are
        copied over the build directory. If these files are can be rerooted
        to the build dir according to [assets_dir] they are copied as such
        otherwise they are copied
@@ -103,9 +145,8 @@ val web :
 
     See {{!page-TODO.fragments}TODO}. *)
 
-
 val copy_assets :
-  B00.Memo.t -> B00_fexts.map -> exts:B00_fexts.t ->
+  B0_memo.Memo.t -> B0_file_exts.map -> exts:B0_file_exts.t ->
   assets_root:Fpath.t option -> dst:B0_std.Fpath.t -> Fpath.Set.t
 (** [copy_assets m srcs ~exts ~assets_root ~dst] copies [srcs] with
     extensions in [exts] to [dst]. If [assets_root] is specified

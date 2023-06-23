@@ -25,8 +25,7 @@ module V000 : sig
   module Fut = B0_std.Fut
   module Os = B0_std.Os
   module Log = B0_std.Log
-  module Rqueue = B0_std.Rqueue
-  module Bincode = B0_std.Bincode
+  module Random_queue = B0_std.Random_queue
 end
 
 (*---------------------------------------------------------------------------

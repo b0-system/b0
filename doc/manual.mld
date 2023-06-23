@@ -148,7 +148,7 @@ the root scope).
 {3:access Access control and isolation}
 
 At definition time a B0 file can only access definitions that are in
-its own scope or in the scope of the files it [@B00.include]s and
+its own scope or in the scope of the files it [@@@B0.include]s and
 recursively. This means that in any B0 file:
 
 {[
@@ -480,7 +480,7 @@ The syntax of the [#mod_use] directive is:
 
 The semantics is to define a module with the contents of [PATH] at
 that location. The name of the module is defined by
-{{!B00_ocaml.Mod.Name.mangled}mangling} the file name of [PATH].
+{{!B0_ocaml.Mod.Name.mangled}mangling} the file name of [PATH].
 
 For example assuming the [PATH] is [B0/file.ml], the directive expands to:
 

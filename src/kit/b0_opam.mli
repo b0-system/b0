@@ -3,7 +3,7 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-(** B0 [opam] support.
+(** [opam] support.
 
     See the {{!page-opam}B0 [opam] manual} for more details. *)
 

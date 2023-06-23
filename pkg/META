@@ -1,10 +1,5 @@
 description = "Software construction and deployment kit"
 version = "%%VERSION_NUM%%"
-requires = "unix cmdliner b0.std b0.b00 b0.b00.kit"
-archive(byte) = "b0.cma"
-archive(native) = "b0.cmxa"
-plugin(byte) = "b0.cma"
-plugin(native) = "b0.cmxs"
 
 package "std" (
   directory = "std"
@@ -17,47 +12,45 @@ package "std" (
   plugin(native) = "b0_std.cmxs"
 )
 
+package "memo" (
+directory = "memo"
+version = "%%VERSION_NUM%%"
+requires = "unix cmdliner b0.std"
+archive(byte) = "b0_memo.cma"
+archive(native) = "b0_memo.cmxa"
+plugin(byte) = "b0_memo.cma"
+plugin(native) = "b0_memo.cmxs"
+)
 
-package "b00" (
-  directory = "b00"
-  description = "B00 build abstraction"
+package "file" (
+  directory = "file"
+  description = "B0 file support"
   version = "%%VERSION_NUM%%"
-  requires = "unix b0.std"
-  archive(byte) = "b0_b00.cma"
-  archive(native) = "b0_b00.cmxa"
-  plugin(byte) = "b0_b00.cma"
-  plugin(native) = "b0_b00.cmxs"
-
-  package "kit" (
-    directory = "kit"
-    description = "B00 toolkit"
-    version = "%%VERSION_NUM%%"
-    requires = "unix cmdliner b0.std b0.b00"
-    archive(byte) = "b0_b00_kit.cma"
-    archive(native) = "b0_b00_kit.cmxa"
-    plugin(byte) = "b0_b00_kit.cma"
-    plugin(native) = "b0_b00_kit.cmxs"
-  )
+  requires = "unix cmdliner b0.std b0.memo"
+  archive(byte) = "b0_file.cma"
+  archive(native) = "b0_file.cmxa"
+  plugin(byte) = "b0_file.cma"
+  plugin(native) = "b0_file.cmxs"
 )
 
 package "kit" (
   directory = "kit"
   description = "B0 toolkit"
   version = "%%VERSION_NUM%%"
-  requires = "unix cmdliner b0.std b0.b00 b0.b00.kit b0"
+  requires = "unix cmdliner b0.std b0.memo b0.file"
   archive(byte) = "b0_kit.cma"
   archive(native) = "b0_kit.cmxa"
   plugin(byte) = "b0_kit.cma"
   plugin(native) = "b0_kit.cmxs"
 )
 
-package "b0" (
-  directory = "b0"
+package "tool" (
+  directory = "tool"
   description = "b0 tool driver"
   version = "%%VERSION_NUM%%"
-  requires = "unix cmdliner b0.std b0.b00 b0.b00.kit b0 b0.kit"
-   archive(byte) = "b0_b0.cma"
-   archive(native) = "b0_b0.cmxa"
-   plugin(byte) = "b0_b0.cma"
-   plugin(native) = "b0_b0.cmxs"
+  requires = "unix cmdliner b0.std b0.memo b0.file b0.kit"
+  archive(byte) = "b0_tool.cma"
+  archive(native) = "b0_tool.cmxa"
+  plugin(byte) = "b0_tool.cma"
+  plugin(native) = "b0_tool.cmxs"
 )

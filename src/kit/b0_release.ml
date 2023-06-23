@@ -25,16 +25,16 @@ let version_of_pack ?(commit_ish = "HEAD") p =
   match B0_def.scope_dir (B0_pack.def p) with
   | None -> Error "No scope directory for pack"
   | Some dir ->
-      let* vcs = B00_vcs.find ~dir () in
+      let* vcs = B0_vcs.find ~dir () in
       match vcs with
       | None -> Fmt.error "No VCS found in %a" Fpath.pp dir
       | Some vcs ->
-          let* tag = B00_vcs.latest_tag vcs commit_ish in
+          let* tag = B0_vcs.latest_tag vcs commit_ish in
           match tag with
           | Some t -> Ok (String.drop_initial_v t)
           | None ->
               Fmt.error "No annotated tag for %s in %a"
-                commit_ish B00_vcs.pp vcs
+                commit_ish B0_vcs.pp vcs
 
 (* Source archives. *)
 
@@ -90,7 +90,7 @@ let src_archive_url_of_pack ~version p =
       match B0_pack.find_meta B0_meta.homepage p with
       | None -> err ()
       | Some h ->
-          let is_github = match B00_http.Uri.parse_authority h with
+          let is_github = match B0_http.Uri.parse_authority h with
           | None -> false
           | Some auth ->
               match String.split_on_char '.' auth with
@@ -116,7 +116,7 @@ let changes_file_of_pack p = match B0_def.scope_dir (B0_pack.def p) with
 
 let changes_latest_of_file f =
   let* contents = Os.File.read f in
-  Ok (B00_cmark.first_section ~preamble:false contents)
+  Ok (B0_cmark.first_section ~preamble:false contents)
 
 module Cmdlet = struct
 end

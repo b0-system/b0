@@ -6,29 +6,23 @@ open Topkg
 let () =
   Pkg.describe "b0" @@ fun c ->
   Ok [
-    (* B00 libraries *)
+    (* Libraries *)
     Pkg.mllib "src/std/b0_std.mllib" ~dst_dir:"std";
     Pkg.clib "src/std/libb0_stubs.clib" ~lib_dst_dir:"std";
     Pkg.lib "src/std/b0_std_top_init.ml"
       ~dst:"std/b0_std_top_init.ml";
-    Pkg.mllib "src/b00/b0_b00.mllib" ~dst_dir:"b00";
-    Pkg.mllib "src/b00/kit/b0_b00_kit.mllib" ~dst_dir:"b00/kit";
-
-    (* B0 libraries *)
-    Pkg.mllib "src/b0.mllib";
+    Pkg.mllib "src/memo/b0_memo.mllib" ~dst_dir:"memo";
+    Pkg.mllib "src/file/b0_file.mllib" ~dst_dir:"file";
     Pkg.mllib "src/kit/b0_kit.mllib" ~dst_dir:"kit";
 
-    (* b0 & d0 tools *)
-    Pkg.mllib "tool-b0/b0_b0.mllib" ~dst_dir:"b0";
-    Pkg.bin "tool-b0/b0_main_run" ~dst:"b0";
-(*    Pkg.mllib "tool-d0/b0_driver_d0.mllib" ~dst_dir:"driver/d0";
-      Pkg.bin "tool-d0/d0_main_run" ~dst:"b0";
- *)
+    (* b0 tool *)
+    Pkg.mllib "src/tool/b0_tool.mllib" ~dst_dir:"tool";
+    Pkg.bin "src/tool/b0_main_run" ~dst:"b0";
 
     (* Tools *)
-    Pkg.bin "tools/b00_cache" ~dst:"b00-cache";
-    Pkg.bin "tools/b00_log" ~dst:"b00-log";
-    Pkg.bin "tools/b00_hash" ~dst:"b00-hash";
+    Pkg.bin "tools/b0_cache" ~dst:"b0-cache";
+    Pkg.bin "tools/b0_log" ~dst:"b0-log";
+    Pkg.bin "tools/b0_hash" ~dst:"b0-hash";
     Pkg.bin "tools/show_uri" ~dst:"show-uri";
 
     (* Tests *)
@@ -45,7 +39,7 @@ let () =
 
     (* Doc *)
     Pkg.doc "doc/index.mld" ~dst:"odoc-pages/index.mld";
-    Pkg.doc "doc/b00_manual.mld" ~dst:"odoc-pages/b00_manual.mld";
+    Pkg.doc "doc/memo_manual.mld" ~dst:"odoc-pages/memo_manual.mld";
     Pkg.doc "doc/manual.mld" ~dst:"odoc-pages/manual.mld";
     Pkg.doc "doc/driver_dev.mld" ~dst:"odoc-pages/driver_dev.mld";
     Pkg.doc "doc/old_manual.mld" ~dst:"odoc-pages/old_manual.mld";

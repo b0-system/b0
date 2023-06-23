@@ -48,10 +48,9 @@ defining an empty build shell, made of a dummy build procedure and a
 function that produces build units invoking it.
 
 {[
-open B00_kit.V000
+open B0_kit.V000
 open B0_std
 open Fut.Syntax
-open B00_memo
 
 let exe_proc b =
   let m = B0_build.memo b in

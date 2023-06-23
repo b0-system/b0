@@ -4,11 +4,10 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
-open B00
 
 let feedback =
   let show_ui = Log.Error and show_op = Log.Info and level = Log.level () in
-  B00_cli.Memo.pp_leveled_feedback ~show_op ~show_ui ~level
+  B0_cli.Memo.pp_leveled_feedback ~show_op ~show_ui ~level
     Fmt.stderr
 
 let with_memo ?jobs f =
@@ -20,15 +19,16 @@ let with_memo ?jobs f =
   let cache_dir = Fpath.(tmp_dir / "b0-test" / "cache") in
   let trash_dir = Fpath.(tmp_dir / "b0-test" / "trash") in
   let build_dir = Fpath.(tmp_dir / "b0-test") in
-  Result.bind (Memo.memo ~cwd ~cache_dir ~trash_dir ?jobs ~feedback ()) @@
+  Result.bind
+    (B0_memo.Memo.memo ~cwd ~cache_dir ~trash_dir ?jobs ~feedback ()) @@
   fun m ->
   f build_dir m;
-  Memo.stir m ~block:true;
-  begin match Memo.status m with
+  B0_memo.Memo.stir m ~block:true;
+  begin match B0_memo.Memo.status m with
   | Ok () -> ()
-  | Error e -> (B000_conv.Op.pp_aggregate_error ()) Fmt.stderr e
+  | Error e -> (B0_zero_conv.Op.pp_aggregate_error ()) Fmt.stderr e
   end;
-  Log.if_error ~use:() (B00_cli.Memo.Log.(write log_file (of_memo m)));
+  Log.if_error ~use:() (B0_cli.Memo.Log.(write log_file (of_memo m)));
   Ok ()
 
 (*---------------------------------------------------------------------------

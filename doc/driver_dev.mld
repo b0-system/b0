@@ -1,8 +1,8 @@
 {0 B0 driver development manual}
 
-A B0 driver like [b0] or [d0] is an executable that provides a service
-on the definitions of a B0 file. This manual shows how to develop a
-custom driver for B0 files.
+A B0 driver like [b0] is an executable that provides a service on the
+definitions of a B0 file. This manual shows how to develop a custom
+driver for B0 files.
 
 {1:overview Overview}
 
@@ -96,4 +96,4 @@ done.
    auto verify and auto recompile if needed ? This could allow
    to share part of the hash cache in the future.}
 {- Maybe go back to use an ad-hoc stamp for driver compilation rather
-   than use B00 itself.}}
+   than use B0_memo itself.}}

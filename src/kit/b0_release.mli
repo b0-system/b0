@@ -28,9 +28,9 @@ end
 (** {1:version Versions} *)
 
 val version_of_pack :
-  ?commit_ish:B00_vcs.commit_ish -> B0_pack.t -> (string, string) result
+  ?commit_ish:B0_vcs.commit_ish -> B0_pack.t -> (string, string) result
 (** [version_of_pack p] looks for a VCS in the scope directory of [p]
-    and gets its {{!B00_vcs.latest_tag}latest annotated tag} reachable from
+    and gets its {{!B0_vcs.latest_tag}latest annotated tag} reachable from
     [commit_ish] (defaults to ["HEAD"]) and drops an initial ['v'] or
     ['V']. {b TODO.} add a meta key to prevent v drop. *)
 
@@ -83,7 +83,7 @@ val changes_file_of_pack : B0_pack.t -> (Fpath.t option, string) result
 val changes_latest_of_file :
   Fpath.t -> ((string * string) option, string) result
 (** [changes_latest_of_file f] extracts the latest release notes as the
-    {{!B00_cmark.first_section}first markdown section} of file [f]. *)
+    {{!B0_cmark.first_section}first markdown section} of file [f]. *)
 
 (** {1:cmdlets Cmdlets} *)
 

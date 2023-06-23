@@ -1,6 +1,5 @@
 PKG unix cmdliner
 S src/**
-S tool-b0/**
 S tools/**
 S test/**
 S examples/**

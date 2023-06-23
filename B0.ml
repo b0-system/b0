@@ -5,45 +5,36 @@ open B0_kit.V000
 let unix = B0_ocaml.libname "unix"
 let cmdliner = B0_ocaml.libname "cmdliner"
 let b0_std = B0_ocaml.libname "b0.std"
-let b00 = B0_ocaml.libname "b0.b00"
-let b00_kit = B0_ocaml.libname "b0.b00.kit"
-let b0 = B0_ocaml.libname "b0"
+let b0_memo = B0_ocaml.libname "b0.memo"
+let b0_file = B0_ocaml.libname "b0.file"
 let b0_kit = B0_ocaml.libname "b0.kit"
-let b0_b0 = B0_ocaml.libname "b0.b0"
-
-(* B00 libraries *)
-
-let b0_std_lib =
-  let srcs =
-    Fpath.[`Dir_rec (v "src/std");
-           `X (v "src/std/b0_std_top_init.ml")]
-  in
-  let requires = [unix] in
-  B0_ocaml.lib b0_std ~doc:"B00 Stdlib extensions" ~srcs ~requires
-
-let b00_lib =
-  let srcs = Fpath.[`Dir (v "src/b00")] in
-  let requires = [unix; b0_std] in
-  B0_ocaml.lib b00 ~doc:"B00 build API" ~srcs ~requires
-
-let b00_kit_lib =
-  let srcs = Fpath.[`Dir (v "src/b00/kit")] in
-  let requires = [unix; cmdliner; b0_std; b00] in
-  B0_ocaml.lib b00_kit ~doc:"B00 toolkit API" ~srcs ~requires
+let b0_tool = B0_ocaml.libname "b0.tool"
 
 (* B0 libraries *)
 
-let b0_lib =
-  let srcs = Fpath.[`Dir (v "src")] in
-  let requires = [unix; cmdliner; b0_std; b00; b00_kit] in
-  B0_ocaml.lib b0 ~doc:"B0 description API" ~srcs ~requires
+let b0_std_lib =
+  let srcs =
+    Fpath.[`Dir_rec (v "src/std"); `X (v "src/std/b0_std_top_init.ml")]
+  in
+  let requires = [unix] in
+  B0_ocaml.lib b0_std ~doc:"B0 standard needs" ~srcs ~requires
+
+let b0_memo_lib =
+  let srcs = Fpath.[`Dir (v "src/memo")] in
+  let requires = [unix; b0_std] in
+  B0_ocaml.lib b0_memo ~doc:"B0 build library" ~srcs ~requires
+
+let b0_file_lib =
+  let srcs = Fpath.[`Dir (v "src/file")] in
+  let requires = [unix; cmdliner; b0_std; b0_memo] in
+  B0_ocaml.lib b0_file ~doc:"B0 build file library" ~srcs ~requires
 
 let b0_kit_lib =
   let srcs = Fpath.[`Dir (v "src/kit")] in
-  let requires = [unix; cmdliner; b0_std; b00; b00_kit; b0] in
-  B0_ocaml.lib b0_kit ~doc:"B0 toolkit API" ~srcs ~requires
+  let requires = [unix; cmdliner; b0_std; b0_memo; b0_file] in
+  B0_ocaml.lib b0_kit ~doc:"B0 toolkit library" ~srcs ~requires
 
-(* B0 tool *)
+(* The b0 tool *)
 
 let bootstrap_env boot_root =
   let env = Os.Env.current () |> Log.if_error ~use:Os.Env.empty in
@@ -52,14 +43,14 @@ let bootstrap_env boot_root =
   |> Os.Env.add "B0_DRIVER_BOOTSTRAP" (Fpath.to_string boot_root)
   |> Os.Env.to_assignments
 
-let b0_b0_lib =
-  let srcs = Fpath.[`Dir (v "tool-b0"); `X (v "tool-b0/b0_main_run.ml")] in
-  let requires = [unix; cmdliner; b0_std; b00; b00_kit; b0; b0_kit] in
-  B0_ocaml.lib b0_b0 ~doc:"b0 tool driver library" ~srcs ~requires
+let b0_tool_lib =
+  let srcs = Fpath.[`Dir (v "src/tool"); `X (v "src/tool/b0_main_run.ml")] in
+  let requires = [unix; cmdliner; b0_std; b0_memo; b0_file; b0_kit] in
+  B0_ocaml.lib b0_tool ~doc:"b0 tool driver library" ~srcs ~requires
 
-let b0_tool =
-  let srcs = Fpath.[`File (v "tool-b0/b0_main_run.ml")] in
-  let requires = [b0; b0_b0] in
+let b0 =
+  let srcs = Fpath.[`File (v "src/tool/b0_main_run.ml")] in
+  let requires = [b0_file; b0_tool] in
   let meta =
     let env b u =
       (* FIXME need to access the root of the build. *)
@@ -68,26 +59,26 @@ let b0_tool =
     B0_meta.empty
     |> B0_meta.add B0_unit.Action.exec_env env
   in
-  B0_ocaml.exe "b0" ~name:"b0-exe" ~doc:"The b0 tool" ~srcs ~requires ~meta
+  B0_ocaml.exe "b0" ~doc:"The b0 tool" ~srcs ~requires ~meta
 
-(* Low-level B00 tools units *)
+(* Low-level B0 tools *)
 
-let b00_tool n ~doc file =
-  let requires = [cmdliner; b0_std; b00; b00_kit] in
+let tool_exe n ~doc file =
+  let requires = [cmdliner; b0_std; b0_memo; b0_file; b0_kit] in
   let srcs = Fpath.[`File (v "tools" / file)] in
   B0_ocaml.exe n ~doc ~srcs ~requires
 
-let b00_cache_tool =
-  b00_tool "b00-cache" ~doc:"Operate on b0 caches" "b00_cache.ml"
+let b0_cache_tool =
+  tool_exe "b0-cache" ~doc:"Operate on b0 caches" "b0_cache.ml"
 
-let b00_hash_tool =
-  b00_tool "b00-hash" ~doc:"Hash like b0" "b00_hash.ml"
+let b0_hash_tool =
+  tool_exe "b0-hash" ~doc:"Hash like b0" "b0_hash.ml"
 
-let b00_log_tool =
-  b00_tool "b00-log" ~doc:"Operate on b0 logs" "b00_log.ml"
+let b0_log_tool =
+  tool_exe "b0-log" ~doc:"Operate on b0 logs" "b0_log.ml"
 
 let show_uri_tool =
-  b00_tool "show-uri" ~doc:"Show URIs in web browsers" "show_uri.ml"
+  tool_exe "show-uri" ~doc:"Show URIs in web browsers" "show_uri.ml"
 
 (* Tests *)
 
@@ -96,7 +87,9 @@ let test_exe ?(requires = []) ?(more_srcs = []) file ~doc =
   let file = Fpath.v file in
   let more_srcs = List.map (fun v -> test_src (Fpath.v v)) more_srcs in
   let srcs = (test_src file) :: more_srcs in
-  let requires = b0_std :: b00 :: b00_kit :: cmdliner :: requires in
+  let requires =
+    b0_std :: b0_memo :: b0_file :: b0_kit :: cmdliner :: requires
+  in
   B0_ocaml.exe (Fpath.basename ~no_ext:true file) ~doc ~srcs ~requires
 
 let test_memo ?requires ?(more_srcs = []) file ~doc =
@@ -109,9 +102,9 @@ let test =
 
 let test_cp = test_exe "test_cp.ml" ~doc:"Test for Os.Path.copy"
 let test_rm = test_exe "test_rm.ml" ~doc:"Test for Os.Path.delete"
-let test_findex = test_exe "test_findex.ml" ~doc:"Test for B00_findex"
+let test_findex = test_exe "test_findex.ml" ~doc:"Test for B0_findex"
 let test_memo_failure =
-  test_memo "test_memo_failures.ml" ~doc:"Tests some failures of B00.Memo."
+  test_memo "test_memo_failures.ml" ~doc:"Tests some failures of B0_memo.Memo."
 
 let test_memo_no_write =
   test_memo "test_memo_no_write.ml" ~doc:"???"
@@ -120,25 +113,24 @@ let test_memo_redir =
   test_memo "test_memo_redir.ml" ~doc:"Test memo spawn stdio redirection"
 
 let test_ocaml_cobj_defs =
-  test_exe "test_ocaml_cobj_defs.ml" ~doc:"Test B00_ocaml.Cobj.of_string"
+  test_exe "test_ocaml_cobj_defs.ml" ~doc:"Test B0_ocaml.Cobj.of_string"
 
 let test_b0_file =
-  let requires = [b0] in
+  let requires = [b0_memo] in
   test_exe "test_b0_file.ml" ~requires ~doc:"Test B0_file module"
 
 (* Packs *)
 
-let b00_pack =
-  B0_pack.v "b00" ~doc:"The B00 subsystem" ~locked:true @@
-  [b0_std_lib; b00_lib; b00_kit_lib]
+let b0_pack =
+  B0_pack.v "b0" ~doc:"The B0 libraries" ~locked:true @@
+  [b0_std_lib; b0_memo_lib; b0_file_lib; b0_kit_lib]
 
 let tool_pack =
-  B0_pack.v "b00-tools" ~doc:"The low-level B00 tools" ~locked:false @@
-  [b00_cache_tool; b00_hash_tool; b00_log_tool; show_uri_tool]
+  B0_pack.v "b0-tools" ~doc:"The low-level B0 tools" ~locked:false @@
+  [b0_cache_tool; b0_hash_tool; b0_log_tool; show_uri_tool]
 
 let driver_pack =
-  B0_pack.v "b0-drivers" ~doc:"The B0 drivers" ~locked:false @@
-  [b0_tool]
+  B0_pack.v "b0-drivers" ~doc:"The B0 drivers" ~locked:false @@ [b0]
 
 let default =
   let meta =

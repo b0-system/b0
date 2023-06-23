@@ -118,7 +118,7 @@ module Outcome : sig
 end
 
 val make :
-  ?vcs:B00_vcs.t -> ?log_absolute:bool -> ?log_diffs:bool ->
+  ?vcs:B0_vcs.t -> ?log_absolute:bool -> ?log_diffs:bool ->
   B0_cmdlet.Env.t -> base:Fpath.t -> t
 (** [make env ~base] is a test context in environment [env] with:
 
@@ -133,7 +133,7 @@ val make :
        outcomes.}
     {- [log_absolute], if [false] (default) paths are logged relative
        to the cwd of [env]. If [true] all paths are made absolute.}
-    {- [vcs] is the VCS to use. By default looked up with {!B00_vcs.t}
+    {- [vcs] is the VCS to use. By default looked up with {!B0_vcs.t}
        in {!B0_cmdlet.Env.scope_dir}.}}
 
     Raises {!Abort} if VCS detection fails. *)
@@ -160,7 +160,7 @@ val log_absolute : t -> bool
 val log_diffs : t -> bool
 (** [log_diffs ctx] is [true] if unexpected and new outcomes log diffs. *)
 
-val vcs : t -> B00_vcs.t
+val vcs : t -> B0_vcs.t
 (** [vcs ctx] is the VCS used for operating the expectation files. *)
 
 val outcomes : t -> Outcome.t list

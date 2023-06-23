@@ -17,12 +17,12 @@ let urify u = (* Detects if u is simply a file path and urifies it *)
   Ok (file_uri Fpath.(cwd // p))
 
 let show_uris tty_cap log_level background prefix browser uris =
-  let tty_cap = B00_cli.B0_std.get_tty_cap tty_cap in
-  let log_level = B00_cli.B0_std.get_log_level log_level in
-  B00_cli.B0_std.setup tty_cap log_level ~log_spawns:Log.Debug;
+  let tty_cap = B0_cli.B0_std.get_tty_cap tty_cap in
+  let log_level = B0_cli.B0_std.get_log_level log_level in
+  B0_cli.B0_std.setup tty_cap log_level ~log_spawns:Log.Debug;
   Log.if_error ~use:1 @@
-  let* browser = B00_www_browser.find ~browser () in
-  let open_uri u = B00_www_browser.show ~background ~prefix browser (urify u) in
+  let* browser = B0_web_browser.find ~browser () in
+  let open_uri u = B0_web_browser.show ~background ~prefix browser (urify u) in
   let rec loop = function
   | [] -> Ok 0
   | u :: us -> let* () = open_uri u in loop us
@@ -56,11 +56,11 @@ let uris =
 let tool =
   Cmd.v (Cmd.info "show-uri" ~version ~doc ~sdocs ~exits ~man)
     Term.(const show_uris $
-          B00_cli.B0_std.tty_cap ~docs:sdocs () $
-          B00_cli.B0_std.log_level ~docs:sdocs () $
-          B00_www_browser.background ~opts:["g"; "background"] () $
-          B00_www_browser.prefix ~opts:["p"; "prefix"] () $
-          B00_www_browser.browser ~opts:["b"; "browser"] () $ uris)
+          B0_cli.B0_std.tty_cap ~docs:sdocs () $
+          B0_cli.B0_std.log_level ~docs:sdocs () $
+          B0_web_browser.background ~opts:["g"; "background"] () $
+          B0_web_browser.prefix ~opts:["p"; "prefix"] () $
+          B0_web_browser.browser ~opts:["b"; "browser"] () $ uris)
 
 let main () = exit (Cmd.eval' tool)
 let () = if !Sys.interactive then () else main ()

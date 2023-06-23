@@ -6,7 +6,7 @@
 open B0_std
 open B0_std.Result.Syntax
 
-let () = B0_def.Scope.lib "opam"
+let () = B0_def.Scope.open_lib "opam"
 
 let collect_results rs =
   let rec loop ok err = function
@@ -234,7 +234,7 @@ module Meta = struct
     in
     let contents = Os.File.read file |> Log.if_error ~use:"" in
     let convert (t, d) = syn_of_title t, descr_of_section d in
-    Option.map convert (B00_cmark.first_section ~preamble:true contents)
+    Option.map convert (B0_cmark.first_section ~preamble:true contents)
 
   let derive_synopsis_and_description p m =
     match B0_meta.(mem synopsis m, mem description m) with
@@ -269,7 +269,7 @@ module Meta = struct
            package membership. Also this makes dependencies on self at the
            moment. Also we can easily derive {build} and {test} deps by
            looking up unit tags. *)
-        List.rev_map (fun l -> B00_ocaml.Lib.Name.last l) libs
+        List.rev_map (fun l -> B0_ocaml.Lib.Name.last l) libs
     in
     let pkg_deps = List.concat_map unit_pkg_deps (B0_pack.units p) in
     let pkg_deps = List.map (fun n -> n, "") (String.distinct pkg_deps) in
@@ -381,10 +381,10 @@ end
 (* .opam.list cmdlet *)
 
 let list_cmdlet env pkgs format =
-  Log.if_error ~use:B00_cli.Exit.no_such_name @@
+  Log.if_error ~use:B0_cli.Exit.no_such_name @@
   let* pkg_packs = Pkg.get_list_or_hints pkgs in
   match pkg_packs with
-  | [] -> Ok B00_cli.Exit.ok
+  | [] -> Ok B0_cli.Exit.ok
   | ps ->
       let pp_normal ppf pkg =
         Fmt.pf ppf "@[<h>%a %s@]" Pkg.pp_name pkg (B0_pack.name (Pkg.pack pkg))
@@ -393,7 +393,7 @@ let list_cmdlet env pkgs format =
       | `Short -> Pkg.pp_name | `Normal | `Long -> pp_normal
       in
       Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_pkg) ps);
-      Ok B00_cli.Exit.ok
+      Ok B0_cli.Exit.ok
 
 (* .opam.file cmdlet *)
 
@@ -404,7 +404,7 @@ let lint_files ~normalize pkgs =
   in
   let* _ = collect_results (List.map lint pkgs) in
   Log.app (fun m -> m "%a" (Fmt.tty_string [`Fg `Green]) "Passed.");
-  Ok B00_cli.Exit.ok
+  Ok B0_cli.Exit.ok
 
 let gen_files pkgs ~normalize ~with_name ~dst =
   let gen_file ~normalize ~with_name ~dst pkg =
@@ -429,10 +429,10 @@ let gen_files pkgs ~normalize ~with_name ~dst =
   in
   let gen = gen_file ~normalize ~with_name ~dst in
   let* () = list_iter_stop_on_error gen pkgs in
-  Ok B00_cli.Exit.ok
+  Ok B0_cli.Exit.ok
 
 let file_cmdlet env constraints pkgs lint raw dst in_scope no_name =
-  Log.if_error ~use:B00_cli.Exit.no_such_name @@
+  Log.if_error ~use:B0_cli.Exit.no_such_name @@
   let action =
     if lint then `Lint else
     if in_scope then `Gen `In_scope else
@@ -445,9 +445,9 @@ let file_cmdlet env constraints pkgs lint raw dst in_scope no_name =
   match pkgs with
   | [] ->
       Log.warn (fun m -> m "No opam packages found in B0 root.");
-      Ok B00_cli.Exit.ok
+      Ok B0_cli.Exit.ok
   | ps ->
-      Log.if_error' ~use:B00_cli.Exit.some_error @@
+      Log.if_error' ~use:B0_cli.Exit.some_error @@
       let normalize = not raw in
       match action with
       | `Lint -> lint_files ~normalize pkgs
@@ -459,12 +459,13 @@ let file_cmdlet env constraints pkgs lint raw dst in_scope no_name =
 
 (* Github pull requests
 
-   N.B. though maybe not full general,this is largely independent from
-   b0_opam, we could consider moving it to a B00_github.Pr module. *)
+   N.B. though maybe not full general, this is largely independent
+   from b0_opam, we could consider moving it to a B0_github.Pr
+   module. *)
 
 module Github_pr = struct
-  open B00_serialk_json
-  open B00_github
+  open B0_json
+  open B0_github
 
   let info =
     let info url id = url, id in
@@ -697,7 +698,7 @@ module Publish = struct
     | None -> Ok csum | Some (csum, _) -> Ok csum
 
   let add_url_checksums httpr shasum ~check_only is =
-    let open B00_http in
+    let open B0_http in
     let add csum i = add_url_csum (Fmt.str "sha%s=%s" shasum_algo csum) i in
     let add_url (acc, is) i = match String.Map.find_opt i.url acc with
     | Some csum -> acc, add csum i :: is
@@ -740,18 +741,18 @@ module Publish = struct
     m "%a" (Fmt.tty_string [`Fg `Green]) "All checks succeeded"
 
   let stdout_logging () =
-    (* Bof bof, maybe we should rather have something in B00_vcs.t *)
+    (* Bof bof, maybe we should rather have something in B0_vcs.t *)
     if Log.level () >= Log.Info then None, None else
     Some Os.Cmd.out_null, Some Os.Cmd.out_null
 
   let rec get_updated_local_repo git ~pkgs_repo ~local_repo:dir =
     let stdout, stderr = stdout_logging () in
     let master = "master" in
-    let* local = B00_vcs.Git.find ~dir () in
+    let* local = B0_vcs.Git.find ~dir () in
     match local with
     | Some repo ->
         Log.app (fun m -> m "Updating %a" Fpath.pp dir);
-        let git = B00_vcs.repo_cmd repo in
+        let git = B0_vcs.repo_cmd repo in
         let fetch = Cmd.(atom "fetch" % "origin" % master) in
         let* () = Os.Cmd.run ?stdout ?stderr Cmd.(git %% fetch) in
         Ok repo
@@ -771,7 +772,7 @@ module Publish = struct
     let fetch_head = Some "FETCH_HEAD" and force = true in
     Log.app (fun m -> m "Branching %s…" branch);
     Result.join @@
-    B00_vcs.Git.with_transient_checkout
+    B0_vcs.Git.with_transient_checkout
       ?stdout ?stderr repo ~force ~branch fetch_head
     @@ fun r ->
     let rec add_pkgs ~base_dir acc = function
@@ -785,26 +786,26 @@ module Publish = struct
         | Error _ as e -> e
         | Ok () -> add_pkgs ~base_dir (file :: acc) is
     in
-    let base_dir = Fpath.(B00_vcs.work_dir r / pkgs_dir) in
+    let base_dir = Fpath.(B0_vcs.work_dir r / pkgs_dir) in
     let* files = add_pkgs ~base_dir [] is in
     (* XXX at that point once we get a usable opam admin add-constraint
        use appropriately with _incs, see
        https://github.com/ocaml/opam/issues/3077 *)
     let msg = msg_title is in
-    let* () = B00_vcs.Git.add ?stdout ?stderr r ~force:false files in
-    let* () = B00_vcs.commit_files ?stdout ?stderr ~msg r files in
+    let* () = B0_vcs.Git.add ?stdout ?stderr r ~force:false files in
+    let* () = B0_vcs.commit_files ?stdout ?stderr ~msg r files in
     Ok ()
 
   let github_auth_env ~github_auth:a =
     let* e = Os.Env.current () in
-    let e = Os.Env.add "B0_GITHUB_USER" (B00_github.Auth.user a) e in
-    let e = Os.Env.add "B0_GITHUB_TOKEN" (B00_github.Auth.token a) e in
+    let e = Os.Env.add "B0_GITHUB_USER" (B0_github.Auth.user a) e in
+    let e = Os.Env.add "B0_GITHUB_TOKEN" (B0_github.Auth.token a) e in
     Ok (Os.Env.to_assignments e)
 
   let push_branch ~github_auth ~local_repo ~branch ~fork_repo  =
     Log.app (fun m -> m "Pushing %s on %s" branch fork_repo);
     let stdout, stderr = stdout_logging () in
-    let repo_cmd = B00_vcs.repo_cmd local_repo in
+    let repo_cmd = B0_vcs.repo_cmd local_repo in
     let env_creds = (* XXX Windows :-( ? *)
       "!f() { echo \"username=${B0_GITHUB_USER}\n\
                      password=${B0_GITHUB_TOKEN}\"; }; f"
@@ -814,7 +815,7 @@ module Publish = struct
     let* env = github_auth_env ~github_auth in
     let src = branch and dst = branch in
     let remote = fork_repo in
-    B00_vcs.Git.remote_branch_push
+    B0_vcs.Git.remote_branch_push
       ?stdout ?stderr local_repo ~env ~force:true ~src ~remote ~dst
 
   let pkgs
@@ -825,9 +826,9 @@ module Publish = struct
        m "@[<v>Incompatibility statements unsupported for now. Ignored.@,\
           See https://github.com/ocaml/opam/issues/3077@]"
     end;
-    let* httpr = B00_http.Httpr.get_curl () in
+    let* httpr = B0_http.Httpr.get_curl () in
     let* shasum = Os.Cmd.get (Cmd.atom "shasum") in
-    let* git = B00_vcs.Git.get_cmd () in
+    let* git = B0_vcs.Git.get_cmd () in
     let* is = collect_results (List.map info_of_pkg pkgs) in
     let title, msg = msg_for_publish is incompats in
     log_start is incompats check_only;
@@ -852,17 +853,17 @@ let publish_cmdlet
     env pkgs_dir pkgs_repo fork_repo local_repo github_auth
     constraints pkgs incompats check_only no_pr
   =
-  Log.if_error ~use:B00_cli.Exit.no_such_name @@
+  Log.if_error ~use:B0_cli.Exit.no_such_name @@
   let pkgs = List.map Publish.split_version pkgs in
   let* ps = Pkg.get_unique_list_or_hints ~constraints (List.map fst pkgs) in
   match ps with
   | [] ->
       Log.app (fun m -> m "No opam package to publish in B0 root.");
-      Ok B00_cli.Exit.ok
+      Ok B0_cli.Exit.ok
   | ps ->
       let add_version p = p, Option.join (List.assoc_opt (Pkg.name p) pkgs) in
       let pkgs = List.map add_version (List.sort compare ps) in
-      Log.if_error' ~use:B00_cli.Exit.some_error @@
+      Log.if_error' ~use:B0_cli.Exit.some_error @@
       let* local_repo = match local_repo with
       | Some d -> Ok d
       | None ->
@@ -873,14 +874,14 @@ let publish_cmdlet
       let fork_repo = match fork_repo with
       | Some url -> url
       | None ->
-          let user = B00_github.Auth.user github_auth in
+          let user = B0_github.Auth.user github_auth in
           Fmt.str "https://github.com/%s/opam-repository" user
       in
       let* () =
         Publish.pkgs ~pkgs_dir ~pkgs_repo ~fork_repo ~local_repo ~github_auth
           pkgs incompats check_only no_pr
       in
-      Ok B00_cli.Exit.ok
+      Ok B0_cli.Exit.ok
 
 (* Cmdlets cli interfaces *)
 
@@ -899,13 +900,13 @@ module Cmdlet = struct
       "If an opam package is defined by more than one pack use the \
        definition by pack $(docv)."
     in
-    B0_cli.Arg.packs ~doc ()
+    B0_cli.packs ~doc ()
 
   let list =
     B0_cmdlet.v "list" ~doc:"List opam packages and their defining packs" @@
     fun env args ->
     let pkgs = pkgs ~doc:"Only list opam package $(docv) (repeatable)." () in
-    let format = B00_cli.Arg.output_format () in
+    let format = B0_cli.output_format () in
     let list = Term.(const list_cmdlet $ const env $ pkgs $ format) in
     B0_cmdlet.eval ~man env args list
 
@@ -918,7 +919,7 @@ module Cmdlet = struct
     in
     let dst =
       let doc = "Write files in directory $(docv)." in
-      Arg.(value & opt (some ~none:"stdout" B00_cli.fpath) None &
+      Arg.(value & opt (some ~none:"stdout" B0_cli.fpath) None &
            info ["d"; "dir"] ~doc ~docv:"DIR")
     in
     let in_scope =
@@ -969,10 +970,10 @@ module Cmdlet = struct
       let doc = "The directory to the local (shallow and bare) clone of \
                  the package repository." in
       let none = "$(b,XDG_CACHE_HOME)/opam-repository.git" in
-      Arg.(value & opt (some ~none B00_cli.fpath) None &
+      Arg.(value & opt (some ~none B0_cli.fpath) None &
            info ["local-repo"] ~doc ~docv:"DIR")
     in
-    let github_auth = B00_github.Auth.cli () in
+    let github_auth = B0_github.Auth.cli () in
     let pkgs =
       let doc = "Only publish opam package $(docv) at version $(i,VERSION)
                  (repeatable)." in
@@ -1002,7 +1003,7 @@ module Cmdlet = struct
             fork_repo $ local_repo $ github_auth $ constraints () $
             pkgs $ incompats $ check_only $ no_pr)
     in
-    let envs = B00_github.Auth.envs in
+    let envs = B0_github.Auth.envs in
     let man = [ `S Cmdliner.Manpage.s_description;
                 `P "$(mname) publishes opam package on GitHub.";
                 `P "If you want to inspect the $(b,opam) file before \
