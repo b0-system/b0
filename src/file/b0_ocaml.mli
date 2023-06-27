@@ -699,13 +699,17 @@ v}
 {[
 ocamlfind query LIB -predicates byte,native -format "%m:%d:%A:%(requires)"
 ]}
-      to derive a {!Lib.t} value. This may fail on certain libraries. In
-      particular it assumes a one-to-one map between [ocamlfind] package
-      names and library names and that the archives are in the library
-      directory. Also the [ocaml.threads], [threads] and [threads.posix]
-      libraries are treated specially, the all lookup the latter and
-      [mt,mt_posix] is added to the predicates. [threads.vm] is unsupported
-      (but deprecated anyways). *)
+        to derive a {!Lib.t} value. This may fail on certain libraries. In
+        particular it assumes a one-to-one map between [ocamlfind] package
+        names and library names and that the archives are in the library
+        directory.
+
+        Also the [ocaml.threads], [threads] and [threads.posix]
+        libraries are treated specially: they all lookup
+        [threads.posix] with predicates [mt,mt_posix] on OCaml < 5.0.0
+        and simply [threads] otherwise. [threads.vm] is unsupported
+        (but deprecated anyways). *)
+
 
     (** {1:resolver Resolver} *)
 

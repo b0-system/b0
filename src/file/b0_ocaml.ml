@@ -812,12 +812,14 @@ module Lib = struct
          FIXME post exec is still super messy, check if we can make it
          to use Memo.t *)
 
-      let write_info m n ~o =
+      let write_info conf m n ~o =
         (* FIXME better [n] not found error *)
         let ocamlfind = B0_memo.Memo.tool m tool in
         let lib, predicates = match Name.to_string n with
         | "ocaml.threads" | "threads" | "threads.posix" ->
-            "threads.posix", "byte,native,mt,mt_posix"
+            if Conf.version conf < (5, 0, 0, None)
+            then "threads.posix", "byte,native,mt,mt_posix"
+            else "threads", "byte,native"
         | n -> n, "byte,native"
         in
         let post_exec op = match B0_zero.Op.status op with
@@ -862,7 +864,7 @@ module Lib = struct
         let clib_ext = Conf.lib_ext conf in
         let fname = Fmt.str "ocamlfind.%s" (Name.to_string n) in
         let o = Fpath.(cache_dir / fname) in
-        write_info m n ~o;
+        write_info conf m n ~o;
         read_info m clib_ext n o
 
       let suggest conf m n = Fut.return None

@@ -1,6 +1,4 @@
 open B0_kit.V000
-open B0_std
-
 
 let threads = B0_ocaml.libname "threads"
 let test =
