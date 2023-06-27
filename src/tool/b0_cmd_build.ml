@@ -41,7 +41,7 @@ let tool_lookup ~may_build ~must_build ~env =
     B0_unit.Set.fold add_unit (B0_unit.Set.union may_build must_build)
     String.Map.empty
   in
-  let lookup = B0_memo.Memo.tool_lookup_of_os_env env in
+  let lookup = B0_memo.tool_lookup_of_os_env env in
   (* We first look into the build and then in [m]'s environment. *)
   fun m t -> match String.Map.find_opt (Fpath.to_string t) tool_name_map with
   | None -> lookup m t
@@ -66,7 +66,7 @@ let memo c ~may_build ~must_build =
   in
   let* env = Os.Env.current () in
   let tool_lookup = tool_lookup ~may_build ~must_build ~env in
-  B0_memo.Memo.memo
+  B0_memo.make
     ~hash_fun ~cwd ~tool_lookup ~env ~cache_dir ~trash_dir ~jobs ~feedback ()
 
 let units_of ~units ~packs =
@@ -334,12 +334,11 @@ let term =
   Term.(const build $ what $ lock $ units $ packs $ x_units $ x_packs $
         output_action_path $ action $ args)
 
-
 let cmd =
   let doc = "Build and run actions (default command)" in
   let sdocs = Manpage.s_common_options in
   let exits = B0_driver.Exit.infos in
-  let envs = B0_pager.envs () in
+  let envs = B0_pager.Env.infos in
   let man_xrefs = [ `Main ] in
   let man = [
     `S Manpage.s_synopsis;

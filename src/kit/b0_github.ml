@@ -144,20 +144,22 @@ end
 
 (* GitHub API queries *)
 
-let v4_api_uri = "https://api.github.com/graphql"
-let v3_api_uri = "https://api.github.com"
+let v4_api_url = "https://api.github.com/graphql"
+let v3_api_url = "https://api.github.com"
 
-let resp_success auth req resp = match Http.resp_status resp with
-| 200 | 201 -> Json.of_string (Http.resp_body resp)
-| 401 ->
-    Fmt.error "GitHub authentication failure on %s.\n\
-               Are you sure the token in %a\n\
-               is valid for user '%s' and has scope '%s' ?\n"
-      (Http.req_uri req) Auth.pp_token_src auth.Auth.token_src
-      auth.Auth.user Auth.token_scope
-| st ->
-    Fmt.error "GitHub API request returned unexpected status %d for %s on %s"
-      st (Http.meth_to_string @@ Http.req_meth req) (Http.req_uri req)
+let response_success auth request response =
+  match Http.Response.status response with
+  | 200 | 201 -> Json.of_string (Http.Response.body response)
+  | 401 ->
+      Fmt.error "GitHub authentication failure on %s.\n\
+                 Are you sure the token in %a\n\
+                 is valid for user '%s' and has scope '%s' ?\n"
+        (Http.Request.url request) Auth.pp_token_src auth.Auth.token_src
+        auth.Auth.user Auth.token_scope
+  | st ->
+      Fmt.error "GitHub API request returned unexpected status %d for %s on %s"
+        st (Http.method_to_string (Http.Request.method' request))
+        (Http.Request.url request)
 
 type content_type = string
 let content_type c = ("Content-Type", c)
@@ -176,10 +178,10 @@ let req_json_v3 ?(headers = []) http auth ~path m body =
   | `Other (c, body) -> (content_type c) :: headers, body
   | `Empty -> headers, ""
   in
-  let uri = v3_api_uri ^ path in
-  let req = Http.req ~uri m ~headers ~body in
-  let resp = Httpr.perform http req in
-  Result.bind resp @@ fun resp -> resp_success auth req resp
+  let url = v3_api_url ^ path in
+  let request = Http.Request.v ~url m ~headers ~body in
+  let* response = Http_client.request http request in
+  response_success auth request response
 
 let query_v4 http auth q =
   let req_v4_headers auth = ["Authorization",
@@ -187,9 +189,9 @@ let query_v4 http auth q =
   let query = Jsong.(obj |> mem "query" (string q) |> obj_end) in
   let headers = req_v4_headers auth in
   let body = Jsong.to_string query in
-  let req = Http.req ~uri:v4_api_uri `POST ~headers ~body in
-  let resp = Httpr.perform http req in
-  Result.bind resp @@ fun resp -> resp_success auth req resp
+  let request = Http.Request.v ~url:v4_api_url `POST ~headers ~body in
+  let* response = Http_client.request http request in
+  response_success auth request response
 
 (* Higher-level interfaces *)
 
@@ -198,7 +200,7 @@ module Repo = struct
   let v ~owner name = { owner; name }
   let of_url url =
     let err () = Fmt.error "%S: Can't parse GitHub owner and repo." url in
-    match Uri.parse_path_and_query url with
+    match Url.path_and_query url with
     | None -> err ()
     | Some p ->
         match String.split_on_char '/' p with
@@ -270,18 +272,18 @@ module Issue = struct
   (* Requests *)
 
   let list http auth repo =
-    let resp = Repo.query_v4 http auth repo issue_list_gql in
-    Result.bind resp (Jsonq.query issue_list_q)
+    let* resp = Repo.query_v4 http auth repo issue_list_gql in
+    Jsonq.query issue_list_q resp
 
   let create http auth repo ~title ~body () =
     let body = `Json (create_g ~title ~body) in
-    let resp = Repo.req_json_v3 http auth repo ~path:"/issues" `POST body in
-    Result.bind resp (Jsonq.query issue_id_q)
+    let* resp = Repo.req_json_v3 http auth repo ~path:"/issues" `POST body in
+    Jsonq.query issue_id_q resp
 
   let close http auth repo num =
     let path = Fmt.str "/issues/%d" num in
-    let resp = Repo.req_json_v3 http auth repo ~path `PATCH (`Json close_g) in
-    Result.bind resp (Jsonq.query issue_id_q)
+    let* resp = Repo.req_json_v3 http auth repo ~path `PATCH (`Json close_g) in
+    Jsonq.query issue_id_q resp
 end
 
 module Release = struct
@@ -297,6 +299,7 @@ module Release = struct
   let html_url r = r.html_url
   let assets_url r = r.assets_url
 
+  let pp_short ppf i = Fmt.pf ppf "@[%s %s@]" i.tag_name i.html_url
   let pp =
     Fmt.record @@
     [ Fmt.field "id" id Fmt.int;
@@ -304,9 +307,6 @@ module Release = struct
       Fmt.field "body" body Fmt.string;
       Fmt.field "html_url" html_url Fmt.string;
       Fmt.field "assets_url" assets_url Fmt.string; ]
-
-
-  let pp_short ppf i = Fmt.pf ppf "@[%s %s@]" i.tag_name i.html_url
 
   (* JSON *)
 
@@ -322,19 +322,19 @@ module Release = struct
 
   let create http auth repo ~tag_name ~body () =
     let body = `Json (create_g ~tag_name ~body) in
-    let resp = Repo.req_json_v3 http auth repo ~path:"/releases" `POST body in
-    Result.bind resp (Jsonq.query release_q)
+    let* resp = Repo.req_json_v3 http auth repo ~path:"/releases" `POST body in
+    Jsonq.query release_q resp
 
   let get http auth repo ~tag_name () =
     let path = Fmt.str "/releases/tags/%s" tag_name in
-    let resp = Repo.req_json_v3 http auth repo ~path `GET `Empty in
-    Result.bind resp (Jsonq.query release_q)
+    let* resp = Repo.req_json_v3 http auth repo ~path `GET `Empty in
+    Jsonq.query release_q resp
 
   let upload_asset http auth repo r ~content_type ~name asset =
     let path = Fmt.str "%s?name=%s" r.assets_url name in
     let body = `Other (content_type, asset) in
-    let resp = Repo.req_json_v3 http auth repo ~path `POST body in
-    Result.bind resp (fun _ -> Ok ())
+    let* resp = Repo.req_json_v3 http auth repo ~path `POST body in
+    Ok ()
 end
 
 module Pages = struct
@@ -349,8 +349,8 @@ module Pages = struct
   let nojekyll = update ~src:(Some Fpath.null) (Fpath.v ".nojekyll")
 
   let fetch_branch r ~log ~remote ~branch =
-    let exists = B0_vcs.Git.remote_branch_exists r ~remote ~branch in
-    Result.bind exists @@ function
+    let* exists = B0_vcs.Git.remote_branch_exists r ~remote ~branch in
+    match exists with
     | false -> Ok None
     | true ->
         Log.msg log begin fun m ->
@@ -390,12 +390,12 @@ module Pages = struct
     | [] -> do_commit r ~log ~amend ~msg
     | u :: us ->
         match u.src with
-        | None -> (rm u.dst |> Result.to_failure); loop r us
+        | None -> (rm u.dst |> Result.error_to_failure); loop r us
         | Some src ->
-            (rm u.dst |> Result.to_failure);
+            (rm u.dst |> Result.error_to_failure);
             (cp r ~follow_symlinks:u.follow_symlinks src u.dst
-             |> Result.to_failure);
-            (B0_vcs.Git.add r ~force:false [u.dst] |> Result.to_failure);
+             |> Result.error_to_failure);
+            (B0_vcs.Git.add r ~force:false [u.dst] |> Result.error_to_failure);
             loop r us
     in
     try loop r us with
@@ -417,8 +417,8 @@ module Pages = struct
       Result.bind (B0_vcs.Git.branch_delete r ~stdout ~force ~branch:ubr) @@
       fun () -> Ok commited
     in
-    Result.bind (B0_vcs.Git.check_kind r) @@ fun () ->
-    Result.bind (fetch_branch r ~log ~remote ~branch:br) @@ fun cish ->
+    let* () = B0_vcs.Git.check_kind r in
+    let* cish = fetch_branch r ~log ~remote ~branch:br in
     match
       update_in_branch r ~log ~amend ~force ~branch:ubr cish ~msg us
     with
@@ -432,4 +432,71 @@ module Pages = struct
         with
         | Error _ as e -> ignore (cleanup ~commited:true r); e
         | Ok () -> cleanup ~commited:true r
+end
+
+module Pull_request = struct
+  let info =
+    let info url id = url, id in
+    Jsonq.(succeed info $ mem "html_url" string $ mem "number" int)
+
+  let head_of_src ~src_repo ~src_branch =
+    Fmt.str "%s:%s" (Repo.owner src_repo) src_branch
+
+  let find httpr ~auth ~dst_repo ~dst_branch ~src_repo ~src_branch =
+    let params = (* not escaping :-( but these should be US-ASCII ids. *)
+      Fmt.str "?state=open&head=%s&base=%s"
+        (head_of_src ~src_repo ~src_branch) dst_branch
+    in
+    let path = Fmt.str "/pulls%s" params in
+    let* r = Repo.req_json_v3 httpr auth dst_repo ~path `GET `Empty in
+    let* infos = Jsonq.query (Jsonq.array info) r in
+    if infos = [] then Ok None else Ok (Some (List.hd infos))
+
+  let update httpr ~auth ~dst_repo ~pr_id ~msg =
+    let params = `Json Jsong.(obj |> mem "body" (string msg) |> obj_end) in
+    let path = Fmt.str "/pulls/%d" pr_id in
+    let* r = Repo.req_json_v3 httpr auth dst_repo ~path `PATCH params in
+    Jsonq.query info r
+
+  let create
+      httpr ~auth ~dst_repo ~dst_branch ~src_repo ~src_branch ~title ~msg
+    =
+    let params =
+      `Json Jsong.(obj
+                   |> mem "title" (string title)
+                   |> mem "head" (string (head_of_src ~src_repo ~src_branch))
+                   |> mem "base" (string dst_branch)
+                   |> mem "body" (string msg)
+                   |> mem "maintainer_can_modify" (bool true)
+                   |> obj_end)
+    in
+    let path = "/pulls" in
+    let* r = Repo.req_json_v3 httpr auth dst_repo ~path `POST params in
+    Jsonq.query info r
+
+  let ensure
+      httpr ~auth ~dst_repo ~dst_branch ~src_repo ~src_branch ~title ~msg
+    =
+    let* dst_repo = Repo.of_url dst_repo in
+    let* src_repo = Repo.of_url src_repo in
+    let* pr = find httpr ~auth ~dst_repo ~dst_branch ~src_repo ~src_branch in
+    let* action, url = match pr with
+    | Some (url, pr_id) ->
+        (* The branch has already been force pushed which should update the
+           contents, we just update the msg *)
+        let* url, _id = update httpr ~auth ~dst_repo ~pr_id ~msg in
+        Ok ("Updated", url)
+    | None ->
+        let* url, _id =
+          create
+            httpr ~auth ~dst_repo ~dst_branch ~src_repo ~src_branch ~title ~msg
+        in
+        Ok ("Opened", url)
+    in
+    let pp_action ppf a = Fmt.tty_string [`Fg `Green] ppf a in
+    (* TODO we sould return this rather than log *)
+    Log.app begin fun m ->
+      m "%a pull request %a" pp_action action Fmt.(code string) url
+    end;
+    Ok ()
 end

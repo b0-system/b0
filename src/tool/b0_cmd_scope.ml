@@ -66,8 +66,8 @@ let list topmost includes excludes format path c =
 
 let vcs root includes excludes all keep_going vcs_kind vcs_args c =
   let vcs_cmd = match vcs_kind with
-  | B0_vcs.Git -> Cmd.(atom "git" %% list vcs_args)
-  | B0_vcs.Hg -> Cmd.(atom "hg" %% list vcs_args)
+  | B0_vcs.Git -> Cmd.(arg "git" %% list vcs_args)
+  | B0_vcs.Hg -> Cmd.(arg "hg" %% list vcs_args)
   in
   let is_vcs_kind (_, dir) = match B0_vcs.find ~kind:vcs_kind ~dir () with
   | Ok None -> Ok false

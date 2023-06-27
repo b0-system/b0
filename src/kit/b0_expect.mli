@@ -147,7 +147,7 @@ val base_files : ?rel:bool -> t -> recurse:bool -> Fpath.t list
     is [true], defaults to [false]) file paths in [base ctx] and
     sub directories if [recurse] is [true]. *)
 
-val dur : t -> Mtime.span
+val dur : t -> Mtime.Span.t
 (** [dur ctx] is the monotonic duration since [ctx] was created. *)
 
 val env : t -> B0_cmdlet.Env.t

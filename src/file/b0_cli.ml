@@ -4,12 +4,12 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
+open Result.Syntax
+open Cmdliner
 
 (* Exit *)
 
 module Exit = struct
-  open Cmdliner
-
   let ok = Os.Exit.Code 0
   let no_such_name = Os.Exit.Code 122
   let some_error = Os.Exit.Code Cmd.Exit.some_error
@@ -17,7 +17,6 @@ module Exit = struct
   let internal_error = Os.Exit.Code Cmd.Exit.internal_error
 
   let e c doc = Cmd.Exit.info (Os.Exit.get_code c) ~doc
-
   let infos =
     e no_such_name "if a specified name does not exist." ::
     Cmd.Exit.defaults
@@ -35,17 +34,12 @@ end
 
 (* Argument converters *)
 
-let err_msg of_string s = Result.map_error (fun e -> `Msg e) (of_string s)
-
-let cmd = Cmdliner.Arg.conv ~docv:"CMD" (err_msg Cmd.of_string, Cmd.pp_dump)
-let fpath =
-  Cmdliner.Arg.conv ~docv:"PATH" (err_msg Fpath.of_string, Fpath.pp_unquoted)
-
-let s_output_format_options = "OUTPUT FORMAT OPTIONS"
-
-open Cmdliner
+let cmd = Arg.conv' ~docv:"CMD" (B0_std.Cmd.of_string, B0_std.Cmd.pp_dump)
+let fpath = Arg.conv' ~docv:"PATH" (Fpath.of_string, Fpath.pp_unquoted)
 
 (* Specifying output detail *)
+
+let s_output_format_options = "OUTPUT FORMAT OPTIONS"
 
 type output_format = [ `Normal | `Short | `Long ]
 let output_format
@@ -81,8 +75,6 @@ let x_packs ?docs ?(doc = "Exclude pack $(docv). Takes over inclusion.") () =
 (* B0_std setup *)
 
 module B0_std = struct
-  open Cmdliner
-
   let get_tty_cap c = match Option.join c with
   | Some c -> c | None -> Tty.(cap (of_fd Unix.stdout))
 
@@ -197,13 +189,15 @@ module File_cache = struct
         let u = {keys_count=uk; keys_file_count=uf; keys_byte_size=ub} in
         t, u
     | k :: ks ->
-        let kf, kb, _ = B0_zero.File_cache.key_stats c k |> Result.to_failure in
+        let kf, kb, _ =
+          B0_zero.File_cache.key_stats c k |> Result.error_to_failure
+        in
         match String.Set.mem k used with
         | true -> loop (tk+1) (tf+kf) (tb+kb) (uk+1) (uf+kf) (ub+kb) ks
         | false -> loop (tk+1) (tf+kf) (tb+kb) uk uf ub ks
     in
     try
-      let keys = B0_zero.File_cache.keys c |> Result.to_failure in
+      let keys = B0_zero.File_cache.keys c |> Result.error_to_failure in
       Ok (loop 0 0 0 0 0 0 keys)
     with
     | Failure e -> Error (Fmt.str "cache stats: %s" e)
@@ -275,13 +269,13 @@ module File_cache = struct
     | false -> Ok false
     | true ->
         let is_unused k = not (String.Set.mem k used) in
-        Result.bind (B0_zero.File_cache.create dir) @@ fun c ->
-        Result.bind (B0_zero.File_cache.trim_size c ~is_unused ~max_byte_size ~pct)
-        @@ fun c -> Ok true
+        let* c = B0_zero.File_cache.create dir in
+        let* c =
+          B0_zero.File_cache.trim_size c ~is_unused ~max_byte_size ~pct
+        in
+        Ok true
 
   (* Cli fragments *)
-
-  open Cmdliner
 
   let key_arg =
     let of_string s = match Fpath.is_seg s with
@@ -361,13 +355,15 @@ module Op = struct
     let mem_reads f = Fpath.Set.mem f reads in
     let writes = Fpath.Set.of_list writes in
     let mem_writes f = Fpath.Set.mem f writes in
-    let hashes = String.Set.of_list (List.rev_map Hash.to_bytes hashes) in
+    let hashes =
+      String.Set.of_list (List.rev_map Hash.to_binary_string hashes)
+    in
     let mem_hash h = String.Set.mem h hashes in
     let marks = String.Set.of_list marks in
     let mem_mark m = String.Set.mem m marks in
     fun o ->
       List.exists (( = ) (Op.id o)) ids ||
-      mem_hash (Hash.to_bytes (Op.hash o)) ||
+      mem_hash (Hash.to_binary_string (Op.hash o)) ||
       List.exists mem_reads (Op.reads o) ||
       List.exists mem_writes (Op.writes o) ||
       mem_mark (Op.mark o)
@@ -426,8 +422,6 @@ module Op = struct
     order sel
 
   (* Command line *)
-
-  open Cmdliner
 
   let hash =
     let of_string s =
@@ -571,7 +565,6 @@ module Op = struct
 
   let s_selection_options = "BUILD OPERATION SELECTION OPTIONS"
   let query_cli ?(docs = s_selection_options) () =
-    let open Cmdliner in
     let query select select_deps filter order =
       query ~select ~select_deps ~filter ~order
     in
@@ -610,8 +603,6 @@ module Memo = struct
         Fmt.pf ppf "@[<v>Missing tool:@,%s@]%a" e sep ()
     | _ ->  ()
 
-  open Cmdliner
-
   (* B0 directory *)
 
   let b0_dir_env = "B0_DIR"
@@ -621,7 +612,7 @@ module Memo = struct
       ?(docs = Manpage.s_common_options)
       ?(doc = "Use $(docv) for the b0 directory.")
       ?doc_none:(absent = "$(b,_b0) in root directory")
-      ?(env = Cmdliner.Cmd.Env.info b0_dir_env) ()
+      ?(env = Cmd.Env.info b0_dir_env) ()
     =
     Arg.(value & opt (some fpath) None &
          info opts ~env ~absent ~doc ~docs ~docv:"DIR")
@@ -653,7 +644,7 @@ module Memo = struct
       ?(docs = Manpage.s_common_options)
       ?(doc = "Use $(docv) for the build cache directory.")
       ?doc_none:(absent = "$(b,.cache) in b0 directory")
-      ?(env = Cmdliner.Cmd.Env.info cache_dir_env) ()
+      ?(env = Cmd.Env.info cache_dir_env) ()
     =
     Arg.(value & opt (some fpath) None &
          info opts ~env ~absent ~doc ~docs ~docv:"DIR")
@@ -675,7 +666,7 @@ module Memo = struct
       ?(opts = ["log-file"]) ?docs
       ?(doc = "Use $(docv) for the build log file.")
       ?doc_none:(absent = "$(b,.log) in b0 directory")
-      ?(env = Cmdliner.Cmd.Env.info log_file_env) ()
+      ?(env = Cmd.Env.info log_file_env) ()
     =
     Arg.(value & opt (some fpath) None &
          info opts ~absent ~env ~doc ?docs ~docv:"LOG_FILE")
@@ -690,7 +681,7 @@ module Memo = struct
       ?(opts = ["j"; "jobs"]) ?docs
       ?(doc = "Maximal number of commands to spawn concurrently.")
       ?doc_none:(absent = "Number of CPUs available")
-      ?(env = Cmdliner.Cmd.Env.info jobs_env) ()
+      ?(env = Cmd.Env.info jobs_env) ()
     =
     Arg.(value & opt (some int) None &
          info opts ~env ~absent ~doc ?docs ~docv:"COUNT")
@@ -708,7 +699,7 @@ module Memo = struct
   let hash_fun_env = "B0_HASH_FUN"
   let hash_fun
       ?(opts = ["hash-fun"]) ?docs ?doc ?(doc_none = Hash.Xxh3_64.id)
-      ?(env = Cmdliner.Cmd.Env.info hash_fun_env) ()
+      ?(env = Cmd.Env.info hash_fun_env) ()
     =
     let doc = match doc with
     | Some doc -> doc
@@ -738,21 +729,21 @@ module Memo = struct
     type t =
       { hash_fun : string;
         file_hashes : Hash.t Fpath.Map.t;
-        hash_dur : Mtime.span;
-        total_dur : Mtime.span;
-        cpu_dur : Os.Cpu.Time.span;
+        hash_dur : Mtime.Span.t;
+        total_dur : Mtime.Span.t;
+        cpu_dur : Os.Cpu.Time.Span.t;
         jobs : int;
         ops : B0_zero.Op.t list; }
 
     let of_memo m =
-      let r = B0_memo.Memo.reviver m in
+      let r = B0_memo.reviver m in
       let module H = (val (B0_zero.Reviver.hash_fun r)) in
       let file_hashes = B0_zero.Reviver.file_hashes r in
       let hash_dur = B0_zero.Reviver.file_hash_dur r in
-      let total_dur = Os.Mtime.count (B0_memo.Memo.clock m) in
-      let cpu_dur = Os.Cpu.Time.count (B0_memo.Memo.cpu_clock m) in
-      let jobs = B0_zero.Exec.jobs (B0_memo.Memo.exec m) in
-      let ops = B0_memo.Memo.ops m in
+      let total_dur = Os.Mtime.count (B0_memo.clock m) in
+      let cpu_dur = Os.Cpu.Time.count (B0_memo.cpu_clock m) in
+      let jobs = B0_zero.Exec.jobs (B0_memo.exec m) in
+      let ops = B0_memo.ops m in
       { hash_fun = H.id; hash_dur; file_hashes; total_dur; cpu_dur; jobs; ops }
 
     let hash_fun l = l.hash_fun
@@ -789,8 +780,8 @@ module Memo = struct
       B0_bincode.enc_magic magic b ();
       B0_bincode.enc_string b l.hash_fun;
       enc_file_hashes b l.file_hashes;
-      B0_bincode.enc_time_span b l.hash_dur;
-      B0_bincode.enc_time_span b l.total_dur;
+      B0_bincode.enc_mtime_span b l.hash_dur;
+      B0_bincode.enc_mtime_span b l.total_dur;
       B0_bincode.enc_cpu_time_span b l.cpu_dur;
       B0_bincode.enc_int b l.jobs;
       B0_bincode.enc_list (B0_bincode.enc B0_zero_conv.Op.bincode) b l.ops
@@ -800,8 +791,8 @@ module Memo = struct
       let i, hash_fun = B0_bincode.dec_string s i in
       let i, file_hashes = i, Fpath.Map.empty in
       let i, file_hashes = dec_file_hashes s i in
-      let i, hash_dur = B0_bincode.dec_time_span s i in
-      let i, total_dur = B0_bincode.dec_time_span s i in
+      let i, hash_dur = B0_bincode.dec_mtime_span s i in
+      let i, total_dur = B0_bincode.dec_mtime_span s i in
       let i, cpu_dur = B0_bincode.dec_cpu_time_span s i in
       let i, jobs = B0_bincode.dec_int s i in
       let i, ops =
@@ -880,11 +871,11 @@ module Memo = struct
           children
       in
       let pp_stime ppf l =
-        let t = Os.Cpu.Time.(stime l.cpu_dur, children_stime l.cpu_dur) in
+        let t = Os.Cpu.Time.Span.(stime l.cpu_dur, children_stime l.cpu_dur) in
         pp_xtime ppf t
       in
       let pp_utime ppf l =
-        let t = Os.Cpu.Time.(utime l.cpu_dur, children_utime l.cpu_dur) in
+        let t = Os.Cpu.Time.Span.(utime l.cpu_dur, children_utime l.cpu_dur) in
         pp_xtime ppf t
       in
       let pp_op ppf (oc, ot, od) =
@@ -972,7 +963,7 @@ module Memo = struct
         Fmt.pf ppf "@[<v>%a@]@." pp_hashed_files l.file_hashes
 
     let out_format_cli ?(docs = s_output_format_options) () =
-      let a opt doc = Cmdliner.Arg.info [opt] ~doc ~docs in
+      let a opt doc = Arg.info [opt] ~doc ~docs in
       let fmts =
         [ `Hashed_files, a "hashed-files"
             "Output the path of every hashed file.";
@@ -990,6 +981,6 @@ module Memo = struct
           `Trace_event, a "trace-event"
             "Output selected operations in Trace Event format." ]
       in
-      Cmdliner.Arg.(value & vflag `Ops fmts)
+      Arg.(value & vflag `Ops fmts)
   end
 end

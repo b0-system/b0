@@ -10,25 +10,25 @@ open B0_std.Fut.Syntax
 
 module rec Build_def : sig
   type t = { u : build_ctx; b : build_state }
-  and build_ctx = { current : Unit.t option; m : B0_memo.Memo.t; }
+  and build_ctx = { current : Unit.t option; m : B0_memo.t; }
   and build_state =
     { root_dir : Fpath.t;
       b0_dir : Fpath.t;
       build_dir : Fpath.t;
       shared_build_dir : Fpath.t;
-      store : B0_memo.Store.t;
+      store : B0_store.t;
       must_build : Unit.Set.t; may_build : Unit.Set.t;
       mutable requested : Unit.t String.Map.t;
       mutable waiting : Unit.t Random_queue.t; }
 end = struct
   type t = { u : build_ctx; b : build_state }
-  and build_ctx = { current : Unit.t option; m : B0_memo.Memo.t; }
+  and build_ctx = { current : Unit.t option; m : B0_memo.t; }
   and build_state =
     { root_dir : Fpath.t;
       b0_dir : Fpath.t;
       build_dir : Fpath.t;
       shared_build_dir : Fpath.t;
-      store : B0_memo.Store.t;
+      store : B0_store.t;
       must_build : Unit.Set.t; may_build : Unit.Set.t;
       mutable requested : Unit.t String.Map.t;
       mutable waiting : Unit.t Random_queue.t; }
@@ -122,7 +122,7 @@ module Action = struct
   | Ok exe_file ->
       let* exe_file = exe_file in
       let exe = Fpath.basename exe_file in
-      let cmd = Cmd.(atom exe %% list args) in
+      let cmd = Cmd.(arg exe %% list args) in
       exec_file build u exe_file cmd
 end
 
@@ -148,7 +148,7 @@ module Build = struct
         b.b.requested <- String.Map.add (name u) u b.b.requested;
         Random_queue.add b.b.waiting u
     | false ->
-        B0_memo.Memo.fail b.u.m
+        B0_memo.fail b.u.m
           "@[<v>Unit %a requested %a which is not part of the build.@,\
            Try with %a or add the unit %a to the build."
           pp_name (current b) pp_name u Fmt.(code string) "--unlock"
@@ -176,11 +176,11 @@ module Build = struct
   (* Store *)
 
   let self =
-    B0_memo.Store.key @@ fun _ ->
+    B0_store.key @@ fun _ ->
     failwith "B0_build.self was not set at store creation"
 
   let store b = b.b.store
-  let get b k = B0_memo.Store.get b.b.store k
+  let get b k = B0_store.get b.b.store k
 
   (* Create *)
 
@@ -188,7 +188,7 @@ module Build = struct
     let u = { current = None; m } in
     let build_dir = B0_dir.build_dir ~b0_dir ~variant in
     let shared_build_dir = B0_dir.shared_build_dir ~build_dir in
-    let store = B0_memo.Store.create m ~dir:(B0_dir.store_dir ~build_dir) [] in
+    let store = B0_store.create m ~dir:(B0_dir.store_dir ~build_dir) [] in
     let may_build = Set.union may_build must_build in
     let add_requested u acc = String.Map.add (name u) u acc in
     let requested = Unit.Set.fold add_requested must_build String.Map.empty in
@@ -201,31 +201,31 @@ module Build = struct
         may_build; requested; waiting; }
     in
     let b = { u; b } in
-    B0_memo.Store.set store self b;
+    B0_store.set store self b;
     b
 
   (* Run *)
 
   let run_unit b unit =
-    let m = B0_memo.Memo.with_mark b.u.m (name unit) in
+    let m = B0_memo.with_mark b.u.m (name unit) in
     let u = { current = Some unit; m } in
     let b = { b with u } in
-    B0_memo.Memo.run_proc m begin fun () ->
-      let* () = B0_memo.Memo.mkdir b.u.m (build_dir b unit) in
+    B0_memo.run_proc m begin fun () ->
+      let* () = B0_memo.mkdir b.u.m (build_dir b unit) in
       (proc unit) b
     end
 
   let rec run_units b = match Random_queue.take b.b.waiting with
   | Some u -> run_unit b u; run_units b
   | None ->
-      B0_memo.Memo.stir ~block:true b.u.m;
+      B0_memo.stir ~block:true b.u.m;
       if Random_queue.length b.b.waiting = 0 then () else run_units b
 
   let log_file b = Fpath.(b.b.build_dir / "_log")
   let write_log_file ~log_file m =
     Log.if_error ~use:() @@ B0_cli.Memo.Log.(write log_file (of_memo m))
 
-  let report_memo_errors ppf m = match B0_memo.Memo.status m with
+  let report_memo_errors ppf m = match B0_memo.status m with
   | Ok _ as v -> v
   | Error e ->
       let read_howto = Fmt.any "b0 log -r " in
@@ -242,16 +242,16 @@ module Build = struct
     let hook () = write_log_file ~log_file b.u.m in
     Os.Exit.on_sigint ~hook @@ fun () ->
     begin
-      B0_memo.Memo.run_proc b.u.m begin fun () ->
-        let* () = B0_memo.Memo.delete b.u.m b.b.build_dir in
-        let* () = B0_memo.Memo.mkdir b.u.m b.b.build_dir in
-        let* () = B0_memo.Memo.mkdir b.u.m (B0_memo.Store.dir b.b.store) in
+      B0_memo.run_proc b.u.m begin fun () ->
+        let* () = B0_memo.delete b.u.m b.b.build_dir in
+        let* () = B0_memo.mkdir b.u.m b.b.build_dir in
+        let* () = B0_memo.mkdir b.u.m (B0_store.dir b.b.store) in
         run_units b; Fut.return ()
       end;
-      B0_memo.Memo.stir ~block:true b.u.m;
+      B0_memo.stir ~block:true b.u.m;
       let ret = report_memo_errors Fmt.stderr b.u.m in
       Log.time (fun _ m -> m "deleting trash") begin fun () ->
-        Log.if_error ~use:() (B0_memo.Memo.delete_trash ~block:false b.u.m)
+        Log.if_error ~use:() (B0_memo.delete_trash ~block:false b.u.m)
       end;
       write_log_file ~log_file b.u.m;
       ret

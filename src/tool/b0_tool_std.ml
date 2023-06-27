@@ -101,8 +101,8 @@ module Cli = struct
     | None -> man
     | Some syn -> `S Manpage.s_synopsis :: syn :: man
 
-  let editor_envs = B0_editor.envs ()
-  let pager_envs = B0_pager.envs ()
+  let editor_envs = B0_editor.Env.infos
+  let pager_envs = B0_pager.Env.infos
   let format = B0_cli.output_format ()
   let pos_key =
     let doc = "The metadata key $(docv) to get." and docv = "KEY" in

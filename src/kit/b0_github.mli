@@ -11,6 +11,7 @@ open B0_http
 
 (** {1:auth GitHub authentication} *)
 
+(** Authentication. *)
 module Auth : sig
 
   type t
@@ -58,13 +59,13 @@ type v3_body = [ `Json of Jsong.t | `Other of content_type * string | `Empty ]
     else tagged with its content type or nothing. *)
 
 val req_json_v3 :
-  ?headers:Http.headers -> Httpr.t -> Auth.t -> path:string -> Http.meth ->
-  v3_body -> (Json.t, string) result
+  ?headers:Http.headers -> Http_client.t -> Auth.t -> path:string ->
+  Http.method' -> v3_body -> (Json.t, string) result
 (** [req_json_v3 auth path m ~headers body] performs the request for json
     on [path] using method [m], additional headers [headers], body [body] and
     authentication [auth]. *)
 
-val query_v4 : Httpr.t -> Auth.t -> string -> (Json.t, string) result
+val query_v4 : Http_client.t -> Auth.t -> string -> (Json.t, string) result
 (** [query_v4 auth q] performs the {{:https://developer.github.com/v4/}
     the GitHub GraphQL V4} query [q] using authentication [auth]. *)
 
@@ -79,7 +80,7 @@ module Repo : sig
   val v : owner:string -> string -> t
   (** [repo ~owner name] identifiers a GitHub repository. *)
 
-  val of_url : string -> (t, string) result
+  val of_url : Url.t -> (t, string) result
   (** [of_url url] parses an owner and repo name from the first
       two segments of [url]'s path. *)
 
@@ -90,12 +91,13 @@ module Repo : sig
   (** [name r] is [r]'s name. *)
 
   val req_json_v3 :
-    ?headers:Http.headers -> Httpr.t -> Auth.t -> t -> path:string ->
-    Http.meth -> v3_body -> (Json.t, string) result
+    ?headers:Http.headers -> Http_client.t -> Auth.t -> t -> path:string ->
+    Http.method' -> v3_body -> (Json.t, string) result
   (** [req_json_v3] is like {!B0_github.req_json_v3} but performs given
       the root subpath on the given repo. *)
 
-  val query_v4 : Httpr.t -> Auth.t -> t -> string -> (Json.t, string) result
+  val query_v4 :
+    Http_client.t -> Auth.t -> t -> string -> (Json.t, string) result
   (** [query_v4 auth r q] performs the subgraph query [q] on repo [r]
       using authentication [auth]. *)
 end
@@ -132,19 +134,20 @@ module Issue : sig
   val pp_short : t Fmt.t
   (** [pp_short] is a short formatter for issues. *)
 
-  val list : Httpr.t -> Auth.t -> Repo.t -> (int * t list, string) result
+  val list : Http_client.t -> Auth.t -> Repo.t -> (int * t list, string) result
   (** [list auth repo] lists the issues for repository [repo].
       The integer is the total number of issues. *)
 
   (** {1:req Requests} *)
 
   val create :
-    Httpr.t -> Auth.t -> Repo.t -> title:string -> body:string -> unit ->
+    Http_client.t -> Auth.t -> Repo.t -> title:string -> body:string -> unit ->
     (num * uri, string) result
   (** [create auth repo] opens an issue on the repository [repo] with
       the given [title] and [body]. *)
 
-  val close : Httpr.t -> Auth.t -> Repo.t -> num -> (num * uri, string) result
+  val close :
+    Http_client.t -> Auth.t -> Repo.t -> num -> (num * uri, string) result
   (** [close auth repo n] closes issues [n] on the repository [repo] *)
 end
 
@@ -180,19 +183,20 @@ module Release : sig
   (** {1:req Requests} *)
 
   val create :
-    Httpr.t -> Auth.t -> Repo.t -> tag_name:string -> body:string -> unit ->
-    (t, string) result
+    Http_client.t -> Auth.t -> Repo.t -> tag_name:string -> body:string ->
+    unit -> (t, string) result
   (** [create auth repo ~tag_name ~body ()] creates a new release in
       repository [repo] with given [tag_name] and [body] description. *)
 
   val get :
-    Httpr.t -> Auth.t -> Repo.t -> tag_name:string -> unit -> (t, string) result
+    Http_client.t -> Auth.t -> Repo.t -> tag_name:string -> unit ->
+    (t, string) result
   (** [get auth repo ~tag_name ()] gets the release with given [tag_name]
       in repo [tag_name]. *)
 
   val upload_asset :
-    Httpr.t -> Auth.t -> Repo.t -> t -> content_type:string -> name:string ->
-    string -> (unit, string) result
+    Http_client.t -> Auth.t -> Repo.t -> t -> content_type:string ->
+    name:string -> string -> (unit, string) result
   (** [upload_asset auth repo r ~content_type ~name asset] uploads
       assets content [asset] with file name [name] and content type
       [content_type] in release [r] of repo [r]. *)
@@ -257,4 +261,19 @@ module Pages : sig
       {b Warning.} If you have paths that start with [_] GitHub pages
       won't publish them. You can disable this by adding a [.nojekyll]
       file at the root the gh-page branch, see {!nojekyll}. *)
+end
+
+(** Pull requests *)
+module Pull_request : sig
+  val ensure :
+    Http_client.t ->
+    auth:Auth.t ->
+    dst_repo:Url.t -> dst_branch:string ->
+    src_repo:Url.t -> src_branch:string ->
+    title:string -> msg:string ->
+    (unit, string) result
+    (** [ensure r ~auth ~dst_repo ~dst_branch ~src_repo ~src_branch ~title
+        ~msg] ensures there's a PR from [src_repo]'s [src_branch] to
+        [dst_repo]'s [dst_branch] with title [title] and message [msg].
+        It logs the PR URL. *)
 end

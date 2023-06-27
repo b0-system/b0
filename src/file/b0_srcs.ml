@@ -26,7 +26,7 @@ type t =
 let by_ext s = s.by_ext
 
 let fail_if_error m u = function
-| Error e -> B0_memo.Memo.fail m "Source selection: %s" e | Ok v -> v
+| Error e -> B0_memo.fail m "Source selection: %s" e | Ok v -> v
 
 let select_files m u (seen, by_ext) fs =
   let rec loop m u seen by_ext = function
@@ -35,7 +35,7 @@ let select_files m u (seen, by_ext) fs =
       match Os.File.exists f |> fail_if_error m u with
       | false ->
           let pp_file = Fmt.(code Fpath.pp) in
-          B0_memo.Memo.fail m "Source file@ %a@ does not exist." pp_file f
+          B0_memo.fail m "Source file@ %a@ does not exist." pp_file f
       | true ->
           if Fpath.Set.mem f seen then loop m u seen by_ext fs else
           let seen = Fpath.Set.add f seen in
@@ -74,7 +74,7 @@ let select_files_in_dirs m u xs (seen, by_ext as acc) ds =
       match Os.Dir.exists d |> fail_if_error m u with
       | false ->
           let pp_dir = Fmt.(code Fpath.pp) in
-          B0_memo.Memo.fail m "Source directory@ %a@ does not exist." pp_dir d
+          B0_memo.fail m "Source directory@ %a@ does not exist." pp_dir d
       | true ->
           let prune _ dname dir _ = exclude dname dir  in
           let dotfiles = true (* exclusions handled by prune *) in
@@ -105,7 +105,7 @@ let select b sels =
   let acc = Fpath.Set.empty, String.Map.empty in
   let acc = select_files m u acc fs in
   let (seen, _ as acc) = select_files_in_dirs m u xs acc ds in
-  Fpath.Set.iter (B0_memo.Memo.file_ready m) seen;
+  Fpath.Set.iter (B0_memo.file_ready m) seen;
   let* futs = Fut.of_list futs in
   let add_files acc files =
     let add_file file (seen, by_ext as acc) =

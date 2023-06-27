@@ -67,7 +67,7 @@ let of_dirs ?dotfiles ?follow_symlinks ?prune root_dirs =
     | None -> None
     | Some prune -> Some (fun st n f _ -> prune st n f)
     in
-    Result.to_failure @@ Os.Dir.fold
+    Result.error_to_failure @@ Os.Dir.fold
       ?dotfiles ?follow_symlinks ?prune ~recurse:true Os.Dir.path_list dir acc
   in
   try

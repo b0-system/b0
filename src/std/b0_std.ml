@@ -529,8 +529,8 @@ module Result = struct
 
   (* Interacting with Stdlib exceptions *)
 
-  let to_failure = function Ok v -> v | Error e -> failwith e
-  let to_invalid_arg = function Ok v -> v | Error e -> invalid_arg e
+  let error_to_failure = function Ok v -> v | Error e -> failwith e
+  let error_to_invalid_argument = function Ok v -> v | Error e -> invalid_arg e
 
   (* Syntax *)
 
@@ -1523,7 +1523,7 @@ module Fpath = struct
 
     let is_root p = p.[path_start p] = dir_sep_char
 
-    let to_uri_path ?(escape_space = true) p =
+    let to_url_path ?(escape_space = true) p =
       let set_char b i = function
       | '\\' -> Bytes.set b i '/'; i + 1
       | c -> pct_esc_set_char ~escape_space b i c
@@ -1589,7 +1589,7 @@ module Fpath = struct
     let is_rel p = p.[0] <> dir_sep_char
     let is_root p = String.equal p dir_sep || String.equal p "//"
 
-    let to_uri_path ?(escape_space = true) p =
+    let to_url_path ?(escape_space = true) p =
       String.byte_escaper (pct_esc_len ~escape_space)
         (pct_esc_set_char ~escape_space) p
   end
@@ -1879,7 +1879,7 @@ module Fpath = struct
 
   (* Converting *)
 
-  let to_uri_path = if Sys.win32 then Windows.to_uri_path else Posix.to_uri_path
+  let to_url_path = if Sys.win32 then Windows.to_url_path else Posix.to_url_path
   let pp_quoted ppf p = String.pp ppf (Filename.quote p)
   let pp_unquoted = String.pp
   let pp ppf p =
@@ -1960,8 +1960,8 @@ module Hash = struct
 
   (* Converting *)
 
-  let to_bytes h = h
-  let of_bytes h = h
+  let to_binary_string h = h
+  let of_binary_string h = h
   let to_hex = String.Ascii.to_hex
   let of_hex = String.Ascii.of_hex
   let pp ppf h = Fmt.string ppf (if is_nil h then "nil" else to_hex h)
@@ -2107,9 +2107,7 @@ module Mtime = struct
     let pp_ns ppf s = Fmt.pf ppf "%Luns" s
   end
 
-  type span = Span.t
-
-  (* Monotonic timestamps *)
+  (* Timestamps *)
 
   type t = uint64
 
@@ -2153,7 +2151,7 @@ module Cmd = struct
 
   let empty = Rseq []
   let rec is_empty = function Rseq [] -> true | _ -> false
-  let atom a = A a
+  let arg a = A a
   let append l0 l1 = match l0, l1 with
   | Rseq [], l1 -> l1
   | l0, Rseq [] -> l0
@@ -2164,22 +2162,19 @@ module Cmd = struct
   | Rseq [] -> empty
   | l -> Unstamp l
 
-  let ( % ) l a = append l (atom a)
+  let ( % ) l a = append l (arg a)
   let ( %% ) = append
 
   (* Derived combinators *)
 
   let if' cond l = if cond then l else empty
+  let if_some o = match o with Some cmd -> cmd | None -> empty
   let path p = A (Fpath.to_string p)
   let int i = A (string_of_int i)
   let float f = A (string_of_float f)
   let list ?slip l = match slip with
-  | None -> Rseq (List.rev_map atom l)
+  | None -> Rseq (List.rev_map arg l)
   | Some slip -> Rseq (List.fold_left (fun acc v -> A v :: A slip :: acc) [] l)
-
-  let rev_list ?slip l = match slip with
-  | None -> Rseq (List.map atom l)
-  | Some slip -> Rseq (List.fold_right (fun v acc -> A v :: A slip :: acc) l [])
 
   let of_list ?slip conv l = match slip with
   | None -> Rseq (List.rev_map (fun a -> A (conv a)) l)
@@ -2187,14 +2182,7 @@ module Cmd = struct
       let add acc v = A (conv v) :: A slip :: acc in
       Rseq (List.fold_left add [] l)
 
-  let of_rev_list ?slip conv l = match slip with
-  | None -> Rseq (List.rev_map (fun a -> A (conv a)) l)
-  | Some slip ->
-      let add a acc = A (conv a) :: A slip :: acc in
-      Rseq (List.fold_right add l [])
-
   let paths ?slip ps = of_list ?slip Fpath.to_string ps
-  let rev_paths ?slip ps = of_rev_list ?slip Fpath.to_string ps
 
   (* Converting *)
 
@@ -2304,8 +2292,8 @@ module Cmd = struct
   let to_string l = String.concat " " (List.map Filename.quote @@ to_list l)
   let pp ppf l = Fmt.pf ppf "@[%a@]" Fmt.(list ~sep:sp string) (to_list l)
   let pp_dump ppf l =
-    let pp_atom ppf a = Fmt.string ppf (Filename.quote a) in
-    Fmt.pf ppf "@[<h>%a@]" Fmt.(list ~sep:sp pp_atom) (to_list l)
+    let pp_arg ppf a = Fmt.string ppf (Filename.quote a) in
+    Fmt.pf ppf "@[<h>%a@]" Fmt.(list ~sep:sp pp_arg) (to_list l)
 
   let rec fold ~arg ~unstamp ~append ~empty = function
   | A a -> arg a
@@ -2367,6 +2355,8 @@ end
 
 (* Futures *)
 
+let relax () = try Unix.sleepf 0.0001 with Unix.Unix_error _ -> ()
+
 module Fut = struct
   type 'a state = Det of 'a | Undet of { mutable awaits : ('a -> unit) list }
   type 'a t = 'a state ref
@@ -2389,12 +2379,7 @@ module Fut = struct
 
   let rec sync f = match !f with
   | Det v -> v
-  | Undet _ ->
-      let relax () =
-        try ignore (Unix.select [] [] [] 0.0001) with
-        | Unix.Unix_error _ -> ()
-      in
-      relax (); sync f
+  | Undet _ -> relax (); sync f
 
   let return v = ref (Det v)
 
@@ -2421,7 +2406,6 @@ module Fut = struct
       loop [] fs; r
 
   module Syntax = struct
-    let ( >>= ) = bind
     let ( let* ) = bind
     let ( and* ) = pair
   end
@@ -2455,34 +2439,34 @@ module Os = struct
 
       (* CPU time spans *)
 
-      let sec_to_span sec = Int64.of_float (sec *. 1e9)
+      module Span = struct
+        type t =
+          { utime : Mtime.Span.t; stime : Mtime.Span.t;
+            children_utime : Mtime.Span.t; children_stime : Mtime.Span.t; }
 
-      type span =
-        { utime : Mtime.span; stime : Mtime.span;
-          children_utime : Mtime.span; children_stime : Mtime.span; }
+        let v ~utime ~stime ~children_utime ~children_stime =
+          { utime; stime; children_utime; children_stime }
 
-      let span ~utime ~stime ~children_utime ~children_stime =
-        { utime; stime; children_utime; children_stime }
-
-      let zero =
-        span ~utime:0L ~stime:0L ~children_utime:0L ~children_stime:0L
-
-      let utime c = c.utime
-      let stime c = c.stime
-      let children_utime c = c.children_utime
-      let children_stime c = c.children_stime
+        let zero = v ~utime:0L ~stime:0L ~children_utime:0L ~children_stime:0L
+        let utime c = c.utime
+        let stime c = c.stime
+        let children_utime c = c.children_utime
+        let children_stime c = c.children_stime
+      end
 
       (* CPU counters *)
 
-      type counter = span
-      let counter () =
+      let sec_to_span sec = Int64.of_float (sec *. 1e9)
+
+      type counter = Span.t
+      let counter () : Span.t =
         let now = Unix.times () in
         { utime = sec_to_span now.Unix.tms_utime;
           stime = sec_to_span now.Unix.tms_stime;
           children_utime = sec_to_span now.Unix.tms_cutime;
           children_stime = sec_to_span now.Unix.tms_cstime; }
 
-      let count c =
+      let count (c : Span.t) : Span.t =
         let now = Unix.times () in
         { utime = Int64.sub (sec_to_span now.Unix.tms_utime) c.utime;
           stime = Int64.sub (sec_to_span now.Unix.tms_stime) c.stime;
@@ -2518,6 +2502,7 @@ module Os = struct
   end
 
   let sleep = Mtime.sleep
+  let relax = relax
 
   module Env = struct
 
@@ -3425,7 +3410,7 @@ module Os = struct
               0o700, ((dst, mode) :: chmods)
           in
           ignore (Fs_base.dir_create ~mode ~make_path:false dst |>
-                  Result.to_failure);
+                  Result.error_to_failure);
           acc
       | Unix.S_REG ->
           let cp ~mode src dst =
@@ -3440,13 +3425,14 @@ module Os = struct
           let mode = st.Unix.st_perm in
           let src = Fpath.(src // p) in
           let dst = Fpath.(dst // p) in
-          (cp ~mode src dst |> Result.to_failure); acc
+          (cp ~mode src dst |> Result.error_to_failure); acc
       | Unix.S_LNK ->
           if prune st name p () then acc else
           let dst = Fpath.(dst // p) in
           let src = Fpath.(src // p) in
           let force = false and make_path = false in
-          Fs_base.copy_symlink ~force ~make_path ~src dst |> Result.to_failure;
+          Fs_base.copy_symlink ~force ~make_path ~src dst
+          |> Result.error_to_failure;
           acc
       | _ when prune st name p () (* why not *) -> acc
       | _ ->
@@ -3456,7 +3442,7 @@ module Os = struct
       let rec chmod_dirs = function
       | [] -> ()
       | (d, m) :: ds ->
-          (Fs_base.path_set_mode d m) |> Result.to_failure; chmod_dirs ds
+          (Fs_base.path_set_mode d m) |> Result.error_to_failure; chmod_dirs ds
       in
       Result.map_error err @@
       Result.bind (Fs_base.path_exists dst) @@ function
@@ -3470,11 +3456,13 @@ module Os = struct
           in
           Result.bind tdst @@ fun tdst ->
           try
-            let src_mode = Fs_base.path_get_mode src |> Result.to_failure in
+            let src_mode =
+              Fs_base.path_get_mode src |> Result.error_to_failure
+            in
             let chmods =
               _fold ~filter:`Any ~rel:true ~dotfiles:true ~follow_symlinks
                 ~prune ~recurse (copy tdst) src ([tdst, src_mode])
-              |> Result.to_failure
+              |> Result.error_to_failure
             in
             chmod_dirs chmods;
             match atomic with
@@ -3793,7 +3781,7 @@ module Os = struct
         begin try
           (* We write the input string to a temporary file. *)
           let flags = Unix.[O_RDWR; O_CREAT; O_EXCL; O_SHARE_DELETE] in
-          let f, fd = Result.to_failure (Tmp.open' ~flags ()) in
+          let f, fd = Result.error_to_failure (Tmp.open' ~flags ()) in
           Fd.Set.add fd fds;
           Tmp.rem_file f; (* We don't need the actual file. *)
           ignore (Unix.write_substring fd s 0 (String.length s));
@@ -3923,7 +3911,7 @@ module Os = struct
       let fds = Fd.Set.empty () in
       try
         let flags = Unix.[O_RDWR; O_CREAT; O_EXCL; O_SHARE_DELETE; O_CLOEXEC] in
-        let tmpf, fd = Result.to_failure (Tmp.open' ~flags ()) in
+        let tmpf, fd = Result.error_to_failure (Tmp.open' ~flags ()) in
         let stdout = out_fd ~close:false fd in
         let stderr = match stderr with `Out -> stdout | `Stdo o -> o in
         let pid = _spawn fds ?env ?cwd ~stdin ~stdout ~stderr cmd in
@@ -4241,11 +4229,12 @@ module Random_queue = struct
   | 0 -> None
   | _ ->
       let i = Random.State.int q.rand q.length in
-      let v = match q.slots.(i) with None -> assert false | Some v -> v in
-      q.length <- q.length - 1;
-      q.slots.(i) <- q.slots.(q.length);
-      q.slots.(q.length) <- None;
-      Some v
+      let v = q.slots.(i) in
+      let last = q.length - 1 in
+      q.slots.(i) <- q.slots.(last);
+      q.slots.(last) <- None;
+      q.length <- last;
+      v
 
   let length q = q.length
 end

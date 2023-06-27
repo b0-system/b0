@@ -13,7 +13,7 @@ let write
        The write fun return a future but this has other impacts. *)
   let open B0_std.Fut.Syntax in
   ignore @@ (* FIXME maybe get rid of that. *)
-  let* contents = B0_memo.Memo.read m frag in
+  let* contents = B0_memo.read m frag in
   let title = if title = "" then El.title_of_fpath o else title in
   let more_head = match more_head with
   | None -> ""
@@ -24,7 +24,7 @@ let write
   let stamp = List.rev_append scripts stamp in
   let stamp = String.concat "" stamp in
   B0_std.Fut.return @@
-  (B0_memo.Memo.write m ~stamp ~reads:[frag] o @@ fun () ->
+  (B0_memo.write m ~stamp ~reads:[frag] o @@ fun () ->
    let more_head = El.raw more_head in
    let body = El.(body [raw contents]) in
    let page =

@@ -6,8 +6,8 @@ depend on it.
 B0 describes software construction and deployments using modular and
 customizable definitions written in OCaml.
 
-At the core of B0 is the [b0.memo] library wich provides arbitrary build
-abstraction with reliable, efficient incremental rebuilds.
+At the core of B0 is the {{!b0_memo}[b0.memo]} library wich provides
+arbitrary build abstraction with reliable, efficient incremental rebuilds.
 
 {1:manuals Manuals}
 
@@ -54,7 +54,24 @@ B0_html
 B0_json
 B0_sexp
 B0_text
-B0_text_lines}
+B0_text_lines
+}
+
+{2:view Viewers and editors}
+
+{!modules:
+B0_editor
+B0_pager
+B0_pdf_viewer
+B0_web_browser
+}
+
+{2:net Networking}
+
+{!modules:
+B0_http
+B0_rsync
+}
 
 {1:b0_memo Library [b0.memo]}
 
@@ -74,23 +91,23 @@ This library has the the system for describing software construction
 and deployments via {{!page-manual.b0_file}B0 files}.
 
 {!modules:
-B0_srcs
-B0_file_exts
-B0_ocaml
 B0_build_trace
 B0_cli
-B0_pager
+B0_file_exts
+B0_ocaml
+B0_srcs
 }
 
 {2:def B0 definitions}
 
 {!modules:
 B0_build
+B0_cmdlet
 B0_def
 B0_dir
 B0_meta
-B0_cmdlet
 B0_pack
+B0_store
 B0_unit
 }
 
@@ -112,19 +129,22 @@ All the convenience you need for writing B0 files.
 {!modules:
 B0_kit
 B0_findex
-B0_srcs}
+B0_srcs
+}
 
 {2:vcs VCS and code hosting}
 
 {!modules:
 B0_vcs
-B0_github}
+B0_github
+}
 
 {2:testing Testing and releasing}
 
 {!modules:
 B0_expect
-B0_release}
+B0_release
+}
 
 {2:ocaml OCaml support}
 
@@ -142,19 +162,3 @@ B0_opam
 
 Note the {!B0_ocaml} module is in fact defined in the [b0.file] library
 as it used to compile [B0.ml] files.
-
-{2:viewers_editors Viewers and editors}
-
-See also {!B0_pager} in [b0].
-
-{!modules:
-B0_editor
-B0_pdf_viewer
-B0_web_browser}
-
-{2:net Networking}
-
-{!modules:
-B0_http
-B0_rsync
-}

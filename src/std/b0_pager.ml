@@ -13,19 +13,14 @@ module Env = struct
   let pager = "PAGER"
   let less = "LESS"
   let term = "TERM"
-end
 
-let envs =
-  let vars =
-    lazy begin
-      Cmd.Env.info Env.pager
-        ~doc:"The pager used to display content. This is a command invocation \
-              given to execvp(3)." ::
-      Cmd.Env.info Env.term
-        ~doc:"See options $(b,--color) and $(b,--no-pager)." :: []
-    end
-  in
-  fun () -> Lazy.force vars
+  let infos =
+    Cmd.Env.info pager
+      ~doc:"The pager used to display content. This is a command invocation \
+            given to execvp(3)." ::
+    Cmd.Env.info term
+      ~doc:"See options $(b,--color) and $(b,--no-pager)." :: []
+end
 
 (* Paging *)
 
@@ -34,7 +29,7 @@ let find ?win_exe ?search ~don't () =
   match Os.Env.find ~empty_is_none:true Env.term with
   | Some "dumb" | None -> Ok None
   | Some _ ->
-      let cmds = B0_std.[Cmd.atom "less"; Cmd.atom "more"] in
+      let cmds = B0_std.[Cmd.arg "less"; Cmd.arg "more"] in
       let* cmds =
         let empty_is_none = true in
         match Os.Env.find' ~empty_is_none B0_std.Cmd.of_string Env.pager with

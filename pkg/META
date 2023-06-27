@@ -5,7 +5,7 @@ package "std" (
   directory = "std"
   description = "B0 stdlib"
   version = "%%VERSION_NUM%%"
-  requires = "unix"
+  requires = "unix cmdliner"
   archive(byte) = "b0_std.cma"
   archive(native) = "b0_std.cmxa"
   plugin(byte) = "b0_std.cma"

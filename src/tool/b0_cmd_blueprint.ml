@@ -72,8 +72,8 @@ let find_project_name () =
     [ "BRZO"; "BRZO.toml"; "B0.ml"; "B0.toml"; "Makefile"; "dune-project"; ]
   in
   try
-    let vcs = B0_vcs.find () |> Result.to_failure in
-    let cwd = Os.Dir.cwd () |> Result.to_failure in
+    let vcs = B0_vcs.find () |> Result.error_to_failure in
+    let cwd = Os.Dir.cwd () |> Result.error_to_failure in
     let project_dir = match vcs with
     | Some t -> B0_vcs.work_dir t
     | None ->

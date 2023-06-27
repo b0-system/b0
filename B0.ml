@@ -16,12 +16,12 @@ let b0_std_lib =
   let srcs =
     Fpath.[`Dir_rec (v "src/std"); `X (v "src/std/b0_std_top_init.ml")]
   in
-  let requires = [unix] in
+  let requires = [unix; cmdliner] in
   B0_ocaml.lib b0_std ~doc:"B0 standard needs" ~srcs ~requires
 
 let b0_memo_lib =
   let srcs = Fpath.[`Dir (v "src/memo")] in
-  let requires = [unix; b0_std] in
+  let requires = [unix; cmdliner; b0_std] in
   B0_ocaml.lib b0_memo ~doc:"B0 build library" ~srcs ~requires
 
 let b0_file_lib =
@@ -168,8 +168,8 @@ let b0wl =
   let bootstrap_root = B0_dir.build_dir ~b0_dir ~variant in
   let env = bootstrap_env bootstrap_root in
   let b0_exec = Fpath.(bootstrap_root / "b0-exe" / "b0") in
-  Os.Exit.exec ~env ~cwd b0_exec Cmd.(atom "b0" %% args)
+  Os.Exit.exec ~env ~cwd b0_exec Cmd.(arg "b0" %% args)
 
 let strap =
-  B0_cmdlet.v "strap" ~doc:"Run b00t/strap" @@
-  B0_cmdlet.exec_file (Fpath.v "b00t/strap")
+  B0_cmdlet.v "strap" ~doc:"Run boot/strap" @@
+  B0_cmdlet.exec_file (Fpath.v "boot/strap")

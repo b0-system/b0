@@ -4,6 +4,9 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
+open Result.Syntax
+
+let uerror = Unix.error_message
 
 module Trash = struct
   type t = { dir : Fpath.t }
@@ -11,43 +14,36 @@ module Trash = struct
   let dir t = t.dir
   let trash t p =
     Result.map_error (Fmt.str "trashing %a: %s" Fpath.pp p) @@
-    Result.bind (Os.Path.exists p) @@ function
-    | false -> Ok ()
-    | true ->
-        let (* deal with races *) force = true and make_path = true in
-        Result.bind (Os.Path.tmp ~make_path ~dir:t.dir ~name:"%s" ()) @@
-        fun garbage -> Os.Path.rename ~force ~make_path ~src:p garbage
+    let* exists = Os.Path.exists p in
+    if not exists then Ok () else
+    let (* deal with races *) force = true and make_path = true in
+    let* garbage = Os.Path.tmp ~make_path ~dir:t.dir ~name:"%s" () in
+    Os.Path.rename ~force ~make_path ~src:p garbage
 
-  let err_delete t err =
-    Fmt.str "delete trash %a: %s" Fpath.pp t.dir err
+  let err_delete t err = Fmt.str "delete trash %a: %s" Fpath.pp t.dir err
 
   let delete_blocking t =
     Result.map_error (err_delete t) @@
-    Result.bind (Os.Path.delete ~recurse:true t.dir) @@ fun _ -> Ok ()
+    let* _existed = Os.Path.delete ~recurse:true t.dir in
+    Ok ()
 
-  let delete_win32 ~block t = match block with
-  | true -> delete_blocking t
-  | false ->
-      let rm = Cmd.(atom "cmd.exe" % "/c" % "rd" % "/s" % "/q" %% path t.dir) in
-      match Os.Cmd.spawn rm (* XXX redirect stdio to Fpath.null ? *) with
-      | Ok _pid -> Ok ()
-      | Error e -> Error (err_delete t e)
+  let delete_win32 ~block t =
+    if block then delete_blocking t else
+    let rm = Cmd.(arg "cmd.exe" % "/c" % "rd" % "/s" % "/q" %% path t.dir) in
+    match Os.Cmd.spawn rm (* XXX redirect stdio to Fpath.null ? *) with
+    | Ok _pid -> Ok () | Error e -> Error (err_delete t e)
 
-  let rec delete_posix ~block t = match block with
-  | true -> delete_blocking t
-  | false ->
-      try match Unix.fork () with
-      | 0 -> ignore (delete_blocking t); exit 0
-      | _pid -> Ok ()
-      with
-      | Unix.Unix_error (err, _, _) ->
-          Error (err_delete t (Unix.error_message err))
+  let rec delete_posix ~block t =
+    if block then delete_blocking t else
+    match Unix.fork () with
+    | 0 -> ignore (delete_blocking t); exit 0
+    | _pid -> Ok ()
+    | exception (Unix.Unix_error (e, _, _)) -> Error (err_delete t (uerror e))
 
   let delete = if Sys.win32 then delete_win32 else delete_posix
 end
 
 module File_cache = struct
-  let uerr = Unix.error_message
   let err op err = Fmt.str "cache %s: %s" op err
   let err_key op key err = Fmt.str "cache %s %s: %s" op key err
 
@@ -72,7 +68,7 @@ module File_cache = struct
         Os.Fd.apply ~close:Unix.close fd (Os.Fd.read_file file)
       with
       | Unix.Unix_error (e, _, _) ->
-          Fmt.failwith_notrace "%s: %s" file (uerr e)
+          Fmt.failwith_notrace "%s: %s" file (uerror e)
 
     let write_flags =
       Unix.[O_WRONLY; O_CREAT; O_SHARE_DELETE; O_CLOEXEC; O_TRUNC; O_EXCL]
@@ -84,7 +80,7 @@ module File_cache = struct
         Os.Fd.apply ~close:Unix.close fd write
       with
       | Unix.Unix_error (e, _, _) ->
-          unlink_noerr file; Fmt.failwith_notrace "%s: %s" file (uerr e)
+          unlink_noerr file; Fmt.failwith_notrace "%s: %s" file (uerror e)
 
     let rec copy_file src dst =
       (* Like link(2) if [src] doesn't exist raises ENOENT. If [dst]
@@ -106,7 +102,7 @@ module File_cache = struct
       try Unix.mkdir d 0o755; true with
       | Unix.Unix_error (Unix.EEXIST, _, _) -> false
       | Unix.Unix_error (Unix.EINTR, _, _) -> mkdir d
-      | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" d (uerr e)
+      | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" d (uerror e)
 
     let rec make_path p =
       let mkdir dir = Unix.mkdir (Fpath.to_string dir) 0o755 in
@@ -121,7 +117,7 @@ module File_cache = struct
               | exception Unix.Unix_error (Unix.EEXIST, _, _) -> down ds
               | exception Unix.Unix_error (Unix.EINTR, _, _) -> down arg
               | exception Unix.Unix_error (e, _, _) ->
-                  Fmt.failwith_notrace "%s: %s" (Fpath.to_string d) (uerr e)
+                  Fmt.failwith_notrace "%s: %s" (Fpath.to_string d) (uerror e)
           in
           let rec up todo d = match mkdir d with
           | () -> down todo
@@ -130,13 +126,13 @@ module File_cache = struct
           | exception Unix.Unix_error (Unix.EEXIST, _, _) -> down todo
           | exception Unix.Unix_error (Unix.EINTR, _, _) -> up todo d
           | exception Unix.Unix_error (e, _, _) ->
-              Fmt.failwith_notrace "%s: %s" (Fpath.to_string d) (uerr e)
+              Fmt.failwith_notrace "%s: %s" (Fpath.to_string d) (uerror e)
           in
           up [dir] (Fpath.parent dir)
       | Unix.Unix_error (Unix.EEXIST, _, _) -> ()
       | Unix.Unix_error (Unix.EINTR, _, _) -> make_path p
       | Unix.Unix_error (e, _, _) ->
-          Fmt.failwith_notrace "%s: %s" (Fpath.to_string dir) (uerr e)
+          Fmt.failwith_notrace "%s: %s" (Fpath.to_string dir) (uerror e)
 
     let fold_dir_filenames dir f acc =
       let rec closedir_noerr dh = try Unix.closedir dh with
@@ -148,7 +144,7 @@ module File_cache = struct
       | n -> filenames dh f (f acc n)
       | exception End_of_file -> acc
       | exception Unix.Unix_error (e, _, _) ->
-          Fmt.failwith_notrace "%s: %s" dir (uerr e)
+          Fmt.failwith_notrace "%s: %s" dir (uerror e)
       in
       match Unix.opendir dir with
       | dh ->
@@ -158,7 +154,7 @@ module File_cache = struct
           end
       | exception Unix.Unix_error (Unix.ENOENT, _, _) -> None
       | exception Unix.Unix_error (e, _, _) ->
-          Fmt.failwith_notrace "%s: %s" dir (uerr e)
+          Fmt.failwith_notrace "%s: %s" dir (uerror e)
 
     let dir_filenames dir = fold_dir_filenames dir (fun acc n -> n :: acc) []
     let dir_delete_files dir =
@@ -168,7 +164,8 @@ module File_cache = struct
         | Unix.Unix_error (Unix.ENOENT, _, _) -> ()
         | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ()
         | Unix.Unix_error (Unix.EINTR, _, _) -> delete_file dir () fname
-        | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" p (uerr e)
+        | Unix.Unix_error (e, _, _) ->
+            Fmt.failwith_notrace "%s: %s" p (uerror e)
       in
       ignore @@ fold_dir_filenames dir (delete_file dir) ()
 
@@ -177,7 +174,7 @@ module File_cache = struct
       | Unix.Unix_error (Unix.ENOENT, _, _) -> false
       | Unix.Unix_error (Unix.ENOTDIR, _, _) -> false
       | Unix.Unix_error (Unix.EINTR, _, _) -> dir_delete d
-      | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" d (uerr e)
+      | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" d (uerror e)
       in
       dir_delete_files dir; dir_delete dir
   end
@@ -206,7 +203,7 @@ module File_cache = struct
   type t = { dir : string; }
 
   let create dir =
-    Result.bind (Os.Dir.create ~make_path:true dir) @@ fun _ ->
+    let* _exists = Os.Dir.create ~make_path:true dir in
     let dir = Fpath.add_dir_sep dir (* assumed e.g. by key_dir *) in
     Ok { dir = Fpath.to_string dir }
 
@@ -259,7 +256,7 @@ module File_cache = struct
 
   let key_manifest_of_string ~root s =
     let path root rel =
-      let p = Fpath.of_string rel |> Result.to_failure in
+      let p = Fpath.of_string rel |> Result.error_to_failure in
       if Fpath.is_rel p then Fpath.(root // p) else
       Fmt.failwith_notrace "%a: path is not relative" Fpath.pp p
     in
@@ -285,7 +282,7 @@ module File_cache = struct
   let key_dir_stats kdir =
     let rec stat p = try Unix.stat p with
     | Unix.Unix_error (Unix.EINTR, _, _) -> stat p
-    | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" p (uerr e)
+    | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" p (uerror e)
     in
     let rec loop fc bc atime = function
     | [] -> fc, bc, atime
@@ -321,7 +318,7 @@ module File_cache = struct
     | Unix.Unix_error (Unix.ENOENT, _, _) -> false
     | Unix.Unix_error (Unix.EINTR, _, _) -> add_file ~src cfile
     | Unix.Unix_error (e, _, arg) ->
-        Fmt.failwith_notrace "%s: %s: %s" src arg (uerr e)
+        Fmt.failwith_notrace "%s: %s: %s" src arg (uerror e)
     in
     if not (Fs.mkdir kdir) then Fs.dir_delete_files kdir;
     let filenum_width = filenum_width (List.length fs) in
@@ -370,7 +367,7 @@ module File_cache = struct
       | Unix.Unix_error (Unix.EINTR, _, _) ->
           revive_file ~did_path cfile ~dst
       | Unix.Unix_error (e, _, arg) ->
-          Fmt.failwith_notrace "%a: %s: %s" Fpath.pp dst arg (uerr e)
+          Fmt.failwith_notrace "%a: %s: %s" Fpath.pp dst arg (uerror e)
     in
     let fs_len = List.length fs in
     let filenum_width = filenum_width fs_len in
@@ -508,9 +505,9 @@ module Op = struct
   type t =
     { id : id;
       mark : mark;
-      time_created : Mtime.span;
-      mutable time_started : Mtime.span;
-      mutable duration : Mtime.span;
+      time_created : Mtime.Span.t;
+      mutable time_started : Mtime.Span.t;
+      mutable duration : Mtime.Span.t;
       mutable revived : bool;
       mutable status : status;
       mutable reads : Fpath.t list;
@@ -871,7 +868,7 @@ module Reviver = struct
       cache : File_cache.t;
       buffer : Buffer.t; (* buffer to encode metadata *)
       mutable file_hashes : Hash.t Fpath.Map.t; (* file hash cache *)
-      mutable file_hash_dur : Mtime.span; (* total file hash duration *) }
+      mutable file_hash_dur : Mtime.Span.t; (* total file hash duration *) }
 
   let create clock hash_fun cache =
     let buffer = Buffer.create 1024 in
@@ -905,7 +902,7 @@ module Reviver = struct
   let hash_file r f = try Ok (_hash_file r f) with Failure e -> Error e
 
   let hash_op_reads r o acc =
-    let add_file_hash acc f = Hash.to_bytes (_hash_file r f) :: acc in
+    let add_file_hash acc f = Hash.to_binary_string (_hash_file r f) :: acc in
     List.fold_left add_file_hash acc (Op.reads o)
 
   let hash_spawn r o s =
@@ -913,7 +910,7 @@ module Reviver = struct
     let stdo_stamp = function `File _ -> "0" | `Tee _ -> "1" | `Ui -> "2" in
     let module H = (val r.hash_fun : Hash.T) in
     let acc = [Op.Spawn.stamp s] in
-    let acc = (Hash.to_bytes (_hash_file r (Op.Spawn.tool s))) :: acc in
+    let acc = (Hash.to_binary_string (_hash_file r (Op.Spawn.tool s))) :: acc in
     let acc = hash_op_reads r o acc in
     let acc = stdin_stamp (Op.Spawn.stdin s) :: acc in
     let acc = stdo_stamp (Op.Spawn.stdout s) :: acc in
@@ -1305,29 +1302,26 @@ module Exec = struct
     loop e spawn_limit
 
   let rec collect_spawns ~block e =
-    let relax () = ignore (Unix.select [] [] [] 0.0001) in
-    match e.spawn_count = 0 with
-    | true -> ()
-    | false ->
-        (* We don't (and can't through B0_std.Os.Cmd API constraints)
-           collect with -1 or 0 because library-wise we might collect
-           things we did not spawn. On Windows there wouldn't be the
-           choice anyways. This means that on a blocking collection
-           there's a bit of busy waiting involved, which we mitigate
-           with [relax]. Sys.sigchild and a self-pipe trick could be
-           used, but again library wise it's better if we can avoid
-           fiddling with signal handlers. *)
-        let old_spawn_count = e.spawn_count in
-        let collect spawns (pid, ui, o as p) =
-          match Os.Cmd.spawn_poll_status pid with
-          | Error _ as err -> finish_exec_spawn e o ui err; spawns
-          | Ok None -> p :: spawns
-          | Ok (Some st) -> finish_exec_spawn e o ui (Ok st); spawns
-        in
-        e.spawns <- List.fold_left collect [] e.spawns;
-        match block && old_spawn_count = e.spawn_count with
-        | true -> (* busy waiting *) relax (); collect_spawns ~block e
-        | false -> ()
+    if e.spawn_count = 0 then () else
+    (* We don't (and can't through B0_std.Os.Cmd API constraints)
+       collect with -1 or 0 because library-wise we might collect
+       things we did not spawn. On Windows there wouldn't be the
+       choice anyways. This means that on a blocking collection
+       there's a bit of busy waiting involved, which we mitigate
+       with [relax]. Sys.sigchild and a self-pipe trick could be
+       used, but again library wise it's better if we can avoid
+       fiddling with signal handlers. *)
+    let old_spawn_count = e.spawn_count in
+    let collect spawns (pid, ui, o as p) =
+      match Os.Cmd.spawn_poll_status pid with
+      | Error _ as err -> finish_exec_spawn e o ui err; spawns
+      | Ok None -> p :: spawns
+      | Ok (Some st) -> finish_exec_spawn e o ui (Ok st); spawns
+    in
+    e.spawns <- List.fold_left collect [] e.spawns;
+    match block && old_spawn_count = e.spawn_count with
+    | true -> (* busy waiting *) Os.relax (); collect_spawns ~block e
+    | false -> ()
 
   let all_done e = (* [true] iff nothing left todo *)
     Random_queue.length e.todo = 0 &&

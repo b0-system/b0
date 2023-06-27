@@ -82,7 +82,7 @@ module Conf = struct
       | Some v -> v
     in
     let where = Fpath.of_string (find "standard_library" fields) in
-    let where = where |> Result.to_failure in
+    let where = where |> Result.error_to_failure in
     let asm_ext = find "ext_asm" fields in
     let dll_ext = find "ext_dll" fields in
     let exe_ext = find "ext_exe" fields in
@@ -114,13 +114,13 @@ module Conf = struct
     | Error e -> B0_text_lines.file_error ?file (Fmt.str "OCaml config: %s" e)
 
   let write m ~comp ~o =
-    let comp = B0_memo.Memo.tool m comp in
-    B0_memo.Memo.spawn m ~writes:[o] ~stdout:(`File o) @@
-    comp (Cmd.atom "-config")
+    let comp = B0_memo.tool m comp in
+    B0_memo.spawn m ~writes:[o] ~stdout:(`File o) @@
+    comp (Cmd.arg "-config")
 
   let read m file =
-    let* s = B0_memo.Memo.read m file in
-    Fut.return (of_string ~file s |> B0_memo.Memo.fail_if_error m)
+    let* s = B0_memo.read m file in
+    Fut.return (of_string ~file s |> B0_memo.fail_if_error m)
 end
 module Mod = struct
   module Name = struct
@@ -256,7 +256,7 @@ module Mod = struct
         B0_text_lines.fold ~file data (parse_line ~src_root) Fpath.Map.empty
 
       let write ?src_root m ~srcs ~o =
-        let ocamldep = B0_memo.Memo.tool m Tool.ocamldep in
+        let ocamldep = B0_memo.tool m Tool.ocamldep in
         let srcs', cwd = match src_root with
         | None -> srcs, None
         | Some root ->
@@ -269,12 +269,12 @@ module Mod = struct
             *)
             srcs, None
         in
-        B0_memo.Memo.spawn m ?cwd ~reads:srcs ~writes:[o] ~stdout:(`File o) @@
-        ocamldep Cmd.(atom "-slash" % "-modules" %% paths srcs')
+        B0_memo.spawn m ?cwd ~reads:srcs ~writes:[o] ~stdout:(`File o) @@
+        ocamldep Cmd.(arg "-slash" % "-modules" %% paths srcs')
 
       let read ?src_root m file =
-        let* s = B0_memo.Memo.read m file in
-        Fut.return (of_string ?src_root ~file s |> B0_memo.Memo.fail_if_error m)
+        let* s = B0_memo.read m file in
+        Fut.return (of_string ?src_root ~file s |> B0_memo.fail_if_error m)
     end
 
     type t =
@@ -337,7 +337,7 @@ module Mod = struct
         match Name.Map.find_opt mname acc with
         | None -> Name.Map.add mname f acc
         | Some f' ->
-            B0_memo.Memo.notify m `Warn
+            B0_memo.notify m `Warn
               "@[<v>%a:@,File ignored. %a's module %s defined by file:@,%a:@]"
               Fpath.pp f Name.pp mname kind Fpath.pp f';
             acc
@@ -563,13 +563,13 @@ module Cobj = struct
 
   let write m ~cobjs ~o =
     (* FIXME add [src_root] so that we can properly unstamp. *)
-    let ocamlobjinfo = B0_memo.Memo.tool m Tool.ocamlobjinfo in
-    B0_memo.Memo.spawn m ~reads:cobjs ~writes:[o] ~stdout:(`File o) @@
-    ocamlobjinfo Cmd.(atom "-no-approx" % "-no-code" %% paths cobjs)
+    let ocamlobjinfo = B0_memo.tool m Tool.ocamlobjinfo in
+    B0_memo.spawn m ~reads:cobjs ~writes:[o] ~stdout:(`File o) @@
+    ocamlobjinfo Cmd.(arg "-no-approx" % "-no-code" %% paths cobjs)
 
   let read m file =
-    let* s = B0_memo.Memo.read m file in
-    Fut.return (of_string ~file s |> B0_memo.Memo.fail_if_error m)
+    let* s = B0_memo.read m file in
+    Fut.return (of_string ~file s |> B0_memo.fail_if_error m)
 end
 
 (* Libraries *)
@@ -628,7 +628,7 @@ module Lib = struct
     let of_string s = Result.bind (name_to_fpath s) @@ fun name -> Ok name
     let to_string n = fpath_to_name n
     let to_fpath n = n
-    let v s = of_string s |> Result.to_invalid_arg
+    let v s = match of_string s with Ok v -> v | Error e -> invalid_arg e
     let equal = Fpath.equal
     let compare = Fpath.compare
     let pp = Fmt.using to_string (Fmt.code Fmt.string)
@@ -662,7 +662,7 @@ module Lib = struct
     Result.map_error (fun e -> Fmt.str "library %a: %s" Name.pp name e) @@
     Result.bind (Os.Dir.exists dir) @@ function
     | false ->
-        B0_memo.Memo.notify m `Warn "library %a: no directory %a"
+        B0_memo.notify m `Warn "library %a: no directory %a"
           Name.pp name Fpath.pp dir;
         Ok (v ~name ~requires ~dir ~cmis:[] ~cmxs:[] ~cma:None ~cmxa:None
               ~c_archive:None ~c_stubs:[] ~js_stubs:[])
@@ -670,7 +670,7 @@ module Lib = struct
         Result.bind (Os.Dir.fold_files ~recurse:false Os.Dir.path_list dir [])
         @@ fun fs ->
         let js_stubs = List.map (fun f -> Fpath.(dir // f)) js_stubs in
-        let () = List.iter (B0_memo.Memo.file_ready m) js_stubs in
+        let () = List.iter (B0_memo.file_ready m) js_stubs in
         let rec loop cmis cmxs cma cmxa c_archive c_stubs = function
         | [] ->
             v ~name ~requires ~dir ~cmis ~cmxs ~cma ~cmxa ~c_archive ~c_stubs
@@ -682,25 +682,25 @@ module Lib = struct
             in
             match Fpath.get_ext f with
             | ".cmi" ->
-                B0_memo.Memo.file_ready m f;
+                B0_memo.file_ready m f;
                 loop (f :: cmis) cmxs cma cmxa c_archive c_stubs fs
             | ".cmx" ->
-                B0_memo.Memo.file_ready m f;
+                B0_memo.file_ready m f;
                 loop cmis (f :: cmxs) cma cmxa c_archive c_stubs fs
             | ".cma" ->
                 let cma = match is_lib_archive f with
-                | true -> B0_memo.Memo.file_ready m f; Some f
+                | true -> B0_memo.file_ready m f; Some f
                 | false -> cma
                 in
                 loop cmis cmxs cma cmxa c_archive c_stubs fs
             | ".cmxa" ->
                 let cmxa = match is_lib_archive f with
-                | true -> B0_memo.Memo.file_ready m f; Some f
+                | true -> B0_memo.file_ready m f; Some f
                 | false -> cmxa
                 in
                 loop cmis cmxs cma cmxa c_archive c_stubs fs
             | ext when String.equal ext clib_ext ->
-                B0_memo.Memo.file_ready m f;
+                B0_memo.file_ready m f;
                 let c_archive, c_stubs = match is_lib_archive f with
                 | true -> Some f, c_stubs
                 | false -> c_archive, (f :: c_stubs)
@@ -733,9 +733,9 @@ module Lib = struct
 
     (* Resolution scopes *)
 
-    type scope_find = Conf.t -> B0_memo.Memo.t -> Name.t -> lib option Fut.t
+    type scope_find = Conf.t -> B0_memo.t -> Name.t -> lib option Fut.t
     type scope_suggest =
-      Conf.t -> B0_memo.Memo.t -> Name.t -> string option Fut.t
+      Conf.t -> B0_memo.t -> Name.t -> string option Fut.t
 
     type scope = { name : string; find : scope_find; suggest : scope_suggest; }
 
@@ -746,15 +746,12 @@ module Lib = struct
 
     module Ocamlpath = struct
       (* Stubbed at the moment *)
-
-      let find ~cache_dir ~ocamlpath conf m n = Fut.return None
+      let find ~cache_dir conf m n = Fut.return None
       let suggest conf m n = Fut.return None
-      let scope ~cache_dir ~ocamlpath =
-        let find = find ~cache_dir ~ocamlpath in
+      let scope ~cache_dir =
+        let find = find ~cache_dir in
         { name = "OCAMLPATH"; find; suggest }
     end
-
-    let ocamlpath = Ocamlpath.scope
 
     module Ocamlfind = struct
       let tool = B0_memo.Tool.by_name "ocamlfind"
@@ -762,7 +759,7 @@ module Lib = struct
       let parse_info m ?(file = Fpath.dash) ~name s =
         let parse_requires requires =
           let to_libname s =
-            Result.to_failure @@
+            Result.error_to_failure @@
             Result.map_error (Fmt.str "required library: %s") @@
             Name.of_string s
           in
@@ -786,7 +783,7 @@ module Lib = struct
         let parse_js_stubs js_stubs =
           let stubs = String.cuts_left ~drop_empty:true ~sep:"," js_stubs in
           let to_path s =
-            Result.to_failure @@
+            Result.error_to_failure @@
             Result.map_error (Fmt.str "js stubs: %s") @@
             Fpath.of_string s
           in
@@ -798,7 +795,7 @@ module Lib = struct
               let requires = parse_requires requires in
               let archive = parse_archive archive in
               let dir =
-                Result.to_failure @@
+                Result.error_to_failure @@
                 Result.map_error (Fmt.str "library directory: %s") @@
                 Fpath.of_string dir
               in
@@ -814,7 +811,7 @@ module Lib = struct
 
       let write_info conf m n ~o =
         (* FIXME better [n] not found error *)
-        let ocamlfind = B0_memo.Memo.tool m tool in
+        let ocamlfind = B0_memo.tool m tool in
         let lib, predicates = match Name.to_string n with
         | "ocaml.threads" | "threads" | "threads.posix" ->
             if Conf.version conf < (5, 0, 0, None)
@@ -843,22 +840,22 @@ module Lib = struct
           "%m:%d:%A:%(requires):%(jsoo_runtime)"
         in
         let stdout = `File o in
-        B0_memo.Memo.spawn m
+        B0_memo.spawn m
           ~success_exits ~reads:[] ~writes:[o] ~stdout ~post_exec @@
-        ocamlfind Cmd.(atom "query" % lib % "-predicates" % predicates %
+        ocamlfind Cmd.(arg "query" % lib % "-predicates" % predicates %
                        "-format" % info)
 
       let read_info m clib_ext name file =
-        let* s = B0_memo.Memo.read m file in
+        let* s = B0_memo.read m file in
         match parse_info ~file m ~name s with
-        | Error _ as e -> B0_memo.Memo.fail_if_error m e
+        | Error _ as e -> B0_memo.fail_if_error m e
         | Ok (_meta, requires, dir, archive, js_stubs) ->
             let* lib =
               of_dir m ~clib_ext ~name ~requires ~dir ~archive ~js_stubs
             in
-            Fut.return (Some (B0_memo.Memo.fail_if_error m lib))
+            Fut.return (Some (B0_memo.fail_if_error m lib))
 
-      let find ~cache_dir ~ocamlpath conf m n =
+      let find ~cache_dir conf m n =
         (* This never returns None we should factor error reporting
            in *)
         let clib_ext = Conf.lib_ext conf in
@@ -869,20 +866,22 @@ module Lib = struct
 
       let suggest conf m n = Fut.return None
       let scope ~cache_dir =
-        let find = find ~cache_dir ~ocamlpath in
+        let find = find ~cache_dir in
         { name = "ocamlfind"; find; suggest }
     end
 
+    let cache_dir_name = "ocaml-lib"
+    let ocamlpath = Ocamlpath.scope
     let ocamlfind = Ocamlfind.scope
 
     type t =
-      { memo : B0_memo.Memo.t;
+      { memo : B0_memo.t;
         conf : Conf.t;
         scopes : scope list;
         mutable libs : lib option Fut.t Name.Map.t; }
 
     let create memo conf scopes =
-      let memo = B0_memo.Memo.with_mark memo "ocamlib" in
+      let memo = B0_memo.with_mark memo "ocamlib" in
       { memo; conf; scopes; libs = Name.Map.empty }
 
     let ocaml_conf r = r.conf
@@ -901,7 +900,7 @@ module Lib = struct
         loop r n r.scopes
 
     let get r n = Fut.bind (find r n) @@ function
-    | None -> B0_memo.Memo.fail r.memo "No OCaml library %a found" Name.pp n
+    | None -> B0_memo.fail r.memo "No OCaml library %a found" Name.pp n
     | Some lib -> Fut.return lib
 
     let get_list r ns = Fut.of_list (List.map (get r) ns)
@@ -925,13 +924,14 @@ end
 (* FIXME likely remove that *)
 
 module Ocamlpath = struct
-  let get_var parse var m = (* FIXME move that to B0_memo.Memo.env ? *)
-    let env = B0_memo.Env.env (B0_memo.Memo.env m) in
+  let get_var parse var m = (* FIXME move that to B0_memo.env ? *)
+    let env = B0_memo.Env.env (B0_memo.env m) in
     match String.Map.find_opt var env with
     | None | Some "" -> None
     | Some v ->
         match parse v with
-        | Error e -> B0_memo.Memo.fail m "parsing %a: %s" Fmt.(code string) var v
+        | Error e ->
+            B0_memo.fail m "parsing %a: %s" Fmt.(code string) var v
         | Ok v -> Some v
 
   let get m ps = match ps with
@@ -943,7 +943,7 @@ module Ocamlpath = struct
           match get_var Fpath.of_string "OPAM_SWITCH_PREFIX" m with
           | Some p -> Fut.return [Fpath.(p / "lib")]
           | None ->
-              B0_memo.Memo.fail m
+              B0_memo.fail m
                 "Could not determine an %a in the build environment."
                 Fmt.(code string) "OCAMLPATH"
 end
@@ -973,9 +973,9 @@ module Compile = struct
          output directory to perform the spawn. *)
     in
     let incs = incs_of_files reads in
-    B0_memo.Memo.spawn m ?post_exec ?k ~reads:(c :: reads) ~writes:[o] ~cwd @@
-    (B0_memo.Memo.tool m comp)
-      Cmd.(atom "-c" %% opts %% unstamp (incs %% path c))
+    B0_memo.spawn m ?post_exec ?k ~reads:(c :: reads) ~writes:[o] ~cwd @@
+    (B0_memo.tool m comp)
+      Cmd.(arg "-c" %% opts %% unstamp (incs %% path c))
 
   let mli_to_cmi ?post_exec ?k ~and_cmti m ~comp ~opts ~reads ~mli ~o =
     let base = Fpath.strip_ext o in
@@ -983,13 +983,13 @@ module Compile = struct
     let reads = mli :: reads in
     let writes = o :: if and_cmti then [Fpath.(base + ".cmti")] else [] in
     let incs = incs_of_files reads in
-    let bin_annot = Cmd.if' and_cmti (Cmd.atom "-bin-annot") in
+    let bin_annot = Cmd.if' and_cmti (Cmd.arg "-bin-annot") in
     let io = Cmd.(unstamp (path o %% incs %% path mli)) in
-    B0_memo.Memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
-    (B0_memo.Memo.tool m comp) Cmd.(atom "-c" %% bin_annot %% opts % "-o" %% io)
+    B0_memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
+    (B0_memo.tool m comp) Cmd.(arg "-c" %% bin_annot %% opts % "-o" %% io)
 
   let ml_to_cmo ?post_exec ?k ~and_cmt m ~opts ~reads ~has_cmi ~ml ~o =
-    let ocamlc = B0_memo.Memo.tool m Tool.ocamlc in
+    let ocamlc = B0_memo.tool m Tool.ocamlc in
     let base = Fpath.strip_ext o in
     let stamp = Fpath.basename base (* output depends on mod name *) in
     let reads = ml :: reads in
@@ -998,13 +998,13 @@ module Compile = struct
             add_if (not has_cmi) Fpath.(base + ".cmi") [])
     in
     let incs = incs_of_files reads in
-    let bin_annot = Cmd.if' and_cmt (Cmd.atom "-bin-annot") in
+    let bin_annot = Cmd.if' and_cmt (Cmd.arg "-bin-annot") in
     let io = Cmd.(unstamp (path o %% incs %% path ml)) in
-    B0_memo.Memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
-    ocamlc Cmd.(atom "-c" %% bin_annot %% opts % "-o" %% io)
+    B0_memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
+    ocamlc Cmd.(arg "-c" %% bin_annot %% opts % "-o" %% io)
 
   let ml_to_cmx ?post_exec ?k ~and_cmt m ~opts ~reads ~has_cmi ~ml ~o =
-    let ocamlopt = B0_memo.Memo.tool m Tool.ocamlopt in
+    let ocamlopt = B0_memo.tool m Tool.ocamlopt in
     let base = Fpath.strip_ext o in
     let stamp = Fpath.basename base (* output depends on mod name *) in
     let reads = ml :: reads in
@@ -1014,10 +1014,10 @@ module Compile = struct
        add_if (not has_cmi) Fpath.(base + ".cmi") [])
     in
     let incs = incs_of_files reads in
-    let bin_annot = Cmd.if' and_cmt (Cmd.atom "-bin-annot") in
+    let bin_annot = Cmd.if' and_cmt (Cmd.arg "-bin-annot") in
     let io = Cmd.(unstamp (path o %% incs %% path ml)) in
-    B0_memo.Memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
-    ocamlopt Cmd.(atom "-c" %% bin_annot %% opts % "-o" %% io)
+    B0_memo.spawn m ?post_exec ?k ~stamp ~reads ~writes @@
+    ocamlopt Cmd.(arg "-c" %% bin_annot %% opts % "-o" %% io)
 
   let ml_to_impl ?post_exec ?k m ~code ~opts ~reads ~has_cmi ~ml ~o ~and_cmt =
     let ml_to_obj = match code with `Byte -> ml_to_cmo | `Native -> ml_to_cmx in
@@ -1091,36 +1091,36 @@ module Archive = struct
   let cstubs ?post_exec ?k m ~conf ~opts ~c_objs ~odir ~oname =
     let lib_ext = Conf.lib_ext conf in
     let dll_ext = Conf.dll_ext conf in
-    let ocamlmklib = B0_memo.Memo.tool m Tool.ocamlmklib in
+    let ocamlmklib = B0_memo.tool m Tool.ocamlmklib in
     let o = Fpath.(odir / cstubs_name oname) in
     let writes =
       Fpath.(odir / cstubs_clib oname lib_ext) ::
       add_if (Conf.has_dynlink conf) Fpath.(odir / cstubs_dll oname dll_ext) []
     in
-    B0_memo.Memo.spawn ?post_exec ?k m ~reads:c_objs ~writes @@
+    B0_memo.spawn ?post_exec ?k m ~reads:c_objs ~writes @@
     ocamlmklib
-      Cmd.(atom "-o" %% unstamp (path o) %% opts %% unstamp (paths c_objs))
+      Cmd.(arg "-o" %% unstamp (path o) %% opts %% unstamp (paths c_objs))
 
   let byte ?post_exec ?k m ~conf ~opts ~has_cstubs ~cobjs ~odir ~oname =
-    let ocamlc = B0_memo.Memo.tool m Tool.ocamlc in
+    let ocamlc = B0_memo.tool m Tool.ocamlc in
     let cstubs_opts =
       if not has_cstubs then Cmd.empty else
       let lib = Fmt.str "-l%s" (cstubs_name oname) in
-      Cmd.(atom "-cclib" % lib %%
-           if' (Conf.has_dynlink conf) (atom "-dllib" % lib))
+      Cmd.(arg "-cclib" % lib %%
+           if' (Conf.has_dynlink conf) (arg "-dllib" % lib))
     in
     let cma = Fpath.(odir / Fmt.str "%s.cma" oname) in
-    B0_memo.Memo.spawn m ~reads:cobjs ~writes:[cma] @@
-    ocamlc Cmd.(atom "-a" % "-o" %% unstamp (path cma) %% opts %% cstubs_opts %%
+    B0_memo.spawn m ~reads:cobjs ~writes:[cma] @@
+    ocamlc Cmd.(arg "-a" % "-o" %% unstamp (path cma) %% opts %% cstubs_opts %%
                 unstamp (paths cobjs))
 
   let native ?post_exec ?k m ~conf ~opts ~has_cstubs ~cobjs ~odir ~oname =
-    let ocamlopt = B0_memo.Memo.tool m Tool.ocamlopt in
+    let ocamlopt = B0_memo.tool m Tool.ocamlopt in
     let lib_ext = Conf.lib_ext conf in
     let obj_ext = Conf.obj_ext conf in
     let cstubs_opts =
       if not has_cstubs then Cmd.empty else
-      Cmd.(atom "-cclib" % Fmt.str "-l%s" (cstubs_name oname))
+      Cmd.(arg "-cclib" % Fmt.str "-l%s" (cstubs_name oname))
     in
     let cmxa_clib =
       if cobjs = [] && Conf.version conf >= (4, 13, 0, None)
@@ -1131,8 +1131,8 @@ module Archive = struct
     let writes = cmxa :: cmxa_clib in
     let c_objs = List.rev_map (Fpath.set_ext obj_ext) cobjs in
     let reads = List.rev_append c_objs cobjs in
-    B0_memo.Memo.spawn m ?post_exec ?k ~reads ~writes @@
-    ocamlopt Cmd.(atom "-a" % "-o" %% unstamp (path cmxa) %% opts %%
+    B0_memo.spawn m ?post_exec ?k ~reads ~writes @@
+    ocamlopt Cmd.(arg "-a" % "-o" %% unstamp (path cmxa) %% opts %%
                   cstubs_opts %% unstamp (paths cobjs))
 
   let code ?post_exec ?k m ~conf ~opts ~code ~has_cstubs ~cobjs ~odir ~oname =
@@ -1141,7 +1141,7 @@ module Archive = struct
 
   let native_dynlink ?post_exec ?k m ~conf ~opts ~has_cstubs ~cmxa ~o =
     let lib_ext = Conf.lib_ext conf in
-    let ocamlopt = B0_memo.Memo.tool m Tool.ocamlopt in
+    let ocamlopt = B0_memo.tool m Tool.ocamlopt in
     let cmxa_clib = Fpath.(cmxa -+ lib_ext) in
     let cstubs_opts, reads =
       if not has_cstubs then Cmd.empty, [cmxa; cmxa_clib] else
@@ -1149,11 +1149,11 @@ module Archive = struct
       let oname = Fpath.basename ~no_ext:true cmxa in
       let cstubs_dir = Fpath.(parent cmxa) in
       let cstubs = Fpath.(cstubs_dir / cstubs_clib oname lib_ext) in
-      let inc = Cmd.(atom "-I" %% unstamp (path cstubs_dir)) in
+      let inc = Cmd.(arg "-I" %% unstamp (path cstubs_dir)) in
       Cmd.(inc %% unstamp (path cstubs)), [cstubs; cmxa; cmxa_clib]
     in
-    B0_memo.Memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
-    ocamlopt Cmd.(atom "-shared" % "-linkall" % "-o" %% unstamp (path o) %%
+    B0_memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
+    ocamlopt Cmd.(arg "-shared" % "-linkall" % "-o" %% unstamp (path o) %%
                   opts %% cstubs_opts %% unstamp (path cmxa))
 end
 
@@ -1168,15 +1168,15 @@ module Link = struct
     Cmd.paths ~slip:"-I" (Fpath.Set.elements incs)
 
   let byte ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~o =
-    let ocamlc = B0_memo.Memo.tool m Tool.ocamlc in
+    let ocamlc = B0_memo.tool m Tool.ocamlc in
     let reads = List.rev_append cobjs c_objs in
     let incs = cstubs_incs cobjs in
-    B0_memo.Memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
-    ocamlc Cmd.(atom "-o" %% unstamp (path o) %% opts %%
+    B0_memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
+    ocamlc Cmd.(arg "-o" %% unstamp (path o) %% opts %%
                 unstamp (incs %% paths c_objs %% paths cobjs))
 
   let native ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~o =
-    let ocamlopt = B0_memo.Memo.tool m Tool.ocamlopt in
+    let ocamlopt = B0_memo.tool m Tool.ocamlopt in
     let obj_ext = Conf.obj_ext conf in
     let incs = cstubs_incs cobjs in
     let reads, cobjs =
@@ -1200,8 +1200,8 @@ module Link = struct
       in
       loop [] [] cobjs
     in
-    B0_memo.Memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
-    ocamlopt Cmd.(atom "-o" %% unstamp (path o) %% opts %%
+    B0_memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
+    ocamlopt Cmd.(arg "-o" %% unstamp (path o) %% opts %%
                   unstamp (incs %% paths c_objs %% paths cobjs))
 
   let code ?post_exec ?k m ~conf ~opts ~code ~c_objs ~cobjs ~o =
@@ -1256,7 +1256,7 @@ module Meta = struct
 
   let mod_srcs = (* FIXME don't do that. *)
     let pp_value = Fmt.any "<dynamic>" in
-    B0_meta.Key.v "srcs" ~doc:"Module sources" ~pp_value
+    B0_meta.Key.v "mod-srcs" ~doc:"Module sources" ~pp_value
 
   let supported_code =
     let pp_value = pp_built_code in
@@ -1280,10 +1280,10 @@ let needed_code s m =
     | Some `Native, Some `Native -> acc
     | Some `Native, Some `Byte -> Some `All
   in
-  let* b = B0_memo.Store.get s B0_build.self in
+  let* b = B0_store.get s B0_build.self in
   Fut.return (B0_unit.Set.fold find_need (B0_build.may_build b) None)
 
-let wanted_code = B0_memo.Store.key (fun _ _ -> Fut.return `Auto)
+let wanted_code = B0_store.key (fun _ _ -> Fut.return `Auto)
 let built_code =
   let of_wanted_code s m = function
   | #built_code as v -> Fut.return v
@@ -1292,29 +1292,29 @@ let built_code =
       match need with
       | Some need -> Fut.return need
       | None ->
-          let* ocamlopt = B0_memo.Memo.tool_opt m Tool.ocamlopt in
+          let* ocamlopt = B0_memo.tool_opt m Tool.ocamlopt in
           Fut.return @@ if Option.is_some ocamlopt then `Native else `Byte
   in
   let det s m =
-    let* wanted = B0_memo.Store.get s wanted_code in
+    let* wanted = B0_store.get s wanted_code in
     of_wanted_code s m wanted
   in
-  B0_memo.Store.key det
+  B0_store.key det
 
-let conf : Conf.t B0_memo.Store.key =
+let conf : Conf.t B0_store.key =
   let conf_comp s m =
     let of_built_code = function
     | `Native | `All -> Tool.ocamlopt | `Byte -> Tool.ocamlc
     in
-    Fut.map of_built_code (B0_memo.Store.get s built_code)
+    Fut.map of_built_code (B0_store.get s built_code)
   in
   let det s m =
     let* comp = conf_comp s m in
-    let file = Fpath.(B0_memo.Store.dir s / B0_memo.Memo.mark m) in
+    let file = Fpath.(B0_store.dir s / B0_memo.mark m) in
     Conf.write m ~comp ~o:file;
     Conf.read m file
   in
-  B0_memo.Store.key ~mark:"ocaml.conf" det
+  B0_store.key ~mark:"ocaml.conf" det
 
 let version b = Fut.map Conf.version (B0_build.get b conf)
 
@@ -1325,9 +1325,9 @@ let lib_of_unit b ocaml_conf u =
   B0_build.require b u;
   let m = B0_build.memo b in
   let build_dir = B0_build.build_dir b u in
-  let name = B0_unit.get_meta Meta.library u |> B0_memo.Memo.fail_if_error m in
+  let name = B0_unit.get_meta Meta.library u |> B0_memo.fail_if_error m in
   let requires =
-    B0_unit.get_meta Meta.requires u |> B0_memo.Memo.fail_if_error m
+    B0_unit.get_meta Meta.requires u |> B0_memo.fail_if_error m
   in
   let archive = Lib.Name.to_archive_name name in
   let base = Fpath.(build_dir / archive) in
@@ -1335,7 +1335,7 @@ let lib_of_unit b ocaml_conf u =
   let cmxa = Some Fpath.(base + ".cmxa") in
   let c_archive = Some Fpath.(base + (Conf.lib_ext ocaml_conf)) in
   let c_stubs = [] (* FIXME *) in
-  let* srcs = B0_unit.get_meta Meta.mod_srcs u |> B0_memo.Memo.fail_if_error m in
+  let* srcs = B0_unit.get_meta Meta.mod_srcs u |> B0_memo.fail_if_error m in
   let cmis, cmxs =
     let rec loop cmis cmxs = function
     | [] -> cmis, cmxs
@@ -1364,7 +1364,7 @@ let libs_in_build
           let lib = lazy (lib_of_unit b conf u) in
           Lib.Name.Map.add lib_name (u, lib) acc
       | Some (lib_u, _) ->
-          B0_memo.Memo.notify (B0_build.memo b)
+          B0_memo.notify (B0_build.memo b)
             `Warn "@[OCaml library %a already defined in unit %a.@,\
                    Ignoring definition in unit %a@]"
             Lib.Name.pp lib_name B0_unit.pp_name lib_u B0_unit.pp_name u;
@@ -1383,17 +1383,18 @@ let lib_resolver_build_scope b conf =
   Lib.Resolver.scope ~name ~find ~suggest
 
 let default_lib_resolver store m =
-  let* b = B0_memo.Store.get store B0_build.self in
+  let* b = B0_store.get store B0_build.self in
   let* ocaml_conf = B0_build.get b conf in
   let build_scope = lib_resolver_build_scope b ocaml_conf in
-  let* ocamlpath = Ocamlpath.get m None in
-  let cache_dir = Fpath.(B0_build.shared_build_dir b / "ocamlib") in
-  let ocamlpath = Lib.Resolver.ocamlpath ~cache_dir ~ocamlpath in
+  let cache_dir =
+    Fpath.(B0_build.shared_build_dir b / Lib.Resolver.cache_dir_name)
+  in
+(*  let ocamlpath = Lib.Resolver.ocamlpath ~cache_dir in *)
   let ocamlfind = Lib.Resolver.ocamlfind ~cache_dir in
   Fut.return @@
-  Lib.Resolver.create m ocaml_conf [build_scope; ocamlpath; ocamlfind]
+  Lib.Resolver.create m ocaml_conf [build_scope; (* ocamlpath; *) ocamlfind]
 
-let lib_resolver = B0_memo.Store.key ~mark:"b0.ocamlib"  default_lib_resolver
+let lib_resolver = B0_store.key ~mark:"b0.ocamlib"  default_lib_resolver
 
 (* Compile *)
 
@@ -1410,7 +1411,7 @@ let compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs =
           Compile.c_to_o m ~comp ~opts ~reads:hs ~c ~o;
           loop (o :: os) (String.Map.add cname c cunits) hs cs
       | f ->
-          B0_memo.Memo.notify m `Warn
+          B0_memo.notify m `Warn
             "@[<v>%a:@,File ignored. %s's compilation unit already defined \
              by file:@,%a:@]"
             Fpath.pp c cname Fpath.pp f;
@@ -1442,7 +1443,7 @@ let exe_proc set_exe_path set_mod_srcs srcs b =
   let* comp_requires = Lib.Resolver.get_list resolver requires in
   let exe_name = B0_meta.get B0_meta.exe_name meta in
   let exe_ext = Conf.exe_ext conf in
-  let opts = Cmd.(atom "-g") (* TODO *) in
+  let opts = Cmd.(arg "-g") (* TODO *) in
   let o = Fpath.(build_dir / (exe_name ^ exe_ext)) in
   set_exe_path o;  (* FIXME introduce a general mecanism for that *)
   let code = match unit_code with `All | `Native -> `Native |`Byte -> `Byte in
@@ -1494,7 +1495,7 @@ let lib_proc set_mod_srcs srcs b =
   let requires = B0_meta.get Meta.requires meta in
   let library = B0_meta.get Meta.library meta in
   let archive_name = Lib.Name.to_archive_name library in
-  let opts = Cmd.(atom "-g") (* TODO *) in
+  let opts = Cmd.(arg "-g") (* TODO *) in
   let* built_code = B0_build.get b built_code in
   let* conf = B0_build.get b conf in
   let* resolver = B0_build.get b lib_resolver in

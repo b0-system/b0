@@ -225,24 +225,24 @@ val dec_hash : Hash.t dec
 val hash : Hash.t t
 (** [hash] is a codec for {!B0_std.Hash.t} *)
 
-(** {2:time_span [Time.span]} *)
+(** {2:mtime_span [Mtime.Span.t]} *)
 
-val enc_time_span : Mtime.span enc
-(** [enc_time_span] encodes a {!B0_std.Mtime.type-span}. *)
+val enc_mtime_span : Mtime.Span.t enc
+(** [enc_mtime_span] encodes a {!B0_std.Mtime.Span.t}. *)
 
-val dec_time_span : Mtime.span dec
-(** [dec_time_span] decodes a {!B0_std.Mtime.type-span}. *)
+val dec_mtime_span : Mtime.Span.t dec
+(** [dec_mtime_span] decodes a {!B0_std.Mtime.Span.t}. *)
 
-val time_span : Mtime.span t
-(** [time_span] is a codec for {!B0_std.Mtime.type-span}. *)
+val mtime_span : Mtime.Span.t t
+(** [mtime_span] is a codec for {!B0_std.Mtime.Span.t}. *)
 
-(** {2:time_cpu_span [Time.cpu_span]} *)
+(** {2:os_cpu_time_span [Os.Cpu.Time.Span.t]} *)
 
-val enc_cpu_time_span : Os.Cpu.Time.span enc
-(** [enc_cpu_time_span] encodes a {!B0_std.Os.Cpu.Time.type-span}. *)
+val enc_cpu_time_span : Os.Cpu.Time.Span.t enc
+(** [enc_cpu_time_span] encodes a {!B0_std.Os.Cpu.Time.Span.t}. *)
 
-val dec_cpu_time_span : Os.Cpu.Time.span dec
-(** [dec_cpu_time_span] decodes a {!B0_std.Os.Cpu.Time.type-span}. *)
+val dec_cpu_time_span : Os.Cpu.Time.Span.t dec
+(** [dec_cpu_time_span] decodes a {!B0_std.Os.Cpu.Time.Span.t}. *)
 
-val cpu_time_span : Os.Cpu.Time.span t
-(** [cpu_time_span] is a codec for {!B0_std.Os.Cpu.Time.type-span}. *)
+val cpu_time_span : Os.Cpu.Time.Span.t t
+(** [cpu_time_span] is a codec for {!B0_std.Os.Cpu.Time.Span.t}. *)

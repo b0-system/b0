@@ -33,6 +33,7 @@ let cmds =
     B0_cmd_cmdlet.cmd;
     B0_cmd_cmd.cmd;
     B0_cmd_delete.cmd;
+    B0_cmd_export.cmd;
     B0_cmd_file.cmd;
     B0_cmd_list.cmd;
     B0_cmd_log.cmd;

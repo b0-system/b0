@@ -260,7 +260,7 @@ let get_include_src b0_file (p, smeta) =
     Ok (file, src)
   in
   match src with
-  | Ok (file, src) -> of_string ~file src |> Result.to_failure
+  | Ok (file, src) -> of_string ~file src |> Result.error_to_failure
   | Error e ->
       (* We could do a bit better with e here *)
       loc_err_fmt Fmt.failwith_notrace smeta "%s" e

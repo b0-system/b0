@@ -9,16 +9,16 @@ open Test_memo_setup
 let cat = B0_memo.Tool.by_name "cat"
 let echo = B0_memo.Tool.by_name "echo"
 let echo m ~reads ~writes f msg =
-  let echo = B0_memo.Memo.tool m echo in
-  B0_memo.Memo.spawn m ~reads ~writes ~stdout:(`File f) @@ echo (Cmd.atom msg)
+  let echo = B0_memo.tool m echo in
+  B0_memo.spawn m ~reads ~writes ~stdout:(`File f) @@ echo (Cmd.arg msg)
 
 let cannot_read build_dir m =
-  let cat = B0_memo.Memo.tool m cat in
+  let cat = B0_memo.tool m cat in
   let f file = Fpath.(build_dir / file) in
   let r = f "nosuchfile" in
   let w = f "out" in
-  B0_memo.Memo.file_ready m r;
-  B0_memo.Memo.spawn m ~reads:[r] ~writes:[w] ~stdout:(`File w) @@
+  B0_memo.file_ready m r;
+  B0_memo.spawn m ~reads:[r] ~writes:[w] ~stdout:(`File w) @@
   cat Cmd.(path r)
 
 let did_not_write build_dir m =
@@ -28,9 +28,9 @@ let did_not_write build_dir m =
 
 let failures build_dir m =
   let f file = Fpath.(build_dir / file) in
-  let cat = B0_memo.Memo.tool m cat in
+  let cat = B0_memo.tool m cat in
   let r = f "doesnotexist" and o = f "o" in
-  B0_memo.Memo.spawn
+  B0_memo.spawn
     m ~reads:[] ~writes:[o] ~stdout:(`File o) @@ cat (Cmd.path r)
 
 (* Test stuck builds *)

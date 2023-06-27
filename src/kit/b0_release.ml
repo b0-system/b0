@@ -90,7 +90,7 @@ let src_archive_url_of_pack ~version p =
       match B0_pack.find_meta B0_meta.homepage p with
       | None -> err ()
       | Some h ->
-          let is_github = match B0_http.Uri.parse_authority h with
+          let is_github = match B0_http.Url.authority h with
           | None -> false
           | Some auth ->
               match String.split_on_char '.' auth with

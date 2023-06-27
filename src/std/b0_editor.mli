@@ -16,10 +16,12 @@ module Env : sig
 
   val editor : string
   (** [editor] is [EDITOR]. *)
+
+  val infos : Cmdliner.Cmd.Env.info list
+  (** [infos] describes the [VISUAL] and [EDITOR] environment variables. *)
 end
 
-val envs : unit -> Cmdliner.Cmd.Env.info list
-(** [envs ()] describe the [VISUAL] and [EDITOR] environment variables. *)
+
 
 (** {1:edit Editing} *)
 

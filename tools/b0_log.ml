@@ -27,7 +27,7 @@ let log_file =
 
 let tool =
   let doc = "Operate on B0 log files" in
-  let envs = B0_pager.envs () in
+  let envs = B0_pager.Env.infos in
   let man_xrefs = [`Tool "b0"; `Tool "b0-cache"; `Tool "b0-hash" ] in
   let man = [
     `S Manpage.s_description;

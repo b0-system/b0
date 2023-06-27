@@ -49,7 +49,7 @@ module Conf = struct
       jobs : int;
       log_level : Log.level;
       no_pager : bool;
-      memo : (B0_memo.Memo.t, string) result Lazy.t;
+      memo : (B0_memo.t, string) result Lazy.t;
       tty_cap : Tty.cap; }
 
   let memo ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs =
@@ -59,7 +59,7 @@ module Conf = struct
       B0_cli.Memo.pp_leveled_feedback ~op_howto ~show_op ~show_ui ~level
         Fmt.stderr
     in
-    B0_memo.Memo.memo ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs ~feedback ()
+    B0_memo.make ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs ~feedback ()
 
   let v
       ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~hash_fun ~jobs
@@ -228,8 +228,8 @@ module Compile = struct
 
   let write_src m c esrc ~src_file  =
     let reads = B0_file.expanded_file_manifest esrc in
-    List.iter (B0_memo.Memo.file_ready m) reads;
-    B0_memo.Memo.write m ~reads src_file @@ fun () ->
+    List.iter (B0_memo.file_ready m) reads;
+    B0_memo.write m ~reads src_file @@ fun () ->
     Ok (B0_file.expanded_src esrc)
 
   let base_ext_libs =
@@ -258,17 +258,17 @@ module Compile = struct
               ~js_stubs:[]
           in
           match lib with
-          | Error _ as e -> B0_memo.Memo.fail_if_error m e
+          | Error _ as e -> B0_memo.fail_if_error m e
           | Ok lib -> Fut.return lib
         in
         Fut.of_list (List.map boot_lib libs)
 
   let find_libs m ocaml_conf ~build_dir ~driver ~requires =
-    let* ocamlpath = B0_ocaml.Ocamlpath.get m None in
-    let cache_dir = Fpath.(build_dir / "ocamlib") in
-    let ocamlpath = B0_ocaml.Lib.Resolver.ocamlpath ~cache_dir ~ocamlpath in
+    let cache_dir = Fpath.(build_dir / B0_ocaml.Lib.Resolver.cache_dir_name) in
+    (* let ocamlpath = B0_ocaml.Lib.Resolver.ocamlpath ~cache_dir in *)
     let ocamlfind = B0_ocaml.Lib.Resolver.ocamlfind ~cache_dir in
-    let r = B0_ocaml.Lib.Resolver.create m ocaml_conf [ocamlpath; ocamlfind] in
+    let scopes = [(*ocamlpath;*) ocamlfind] in
+    let r = B0_ocaml.Lib.Resolver.create m ocaml_conf scopes in
     let requires = List.map fst requires in
     let* requires = find_libs m r requires in
     (* FIXME we are loosing locations here would be nice to
@@ -290,7 +290,7 @@ module Compile = struct
   | Some (`Byte as c) -> Fut.return (B0_ocaml.Tool.ocamlc, c)
   | Some (`Native as c) -> Fut.return (B0_ocaml.Tool.ocamlopt, c)
   | None ->
-      let* ocamlopt = B0_memo.Memo.tool_opt m B0_ocaml.Tool.ocamlopt in
+      let* ocamlopt = B0_memo.tool_opt m B0_ocaml.Tool.ocamlopt in
       match ocamlopt with
       | None -> Fut.return (B0_ocaml.Tool.ocamlc, `Byte)
       | Some comp -> Fut.return (B0_ocaml.Tool.ocamlopt, `Native)
@@ -301,8 +301,8 @@ module Compile = struct
     B0_ocaml.Conf.write m ~comp ~o:ocaml_conf;
     let* ocaml_conf = B0_ocaml.Conf.read m ocaml_conf in
     let obj_ext = B0_ocaml.Conf.obj_ext ocaml_conf in
-    let comp = B0_memo.Memo.tool m comp in
-    let esrc = B0_memo.Memo.fail_if_error m (B0_file.expand src) in
+    let comp = B0_memo.tool m comp in
+    let esrc = B0_memo.fail_if_error m (B0_file.expand src) in
     let requires = B0_file.expanded_requires esrc in
     let* all_libs, seen_libs =
       find_libs m ocaml_conf ~build_dir ~driver ~requires
@@ -328,10 +328,10 @@ module Compile = struct
     let c_archives = List.filter_map B0_ocaml.Lib.c_archive all_libs in
     let ars = List.rev_append archives c_archives in
     (* FIXME this should be done b the resolver *)
-    List.iter (B0_memo.Memo.file_ready m) ars;
+    List.iter (B0_memo.file_ready m) ars;
     let reads = src_file :: ars in
-    B0_memo.Memo.spawn m ~reads ~writes @@
-    comp Cmd.(atom "-linkall" % "-g" % "-o" %% unstamp (path exe) % "-opaque" %%
+    B0_memo.spawn m ~reads ~writes @@
+    comp Cmd.(arg "-linkall" % "-g" % "-o" %% unstamp (path exe) % "-opaque" %%
               incs %% (unstamp @@ (paths archives %% path src_file)));
     Fut.return ()
 
@@ -347,14 +347,14 @@ module Compile = struct
        have similar setup/log/reporting bits. *)
     Os.Exit.on_sigint
       ~hook:(fun () -> write_log_file ~log_file m) @@ fun () ->
-    B0_memo.Memo.run_proc m begin fun () ->
-      let* () = B0_memo.Memo.delete m build_dir in
-      let* () = B0_memo.Memo.mkdir m build_dir in
+    B0_memo.run_proc m begin fun () ->
+      let* () = B0_memo.delete m build_dir in
+      let* () = B0_memo.mkdir m build_dir in
       compile_src m c ~driver ~build_dir src ~exe
     end;
-    B0_memo.Memo.stir ~block:true m;
+    B0_memo.stir ~block:true m;
     write_log_file ~log_file m;
-    match B0_memo.Memo.status m with
+    match B0_memo.status m with
     | Ok () -> Ok exe
     | Error e ->
         let name = name driver in

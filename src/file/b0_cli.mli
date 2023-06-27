@@ -334,7 +334,7 @@ module Memo : sig
   val pp_leveled_feedback :
     ?sep:unit Fmt.t -> ?op_howto:B0_zero.Op.t Fmt.t -> show_op:Log.level ->
     show_ui:Log.level -> level:Log.level ->
-    [B0_memo.Memo.feedback | B0_zero.Exec.feedback] Fmt.t
+    [B0_memo.feedback | B0_zero.Exec.feedback] Fmt.t
   (** [pp_leveled_feedback ~sep ~op_howto ~show_spawn_ui ~show_success ~level
       ppf] formats memo feedback on [ppf] followed by [sep] iff something
       is printed (defaults to {!B0_std.Fmt.flush_nl}).
@@ -522,7 +522,7 @@ module Memo : sig
     type t
     (** The type for {!B0_memo.Memo} logs. *)
 
-    val of_memo : B0_memo.Memo.t -> t
+    val of_memo : B0_memo.t -> t
     (** [of_memo m] is a log for memo [m]. *)
 
     val hash_fun : t -> string
@@ -531,15 +531,15 @@ module Memo : sig
     val file_hashes : t -> Hash.t Fpath.Map.t
     (** [file_hashes l] has all the files that were hashed through the memo. *)
 
-    val hash_dur : t -> Mtime.span
+    val hash_dur : t -> Mtime.Span.t
     (** [hash_dur l] is the time span spent hashing. *)
 
-    val total_dur : t -> Mtime.span
-    (** [total_dur l] is the time spanning from {!B0_memo.Memo.create} to
+    val total_dur : t -> Mtime.Span.t
+    (** [total_dur l] is the time spanning from {!B0_memo.create} to
         {!of_memo}. *)
 
-    val cpu_dur : t -> Os.Cpu.Time.span
-    (** [cpu_dur l] is the CPU time spanning from {!B0_memo.Memo.create} to
+    val cpu_dur : t -> Os.Cpu.Time.Span.t
+    (** [cpu_dur l] is the CPU time spanning from {!B0_memo.create} to
         {!of_memo}. *)
 
     val jobs : t -> int

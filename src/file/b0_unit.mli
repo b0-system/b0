@@ -98,7 +98,7 @@ include B0_def.S with type t := t
 module Build : sig
   type build_unit = t
   type t = build
-  val memo : t -> B0_memo.Memo.t
+  val memo : t -> B0_memo.t
   val must_build : t -> Set.t
   val may_build : t -> Set.t
   val require : t -> build_unit -> unit
@@ -113,12 +113,12 @@ module Build : sig
   val in_scope_dir : t -> Fpath.t -> Fpath.t
   val in_shared_build_dir : t -> Fpath.t -> Fpath.t
   val create :
-    root_dir:Fpath.t -> b0_dir:Fpath.t -> variant:string -> B0_memo.Memo.t ->
+    root_dir:Fpath.t -> b0_dir:Fpath.t -> variant:string -> B0_memo.t ->
     may_build:Set.t -> must_build:Set.t -> t
 
-  val store : t -> B0_memo.Store.t
-  val get : t -> 'a B0_memo.Store.key -> 'a Fut.t
-  val self : t B0_memo.Store.key
+  val store : t -> B0_store.t
+  val get : t -> 'a B0_store.key -> 'a Fut.t
+  val self : t B0_store.key
   val run : t -> (unit, unit) result
 end
 (**/**)

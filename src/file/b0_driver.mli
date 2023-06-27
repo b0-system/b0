@@ -114,7 +114,7 @@ module Conf : sig
   val log_level : t -> Log.level
   (** [log_level] is the desired log level. *)
 
-  val memo : t -> (B0_memo.Memo.t, string) result
+  val memo : t -> (B0_memo.t, string) result
   (** [memo] is the memoizer for the configuration. *)
 
   val no_pager : t -> bool

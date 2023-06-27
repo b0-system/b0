@@ -20,14 +20,14 @@ let find ?search ~pdf_viewer () =
   match pdf_viewer with
   | Some cmd -> Os.Cmd.find ?search cmd
   | None ->
-      Result.bind (Os.Cmd.find ?search Cmd.(atom "xdg-open")) @@ function
+      Result.bind (Os.Cmd.find ?search Cmd.(arg "xdg-open")) @@ function
       | Some xdg -> Ok (Some xdg)
       | None ->
-          Result.bind (Os.Cmd.find ?search Cmd.(atom "open")) @@ function
+          Result.bind (Os.Cmd.find ?search Cmd.(arg "open")) @@ function
           | Some oopen -> Ok (Some oopen)
           | None ->
               if Sys.win32
-              then Ok (Some Cmd.(atom "start" % "")) (* XXX really ? *)
+              then Ok (Some Cmd.(arg "start" % "")) (* XXX really ? *)
               else Ok None
 
 (* XXX support background *)
@@ -50,5 +50,6 @@ let pdf_viewer ?docs ?(opts = ["pdf-viewer"]) () =
      on Windows $(b,start) is used."
   in
   let absent = "OS dependent fallback"  in
-  let cmd = Arg.some B0_cli.cmd in
-  Arg.(value & opt cmd None & info opts ~env ~absent ~doc ?docs ~docv:"CMD")
+  let cmd = Arg.conv' ~docv:"CMD" (B0_std.Cmd.of_string, B0_std.Cmd.pp_dump) in
+  Arg.(value & opt (Arg.some cmd) None &
+       info opts ~env ~absent ~doc ?docs ~docv:"CMD")

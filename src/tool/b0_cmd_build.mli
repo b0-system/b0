@@ -8,7 +8,7 @@
 val memo :
   B0_driver.Conf.t ->
   may_build:B0_unit.Set.t -> must_build:B0_unit.Set.t ->
-  (B0_memo.Memo.t, string) result
+  (B0_memo.t, string) result
 
 val term : B0_std.Os.Exit.t Cmdliner.Term.t
 (** [term] is the command term for [build]. *)

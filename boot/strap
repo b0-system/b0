@@ -1,11 +1,11 @@
 #!/usr/bin/env ocaml
 (*---------------------------------------------------------------------------
    Copyright (c) 2020 The b0 programmers. All rights reserved.
-   Distributed under the ISC license, see terms at the end of the file.
+   SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
 (* See DEVEL.md for details.
-   Usage: ocaml b00t/strap [--debug | --no-exec | --clean] *)
+   Usage: ocaml boot/strap [--debug | --no-exec | --clean] *)
 
 let debug = ref false
 let ( / ) = Filename.concat
@@ -17,7 +17,7 @@ let log fmt = Printf.kfprintf (fun oc -> flush oc) stdout fmt
 
 let root_dir = Sys.getcwd ()
 let b0_file = root_dir / "B0.ml"
-let boot_dir = root_dir / "b00t"
+let boot_dir = root_dir / "boot"
 let boot_build_dir = boot_dir / "_build"
 let boot_exe = (boot_dir / "run") ^ (if Sys.win32 then ".exe" else "")
 
@@ -71,7 +71,7 @@ let run_cmd args =
   if exit = 0 then () else err_cmd exit cmd
 
 let read_cmd args =
-  let stdout = Filename.temp_file "b00t" (Filename.basename Sys.argv.(0)) in
+  let stdout = Filename.temp_file "boot" (Filename.basename Sys.argv.(0)) in
   at_exit (fun () -> try ignore (Sys.remove stdout) with _ -> ());
   let cmd = String.concat " " (List.map Filename.quote args) in
   let cmd = quote_cmd @@ strf "%s 1>%s" cmd (Filename.quote stdout) in
@@ -143,7 +143,7 @@ let ext_lib_archives = [cmdliner_archive; unix_archive]
    We concatenate the sorted source files of all needed B0 libraries
    with the B0 file to a single source. This source is compiled and
    linked along with the C stub sources in a single step in the
-   b00t/_build directory to produce the b00t/run executable. The build
+   boot/_build directory to produce the boot/run executable. The build
    directory exists in the repo to avoid having to mkdir which Sys
    doesn't provide. *)
 
@@ -197,7 +197,7 @@ let clean () =
   end
 
 let main () =
-  let usage = "Usage: ocaml b00t/strap [--no-exec | --clean] " in
+  let usage = "Usage: ocaml boot/strap [--no-exec | --clean] " in
   let cmd = ref (`Build `Exec) in
   let args =
     ["--debug", Arg.Set debug,
@@ -217,22 +217,6 @@ let main () =
       compile ();
       let c = Sys.command boot_exe in
       if c <> 0 then c else
-      (log "[DONE] Invoke 'source b00t/env' to use the bootstrapped b0.\n"; 0)
+      (log "[DONE] Invoke 'source boot/env' to use the bootstrapped b0.\n"; 0)
 
 let () = if !Sys.interactive then () else (exit (main ()))
-
-(*---------------------------------------------------------------------------
-   Copyright (c) 2020 The b0 programmers
-
-   Permission to use, copy, modify, and/or distribute this software for any
-   purpose with or without fee is hereby granted, provided that the above
-   copyright notice and this permission notice appear in all copies.
-
-   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-   WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-   MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-   ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-   WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-   ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-  ---------------------------------------------------------------------------*)

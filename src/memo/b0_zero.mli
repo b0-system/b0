@@ -53,10 +53,9 @@ end
     operation and the metadata has additional output information
     (e.g. exit codes, standard outputs, etc.).
 
-    For some scenarios it may still be useful to store relative
-    not only file contents but also relative file paths associated
-    to them. Thus for certain keys these are stored along side
-    the file contents.
+    For some scenarios it may still be useful to store not only file
+    contents but also relative file paths associated to them. Thus for
+    certain keys these are stored along side the file contents.
 
     {b Note.} In general, whenever a cache operation modifies the
     file system and errors with [Error _] the resulting file system
@@ -210,7 +209,7 @@ module Op : sig
     (** The type for file copies. *)
 
     val v_op :
-      id:id -> mark:mark -> created:Mtime.span -> ?post_exec:(op -> unit) ->
+      id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> mode:int -> linenum:int option -> src:Fpath.t ->
       Fpath.t -> op
     (** [v] declares a file copy operation, see the corresponding
@@ -246,7 +245,7 @@ module Op : sig
     (** The type for path deletion operations. *)
 
     val v_op :
-      id:id -> mark:mark -> created:Mtime.span -> ?post_exec:(op -> unit) ->
+      id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> Fpath.t -> op
     (** [v_op] declares a path deletion operation, see the corresponding
         accessors for the semantics of the various arguments. *)
@@ -271,7 +270,7 @@ module Op : sig
     (** The type for directory creation operations. *)
 
     val v_op :
-      id:id -> mark:mark -> mode:int -> created:Mtime.span ->
+      id:id -> mark:mark -> mode:int -> created:Mtime.Span.t ->
       ?post_exec:(op -> unit) -> ?k:(op -> unit) -> Fpath.t -> op
     (** [v_op] declares a directory creation operation, see the
         corresponding accessors for the semantics of the various
@@ -303,7 +302,7 @@ module Op : sig
     (** The type for kinds of notifications. *)
 
     val v_op :
-      id:id -> mark:mark -> created:Mtime.span -> ?post_exec:(op -> unit) ->
+      id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> kind -> string -> op
     (** [v_op] declares a notification operation see the corresponding
         accessors for the semantics of the various arguments. *)
@@ -331,7 +330,7 @@ module Op : sig
     (** The type for file read operations. *)
 
     val v_op :
-      id:id -> mark:mark -> created:Mtime.span -> ?post_exec:(op -> unit) ->
+      id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> Fpath.t -> op
     (** [v_op] declares a file read operation, see the corresponding
         accessors for the semantics of the various arguments. *)
@@ -380,7 +379,7 @@ module Op : sig
     (** The type for process spawn operations. *)
 
     val v_op :
-      id:id -> mark:mark -> created:Mtime.span -> reads:Fpath.t list ->
+      id:id -> mark:mark -> created:Mtime.Span.t -> reads:Fpath.t list ->
       writes:Fpath.t list -> ?writes_manifest_root:Fpath.t ->
       ?post_exec:(op -> unit) -> ?k:(op -> unit) ->
       stamp:string -> env:Os.Env.assignments ->
@@ -468,7 +467,7 @@ module Op : sig
     (** The type for wait files operations. *)
 
     val v_op :
-      id:id -> mark:mark -> created:Mtime.span -> ?post_exec:(op -> unit) ->
+      id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> Fpath.t list -> op
     (** [v] declares a wait files operation, these are stored in
           {!reads}. *)
@@ -486,7 +485,7 @@ module Op : sig
     (** The type for file write operations. *)
 
     val v_op :
-      id:id -> mark:mark -> created:Mtime.span -> ?post_exec:(op -> unit) ->
+      id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> stamp:string -> reads:Fpath.t list -> mode:int ->
       write:Fpath.t -> (unit -> (string, string) result) -> op
     (** [write] declares a file write operations, see the corresponding
@@ -533,8 +532,8 @@ module Op : sig
   (** [kind_name k] is an end user name for kind [k]. *)
 
   val v :
-    id -> mark:mark -> time_created:Mtime.span -> time_started:Mtime.span ->
-    duration:Mtime.span -> revived:bool -> status:status ->
+    id -> mark:mark -> time_created:Mtime.Span.t -> time_started:Mtime.Span.t ->
+    duration:Mtime.Span.t -> revived:bool -> status:status ->
     reads:Fpath.t list -> writes:Fpath.t list ->
     writes_manifest_root:Fpath.t option -> hash:Hash.t ->
     ?post_exec:(op -> unit) -> ?k:(op -> unit) -> kind -> t
@@ -556,23 +555,23 @@ module Op : sig
   val mark : t -> string
   (** [mark o] is the mark of [o]. *)
 
-  val time_created : t -> Mtime.span
+  val time_created : t -> Mtime.Span.t
   (** [time_created o] is [o]'s creation time. *)
 
-  val time_started : t -> Mtime.span
+  val time_started : t -> Mtime.Span.t
   (** [time_started o] is [o]'s execution start time. This is
       different from {!B0_std.Mtime.Span.max_span} once the operation has
       been submitted for execution. *)
 
-  val time_ended : t -> Mtime.span
+  val time_ended : t -> Mtime.Span.t
   (** [time_ended o] is [o]'s execution end time. This is different
       from {!B0_std.Mtime.Span.max_span} once the operation has been completed
       and collected. *)
 
-  val waited : t -> Mtime.span
+  val waited : t -> Mtime.Span.t
   (** [waited] is [o]'s waiting time between creation and execution. *)
 
-  val duration : t -> Mtime.span
+  val duration : t -> Mtime.Span.t
   (** [duration] is [o]'s execution duration time. *)
 
   val revived : t -> bool
@@ -624,10 +623,10 @@ module Op : sig
   (** [abort o] sets the status of [o] to {!Op.Aborted} and discards
       the operation closures (including kind specific ones). *)
 
-  val set_time_started : t -> Mtime.span -> unit
+  val set_time_started : t -> Mtime.Span.t -> unit
   (** [set_time_started o t] sets [o]'s execution start time to [t]. *)
 
-  val set_time_ended : t -> Mtime.span -> unit
+  val set_time_ended : t -> Mtime.Span.t -> unit
   (** [set_time_ended o t] sets [o]'s execution end time to [s]. *)
 
   val set_revived : t -> bool -> unit
@@ -770,7 +769,7 @@ module Reviver : sig
   val file_hashes : t -> Hash.t Fpath.Map.t
   (** [file_hashes r] is a map of the files that were hashed. *)
 
-  val file_hash_dur : t -> Mtime.span
+  val file_hash_dur : t -> Mtime.Span.t
   (** [file_hash_dur r] is the time spent hashing files. *)
 
   (** {1:record_and_revive Recording and reviving operations} *)

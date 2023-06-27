@@ -4,7 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
-open B0_std.Result.Syntax
+open Result.Syntax
 
 let () = B0_def.Scope.open_lib "opam"
 
@@ -25,7 +25,7 @@ let list_iter_stop_on_error f vs =
 
 (* [opam] tool *)
 
-let get_cmd ?search ?(cmd = Cmd.atom "opam") () = Os.Cmd.get ?search cmd
+let get_cmd ?search ?(cmd = Cmd.arg "opam") () = Os.Cmd.get ?search cmd
 let opam = lazy (get_cmd ())
 
 (* [opam] files *)
@@ -457,81 +457,6 @@ let file_cmdlet env constraints pkgs lint raw dst in_scope no_name =
 
 (* .opam.publish cmdlet *)
 
-(* Github pull requests
-
-   N.B. though maybe not full general, this is largely independent
-   from b0_opam, we could consider moving it to a B0_github.Pr
-   module. *)
-
-module Github_pr = struct
-  open B0_json
-  open B0_github
-
-  let info =
-    let info url id = url, id in
-    Jsonq.(succeed info $ mem "html_url" string $ mem "number" int)
-
-  let head_of_src ~src_repo ~src_branch =
-    Fmt.str "%s:%s" (Repo.owner src_repo) src_branch
-
-  let find httpr ~auth ~dst_repo ~dst_branch ~src_repo ~src_branch =
-    let params = (* not escaping :-( but these should be US-ASCII ids. *)
-      Fmt.str "?state=open&head=%s&base=%s"
-        (head_of_src ~src_repo ~src_branch) dst_branch
-    in
-    let path = Fmt.str "/pulls%s" params in
-    let* r = Repo.req_json_v3 httpr auth dst_repo ~path `GET `Empty in
-    let* infos = Jsonq.query (Jsonq.array info) r in
-    if infos = [] then Ok None else Ok (Some (List.hd infos))
-
-  let update httpr ~auth ~dst_repo ~pr_id ~msg =
-    let params = `Json Jsong.(obj |> mem "body" (string msg) |> obj_end) in
-    let path = Fmt.str "/pulls/%d" pr_id in
-    let* r = Repo.req_json_v3 httpr auth dst_repo ~path `PATCH params in
-    Jsonq.query info r
-
-  let create
-      httpr ~auth ~dst_repo ~dst_branch ~src_repo ~src_branch ~title ~msg
-    =
-    let params =
-      `Json Jsong.(obj
-                   |> mem "title" (string title)
-                   |> mem "head" (string (head_of_src ~src_repo ~src_branch))
-                   |> mem "base" (string dst_branch)
-                   |> mem "body" (string msg)
-                   |> mem "maintainer_can_modify" (bool true)
-                   |> obj_end)
-    in
-    let path = "/pulls" in
-    let* r = Repo.req_json_v3 httpr auth dst_repo ~path `POST params in
-    Jsonq.query info r
-
-  let ensure
-      httpr ~auth ~dst_repo ~dst_branch ~src_repo ~src_branch ~title ~msg
-    =
-    let* dst_repo = Repo.of_url dst_repo in
-    let* src_repo = Repo.of_url src_repo in
-    let* pr = find httpr ~auth ~dst_repo ~dst_branch ~src_repo ~src_branch in
-    let* action, url = match pr with
-    | Some (url, pr_id) ->
-        (* The branch has already been force pushed which should update the
-           contents, we just update the msg *)
-        let* url, _id = update httpr ~auth ~dst_repo ~pr_id ~msg in
-        Ok ("Updated", url)
-    | None ->
-        let* url, _id =
-          create
-            httpr ~auth ~dst_repo ~dst_branch ~src_repo ~src_branch ~title ~msg
-        in
-        Ok ("Opened", url)
-    in
-    let pp_action ppf a = Fmt.tty_string [`Fg `Green] ppf a in
-    Log.app begin fun m ->
-      m "%a pull request %a" pp_action action Fmt.(code string) url
-    end;
-    Ok ()
-end
-
 module Publish = struct
   type info =
     { pkg : Pkg.t;
@@ -697,20 +622,20 @@ module Publish = struct
     match String.cut_left ~sep:" " csum with
     | None -> Ok csum | Some (csum, _) -> Ok csum
 
-  let add_url_checksums httpr shasum ~check_only is =
+  let add_url_checksums http shasum ~check_only is =
     let open B0_http in
     let add csum i = add_url_csum (Fmt.str "sha%s=%s" shasum_algo csum) i in
     let add_url (acc, is) i = match String.Map.find_opt i.url acc with
     | Some csum -> acc, add csum i :: is
     | None ->
         let meth = if check_only then `HEAD else `GET in
-        let req = Http.req ~uri:i.url meth in
+        let request = Http.Request.v ~url:i.url meth in
         let csum =
-          Result.to_failure @@
+          Result.error_to_failure @@
           Result.map_error (Fmt.str "%a: %s" Pkg.pp_err i.pkg) @@
-          let* resp = Httpr.perform httpr req in
-          match Http.resp_status resp with
-          | 200 -> checksum shasum (Http.resp_body resp)
+          let* response = Http_client.request http request in
+          match Http.Response.status response with
+          | 200 -> checksum shasum (Http.Response.body response)
           | c -> Fmt.error "[%a] %s" Fmt.(tty [`Fg `Red] int) c i.url
         in
         String.Map.add i.url csum acc, add csum i :: is
@@ -753,13 +678,13 @@ module Publish = struct
     | Some repo ->
         Log.app (fun m -> m "Updating %a" Fpath.pp dir);
         let git = B0_vcs.repo_cmd repo in
-        let fetch = Cmd.(atom "fetch" % "origin" % master) in
+        let fetch = Cmd.(arg "fetch" % "origin" % master) in
         let* () = Os.Cmd.run ?stdout ?stderr Cmd.(git %% fetch) in
         Ok repo
     | None ->
         Log.app (fun m -> m "Cloning %s to %a" pkgs_repo Fpath.pp dir);
         let clone =
-          Cmd.(atom "clone" % "--bare" % "--single-branch" %
+          Cmd.(arg "clone" % "--bare" % "--single-branch" %
                "--branch" % master % pkgs_repo %% path dir)
         in
         let* () = Os.Cmd.run ?stdout ?stderr Cmd.(git %% clone) in
@@ -826,13 +751,13 @@ module Publish = struct
        m "@[<v>Incompatibility statements unsupported for now. Ignored.@,\
           See https://github.com/ocaml/opam/issues/3077@]"
     end;
-    let* httpr = B0_http.Httpr.get_curl () in
-    let* shasum = Os.Cmd.get (Cmd.atom "shasum") in
+    let* httpc = B0_http.Http_client.get () in
+    let* shasum = Os.Cmd.get (Cmd.arg "shasum") in
     let* git = B0_vcs.Git.get_cmd () in
     let* is = collect_results (List.map info_of_pkg pkgs) in
     let title, msg = msg_for_publish is incompats in
     log_start is incompats check_only;
-    let* is = add_url_checksums httpr shasum ~check_only is in
+    let* is = add_url_checksums httpc shasum ~check_only is in
     if check_only then (log_check_success (); Ok ()) else
     let* local_repo = get_updated_local_repo git ~pkgs_repo ~local_repo in
     let branch = branch_name_of_pkgs is in
@@ -843,8 +768,8 @@ module Publish = struct
       let dst_repo = pkgs_repo and dst_branch = "master" in
       let src_repo = fork_repo and src_branch = branch in
       let auth = github_auth in
-      Github_pr.ensure
-        httpr ~auth ~dst_repo ~dst_branch ~src_repo ~src_branch ~title ~msg
+      B0_github.Pull_request.ensure
+        httpc ~auth ~dst_repo ~dst_branch ~src_repo ~src_branch ~title ~msg
     in
     Ok ()
 end

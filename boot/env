@@ -1,13 +1,13 @@
 # run built b0 as if it was in PATH
 #
-# source b00t/env
+# source boot/env
 
 ROOT=`pwd`/_b0/b/user
 
 b0 ()
 {
-  if [ -e $ROOT/b0-exe/b0 ]; then
-    B0_BOOTSTRAP=$ROOT B0_DRIVER_BOOTSTRAP=$ROOT $ROOT/b0-exe/b0 $@
+  if [ -e $ROOT/b0/b0 ]; then
+    B0_BOOTSTRAP=$ROOT B0_DRIVER_BOOTSTRAP=$ROOT $ROOT/b0/b0 $@
   else
     echo "Error: No b0 bootstrap build found."
   fi

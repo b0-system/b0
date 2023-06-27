@@ -12,8 +12,8 @@ let read_path_writes m file =
   | Ok p -> p :: acc
   in
   let parse s = B0_text_lines.fold ~file (String.trim s) parse_path [] in
-  let* lines = B0_memo.Memo.read m file in
-  Fut.return (B0_memo.Memo.fail_if_error m (parse lines))
+  let* lines = B0_memo.read m file in
+  Fut.return (B0_memo.fail_if_error m (parse lines))
 
 let tool = B0_memo.Tool.by_name "odoc" (* FIXME conf ! *)
 
@@ -39,23 +39,23 @@ module Compile = struct
         (name, digest) :: acc
 
     let write m cobj ~o =
-      let odoc = B0_memo.Memo.tool m tool in
-      B0_memo.Memo.spawn m ~reads:[cobj] ~writes:[o] ~stdout:(`File o) @@
-      odoc Cmd.(atom "compile-deps" %% path cobj)
+      let odoc = B0_memo.tool m tool in
+      B0_memo.spawn m ~reads:[cobj] ~writes:[o] ~stdout:(`File o) @@
+      odoc Cmd.(arg "compile-deps" %% path cobj)
 
     let read m file =
       let parse lines =
         B0_text_lines.fold ~file (String.trim lines) parse_dep []
       in
-      let* lines = B0_memo.Memo.read m file in
-      Fut.return (B0_memo.Memo.fail_if_error m (parse lines))
+      let* lines = B0_memo.read m file in
+      Fut.return (B0_memo.fail_if_error m (parse lines))
   end
 
   module Writes = struct
     let write m cobj ~to_odoc ~o =
-      let odoc = B0_memo.Memo.tool m tool in
-      B0_memo.Memo.spawn m ~reads:[cobj] ~writes:[o] ~stdout:(`File o) @@
-      odoc Cmd.(atom "compile-targets" % "-o" %% path to_odoc %% path cobj)
+      let odoc = B0_memo.tool m tool in
+      B0_memo.spawn m ~reads:[cobj] ~writes:[o] ~stdout:(`File o) @@
+      odoc Cmd.(arg "compile-targets" % "-o" %% path to_odoc %% path cobj)
 
     let read = read_path_writes
   end
@@ -64,11 +64,11 @@ module Compile = struct
       ?(resolve_forward_deps = false) ?(hidden = false) m ~odoc_deps ~writes
       ~pkg cobj ~o
     =
-    let odoc = B0_memo.Memo.tool m tool in
+    let odoc = B0_memo.tool m tool in
     let incs = files_to_includes odoc_deps in
-    B0_memo.Memo.spawn m ~reads:(cobj :: odoc_deps) ~writes @@
-    odoc Cmd.(atom "compile" % "--pkg" % pkg %% if' hidden (atom "--hidden") %%
-              if' resolve_forward_deps (atom "--resolve-fwd-refs") %
+    B0_memo.spawn m ~reads:(cobj :: odoc_deps) ~writes @@
+    odoc Cmd.(arg "compile" % "--pkg" % pkg %% if' hidden (arg "--hidden") %%
+              if' resolve_forward_deps (arg "--resolve-fwd-refs") %
               "-o" %% path o %% path cobj %% incs)
 
   let to_odoc m ?hidden ~pkg ~odoc_deps obj ~o:odoc =
@@ -100,39 +100,39 @@ module Html = struct
             B0_text_lines.fail n "Could not parse pkg and mod names %S" rest
 
     let write m ~odoc_files pkg_odoc_dir ~o =
-      let odoc = B0_memo.Memo.tool m tool in
-      B0_memo.Memo.spawn m ~reads:odoc_files ~writes:[o] ~stdout:(`File o) @@
-      odoc Cmd.(atom "html-deps" %% path pkg_odoc_dir)
+      let odoc = B0_memo.tool m tool in
+      B0_memo.spawn m ~reads:odoc_files ~writes:[o] ~stdout:(`File o) @@
+      odoc Cmd.(arg "html-deps" %% path pkg_odoc_dir)
 
     let read m file =
       let parse lines =
         B0_text_lines.fold ~file (String.trim lines) parse_dep []
       in
-      let* lines = B0_memo.Memo.read m file in
-      Fut.return (B0_memo.Memo.fail_if_error m (parse lines))
+      let* lines = B0_memo.read m file in
+      Fut.return (B0_memo.fail_if_error m (parse lines))
   end
 
   module Writes = struct
     let write m ~odoc_deps odoc_file ~to_dir ~o =
-      let odoc = B0_memo.Memo.tool m tool in
+      let odoc = B0_memo.tool m tool in
       let incs = files_to_includes odoc_deps in
       let reads = odoc_file :: odoc_deps in
-      B0_memo.Memo.spawn m ~reads ~writes:[o] ~stdout:(`File o) @@
-      odoc Cmd.(atom "html-targets" %% incs % "-o" %% path to_dir %%
+      B0_memo.spawn m ~reads ~writes:[o] ~stdout:(`File o) @@
+      odoc Cmd.(arg "html-targets" %% incs % "-o" %% path to_dir %%
                 path odoc_file)
 
     let read = read_path_writes
   end
 
   let cmd ?(hidden = false) ?theme_uri m ~odoc_deps ~writes odoc_file ~to_dir =
-    let odoc = B0_memo.Memo.tool m tool in
+    let odoc = B0_memo.tool m tool in
     let incs = files_to_includes odoc_deps in
     let theme_uri = match theme_uri with
     | None -> Cmd.empty
-    | Some u -> Cmd.(atom "--theme-uri" % u)
+    | Some u -> Cmd.(arg "--theme-uri" % u)
     in
-    B0_memo.Memo.spawn m ~reads:(odoc_file :: odoc_deps) ~writes @@
-    odoc Cmd.(atom "html" %% if' hidden (atom "--hidden") %% theme_uri % "-o" %%
+    B0_memo.spawn m ~reads:(odoc_file :: odoc_deps) ~writes @@
+    odoc Cmd.(arg "html" %% if' hidden (arg "--hidden") %% theme_uri % "-o" %%
               path to_dir %% path odoc_file %% incs)
 
   let write m ?theme_uri ~html_dir ~odoc_deps odoc =
@@ -157,29 +157,29 @@ end
 
 module Html_fragment = struct
   let cmd m ~odoc_deps mld_file ~o =
-    let odoc = B0_memo.Memo.tool m tool in
+    let odoc = B0_memo.tool m tool in
     let incs = files_to_includes odoc_deps in
-    B0_memo.Memo.spawn m ~reads:(mld_file :: odoc_deps) ~writes:[o] @@
-    odoc Cmd.(atom "html-fragment" % "-o" %% path o %% path mld_file %% incs)
+    B0_memo.spawn m ~reads:(mld_file :: odoc_deps) ~writes:[o] @@
+    odoc Cmd.(arg "html-fragment" % "-o" %% path o %% path mld_file %% incs)
 end
 
 module Support_files = struct
   module Writes = struct
     let write ?(without_theme = false) m ~to_dir ~o =
-      let odoc = B0_memo.Memo.tool m tool in
-      B0_memo.Memo.spawn m ~reads:[] ~writes:[o] ~stdout:(`File o) @@
-      odoc Cmd.(atom "support-files-targets" %%
-                if' without_theme (atom "--without-theme") % "-o" %%
+      let odoc = B0_memo.tool m tool in
+      B0_memo.spawn m ~reads:[] ~writes:[o] ~stdout:(`File o) @@
+      odoc Cmd.(arg "support-files-targets" %%
+                if' without_theme (arg "--without-theme") % "-o" %%
                 path to_dir)
 
     let read = read_path_writes
   end
 
   let cmd ?(without_theme = false) m ~writes ~to_dir =
-    let odoc = B0_memo.Memo.tool m tool in
-    let theme = Cmd.(if' without_theme (atom "--without-theme")) in
-    B0_memo.Memo.spawn m ~reads:[] ~writes @@
-    odoc Cmd.(atom "support-files" %% theme % "-o" %% path to_dir)
+    let odoc = B0_memo.tool m tool in
+    let theme = Cmd.(if' without_theme (arg "--without-theme")) in
+    B0_memo.spawn m ~reads:[] ~writes @@
+    odoc Cmd.(arg "support-files" %% theme % "-o" %% path to_dir)
 
   let write m ~without_theme ~html_dir ~build_dir =
     ignore @@ (* FIXME maybe remove that *)
@@ -206,7 +206,7 @@ module Theme = struct
   let config_file = Fpath.v "odig/odoc-theme"
   let set_user_preference name =
     try
-      let config = Os.Dir.config () |> Result.to_failure in
+      let config = Os.Dir.config () |> Result.error_to_failure in
       let config_file = Fpath.(config // config_file) in
       match name with
       | None ->
@@ -217,12 +217,14 @@ module Theme = struct
 
   let get_user_preference () =
     try
-      let config = Os.Dir.config () |> Result.to_failure in
+      let config = Os.Dir.config () |> Result.error_to_failure in
       let file = Fpath.(config // config_file) in
-      match Os.File.exists file |> Result.to_failure with
+      match Os.File.exists file |> Result.error_to_failure with
       | false -> Ok None
       | true ->
-          let name = String.trim (Os.File.read file |> Result.to_failure) in
+          let name =
+            String.trim (Os.File.read file |> Result.error_to_failure)
+          in
           Ok (Some name)
     with Failure e -> Error e
 
@@ -240,19 +242,19 @@ module Theme = struct
     try
       let add_themes _ pkg dir acc =
         let tdir = Fpath.(dir / "odoc-theme") in
-        match Os.Dir.exists tdir |> Result.to_failure with
+        match Os.Dir.exists tdir |> Result.error_to_failure with
         | false -> acc
         | true ->
             let name pkg name = Fmt.str "%s.%s" pkg name in
             let add_theme _ sub dir acc = (name pkg sub, dir) :: acc in
-            Result.to_failure @@
+            Result.error_to_failure @@
             Os.Dir.fold_dirs ~recurse:false add_theme tdir acc
       in
       let ts = Os.Dir.fold_dirs ~recurse:false add_themes dir [] in
       let compare (n0, _) (n1, _) =
         compare (String.Ascii.lowercase n0) (String.Ascii.lowercase n1)
       in
-      List.sort compare (Result.to_failure ts)
+      List.sort compare (Result.error_to_failure ts)
     with Failure e -> Log.err (fun m -> m "theme list: %s" e); []
 
   let find ~fallback n ts = match List.find (fun t -> name t = n) ts with
@@ -274,11 +276,11 @@ module Theme = struct
        that in the API somewhere  *)
     let copy_file m ~src_root ~dst_root src =
       let dst = Fpath.reroot ~root:src_root ~dst:dst_root src in
-      B0_memo.Memo.file_ready m src;
-      B0_memo.Memo.copy m ~src dst
+      B0_memo.file_ready m src;
+      B0_memo.copy m ~src dst
     in
     let src_root = path theme in
     let files = Os.Dir.fold_files ~recurse:true Os.Dir.path_list src_root [] in
-    let files = B0_memo.Memo.fail_if_error m files in
+    let files = B0_memo.fail_if_error m files in
     List.iter (copy_file m ~src_root ~dst_root:to_dir) files
 end

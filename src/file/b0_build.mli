@@ -14,7 +14,7 @@ open B0_std
 type t = B0_unit.build
 (** The type for builds. *)
 
-val memo : t -> B0_memo.Memo.t
+val memo : t -> B0_memo.t
 (** [memo b] the memoizer for the build. *)
 
 (** {1:units Units} *)
@@ -74,14 +74,14 @@ val in_shared_build_dir : t -> Fpath.t -> Fpath.t
 
 (** {1:store Store} *)
 
-val store : t -> B0_memo.Store.t
+val store : t -> B0_store.t
 (** [store b] is the store for the build. Note that [b] itself
     can be found in store via the {!self} key. *)
 
-val get : t -> 'a B0_memo.Store.key -> 'a Fut.t
-(** [get b k] is {!B0_memo.Store.get}[ (store b) k]. *)
+val get : t -> 'a B0_store.key -> 'a Fut.t
+(** [get b k] is {!B0_store.get}[ (store b) k]. *)
 
-val self : t B0_memo.Store.key
+val self : t B0_store.key
 (** [self] is a store key that holds the build itself. The store
     returned by {!val-store} has this key bound to the build. *)
 
@@ -89,7 +89,7 @@ val self : t B0_memo.Store.key
 
 val create :
   root_dir:Fpath.t -> b0_dir:Fpath.t -> variant:string ->
-  B0_memo.Memo.t -> may_build:B0_unit.Set.t -> must_build:B0_unit.Set.t -> t
+  B0_memo.t -> may_build:B0_unit.Set.t -> must_build:B0_unit.Set.t -> t
 (** [create ~root_dir ~b0_dir m ~may_build ~must_build]
     {ul
     {- [must_build] are the build units that must be build by [b].}

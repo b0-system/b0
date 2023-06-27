@@ -22,26 +22,26 @@ val tool : B0_memo.Tool.t
 (** [tool] is the [js_of_ocaml] executable. *)
 
 val build_runtime :
-  B0_memo.Memo.t -> opts:Cmd.t -> jss:Fpath.t list -> o:Fpath.t -> unit
+  B0_memo.t -> opts:Cmd.t -> jss:Fpath.t list -> o:Fpath.t -> unit
 (** [build_runtime m ~jss o] writes a standalone runtime with JavaScript
     files [jss] to [o]. *)
 
 val compile :
-  B0_memo.Memo.t -> opts:Cmd.t -> source_map:source_map ->
+  B0_memo.t -> opts:Cmd.t -> source_map:source_map ->
   jss:Fpath.t list -> byte:Fpath.t -> o:Fpath.t -> unit
 (** [compile m ~source_map ~jss ~byte ~o] compiles the JavaScript
     files [jss] and byte code object or executable [byte] to the
     JavaScript file [o]. *)
 
 val link :
-  B0_memo.Memo.t -> opts:Cmd.t -> source_map:source_map ->
+  B0_memo.t -> opts:Cmd.t -> source_map:source_map ->
   jss:Fpath.t list -> o:Fpath.t -> unit
 (** [link m ~opts ~jss ~o] links the JavaScript files [jss] to [o] with
     options [opts]. *)
 
 val write_page :
   ?lang:string -> ?generator:string -> ?styles:string list ->
-  ?scripts:string list -> ?title:string -> B0_memo.Memo.t ->
+  ?scripts:string list -> ?title:string -> B0_memo.t ->
   o:B0_std.Fpath.t -> unit
 (** [write_page m ~title ~o] writes to file [o] a full HTML document
     whose body contains only a {!B0_html.El.noscript} element that
@@ -146,7 +146,7 @@ val web :
     See {{!page-TODO.fragments}TODO}. *)
 
 val copy_assets :
-  B0_memo.Memo.t -> B0_file_exts.map -> exts:B0_file_exts.t ->
+  B0_memo.t -> B0_file_exts.map -> exts:B0_file_exts.t ->
   assets_root:Fpath.t option -> dst:B0_std.Fpath.t -> Fpath.Set.t
 (** [copy_assets m srcs ~exts ~assets_root ~dst] copies [srcs] with
     extensions in [exts] to [dst]. If [assets_root] is specified

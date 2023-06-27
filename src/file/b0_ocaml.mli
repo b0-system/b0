@@ -64,11 +64,11 @@ module Conf : sig
       as output by the compiler's [-config] option assuming it was read
       from file [file] (defaults to {!B0_std.Fpath.dash}). *)
 
-  val write : B0_memo.Memo.t -> comp:B0_memo.Tool.t -> o:Fpath.t -> unit
+  val write : B0_memo.t -> comp:B0_memo.Tool.t -> o:Fpath.t -> unit
   (** [write m ~o] writes the toolchain configuration to [o] by
       running [comp] with [-config]. *)
 
-  val read : B0_memo.Memo.t -> Fpath.t -> t Fut.t
+  val read : B0_memo.t -> Fpath.t -> t Fut.t
   (** [read m file] reads a toolchain configuration from [file]. *)
 
   (** {1:fields Fields} *)
@@ -287,7 +287,7 @@ v} *)
         As found by {!Tool.ocamldep}. *)
     module Deps : sig
       val write :
-        ?src_root:Fpath.t -> B0_memo.Memo.t -> srcs:Fpath.t list ->
+        ?src_root:Fpath.t -> B0_memo.t -> srcs:Fpath.t list ->
         o:Fpath.t -> unit
       (** [write m ~src_root ~srcs ~o] writes the module dependencies of each
           file in [srcs] in file [o]. If [src_root] if specified it is used
@@ -304,7 +304,7 @@ v} *)
           machines. *)
 
       val read :
-        ?src_root:Fpath.t -> B0_memo.Memo.t -> Fpath.t ->
+        ?src_root:Fpath.t -> B0_memo.t -> Fpath.t ->
         Name.Set.t Fpath.Map.t Fut.t
         (** [read ~src_root file] reads dependencies produced by {!write}
             as a map from absolute file paths to their dependencies.
@@ -385,7 +385,7 @@ v} *)
     (** {1:map Module name maps} *)
 
     val map_of_srcs :
-      B0_memo.Memo.t -> build_dir:Fpath.t -> srcs:Fpath.t list ->
+      B0_memo.t -> build_dir:Fpath.t -> srcs:Fpath.t list ->
       src_deps:Name.Set.t Fpath.Map.t -> t Name.Map.t
     (** [of_srcs m ~srcs ~src_deps] determines source modules values
         to be built in [build_dir] (mapped by their names) given
@@ -406,7 +406,7 @@ v} *)
     (** {1:convenience Convenience} *)
 
     val map_of_files :
-      ?only_mlis:bool -> B0_memo.Memo.t ->
+      ?only_mlis:bool -> B0_memo.t ->
       build_dir:Fpath.t -> src_root:Fpath.t ->
       srcs:B0_file_exts.map -> t Name.Map.t Fut.t
     (** [map_of_files m ~only_mlis ~build_dir ~src_root ~srcs] looks for
@@ -482,11 +482,11 @@ module Cobj : sig
 
   (** {1:io IO} *)
 
-  val write : B0_memo.Memo.t -> cobjs:Fpath.t list -> o:Fpath.t -> unit
+  val write : B0_memo.t -> cobjs:Fpath.t list -> o:Fpath.t -> unit
   (** [write m ~cobjs o] writes information about the compilation [cobjs]
       to [o]. *)
 
-  val read : B0_memo.Memo.t -> Fpath.t -> t list Fut.t
+  val read : B0_memo.t -> Fpath.t -> t list Fut.t
   (** [read m file] has the [cobjs] of a {!write} to [file]. *)
 
   val of_string : ?file:Fpath.t -> string -> (t list, string) result
@@ -595,7 +595,7 @@ v}
       [dir]. *)
 
   val of_dir :
-    B0_memo.Memo.t -> clib_ext:Fpath.ext -> name:Name.t ->
+    B0_memo.t -> clib_ext:Fpath.ext -> name:Name.t ->
     requires:Name.t list -> dir:Fpath.t -> archive:string option ->
     js_stubs:Fpath.t list -> (t, string) result Fut.t
   (** [of_dir m ~clib_ext ~name ~requires ~dir ~archive] is a library
@@ -660,11 +660,11 @@ v}
         and possibly a function to indicate how to troubleshoot a missing
         library. *)
 
-    type scope_find = Conf.t -> B0_memo.Memo.t -> Name.t -> lib option Fut.t
+    type scope_find = Conf.t -> B0_memo.t -> Name.t -> lib option Fut.t
     (** The type for the scope finding function. *)
 
     type scope_suggest =
-      Conf.t -> B0_memo.Memo.t -> Name.t -> string option Fut.t
+      Conf.t -> B0_memo.t -> Name.t -> string option Fut.t
     (** The type for the scope missing library suggestion function. *)
 
     val scope : name:string -> find:scope_find -> suggest:scope_suggest -> scope
@@ -683,10 +683,14 @@ v}
 
     (** {2:predef_scopes Predefined resolution scopes} *)
 
-    val ocamlpath : cache_dir:Fpath.t -> ocamlpath:Fpath.t list -> scope
-    (** [ocampath ~cache_dir ~ocamlpath] looks up libraries according
-        to the OCaml library convention in the [OCAMLPATH] [ocamlpath]
-        using [cache_dir] to cache results.
+    val cache_dir_name : string
+    (** [cache_dir_name] is a name that can be used for the
+        cache directory of resolution scopes. *)
+
+    val ocamlpath : cache_dir:Fpath.t -> scope
+    (** [ocampath ~cache_dir] looks up libraries according to the
+        OCaml library convention in the [OCAMLPATH] of the memo using
+        [cache_dir] to cache results.
 
         {b Note.} This is a nop for now. *)
 
@@ -710,13 +714,12 @@ ocamlfind query LIB -predicates byte,native -format "%m:%d:%A:%(requires)"
         and simply [threads] otherwise. [threads.vm] is unsupported
         (but deprecated anyways). *)
 
-
     (** {1:resolver Resolver} *)
 
     type t
     (** The type for library resolvers. *)
 
-    val create : B0_memo.Memo.t -> Conf.t -> scope list -> t
+    val create : B0_memo.t -> Conf.t -> scope list -> t
     (** [create m ocaml_conf scopes] is a library resolver looking for
         libraries in the given [scopes], in order. [ocaml_conf] is the
         toolchain configuration. [m] gets marked by [ocamlib]. *)
@@ -749,7 +752,7 @@ end
     FIXME, maybe this should be a store key. *)
 module Ocamlpath : sig
 
-  val get : B0_memo.Memo.t -> Fpath.t list option -> Fpath.t list Fut.t
+  val get : B0_memo.t -> Fpath.t list option -> Fpath.t list Fut.t
   (** [get m o k] is [k ps] if [o] is [Some ps] and otherwise in order:
       {ol
       {- If the [OCAMLPATH] environment variable is defined in [m] and
@@ -766,7 +769,7 @@ end
 module Compile : sig
 
   val c_to_o :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.Memo.t ->
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
     comp:B0_memo.Tool.t -> opts:Cmd.t -> reads:Fpath.t list -> c:Fpath.t ->
     o:Fpath.t -> unit
   (** [c_to_o m ~comp ~opts ~reads ~c ~o] compiles the C file [c] to
@@ -777,7 +780,7 @@ module Compile : sig
 
   val mli_to_cmi :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> and_cmti:bool ->
-    B0_memo.Memo.t -> comp:B0_memo.Tool.t -> opts:Cmd.t -> reads:Fpath.t list ->
+    B0_memo.t -> comp:B0_memo.Tool.t -> opts:Cmd.t -> reads:Fpath.t list ->
     mli:Fpath.t -> o:Fpath.t -> unit
   (** [mli_to_cmi ~and_cmti m ~comp ~opts ~reads ~mli ~o] compiles the
       file [mli] to the cmi file [o] and, if [and_cmti] is [true], to
@@ -788,7 +791,7 @@ module Compile : sig
 
   val ml_to_cmo :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> and_cmt:bool ->
-    B0_memo.Memo.t -> opts:Cmd.t -> reads:Fpath.t list -> has_cmi:bool ->
+    B0_memo.t -> opts:Cmd.t -> reads:Fpath.t list -> has_cmi:bool ->
     ml:Fpath.t -> o:Fpath.t -> unit
   (** [ml_to_cmo ~and_cmt m ~opts ~reads ~has_cmi ~ml ~o] compiles the
       file [ml] to cmo file [o] and, if [and_cmt] is [true], to the
@@ -800,7 +803,7 @@ module Compile : sig
 
   val ml_to_cmx :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> and_cmt:bool ->
-    B0_memo.Memo.t -> opts:Cmd.t -> reads:Fpath.t list -> has_cmi:bool ->
+    B0_memo.t -> opts:Cmd.t -> reads:Fpath.t list -> has_cmi:bool ->
     ml:Fpath.t -> o:Fpath.t -> unit
   (** [ml_to_cmx ~and_cmt m ~opts ~reads ~has_cmi ~ml ~o ~and_cmt]
       compiles the file [ml] to cmx file [o] and, if [and_cmt] is
@@ -812,7 +815,7 @@ module Compile : sig
       (FIXME specify path directly ?). *)
 
   val ml_to_impl :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.Memo.t ->
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
     code:Conf.code -> opts:Cmd.t -> reads:Fpath.t list -> has_cmi:bool ->
     ml:Fpath.t -> o:Fpath.t -> and_cmt:bool -> unit
   (** [ml_to_impl] is {!ml_to_cmo} or {!ml_to_cmx} according to [code].
@@ -823,7 +826,7 @@ module Compile : sig
       A few helpers that deal directly with the {!Mod.Src} abstraction. *)
 
   val mod_src_intf :
-    and_cmti:bool -> B0_memo.Memo.t -> comp:B0_memo.Tool.t -> opts:Cmd.t ->
+    and_cmti:bool -> B0_memo.t -> comp:B0_memo.Tool.t -> opts:Cmd.t ->
     requires:Lib.t list -> mod_srcs:Mod.Src.t Mod.Name.Map.t -> Mod.Src.t ->
     unit
   (** [mod_src_intf m ~opts ~requires ~mod_srcs ~and_cmti src]
@@ -833,7 +836,7 @@ module Compile : sig
       produced. If [src] has no [.mli] this is a nop. *)
 
   val mod_src_impl :
-    and_cmt:bool -> B0_memo.Memo.t -> code:Conf.code -> opts:Cmd.t ->
+    and_cmt:bool -> B0_memo.t -> code:Conf.code -> opts:Cmd.t ->
     requires:Lib.t list -> mod_srcs:Mod.Src.t Mod.Name.Map.t -> Mod.Src.t ->
     unit
   (** [mod_src_impl m ~code ~opts ~requires ~mod_srcs src] compile the
@@ -843,12 +846,12 @@ module Compile : sig
       a nop. *)
 
   val intfs :
-    and_cmti:bool -> B0_memo.Memo.t -> comp:B0_memo.Tool.t -> opts:Cmd.t ->
+    and_cmti:bool -> B0_memo.t -> comp:B0_memo.Tool.t -> opts:Cmd.t ->
     requires:Lib.t list -> mod_srcs:Mod.Src.t Mod.Name.Map.t -> unit
   (** [intfs] iters {!mod_src_intf} over the elements of [mod_srcs]. *)
 
   val impls :
-    and_cmt:bool -> B0_memo.Memo.t -> code:Conf.code -> opts:Cmd.t ->
+    and_cmt:bool -> B0_memo.t -> code:Conf.code -> opts:Cmd.t ->
     requires:Lib.t list -> mod_srcs:Mod.Src.t Mod.Name.Map.t -> unit
    (** [impls] iters {!mod_src_impl} over the elements of [mod_srcs]. *)
 end
@@ -859,7 +862,7 @@ end
 module Archive : sig
 
   val cstubs :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.Memo.t ->
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
     conf:Conf.t -> opts:Cmd.t -> c_objs:Fpath.t list -> odir:Fpath.t ->
     oname:string -> unit
   (** [cstubs m ~conf ~opts ~c_objs ~odir ~oname] creates in directory
@@ -869,7 +872,7 @@ module Archive : sig
      c stubs archive directly. *)
 
   val byte :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.Memo.t ->
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
     conf:Conf.t -> opts:Cmd.t -> has_cstubs:bool -> cobjs:Fpath.t list ->
     odir:Fpath.t -> oname:string -> unit
   (** [byte_archive m ~opts ~has_cstubs ~cobjs ~obase] creates in directory
@@ -877,7 +880,7 @@ module Archive : sig
       compilation objects [cobjs]. *)
 
   val native :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.Memo.t ->
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
     conf:Conf.t -> opts:Cmd.t -> has_cstubs:bool -> cobjs:Fpath.t list ->
     odir:Fpath.t -> oname:string -> unit
   (** [native m ~opts ~has_cstubs ~cobjs ~obase] creates in directory
@@ -885,13 +888,13 @@ module Archive : sig
       code compilation objects [cobjs]. *)
 
   val code :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.Memo.t ->
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
     conf:Conf.t -> opts:Cmd.t -> code:Conf.code -> has_cstubs:bool ->
     cobjs:Fpath.t list -> odir:Fpath.t -> oname:string -> unit
   (** [archive] is {!byte} or {!native} according to [code]. *)
 
   val native_dynlink :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.Memo.t ->
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
     conf:Conf.t -> opts:Cmd.t -> has_cstubs:bool -> cmxa:Fpath.t ->
     o:Fpath.t -> unit
 end
@@ -901,7 +904,7 @@ end
     Tool invocations for linking. *)
 module Link : sig
   val byte :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.Memo.t ->
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
     conf:Conf.t -> opts:Cmd.t -> c_objs:Fpath.t list -> cobjs:Fpath.t list ->
     o:Fpath.t -> unit
   (** [byte_exe m ~opts ~c_objs ~cmos ~o] links the C objects [c_objs]
@@ -909,7 +912,7 @@ module Link : sig
       executable [o] compiled in [-custom] mode. *)
 
   val native :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.Memo.t ->
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
     conf:Conf.t -> opts:Cmd.t -> c_objs:Fpath.t list -> cobjs:Fpath.t list ->
     o:Fpath.t -> unit
   (** [byte_exe m ~opts ~c_objs ~cobjs ~o] links the C objects
@@ -920,7 +923,7 @@ module Link : sig
       lookup potential C stubs. *)
 
   val code :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.Memo.t ->
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
     conf:Conf.t -> opts:Cmd.t -> code:Conf.code -> c_objs:Fpath.t list ->
     cobjs:Fpath.t list -> o:Fpath.t -> unit
   (** [code] is {!byte} or {!native} according to [code]. *)
@@ -983,7 +986,7 @@ val lib :
 
 (** {1:build_conf Build configuration} *)
 
-val conf : Conf.t B0_memo.Store.key
+val conf : Conf.t B0_store.key
 (** [conf] is a memo key store with the OCaml configuration. *)
 
 val version : B0_build.t -> (int * int * int * string option) Fut.t
@@ -1005,14 +1008,14 @@ type built_code = [ `Byte | `Native | `All ]
 val pp_built_code : built_code Fmt.t
 (** [pp_built_code] formats {!type-built_code} values. *)
 
-val wanted_code : [ built_code | `Auto ] B0_memo.Store.key
+val wanted_code : [ built_code | `Auto ] B0_store.key
 (** [wanted_code] indicates which code should be built, default
     determines to [`Auto]. If [`Auto] is used and no unit that
     may build has specific {!Meta.needs_code} then [`Native] is
     used if [ocamlopt] can be found in the memo environment and
     [`Byte] otherwise. *)
 
-val built_code : built_code B0_memo.Store.key
+val built_code : built_code B0_store.key
 (** [build_code] is a memo key indicating the built code. By default
     determines by consulting [wanted_code]. *)
 
@@ -1054,12 +1057,12 @@ end
 
 (** {1:lib Library resolution} *)
 
-val lib_resolver : Lib.Resolver.t B0_memo.Store.key
+val lib_resolver : Lib.Resolver.t B0_store.key
 (** [lib_resolver] is the library resolver used by the build units defined by
     this module. See {!default_lib_resolver} for the default. *)
 
 val default_lib_resolver :
-  B0_memo.Store.t -> B0_memo.Memo.t -> Lib.Resolver.t Fut.t
+  B0_store.t -> B0_memo.t -> Lib.Resolver.t Fut.t
 (** [default_lib_resolver] determines the default value of {!lib_resolver}.
     This resolver does the following:
     {ol

@@ -243,31 +243,31 @@ let set s c = v (enc_set s c.enc) (dec_set s c.dec)
 
 (* Hash.t *)
 
-let enc_hash b h = enc_string b (Hash.to_bytes h)
-let dec_hash s i = let i, h = dec_string s i in i, (Hash.of_bytes h)
+let enc_hash b h = enc_string b (Hash.to_binary_string h)
+let dec_hash s i = let i, h = dec_string s i in i, (Hash.of_binary_string h)
 let hash = v enc_hash dec_hash
 
 (* Time.span *)
 
-let enc_time_span b s = enc_int64 b (Mtime.Span.to_uint64_ns s)
-let dec_time_span s i =
+let enc_mtime_span b s = enc_int64 b (Mtime.Span.to_uint64_ns s)
+let dec_mtime_span s i =
   let i, s = dec_int64 s i in i, Mtime.Span.of_uint64_ns s
 
-let time_span = v enc_time_span dec_time_span
+let mtime_span = v enc_mtime_span dec_mtime_span
 
 (* Time.cpu_span *)
 
 let enc_cpu_time_span b c =
-  enc_time_span b (Os.Cpu.Time.utime c);
-  enc_time_span b (Os.Cpu.Time.stime c);
-  enc_time_span b (Os.Cpu.Time.children_utime c);
-  enc_time_span b (Os.Cpu.Time.children_stime c)
+  enc_mtime_span b (Os.Cpu.Time.Span.utime c);
+  enc_mtime_span b (Os.Cpu.Time.Span.stime c);
+  enc_mtime_span b (Os.Cpu.Time.Span.children_utime c);
+  enc_mtime_span b (Os.Cpu.Time.Span.children_stime c)
 
 let dec_cpu_time_span s i  =
-  let i, utime = dec_time_span s i in
-  let i, stime = dec_time_span s i in
-  let i, children_utime = dec_time_span s i in
-  let i, children_stime = dec_time_span s i in
-  i, Os.Cpu.Time.span ~utime ~stime ~children_utime ~children_stime
+  let i, utime = dec_mtime_span s i in
+  let i, stime = dec_mtime_span s i in
+  let i, children_utime = dec_mtime_span s i in
+  let i, children_stime = dec_mtime_span s i in
+  i, Os.Cpu.Time.Span.v ~utime ~stime ~children_utime ~children_stime
 
 let cpu_time_span = v enc_cpu_time_span dec_cpu_time_span

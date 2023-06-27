@@ -14,28 +14,28 @@ module Tool = struct
   let tool = B0_memo.Tool.by_name ~vars:env_vars "js_of_ocaml"
 
   let build_runtime m ~opts ~jss ~o =
-    let jsoo = B0_memo.Memo.tool m tool in
-    B0_memo.Memo.spawn m ~reads:jss ~writes:[o] @@
-    jsoo Cmd.(atom "build-runtime" % "-o" %% (unstamp @@ path o) %% opts %%
+    let jsoo = B0_memo.tool m tool in
+    B0_memo.spawn m ~reads:jss ~writes:[o] @@
+    jsoo Cmd.(arg "build-runtime" % "-o" %% (unstamp @@ path o) %% opts %%
               unstamp (paths jss))
 
   let handle_source_map ~o = function
   | None -> [o], Cmd.empty
-  | Some `Inline -> [o], Cmd.(atom "--source-map-inline")
-  | Some `File -> [o; Fpath.(o -+ ".map")], Cmd.(atom "--source-map")
+  | Some `Inline -> [o], Cmd.(arg "--source-map-inline")
+  | Some `File -> [o; Fpath.(o -+ ".map")], Cmd.(arg "--source-map")
 
   let compile m ~opts ~source_map ~jss ~byte ~o =
-    let jsoo = B0_memo.Memo.tool m tool in
+    let jsoo = B0_memo.tool m tool in
     let writes, source_map = handle_source_map ~o source_map in
-    B0_memo.Memo.spawn m ~reads:(byte :: jss) ~writes @@
-    jsoo Cmd.(atom "compile" % "-o" %% (unstamp @@ path o) %% opts %%
+    B0_memo.spawn m ~reads:(byte :: jss) ~writes @@
+    jsoo Cmd.(arg "compile" % "-o" %% (unstamp @@ path o) %% opts %%
               source_map %% (unstamp @@ paths jss %% path byte))
 
   let link m ~opts ~source_map ~jss ~o =
-    let jsoo = B0_memo.Memo.tool m tool in
+    let jsoo = B0_memo.tool m tool in
     let writes, source_map = handle_source_map ~o source_map in
-    B0_memo.Memo.spawn m ~reads:jss ~writes @@
-    jsoo Cmd.(atom "link" % "-o" %% (unstamp @@ path o) %% opts %% source_map %%
+    B0_memo.spawn m ~reads:jss ~writes @@
+    jsoo Cmd.(arg "link" % "-o" %% (unstamp @@ path o) %% opts %% source_map %%
               (unstamp @@ paths jss))
 
   let write_page
@@ -45,7 +45,7 @@ module Tool = struct
     let title = if title = "" then Fpath.basename ~no_ext:true o else title in
     let stamp = List.rev_append styles scripts in
     let stamp = String.concat "" (lang :: generator :: title :: stamp) in
-    B0_memo.Memo.write m ~stamp o @@ fun () ->
+    B0_memo.write m ~stamp o @@ fun () ->
     let open B0_html in
     let body =
       let sorry = "Sorry, you need to enable JavaScript to see this page." in
@@ -150,11 +150,11 @@ let byte_exe ~mod_srcs ~o b =
   let o = Fpath.(o + B0_ocaml.Conf.exe_ext conf) in
   let* resolver = B0_build.get b B0_ocaml.lib_resolver in
   let toplevel = Option.value ~default:false (B0_meta.find toplevel meta) in
-  let global_opts = Cmd.(atom "-g") (* TODO *) in
+  let global_opts = Cmd.(arg "-g") (* TODO *) in
   let opts = global_opts in
   let m = B0_build.memo b in
   let* () = compile_byte m ~opts ~resolver ~requires ~mod_srcs in
-  let opts = Cmd.(global_opts %% if' toplevel (atom "-linkall")) in
+  let opts = Cmd.(global_opts %% if' toplevel (arg "-linkall")) in
   let* lib_jss = link_byte m ~conf ~opts ~resolver ~requires ~mod_srcs ~o in
   Fut.return (o, lib_jss)
 
@@ -175,7 +175,7 @@ let js_of_byte_objs ~jss ~mod_srcs ~o b =
   let* conf = B0_build.get b B0_ocaml.conf in
   let* resolver = B0_build.get b B0_ocaml.lib_resolver in
   let m = B0_build.memo b in
-  let global_opts = Cmd.(atom "-g") (* TODO *) in
+  let global_opts = Cmd.(arg "-g") (* TODO *) in
   let opts = global_opts in
   let* () = compile_byte m ~opts ~resolver ~requires ~mod_srcs in
   let code = `Byte in
@@ -203,7 +203,7 @@ let js_of_byte_objs ~jss ~mod_srcs ~o b =
       (* FIXME this won't work with lib convention we need to
          remember the lib_name and mangle. *)
       let o = Fpath.(build_dir / (Fpath.basename obj ^ ".js")) in
-      let opts = Cmd.(opts %% atom "-I" %% path (Fpath.parent obj)) in
+      let opts = Cmd.(opts %% arg "-I" %% path (Fpath.parent obj)) in
       Tool.compile m ~opts ~source_map ~jss:[] ~byte:obj ~o;
       o
     in
@@ -211,9 +211,9 @@ let js_of_byte_objs ~jss ~mod_srcs ~o b =
     let jss = List.rev (List.fold_left compile_lib [] lib_objs) in
     (* FIXME at least stdlib should be looked up via resolver *)
     let stdlib_cma = Fpath.(B0_ocaml.Conf.where conf / "stdlib.cma") in
-    let stdlib_js = B0_memo.Memo.file_ready m stdlib_cma; compile stdlib_cma in
+    let stdlib_js = B0_memo.file_ready m stdlib_cma; compile stdlib_cma in
     let std_exit_cmo = Fpath.(B0_ocaml.Conf.where conf / "std_exit.cmo") in
-    let std_exit_js = B0_memo.Memo.file_ready m std_exit_cmo; compile std_exit_cmo in
+    let std_exit_js = B0_memo.file_ready m std_exit_cmo; compile std_exit_cmo in
     stdlib_js :: jss, std_exit_js
   in
   let mod_obj_jss =
@@ -284,10 +284,10 @@ let copy_assets m srcs ~exts ~assets_root ~dst =
     | Some r when Fpath.is_prefix r src -> Fpath.reroot ~root:r ~dst src
     | _ -> Fpath.(dst / Fpath.basename src)
     in
-    B0_memo.Memo.copy m ~src dst;
+    B0_memo.copy m ~src dst;
     Fpath.Set.add dst acc
   in
-  List.iter (B0_memo.Memo.file_ready m) assets;
+  List.iter (B0_memo.file_ready m) assets;
   List.fold_left copy Fpath.Set.empty assets
 
 let web_exe ~srcs ~js ~o b =

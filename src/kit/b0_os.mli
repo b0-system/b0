@@ -7,7 +7,7 @@
 
 (** {1:id OS identification} *)
 
-val name : string B0_memo.Store.key
+val name : string B0_store.key
 (** [name] is the operating system name. Determined using the
     following steps, in order:
     {ol
@@ -20,7 +20,7 @@ val name : string B0_memo.Store.key
        memo environment, ["windows"].}
     {- Otherwise, ["unknown"].}} *)
 
-val version : string B0_memo.Store.key
+val version : string B0_store.key
 (** [version] is the operating system version string. This depends on
     the value of {!name}:
     {ul
@@ -37,7 +37,7 @@ val version : string B0_memo.Store.key
     {- Otherwise if the [uname] tool is available in the memo environment
        the result of [uname -r] and otherwise ["unknown"].}} *)
 
-val distribution : string B0_memo.Store.key
+val distribution : string B0_store.key
 (** [distribution] is the operating system distribution or
     a package manager. This depends on the value of {!name}:
     {ul
@@ -50,7 +50,7 @@ val distribution : string B0_memo.Store.key
        The former takes over if both are present. If none are found ["macos"].}
     {- Otherwise. The value of {!name}}} *)
 
-val family : string B0_memo.Store.key
+val family : string B0_store.key
 (** [family] is the operating system family. This lumps the following
     {!name} names under a common identifier:
     {ul
@@ -63,7 +63,7 @@ val family : string B0_memo.Store.key
 
 (** {1:exe_ext Executable file extension} *)
 
-val exe_ext : B0_std.Fpath.ext B0_memo.Store.key
+val exe_ext : B0_std.Fpath.ext B0_store.key
 (** [exe_ext] is operating system specific file extension for
     executable files. This is:
     {ul
@@ -74,7 +74,7 @@ val exe_ext : B0_std.Fpath.ext B0_memo.Store.key
 
     As reported by the operating system. *)
 
-val arch : string B0_memo.Store.key
+val arch : string B0_store.key
 (** [arch] is the architecture of the operating system, see also
     {!arch_normalized}. Determined using the following steps (in order):
     {ul
@@ -87,12 +87,12 @@ val arch : string B0_memo.Store.key
        rationale.}
     {- Otherwise, ["unknown"].}} *)
 
-val arch_normalized : string B0_memo.Store.key
+val arch_normalized : string B0_store.key
 (** [arch_normalized] normalizes some of the {!arch} values to more
     general identifiers like ["arm32"], ["arm64"], ["ppc32"],
     ["ppc64"], ["x86_32"] and ["x86_64"]. *)
 
-val arch_bits : int B0_memo.Store.key
+val arch_bits : int B0_store.key
 (** [arch_bits] is number of bits in a word on the architecture of the
     operating system, derived from {!arch_normalized}. Usually either
     [32] or [64]. If unknown warns on the memo and defaults to [64]. *)

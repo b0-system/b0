@@ -13,20 +13,16 @@ open Cmdliner
 module Env = struct
   let visual = "VISUAL"
   let editor = "EDITOR"
-end
-
-let envs =
-  let vars = lazy begin
-    Cmd.Env.info Env.visual
+  let infos =
+    Cmd.Env.info visual
       ~doc:"The editor used to edit files. This is a command invocation given \
             to execvp(3) and is used before EDITOR." ::
-    Cmd.Env.info Env.editor
+    Cmd.Env.info editor
       ~doc:"The editor used to edit files. This is a command invocation given \
             to execvp(3) and is used after VISUAL." ::
     []
-  end
-  in
-  fun () -> Lazy.force vars
+
+end
 
 (* Editing *)
 
@@ -40,7 +36,7 @@ let find ?win_exe ?search () =
       | Ok None -> r
       | Ok (Some cmd) -> Ok (cmd :: cmds)
   in
-  let cmds = Ok [B0_std.Cmd.atom "nano"] in
+  let cmds = Ok [B0_std.Cmd.arg "nano"] in
   let cmds = parse_env cmds Env.editor in
   let* cmds = parse_env cmds Env.visual in
   let rec loop = function

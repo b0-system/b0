@@ -19,11 +19,12 @@ module Env : sig
 
   val term : string
   (** [term] is [TERM]. *)
+
+  val infos : Cmdliner.Cmd.Env.info list
+  (** [infos] describe the [PAGER] and [TERM] environment variable for
+      cmdliner. *)
 end
 
-val envs : unit -> Cmdliner.Cmd.Env.info list
-(** [envs ()] describe the [PAGER] and [TERM] environment variable for
-    cmdliner. *)
 
 (** {1:paging Paging} *)
 

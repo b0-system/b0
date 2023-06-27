@@ -7,12 +7,15 @@
 
 open B0_std
 
-val get_cmd :
-  ?search:Fpath.t list -> ?cmd:Cmd.t -> unit -> (Cmd.t, string) result
-(** [get_cmd ()] looks for [rsync] with {!B0_std.Os.Cmd.get}. *)
+type t
+(** The type for rsync clients. *)
+
+val get :
+  ?search:Fpath.t list -> ?cmd:Cmd.t -> unit -> (t, string) result
+(** [get ()] looks for [rsync] with {!B0_std.Os.Cmd.get}. *)
 
 val copy :
-  ?opts:Cmd.t -> ?stats:bool -> ?progress:bool -> delete:bool ->
+  t -> ?opts:Cmd.t -> ?stats:bool -> ?progress:bool -> delete:bool ->
   ?src_host:string -> src:Fpath.t ->
   ?dst_host:string -> Fpath.t -> (unit, string) result
 (** [copy ~src dst] copies the contents of directory [src] to [dst]

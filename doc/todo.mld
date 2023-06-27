@@ -1,5 +1,13 @@
 {0:design_todo Design considerations and todo}
 
+
+{1:b0_std [b0.std]}
+
+{ul
+{- Review the tool lookup stuff. First we may want to
+   generalize the lookup path to a function (rather than list of paths).
+   Then maybe we should simply have a DLS global.}}
+
 {1:design_b0_file B0 file}
 
 {ul

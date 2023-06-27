@@ -19,7 +19,7 @@ let parse_ptime ptime = try Ok (int_of_string ptime) with
 | Failure _ -> Fmt.error "Could not parse timestamp from %S" ptime
 
 let parse_files ~err o =
-  let file_of_string l = Fpath.of_string l |> Result.to_failure in
+  let file_of_string l = Fpath.of_string l |> Result.error_to_failure in
   try Ok (List.map file_of_string (String.cuts_left ~sep:"\n" o)) with
   | Failure e -> Fmt.error "%s: %s" err e
 
@@ -103,7 +103,7 @@ let run_status ?stdout ?stderr r cmd_args =
 (* Git support *)
 
 module Git_vcs = struct
-  let git = lazy (Os.Cmd.find (Cmd.atom "git"))
+  let git = lazy (Os.Cmd.find (Cmd.arg "git"))
   let repo_cmd git repo_dir work_dir =
     Cmd.(git % "--git-dir" %% path repo_dir % "--work-tree" %% path work_dir)
 
@@ -123,7 +123,7 @@ module Git_vcs = struct
     | None -> Ok None
     | Some git ->
         let cwd = match dir with
-        | Some d -> Cmd.(atom "-C" %% path d)
+        | Some d -> Cmd.(arg "-C" %% path d)
         | None -> Cmd.empty
         in
         let repo_dir = Cmd.(git %% cwd % "rev-parse" % "--absolute-git-dir") in
@@ -142,7 +142,7 @@ module Git_vcs = struct
 
   let is_dirty r =
     let stderr = `Stdo Os.Cmd.out_null in
-    let status = Cmd.(atom "status" % "--porcelain") in
+    let status = Cmd.(arg "status" % "--porcelain") in
     Result.bind (run ~stderr r status) @@ function
     | "" -> Ok false | _ -> Ok true
 
@@ -157,26 +157,26 @@ module Git_vcs = struct
 
   let commit_id r ~dirty_mark commit_ish =
     let typed_commit_ish = Fmt.str "%s^{commit}" commit_ish in
-    let args = Cmd.(atom "rev-parse" % "--verify" % typed_commit_ish) in
+    let args = Cmd.(arg "rev-parse" % "--verify" % typed_commit_ish) in
     Result.bind (run r args) (handle_dirt ~dirty_mark commit_ish r)
 
   let commit_ptime_s r commit_ish =
-    let args = Cmd.(atom "show" % "-s" % "--format=%ct" % commit_ish) in
+    let args = Cmd.(arg "show" % "-s" % "--format=%ct" % commit_ish) in
     Result.bind (run r args) parse_ptime
 
   let changes r ~after ~until =
     let range = if after = "" then until else Fmt.str "%s..%s" after until in
-    let args = Cmd.(atom "log" % "--oneline" % "--no-decorate" % range) in
+    let args = Cmd.(arg "log" % "--oneline" % "--no-decorate" % range) in
     Result.bind (run r args) @@ fun o ->
     parse_changes (String.cuts_left ~sep:"\n" o)
 
   let tracked_files r ~tree_ish =
-    let args = Cmd.(atom "ls-tree" % "--name-only" % "-r" % tree_ish) in
+    let args = Cmd.(arg "ls-tree" % "--name-only" % "-r" % tree_ish) in
     Result.bind (run r args) (parse_files ~err:"tracked files")
 
   let commit_files ?stdout ?stderr ?msg:m r files =
-    let msg = match m with None -> Cmd.empty | Some m -> Cmd.(atom "-m" % m) in
-    let args = Cmd.(atom "commit" %% msg %% paths files) in
+    let msg = match m with None -> Cmd.empty | Some m -> Cmd.(arg "-m" % m) in
+    let args = Cmd.(arg "commit" %% msg %% paths files) in
     run_status ?stdout ?stderr r args
 
   (* Working directory *)
@@ -190,12 +190,12 @@ module Git_vcs = struct
     | _ as status -> err cmd status
 
   let checkout ?and_branch:b r commit_ish =
-    let b = match b with None -> Cmd.empty | Some b -> Cmd.(atom "-b" % b) in
-    let args = Cmd.(atom "checkout" % "--quiet" %% b % commit_ish) in
+    let b = match b with None -> Cmd.empty | Some b -> Cmd.(arg "-b" % b) in
+    let args = Cmd.(arg "checkout" % "--quiet" %% b % commit_ish) in
     run_status r args
 
   let local_clone r ~dir =
-    let args = Cmd.(atom "clone" % "--local" %% path r.repo_dir %% path dir) in
+    let args = Cmd.(arg "clone" % "--local" %% path r.repo_dir %% path dir) in
     Result.bind (run_status r args) @@ fun () ->
     Result.bind (find ~dir ()) @@ function
     | Some r -> Ok r
@@ -204,26 +204,26 @@ module Git_vcs = struct
   (* Tags *)
 
   let tags r =
-    let args = Cmd.(atom "tag" % "--list") in
+    let args = Cmd.(arg "tag" % "--list") in
     Result.bind (run r args) @@ fun o -> Ok (String.cuts_left ~sep:"\n" o)
 
   let tag ?msg:m r ~force ~sign commit_ish tag =
-    let msg = match m with None -> Cmd.empty | Some m -> Cmd.(atom "-m" % m) in
-    let flags = Cmd.(if' force (atom "-f") %% if' sign (atom "-s")) in
-    let args = Cmd.(atom "tag" % "-a" %% flags %% msg % tag % commit_ish) in
+    let msg = match m with None -> Cmd.empty | Some m -> Cmd.(arg "-m" % m) in
+    let flags = Cmd.(if' force (arg "-f") %% if' sign (arg "-s")) in
+    let args = Cmd.(arg "tag" % "-a" %% flags %% msg % tag % commit_ish) in
     run_status r args
 
   let delete_tag r tag =
-    let args = Cmd.(atom "tag" % "-d" % tag) in
+    let args = Cmd.(arg "tag" % "-d" % tag) in
     run_status r args
 
   let describe r ~dirty_mark commit_ish =
-    let args = Cmd.(atom "describe" % "--always" % commit_ish) in
+    let args = Cmd.(arg "describe" % "--always" % commit_ish) in
     Result.bind (run r args) (handle_dirt ~dirty_mark commit_ish r)
 
   let latest_tag r commit_ish =
     let stderr = `Stdo Os.Cmd.out_null in
-    let args = Cmd.(atom "describe" % "--abbrev=0" % commit_ish) in
+    let args = Cmd.(arg "describe" % "--abbrev=0" % commit_ish) in
     let cmd = Cmd.(r.cmd %% args) in
     Result.bind (Os.Cmd.run_status_out ~stderr ~trim:true cmd) @@ function
     | `Exited 0,  v -> Ok (Some v)
@@ -234,7 +234,7 @@ end
 (* Hg support *)
 
 module Hg_vcs = struct
-  let hg = lazy (Os.Cmd.find (Cmd.atom "hg"))
+  let hg = lazy (Os.Cmd.find (Cmd.arg "hg"))
   let repo_cmd hg repo_dir = Cmd.(hg % "--repository" %% path repo_dir)
 
   let find ?dir () = match dir with
@@ -272,7 +272,7 @@ module Hg_vcs = struct
   let revision commit_ish = match commit_ish with "HEAD" -> "tip" | c -> c
 
   let id r ~rev =
-    let* id = run r Cmd.(atom "id" % "-i" % "--rev" % rev) in
+    let* id = run r Cmd.(arg "id" % "-i" % "--rev" % rev) in
     let len = String.length id in
     let is_dirty = String.length id > 0 && id.[len - 1] = '+' in
     let id = if is_dirty then String.sub id 0 (len - 1) else id in
@@ -298,14 +298,14 @@ module Hg_vcs = struct
   let commit_ptime_s r commit_ish =
     let rev = revision commit_ish in
     let date = "{date(date, \"%s\")}" in
-    let args = Cmd.(atom "log" % "--template" % date % "--rev" % rev) in
+    let args = Cmd.(arg "log" % "--template" % date % "--rev" % rev) in
     Result.bind (run r args) parse_ptime
 
   let changes r ~after ~until =
     let after = revision after and until = revision until in
     let rev = Fmt.str "%s::%s" after until in
     let template = "{node|short} {desc|firstline}\\n" in
-    let args = Cmd.(atom "log" % "--template" % template % "--rev" % rev) in
+    let args = Cmd.(arg "log" % "--template" % template % "--rev" % rev) in
     Result.bind (run r args) @@ fun o ->
     Result.bind (parse_changes (String.cuts_left ~sep:"\n" o)) @@ function
     | [] -> Ok []
@@ -313,32 +313,32 @@ module Hg_vcs = struct
 
   let tracked_files r ~tree_ish =
     let rev = revision tree_ish in
-    let args = Cmd.(atom "manifest" % "--rev" % rev) in
+    let args = Cmd.(arg "manifest" % "--rev" % rev) in
     Result.bind (run r args) (parse_files ~err:"tracked files")
 
   let commit_files ?stdout ?stderr ?msg:m r files =
-    let msg = match m with None -> Cmd.empty | Some m -> Cmd.(atom "-m" % m) in
-    let args = Cmd.(atom "commit" %% msg %% paths files) in
+    let msg = match m with None -> Cmd.empty | Some m -> Cmd.(arg "-m" % m) in
+    let args = Cmd.(arg "commit" %% msg %% paths files) in
     run_status ?stdout ?stderr r args
 
   (* Working directory *)
 
   let file_is_dirty r file =
-    let args = Cmd.(atom "status" %% path file) in
+    let args = Cmd.(arg "status" %% path file) in
     Result.bind (run r args) @@ function "" -> Ok false | _ -> Ok true
 
   let checkout ?and_branch:branch r commit_ish =
     let rev = revision commit_ish in
-    let args = Cmd.(atom "update" % "--rev" % rev) in
+    let args = Cmd.(arg "update" % "--rev" % rev) in
     Result.bind (run r args) @@ fun _ ->
     match branch with
     | None -> Ok ()
     | Some branch ->
-        let args = Cmd.(atom "branch" % branch) in
+        let args = Cmd.(arg "branch" % branch) in
         Result.bind (run r args) @@ fun _ -> Ok ()
 
   let local_clone r ~dir =
-    let args = Cmd.(atom "clone" %% path r.repo_dir %% path dir) in
+    let args = Cmd.(arg "clone" %% path r.repo_dir %% path dir) in
     Result.bind (run_status r args) @@ fun _ ->
     Result.bind (find ~dir ()) @@ function
     | Some r -> Ok r
@@ -347,19 +347,19 @@ module Hg_vcs = struct
   (* Tags *)
 
   let tags r =
-    let args = Cmd.(atom "tags" % "--quiet" (* sic *)) in
+    let args = Cmd.(arg "tags" % "--quiet" (* sic *)) in
     Result.bind (run r args) @@ fun o -> Ok (String.cuts_left ~sep:"\n" o)
 
   let tag ?msg:m r ~force ~sign commit_ish tag =
     if sign then Error "Tag signing is not supported by hg" else
     let rev = revision commit_ish in
-    let msg = match m with None -> Cmd.empty | Some m -> Cmd.(atom "-m" % m) in
-    let may_force = Cmd.(if' force (atom "-f")) in
-    let args = Cmd.(atom "tag" %% may_force %% msg % "--rev" % rev % tag) in
+    let msg = match m with None -> Cmd.empty | Some m -> Cmd.(arg "-m" % m) in
+    let may_force = Cmd.(if' force (arg "-f")) in
+    let args = Cmd.(arg "tag" %% may_force %% msg % "--rev" % rev % tag) in
     run_status r args
 
   let delete_tag r tag =
-    let args = Cmd.(atom "tag" % "--remove" % tag) in
+    let args = Cmd.(arg "tag" % "--remove" % tag) in
     run_status r args
 
   let describe r ~dirty_mark commit_ish =
@@ -369,7 +369,7 @@ module Hg_vcs = struct
           Fpath.pp_quoted r.repo_dir
     in
     let rev = revision commit_ish in
-    let parent t = Cmd.(atom "parent" % "--rev" % rev % "--template" % t) in
+    let parent t = Cmd.(arg "parent" % "--rev" % rev % "--template" % t) in
     Result.bind (run r (parent "{latesttagdistance}")) @@ fun dist ->
     Result.bind (get_distance dist) @@ fun dist ->
     let template = match dist with
@@ -380,7 +380,7 @@ module Hg_vcs = struct
 
   let latest_tag r commit_ish =
     let rev = revision commit_ish in
-    let args = Cmd.(atom "parent" % "--rev" % rev % "--template" %
+    let args = Cmd.(arg "parent" % "--rev" % rev % "--template" %
                     "{latesttag}")
     in
     Result.map Option.some (run r args)
@@ -454,7 +454,7 @@ let latest_tag (r, (module Vcs : VCS)) = Vcs.latest_tag r
 (* Git specific *)
 
 module Git = struct
-  let get_cmd ?search ?(cmd = Cmd.atom "git") () = Os.Cmd.get ?search cmd
+  let get_cmd ?search ?(cmd = Cmd.arg "git") () = Os.Cmd.get ?search cmd
   let find ?dir () =
     let* vcs = Git_vcs.find ?dir () in
     Ok (Option.map (fun r -> r, (module Git_vcs : VCS)) vcs)
@@ -473,7 +473,7 @@ module Git = struct
     Fmt.tty [`Fg `Red; `Bold] (fun ppf (r, b) -> Fmt.pf ppf "%s/%s" r b)
 
   let remote_branch_exists ?env (r, _) ~remote ~branch =
-    let ui = Cmd.(atom "--exit-code" % "--quiet") in
+    let ui = Cmd.(arg "--exit-code" % "--quiet") in
     let stdout = Os.Cmd.out_null (* not so quiet *) in
     let ls_remote = Cmd.(r.cmd % "ls-remote" %% ui % remote % branch) in
     Result.bind (Os.Cmd.run_status ?env ~stdout ls_remote) @@ function
@@ -487,17 +487,17 @@ module Git = struct
 
   let remote_branch_push ?env ?stdout ?stderr (r, _) ~force ~src ~remote ~dst =
     let refspec = Fmt.str "%s:%s" src dst in
-    let force = Cmd.(if' force (atom "--force")) in
+    let force = Cmd.(if' force (arg "--force")) in
     let push = Cmd.(r.cmd % "push" %% force % remote % refspec) in
     Os.Cmd.run ?env ?stdout ?stderr push
 
   let remote_branch_delete ?env ?stdout ?stderr (r, _) ~force ~remote ~branch =
-    let force = Cmd.(if' force (atom "--force")) in
+    let force = Cmd.(if' force (arg "--force")) in
     let push = Cmd.(r.cmd % "push" % "--delete" %% force % remote % branch) in
     Os.Cmd.run ?env ?stdout ?stderr push
 
   let branch_delete ?env ?stdout ?stderr (r, _) ~force ~branch =
-    let force = Cmd.(if' force (atom "--force")) in
+    let force = Cmd.(if' force (arg "--force")) in
     let del = Cmd.(r.cmd % "branch" % "-d" %% force % branch) in
     Os.Cmd.run ?env ?stdout ?stderr del
 
@@ -506,7 +506,7 @@ module Git = struct
   let transient_checkout ?stdout ?stderr (r, _) ~force ~branch dir = function
   | Some cish ->
       let b = if force then "-B" else "-b" in
-      let add = Cmd.(atom "worktree" % "add" % b % branch %% path dir % cish) in
+      let add = Cmd.(arg "worktree" % "add" % b % branch %% path dir % cish) in
       let* () = Os.Cmd.run ?stdout ?stderr Cmd.(r.cmd %% add) in
       get ~dir ()
   | None ->
@@ -521,8 +521,8 @@ module Git = struct
       Ok repo
 
   let transient_checkout_delete ?stdout ?stderr (r, _) ~force =
-    let force = Cmd.(if' force (atom "--force")) in
-    let rem = Cmd.(atom "worktree" % "remove" %% force %% path r.work_dir) in
+    let force = Cmd.(if' force (arg "--force")) in
+    let rem = Cmd.(arg "worktree" % "remove" %% force %% path r.work_dir) in
     Os.Cmd.run ?stdout ?stderr Cmd.(r.cmd %% rem)
 
   let with_transient_checkout ?stdout ?stderr ?dir r ~force ~branch cish f =
@@ -540,7 +540,7 @@ module Git = struct
   (* Working dir *)
 
   let add ?stdout ?stderr (r, _) ~force fs =
-    let force = Cmd.(if' force (atom "--force")) in
+    let force = Cmd.(if' force (arg "--force")) in
     let add = Cmd.(r.cmd % "add" %% force % "--" %% paths fs) in
     Os.Cmd.run ?stdout ?stderr add
 
@@ -555,11 +555,11 @@ module Git = struct
       ?stdout ?stderr ?(sign = false) ?(reset_author = false) ?(amend = false)
       ?msg:m (r, _)
     =
-    let sign = Cmd.(if' sign (atom "--signoff")) in
-    let reset_author = Cmd.(if' reset_author (atom "--reset-author")) in
-    let amend = Cmd.(if' amend (atom "--amend")) in
-    let msg = match m with None -> Cmd.empty | Some m -> Cmd.(atom "-m" % m) in
-    let commit = Cmd.(atom "commit" %% sign %% reset_author %% amend %% msg) in
+    let sign = Cmd.(if' sign (arg "--signoff")) in
+    let reset_author = Cmd.(if' reset_author (arg "--reset-author")) in
+    let amend = Cmd.(if' amend (arg "--amend")) in
+    let msg = match m with None -> Cmd.empty | Some m -> Cmd.(arg "-m" % m) in
+    let commit = Cmd.(arg "commit" %% sign %% reset_author %% amend %% msg) in
     Os.Cmd.run ?stdout ?stderr Cmd.(r.cmd %% commit)
 
   let commit_exists (r, _) cish =
@@ -570,15 +570,15 @@ module Git = struct
     | status -> Fmt.error "%a" Os.Cmd.pp_cmd_status (reflog, status)
 
   let rm ?stdout ?stderr (r, _) ~force ~recurse ~ignore_unmatch files =
-    let force = Cmd.(if' force (atom "--force")) in
-    let recurse = Cmd.(if' recurse (atom "-r")) in
-    let ign = Cmd.(if' ignore_unmatch (atom "--ignore-unmatch")) in
+    let force = Cmd.(if' force (arg "--force")) in
+    let recurse = Cmd.(if' recurse (arg "-r")) in
+    let ign = Cmd.(if' ignore_unmatch (arg "--ignore-unmatch")) in
     let rm = Cmd.(r.cmd % "rm" %% force %% recurse %% ign %% paths files) in
     Os.Cmd.run ?stdout ?stderr rm
 end
 
 module Hg = struct
-  let get_cmd ?search ?(cmd = Cmd.atom "hg") () = Os.Cmd.get ?search cmd
+  let get_cmd ?search ?(cmd = Cmd.arg "hg") () = Os.Cmd.get ?search cmd
   let find ?dir () =
     let* vcs = Hg_vcs.find ?dir () in
     Ok (Option.map (fun r -> r, (module Hg_vcs : VCS)) vcs)

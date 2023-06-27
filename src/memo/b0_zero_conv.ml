@@ -515,7 +515,7 @@ module Op = struct
     let kind = "Cmd.t" in
     let next, b = B0_bincode.dec_byte ~kind s i in
     match b with
-    | 0 -> let i, s = B0_bincode.dec_string s next in i, Cmd.atom s
+    | 0 -> let i, s = B0_bincode.dec_string s next in i, Cmd.arg s
     | 1 -> let i, cmd = dec_cmd s next in i, Cmd.unstamp cmd
     | 2 ->
         let i, cmd0 = dec_cmd s next in
@@ -615,9 +615,9 @@ module Op = struct
   let enc b o =
     B0_bincode.enc_int b (Op.id o);
     B0_bincode.enc_string b (Op.mark o);
-    B0_bincode.enc_time_span b (Op.time_created o);
-    B0_bincode.enc_time_span b (Op.time_started o);
-    B0_bincode.enc_time_span b (Op.duration o);
+    B0_bincode.enc_mtime_span b (Op.time_created o);
+    B0_bincode.enc_mtime_span b (Op.time_started o);
+    B0_bincode.enc_mtime_span b (Op.duration o);
     B0_bincode.enc_bool b (Op.revived o);
     enc_status b (Op.status o);
     B0_bincode.enc_list B0_bincode.enc_fpath b (Op.reads o);
@@ -631,9 +631,9 @@ module Op = struct
     let k o = invalid_arg "deserialized op, no kontinuation" in
     let i, id = B0_bincode.dec_int s i in
     let i, mark = B0_bincode.dec_string s i in
-    let i, time_created = B0_bincode.dec_time_span s i in
-    let i, time_started = B0_bincode.dec_time_span s i in
-    let i, duration = B0_bincode.dec_time_span s i in
+    let i, time_created = B0_bincode.dec_mtime_span s i in
+    let i, time_started = B0_bincode.dec_mtime_span s i in
+    let i, duration = B0_bincode.dec_mtime_span s i in
     let i, revived = B0_bincode.dec_bool s i in
     let i, status = dec_status s i in
     let i, reads = B0_bincode.dec_list B0_bincode.dec_fpath s i in

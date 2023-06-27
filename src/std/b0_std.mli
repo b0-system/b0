@@ -422,12 +422,8 @@ module Result : sig
   val retract : ('a, 'a) result -> 'a
   (** [retract r] is [v] if [r] is [Ok v] or [Error v]. *)
 
-  val to_failure : ('a, string) result -> 'a
-  (** [to_failure r] is [failwith e] if [r] is [Error e] and [v]
-      if [r] is [Ok v]. *)
-
-  val to_invalid_arg : ('a, string) result -> 'a
-  (** [to_invalid_arg r] is [invalid_arg e] if [r] is [Error e] and [v]
+  val error_to_failure : ('a, string) result -> 'a
+  (** [error_to_failure r] is [failwith e] if [r] is [Error e] and [v]
       if [r] is [Ok v]. *)
 
   (** let operators. *)
@@ -1120,7 +1116,7 @@ end
 
     The paths segments ["."] and [".."] are relative path segments
     that respectively denote the current and parent directory. The
-    {{!basename}basename} of a path is its last non-empty segment if
+    {{!Fpath.basename}basename} of a path is its last non-empty segment if
     it is not a relative path segment or the empty string otherwise (e.g.
     on ["/"] or [".."]). *)
 module Fpath : sig
@@ -1370,20 +1366,20 @@ module Fpath : sig
   (** [to_string p] is the path [p] as a string. The result can
       be safely converted back with {!v}. *)
 
-  val to_uri_path : ?escape_space:bool -> t -> string
-  (** [to_uri_path p] is the path [p] as an URI path. This is [p] with
+  val to_url_path : ?escape_space:bool -> t -> string
+  (** [to_url_path p] is the path [p] as an URL path. This is [p] with
       the system specific {!dir_sep_char} directory separator replaced
       by ['/'] and with the following characters percent encoded:
       ['%'], ['?'], ['#'], [' '] (unless [escape_space] is [false],
       defaults to [true]), and the US-ASCII
       {{!Char.Ascii.is_control}control characters}.
 
-      {b Note.} In 2019, the standard definition of URIs is in a sorry
+      {b Note.} In 2019, the standard definition of URLs is in a sorry
       state. Assuming [p] is UTF-8 encoded. It is {e believed} the
-      above function should lead to an URI path component that can be
+      above function should lead to an URL path component that can be
       parsed by HTML5's
       {{:https://dev.w3.org/html5/spec-LC/urls.html#parsing-urls}
-      definition} of URI parsing. *)
+      definition} of URL parsing. *)
 
   (** {1:fmt Formatting} *)
 
@@ -1536,11 +1532,11 @@ module Hash : sig
 
   (** {1:converting Converting} *)
 
-  val to_bytes : t -> string
-  (** [to_bytes h] is the sequence of bytes of [h]. *)
+  val to_binary_string : t -> string
+  (** [to_binary_string h] is the sequence of bytes of [h]. *)
 
-  val of_bytes : string -> t
-  (** [of_bytes s] is the sequences of bytes of [s] as a hash value. *)
+  val of_binary_string : string -> t
+  (** [of_binary_string s] is the sequences of bytes of [s] as a hash value. *)
 
   val to_hex : t -> string
   (** [to_hex h] is {!String.Ascii.to_hex}[ (to_bytes h)]. *)
@@ -1601,96 +1597,95 @@ end
     This time increases monotonically and is not subject to operating
     system calendar time adjustement. Its absolute value is meaningless.
 
-    To obtain monotonic time stamps and measure it use {!Os.Mtime}. *)
+    To obtain and measure monotonic time use {!Os.Mtime}. *)
 module Mtime : sig
 
-  (** {1:span Monotonic time spans} *)
+  (** {1:spans Time spans} *)
 
-  type span
-  (** The type for non-negative monotonic time spans. They represent
-      the difference between two monotonic clock readings with
-      nanosecond precision (1e-9s) and can measure up to
-      approximatevely 584 Julian year spans before silently rolling
-      over (unlikely since this is in a single program run). *)
-
-    (** Monotonic time spans *)
+  (** Monotonic time spans *)
   module Span : sig
 
     (** {1:span Time spans} *)
 
-    type t = span
-    (** See {!type:span}. *)
+    type t
+    (** The type for non-negative monotonic time spans.
 
-    val zero : span
+        They represent the difference between two monotonic clock
+        readings with nanosecond precision (1e-9s) and can measure up
+        to approximatevely 584 Julian year spans before silently
+        rolling over (unlikely since this is in a single program
+        run). *)
+
+    val zero : t
     (** [zero] is a span of 0ns. *)
 
-    val one : span
+    val one : t
     (** [one] is a span of 1ns. *)
 
-    val max_span : span
+    val max_span : t
     (** [max_span] is a span of [2^64-1]ns. *)
 
-    val add : span -> span -> span
+    val add : t -> t -> t
     (** [add s0 s1] is [s0] + [s1]. {b Warning.} Rolls over on overflow. *)
 
-    val abs_diff : span -> span -> span
+    val abs_diff : t -> t -> t
     (** [abs_diff s0 s1] is the absolute difference between [s0] and [s1]. *)
 
     (** {1:preds Predicates and comparisons} *)
 
-    val equal : span -> span -> bool
+    val equal : t -> t -> bool
     (** [equal s0 s1] is [s0 = s1]. *)
 
-    val compare : span -> span -> int
+    val compare : t -> t -> int
     (** [compare s0 s1] orders span by increasing duration. *)
 
     (** {1:const Durations} *)
 
-    val ( * ) : int -> span -> span
+    val ( * ) : int -> t -> t
     (** [n * dur] is [n] times duration [n]. Does not check for
         overflow or that [n] is positive. *)
 
-    val ns : span
+    val ns : t
     (** [ns] is a nanosecond duration, 1·10{^-9}s. *)
 
-    val us : span
+    val us : t
     (** [us] is a microsecond duration, 1·10{^-6}s. *)
 
-    val ms : span
+    val ms : t
     (** [ms] is a millisecond duration, 1·10{^-3}s. *)
 
-    val s : span
+    val s : t
     (** [s] is a second duration, 1s. *)
 
-    val min : span
+    val min : t
     (** [min] is a minute duration, 60s. *)
 
-    val hour : span
+    val hour : t
     (** [hour] is an hour duration, 3600s. *)
 
-    val day : span
+    val day : t
     (** [day] is a day duration, 86'400s. *)
 
-    val year : span
+    val year : t
     (** [year] is a Julian year duration (365.25 days), 31'557'600s. *)
 
     (** {1:conv Conversions} *)
 
-    val to_uint64_ns : span -> int64
+    val to_uint64_ns : t -> int64
     (** [to_uint64_ns s] is [s] as an {e unsigned} 64-bit integer nanosecond
         span. *)
 
-    val of_uint64_ns : int64 -> span
+    val of_uint64_ns : int64 -> t
     (** [of_uint64_ns u] is the {e unsigned} 64-bit integer nanosecond span [u]
         as a span. *)
 
-    val of_float_ns : float -> span option
+    val of_float_ns : float -> t option
     (** [of_float_ns f] is the positive floating point nanosecond span [f] as
         a span. This is [None] if [f] is negative, non finite, or
         larger or equal than 2{^53} (~104 days, the largest exact floating
         point integer). *)
 
-    val to_float_ns : span -> float
+    val to_float_ns : t -> float
     (** [to_float_ns s] is [span] as a nanosecond floating point span.
         Note that if [s] is larger than 2{^53} (~104 days, the largest
         exact floating point integer) the result is an approximation
@@ -1698,15 +1693,15 @@ module Mtime : sig
 
     (** {1:fmt Formatting} *)
 
-    val pp : span Fmt.t
+    val pp : t Fmt.t
     (** [pp] formats with {!Fmt.uint64_ns_span}. *)
 
-    val pp_ns : span Fmt.t
+    val pp_ns : t Fmt.t
     (** [pp_ns ppf s] prints [s] as an unsigned 64-bit integer nanosecond
         span. *)
   end
 
-  (** {1:timestamp Monotonic timestamps}
+  (** {1:timestamps Timestamps}
 
       {b Note.} Only use timestamps if you need inter-process time
       correlation,  otherwise prefer {!Os.Mtime.elapsed} and
@@ -1754,15 +1749,15 @@ module Mtime : sig
 
   (** {1:arith Arithmetic} *)
 
-  val span : t -> t -> span
+  val span : t -> t -> Span.t
   (** [span t t'] is the span between [t] and [t'] regardless of the
       order between [t] and [t']. *)
 
-  val add_span : t -> span -> t option
+  val add_span : t -> Span.t -> t option
   (** [add_span t s] is the timestamp [s] units later than [t] or [None] if
       the result overflows. *)
 
-  val sub_span : t -> span -> t option
+  val sub_span : t -> Span.t -> t option
   (** [sub_span t s] is the timestamp [s] units earlier than [t] or
       [None] if overflows. *)
 end
@@ -1775,14 +1770,14 @@ end
     element of the line defines the program to invoke. In other
     contexts the tool to invoke and its arguments are kept separate.
 
-    {!examples}.
+    {!Cmd.examples}.
 
-    {b B0 artefact.}  This module allows to {!unstamp} command
+    {b B0 artefact.}  This module allows to {!Cmd.unstamp} command
     arguments. Unstamped arguments have no special semantics as far as
     the command line is concerned they simply indicate that the
     argument value itself does not influence the outputs of the
     tool. Unstamped arguments do not appear in the command line
-    {{!to_list_and_stamp}stamp} which is used to memoize tool
+    {{!Cmd.to_list_and_stamp}stamp} which is used to memoize tool
     spawns. A typical example of unstamped arguments are file paths to
     inputs: it's often the file contents not the actual file path that
     determines the tool output; beware though that some tool use both
@@ -1802,8 +1797,8 @@ module Cmd : sig
   val empty : t
   (** [empty] is an empty list of arguments. *)
 
-  val atom : string -> t
-  (** [atom a] is the atomic argument [a]. *)
+  val arg : string -> t
+  (** [arg a] is the atomic argument [a]. *)
 
   val append : t -> t -> t
   (** [append l1 l2] appends arguments [l2] to [l1]. *)
@@ -1824,6 +1819,9 @@ module Cmd : sig
   val if' : bool -> t -> t
   (** [if' cond l] is [l] if [cond] is [true] and {!empty} otherwise. *)
 
+  val if_some : t option -> t
+  (** [if_some o] is [cmd] if [o] is [Some cmd] and {!empty} otherwise. *)
+
   val int : int -> t
   (** [int i] is [arg (string_of_int i)]. *)
 
@@ -1843,18 +1841,6 @@ module Cmd : sig
 
   val of_list : ?slip:string -> ('a -> string) -> 'a list -> t
   (** [of_list ?slip conv l] is {!args}[ ?slip (List.map conv l)]. *)
-
-  val rev_list : ?slip:string -> string list -> t
-  [@@ocaml.deprecated]
-  (** [rev_list ?slip l] is {!list}[ ?slip (List.rev l)]. *)
-
-  val of_rev_list : ?slip:string -> ('a -> string) -> 'a list -> t
-  [@@ocaml.deprecated]
-  (** [of_rev_list ?slip conv l] is {!args}[ ?slip (List.rev_map conv l)]. *)
-
-  val rev_paths : ?slip:string -> Fpath.t list -> t
-  [@@ocaml.deprecated]
-  (** [rev_paths ?slip ps] is {!of_rev_list}[ ?slip Fpath.to_string ps]. *)
 
   (** {1:tool Tools} *)
 
@@ -2012,11 +1998,6 @@ module Fut : sig
 
   (** Future syntax. *)
   module Syntax : sig
-
-    (*
-    val ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t
-    (** [>>=] is {!bind}. *) *)
-
     val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
     (** [let*] is {!bind}. *)
 
@@ -2027,6 +2008,16 @@ end
 
 (** OS interaction. *)
 module Os : sig
+
+  val sleep : Mtime.Span.t -> Mtime.Span.t
+  (** [sleep dur] sleeps for duration [dur] and returns the duration
+      slept. The latter may be smaller than [dur] if the call was
+      interrupted by a signal. This becomes imprecise if [dur] is
+      greater than ~104 days. *)
+
+  val relax : unit -> unit
+  (** [relax] sleeps for a very small duration. Can be used
+      for relaxed busy waiting. *)
 
   (** CPU time and information. *)
   module Cpu : sig
@@ -2039,32 +2030,36 @@ module Os : sig
 
       (** {1:cpu_span CPU time spans} *)
 
-      type span
-      (** The type for CPU execution time spans. *)
+      (** CPU time spans. *)
+      module Span : sig
 
-      val span :
-        utime:Mtime.span -> stime:Mtime.span ->
-        children_utime:Mtime.span ->
-        children_stime:Mtime.span -> span
-      (** [span ~utime ~stime ~children_utime
-          ~children_stime] is a cpu span with the given fields. See
-          accessors for semantics. *)
+        type t
+        (** The type for CPU execution time spans. *)
 
-      val zero : span
-      (** [zero] is zero CPU times. *)
+        val v :
+          utime:Mtime.Span.t -> stime:Mtime.Span.t ->
+          children_utime:Mtime.Span.t -> children_stime:Mtime.Span.t -> t
+        (** [v ~utime ~stime ~children_utime ~children_stime] is a cpu
+            span with the given fields. See accessors for
+            semantics. *)
 
-      val utime : span -> Mtime.span
-      (** [utime cpu] is [cpu]'s user time. *)
+        val zero : t
+        (** [zero] is zero CPU times. *)
 
-      val stime : span -> Mtime.span
-      (** [stime cpu] is [cpu]'s system time. *)
+        val utime : t -> Mtime.Span.t
+        (** [utime cpu] is the user time of [cpu]. *)
 
-      val children_utime : span -> Mtime.span
-      (** [children_utime cpu] is [cpu]'s user time for children processes. *)
+        val stime : t -> Mtime.Span.t
+        (** [stime cpu] is the system time of [cpu]. *)
 
-      val children_stime : span -> Mtime.span
-      (** [children_stime cpu] is [cpu]'s system time for children processes. *)
+        val children_utime : t -> Mtime.Span.t
+        (** [children_utime cpu] is the user time for children processes
+            of [cpu]. *)
 
+        val children_stime : t -> Mtime.Span.t
+        (** [children_stime cpu] is the system time for children processes
+            of [cpu]. *)
+      end
       (** {1:counter CPU time counters} *)
 
       type counter
@@ -2073,16 +2068,10 @@ module Os : sig
       val counter : unit -> counter
       (** [counter ()] is a counter counting from now on. *)
 
-      val count : counter -> span
+      val count : counter -> Span.t
       (** [count c] are CPU times since [c] was created. *)
     end
   end
-
-  val sleep : Mtime.Span.t -> Mtime.Span.t
-  (** [sleep dur] sleeps for duration [dur] and returns the duration
-      slept. The latter may be smaller than [dur] if the call was
-      interrupted by a signal. This becomes imprecise if [dur] is
-      greater than ~104 days. *)
 
   (** Monotonic time clock and sleep.
 
@@ -2095,7 +2084,7 @@ module Os : sig
     (** [now ()] is the current system-relative monotonic timestamp. Its
         absolute value is meaningless. *)
 
-    val elapsed : unit -> Mtime.span
+    val elapsed : unit -> Mtime.Span.t
     (** [elapsed ()] is the monotonic time span elapsed since the
         beginning of the program. *)
 
@@ -2107,7 +2096,7 @@ module Os : sig
     val counter : unit -> counter
     (** [counter ()] is a counter counting from now on. *)
 
-    val count : counter -> Mtime.span
+    val count : counter -> Mtime.Span.t
     (** [count c] is the monotonic time span elapsed since [c] was created. *)
 
     (** {1:err Error handling}
@@ -3032,7 +3021,7 @@ module Os : sig
     | Code : int -> t (** [exit] with code. *)
     | Exec : (unit -> ('a, string) result) -> t (** exit with [execv] *)
     (** The type for specifying program exits. Either an exit code or a
-        function (should be) calling {!B0_std.Cmd.execv}. *)
+        function (that should be) calling {!B0_std.Cmd.execv}. *)
 
     val code : int -> t
     (** [code c] is [Code c]. *)
@@ -3081,7 +3070,7 @@ end
 
     The module is modelled after {!Logs} logging, see
     {{!Logs.basics}this quick introduction}. It can be made
-    to log on a {!Logs} source, see {{!logger}here}.
+    to log on a {!Logs} source, see {{!Log.logger}here}.
 
     {b FIXME} This should maybe moved to a B0_log module. Make the doc
     self contained (cf. references to Logs). OTOH it's nice to simply

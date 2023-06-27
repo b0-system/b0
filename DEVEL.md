@@ -10,22 +10,22 @@ which can be by-passed by explicitly setting:
 Now the following OCaml scripts can be invoked (see below for
 more explanations):
 
-    ocaml b00t/strap            # build b00t/run and run it
-    ocaml b00t/strap --no-exec  # only build b00t/run
-    ./b00t/run                  # run the bootstrap build
+    ocaml boot/strap            # build boot/run and run it
+    ocaml boot/strap --no-exec  # only build boot/run
+    ./boot/run                  # run the bootstrap build
 
-    ./b00t/env.bat   # let `b0` invocations be the bootstrap build on Windows
-    source b00t/env  # let `b0` invocations be the bootstrap build on Unix
+    ./boot/env.bat   # let `b0` invocations be the bootstrap build on Windows
+    source boot/env  # let `b0` invocations be the bootstrap build on Unix
     unset -f b0      # stop using bootstrap b0 on Unix
 
-    ocaml b00t/strap --clean    # clean the bootstrap build
+    ocaml boot/strap --clean    # clean the bootstrap build
 
-The `b00t/strap` invocation produces the `b00t/run` executable which
+The `boot/strap` invocation produces the `boot/run` executable which
 has B0's own B0 file linked with the `b0` tool driver. Running
-`b00t/run` it is equivalent to run `b0` on the root `B0.ml`
+`boot/run` it is equivalent to run `b0` on the root `B0.ml`
 file. After this we have usable `b0` executables and libraries in the
 `_b0` directory. We can use these by having the `B0_BOOTSTRAP` and 
-`B0_DRIVER_BOOTSTRAP` point to the libraries (see [`b00t/env`](b00t/env)).
+`B0_DRIVER_BOOTSTRAP` point to the libraries (see [`boot/env`](boot/env)).
 
 # Source map
 

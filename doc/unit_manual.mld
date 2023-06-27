@@ -49,7 +49,6 @@ function that produces build units invoking it.
 
 {[
 open B0_kit.V000
-open B0_std
 open Fut.Syntax
 
 let exe_proc b =
