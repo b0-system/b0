@@ -881,23 +881,28 @@ module Lib = struct
         mutable libs : lib option Fut.t Name.Map.t; }
 
     let create memo conf scopes =
-      let memo = B0_memo.with_mark memo "ocamlib" in
+      let memo = B0_memo.with_mark memo "ocaml-lib-resolver" in
       { memo; conf; scopes; libs = Name.Map.empty }
 
     let ocaml_conf r = r.conf
+
+    let find_in_scopes r set n =
+      let rec loop r set n = function
+      | [] -> set None
+      | s :: ss ->
+          Fut.await (scope_find s r.conf r.memo n) @@ function
+          | None -> loop r set n ss
+          | Some _ as lib -> set lib
+      in
+      loop r set n r.scopes
+
     let find r n = match Name.Map.find_opt n r.libs with
     | Some v -> v
     | None ->
-        let rec loop r n = function
-        | [] -> Fut.return None
-        | s :: ss ->
-            let fut = scope_find s r.conf r.memo n in
-            let* l = fut in
-            match l with
-            | None -> loop r n ss
-            | Some _ -> r.libs <- Name.Map.add n fut r.libs; fut
-        in
-        loop r n r.scopes
+        let fut, set = Fut.create () in
+        r.libs <- Name.Map.add n fut r.libs;
+        find_in_scopes r set n;
+        fut
 
     let get r n = Fut.bind (find r n) @@ function
     | None -> B0_memo.fail r.memo "No OCaml library %a found" Name.pp n
