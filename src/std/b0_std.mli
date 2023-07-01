@@ -2125,14 +2125,17 @@ module Os : sig
 
     (** {1:var Variables} *)
 
-    val find : empty_is_none:bool -> string -> string option
+    type var_name = string
+    (** The type for environment variable names. *)
+
+    val find : empty_is_none:bool -> var_name -> string option
     (** [find ~empty_is_none name] is the value of the environment
         variable [name] in the current process environment, if
         defined. If [empty_is_none] is [true], [None] is returned if
         the variable value is the empty string. *)
 
     val find' :
-      empty_is_none:bool -> (string -> ('a, string) result) -> string ->
+      empty_is_none:bool -> (var_name -> ('a, string) result) -> var_name ->
       ('a option, string) result
     (** [find' ~empty_is_none parse name] is like {!find} but
         the value is parsed with [parse]. If the latter errors
@@ -2150,7 +2153,7 @@ module Os : sig
     val override : t -> by:t -> t
     (** [override env ~by:o] overrides the definitions in [env] by [o]. *)
 
-    val add : string -> string -> t -> t
+    val add : var_name -> string -> t -> t
     (** [add] is {!String.Map.val-add}. *)
 
     val current : unit -> (t, string) result
@@ -3070,11 +3073,7 @@ end
 
     The module is modelled after {!Logs} logging, see
     {{!Logs.basics}this quick introduction}. It can be made
-    to log on a {!Logs} source, see {{!Log.logger}here}.
-
-    {b FIXME} This should maybe moved to a B0_log module. Make the doc
-    self contained (cf. references to Logs). OTOH it's nice to simply
-    open B0_std and be done. *)
+    to log on a {!Logs} source, see {{!Log.logger}here}. *)
 module Log : sig
 
   (** {1:levels Reporting levels} *)
@@ -3183,7 +3182,7 @@ module Log : sig
     ('a, 'b) result
   (** [if_error_pp'] is {!if_error_pp'} wrapped by {!Result.ok} *)
 
-  (** {2:timings Timings logging} *)
+  (** {2:time Logging time} *)
 
   val time :
     ?level:level ->

@@ -253,3 +253,9 @@ will update the pull request.
 
 If you want to define multiple packages from a single archive tarball
 follow the instructions in {!det_archive_url}.
+
+{2:troubleshooting Troubleshooting}
+
+{ul
+{- Publish hangs after push: go to [cd ~/.cache/opam-repository && git gc] and
+   try again}}

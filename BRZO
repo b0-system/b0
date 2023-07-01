@@ -1,3 +1,3 @@
 (srcs-i .)
 (srcs-x
-  B0.ml test pkg examples tools myocamlbuild.ml b0wl src/std/b0_std_top_init.ml)
+  B0.ml tmp test pkg examples tools myocamlbuild.ml b0wl src/std/b0_std_top_init.ml)

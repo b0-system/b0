@@ -101,6 +101,7 @@ B0_srcs
 {2:def B0 definitions}
 
 {!modules:
+B0_action
 B0_build
 B0_cmdlet
 B0_def
@@ -130,6 +131,7 @@ All the convenience you need for writing B0 files.
 B0_kit
 B0_findex
 B0_srcs
+B0_cmark
 }
 
 {2:vcs VCS and code hosting}

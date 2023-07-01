@@ -881,7 +881,7 @@ module Lib = struct
         mutable libs : lib option Fut.t Name.Map.t; }
 
     let create memo conf scopes =
-      let memo = B0_memo.with_mark memo "ocaml-lib-resolver" in
+      let memo = B0_memo.with_mark memo "ocaml-resolver" in
       { memo; conf; scopes; libs = Name.Map.empty }
 
     let ocaml_conf r = r.conf
@@ -929,23 +929,19 @@ end
 (* FIXME likely remove that *)
 
 module Ocamlpath = struct
-  let get_var parse var m = (* FIXME move that to B0_memo.env ? *)
-    let env = B0_memo.Env.env (B0_memo.env m) in
-    match String.Map.find_opt var env with
-    | None | Some "" -> None
-    | Some v ->
-        match parse v with
-        | Error e ->
-            B0_memo.fail m "parsing %a: %s" Fmt.(code string) var v
-        | Ok v -> Some v
-
   let get m ps = match ps with
   | Some ps -> Fut.return ps
   | None ->
-      match get_var Fpath.list_of_search_path "OCAMLPATH" m with
+      let empty_is_none = true in
+      match
+        B0_memo.Env.find' ~empty_is_none Fpath.list_of_search_path "OCAMLPATH" m
+      with
       | Some ps -> Fut.return ps
       | None ->
-          match get_var Fpath.of_string "OPAM_SWITCH_PREFIX" m with
+          match
+            B0_memo.Env.find' ~empty_is_none
+              Fpath.of_string "OPAM_SWITCH_PREFIX" m
+          with
           | Some p -> Fut.return [Fpath.(p / "lib")]
           | None ->
               B0_memo.fail m

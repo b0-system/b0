@@ -86,8 +86,7 @@ let uname = (* gets system name, release version, machine arch *)
 let name =
   let of_uname m = function
   | None ->
-      let env = B0_memo.Env.env (B0_memo.env m) in
-      if String.Map.mem "COMSPEC" env || String.Map.mem "ComSpec" env
+      if B0_memo.Env.mem "COMSPEC" m || B0_memo.Env.mem "ComSpec" m
       then "windows"
       else "unknown"
   | Some (s, _, _) ->
@@ -219,15 +218,16 @@ let arch =
   let det s m = Fut.bind (B0_store.get s uname) @@ function
   | Some (_, _, a) -> Fut.return (ret a)
   | None ->
-      let env = B0_memo.Env.env (B0_memo.env m) in
-      match String.Map.find "PROCESSOR_ARCHITECTURE" env with
-      | exception Not_found -> Fut.return "unknown"
-      | "x86" as a ->
-          begin match String.Map.find "PROCESSOR_ARCHITEW6432" env with
-          | exception Not_found -> Fut.return a
-          | a -> Fut.return (ret a)
+      match B0_memo.Env.find ~empty_is_none:true "PROCESSOR_ARCHITECTURE" m with
+      | None -> Fut.return "unknown"
+      | Some ("x86" as a) ->
+          begin match
+            B0_memo.Env.find ~empty_is_none:true "PROCESSOR_ARCHITEW6432" m
+          with
+          | None -> Fut.return a
+          | Some a -> Fut.return (ret a)
           end
-      | a -> Fut.return (ret a)
+      | Some a -> Fut.return (ret a)
   in
   B0_store.key ~mark:"b0_os.arch" det
 

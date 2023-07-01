@@ -599,8 +599,6 @@ module Memo = struct
         then (B0_zero_conv.Op.pp_line_and_ui ppf o; sep ppf ()) else
         if level >= show_ui
         then (B0_zero_conv.Op.pp_ui ~sep ~op_howto ppf o)
-    | `Miss_tool (t, e) when level >= Log.Error ->
-        Fmt.pf ppf "@[<v>Missing tool:@,%s@]%a" e sep ()
     | _ ->  ()
 
   (* B0 directory *)

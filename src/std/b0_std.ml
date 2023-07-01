@@ -2508,6 +2508,8 @@ module Os = struct
 
     (* Variables *)
 
+    type var_name = string
+
     let find ~empty_is_none name = match Unix.getenv name with
     | "" when empty_is_none -> None
     | v -> Some v
@@ -4102,11 +4104,9 @@ module Log = struct
 
   let _err_count = ref 0
   let err_count () = !_err_count
-  let incr_err_count () = incr _err_count
 
   let _warn_count = ref 0
   let warn_count () = !_warn_count
-  let incr_warn_count () = incr _warn_count
 
   type ('a, 'b) msgf =
     (?header:string -> ('a, Format.formatter, unit, 'b) format4 -> 'a) -> 'b

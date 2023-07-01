@@ -165,7 +165,6 @@ module B0_std : sig
        the cli or via the env var. *)
 end
 
-
 (** {!B0_zero.File_cache} interaction. *)
 module File_cache : sig
 

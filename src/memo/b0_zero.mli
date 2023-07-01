@@ -3,10 +3,10 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** Build kernel plumbing.
+(** Build memoizer plumbing.
 
     These components when tied together appropriately are what makes
-    a build {!B0_memo.Memo}. *)
+    a build {!B0_memo.t}. *)
 
 open B0_std
 

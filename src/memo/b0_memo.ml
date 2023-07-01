@@ -39,30 +39,18 @@ module Tool = struct
   let vars t = t.vars
   let unstamped_vars t = t.unstamped_vars
   let response_file t = t.response_file
-  let read_env t env =
-    let add_var acc var = match String.Map.find var env with
-    | v -> String.Map.add var v acc
-    | exception Not_found -> acc
+  let read_env ~forced_env_vars t env =
+    let add_var acc var = match String.Map.find_opt var env with
+    | Some v -> String.Map.add var v acc
+    | None -> acc
     in
     let stamped = List.fold_left add_var String.Map.empty t.vars in
+    let stamped = List.fold_left add_var stamped forced_env_vars in
     let all = List.fold_left add_var stamped t.unstamped_vars in
     all, stamped
 end
 
-module Env = struct
-  (** Does it still make sense to have that separate ? *)
-
-  type t = { env : Os.Env.t; forced_env : Os.Env.t; }
-  let v ?(forced_env = String.Map.empty) env = { env; forced_env }
-  let env e = e.env
-  let forced_env e = e.forced_env
-end
-
-
-type feedback =
-[ `Miss_tool of Tool.t * string
-| `Op_complete of Op.t ]
-
+type feedback = [ `Op_complete of Op.t ]
 type t = { c : ctx; m : memo }
 and ctx = { mark : Op.mark }
 and tool_lookup = t -> Cmd.tool -> (Fpath.t, string) result Fut.t
@@ -73,7 +61,8 @@ and memo =
     cwd : Fpath.t;
     win_exe : bool;
     tool_lookup : tool_lookup;
-    env : Env.t ;
+    env : Os.Env.t;
+    forced_env_vars : Tool.env_vars;
     guard : Guard.t;
     reviver : Reviver.t;
     exec : Exec.t;
@@ -81,6 +70,21 @@ and memo =
     mutable op_id : int;
     mutable ops : Op.t list;
     mutable ready_roots : Fpath.Set.t; }
+
+(* Properties *)
+
+let clock m = m.m.clock
+let cpu_clock m = m.m.cpu_clock
+let env m = m.m.env
+let exec m = m.m.exec
+let forced_env_vars m = m.m.forced_env_vars
+let guard m = m.m.guard
+let has_failures m = m.m.has_failures
+let ops m = m.m.ops
+let reviver m = m.m.reviver
+let tool_lookup m = m.m.tool_lookup
+let trash m = Exec.trash m.m.exec
+let win_exe m = m.m.win_exe
 
 (* Tool lookup *)
 
@@ -116,73 +120,61 @@ let tool_lookup_of_os_env ?sep ?(var = "PATH") env =
 
 let make_zero
     ?clock ?cpu_clock:cc ~feedback ~cwd ?(win_exe = Sys.win32)
-    ?tool_lookup env guard reviver exec
+    ?tool_lookup ?env ?(forced_env_vars = []) guard reviver exec
   =
+  let* env = match env with None -> Os.Env.current () | Some env -> Ok env in
   let clock = match clock with None -> Os.Mtime.counter () | Some c -> c in
   let cpu_clock = match cc with
   | None -> Os.Cpu.Time.counter () | Some c -> c
   in
   let tool_lookup = cache_lookup @@ match tool_lookup with
-  | None -> tool_lookup_of_os_env (Env.env env)
+  | None -> tool_lookup_of_os_env env
   | Some l -> l
   in
   let op_id = 0 and ops = [] in
-  let c = { mark = "" } in
   let m =
-    { clock; cpu_clock; feedback; cwd; win_exe; tool_lookup; env; guard;
-      reviver; exec; has_failures = false; op_id; ops;
+    { clock; cpu_clock; feedback; cwd; win_exe; tool_lookup; env;
+      forced_env_vars; guard; reviver; exec; has_failures = false; op_id; ops;
       ready_roots = Fpath.Set.empty }
   in
-  { c; m }
+  Ok { c = { mark = "" }; m }
 
 let make
     ?(hash_fun = (module Hash.Xxh3_64 : Hash.T)) ?win_exe ?tool_lookup
-    ?env ?cwd ?cache_dir ?trash_dir
-    ?(jobs = Os.Cpu.logical_count ()) ?feedback ()
+    ?env ?forced_env_vars ?cwd
+    ?(jobs = Os.Cpu.logical_count ()) ?feedback ~cache_dir ~trash_dir ()
   =
   let feedback = match feedback with | Some f -> f | None -> fun _ -> () in
   let fb_exec = (feedback :> Exec.feedback -> unit) in
   let fb_memo = (feedback :> feedback -> unit) in
   let clock = Os.Mtime.counter () in
-  let* env = match env with None -> Os.Env.current () | Some env -> Ok env in
   let* cwd = match cwd with None -> Os.Dir.cwd () | Some cwd -> Ok cwd in
-  (* FIXME remove these defaults. *)
-  let cache_dir = match cache_dir with
-  | None -> Fpath.(cwd / "_b0" / ".cache") | Some d -> d
-  in
-  let trash_dir = match trash_dir with
-  | None -> Fpath.(cwd / "_b0" / ".trash") | Some d -> d
-  in
   let* cache = File_cache.create cache_dir in
-  let env = Env.v env in
   let guard = Guard.create () in
   let reviver = Reviver.create clock hash_fun cache in
   let trash = Trash.create trash_dir in
   let exec = Exec.create ~clock ~feedback:fb_exec ~trash ~jobs () in
-  Ok (make_zero ~clock ~feedback:fb_memo ~cwd ?win_exe ?tool_lookup env
-        guard reviver exec)
+  make_zero ~clock ~feedback:fb_memo ~cwd ?win_exe ?tool_lookup ?env
+    ?forced_env_vars guard reviver exec
 
-let clock m = m.m.clock
-let cpu_clock m = m.m.cpu_clock
-let win_exe m = m.m.win_exe
-let tool_lookup m = m.m.tool_lookup
-let env m = m.m.env
-let reviver m = m.m.reviver
-let guard m = m.m.guard
-let exec m = m.m.exec
-let trash m = Exec.trash m.m.exec
-let delete_trash ~block m = Trash.delete ~block (trash m)
-let hash_string m s = Reviver.hash_string m.m.reviver s
-let hash_file m f = Reviver.hash_file m.m.reviver f
-let ops m = m.m.ops
-let timestamp m = Os.Mtime.count m.m.clock
-let new_op_id m = let id = m.m.op_id in m.m.op_id <- id + 1; id
-let mark m = m.c.mark
+(* Activity marks *)
+
 let with_mark m mark = { c = { mark }; m = m.m }
-let has_failures m = m.m.has_failures
-let add_op m o = m.m.ops <- o :: m.m.ops; Guard.add m.m.guard o
+let mark m = m.c.mark
 
-exception Fail
+(* Low-level operations *)
+
+let add_op m o = m.m.ops <- o :: m.m.ops; Guard.add m.m.guard o
+let delete_trash ~block m = Trash.delete ~block (Exec.trash m.m.exec)
+let hash_file m f = Reviver.hash_file m.m.reviver f
+let hash_string m s = Reviver.hash_string m.m.reviver s
+let new_op_id m = let id = m.m.op_id in m.m.op_id <- id + 1; id
+let status m =
+  B0_zero.Op.find_aggregate_error ~ready_roots:m.m.ready_roots (ops m)
+
+let timestamp m = Os.Mtime.count m.m.clock
+
+(* Feedback *)
 
 let notify_op m ?k kind msg =
   let k = match k with None -> None | Some k -> Some (fun o -> k ()) in
@@ -193,11 +185,31 @@ let notify_op m ?k kind msg =
 let notify_reviver_error m kind o e =
   notify_op m kind (Fmt.str "@[cache error: op %d: %s@]" (Op.id o) e)
 
+(* Procedures *)
+
+exception Fail
+
 let fail m fmt =
   let k msg = notify_op m `Fail msg; raise Fail in
   Fmt.kstr k fmt
 
 let fail_if_error m = function Ok v -> v | Error e -> fail m "%s" e
+
+module Env = struct
+  let find ~empty_is_none var m = match String.Map.find_opt var m.m.env with
+  | None -> None
+  | Some "" when empty_is_none -> None
+  | Some _ as v -> v
+
+  let find' ~empty_is_none parse var m = match find ~empty_is_none var m with
+  | None -> None
+  | Some v ->
+      match parse v with
+      | Ok v -> Some v
+      | Error e -> fail m "parsing %a: %s" Fmt.(code string) var e
+
+  let mem var m = String.Map.mem var m.m.env
+end
 
 let invoke_k m ~pp_kind k v = try k v with
 | Stack_overflow as e -> raise e
@@ -224,9 +236,9 @@ let continue_op m o =
   invoke_k m ~pp_kind Op.invoke_k o
 
 let discontinue_op m o =
-  (* This is may not be entirely clear from the code :-( but any failed op
-       means this function eventually gets called, hereby giving [has_failure]
-       its appropriate semantics. *)
+  (* This is may not be entirely clear from the code :-( but any
+     failed op means this function eventually gets called, hereby
+     giving [has_failure] its appropriate semantics. *)
   m.m.has_failures <- true;
   List.iter (Guard.set_file_never m.m.guard) (Op.writes o);
   Op.discard_k o; m.m.feedback (`Op_complete o)
@@ -297,17 +309,12 @@ let rec stir ~block m = match Guard.allowed m.m.guard with
 
 let add_op_and_stir m o = add_op m o; stir ~block:false m
 
-let status m =
-  B0_zero.Op.find_aggregate_error ~ready_roots:m.m.ready_roots (ops m)
-
-(* Futures *)
-
 (* Notifications *)
 
+type notify_kind = B0_zero.Op.Notify.kind
 let notify ?k m kind fmt = Fmt.kstr (notify_op m ?k kind) fmt
 let notify_if_error m kind ~use = function
-| Ok v -> v
-| Error e -> notify_op m kind e; use
+| Ok v -> v | Error e -> notify_op m kind e; use
 
 (* Files *)
 
@@ -370,23 +377,15 @@ type tool =
 type cmd = { cmd_tool : tool Fut.t; cmd_args : Cmd.t }
 
 let tool_env m t =
-  let env = Env.env m.m.env in
-  let tool_env, stamped = Tool.read_env t env in
-  let forced_env = Env.forced_env m.m.env in
-  let tool_env = Os.Env.override tool_env ~by:forced_env in
-  let stamped = Os.Env.override stamped ~by:forced_env in
-  tool_env, stamped
+  let forced_env_vars = m.m.forced_env_vars in
+  Tool.read_env ~forced_env_vars t m.m.env
 
 let spawn_env m cmd_tool = function
 | None -> cmd_tool.tool_env, cmd_tool.tool_stamped_env
 | Some spawn_env ->
-    let env = Env.env m.m.env in
-    let tool_env, stamped = Tool.read_env cmd_tool.tool env in
-    let forced_env = Env.forced_env m.m.env in
-    let tool_env = Os.Env.override tool_env ~by:spawn_env in
-    let tool_env = Os.Env.override tool_env ~by:forced_env in
-    let stamped = Os.Env.override stamped ~by:spawn_env in
-    let stamped = Os.Env.override stamped ~by:forced_env in
+    let forced_env_vars = m.m.forced_env_vars in
+    let env = Os.Env.override m.m.env ~by:spawn_env in
+    let tool_env, stamped = Tool.read_env ~forced_env_vars cmd_tool.tool env in
     Os.Env.to_assignments tool_env, Os.Env.to_assignments stamped
 
 let tool m tool =
@@ -427,7 +426,7 @@ let _spawn
     ?post_exec ?k cmd
   =
   Fut.await cmd.cmd_tool @@ function
-  | Miss (tool, e) -> m.m.feedback (`Miss_tool (tool, e))
+  | Miss (tool, e) -> fail m "%s" e
   | Tool tool ->
       let id = new_op_id m and created = timestamp m in
       let reads =
