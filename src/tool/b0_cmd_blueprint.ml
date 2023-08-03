@@ -101,20 +101,21 @@ let find_holder = function
     Ok (Fmt.str "The %s programmers" name)
 
 let find_year = function Some y -> y | None -> Fmt.str "%04d" (current_year ())
-let find_license = function
+let find_license ~sample = function
 | Some license -> Ok license
-| None -> Ok "ISC" (* FIXME lookup in B0.ml *)
+| None when sample -> Ok "CC0-1.0" (* FIXME also lookup in B0.ml *)
+| None -> Ok "ISC" (* FIXME also lookup in B0.ml *)
 
 let find_src_gen lang file = match lang with
 | Some lang -> Ok (find_src_gen_by_lang lang)
 | None when file = Fpath.dash -> Ok (find_src_gen_by_lang `Ocaml)
 | None -> find_src_gen_by_file file
 
-let src year holder license lang file _conf =
+let src year holder license lang file sample _conf =
   Log.if_error ~use:B0_cli.Exit.some_error @@
   let year = find_year year in
   let* holder = find_holder holder in
-  let* license = find_license license in
+  let* license = find_license ~sample license in
   let* src_gen = find_src_gen lang file in
   let src = src_gen year holder license in
   let* () = Os.File.write ~force:false ~make_path:true file src in
@@ -161,12 +162,20 @@ let src =
     let doc = "File path to generate to. Standard output if unspecified." in
     Arg.(value & pos 0 B0_cli.fpath Fpath.dash & info [] ~doc ~docv:"PATH")
   in
+  let sample =
+    let doc = "Sample code source. If $(b,--license) is unspecified, uses \
+               $(b,CC0-1.0) for the license."
+    in
+    Arg.(value & flag & info ["s"; "sample"] ~doc)
+
+  in
   let doc = "Generate empty copyrighted source files" in
   let descr =
     `Blocks
       [`P "The $(iname) command generates an empty copyrighted source file. \
            For example:";
        `P "$(iname) $(b,mysrc.c)"; `Noblank;
+       `P "$(iname) $(b,-s) $(b,samplecode.c)"; `Noblank;
        `P "$(iname) $(b,-y 2038 mysrc.mli) "; `Noblank;
        `P "$(iname) $(b,-h Unknown > mysrc.ml)"; `Noblank;
        `P "$(iname) $(b,--lang c > mysrc.h)";
@@ -176,7 +185,7 @@ let src =
        `P "The output format is fixed, it cannot be tweaked."]
   in
   B0_tool_std.Cli.subcmd_with_driver_conf "src" ~doc ~descr @@
-  Term.(const src $ year $ holder $ license $ lang $ file)
+  Term.(const src $ year $ holder $ license $ lang $ file $ sample)
 
 let subs = [src]
 
