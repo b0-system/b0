@@ -809,15 +809,15 @@ module Lib = struct
          FIXME post exec is still super messy, check if we can make it
          to use Memo.t *)
 
-      let write_info conf m n ~o =
+      let write_info ~cache_dir conf m n =
         (* FIXME better [n] not found error *)
         let ocamlfind = B0_memo.tool m tool in
-        let lib, predicates = match Name.to_string n with
+        let fname, lib, predicates = match Name.to_string n with
         | "ocaml.threads" | "threads" | "threads.posix" ->
             if Conf.version conf < (5, 0, 0, None)
-            then "threads.posix", "byte,native,mt,mt_posix"
-            else "threads", "byte,native"
-        | n -> n, "byte,native"
+            then "threads", "threads.posix", "byte,native,mt,mt_posix"
+            else "threads", "threads", "byte,native"
+        | n -> n, n, "byte,native"
         in
         let post_exec op = match B0_zero.Op.status op with
         | B0_zero.Op.Done ->
@@ -839,11 +839,14 @@ module Lib = struct
              archives *)
           "%m:%d:%A:%(requires):%(jsoo_runtime)"
         in
+        let fname = Fmt.str "ocamlfind.%s" fname in
+        let o = Fpath.(cache_dir / fname) in
         let stdout = `File o in
         B0_memo.spawn m
           ~success_exits ~reads:[] ~writes:[o] ~stdout ~post_exec @@
         ocamlfind Cmd.(arg "query" % lib % "-predicates" % predicates %
-                       "-format" % info)
+                       "-format" % info);
+        o
 
       let read_info m clib_ext name file =
         let* s = B0_memo.read m file in
@@ -859,9 +862,7 @@ module Lib = struct
         (* This never returns None we should factor error reporting
            in *)
         let clib_ext = Conf.lib_ext conf in
-        let fname = Fmt.str "ocamlfind.%s" (Name.to_string n) in
-        let o = Fpath.(cache_dir / fname) in
-        write_info conf m n ~o;
+        let o = write_info ~cache_dir conf m n in
         read_info m clib_ext n o
 
       let suggest conf m n = Fut.return None
@@ -1168,8 +1169,15 @@ module Link = struct
     let incs = List.fold_left add_inc Fpath.Set.empty objs in
     Cmd.paths ~slip:"-I" (Fpath.Set.elements incs)
 
+  let distinct_cobjs cobjs =
+    (* Formally two ocamlfind package name can point to the same objects
+       (we also have aliases hardcoded in the resolver to handle the thread
+       package mess) so we might have the same archive twice. *)
+    Fpath.distinct cobjs
+
   let byte ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~o =
     let ocamlc = B0_memo.tool m Tool.ocamlc in
+    let cobjs = distinct_cobjs cobjs in
     let reads = List.rev_append cobjs c_objs in
     let incs = cstubs_incs cobjs in
     B0_memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
@@ -1179,6 +1187,7 @@ module Link = struct
   let native ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~o =
     let ocamlopt = B0_memo.tool m Tool.ocamlopt in
     let obj_ext = Conf.obj_ext conf in
+    let cobjs = distinct_cobjs cobjs in
     let incs = cstubs_incs cobjs in
     let reads, cobjs =
       let rec loop rsides rcobjs = function
