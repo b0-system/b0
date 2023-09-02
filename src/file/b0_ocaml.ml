@@ -103,15 +103,17 @@ module Conf = struct
   (* IO *)
 
   let of_string ?file s =
-    let parse_line i l acc = match String.cut_left ~sep:":" l with
-    | None -> acc
+    let parse_line _ acc l = match String.cut_left ~sep:":" l with
+    | None -> acc (* XXX report an error *)
     | Some (k, v) -> String.Map.add (String.trim k) (String.trim v) acc
     in
-    let s = String.trim s in
-    Result.bind (B0_text_lines.fold ?file s parse_line String.Map.empty) @@
-    fun fields -> match of_string_map fields with
-    | Ok v -> Ok v
-    | Error e -> B0_text_lines.file_error ?file (Fmt.str "OCaml config: %s" e)
+    try
+      let s = String.trim s and strip_newlines = true in
+      let fields =
+        String.fold_ascii_lines ~strip_newlines parse_line String.Map.empty s
+      in
+      Ok (of_string_map fields |> Result.error_to_failure)
+    with Failure e -> Fpath.error ?file " OCaml config: %s" e
 
   let write m ~comp ~o =
     let comp = B0_memo.tool m comp in
@@ -216,7 +218,7 @@ module Mod = struct
 
   module Src = struct
     module Deps = struct
-      let of_string ?(file = Fpath.dash) ?src_root data =
+      let of_string ?(file = Fpath.dash) ?src_root s =
         (* Parse ocamldep's [-slash -modules], a bit annoying to parse.
            ocamldep shows its Makefile legacy. *)
         let parse_path n p = (* ocamldep escapes spaces as "\ ",
@@ -231,16 +233,16 @@ module Mod = struct
           | _ -> assert false
           in
           match String.byte_unescaper char_len_at set_char p with
-          | Error j -> B0_text_lines.fail n "%d: illegal escape" j
+          | Error j -> Fmt.failwith_line n "%d: illegal escape" j
           | Ok p ->
               match Fpath.of_string p with
-              | Error e -> B0_text_lines.fail n "%s" e
+              | Error e -> Fmt.failwith_line n " %s" e
               | Ok p -> p
         in
-        let parse_line ~src_root n line acc =
+        let parse_line ~src_root n acc line =
           if line = "" then acc else
           match String.cut_right (* right, windows drives *) ~sep:":" line with
-          | None -> B0_text_lines.fail n "cannot parse line: %S" line
+          | None -> Fmt.failwith_line n " cannot parse line: %S" line
           | Some (file, mods) ->
               let file = parse_path n file in
               let file = match src_root with
@@ -253,7 +255,11 @@ module Mod = struct
               let mods = List.fold_left add_mod start mods in
               Fpath.Map.add file mods acc
         in
-        B0_text_lines.fold ~file data (parse_line ~src_root) Fpath.Map.empty
+        try
+          let strip_newlines = true and parse = parse_line ~src_root in
+          Ok (String.fold_ascii_lines ~strip_newlines parse Fpath.Map.empty s)
+        with
+        | Failure e -> Fpath.error ~file "%s" e
 
       let write ?src_root m ~srcs ~o =
         let ocamldep = B0_memo.tool m Tool.ocamldep in
@@ -483,32 +489,33 @@ module Cobj = struct
     { file; defs; deps; link_deps; }
 
   let file_prefix = "File "
-  let parse_file_path n line =
+  let parse_file_path (n, line) =
     let len = String.length file_prefix in
     match Fpath.of_string (String.drop_left len line) with
     | Ok file -> file
-    | Error e -> B0_text_lines.fail n "%s" e
+    | Error e -> Fmt.failwith_line n " %s" e
 
-  let rec parse_ldeps acc file defs deps ldeps name n = function
+  let rec parse_ldeps acc file defs deps ldeps name = function
   | [] -> make_cobj file defs deps ldeps :: acc
-  | (l :: ls) as data ->
+  | ((n, l) :: ls) as data ->
       match String.cut_right ~sep:"\t" l with
-      | None -> parse_file acc file defs deps ldeps n data
+      | None -> parse_file acc file defs deps ldeps data
       | Some (_, ldep) ->
           let ldeps = String.Set.add (String.trim ldep) ldeps in
-          parse_ldeps acc file defs deps ldeps name (n + 1) ls
+          parse_ldeps acc file defs deps ldeps name ls
 
-  and parse_deps acc file defs deps ldeps name n = function
+  and parse_deps acc file defs deps ldeps name = function
   | [] -> make_cobj file defs deps ldeps :: acc
-  | (l :: ls) as data ->
+  | ((n, l) :: ls) as data ->
       match String.cut_right ~sep:"\t" l with
       | None ->
           begin match l with
-          | l when String.starts_with ~prefix:"Implementations imported:" l ||
-                   String.starts_with ~prefix:"Required globals:" l ->
-              parse_ldeps acc file defs deps ldeps name (n + 1) ls
+          | l
+            when String.starts_with ~prefix:"Implementations imported:" l ||
+                 String.starts_with ~prefix:"Required globals:" l ->
+              parse_ldeps acc file defs deps ldeps name ls
           | _ ->
-              parse_file acc file defs deps ldeps n data
+              parse_file acc file defs deps ldeps data
           end
       | Some (dhex, dname) ->
           let dhex = String.trim dhex in
@@ -520,46 +527,48 @@ module Cobj = struct
               | true -> Mod.Ref.Set.add mref defs, deps
               | false -> defs, Mod.Ref.Set.add mref deps
               in
-              parse_deps acc file defs deps ldeps name (n + 1) ls
+              parse_deps acc file defs deps ldeps name ls
           | exception Invalid_argument _ ->
               (* skip undigested deps *)
               match dhex <> "" && dhex.[0] = '-' with
-              | true -> parse_deps acc file defs deps ldeps name (n + 1) ls
-              | false -> B0_text_lines.fail n "%S: could not parse digest" dhex
+              | true -> parse_deps acc file defs deps ldeps name ls
+              | false -> Fmt.failwith_line n " %S: could not parse digest" dhex
 
-  and parse_unit acc file defs deps ldeps name n = function
-  | [] -> B0_text_lines.fail n "unexpected end of input"
-  | line :: rest when String.starts_with ~prefix:"Interfaces imported:" line ->
-      parse_deps acc file defs deps ldeps name (n + 1) rest
-  | _ :: rest -> parse_unit acc file defs deps ldeps name (n + 1) rest
+  and parse_unit acc file defs deps ldeps name = function
+  | [] -> Fmt.failwith "unexpected end of input"
+  | (_, l) :: rest when String.starts_with ~prefix:"Interfaces imported:" l ->
+      parse_deps acc file defs deps ldeps name rest
+  | _ :: rest -> parse_unit acc file defs deps ldeps name rest
 
-  and parse_file acc file defs deps ldeps n = function
+  and parse_file acc file defs deps ldeps = function
   | [] -> make_cobj file defs deps ldeps :: acc
-  | l :: ls when String.starts_with ~prefix:"Unit name" l ||
+  | (n, l) :: ls when String.starts_with ~prefix:"Unit name" l ||
                  String.starts_with ~prefix:"Name" l ->
       begin match String.cut_left ~sep:":" l with
       | None -> assert false
       | Some (_, name) ->
-          parse_unit acc file defs deps ldeps (String.trim name) (n + 1) ls
+          parse_unit acc file defs deps ldeps (String.trim name) ls
       end
-  | l :: ls when String.starts_with ~prefix:file_prefix l ->
+  | (n, l as line) :: ls when String.starts_with ~prefix:file_prefix l ->
       let acc = make_cobj file defs deps ldeps :: acc in
-      let file = parse_file_path n l in
+      let file = parse_file_path line in
       parse_file
-        acc file Mod.Ref.Set.empty Mod.Ref.Set.empty String.Set.empty (n + 1) ls
-  | _ :: ls -> parse_file acc file defs deps ldeps (n + 1) ls
+        acc file Mod.Ref.Set.empty Mod.Ref.Set.empty String.Set.empty ls
+  | _ :: ls -> parse_file acc file defs deps ldeps ls
 
-  and parse_files acc n = function
+  and parse_files acc = function
   | [] -> acc
-  | l :: ls when String.starts_with ~prefix:file_prefix l ->
-      let file = parse_file_path n l in
+  | (n, l as line) :: ls when String.starts_with ~prefix:file_prefix l ->
+      let file = parse_file_path line in
       parse_file
-        acc file Mod.Ref.Set.empty Mod.Ref.Set.empty String.Set.empty (n + 1) ls
-  | l :: ls -> parse_files acc (n + 1) ls
+        acc file Mod.Ref.Set.empty Mod.Ref.Set.empty String.Set.empty ls
+  | l :: ls -> parse_files acc ls
 
   let of_string ?file data =
-    try Ok (parse_files [] 1 (B0_text_lines.of_string data)) with
-    | Failure e -> B0_text_lines.file_error ?file e
+    let line num acc l = (num, l) :: acc in
+    let rev_lines = String.fold_ascii_lines ~strip_newlines:true line [] data in
+    try Ok (parse_files [] (List.rev rev_lines)) with
+    | Failure e -> Fpath.error ?file "%s" e
 
   let write m ~cobjs ~o =
     (* FIXME add [src_root] so that we can properly unstamp. *)

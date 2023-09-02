@@ -122,6 +122,9 @@ module Fmt : sig
   (** [failwith_notrace] is like {!failwith} but [Failure] is raised with
       {!raise_notrace}. *)
 
+  val failwith_line : int -> ('b, Format.formatter, unit, 'a) format4 -> 'b
+  (** [failwith_line fmt …] is [failwith ("%d:" ^^ fmt) …]. *)
+
   val invalid_arg : ('b, Format.formatter, unit, 'a) format4 -> 'b
   (** [invalid_arg fmt ...] is [kstr invalid_arg fmt ...] *)
 
@@ -709,7 +712,7 @@ module String : sig
   (** {2:break_lines Breaking lines} *)
 
   val fold_ascii_lines :
-    strip_newline:bool -> (int -> 'a -> string -> 'a) -> 'a -> string -> 'a
+    strip_newlines:bool -> (int -> 'a -> string -> 'a) -> 'a -> string -> 'a
   (** [fold_ascii_lines ~strip_newlines f acc s] folds over the lines of [s] by
       calling [f linenum acc' line] with [linenum] the one-based line number
       count, [acc'] the result of accumulating [acc] with [f] so far and [line]
@@ -1426,6 +1429,11 @@ module Fpath : sig
 
   val pp_dump : t Fmt.t
   (** [pp_dump ppf p] prints path [p] on [ppf] using {!String.dump}. *)
+
+  val error :
+    ?file:t -> ('b, Format.formatter , unit, ('a, string) result) format4 -> 'b
+  (** [error ~file fmt …] is [Fmt.error ("%a:" ^^ fmt) pp_unquoted file … ].
+      [file] defaults to {!dash}. *)
 
   (** {1:unique Uniqueness} *)
 

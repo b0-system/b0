@@ -63,4 +63,6 @@ let first_section ~preamble md =
               let title = prev_lines prev in
               find_content num title [] ls
   in
-  find_heading [] (B0_text_lines.of_string md)
+  let add_line _ ls l = l :: ls in
+  let rev_lines = String.fold_ascii_lines ~strip_newlines:true add_line [] md in
+  find_heading [] (List.rev rev_lines)

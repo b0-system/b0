@@ -133,8 +133,11 @@ module Fmt = struct
   let str = Format.asprintf
   let kpf = Format.kfprintf
   let kstr = Format.kasprintf
+  let failwith_line n fmt = kstr failwith ("%d:" ^^ fmt) n
   let failwith fmt = kstr failwith fmt
   let failwith_notrace fmt = kstr (fun s -> raise_notrace (Failure s)) fmt
+
+
   let invalid_arg fmt = kstr invalid_arg fmt
   let error fmt = kstr (fun s -> Error s) fmt
 
@@ -1928,6 +1931,8 @@ module Fpath = struct
     else String.pp ppf p
 
   let pp_dump = String.pp_dump
+
+  let error ?(file = dash) fmt = Fmt.error ("%a:" ^^ fmt) pp_unquoted file
 
   (* Uniqueness *)
 

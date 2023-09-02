@@ -7,11 +7,15 @@ open B0_std
 open B0_std.Fut.Syntax
 
 let read_path_writes m file =
-  let parse_path n p acc = match Fpath.of_string p with
-  | Error e -> B0_text_lines.fail n "%s" e
-  | Ok p -> p :: acc
+  let parse s =
+    let parse_line n acc l =
+      if l = "" then acc else match Fpath.of_string l with
+      | Error e -> Fmt.failwith_line n " %s" e
+      | Ok p -> p :: acc
+    in
+    try Ok (String.fold_ascii_lines ~strip_newlines:true parse_line [] s)
+    with Failure e -> Fpath.error ~file "%s" e
   in
-  let parse s = B0_text_lines.fold ~file (String.trim s) parse_path [] in
   let* lines = B0_memo.read m file in
   Fut.return (B0_memo.fail_if_error m (parse lines))
 
@@ -29,14 +33,16 @@ module Compile = struct
     let name = fst
     let digest = snd
     let pp ppf (n, d) = Fmt.pf ppf "@[%s %s@]" n (Digest.to_hex d)
-    let parse_dep n line acc = match String.cut_right ~sep:" " line with
-    | None -> B0_text_lines.fail n "Could not parse line %S" line
-    | Some (name, digest) ->
-        let digest = try Digest.from_hex digest with
-        | Invalid_argument _ (* sic *) ->
-            B0_text_lines.fail n "Could not parse digest %S" digest
-        in
-        (name, digest) :: acc
+    let parse_dep n acc line =
+      if line = "" then acc else
+      match String.cut_right ~sep:" " line with
+      | None -> Fmt.failwith_line n " Could not parse line %S" line
+      | Some (name, digest) ->
+          let digest = try Digest.from_hex digest with
+          | Invalid_argument _ (* sic *) ->
+              Fmt.failwith_line n " Could not parse digest %S" digest
+          in
+          (name, digest) :: acc
 
     let write m cobj ~o =
       let odoc = B0_memo.tool m tool in
@@ -45,7 +51,8 @@ module Compile = struct
 
     let read m file =
       let parse lines =
-        B0_text_lines.fold ~file (String.trim lines) parse_dep []
+        try Ok (String.fold_ascii_lines ~strip_newlines:true parse_dep [] lines)
+        with Failure e -> Fpath.error ~file "%s" e
       in
       let* lines = B0_memo.read m file in
       Fut.return (B0_memo.fail_if_error m (parse lines))
@@ -87,17 +94,19 @@ module Html = struct
     let name (_, n, _) = n
     let digest (_, _, d) = d
     let to_compile_dep (_, n, d) = (n, d)
-    let parse_dep n line acc = match String.cut_right ~sep:" " line with
-    | None -> B0_text_lines.fail n "Could not parse line %S" line
-    | Some (rest, digest) ->
-        let digest = try Digest.from_hex digest with
-        | Invalid_argument _ (* sic *) ->
-            B0_text_lines.fail n "Could not parse digest %S" digest
-        in
-        match String.cut_right ~sep:" " rest with
-        | Some (pkg, name) -> (pkg, name, digest) :: acc
-        | None ->
-            B0_text_lines.fail n "Could not parse pkg and mod names %S" rest
+    let parse_dep n acc line =
+      if line = "" then acc else
+      match String.cut_right ~sep:" " line with
+      | None -> Fmt.failwith_line n " Could not parse line %S" line
+      | Some (rest, digest) ->
+          let digest = try Digest.from_hex digest with
+          | Invalid_argument _ (* sic *) ->
+              Fmt.failwith_line n " Could not parse digest %S" digest
+          in
+          match String.cut_right ~sep:" " rest with
+          | Some (pkg, name) -> (pkg, name, digest) :: acc
+          | None ->
+              Fmt.failwith_line n " Could not parse pkg and mod names %S" rest
 
     let write m ~odoc_files pkg_odoc_dir ~o =
       let odoc = B0_memo.tool m tool in
@@ -105,8 +114,9 @@ module Html = struct
       odoc Cmd.(arg "html-deps" %% path pkg_odoc_dir)
 
     let read m file =
-      let parse lines =
-        B0_text_lines.fold ~file (String.trim lines) parse_dep []
+      let parse s =
+        try Ok (String.fold_ascii_lines ~strip_newlines:true parse_dep [] s)
+        with Failure e -> Fpath.error ~file "%s" e
       in
       let* lines = B0_memo.read m file in
       Fut.return (B0_memo.fail_if_error m (parse lines))

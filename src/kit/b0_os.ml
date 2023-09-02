@@ -39,13 +39,13 @@ let os_release =
     | len when quoted s len -> String.subrange s ~first:1 ~last:(len - 2)
     | len -> s
   in
-  let parse_line i line acc = match String.length (String.trim line) with
+  let parse_line i acc line = match String.length (String.trim line) with
   | 0 -> acc | _ when line.[0] = '#' -> acc
   | _ ->
       match String.cut_left ~sep:"=" line with
       | None ->
-          B0_text_lines.fail
-            i "Cannot find %a char in %S" Fmt.(code char) '=' line
+          Fmt.failwith_line
+            i " Cannot find %a char in %S" Fmt.(code char) '=' line
       | Some (k, v) ->
           String.Map.add (String.trim k) (unquote (String.trim v)) acc
   in
@@ -56,7 +56,12 @@ let os_release =
     | Some file ->
         B0_memo.file_ready m file;
         let* s = B0_memo.read m file in
-        let map = B0_text_lines.fold s ~file parse_line String.Map.empty in
+        let map =
+          try
+            Ok (String.fold_ascii_lines
+                  ~strip_newlines:true parse_line String.Map.empty s)
+          with Failure e -> Fpath.error ~file "%s" e
+        in
         let map = B0_memo.notify_if_error m `Warn ~use:String.Map.empty map in
         Fut.return map
   in
