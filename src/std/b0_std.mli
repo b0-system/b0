@@ -706,6 +706,36 @@ module String : sig
   (** [cuts_right sep s] is like {!cuts_left} but matching starts on the
       right of [s]. *)
 
+  (** {2:break_lines Breaking lines} *)
+
+  val fold_ascii_lines :
+    strip_newline:bool -> (int -> 'a -> string -> 'a) -> 'a -> string -> 'a
+  (** [fold_ascii_lines ~strip_newlines f acc s] folds over the lines of [s] by
+      calling [f linenum acc' line] with [linenum] the one-based line number
+      count, [acc'] the result of accumulating [acc] with [f] so far and [line]
+      the data of the line (without the newline found in the data if
+      [strip_newlines] is [true]).
+
+      Lines are delimited by newline sequences which are either one of
+      ["\n"], ["\r\n"] or ["\r"]. More precisely the function determines lines
+      and line data as follows:
+      {ul
+      {- If [s = ""], the function considers there are no lines in [s] and
+       [acc] is returned without [f] being called.}
+      {- If [s <> ""], [s] is repeteadly split on the first newline sequences
+       ["\n"], ["\r\n"] or ["\r"] into [(left, newline, right)], [left]
+       (or [left ^ newline] when [strip_newlines = false]) is given to [f]
+       and the process is repeated with [right] until a split can no longer
+       be found. At that point this final string is given to [f] and the
+       process stops.}} *)
+
+  val detach_ascii_newline : string -> string * string
+  (** [detach_ascii_newline s] is [(data, endline)] with:
+      {ul
+      {- [endline] either the suffix ["\n"], ["\r\n"] or ["\r"] of [s] or [""]
+         if [s] has no such suffix.}
+      {- [data] the bytes before [endline] such that [data ^ newline = s]}} *)
+
   (** {1:fmt Formatting} *)
 
   val pp : string Fmt.t

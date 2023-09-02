@@ -843,6 +843,46 @@ module String = struct
     in
     loop [] s
 
+  (* Breaking lines *)
+
+  let fold_ascii_lines ~strip_newlines:strip f acc s =
+    let rec loop ~strip linenum s start i max f acc =
+      if i > max then
+        f linenum acc (if start = 0 then s else String.sub s start (i - start))
+      else
+      let next_start =
+        let next = i + 1 in
+        if unsafe_get s i = '\n' then next else
+        if unsafe_get s i = '\r' then
+          if next > max then next else
+          if unsafe_get s next = '\n' then next + 1 else next
+        else start
+      in
+      if next_start = start
+      then loop ~strip linenum s start (i + 1) max f acc else
+      let after_line_data = if strip then i else next_start in
+      let line = String.sub s start (after_line_data - start) in
+      let acc = f linenum acc line in
+      loop ~strip (linenum + 1) s next_start next_start max f acc
+    in
+    if s = "" then acc else loop ~strip 1 s 0 0 (String.length s - 1) f acc
+
+  let detach_ascii_newline s =
+    if s = "" then ("", "") else
+    let len = String.length s in
+    let last = len - 1 in
+    let newline_start =
+      if unsafe_get s last = '\n' then
+        let prev = last - 1 in
+        if prev < 0 then last else
+        (if unsafe_get s prev = '\r' then prev else last)
+      else
+      if unsafe_get s last = '\r' then last else len
+    in
+    if newline_start > last then (s, "") else
+    String.sub s 0 newline_start,
+    String.sub s newline_start (len - newline_start)
+
   (* Formatting *)
 
   let pp = Fmt.string
