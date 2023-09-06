@@ -201,13 +201,13 @@ let vcs =
   Term.(const vcs $ topmost $ includes $ excludes $ all $ keep_going $
         vcs_kind $ tool_args)
 
-let subs = [exec; list; vcs]
+let subs = [exec; list; (* vcs *) ]
 let cmd =
   let doc = "Operate on B0 scopes" in
   let descr =
     `P "The command $(iname) operates on scopes. The $(b,b0 scope exec) \
         command allows to fold over scope directories and invoke an \
-        arbitary tool. The $(b,b0 scope vcs) command invokes a vcs operation \
+        arbitary tool. Use the $(b,b0 vcs) command to invokes a vcs operation \
         on scope directories that are managed by it and dirty.";
   in
   B0_tool_std.Cli.cmd_group_with_b0_file "scope" ~doc ~descr subs
