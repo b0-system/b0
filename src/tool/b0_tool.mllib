@@ -11,5 +11,6 @@ B0_cmd_pack
 B0_cmd_root
 B0_cmd_scope
 B0_cmd_unit
+B0_cmd_vcs
 B0_tool_std
 B0_main

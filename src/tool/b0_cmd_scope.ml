@@ -178,19 +178,20 @@ let vcs =
   let synopsis = `P "$(iname) [$(i,OPTION)]… $(b,--) $(i,VCS) [$(i,ARG)]…" in
   let descr = `Blocks [
       `P "$(tname) executes $(i,VCS) with given arguments in the directory \
-          of each of the scopes which are found to be managed by $(i,VCS) and
-          dirty; or all of them if $(b,--all) is specified.";
+          of each of the scopes which are found to be managed by $(i,VCS) \
+          and dirty; or all of them if $(b,--all) is specified. It is a \
+          specialized $(b,b0 scope exec) for version control systems.";
       `P "Typical worfklow:";
       `P "$(b,b0)"; `Noblank;
       `P "Error: ..."; `Noblank;
       `P "... # Fix errors"; `Noblank;
       `P "$(b,b0)"; `Noblank;
-      `P "$(b,b0 scope vcs -- git status)"; `Noblank;
-      `P "$(b,b0 scope vcs -- git add -p)"; `Noblank;
-      `P "$(b,b0 scope vcs -- git commit -m 'Cope with changes!')"; `Noblank;
-      `P "$(b,b0 scope vcs -a -- git push)";
+      `P "$(iname) $(b,-- git status)"; `Noblank;
+      `P "$(iname) $(b,-- git add -p)"; `Noblank;
+      `P "$(iname) $(b,-- git commit -m 'Cope with changes!')"; `Noblank;
+      `P "$(iname) $(b,-a -- git push)";
       `P "Or:";
-      `P "$(b,b0 scope vcs -q -a -- git grep) $(i,PATTERN)";
+      `P "$(iname) $(b,-q -a -- git grep) $(i,PATTERN)";
       `P "The process continues if $(i,VCS) returns with a non-zero exit \
           code, use the option $(b,--fail-stop) to prevent that.";
       select_doc;

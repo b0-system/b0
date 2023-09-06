@@ -40,7 +40,9 @@ let cmds =
     B0_cmd_pack.cmd;
     B0_cmd_root.cmd;
     B0_cmd_scope.cmd;
-    B0_cmd_unit.cmd ]
+    B0_cmd_unit.cmd;
+    B0_cmd_vcs.cmd;
+  ]
 
 let b0 =
   let info = Cmd.info "b0" ~version:"%%VERSION%%" ~doc ~sdocs ~exits ~man in
