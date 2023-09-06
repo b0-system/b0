@@ -14,6 +14,9 @@ exception Err of string
 
 module Scope = struct
 
+  let sep = "."
+  let lib_root = sep
+
   (* Names *)
 
   type name = string
@@ -31,13 +34,9 @@ module Scope = struct
     if !sealed then List.rev !list else
     invalid_arg "B0_def.Scope.seal () has not been called yet."
 
-  let file_scope_name_of_pre = function
-  | "" -> "."
-  | pre -> String.subrange pre ~last:(String.length pre - 2)
-
   let close () = match !current with
   | File ((pre, file, _) :: ss) ->
-      list := (file_scope_name_of_pre pre, file) :: !list;
+      list := (pre, file) :: !list;
       current := (match ss with [] -> Nil | ss -> (File ss));
   | Lib _ -> current := Nil
   | Nil -> invalid_arg "No scope to close"
@@ -47,13 +46,13 @@ module Scope = struct
   | Nil -> ()
   | Lib n -> Fmt.invalid_arg "Unclosed library scope %s" n
   | File ((pre, file, _) :: _) ->
-      let scope = file_scope_name_of_pre pre in
-      Fmt.invalid_arg "Unclosed file scope %s %a" scope Fpath.pp file
+      Fmt.invalid_arg "Unclosed file scope %s %a" pre Fpath.pp file
   | File [] -> assert false
 
   let open_lib lib =
+    if lib = "" then Fmt.invalid_arg "Empty library scope name" else
     check_no_scope ();
-    current := Lib (String.concat "" ["."; lib; "."])
+    current := Lib (String.concat "" [lib_root; lib])
 
   let file = function
   | Nil | Lib _ | File [] -> None | File ((_, f, _) :: _) -> Some f
@@ -124,7 +123,7 @@ module Scope = struct
 
   let open_file name file = match !current with
   | File ((pre, _, _) :: _ as ss) ->
-      let pre = String.concat "" [pre; name; "."] in
+      let pre = String.concat sep [pre; name] in
       current := File ((pre, file, Fpath.parent file) :: ss)
   | _ -> invalid_arg "Illegal scope context, no root"
 
@@ -132,13 +131,13 @@ module Scope = struct
   let is_root () = match !current with
   | File (["", _, _]) -> true | _ -> false
 
-  let qualify_name n =
-    let prefix = match !current with
-    | Lib n -> n | File ((pre, _, _) :: _) -> pre
-    | Nil -> ""
-    | File [] -> assert false
-    in
-    String.concat "" [prefix; n]
+  let qualify_name n = match !current with
+  | Lib prefix ->
+      (* Allow to use lib scope name without [sep] as a name *)
+      if n = "" then prefix else String.concat sep [prefix; n]
+  | File (("", _, _) :: _) | Nil -> n
+  | File ((prefix, _, _) :: _) -> String.concat sep [prefix; n]
+  | File [] -> assert false
 
   let seal () =
     (* XXX it would be nice to remove the set_uncaught_exception_handler
@@ -229,7 +228,6 @@ module Make (V : VALUE) = struct
       Fmt.error "%s %a does not define metadata %a"
         (String.Ascii.capitalize V.def_kind)
         V.pp_name_str (name v) B0_meta.Key.pp_name k
-
 
   let defs = ref String.Map.empty
   let add v = defs := String.Map.add (name v) v !defs

@@ -113,7 +113,7 @@ B0_unit
 
 {2:driver Driver support}
 
-The following is only needed Onlyif you want to process B0 files
+The following is only needed if you want to process B0 files
 your own own way. See the {{!page-driver_dev}B0 driver development
 manual}.
 
@@ -161,5 +161,5 @@ B0_ocaml_eco
 B0_opam
 }
 
-Note the {!B0_ocaml} module is in fact defined in the [b0.file] library
-as it used to compile [B0.ml] files.
+{b Note.} The {!B0_ocaml} module is in fact defined in the [b0.file] library
+as it is used to compile [B0.ml] files.
