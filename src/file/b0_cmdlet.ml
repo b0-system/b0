@@ -88,3 +88,10 @@ let eval ?man_xrefs ?man ?envs ?exits ?sdocs ?docs ?doc:d ?version e cmd t =
   let argv = Array.of_list (name :: Cmd.to_list cmd) in
   let cmd = Cmdliner.Cmd.v info t in
   B0_cli.Exit.of_eval_result @@ Cmdliner.Cmd.eval_value ~argv cmd
+
+let of_cmdliner_cmd ?doc ?meta name cmd =
+  let run env args =
+    let argv = Array.of_list (name :: Cmd.to_list args) in
+    B0_cli.Exit.of_eval_result @@ Cmdliner.Cmd.eval_value ~argv (cmd env)
+  in
+  v ?doc ?meta name run

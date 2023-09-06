@@ -124,6 +124,17 @@ val eval :
     the docs there. By default [doc] is derived from the cmdlet's doc string
     and [exits] is {!B0_cli.Exit.infos}. *)
 
+val of_cmdliner_cmd :
+  ?doc:string -> ?meta:B0_meta.t -> string ->
+  (Env.t -> Os.Exit.t Cmdliner.Cmd.t) -> t
+(** [of_cmdliner_cmd name cmd] defines a cmdlet from the cmdliner command.
+
+    {b Note.} This is not the best definition we'd like to use the cmdliner
+    command name and doc but it keeps cmdliner defs under a thunk.
+
+
+    {b Note.} It would be nice to be able to extract [doc] from [cmd]. *)
+
 (** {1:b0_def B0 definition API} *)
 
 include B0_def.S with type t := t
