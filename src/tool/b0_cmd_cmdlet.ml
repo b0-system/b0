@@ -31,7 +31,7 @@ let list_term = Term.(const list $ B0_tool_std.Cli.format $ clets_all)
 
 let edit =
   let doc = "Edit cmdlets" in
-  let descr = `P "$(tname) opens in your editor the B0 files of given \
+  let descr = `P "$(iname) opens in your editor the B0 files of given \
                   cmdlets are defined." in
   let envs = B0_tool_std.Cli.editor_envs in
   let term = Term.(const edit $ clets_all) in
@@ -39,7 +39,7 @@ let edit =
 
 let get =
   let doc = "Get cmdlet metadata" in
-  let descr = `P "$(tname) outputs the value of metadata $(i,KEY) of given \
+  let descr = `P "$(iname) outputs the value of metadata $(i,KEY) of given \
                   cmdlets."
   in
   let envs = B0_tool_std.Cli.pager_envs in
@@ -51,13 +51,13 @@ let get =
 
 let list =
   let doc = "List cmdlets (default command)" in
-  let descr = `P "$(tname) lists given cmdlets." in
+  let descr = `P "$(iname) lists given cmdlets." in
   let envs = B0_tool_std.Cli.pager_envs in
   B0_tool_std.Cli.subcmd_with_b0_file "list" ~doc ~descr ~envs list_term
 
 let show =
   let doc = "Show cmdlet metadata." in
-  let descr = `P "$(tname) is $(b,list -l), it outputs metadata of given \
+  let descr = `P "$(iname) is $(b,list -l), it outputs metadata of given \
                   cmdlets."
   in
   let envs = B0_tool_std.Cli.pager_envs in
@@ -68,8 +68,8 @@ let subs = [edit; get; list; show]
 
 let cmd =
   let doc = "Operate on cmdlets" in
-  let descr = `P "$(tname) operates on cmdlets. The default command is \
-                  $(tname) $(b,list)."
+  let descr = `P "$(iname) operates on cmdlets. The default command is \
+                  $(iname) $(b,list)."
   in
   let envs = B0_tool_std.Cli.pager_envs and default = list_term in
   B0_tool_std.Cli.cmd_group_with_b0_file

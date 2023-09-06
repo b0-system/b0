@@ -28,7 +28,7 @@ let exits = B0_driver.Exit.infos
 let man_xrefs = [ `Main; `Cmd "cache" ]
 let man = [
   `S Manpage.s_description;
-  `P "The $(tname) command deletes the current variant and deployement \
+  `P "The $(iname) command deletes the current variant and deployement \
       builds and artefacts. The build cache is however kept intact.";
   `P "Use option $(b,--clean) option to get rid of the $(b,_b0) directory \
       altogeter. This deletes all variants and deployments an most likely \

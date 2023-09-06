@@ -50,7 +50,7 @@ open Cmdliner
 
 let path, path_term =
   let doc = "Show the root directory (default command)" in
-  let descr = `P "$(tname) outputs the b0 root directory." in
+  let descr = `P "$(iname) outputs the b0 root directory." in
   let path_term = Term.(const path) in
   B0_tool_std.Cli.subcmd_with_driver_conf "path" ~doc ~descr path_term,
   path_term
@@ -58,7 +58,7 @@ let path, path_term =
 let lock =
   let doc = "Lock the root and b0 directory" in
   let descr = `Blocks
-    [ `P "$(tname) outputs environment variable bindings to lock $(mname) \
+    [ `P "$(iname) outputs environment variable bindings to lock $(mname) \
           invocations on the currently inferred b0 file and directory. \
           The intended usage is:";
       `Pre "$(b,eval \\$(b0 root lock\\))"; `Noblank;
@@ -72,7 +72,7 @@ let lock =
 let unlock =
   let doc = "Unlock the root and b0 directory" in
   let descr = `Blocks
-      [ `P "$(tname) outputs instructions to clear the environment bindings \
+      [ `P "$(iname) outputs instructions to clear the environment bindings \
             performed by $(b,lock). The indented usage is:";
         `Pre "$(b,eval \\$(b0 root unlock\\))"; ]
   in
@@ -84,7 +84,7 @@ let subs = [lock; path; unlock]
 let cmd =
   let doc = "Show and lock the root directory" in
   let descr =
-    `P "$(tname) operates on the root directory. The default \
+    `P "$(iname) operates on the root directory. The default \
         command is $(b,path).";
   in
   let default = path_term in

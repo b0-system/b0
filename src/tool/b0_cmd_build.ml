@@ -342,11 +342,11 @@ let cmd =
   let man_xrefs = [ `Main ] in
   let man = [
     `S Manpage.s_synopsis;
-    `P "$(mname) $(tname) \
+    `P "$(iname) \
         [$(b,-u) $(i,UNIT)]…  [$(b,-p) $(i,PACK)]… [$(i,OPTION)]… \
         $(b,--) [$(i,ACTION)] [$(i,ARG)]…";
     `S Manpage.s_description;
-    `P "The $(tname) command builds and runs actions.";
+    `P "The $(iname) command builds and runs actions.";
     `P "To build a unit use the $(b,-u) option. To build all the units of \
         a pack use the $(b,-p) option. If no unit or pack is specified on \
         the command line all units build unless a pack named $(b,default) \

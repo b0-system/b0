@@ -132,7 +132,7 @@ let tool_args =
   Arg.(value & pos_right 0 string [] & info [] ~doc ~docv:"ARG")
 
 let vcs_syn =
-  "$(mname) $(b,scope) $(tname) [$(i,OPTION)]… $(b,--) $(i,SUBCMD) [$(i,ARG)]…"
+  "$(iname) [$(i,OPTION)]… $(b,--) $(i,SUBCMD) [$(i,ARG)]…"
 
 (* Commands *)
 
@@ -143,11 +143,9 @@ let select_doc =
 
 let exec =
   let doc = "Execute a tool in scope directories" in
-  let synopsis = `P "$(mname) $(b,scope) $(tname) [$(i,OPTION)]… $(b,--) \
-                     $(i,TOOL) [$(i,ARG)]…"
-  in
+  let synopsis = `P "$(iname) [$(i,OPTION)]… $(b,--) $(i,TOOL) [$(i,ARG)]…" in
   let descr = `Blocks [
-    `P "$(tname) executes $(i,TOOL) with given arguments in the \
+    `P "$(iname) executes $(i,TOOL) with given arguments in the \
         directory of each of the scopes. The process continues \
         if $(i,TOOL) returns with a non-zero exit code, \
         use the option $(b,--fail-stop) to prevent that.";
@@ -160,7 +158,7 @@ let exec =
 let list =
   let doc = "List scopes (default command)" in
   let descr = `Blocks [
-      `P "$(tname) lists scope names and their location. \
+      `P "$(iname) lists scope names and their location. \
           If $(b,--path) is specified only paths are listed.";
       select_doc ]
   in
@@ -177,7 +175,7 @@ let vcs =
   let doc = "Execute a vcs in its managed and dirty scopes" in
   let synopsis = `P "$(iname) [$(i,OPTION)]… $(b,--) $(i,VCS) [$(i,ARG)]…" in
   let descr = `Blocks [
-      `P "$(tname) executes $(i,VCS) with given arguments in the directory \
+      `P "$(iname) executes $(i,VCS) with given arguments in the directory \
           of each of the scopes which are found to be managed by $(i,VCS) \
           and dirty; or all of them if $(b,--all) is specified. It is a \
           specialized $(b,b0 scope exec) for version control systems.";

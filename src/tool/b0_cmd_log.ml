@@ -28,7 +28,7 @@ let cmd =
   let exits = B0_driver.Exit.infos in
   let man = [
     `S Manpage.s_description;
-    `P "The $(tname) command shows build information and operations in \
+    `P "The $(iname) command shows build information and operations in \
         various formats.";
     `S Manpage.s_options;
     `S B0_cli.s_output_format_options;

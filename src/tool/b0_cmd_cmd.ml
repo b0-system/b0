@@ -29,7 +29,7 @@ let cmdlet =
 let cmdlet_args =
   let doc =
     "Argument for the cmdlet. Specify arguments after the $(b,--) token \
-     otherwise command line options will be interpreted by $(mname) $(tname)."
+     otherwise command line options will be interpreted by $(iname)."
   in
   Arg.(value & pos_right 0 string [] & info [] ~doc ~docv:"ARG")
 
@@ -40,9 +40,9 @@ let cmd =
   let man_xrefs = [ `Main ] in
   let man = [
     `S Manpage.s_synopsis;
-    `P "$(mname) $(tname) [$(i,OPTION)]… $(b,--) $(i,CMDLET) [$(i,ARG)]…";
+    `P "$(iname) [$(i,OPTION)]… $(b,--) $(i,CMDLET) [$(i,ARG)]…";
     `S Manpage.s_description;
-    `P "$(tname) executes cmdlets.";
+    `P "$(iname) executes cmdlets.";
     `S Manpage.s_arguments;
     B0_tool_std.Cli.man_see_manual; ]
   in

@@ -200,19 +200,19 @@ let path_term = Term.(const path)
 
 let boot =
   let doc = "Install libraries needed for the B0 file" in
-  let descr = `P "$(tname) install libraries needed to compile the B0 file." in
+  let descr = `P "$(iname) install libraries needed to compile the B0 file." in
   B0_tool_std.Cli.subcmd_with_driver_conf "boot" ~doc ~descr @@
   Term.(const boot $ root)
 
 let compile =
   let doc = "Compile the driver for the B0 file" in
-  let descr = `P "$(tname) compiles the driver for the B0 file." in
+  let descr = `P "$(iname) compiles the driver for the B0 file." in
   B0_tool_std.Cli.subcmd_with_driver_conf "compile" ~doc ~descr @@
   Term.(const compile)
 
 let edit =
   let doc = "Edit the B0 file" in
-  let descr = `P "$(tname) opens the B0 file in your editor. If $(b,--all) \
+  let descr = `P "$(iname) opens the B0 file in your editor. If $(b,--all) \
                   is specified also opens all includes."
   in
   let all =
@@ -268,7 +268,7 @@ let gather_dirs =
 
 let includes =
   let doc = "Output scope name and paths of included B0 files" in
-  let descr = `P "$(tname) outputs the scope name and paths of included B0 \
+  let descr = `P "$(iname) outputs the scope name and paths of included B0 \
                   files. If $(b,--root) is specified only shows the includes \
                   of the root B0 file."
   in
@@ -278,7 +278,7 @@ let includes =
 let log =
   let doc = "Show driver compilation log" in
   let descr = `Blocks [
-      `P "$(tname) shows the driver compilation operations \
+      `P "$(iname) shows the driver compilation operations \
           in various formats. If $(b,--path) \
           is specified, shows the path to the log.";
       `S Manpage.s_options;
@@ -293,12 +293,12 @@ let log =
 
 let path =
   let doc = "Output the B0 file path (default command)" in
-  let descr = `P "$(tname) outputs the B0 file path." in
+  let descr = `P "$(iname) outputs the B0 file path." in
   B0_tool_std.Cli.subcmd_with_driver_conf "path" ~doc ~descr path_term
 
 let requires =
   let doc = "Output the OCaml libraries required by the B0 file" in
-  let descr = `P "$(tname) outputs the OCaml libraries required to compile \
+  let descr = `P "$(iname) outputs the OCaml libraries required to compile \
                   the B0 file. If $(b,--root) is specified only shows the \
                   requires of the root B0 file."
   in
@@ -307,7 +307,7 @@ let requires =
 
 let source =
   let doc = "Output the expanded B0 source file" in
-  let descr = `P "$(tname) outputs the expanded B0 source file compiled
+  let descr = `P "$(iname) outputs the expanded B0 source file compiled
                   by the driver. If $(b,--root) is specified shows the \
                   non-expanded source of the root B0 file."
   in
@@ -320,7 +320,7 @@ let subs = [boot; compile; edit; gather; gather_dirs;
 let cmd =
   let doc = "Operate on the B0 file" in
   let descr =
-    `P "$(tname) operates on the B0 file. The default command is $(b,path).";
+    `P "$(iname) operates on the B0 file. The default command is $(b,path).";
   in
   let default = path_term in
   B0_tool_std.Cli.cmd_group_with_driver_conf "file" ~doc ~descr ~default subs

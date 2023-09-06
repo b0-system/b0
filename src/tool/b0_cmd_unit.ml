@@ -43,7 +43,7 @@ let list_term = Term.(const list $ B0_tool_std.Cli.format $ units_all)
 
 let build_dir =
   let doc = "Output build directories of units" in
-  let descr = `P "$(tname) outputs build directories of given build units. \
+  let descr = `P "$(iname) outputs build directories of given build units. \
                   The paths may not exist."
   in
   B0_tool_std.Cli.subcmd_with_b0_file "build-dir" ~doc ~descr @@
@@ -51,7 +51,7 @@ let build_dir =
 
 let edit =
   let doc = "Edit build units" in
-  let descr = `P "$(tname) opens in your editor the B0 files in which given \
+  let descr = `P "$(iname) opens in your editor the B0 files in which given \
                   build units are defined." in
   let envs = B0_tool_std.Cli.editor_envs in
   B0_tool_std.Cli.subcmd_with_b0_file "edit" ~doc ~descr ~envs @@
@@ -59,7 +59,7 @@ let edit =
 
 let get =
   let doc = "Get build unit metadata" in
-  let descr = `P "$(tname) outputs the value of metadata $(i,KEY) of given \
+  let descr = `P "$(iname) outputs the value of metadata $(i,KEY) of given \
                   build units."
   in
   let envs = B0_tool_std.Cli.pager_envs in
@@ -69,13 +69,13 @@ let get =
 
 let list =
   let doc = "List build units (default command)" in
-  let descr = `P "$(tname) lists given build units." in
+  let descr = `P "$(iname) lists given build units." in
   let envs = B0_tool_std.Cli.pager_envs in
   B0_tool_std.Cli.subcmd_with_b0_file "list" ~doc ~descr ~envs list_term
 
 let show =
   let doc = "Show build unit metadata." in
-  let descr = `P "$(tname) is $(b,list -l), it outputs metadata of \
+  let descr = `P "$(iname) is $(b,list -l), it outputs metadata of \
                   given build units."
   in
   let envs = B0_tool_std.Cli.pager_envs in
@@ -86,8 +86,8 @@ let subs = [build_dir; edit; get; list; show]
 
 let cmd =
   let doc = "Operate on build units" in
-  let descr = `P "$(tname) operates on build units. The default command \
-                  is $(tname) $(b,list)."
+  let descr = `P "$(iname) operates on build units. The default command \
+                  is $(iname) $(b,list)."
   in
   let envs = B0_tool_std.Cli.pager_envs in
   B0_tool_std.Cli.cmd_group_with_b0_file "unit" ~doc ~descr ~envs subs
