@@ -244,7 +244,7 @@ module Theme = struct
   let name (n, _) = n
   let path (_, p) = p
   let pp ppf (n, p) =
-    Fmt.pf ppf "@[<h>%s %a@]" n (Fmt.tty [`Faint] Fpath.pp_unquoted) p
+    Fmt.pf ppf "@[<h>y%a %a@]" (Fmt.tty_string [`Bold]) n Fpath.pp_unquoted p
 
   let pp_name ppf (n, _) = Fmt.string ppf n
   let of_dir dir =
