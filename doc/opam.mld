@@ -1,9 +1,12 @@
 {0 [opam] support manual}
 
 {!B0_opam} has support for {{:http://opam.ocaml.org/}[opam]}, the
-OCaml package manager. It provides a convention to represent [opam]
-packages in [B0] and cmdlets for [opam] package file generation and
-automated package publication on the OCaml [opam] repository.
+OCaml package manager. It provides:
+
+- A convention to represent [opam] packages in the metadata of [B0]
+  packs.
+- The [.opam] cmdlet to generate opam package files and publish
+  packages on the OCaml [opam] repository.
 
 {1:representation Package representation}
 
@@ -45,11 +48,11 @@ let mypkg =
 ]}
 
 The [opam] packages defined in a B0 root along with the pack in which
-they are defined can be listed with the [.opam.list] cmdlet.
+they are defined can be listed with the [.opam list] command:
 
 {v
-b0 -- .opam.list           # List opam packages in the B0 root
-b0 -- .opam.list --help    # See more options
+b0 -- .opam list           # List opam packages in the B0 root
+b0 -- .opam list --help    # See more options
 v}
 
 {1:file_generation Package file generation}
@@ -57,14 +60,14 @@ v}
 The [opam] file for a package is generated from its pack metadata via
 {!B0_opam.Meta.pkg_of_pack} and {!B0_opam.File.pkg_of_meta}.
 
-The [.opam.file] cmdlet outputs the generated files in various ways.
+The [.opam file] command outputs the generated files in various ways.
 
 {v
-b0 -- .opam.file mypkg             # opam file for mypkg on stdout
-b0 -- .opam.file                   # All packages, on stdout
-b0 -- .opam.file -d /tmp/opam/     # Write them to /tmp/opam
-b0 -- .opam.file --in-scope-dir    # Write them in their scopes
-b0 -- .opam.file --help            # See more options
+b0 -- .opam file mypkg             # opam file for mypkg on stdout
+b0 -- .opam file                   # All packages, on stdout
+b0 -- .opam file -d /tmp/opam/     # Write them to /tmp/opam
+b0 -- .opam file --in-scope-dir    # Write them in their scopes
+b0 -- .opam file --help            # See more options
 v}
 
 Note that the generation differs slightly when [opam] files are
@@ -73,7 +76,7 @@ to prevent that.
 
 {1:publish Package publication}
 
-The [.opam.publish] cmdlet publishes packages on [opam] by making a
+The [.opam publish] command publishes packages on [opam] by making a
 pull request on the OCaml [opam] package repository on GitHub.
 
 {2:github GitHub setup}
@@ -99,7 +102,7 @@ to:
 {2:basic Basics}
 
 [opam] package publication happens after the software source archive
-has been released on the WWW. To get help for releasing your software
+has been released on the web. To get help for releasing your software
 with B0 see the {{!page-release}B0 release manual}.
 
 The publication process depends on the current work tree of the VCSes
@@ -118,7 +121,7 @@ Multiple package releases and incompatibilites with existing packages
 can be stated via a single pull request. For example:
 
 {v
-b0 -- .opam.publish p1 p2 p3.2.0.1 -i otherpackage
+b0 -- .opam publish p1 p2 p3.2.0.1 -i otherpackage
 v}
 
 publishes the [opam] packages [p1] and [p2] at a version determined by
@@ -230,17 +233,17 @@ versions of [otherpack] and the version 2.1.0 of [thispack] are
 incompatible with it – provided [mypkg] is in their dependencies:
 
 {v
-b0 -- .opam.publish mypkg -i otherpack -i thispack.2.1.0
+b0 -- .opam publish mypkg -i otherpack -i thispack.2.1.0
 v}
 
 If you discover the incompatibilites only once the pull request has
-been made, repeat the same [.opam.publish] invocation with more [-i]
+been made, repeat the same [.opam publish] invocation with more [-i]
 options, this will update the pull request.
 
 {2:problems Dealing with pull request issues}
 
 If there are issues with the pull request you can adjust your metadata
-and invoke again the same [.opam.publish] command. As long as the same
+and invoke again the same [.opam publish] command. As long as the same
 set of [opam] packages with the same version end-up being published
 this updates the existing pull request.
 
@@ -254,8 +257,7 @@ will update the pull request.
 If you want to define multiple packages from a single archive tarball
 follow the instructions in {!det_archive_url}.
 
-{2:troubleshooting Troubleshooting}
+{2:publish_hang [.opam publish] hangs after push}
 
-{ul
-{- Publish hangs after push: go to [cd ~/.cache/opam-repository && git gc] and
-   try again}}
+If publish hangs after push: go to [cd ~/.cache/opam-repository && git gc]
+and try again.

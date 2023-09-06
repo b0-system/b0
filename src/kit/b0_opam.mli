@@ -189,26 +189,9 @@ module Meta : sig
          names.}} *)
 end
 
-(** {1:cmdlets Cmdlets} *)
+(** {1:cmdlets [.opam] cmdlet} *)
 
-(** [.opam.*] cmdlets.
-
-   See the {{!page-opam}B0 [opam] manual} and:
-{v
-b0 -- .opam.list --help
-b0 -- .opam.file --help
-b0 -- .opam.publish --help
-v}
-  for more information.
- *)
-module Cmdlet : sig
-
-  val file : B0_cmdlet.t
-  (** [file] is the [.opam.file] cmdlet. *)
-
-  val list : B0_cmdlet.t
-  (** [list] is the [.opam.list] cmdlet. *)
-
-  val publish : B0_cmdlet.t
-  (** [publish] is the [.opam.publish] cmdlet. *)
-end
+val cmdlet : B0_cmdlet.t
+(** [cmdlet] is the [.opam] cmdlet. See the
+    {{!page-opam}B0 [opam] manual} and [b0 -- .opam --help] for
+    more information. *)
