@@ -10,6 +10,57 @@ let driver =
   let libs = [B0_ocaml.Lib.Name.v "b0.tool"] in
   B0_driver.create ~name:"b0" ~version:"%%VERSION%%" ~libs
 
+let def_list : (module B0_def.S) list =
+  [(module B0_action); (module B0_pack); (module B0_unit)]
+
+let def_list_list def_list =
+  let add_values (type a) acc (module Def : B0_def.S) =
+    let vs = Def.list () in
+    let add_value acc v =
+      ((Def.name v, Def.def_kind), B0_def.V ((module Def), v)) :: acc
+    in
+    List.fold_left add_value acc vs
+  in
+  let vs = List.fold_left add_values [] def_list in
+  List.map snd (List.sort compare vs)
+
+let def_list_get_or_hint def_list name =
+  let rec loop vs suggs = function
+  | [] ->
+      let rev_compare a b = compare b a in
+      if vs <> []
+      then Ok (List.map snd (List.sort rev_compare (* sort by rev kind *) vs))
+      else
+      let kind ppf () = Fmt.string ppf "definition"  in
+      let hint = Fmt.did_you_mean in
+      let pp = Fmt.unknown' ~kind Fmt.(code string) ~hint in
+      Fmt.error "@[%a@]" pp (name, String.Set.elements suggs)
+  | (module Def : B0_def.S) :: defs ->
+      let vs, suggs = match Def.get_or_suggest name with
+      | Ok v -> ((Def.def_kind, B0_def.V ((module Def), v)) :: vs), suggs
+      | Error sugg_vs ->
+          let add_sugg acc v = String.Set.add (Def.name v) acc in
+          let suggs = List.fold_left add_sugg suggs sugg_vs in
+          vs, suggs
+      in
+      loop vs suggs defs
+  in
+  loop [] String.Set.empty def_list
+
+let def_list_get_list_or_hint def_list ~empty_means_all names =
+  if empty_means_all && names = [] then Ok (def_list_list def_list) else
+  let rec loop vs es = function
+  | [] ->
+      if es <> []
+      then Error (String.concat "\n" (List.rev es))
+      else Ok (List.rev vs)
+  | n :: ns ->
+      match def_list_get_or_hint def_list n with
+      | Ok values -> loop (List.rev_append values vs) es ns
+      | Error e -> loop vs (e :: es) ns
+  in
+  loop [] [] names
+
 module Def = struct
   let list (module Def : B0_def.S) c format ds =
     let pp, sep = match format with
@@ -26,7 +77,7 @@ module Def = struct
     if ds <> [] then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp) ds);
     Ok B0_cli.Exit.ok
 
-  let edit (module Def : B0_def.S) c ds =
+  let edit (module Def : B0_def.S) _c ds =
     let rec find_files not_found fs = function
     | [] -> not_found, Fpath.distinct fs
     | d :: ds ->

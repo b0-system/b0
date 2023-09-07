@@ -8,14 +8,14 @@ open B0_std.Fut.Syntax
 open Test_memo_setup
 
 let lookup_b0_os build_dir m =
-  let store = B0_memo.Store.create m ~dir:build_dir [] in
-  let* n = B0_memo.Store.get store B0_os.name in
-  let* v = B0_memo.Store.get store B0_os.version in
-  let* d = B0_memo.Store.get store B0_os.distribution in
-  let* f = B0_memo.Store.get store B0_os.family in
-  let* a = B0_memo.Store.get store B0_os.arch in
-  let* an = B0_memo.Store.get store B0_os.arch_normalized in
-  let* bits = B0_memo.Store.get store B0_os.arch_bits in
+  let store = B0_store.create m ~dir:build_dir [] in
+  let* n = B0_store.get store B0_os.name in
+  let* v = B0_store.get store B0_os.version in
+  let* d = B0_store.get store B0_os.distribution in
+  let* f = B0_store.get store B0_os.family in
+  let* a = B0_store.get store B0_os.arch in
+  let* an = B0_store.get store B0_os.arch_normalized in
+  let* bits = B0_store.get store B0_os.arch_bits in
   Log.app (fun m ->
       m "@[<v>%a@,%a@,%a@,%a@,%a@,%a@,%a@]"
         Fmt.(field "name" id string) n

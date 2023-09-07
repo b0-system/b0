@@ -18,8 +18,8 @@ For B0 users.
    B0 system and B0 files. It is recommended reading.}
 {- The {{!page-unit_manual}build unit manual} describes how to
    create your own build units.}
-{- The {{!page-cmdlet_manual}cmdlet manual} describes how to define
-   your own cmdlets.}
+{- The {{!page-action_manual}action manual} describes how to define
+   your own actions.}
 {- The {{!page-memo_manual}B0_memo manual} describes the [b0.memo] build
    library.}
 {- The {{!page-release}B0 release manual} describes B0 support
@@ -102,7 +102,6 @@ B0_srcs
 {!modules:
 B0_action
 B0_build
-B0_cmdlet
 B0_def
 B0_dir
 B0_meta

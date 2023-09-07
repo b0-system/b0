@@ -32,7 +32,7 @@ let () =
     Pkg.doc "doc/driver_dev.mld" ~dst:"odoc-pages/driver_dev.mld";
     Pkg.doc "doc/old_manual.mld" ~dst:"odoc-pages/old_manual.mld";
     Pkg.doc "doc/unit_manual.mld" ~dst:"odoc-pages/unit_manual.mld";
-    Pkg.doc "doc/cmdlet_manual.mld" ~dst:"odoc-pages/cmdlet_manual.mld";
+    Pkg.doc "doc/action_manual.mld" ~dst:"odoc-pages/action_manual.mld";
     Pkg.doc "doc/rationale.mld" ~dst:"odoc-pages/rationale.mld";
     Pkg.doc "doc/todo.mld" ~dst:"odoc-pages/todo.mld";
     Pkg.doc "doc/opam.mld" ~dst:"odoc-pages/opam.mld";

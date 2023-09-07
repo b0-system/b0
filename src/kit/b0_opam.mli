@@ -191,7 +191,7 @@ end
 
 (** {1:cmdlets [.opam] cmdlet} *)
 
-val cmdlet : B0_cmdlet.t
-(** [cmdlet] is the [.opam] cmdlet. See the
+val action : B0_action.t
+(** [action] is the [.opam] action. See the
     {{!page-opam}B0 [opam] manual} and [b0 -- .opam --help] for
     more information. *)

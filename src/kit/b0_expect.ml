@@ -40,7 +40,7 @@ end
 
 type t =
   { base : Fpath.t;
-    env : B0_cmdlet.Env.t;
+    env : B0_action.Env.t;
     log_absolute : bool;
     log_diffs : bool;
     mutable outcomes : Outcome.t list;
@@ -49,7 +49,7 @@ type t =
     vcs : B0_vcs.t; }
 
 let make ?vcs ?(log_absolute = false) ?(log_diffs = true) env ~base =
-  let scope_dir = B0_cmdlet.Env.scope_dir env in
+  let scope_dir = B0_action.Env.scope_dir env in
   let base = Fpath.(scope_dir // base) in
   let outcomes = [] and seen = Fpath.Set.empty in
   let time = Os.Mtime.counter () in
@@ -71,10 +71,10 @@ let log_diffs ctx = ctx.log_diffs
 let vcs ctx = ctx.vcs
 let outcomes ctx = ctx.outcomes
 
-let cwd_rel_path ctx p = Fpath.relative ~to_dir:(B0_cmdlet.Env.cwd ctx.env) p
+let cwd_rel_path ctx p = Fpath.relative ~to_dir:(B0_action.Env.cwd ctx.env) p
 let path_for_user ctx p = if ctx.log_absolute then p else cwd_rel_path ctx p
 let pp_path_for_user ctx ppf p = match ctx.log_absolute with
-| true -> fpath_pp_high_suffix (B0_cmdlet.Env.scope_dir ctx.env) ppf p
+| true -> fpath_pp_high_suffix (B0_action.Env.scope_dir ctx.env) ppf p
 | false -> (Fmt.code Fpath.pp) ppf (cwd_rel_path ctx p)
 
 (* Showing results *)
@@ -254,12 +254,12 @@ let exits =
   Cmdliner.Cmd.Exit.defaults
 
 let run f env base short log_absolute =
-  B0_cmdlet.exit_of_result' @@
+  B0_action.exit_of_result' @@
   abort_to_result @@ fun () ->
   let ctx = make env ~log_absolute ~log_diffs:(not short) ~base in
   f ctx; finish ctx
 
-let cmdlet env cmd ~base f =
+let action env cmd ~base f =
   let run = run f env base in
   let run = Cmdliner.Term.(const run $ short $ log_absolute_arg) in
-  B0_cmdlet.eval ~exits env cmd run
+  B0_action.eval ~exits env cmd run

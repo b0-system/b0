@@ -4,14 +4,14 @@ This manual shows how to deal with B0 cmdlets and create your own.
 
 {1:basics Basics}
 
-Basic operations on cmdlets are provided by the [b0 cmdlet] command.
+Basic operations on cmdlets are provided by the [b0 action] command.
 {[
-b0 cmdlet list  # List cmdlets
+b0 action list  # List action
 ]}
 
 {1:tutorial Making your own}
 
-Let's make a simple cmdlet that invokes a script at the root of your project:
+Let's make a simple action a script at the root of your project:
 
 Yaddada root vs scope
 

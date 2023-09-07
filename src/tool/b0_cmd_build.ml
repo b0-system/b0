@@ -178,9 +178,9 @@ let build_run
          they implement in their metadata and we should just look at this
          name. *)
       let u = B0_unit.get_or_suggest act in
-      let cmdlet = B0_cmdlet.get_or_suggest act in
-      match u, cmdlet with
-      | Ok u, Ok cmdlet ->
+      let action = B0_action.get_or_suggest act in
+      match u, action with
+      | Ok u, Ok action ->
           (* XXX when ww get rid  of unit actions we should disallow declaring
              an action with the same name as a tool or unit in a given scope.
              And tools should be available both under their name and a unit:tool
@@ -188,10 +188,10 @@ let build_run
           Fmt.error "Both a tool and cmdlet are called %a"
             (Fmt.code Fmt.string) act
       | Ok u, Error _ -> Ok (Some (`Unit u))
-      | Error _, Ok cmdlet -> Ok (Some (`Cmdlet cmdlet))
+      | Error _, Ok action -> Ok (Some (`Action action))
       | Error us, Error cs ->
           let us = List.map B0_unit.name us in
-          let cs = List.map B0_cmdlet.name cs in
+          let cs = List.map B0_action.name cs in
           let suggs = List.sort String.compare (List.rev_append us cs) in
           let kind ppf () = Fmt.string ppf "action" in
           let hint = Fmt.did_you_mean in
@@ -202,15 +202,15 @@ let build_run
   Log.if_error ~use:B0_cli.Exit.no_such_name @@
   let* act = find_action action in
   match act with
-  | Some (`Cmdlet cmdlet) ->
-      let cmd = B0_cmdlet.cmd cmdlet in
+  | Some (`Action action) ->
+      let func = B0_action.func action in
       let cwd = B0_driver.Conf.cwd c in
       let root_dir = Fpath.parent @@ Option.get @@ B0_driver.Conf.b0_file c in
-      let scope_dir = B0_def.scope_dir (B0_cmdlet.def cmdlet) in
+      let scope_dir = B0_def.scope_dir (B0_action.def action) in
       let scope_dir = Option.value scope_dir ~default:root_dir in
       let b0_dir = B0_driver.Conf.b0_dir c in
-      let exec = B0_cmdlet.Env.v ~cwd ~scope_dir ~root_dir ~b0_dir ~cmdlet in
-      Ok (cmd exec (Cmd.list args))
+      let exec = B0_action.Env.v ~cwd ~scope_dir ~root_dir ~b0_dir ~action in
+      Ok (func exec (Cmd.list args))
   | None | Some (`Unit _) ->
       build_run'
         lock ~units ~packs ~x_units ~x_packs output_action_path action args c

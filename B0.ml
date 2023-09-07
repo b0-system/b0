@@ -122,7 +122,6 @@ let test_b0_file =
   let requires = [b0_memo] in
   test_exe "test_b0_file.ml" ~requires ~doc:"Test B0_file module"
 
-
 (* Packs *)
 
 let b0_pack =
@@ -161,13 +160,13 @@ let default =
   B0_pack.v "default" ~doc:"The B0 system" ~meta ~locked:true @@
   B0_unit.list ()
 
-(* Cmdlets *)
+(* Actions *)
 
 let b0wl =
-  B0_cmdlet.v "b0wl" ~doc:"Run built b0 in the b0wl directory" @@
+  B0_action.v "b0wl" ~doc:"Run built b0 in the b0wl directory" @@
   fun env args ->
-  let cwd = Fpath.(B0_cmdlet.Env.scope_dir env / "b0wl") in
-  let b0_dir = B0_cmdlet.Env.b0_dir env in
+  let cwd = Fpath.(B0_action.Env.scope_dir env / "b0wl") in
+  let b0_dir = B0_action.Env.b0_dir env in
   let variant = "user" in (* FIXME access to current variant *)
   let bootstrap_root = B0_dir.build_dir ~b0_dir ~variant in
   let env = bootstrap_env bootstrap_root in
@@ -175,5 +174,5 @@ let b0wl =
   Os.Exit.exec ~env ~cwd b0_exec Cmd.(arg "b0" %% args)
 
 let strap =
-  B0_cmdlet.v "strap" ~doc:"Run boot/strap" @@
-  B0_cmdlet.exec_file (Fpath.v "boot/strap")
+  B0_action.v "strap" ~doc:"Run boot/strap" @@
+  B0_action.exec_file (Fpath.v "boot/strap")

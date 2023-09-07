@@ -21,7 +21,7 @@ open Cmdliner
 
 let packs ~right:r =
   let doc = "The $(docv) to act on. All of them if unspecified." in
-  Arg.(value & pos_right r string [] & info [] ~doc ~docv:"CMDLET")
+  Arg.(value & pos_right r string [] & info [] ~doc ~docv:"PACK")
 
 let packs_all = packs ~right:(-1)
 

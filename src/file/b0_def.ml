@@ -325,3 +325,6 @@ module Make (V : VALUE) = struct
   module Set = Set.Make(T)
   module Map = Map.Make(T)
 end
+
+
+type value = V : (module S with type t = 'a) * 'a -> value

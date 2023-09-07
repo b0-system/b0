@@ -263,3 +263,5 @@ end
 
 (** [Make (V)] names the values of [V]. *)
 module Make (V : VALUE) : S with type t = V.t
+
+type value = V : (module S with type t = 'a) * 'a -> value

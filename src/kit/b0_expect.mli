@@ -19,9 +19,9 @@ type t
 (** The type for expectation contexts. An expectation context
     orchestrates and gathers the result of expectation tests. *)
 
-val cmdlet :
-  B0_cmdlet.Env.t -> Cmd.t -> base:Fpath.t -> (t -> unit) -> Os.Exit.t
-(** [cmdlet env cmd ~base f] is a cmdlet calling [f ctx] and handling
+val action :
+  B0_action.Env.t -> Cmd.t -> base:Fpath.t -> (t -> unit) -> Os.Exit.t
+(** [action env cmd ~base f] is an action calling [f ctx] and handling
     test reporting and aborting. [f] should simply perform
     computations, add {{!expectations}expectations} to [ctx] and,
     possibly, {{!aborting}aborting}.
@@ -119,7 +119,7 @@ end
 
 val make :
   ?vcs:B0_vcs.t -> ?log_absolute:bool -> ?log_diffs:bool ->
-  B0_cmdlet.Env.t -> base:Fpath.t -> t
+  B0_action.Env.t -> base:Fpath.t -> t
 (** [make env ~base] is a test context in environment [env] with:
 
     {ul
@@ -150,7 +150,7 @@ val base_files : ?rel:bool -> t -> recurse:bool -> Fpath.t list
 val dur : t -> Mtime.Span.t
 (** [dur ctx] is the monotonic duration since [ctx] was created. *)
 
-val env : t -> B0_cmdlet.Env.t
+val env : t -> B0_action.Env.t
 (** [env ctx] is the environment of [ctx]. *)
 
 val log_absolute : t -> bool

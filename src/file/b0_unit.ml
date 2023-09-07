@@ -72,10 +72,10 @@ let action u = u.Unit_def.action
 let pp_synopsis ppf v =
   let pp_tag ppf u =
     let tag, style =
-      (if has_meta B0_meta.exe u then "exe", [`Fg `Green] else
-       if has_meta B0_meta.lib u then "lib", [`Fg `Magenta] else
-       if has_meta B0_meta.doc u then "doc", [`Fg `Yellow] else
-       "   ", [`Fg `Cyan])
+      (if has_meta B0_meta.exe u then "u", [`Fg `Green] else
+       if has_meta B0_meta.lib u then "u", [`Fg `Magenta] else
+       if has_meta B0_meta.doc u then "u", [`Fg `Yellow] else
+       "u", [])
     in
     Fmt.tty_string style ppf "[";
     Fmt.string ppf tag;

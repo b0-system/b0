@@ -4,6 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
+open Result.Syntax
 
 let pp_name = B0_def.Scope.pp_name
 let pp_dir = Fmt.tty [`Fg `Blue] Fpath.pp
@@ -63,6 +64,40 @@ let list topmost includes excludes format path c =
   let scopes = get_scopes c ~topmost ~includes ~excludes in
   if scopes <> [] then Log.app (fun m -> m "@[<v>%a@]" pp_scopes scopes);
   B0_cli.Exit.ok
+
+let symlink topmost includes excludes dir rm c =
+  Log.if_error ~use:B0_cli.Exit.some_error @@
+  let scopes = get_scopes c ~topmost ~includes ~excludes in
+  let symlink_scope (scope, path) =
+    if scope = "" (* root scope *) then Ok () else
+    let err e = Fmt.str "Could not symlink scope %s: %s" scope e in
+    Result.map_error err @@
+    let symlink = Fpath.(dir / scope) in
+    let* exists = Os.Path.exists symlink in
+    let force = true and make_path = true in
+    if not exists then Os.Path.symlink ~force ~make_path ~src:path symlink else
+    let* stat = Os.Path.symlink_stat symlink in
+    if stat.st_kind = Unix.S_LNK
+    then Os.Path.symlink ~force ~make_path ~src:path symlink else
+    (Log.warn (fun m -> m "%a: exists and not a symlink, skipped."
+                  Fpath.pp symlink); Ok ())
+  in
+  let remove_scope_symlink (scope, _) =
+    if scope = "" (* root scope *) then Ok () else
+    let err e = Fmt.str "Could not remove symlink for scope %s: %s" scope e in
+    Result.map_error err @@
+    let symlink = Fpath.(dir / scope) in
+    let* exists = Os.Path.exists symlink in
+    if not exists then Ok () else
+    let* stat = Os.Path.symlink_stat symlink in
+    if stat.st_kind = Unix.S_LNK
+    then Result.map ignore (Os.Path.delete ~recurse:false symlink) else
+    (Log.warn (fun m -> m "%a: not a symlink, skipped." Fpath.pp symlink);
+     Ok ())
+  in
+  let op = if rm then remove_scope_symlink else symlink_scope in
+  let* () = List.iter_stop_on_error op scopes in
+  Ok B0_cli.Exit.ok
 
 let vcs root includes excludes all keep_going vcs_kind vcs_args c =
   let vcs_cmd = match vcs_kind with
@@ -156,7 +191,7 @@ let exec =
         tool_args)
 
 let list =
-  let doc = "List scopes (default command)" in
+  let doc = "List scopes" in
   let descr = `Blocks [
       `P "$(iname) lists scope names and their location. \
           If $(b,--path) is specified only paths are listed.";
@@ -170,6 +205,37 @@ let list =
   B0_tool_std.Cli.subcmd_with_b0_file "list" ~doc ~descr ~envs @@
   Term.(const list $ topmost $ includes $ excludes $ B0_tool_std.Cli.format $
         path)
+
+let symlink =
+  let doc = "Create symlinks to scope directories" in
+  let descr = `Blocks [
+      `P "$(iname) symlinks scope names to their directory in the directory \
+          specified with the $(b,--in-dir) option or the current working \
+          directory if none is specified. If a symlink already exists it is \
+          relinked, if a corresponding file or directory exists it is left
+          intact";
+      `P "If the $(b,--rm) flag is specified removes the symlinks that \
+          would be created, only if they exist and are symlinks.";
+      select_doc;
+    ]
+  in
+  let dir =
+    let doc =
+      "Create symlinks in directory $(docv). The path to the directory is \
+       created if it doesn't exist."
+    in
+    let docv = "DIR" in
+    Arg.(value & opt B0_cli.fpath (Fpath.v ".") &
+         info ["d"; "in-dir"] ~doc ~docv)
+  in
+  let rm =
+    let doc = "Remove symlinks rather than create them. If they exist and \
+               are symlinks."
+    in
+    Arg.(value & flag & info ["rm"] ~doc)
+  in
+  B0_tool_std.Cli.subcmd_with_b0_file "symlink" ~doc ~descr @@
+  Term.(const symlink $ topmost $ includes $ excludes $ dir $ rm)
 
 let vcs =
   let doc = "Execute a vcs in its managed and dirty scopes" in
@@ -199,7 +265,7 @@ let vcs =
   Term.(const vcs $ topmost $ includes $ excludes $ all $ keep_going $
         vcs_kind $ tool_args)
 
-let subs = [exec; list; (* vcs *) ]
+let subs = [exec; list; symlink (* vcs *) ]
 let cmd =
   let doc = "Operate on B0 scopes" in
   let descr =

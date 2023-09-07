@@ -34,6 +34,17 @@ let pp_units ppf p =
   let pp = Fmt.(pp_locked ++ using units (list ~sep:sp B0_unit.pp_name)) in
   Fmt.field ~label "units" Fmt.id pp ppf p
 
+let pp_synopsis ppf v =
+  let pp_tag ppf u =
+    let style = [`Bold] in
+    Fmt.tty_string style ppf "[";
+    Fmt.string ppf "p";
+    Fmt.tty_string style ppf "]";
+  in
+  Fmt.pf ppf "@[%a %a@]" pp_tag v pp_synopsis v
+
+
+
 let pp ppf p =
   Fmt.pf ppf "@[<v>@[%a@]@, @[<v>%a%a@]@]"
     pp_synopsis p pp_units p B0_meta.pp_non_empty (meta p)

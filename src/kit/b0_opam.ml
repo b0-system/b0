@@ -941,8 +941,8 @@ let opam_cmd env =
   Cmd.group (Cmd.info ".opam" ~doc:"B0 opam support" ~man) @@
   [file_cmd; list_cmd; publish_cmd]
 
-let cmdlet =
+let action =
   let doc = "opam support, use --help for more information" in
-  B0_cmdlet.of_cmdliner_cmd "" opam_cmd ~doc
+  B0_action.of_cmdliner_cmd "" opam_cmd ~doc
 
 let () = B0_def.Scope.close ()

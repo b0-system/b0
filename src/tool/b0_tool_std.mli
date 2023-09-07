@@ -12,6 +12,17 @@ open B0_std
 val driver : B0_driver.t
 (** [driver] is the driver definition. *)
 
+val def_list : (module B0_def.S) list
+(** [def_list] is the list of kind of b0 definitions. *)
+
+val def_list_list : (module B0_def.S) list -> B0_def.value list
+(** [def_list_list defs] is the list of definitions of [def] order
+    first by name then by kind. *)
+
+val def_list_get_list_or_hint :
+    (module B0_def.S) list -> empty_means_all:bool -> string list ->
+    (B0_def.value list, string) result
+
 (** {!B0_def} generic support.
 
     Generic implementation of a few standard commands we need for
