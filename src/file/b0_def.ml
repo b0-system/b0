@@ -123,7 +123,7 @@ module Scope = struct
 
   let open_file name file = match !current with
   | File ((pre, _, _) :: _ as ss) ->
-      let pre = String.concat sep [pre; name] in
+      let pre = if pre <> "" then String.concat sep [pre; name] else name in
       current := File ((pre, file, Fpath.parent file) :: ss)
   | _ -> invalid_arg "Illegal scope context, no root"
 
