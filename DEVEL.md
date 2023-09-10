@@ -29,15 +29,28 @@ file. After this we have usable `b0` executables and libraries in the
 
 # Source map
 
-* [`src/std`](src/std) has the `b0.std` library. This has a few things
-  that should be in the stdlib and a few others that shouldn't but are
+* [`src/std`] has the `b0.std` library. This has a few things that
+  should be in the stdlib and a few others that shouldn't but are
   useful for `b0` based programs.
-* [`src/memo`](src/memo) is the core `b0.memo` build library.
-* [`src/file`](src/file) has the `b0.file` library which for describing 
-  software construction and deployments and provides programmatic access to 
-  the definitions of `B0.ml` files.
-* [`src/kit`](src/kit) is the `b0.kit` library. Everything but the 
-  the kitchen sink.
-* [`src/tool`](src/tool) is b0 tool driver. This implements the `b0` tool.
-* [`tools`](tools) has a few b0 low-level tools. 
+  
+* [`src/memo`] is the core `b0.memo` build library.
 
+* [`src/file`] has the `b0.file` library which for describing software
+  construction and deployments and provides programmatic access to the
+  definitions of `B0.ml` files.
+  
+* [`src/kit`] is the `b0.kit` library, it contains build domain 
+  specific logics.
+  
+* [`src/tool`] is the `b0` tool driver. This implements the `b0` tool.
+
+* [`src/low-tools`] has a few b0 low-level tools: `b0-cache`, 
+  `b0-log`, `b0-hash`, `show-uri`.
+
+
+[`src/std`]: src/std
+[`src/memo`]: src/memo
+[`src/file`]: src/file
+[`src/kit`]: src/kit
+[`src/tool`]: src/tool
+[`src/lowtools`]: src/lowtools

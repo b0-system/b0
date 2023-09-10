@@ -20,22 +20,10 @@ let () =
     Pkg.bin "src/tool/b0_main_run" ~dst:"b0";
 
     (* Tools *)
-    Pkg.bin "tools/b0_cache" ~dst:"b0-cache";
-    Pkg.bin "tools/b0_log" ~dst:"b0-log";
-    Pkg.bin "tools/b0_hash" ~dst:"b0-hash";
-    Pkg.bin "tools/show_uri" ~dst:"show-uri";
-
-    (* Tests *)
-    Pkg.test "test/test";
-    Pkg.test "test/test_b0_file";
-    Pkg.test "test/test_cp";
-    Pkg.test "test/test_findex";
-    Pkg.test "test/test_memo_failures";
-    Pkg.test "test/test_memo_no_write";
-    Pkg.test "test/test_memo_redir";
-    Pkg.test "test/test_memo_store";
-    Pkg.test "test/test_ocaml_cobj_defs";
-    Pkg.test "test/test_rm";
+    Pkg.bin "src/lowtools/b0_cache" ~dst:"b0-cache";
+    Pkg.bin "src/lowtools/b0_log" ~dst:"b0-log";
+    Pkg.bin "src/lowtools/b0_hash" ~dst:"b0-hash";
+    Pkg.bin "src/lowtools/show_uri" ~dst:"show-uri";
 
     (* Doc *)
     Pkg.doc "doc/index.mld" ~dst:"odoc-pages/index.mld";

@@ -15,8 +15,8 @@ true : package(unix), package(cmdliner)
 <src/tool> : include
 <src/tool/b0_main_run.*> : use_b0_stubs
 
-<tools> : include
-<tools/**> : use_b0_stubs
+<src/lowtools> : include
+<src/lowtools/**> : use_b0_stubs
 
 <test> : include
 <test/**> : use_b0_stubs

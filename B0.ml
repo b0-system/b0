@@ -65,7 +65,7 @@ let b0 =
 
 let tool_exe n ~doc file =
   let requires = [cmdliner; b0_std; b0_memo; b0_file; b0_kit] in
-  let srcs = Fpath.[`File (v "tools" / file)] in
+  let srcs = [`File Fpath.(v "src/lowtools" / file)] in
   B0_ocaml.exe n ~doc ~srcs ~requires
 
 let b0_cache_tool =
@@ -109,6 +109,9 @@ let test_memo_failure =
 let test_memo_no_write =
   test_memo "test_memo_no_write.ml" ~doc:"???"
 
+let test_memo_store =
+  test_memo "test_memo_store.ml" ~doc:"???"
+
 let test_memo_redir =
   test_memo "test_memo_redir.ml" ~doc:"Test memo spawn stdio redirection"
 
@@ -118,6 +121,7 @@ let test_ocaml_cobj_defs =
 let test_b0_file =
   let requires = [b0_memo] in
   test_exe "test_b0_file.ml" ~requires ~doc:"Test B0_file module"
+
 
 (* Packs *)
 
