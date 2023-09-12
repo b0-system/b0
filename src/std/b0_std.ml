@@ -490,12 +490,6 @@ module Fmt = struct
 
   let tty_cap () = !_tty_cap
 
-  let tty_string styles ppf s = match !_tty_cap with
-  | `None -> Format.pp_print_string ppf s
-  | `Ansi ->
-      Format.fprintf ppf "@<0>%s%s@<0>%s"
-        (Printf.sprintf "\027[%sm" @@ Tty.sgrs_of_styles styles) s "\027[m"
-
   let tty styles pp_v ppf v = match !_tty_cap with
   | `None -> pp_v ppf v
   | `Ansi ->
@@ -505,13 +499,20 @@ module Fmt = struct
       Format.kfprintf reset ppf "@<0>%s%a"
         (Printf.sprintf "\027[%sm" @@ Tty.sgrs_of_styles styles) pp_v v
 
+  let tty' styles ppf s = match !_tty_cap with
+  | `None -> Format.pp_print_string ppf s
+  | `Ansi ->
+      Format.fprintf ppf "@<0>%s%s@<0>%s"
+        (Printf.sprintf "\027[%sm" @@ Tty.sgrs_of_styles styles) s "\027[m"
+
   let code pp_v ppf v = tty [`Bold] pp_v ppf v
+  let code' ppf v = tty' [`Bold] ppf v
 
   (* Records *)
 
   external id : 'a -> 'a = "%identity"
   let field
-      ?(label = tty_string [`Fg `Yellow]) ?(sep = any ":@ ") l prj pp_v ppf v
+      ?(label = tty' [`Fg `Yellow]) ?(sep = any ":@ ") l prj pp_v ppf v
     =
     pf ppf "@[<1>%a%a%a@]" label l sep () pp_v (prj v)
 
@@ -1268,6 +1269,63 @@ module String = struct
   let of_version (major, minor, patchlevel, info) =
     Fmt.str "%d.%d.%d%a" major minor patchlevel Fmt.(option string) info
 
+  let version_tty = [`Bold; `Fg `Magenta]
+  let pp_version ppf v = Fmt.tty' version_tty ppf (of_version v)
+  let pp_version_str ppf v = Fmt.tty' version_tty ppf v
+
+  (* CommonMark toy stuff *)
+
+  let commonmark_first_section ~preamble md =
+    let atx_heading s (* trimmed *) =
+      (* approximate https://spec.commonmark.org/0.29/#atx-headings *)
+      let num, title = span_left (Char.equal '#') s in
+      let num = String.length num and tlen = String.length title in
+      if num = 0 || num > 6 then None else
+      if tlen = 0 then Some (num, "") else
+      if title.[0] <> ' ' then None else
+      Some (num, String.trim title)
+    in
+    let setex_heading s (* trimmed *) =
+      (* approximate https://spec.commonmark.org/0.29/#setext-headings *)
+      if String.starts_with ~prefix:"==" s then Some 1 else
+      if String.starts_with ~prefix:"--" s then Some 2 else
+      None
+    in
+    let nl = "\n" in
+    let prev_lines prev = String.trim (String.concat nl (List.rev prev)) in
+    let rec find_content num title prev = function
+    | [] -> Some (title, String.concat nl (List.rev prev))
+    | l :: ls ->
+        let ltrim = String.trim l in
+        match atx_heading ltrim with
+        | Some (n, _) when n <= num || preamble -> Some (title, prev_lines prev)
+        | Some _ -> find_content num title (l :: prev) ls
+        | None ->
+            match setex_heading ltrim with
+            | Some n when n <= num || preamble ->
+                let prev = match prev with [] -> [] | _ :: prev -> prev in
+                Some (title, prev_lines prev)
+            | Some _ | None -> find_content num title (l :: prev) ls
+    and find_heading prev = function
+    | [] -> None
+    | l :: ls ->
+        let l = String.trim l in
+        if is_empty l then find_heading [] ls else
+        match atx_heading l with
+        | Some (num, title) -> find_content num title [] ls
+        | None ->
+            match setex_heading l with
+            | None -> find_heading (l :: prev) ls
+            | Some num ->
+                let title = prev_lines prev in
+                find_content num title [] ls
+    in
+    let add_line _ ls l = l :: ls in
+    let rev_lines = fold_ascii_lines ~strip_newlines:true add_line [] md
+    in
+    find_heading [] (List.rev rev_lines)
+
+
   (* String map and sets *)
 
   module Set = struct
@@ -1923,6 +1981,8 @@ module Fpath = struct
   (* Converting *)
 
   let to_url_path = if Sys.win32 then Windows.to_url_path else Posix.to_url_path
+  let to_segments p = String.split_on_char dir_sep_char (chop_volume p)
+
   let pp_quoted ppf p = String.pp ppf (Filename.quote p)
   let pp_unquoted = String.pp
   let pp ppf p =
@@ -2118,6 +2178,8 @@ module Mtime = struct
 
     let equal = Int64.equal
     let compare = Int64.unsigned_compare
+    let is_shorter s ~than = compare s than < 0
+    let is_longer s ~than = compare s than > 0
 
     (* Durations *)
 
@@ -2388,7 +2450,7 @@ module Cmd = struct
   | None -> Fmt.invalid_arg "cmd %s: tool parse error" (to_string l)
 
   let pp_tool ppf t =
-    Fmt.tty_string [`Fg `Blue] ppf (Filename.quote (Fpath.to_string t))
+    Fmt.tty' [`Fg `Blue] ppf (Filename.quote (Fpath.to_string t))
 
   (* Predicates *)
 
@@ -2416,8 +2478,8 @@ module Fut = struct
   | Det _ -> invalid_arg "The future is already set"
   | Undet u -> f := Det v; kontinue u.awaits v
 
-  let _create () = ref (Undet { awaits = [] })
-  let create () = let f = _create () in f, set f
+  let _make () = ref (Undet { awaits = [] })
+  let make () = let f = _make () in f, set f
   let value f = match !f with Det v -> Some v | _ -> None
   let await f k = match !f with
   | Det v -> k v | Undet u -> u.awaits <- k :: u.awaits
@@ -2429,21 +2491,21 @@ module Fut = struct
   let return v = ref (Det v)
 
   let map fn f =
-    let r = _create () in
+    let r = _make () in
     await f (fun v -> set r (fn v)); r
 
   let bind f fn =
-    let r = _create () in
+    let r = _make () in
     await f (fun v -> await (fn v) (set r)); r
 
   let pair f0 f1 =
-    let r = _create () in
+    let r = _make () in
     await f0 (fun v0 -> await f1 (fun v1 -> set r (v0, v1))); r
 
   let of_list fs = match fs with
   | [] -> return []
   | fs ->
-      let r = _create () in
+      let r = _make () in
       let rec loop acc = function
       | [] -> set r (List.rev acc)
       | f :: fs -> await f (fun v -> loop (v :: acc) fs)
@@ -2469,60 +2531,16 @@ module Os = struct
   let doing_exist_test = "Existence test:"
   let err_seg_not_dir = "A segment of the path is not a directory"
 
-  let uerr = Unix.error_message
+  let uerror = Unix.error_message
   let err_doing doing e = Fmt.str "%s: %s" doing e
   let ferr file e = Fmt.error "%a: %s" Fpath.pp file e
   let ffail file e = Fmt.failwith "%a: %s" Fpath.pp file e
   let ffail_notrace file e = Fmt.failwith_notrace "%a: %s" Fpath.pp file e
 
-  module Cpu = struct
-    external logical_count : unit -> int = "ocaml_b0_cpu_logical_count"
+  module Os_mtime = struct
+    (* Mtime is defined at the end of the module otherwise we get problems
+       accessing ../Mtime. *)
 
-    (* Measuring CPU time *)
-
-    module Time = struct
-
-      (* CPU time spans *)
-
-      module Span = struct
-        type t =
-          { utime : Mtime.Span.t; stime : Mtime.Span.t;
-            children_utime : Mtime.Span.t; children_stime : Mtime.Span.t; }
-
-        let v ~utime ~stime ~children_utime ~children_stime =
-          { utime; stime; children_utime; children_stime }
-
-        let zero = v ~utime:0L ~stime:0L ~children_utime:0L ~children_stime:0L
-        let utime c = c.utime
-        let stime c = c.stime
-        let children_utime c = c.children_utime
-        let children_stime c = c.children_stime
-      end
-
-      (* CPU counters *)
-
-      let sec_to_span sec = Int64.of_float (sec *. 1e9)
-
-      type counter = Span.t
-      let counter () : Span.t =
-        let now = Unix.times () in
-        { utime = sec_to_span now.Unix.tms_utime;
-          stime = sec_to_span now.Unix.tms_stime;
-          children_utime = sec_to_span now.Unix.tms_cutime;
-          children_stime = sec_to_span now.Unix.tms_cstime; }
-
-      let count (c : Span.t) : Span.t =
-        let now = Unix.times () in
-        { utime = Int64.sub (sec_to_span now.Unix.tms_utime) c.utime;
-          stime = Int64.sub (sec_to_span now.Unix.tms_stime) c.stime;
-          children_utime =
-            Int64.sub (sec_to_span now.Unix.tms_cutime) c.children_utime;
-          children_stime =
-            Int64.sub (sec_to_span now.Unix.tms_cstime) c.children_stime; }
-    end
-  end
-
-  module Mtime = struct
     external mtime_now_ns : unit -> Mtime.t = "ocaml_b0_monotonic_now_ns"
 
     (* Monotonic clock *)
@@ -2544,74 +2562,6 @@ module Os = struct
       let dur = Mtime.Span.to_float_ns dur *. 1e-9 in
       let () = try Unix.sleepf dur with Unix.Unix_error _ -> () in
       count measure
-  end
-
-  let sleep = Mtime.sleep
-  let relax = relax
-
-  module Env = struct
-
-    (* Variables *)
-
-    type var_name = string
-
-    let find ~empty_is_none name = match Unix.getenv name with
-    | "" when empty_is_none -> None
-    | v -> Some v
-    | exception Not_found -> None
-
-    let find' ~empty_is_none parse name = match find ~empty_is_none name with
-    | None -> Ok None
-    | Some v ->
-        match parse v with
-        | Error e -> Fmt.error "%s env: %s" name e
-        | Ok v -> Ok (Some v)
-
-    (* Process environment *)
-
-    type t = string String.Map.t
-    let empty = String.Map.empty
-    let add = String.Map.add
-    let override env ~by =
-      if String.Map.is_empty by then env else
-      let lean_right _ l r = match r with
-      | Some _ as v -> v
-      | None -> match l with Some _ as v -> v | None -> assert false
-      in
-      String.Map.merge lean_right env by
-
-    (* Assignements *)
-
-    let env_err e = Fmt.error "process environment: %s" e
-
-    type assignments = string list
-    let current_assignments () =
-      try Ok (Array.to_list @@ Unix.environment ()) with
-      | Sys_error e -> env_err e
-      | Unix.Unix_error (e, _, _) -> env_err (uerr e)
-
-    let parse_assignments ?(init = String.Map.empty) fold v =
-      try
-        let add acc assign = match String.cut_left ~sep:"=" assign with
-        | Some (var, value) -> String.Map.add var value acc
-        | None ->
-            Fmt.failwith_notrace "%S: cannot parse VAR=VAL assignement" assign
-        in
-        Ok (fold add init v)
-      with
-      | Failure e -> Result.error e
-
-    let of_assignments ?init l = parse_assignments ?init List.fold_left l
-    let to_assignments env =
-      let add var v acc = String.concat "=" [var; v] :: acc in
-      String.Map.fold add env []
-
-    let current () =
-      match parse_assignments Array.fold_left (Unix.environment ()) with
-      | Ok _ as v -> v
-      | Error e -> env_err e
-      | exception Sys_error e -> env_err e
-      | exception Unix.Unix_error (e, _, _) -> env_err (uerr e)
   end
 
   module Fd = struct
@@ -2685,7 +2635,7 @@ module Os = struct
       with
       | Failure e -> Fmt.failwith_notrace "%a: %s" Fpath.pp file e
       | Unix.Unix_error (e, _, _) ->
-          Fmt.failwith_notrace "%s: %s" file (err_doing "Reading" (uerr e))
+          Fmt.failwith_notrace "%s: %s" file (err_doing "Reading" (uerror e))
 
     module Set = struct (* Maintains a set of fds to close. *)
       module Fd = struct
@@ -2703,6 +2653,162 @@ module Os = struct
     end
   end
 
+  module Socket = struct
+    let close_noerr fd = try Unix.close fd with Unix.Unix_error _ -> ()
+
+    let rec of_endpoint ep stype = match ep with
+    | `Fd fd -> Ok (None, fd, false)
+    | `Host (name, port) ->
+        begin match Unix.gethostbyname name with
+        | exception Not_found -> Fmt.error "%s: host not found" name
+        | h ->
+            let c = `Sockaddr (Unix.ADDR_INET (h.h_addr_list.(0), port)) in
+            of_endpoint c stype
+        end
+    | `Sockaddr addr ->
+        let domain = Unix.domain_of_sockaddr addr in
+        match Unix.socket ~cloexec:true domain stype 0 with
+        | exception Unix.Unix_error (e, _, _) -> Error (uerror e)
+        | fd ->
+            match Unix.set_nonblock fd with
+            | exception Unix.Unix_error (e, _, _) ->
+                close_noerr fd; Error (uerror e)
+            | () -> Ok (Some addr, fd, true)
+
+    module Endpoint = struct
+      type t =
+        [ `Host of string * int
+        | `Sockaddr of Unix.sockaddr
+        | `Fd of Unix.file_descr ]
+
+      let of_string ~default_port s =
+        if String.contains s Filename.dir_sep.[0]
+        then Ok (`Sockaddr (Unix.ADDR_UNIX s)) else
+        match String.rindex_opt s ':' with
+        | None -> Ok (`Host (s, default_port))
+        | Some i ->
+            match String.index_from_opt s i ']' with (* beware IPv6 *)
+            | Some _ -> Ok (`Host (s, default_port))
+            | None ->
+                let h = String.subrange ~last:(i - 1) s in
+                let p = String.subrange ~first:(i + 1) s in
+                match int_of_string_opt p with
+                | None -> Fmt.error "port %S not an integer" p
+                | Some p -> Ok (`Host (h, p))
+
+      let pp_name_port ppf (n, p) = Fmt.pf ppf "%s:%d" n p
+      let pp ppf = function
+      | `Host (n, p) -> pp_name_port ppf (n, p)
+      | `Fd _fd -> Fmt.pf ppf "<fd>"
+      | `Sockaddr (Unix.ADDR_UNIX s) -> Fmt.string ppf s
+      | `Sockaddr (Unix.ADDR_INET (a, p)) ->
+          pp_name_port ppf (Unix.string_of_inet_addr a, p)
+
+      let err_wait ep e = Fmt.str "Wait on %a: %s" pp ep e
+
+      let wait_connectable ?(socket_type = Unix.SOCK_STREAM) ~timeout ep =
+        let open Result.Syntax in
+        let relax = Os_mtime.sleep Mtime.Span.(1 * ms) in
+        Result.map_error (err_wait ep) @@
+        let rec loop ~deadline dur =
+          let* addr, fd, close = of_endpoint ep socket_type in
+          let () = Unix.clear_nonblock fd in
+          let finally () = if close then close_noerr fd in
+          let* status = Fun.protect ~finally @@ fun () ->
+            match addr with
+            | None -> Error "no address to connect to"
+            | Some addr ->
+                match Unix.connect fd addr with
+                | () -> Ok `Ready
+                | exception Unix.(Unix_error (ECONNREFUSED, _, _)) -> Ok `Retry
+                | exception Unix.Unix_error (e, _, _) ->
+                    Error (Unix.error_message e)
+          in
+          match status with
+          | `Ready -> Ok `Ready
+          | `Retry ->
+              let count = Os_mtime.count dur in
+              if Mtime.Span.is_shorter count ~than:deadline
+              then (ignore (Os_mtime.sleep relax); loop ~deadline dur)
+              else Ok `Timeout
+        in
+        loop ~deadline:timeout (Os_mtime.counter ())
+
+      let wait_connectable' ?socket_type ~timeout ep =
+        match wait_connectable ?socket_type ~timeout ep with
+        | Error _ as e -> e
+        | Ok `Ready -> Ok ()
+        | Ok `Timeout ->
+            let err = Fmt.str "timed out after %a" Mtime.Span.pp timeout in
+            Error (err_wait ep err)
+    end
+  end
+
+
+    module Env = struct
+    (* Variables *)
+
+    type var_name = string
+
+    let find ~empty_is_none name = match Unix.getenv name with
+    | "" when empty_is_none -> None
+    | v -> Some v
+    | exception Not_found -> None
+
+    let find' ~empty_is_none parse name = match find ~empty_is_none name with
+    | None -> Ok None
+    | Some v ->
+        match parse v with
+        | Error e -> Fmt.error "%s env: %s" name e
+        | Ok v -> Ok (Some v)
+
+    (* Process environment *)
+
+    type t = string String.Map.t
+    let empty = String.Map.empty
+    let add = String.Map.add
+    let override env ~by =
+      if String.Map.is_empty by then env else
+      let lean_right _ l r = match r with
+      | Some _ as v -> v
+      | None -> match l with Some _ as v -> v | None -> assert false
+      in
+      String.Map.merge lean_right env by
+
+    (* Assignements *)
+
+    let env_err e = Fmt.error "process environment: %s" e
+
+    type assignments = string list
+    let current_assignments () =
+      try Ok (Array.to_list @@ Unix.environment ()) with
+      | Sys_error e -> env_err e
+      | Unix.Unix_error (e, _, _) -> env_err (uerror e)
+
+    let parse_assignments ?(init = String.Map.empty) fold v =
+      try
+        let add acc assign = match String.cut_left ~sep:"=" assign with
+        | Some (var, value) -> String.Map.add var value acc
+        | None ->
+            Fmt.failwith_notrace "%S: cannot parse VAR=VAL assignement" assign
+        in
+        Ok (fold add init v)
+      with
+      | Failure e -> Result.error e
+
+    let of_assignments ?init l = parse_assignments ?init List.fold_left l
+    let to_assignments env =
+      let add var v acc = String.concat "=" [var; v] :: acc in
+      String.Map.fold add env []
+
+    let current () =
+      match parse_assignments Array.fold_left (Unix.environment ()) with
+      | Ok _ as v -> v
+      | Error e -> env_err e
+      | exception Sys_error e -> env_err e
+      | exception Unix.Unix_error (e, _, _) -> env_err (uerror e)
+  end
+
   module Fs_base = struct
     let rec is_dir p = try (Unix.stat p).Unix.st_kind = Unix.S_DIR with
     | Unix.Unix_error (Unix.EINTR, _, _) -> is_dir p
@@ -2716,7 +2822,7 @@ module Os = struct
     let rec file_delete p = try Ok (Unix.unlink (Fpath.to_string p); true) with
     | Unix.Unix_error (Unix.ENOENT, _, _) -> Ok false
     | Unix.Unix_error (Unix.EINTR, _, _) -> file_delete p
-    | Unix.Unix_error (e, _, _) -> ferr p (err_doing "Deleting" (uerr e))
+    | Unix.Unix_error (e, _, _) -> ferr p (err_doing "Deleting" (uerror e))
 
     (* Directory operations. *)
 
@@ -2749,9 +2855,9 @@ module Os = struct
       with
       | Unix.Unix_error (e, _, p) ->
           match String.equal (Fpath.to_string dir) p with
-          | true -> ferr dir (err_doing create_op (uerr e))
+          | true -> ferr dir (err_doing create_op (uerror e))
           | false ->
-              let perr = Fmt.str "%s: %s" p (uerr e) in
+              let perr = Fmt.str "%s: %s" p (uerror e) in
               ferr dir (err_doing create_op perr)
 
     let dir_delete ~recurse dir =
@@ -2770,7 +2876,7 @@ module Os = struct
               (* This is what Unix.unlink returns on directories on Windows. *)
               false
           | e ->
-              let ferr = Fmt.str "%a: %s" Fpath.pp file (uerr e) in
+              let ferr = Fmt.str "%a: %s" Fpath.pp file (uerror e) in
               err (err_doing delete_op ferr)
       in
       let rec delete_contents d dh todo = match Unix.readdir dh with
@@ -2792,7 +2898,7 @@ module Os = struct
           match e with
           | Unix.ENOENT | Unix.ENOTDIR -> doit todo
           | e ->
-              let derr = Fmt.str "%a: %s" Fpath.pp d (uerr e) in
+              let derr = Fmt.str "%a: %s" Fpath.pp d (uerror e) in
               err (err_doing delete_op derr)
       and doit = function
       | [] -> ()
@@ -2804,7 +2910,7 @@ module Os = struct
               | Unix.ENOTEMPTY -> try_delete d ds
               | Unix.ENOENT | Unix.ENOTDIR -> doit ds
               | e ->
-                  let derr = Fmt.str "%a: %s" Fpath.pp d (uerr e) in
+                  let derr = Fmt.str "%a: %s" Fpath.pp d (uerror e) in
                   err (err_doing delete_op derr)
       in
       try match Unix.rmdir (Fpath.to_string dir) with
@@ -2816,11 +2922,11 @@ module Os = struct
           | Unix.ENOTDIR ->
               begin try
                 if delete_symlink (Fpath.to_string dir) then Ok true else
-                err (err_doing delete_op (uerr Unix.ENOTDIR))
+                err (err_doing delete_op (uerror Unix.ENOTDIR))
               with
-              | Unix.Unix_error (e, _, _) -> err (err_doing delete_op (uerr e))
+              | Unix.Unix_error (e,_,_) -> err (err_doing delete_op (uerror e))
               end
-          | e -> err (err_doing delete_op (uerr e))
+          | e -> err (err_doing delete_op (uerror e))
       with
       | Failure e -> Result.error e
 
@@ -2835,7 +2941,7 @@ module Os = struct
       | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ferr file err_seg_not_dir
       | Unix.Unix_error (Unix.EINTR, _, _) -> handle_force ~force file
       | Unix.Unix_error (e, _, _) ->
-          ferr file (err_doing doing_exist_test (uerr e))
+          ferr file (err_doing doing_exist_test (uerror e))
 
     let rec handle_force_open_fdout
       ?(flags = Unix.[O_WRONLY; O_CREAT; O_SHARE_DELETE; O_CLOEXEC; O_TRUNC])
@@ -2850,11 +2956,11 @@ module Os = struct
       | exception Unix.Unix_error (Unix.ENOENT as e, _, _) when make_path ->
           begin match dir_create ~make_path (Fpath.parent file) with
           | Error e -> ferr file e
-          | Ok false (* existed *) -> ferr file (uerr e)
+          | Ok false (* existed *) -> ferr file (uerror e)
           | Ok true (* created *) ->
               handle_force_open_fdout ~flags ~force ~make_path ~mode file
           end
-      | exception Unix.Unix_error (e, _, _) -> ferr file (uerr e)
+      | exception Unix.Unix_error (e, _, _) -> ferr file (uerror e)
 
     (* Path operations *)
 
@@ -2864,19 +2970,19 @@ module Os = struct
       | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ferr p err_seg_not_dir
       | Unix.Unix_error (Unix.EINTR, _, _) -> path_exists p
       | Unix.Unix_error (e, _, _) ->
-          ferr p (err_doing doing_exist_test (uerr e))
+          ferr p (err_doing doing_exist_test (uerror e))
 
     let rec path_get_mode p =
       try Ok ((Unix.stat @@ Fpath.to_string p).Unix.st_perm) with
       | Unix.Unix_error (Unix.EINTR, _, _) -> path_get_mode p
       | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ferr p err_seg_not_dir
       | Unix.Unix_error (e, _, _) ->
-          ferr p (err_doing "Getting file mode" (uerr e))
+          ferr p (err_doing "Getting file mode" (uerror e))
 
     let rec path_set_mode p m = try Ok (Unix.chmod (Fpath.to_string p) m) with
     | Unix.Unix_error (Unix.EINTR, _, _) -> path_set_mode p m
     | Unix.Unix_error (e, _, _) ->
-        ferr p (err_doing "Setting file mode" (uerr e))
+        ferr p (err_doing "Setting file mode" (uerror e))
 
     let rec path_delete ~recurse p =
       try Ok (Unix.unlink (Fpath.to_string p); true) with
@@ -2884,7 +2990,7 @@ module Os = struct
       | Unix.Unix_error (Unix.EINTR, _, _) -> path_delete ~recurse p
       | Unix.Unix_error ((Unix.EPERM | Unix.EISDIR), _, _) ->
           dir_delete ~recurse p
-      | Unix.Unix_error (e, _, _) -> ferr p (err_doing "Deleting" (uerr e))
+      | Unix.Unix_error (e, _, _) -> ferr p (err_doing "Deleting" (uerror e))
 
     let rec path_rename ~force ~make_path ~src p =
       let err e = Fmt.error "rename %a to %a: %s" Fpath.pp src Fpath.pp p e in
@@ -2895,17 +3001,17 @@ module Os = struct
           | Unix.Unix_error (Unix.ENOENT as e, _, _) when make_path ->
               begin match dir_create ~make_path (Fpath.parent p) with
               | Error e -> err e
-              | Ok false (* existed *) -> err (uerr e)
+              | Ok false (* existed *) -> err (uerror e)
               | Ok true (* created *) -> path_rename ~force ~make_path ~src p
               end
           | Unix.Unix_error (Unix.EINTR, _, _) ->
               path_rename ~force ~make_path ~src p
-          | Unix.Unix_error (e, _, _) -> err (uerr e)
+          | Unix.Unix_error (e, _, _) -> err (uerror e)
 
     let rec path_stat p = try Ok (Unix.stat (Fpath.to_string p)) with
     | Unix.Unix_error (Unix.EINTR, _, _) -> path_stat p
     | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ferr p err_seg_not_dir
-    | Unix.Unix_error (e, _, _) -> ferr p (err_doing "stat" (uerr e))
+    | Unix.Unix_error (e, _, _) -> ferr p (err_doing "stat" (uerror e))
 
     (* Links *)
 
@@ -2921,11 +3027,11 @@ module Os = struct
         when make_path ->
           begin match dir_create ~make_path (Fpath.parent p) with
           | Error e -> ferr p (err_doing "Creating path" e)
-          | Ok false (* existed *) -> err (uerr e)
+          | Ok false (* existed *) -> err (uerror e)
           | Ok true (* created *) -> symlink ~force ~make_path ~src p
           end
       | Unix.Unix_error (Unix.EINTR, _, _) -> symlink ~force ~make_path ~src p
-      | Unix.Unix_error (e, _, _) -> err (uerr e)
+      | Unix.Unix_error (e, _, _) -> err (uerror e)
 
     let rec symlink_link p =
       try
@@ -2936,12 +3042,12 @@ module Os = struct
       with
       | Unix.Unix_error (Unix.EINVAL, _, _) -> ferr p "Not a symbolic link"
       | Unix.Unix_error (Unix.EINTR, _, _) -> symlink_link p
-      | Unix.Unix_error (e, _, _) -> ferr p (uerr e)
+      | Unix.Unix_error (e, _, _) -> ferr p (uerror e)
 
     let rec symlink_stat p = try Ok (Unix.lstat (Fpath.to_string p)) with
     | Unix.Unix_error (Unix.EINTR, _, _) -> symlink_stat p
     | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ferr p err_seg_not_dir
-    | Unix.Unix_error (e, _, _) -> ferr p (err_doing "lstat" (uerr e))
+    | Unix.Unix_error (e, _, _) -> ferr p (err_doing "lstat" (uerror e))
 
     let copy_symlink ~force ~make_path ~src dst =
       Result.bind (symlink_link src) @@ fun src ->
@@ -2949,7 +3055,6 @@ module Os = struct
   end
 
   module Tmp = struct
-
     let delete_file file = ignore (Fs_base.file_delete file)
     let files = ref Fpath.Set.empty
     let add_file file = files := Fpath.Set.add file !files
@@ -3015,9 +3120,9 @@ module Os = struct
               begin match Fs_base.dir_create ~make_path dir with
               | Error e -> err dir name rand e
               | Ok true (* created *) -> loop n
-              | Ok false (* existed *) -> err dir name rand (uerr e)
+              | Ok false (* existed *) -> err dir name rand (uerror e)
               end
-          | Unix.Unix_error (e, _, _) -> err dir name rand (uerr e)
+          | Unix.Unix_error (e, _, _) -> err dir name rand (uerror e)
       in
       loop attempts
 
@@ -3042,9 +3147,9 @@ module Os = struct
               begin match Fs_base.dir_create ~make_path dir with
               | Error e -> err dir name rand e
               | Ok true (* created *) -> loop n
-              | Ok false (* existed *) -> err dir name rand (uerr e)
+              | Ok false (* existed *) -> err dir name rand (uerror e)
               end
-          | Unix.Unix_error (e, _, _) -> err dir name rand (uerr e)
+          | Unix.Unix_error (e, _, _) -> err dir name rand (uerror e)
       in
       loop attempts
 
@@ -3058,7 +3163,7 @@ module Os = struct
           let file = tmp_path dir_str name rand in
           match Unix.access file [Unix.F_OK] with
           | exception Unix.Unix_error (Unix.ENOENT, _, _) -> Ok file
-          | exception Unix.Unix_error (e, _, _) -> err dir name rand (uerr e)
+          | exception Unix.Unix_error (e, _, _) -> err dir name rand (uerror e)
           | _ -> loop (n - 1)
       in
       if not make_path then loop attempts else
@@ -3087,7 +3192,7 @@ module Os = struct
           ferr file err_seg_not_dir
       | exception Unix.Unix_error (Unix.EINTR, _, _) -> exists file
       | exception Unix.Unix_error (e, _, _) ->
-          ferr file (err_doing doing_exist_test (uerr e))
+          ferr file (err_doing doing_exist_test (uerror e))
 
     let rec must_exist file =
       match (Unix.stat (Fpath.to_string file)).Unix.st_kind with
@@ -3099,7 +3204,7 @@ module Os = struct
           ferr file err_seg_not_dir
       | exception Unix.Unix_error (Unix.EINTR, _, _) -> must_exist file
       | exception Unix.Unix_error (e, _, _) ->
-          ferr file (err_doing doing_exist_test (uerr e))
+          ferr file (err_doing doing_exist_test (uerror e))
 
     let is_executable file = match Unix.access file [Unix.X_OK] with
     | () -> true
@@ -3112,7 +3217,7 @@ module Os = struct
       try Ok (Unix.truncate (Fpath.to_string file) size) with
       | Unix.Unix_error (Unix.EINTR, _, _) -> truncate file size
       | Unix.Unix_error (e, _, _) ->
-          ferr file (err_doing "Truncating" (uerr e))
+          ferr file (err_doing "Truncating" (uerror e))
 
     (* Hard links *)
 
@@ -3128,11 +3233,11 @@ module Os = struct
         when make_path ->
           begin match Fs_base.dir_create ~make_path (Fpath.parent file) with
           | Error e -> ferr file (err_doing "Creating path" e)
-          | Ok false (* existed *) -> err (uerr e)
+          | Ok false (* existed *) -> err (uerror e)
           | Ok true (* created *) -> link ~force ~make_path ~src file
           end
       | Unix.Unix_error (Unix.EINTR, _, _) -> link ~force ~make_path ~src file
-      | Unix.Unix_error (e, _, _) -> err (uerr e)
+      | Unix.Unix_error (e, _, _) -> err (uerror e)
 
     (* Reads *)
 
@@ -3155,7 +3260,7 @@ module Os = struct
         in
         Ok (Fd.apply ~close fdin f)
       with
-      | Unix.Unix_error (e, _, _) -> ferr file (uerr e)
+      | Unix.Unix_error (e, _, _) -> ferr file (uerror e)
 
     let read_stdin () =
       let b = Bytes.create Fd.unix_buffer_size in
@@ -3203,7 +3308,7 @@ module Os = struct
       | Unix.Unix_error (Unix.EINTR, _, _) -> rename_tmp src dst
       | Unix.Unix_error (e, _, _) ->
           let r = Fmt.str "renaming %a to %a" Fpath.pp src Fpath.pp dst in
-          Result.error (err_doing r (uerr e))
+          Result.error (err_doing r (uerror e))
 
     let write_op = "Writing"
 
@@ -3276,7 +3381,7 @@ module Os = struct
           write_with_fd ?atomic ~mode ~force ~make_path file @@ fun fdo ->
           Ok (Fd.copy ~src:fdi fdo)
       with
-      | Unix.Unix_error (e, _, arg) -> Fmt.error "%s: %s" arg (uerr e)
+      | Unix.Unix_error (e, _, arg) -> Fmt.error "%s: %s" arg (uerror e)
   end
 
   module Dir = struct
@@ -3292,7 +3397,7 @@ module Os = struct
           ferr dir err_seg_not_dir
       | exception Unix.Unix_error (Unix.EINTR, _, _) -> exists dir
       | exception Unix.Unix_error (e, _, _) ->
-          ferr dir (err_doing doing_exist_test (uerr e))
+          ferr dir (err_doing doing_exist_test (uerror e))
 
     let rec must_exist dir =
       match (Unix.stat @@ Fpath.to_string dir).Unix.st_kind with
@@ -3305,7 +3410,7 @@ module Os = struct
           ferr dir err_seg_not_dir
       | exception Unix.Unix_error (Unix.EINTR, _, _) -> must_exist dir
       | exception Unix.Unix_error (e, _, _) ->
-          ferr dir (err_doing doing_exist_test (uerr e))
+          ferr dir (err_doing doing_exist_test (uerror e))
 
     (* Creating, deleting and renaming. *)
 
@@ -3414,8 +3519,8 @@ module Os = struct
       | Failure e -> ferr dir (err_doing listing_op e)
       | Unix.Unix_error (e, _, ep) ->
           if String.equal (Fpath.to_string dir) ep
-          then ferr dir (err_doing listing_op @@ uerr e)
-          else ferr dir (err_doing listing_op @@ Fmt.str "%s: %s" ep (uerr e))
+          then ferr dir (err_doing listing_op @@ uerror e)
+          else ferr dir (err_doing listing_op @@ Fmt.str "%s: %s" ep (uerror e))
 
     let fold ?rel ?dotfiles ?follow_symlinks ?prune ~recurse f dir acc =
       _fold ~filter:`Any ?rel ?dotfiles ?follow_symlinks ?prune ~recurse
@@ -3544,13 +3649,13 @@ module Os = struct
       | Ok dir -> err (Fmt.str "%a is relative" Fpath.pp dir)
       | Error e -> err e
       | exception Unix.Unix_error (Unix.EINTR, _, _) -> cwd ()
-      | exception Unix.Unix_error (e, _, _) -> err (uerr e)
+      | exception Unix.Unix_error (e, _, _) -> err (uerror e)
 
     let rec set_cwd dir =
       let err e = Fmt.error "set cwd to %a: %s" Fpath.pp dir e in
       try Ok (Unix.chdir (Fpath.to_string dir)) with
       | Unix.Unix_error (Unix.EINTR, _, _) -> set_cwd dir
-      | Unix.Unix_error (e, _, _) -> err (uerr e)
+      | Unix.Unix_error (e, _, _) -> err (uerror e)
 
     let with_cwd dir f =
       Result.bind (cwd ()) @@ fun old ->
@@ -3635,7 +3740,7 @@ module Os = struct
       | Unix.Unix_error (Unix.EINTR, _, _) -> must_exist p
       | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ferr p err_seg_not_dir
       | Unix.Unix_error (e, _, _) ->
-          ferr p (err_doing doing_exist_test (uerr e))
+          ferr p (err_doing doing_exist_test (uerror e))
 
     (* Deleting and renaming *)
 
@@ -3649,7 +3754,7 @@ module Os = struct
       try Fpath.of_string (_realpath (Fpath.to_string p)) with
       | Unix.Unix_error (Unix.EINTR, _, _) -> realpath p
       | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ferr p err_seg_not_dir
-      | Unix.Unix_error (e, _, _) -> ferr p (uerr e)
+      | Unix.Unix_error (e, _, _) -> ferr p (uerror e)
 
     (* Copying *)
 
@@ -3701,9 +3806,13 @@ module Os = struct
     let tmp = Tmp.path
   end
 
+  (* Processes *)
+
   module Cmd = struct
 
     (* Tool search *)
+
+    type search = Fpath.t -> (Fpath.t, string) result
 
     let tool_file ~dir tool = match dir.[String.length dir - 1] with
     | c when Fpath.char_is_dir_sep c -> dir ^ tool
@@ -3836,7 +3945,7 @@ module Os = struct
           fd
         with
         | Unix.Unix_error (e, _, _) ->
-            Fmt.failwith_notrace "tmp file for stdin: %s" (uerr e)
+            Fmt.failwith_notrace "tmp file for stdin: %s" (uerror e)
         end
     | In_file f ->
         try
@@ -3844,7 +3953,8 @@ module Os = struct
           let fd = Fd.openfile f Unix.[O_RDONLY] 0o644 in
           Fd.Set.add fd fds; fd
         with Unix.Unix_error (e, _, _) ->
-          Fmt.failwith_notrace "open file %a for stdin: %s" Fpath.pp f (uerr e)
+          Fmt.failwith_notrace "open file %a for stdin: %s"
+            Fpath.pp f (uerror e)
 
     (* Process standard outputs *)
 
@@ -3884,12 +3994,12 @@ module Os = struct
 
     let rec getcwd () = try Unix.getcwd () with
     | Unix.Unix_error (Unix.EINTR, _, _) -> getcwd ()
-    | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "getcwd: %s" (uerr e)
+    | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "getcwd: %s" (uerror e)
 
     let rec chdir cwd = try Unix.chdir cwd with
     | Unix.Unix_error (Unix.EINTR, _, _) -> chdir cwd
     | Unix.Unix_error (e, _, _) ->
-        Fmt.failwith_notrace "chdir %s: %s" cwd (uerr e)
+        Fmt.failwith_notrace "chdir %s: %s" cwd (uerror e)
 
     let spawn_err cmd e = match Cmd.is_empty cmd with
     | true -> Result.error e
@@ -3937,7 +4047,7 @@ module Os = struct
     | _, status -> status_of_unix_status status
     | exception Unix.Unix_error (Unix.EINTR, _, _) -> run_collect pid
     | exception Unix.Unix_error (e, _, _) ->
-        Fmt.failwith_notrace "waitpid [%d]: %s" pid (uerr e)
+        Fmt.failwith_notrace "waitpid [%d]: %s" pid (uerror e)
 
     let run_status
         ?env ?cwd ?(stdin = in_stdin) ?(stdout = out_stdout)
@@ -3950,7 +4060,7 @@ module Os = struct
       with
       | Failure e -> Fd.Set.close_all fds; spawn_err cmd e
       | Unix.Unix_error (e, _, _) ->
-          Fd.Set.close_all fds; spawn_err cmd (uerr e)
+          Fd.Set.close_all fds; spawn_err cmd (uerror e)
 
     let run_status_out
         ?env ?cwd ?(stdin = in_stdin) ?(stderr = `Stdo out_stderr) ~trim cmd
@@ -3969,7 +4079,7 @@ module Os = struct
       with
       | Failure e -> Fd.Set.close_all fds; spawn_err cmd e
       | Unix.Unix_error (e, _, _) ->
-          Fd.Set.close_all fds; spawn_err cmd (uerr e)
+          Fd.Set.close_all fds; spawn_err cmd (uerror e)
 
     let run ?env ?cwd ?stdin ?stdout ?stderr cmd =
       match run_status ?env ?cwd ?stdin ?stdout ?stderr cmd with
@@ -3999,25 +4109,25 @@ module Os = struct
       try Ok (_spawn fds ?env ?cwd ~stdin ~stdout ~stderr cmd) with
       | Failure e -> Fd.Set.close_all fds; spawn_err cmd e
       | Unix.Unix_error (e, _, _) ->
-          Fd.Set.close_all fds; spawn_err cmd (uerr e)
+          Fd.Set.close_all fds; spawn_err cmd (uerror e)
 
     let rec spawn_poll_status pid = match Unix.waitpid Unix.[WNOHANG] pid with
     | 0, _ -> Ok None
     | _, status -> Ok (Some (status_of_unix_status status))
     | exception Unix.Unix_error (Unix.EINTR, _, _) -> spawn_poll_status pid
     | exception Unix.Unix_error (e, _, _) ->
-        Fmt.error "poll_status: waitpid %d: %s" pid (uerr e)
+        Fmt.error "poll_status: waitpid %d: %s" pid (uerror e)
 
     let rec spawn_wait_status pid = match Unix.waitpid [] pid with
     | _, status -> Ok (status_of_unix_status status)
     | exception Unix.Unix_error (Unix.EINTR, _, _) -> spawn_wait_status pid
     | exception Unix.Unix_error (e, _, _) ->
-        Fmt.error "wait_status: waitpid %d: %s" pid (uerr e)
+        Fmt.error "wait_status: waitpid %d: %s" pid (uerror e)
 
     let kill pid sg = match Unix.kill pid sg with
     | () -> Ok ()
     | exception Unix.Unix_error (e, _, _) ->
-        Fmt.error "kill %d with %a: %s" pid Fmt.sys_signal sg (uerr e)
+        Fmt.error "kill %d with %a: %s" pid Fmt.sys_signal sg (uerror e)
 
     (* execv
 
@@ -4060,7 +4170,7 @@ module Os = struct
         _execv ~env file (Array.of_list @@ Cmd.to_list cmd)
       with
       | Failure e -> err_execv file e
-      | Unix.Unix_error (e, _, _) -> err_execv file (uerr e)
+      | Unix.Unix_error (e, _, _) -> err_execv file (uerror e)
 
     type t = Cmd.t
   end
@@ -4081,6 +4191,64 @@ module Os = struct
       let previous = Sys.signal Sys.sigint (Sys.Signal_handle hook) in
       let restore () = Sys.set_signal Sys.sigint previous in
       Fun.protect ~finally:restore f
+  end
+
+  (* Sleeping and timing *)
+
+  let sleep = Os_mtime.sleep
+  let relax = relax
+
+  module Cpu = struct
+    external logical_count : unit -> int = "ocaml_b0_cpu_logical_count"
+
+    (* Measuring CPU time *)
+
+    module Time = struct
+
+      (* CPU time spans *)
+
+      module Span = struct
+        type t =
+          { utime : Mtime.Span.t; stime : Mtime.Span.t;
+            children_utime : Mtime.Span.t; children_stime : Mtime.Span.t; }
+
+        let make ~utime ~stime ~children_utime ~children_stime =
+          { utime; stime; children_utime; children_stime }
+
+        let zero =
+          make ~utime:0L ~stime:0L ~children_utime:0L ~children_stime:0L
+
+        let utime c = c.utime
+        let stime c = c.stime
+        let children_utime c = c.children_utime
+        let children_stime c = c.children_stime
+      end
+
+      (* CPU counters *)
+
+      let sec_to_span sec = Int64.of_float (sec *. 1e9)
+
+      type counter = Span.t
+      let counter () : Span.t =
+        let now = Unix.times () in
+        { utime = sec_to_span now.Unix.tms_utime;
+          stime = sec_to_span now.Unix.tms_stime;
+          children_utime = sec_to_span now.Unix.tms_cutime;
+          children_stime = sec_to_span now.Unix.tms_cstime; }
+
+      let count (c : Span.t) : Span.t =
+        let now = Unix.times () in
+        { utime = Int64.sub (sec_to_span now.Unix.tms_utime) c.utime;
+          stime = Int64.sub (sec_to_span now.Unix.tms_stime) c.stime;
+          children_utime =
+            Int64.sub (sec_to_span now.Unix.tms_cutime) c.children_utime;
+          children_stime =
+            Int64.sub (sec_to_span now.Unix.tms_cstime) c.children_stime; }
+    end
+  end
+
+  module Mtime = struct
+    include Os_mtime
   end
 end
 
@@ -4118,19 +4286,19 @@ module Log = struct
   let debug_style = [`Faint; `Fg `Magenta]
 
   let pp_level_str level ppf v = match level with
-  | App -> Fmt.tty_string app_style ppf v
-  | Error -> Fmt.tty_string err_style ppf v
-  | Warning -> Fmt.tty_string warn_style ppf v
-  | Info -> Fmt.tty_string info_style ppf v
-  | Debug -> Fmt.tty_string debug_style ppf v
+  | App -> Fmt.tty' app_style ppf v
+  | Error -> Fmt.tty' err_style ppf v
+  | Warning -> Fmt.tty' warn_style ppf v
+  | Info -> Fmt.tty' info_style ppf v
+  | Debug -> Fmt.tty' debug_style ppf v
   | Quiet -> assert false
 
   let pp_level ppf level = match level with
   | App -> ()
-  | Error -> Fmt.tty_string (`Bold :: err_style) ppf "Error"
-  | Warning -> Fmt.tty_string (`Bold :: warn_style) ppf "Warning"
-  | Info -> Fmt.tty_string (`Bold :: info_style) ppf "Info"
-  | Debug -> Fmt.tty_string (`Bold :: debug_style) ppf "Debug"
+  | Error -> Fmt.tty' (`Bold :: err_style) ppf "Error"
+  | Warning -> Fmt.tty' (`Bold :: warn_style) ppf "Warning"
+  | Info -> Fmt.tty' (`Bold :: info_style) ppf "Info"
+  | Debug -> Fmt.tty' (`Bold :: debug_style) ppf "Debug"
   | Quiet -> assert false
 
   let pp_header =

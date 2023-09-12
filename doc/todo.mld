@@ -1,14 +1,33 @@
 {0:design_todo Design considerations and todo}
 
 
-{1:b0_std [b0.std]}
+{1:b0_std [b0.std] library}
 
 {ul
 {- Review the tool lookup stuff. First we may want to
    generalize the lookup path to a function (rather than list of paths).
    Then maybe we should simply have a DLS global.}}
 
-{1:design_b0_file B0 file}
+{1:design_b0 [b0.memo] library}
+
+- The signature of {!B0_memo.Memo.write} looks wrong you want a fut. E.g.
+  we don't want to the [Fut.sync] here.
+
+  {[
+let crunch_file m file ~in_dir =
+  let open Fut.Syntax in
+  let mn = B0_ocaml.Mod.Name.of_mangled_filename (Fpath.basename file) in
+  let out = Fpath.(in_dir / String.Ascii.uncapitalize mn + ".ml") in
+  B0_memo.Memo.write m out ~reads:[file] begin fun () ->
+  (* FIXME b0 the sig of write is wrong *)
+  let data = Fut.sync (B0_memo.Memo.read m file) in
+  Ok (B0_memo_ocaml.Crunch.string_to_string ~id:"file" ~data)
+  end;
+  Fut.return out
+
+]}
+
+{1:design_b0_file [b0.file] library}
 
 {ul
 {- [B0.ml] file finding. Should we stop at the last B0.ml file upwards ?
@@ -26,83 +45,96 @@
    to access library definitions and allow dots in their name.
    (["/my.def.bla"])}}
 
-{1:design_b0 B0 library}
-
-{2:unit_meta Unit dynamic meta}
-
-For now we used ['a Fut B0_beta.key].
-{ul
-{- See how it goes fares for sync. Push/pull.}
-{- What about serializing them so that it can be read
-   by `b0 unit get` ?}}
-
-{2:unit_action Unit actions}
-
-The current implementations raises a few questions. It will need to be
-refined, see {!B0_unit.type-action}.
-
-{ul
-{- action/cmdlet overlap}
-{- Should we have the action as a meta key ?}
-{- The action needs to be run or be aware of the deployement environment.}
-{- Maybe we don't need to be given the build and simply let the unit's
-   dynamic meta have whatever is needed.}
-{- If we get a fast up-to-date check. How to we get the dynamic meta.
-   (serialize ?).}
-{- Should actions be definitions to apply on units ? Seems to
-   get into testing territory.}
-{- Action cwd. Often we want scope. But maybe it's better to leave
-   it free-weeling and define a cmdlet that invokes it with a cwd
-   with the scope. Should we distinguish a `-a` (honours cwd) and `-e` ?
-   or a `--cwd` option to override the action ?}}
-
-{1:design_b0_tool [b0] tool}
-
-{ul
-{- [b0 build] consider [-x|-u] ordering ? }}
-
-{1:conventions Build API conventions}
-
-{ul
-{- Should [?meta] be the initial or override an initial meta done by
-   the combinator. initial ensures [get]s do not blow, but it could
-   be nice to be able to override auto-derivations}}
-
 {2:fragments Build fragments}
 
 At the B0 level we need to expose build fragments. It seems the build
 procedures of units is a good candidate but for now it's a bit unconvient
 to do that. We need to clarify the configuration store and dynamic
-metadata see {!unit_meta}.
+metadata see {!b0_meta}.
 
 For now as a temporary hack we add the [wrap] parameter to units.
 
-{1:b0_memo B0_memo}
+{2:b0_env [B0_env]}
 
-The signature of {!B0_memo.Memo.write} looks wrong you want a fut. E.g.
-we don't want to the [Fut.sync] here.
+- Maybe we should start exposing a mini [Os] in [B0_env] for
+  actions. This might be needed for remote builds. In fact
+  at some point we should indicate on which Os the action
+  happens [`Build], [`Host] or [`Driver] (b0 invocation).
+  Not sure we need the last one. Maybe it's then sufficient
+  to a proxy dance by executing the same b0 driver executable
+  on the remote platform, at which point the [Os] invocation
+  run on the right platform. Do we ever want mixed [`Build] and
+  [`Host] ? Not undoable but a bit cold feet on replacating all
+  the `Os` module.
 
-{[
-let crunch_file m file ~in_dir =
-  let open Fut.Syntax in
-  let mn = B0_ocaml.Mod.Name.of_mangled_filename (Fpath.basename file) in
-  let out = Fpath.(in_dir / String.Ascii.uncapitalize mn + ".ml") in
-  B0_memo.Memo.write m out ~reads:[file] begin fun () ->
-  (* FIXME b0 the sig of write is wrong *)
-  let data = Fut.sync (B0_memo.Memo.read m file) in
-  Ok (B0_memo_ocaml.Crunch.string_to_string ~id:"file" ~data)
-  end;
-  Fut.return out
+{2:b0_action [B0_action]}
 
-]}
+- Maybe we could specify an option that an action always requires a
+  build and defaults to the default build if none is explicitely
+  specified. This could be useful or not for [.ocaml ocaml]. Though
+  you likely often only want to test an excutable so it's just a [b0
+  -u myexec -- .ocaml ocaml].
 
-{1:opam opam}
+- Store keys on the build of an action, that works but it means we
+  can't do that on specific subcommands when the action is a cmdliner
+  group cmd. E.g. it would be nice to have everything for `ocaml`
+  under `.ocaml` but `.ocaml ocaml` or `.ocaml utop` will want a byte
+  code build and `.ocaml ocamlnat` will want a native code build. So
+  for now we have `.ocaml.ocaml`
 
+- Access control. Maybe actions accessing the full builds opens a can
+  of worms (or not) we could try to enforce more access control via
+  the definition scope of the action (lib vs. file).
+
+- Execution logic. Unit name and action name conflicting should be
+  resolved locally. If a tool conflicts with action warn but use tool,
+  [b0 action exec] can be used for the action. If a tool conflicts
+  with a unit warn if it's not the same unit. We should again add a
+  [b0 unit exec], we should also maybe add a [b0 tool] command.
+
+{2:b0_unit [B0_unit]}
+
+For now we used ['a Fut B0_meta.key].
 {ul
-{- Worfklow to easily check opam file in sync.
-   Part of more general workflow ?}}
+{- See how it goes fares for sync. Push/pull.}
+{- What about serializing them so that it can be read
+   by `b0 unit get` ?}}
 
-{1:expect B0_expect}
+{2:b0_meta [B0_meta]}
+
+- Should we maybe have a default for key ? It would be nice
+  to distinguish it at the type level so that we can avoid options
+  when we get or rather a new get_has_default that invalid argumetns
+  if the key has no default.
+- They used to be serializable, see if we don't want that again. Especially
+  in the optic of a merge with B0_store.
+- I think keys should be B0_defs.
+
+{2:b0_store [B0_store]}
+
+It's a bit unclear whether we don't want to merge [B0_meta]
+and [B0_store] perhaps at the expense of more complex
+[B0_meta.Key].
+
+Also for now only actions can mandate store bindings (e.g. to request
+a bytecode build). This should of course be user definable, likely at
+the build variant level.
+
+{2:b0_ocaml [B0_ocaml]}
+
+- We should let constraints be defined on libraries. Then we can
+  auto-generate opam constraints.
+- Implement the [public] visibility stuff in the library resolver.
+
+{1:b0_kit [b0.kit] library}
+
+{2:b0_opam [B0_opam]}
+
+- Worfklow to easily check opam file in sync. Part of more general
+  workflow ? In fact it would be better to have
+ {:https://github.com/ocaml/opam/issues/3797}
+
+{2:b0_expect [B0_expect]}
 
 - Default cli driver, integrate with the plans on general actions.
 - Parallel execution
@@ -126,5 +158,16 @@ let crunch_file m file ~in_dir =
   - normal, paths but no diff
   - long, paths and diffs
   - short, only final summary
+- Add a small manual to the action.
 
-- Add a small manual to the cmdlet.
+{1:doc Documentation overhaul}
+
+- Howto on action/unit execution
+
+- B0.ml file style guide. Toplevel defs, constructor at the
+  end except for actions. doc strings either inline or first thing
+  after defining [let].
+
+- Metadata convention. While it may entail user errors if certain
+  meta is needed by build unit. It's better that the optional
+  `meta` always provides a final override over any key.

@@ -161,8 +161,8 @@ module File_cache = struct
       s.keys_count s.keys_file_count (Fmt.code Fmt.byte_size) s.keys_byte_size
 
   let pp_stats ppf (total, used) =
-    let row = Fmt.tty_string [`Fg `Yellow] in
-    let col = Fmt.tty_string [`Italic] in
+    let row = Fmt.tty' [`Fg `Yellow] in
+    let col = Fmt.tty' [`Italic] in
     let pp_cols ppf () = Fmt.pf ppf "       %a  %a" col "keys" col "files" in
     Fmt.pf ppf "@[<v>%a%a@,%a%a@,%a@]"
       row "total" pp_key_stats total
@@ -170,8 +170,8 @@ module File_cache = struct
       pp_cols ()
 
   let pp_stats ppf (total, used) =
-    let row = Fmt.tty_string [`Fg `Yellow] in
-    let col = Fmt.tty_string [`Italic] in
+    let row = Fmt.tty' [`Fg `Yellow] in
+    let col = Fmt.tty' [`Italic] in
     let pp_size ppf s = Fmt.pf ppf "%6s" (Fmt.str "%a" Fmt.byte_size s) in
     let pp_cols ppf () = Fmt.pf ppf "       %a    %a" col "total" col "used" in
     Fmt.pf ppf "@[<v>%a@,%a %6d  %6d@,%a %6d  %6d@,%a %a  %a@]"
@@ -222,7 +222,7 @@ module File_cache = struct
           Result.bind (Os.Path.delete ~recurse:true dir) @@ fun _ ->
           Result.bind (Os.Dir.create ~make_path:true dir) @@ fun _ -> Ok true
       | `Keys keys ->
-          Result.bind (B0_zero.File_cache.create dir) @@ fun c ->
+          Result.bind (B0_zero.File_cache.make dir) @@ fun c ->
           let delete c k =
             Log.if_error ~use:() @@
             Result.bind (B0_zero.File_cache.rem c k) @@ function
@@ -238,7 +238,7 @@ module File_cache = struct
   let gc ~dir ~used = Result.bind (Os.Dir.exists dir) @@ function
   | false -> Ok false
   | true ->
-      Result.bind (B0_zero.File_cache.create dir) @@ fun c ->
+      Result.bind (B0_zero.File_cache.make dir) @@ fun c ->
       Result.bind (B0_zero.File_cache.keys c) @@ fun keys ->
       let unused k = not (String.Set.mem k used) in
       let unused = List.filter unused keys in
@@ -251,7 +251,7 @@ module File_cache = struct
   let keys ~dir = Result.bind (Os.Dir.exists dir) @@ function
   | false -> Ok false
   | true ->
-      Result.bind (B0_zero.File_cache.create dir) @@ fun c ->
+      Result.bind (B0_zero.File_cache.make dir) @@ fun c ->
       Result.bind (B0_zero.File_cache.keys c) @@ fun keys ->
       Log.app (fun m -> m "@[<v>%a@]" Fmt.(list string) keys);
       Ok true
@@ -259,7 +259,7 @@ module File_cache = struct
   let stats ~dir ~used = Result.bind (Os.Dir.exists dir) @@ function
   | false -> Ok false
   | true ->
-      Result.bind (B0_zero.File_cache.create dir) @@ fun c ->
+      Result.bind (B0_zero.File_cache.make dir) @@ fun c ->
       Result.bind (stats_of_cache c ~used) @@ fun stats ->
       Log.app (fun m -> m "@[<v>%a@]" pp_stats stats);
       Ok true
@@ -269,7 +269,7 @@ module File_cache = struct
     | false -> Ok false
     | true ->
         let is_unused k = not (String.Set.mem k used) in
-        let* c = B0_zero.File_cache.create dir in
+        let* c = B0_zero.File_cache.make dir in
         let* c =
           B0_zero.File_cache.trim_size c ~is_unused ~max_byte_size ~pct
         in
@@ -798,7 +798,7 @@ module Memo = struct
       in
       i, { hash_fun; file_hashes; hash_dur; total_dur; cpu_dur; jobs; ops; }
 
-    let bincode = B0_bincode.v enc dec
+    let bincode = B0_bincode.make enc dec
 
     let write file l =
       let data =
@@ -855,7 +855,7 @@ module Memo = struct
         let hs = if not hashed_size then 0 else hashed_byte_size l.file_hashes
         in
         let pp_hashed_size ppf s =
-          let label = Fmt.tty_string [`Italic] in
+          let label = Fmt.tty' [`Italic] in
           match hashed_size with
           | true -> Fmt.field ~label "size" (fun c -> c) Fmt.byte_size ppf s
           | false -> ()
@@ -863,7 +863,7 @@ module Memo = struct
         Fmt.pf ppf "%a %a" pp_totals (hc, hd) pp_hashed_size hs
       in
       let pp_xtime ppf (self, children) =
-        let label = Fmt.tty_string [`Italic] in
+        let label = Fmt.tty' [`Italic] in
         Fmt.pf ppf "%a %a" Mtime.Span.pp self
           (Fmt.field ~label "children" (fun c -> c) Mtime.Span.pp)
           children
@@ -882,7 +882,7 @@ module Memo = struct
       let pp_op_no_cache ppf (ot, od) =
         Fmt.pf ppf "%a %d" Mtime.Span.pp od ot
       in
-      let pp_sec s ppf _ = Fmt.tty_string [`Bold] ppf s in
+      let pp_sec s ppf _ = Fmt.tty' [`Bold] ppf s in
       (Fmt.record @@
        [ pp_sec "selected operations";
          Fmt.field "spawns" (fun _ -> (sc, st, sd)) pp_op;

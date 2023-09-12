@@ -19,4 +19,5 @@ module V000 = struct
   module Os = B0_std.Os
   module Log = B0_std.Log
   module Random_queue = B0_std.Random_queue
+  let ( ~/ ) = Fpath.v
 end

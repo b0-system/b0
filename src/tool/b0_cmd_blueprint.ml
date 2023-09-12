@@ -6,7 +6,7 @@
 open B0_std
 open Result.Syntax
 
-(* Eventually add something caracass-like. *)
+(* Eventually add something carcass-like. *)
 
 (* src command *)
 
@@ -61,8 +61,7 @@ let find_src_gen_by_file file =
   | None ->
       Fmt.error
         "@[<v>Could not find a language for extension %a@,\
-         Use option %a to specify one.@]"
-        Fmt.(code string) ext Fmt.(code string) "--lang"
+         Use option %a to specify one.@]" Fmt.code' ext Fmt.code' "--lang"
 
 let find_project_name () =
   let has_file dir file =
@@ -72,10 +71,10 @@ let find_project_name () =
     [ "BRZO"; "BRZO.toml"; "B0.ml"; "B0.toml"; "Makefile"; "dune-project"; ]
   in
   try
-    let vcs = B0_vcs.find () |> Result.error_to_failure in
+    let vcs = B0_vcs_repo.find () |> Result.error_to_failure in
     let cwd = Os.Dir.cwd () |> Result.error_to_failure in
     let project_dir = match vcs with
-    | Some t -> B0_vcs.work_dir t
+    | Some t -> B0_vcs_repo.work_dir t
     | None ->
         let rec loop dir =
           if List.exists (has_file dir) root_markers then dir else
@@ -90,9 +89,9 @@ let find_project_name () =
       if e <> ""
       then (Fmt.error "@[<v>While looking for a project name:@,%s@]" e)
       else (Fmt.error
-              "@[<v>Could not find a project name.@,\
+              "@[<v>Could not find a project name to assign copyright.@,\
                Use option %a to specify a copyright holder.@]"
-              Fmt.(code string) "--holder")
+              Fmt.code' "--holder")
 
 let find_holder = function
 | Some holder -> Ok holder
@@ -111,7 +110,7 @@ let find_src_gen lang file = match lang with
 | None when file = Fpath.dash -> Ok (find_src_gen_by_lang `Ocaml)
 | None -> find_src_gen_by_file file
 
-let src year holder license lang file sample _conf =
+let src year holder license lang file sample () =
   Log.if_error ~use:B0_cli.Exit.some_error @@
   let year = find_year year in
   let* holder = find_holder holder in
@@ -184,15 +183,14 @@ let src =
            See the corresponding options for more details.";
        `P "The output format is fixed, it cannot be tweaked."]
   in
-  B0_tool_std.Cli.subcmd_with_driver_conf "src" ~doc ~descr @@
+  B0_tool_std.Cli.subcmd "src" ~doc ~descr @@
   Term.(const src $ year $ holder $ license $ lang $ file $ sample)
-
-let subs = [src]
 
 let cmd =
   let doc = "Generate files from blueprints" in
   let descr = `P "The $(iname) command generates files from blueprints." in
-  B0_tool_std.Cli.cmd_group_with_driver_conf "blueprint" ~doc ~descr subs
+  B0_tool_std.Cli.cmd_group "blueprint" ~doc ~descr @@
+  [src]
 
 (* Format strings *)
 

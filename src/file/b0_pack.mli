@@ -14,9 +14,9 @@ open B0_std
 type t
 (** The type for build units. *)
 
-val v :
+val make :
   ?doc:string -> ?meta:B0_meta.t -> string -> locked:bool -> B0_unit.t list -> t
-(** [v n us] is a build pack named [n] made of build units [us] and
+(** [make n us] is a build pack named [n] made of build units [us] and
     described by [doc]. [locked] defaults to [false], see {!locked} for
     the semantics. *)
 
@@ -26,6 +26,21 @@ val locked : t -> bool
 
 val units : t -> B0_unit.t list
 (** [units p] are the units of [p]. *)
+
+(** {1:meta_derivation Metadata derivation} *)
+
+val derive_synopsis_and_description : t -> B0_meta.t -> B0_meta.t
+(** [derive_synopsis_and_description p m] if {!B0_meta.synopsis} or
+    {!B0_meta.description} are undefined in [m] it tries to fill them
+    in from an existing [README.md] in the scope directory of [p]. The
+    first marked up section of the file is extracted using
+    {!B0_std.String.commonmark_first_section} its title is parsed
+    according to the pattern '$(NAME) $(SEP) $(SYNOPSIS)' to get a
+    synopsis line and the body up to the next (sub)section defines the
+    description.
+
+    {b XXX.} See if we couldn't define that as a default key value
+    in the future. Though we'd need the def for getting the directory. *)
 
 (** {1:b0_def B0 definition API} *)
 

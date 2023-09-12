@@ -19,10 +19,9 @@ type t
 (** The type for expectation contexts. An expectation context
     orchestrates and gathers the result of expectation tests. *)
 
-val action :
-  B0_action.Env.t -> Cmd.t -> base:Fpath.t -> (t -> unit) -> Os.Exit.t
-(** [action env cmd ~base f] is an action calling [f ctx] and handling
-    test reporting and aborting. [f] should simply perform
+val action_func : base:Fpath.t -> (t -> unit) -> B0_action.func
+(** [action_func ~base f] is an action function calling [f ctx] and
+    handling test reporting and aborting. [f] should simply perform
     computations, add {{!expectations}expectations} to [ctx] and,
     possibly, {{!aborting}aborting}.
 
@@ -118,8 +117,8 @@ module Outcome : sig
 end
 
 val make :
-  ?vcs:B0_vcs.t -> ?log_absolute:bool -> ?log_diffs:bool ->
-  B0_action.Env.t -> base:Fpath.t -> t
+  ?vcs_repo:B0_vcs_repo.t -> ?log_absolute:bool -> ?log_diffs:bool ->
+  B0_env.t -> base:Fpath.t -> t
 (** [make env ~base] is a test context in environment [env] with:
 
     {ul
@@ -133,8 +132,8 @@ val make :
        outcomes.}
     {- [log_absolute], if [false] (default) paths are logged relative
        to the cwd of [env]. If [true] all paths are made absolute.}
-    {- [vcs] is the VCS to use. By default looked up with {!B0_vcs.t}
-       in {!B0_cmdlet.Env.scope_dir}.}}
+    {- [repo] is the VCS repository to use. By default looked up with
+       {!B0_vcs_repo.find} in {!B0_cmdlet.Env.scope_dir}.}}
 
     Raises {!Abort} if VCS detection fails. *)
 
@@ -150,7 +149,7 @@ val base_files : ?rel:bool -> t -> recurse:bool -> Fpath.t list
 val dur : t -> Mtime.Span.t
 (** [dur ctx] is the monotonic duration since [ctx] was created. *)
 
-val env : t -> B0_action.Env.t
+val env : t -> B0_env.t
 (** [env ctx] is the environment of [ctx]. *)
 
 val log_absolute : t -> bool
@@ -160,7 +159,7 @@ val log_absolute : t -> bool
 val log_diffs : t -> bool
 (** [log_diffs ctx] is [true] if unexpected and new outcomes log diffs. *)
 
-val vcs : t -> B0_vcs.t
+val vcs_repo : t -> B0_vcs_repo.t
 (** [vcs ctx] is the VCS used for operating the expectation files. *)
 
 val outcomes : t -> Outcome.t list

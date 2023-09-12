@@ -43,8 +43,8 @@ val dec_eoi : string -> int -> unit
 type 'a t
 (** The type for encoding and decoding values of type ['a]. *)
 
-val v : 'a enc -> 'a dec -> 'a t
-(** [v enc dec] is a decoder using [enc] to encode and [dec] to decode. *)
+val make : 'a enc -> 'a dec -> 'a t
+(** [make enc dec] is a decoder using [enc] to encode and [dec] to decode. *)
 
 val enc : 'a t -> 'a enc
 (** [enc c] is [c]'s encoder. *)

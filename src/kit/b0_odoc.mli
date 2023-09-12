@@ -3,7 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** B0 odoc support.
+(** {{:https://ocaml.github.io/odoc/odoc/index.html}odoc} support.
 
     {b Note.} This models the odoc tool and its invocations. Dependecy
     {e resolution} is not part of the module yet we could try to

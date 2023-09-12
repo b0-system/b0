@@ -1,0 +1,77 @@
+{0 B0 actions manual}
+
+This manual shows how to deal with B0 actions and how to create your
+own.
+
+{1:basics Basics}
+
+Basic operations on actions are provided by the [b0 action] command.
+{[
+b0 action list  # List action
+]}
+
+Running an action is
+
+{1:action Action, tool or executable unit ?}
+
+XXX clarify terminology and formally define executable unit (or eschew
+the concept and only keep tool).
+
+From the point of user interface there's not much difference between you
+all call them the same way which is:
+
+{[
+b0 -- NAME ARG…
+]}
+
+Actions may involve a build or not, invoking a tool described by a
+unit automatically builds it and runs the tool. The [b0 list] command
+lists both tools an actions (except the library actions for which you
+need [--all]. If you want to see specific listings
+
+{[
+b0 list        # Actions, build units, build packs
+b0 list --all  # Also include library actions
+b0 action list # List only actions
+b0 tool list   # List public tools and private tools in the root scopexs
+]}
+
+{1:tutorial Making your own action}
+
+Let's make a simple action a script at the root of your project:
+
+Yaddada root vs scope
+
+{[
+let run_script script _ env ~args =
+  let cwd = B0_env.scope_dir env in
+  let script = B0_env.in_scope_dir env script in
+  Os.Exit.exec ~cwd script Cmd.(path script %% args)
+
+let mycmd =
+  B0_action.make "mycmd" ~doc:"Run mycmd" @@
+  run_script ~/"scripts/mycmd"
+]}
+
+Even though you should rewrite all these scripts as OCaml actions a
+direct short cut for the above boilerplate is provided.  Use
+{!B0_action.exec_file'}:
+
+{[
+let mycmd =
+  B0_action.make "mycmd" ~doc:"Run mycmd" @@
+  B0_action.exec_file' ~/"scripts/mycmd"
+]}
+
+{1:howto Howto}
+
+{2:run Run a unit executable in an action}
+
+{[
+let myunit = …
+let action
+  let doc = "That's particular" in
+  B0_action.make' "my-exec" ~units:[myunit] ~doc @@ fun _ env ~args ->
+  let* cmd = B0_env.unit_cmd myunit in
+  Os.Cmd.run cmd
+]}

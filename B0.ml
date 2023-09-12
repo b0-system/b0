@@ -1,5 +1,5 @@
 open B0_kit.V000
-
+open Result.Syntax
 (* OCaml library names *)
 
 let unix = B0_ocaml.libname "unix"
@@ -13,51 +13,56 @@ let b0_tool = B0_ocaml.libname "b0.tool"
 (* B0 libraries *)
 
 let b0_std_lib =
-  let srcs =
-    Fpath.[`Dir_rec (v "src/std"); `X (v "src/std/b0_std_top_init.ml")]
-  in
+  let srcs = [ `Dir_rec ~/"src/std"; `X ~/"src/std/b0_std_top_init.ml" ] in
   let requires = [unix; cmdliner] in
-  B0_ocaml.lib b0_std ~doc:"B0 standard needs" ~srcs ~requires
+  B0_ocaml.lib b0_std ~doc:"B0 standard library" ~srcs ~requires
 
 let b0_memo_lib =
-  let srcs = Fpath.[`Dir (v "src/memo")] in
+  let srcs = [`Dir ~/"src/memo"] in
   let requires = [unix; cmdliner; b0_std] in
   B0_ocaml.lib b0_memo ~doc:"B0 build library" ~srcs ~requires
 
 let b0_file_lib =
-  let srcs = Fpath.[`Dir (v "src/file")] in
+  let srcs = [`Dir ~/"src/file"] in
   let requires = [unix; cmdliner; b0_std; b0_memo] in
   B0_ocaml.lib b0_file ~doc:"B0 build file library" ~srcs ~requires
 
 let b0_kit_lib =
-  let srcs = Fpath.[`Dir (v "src/kit")] in
+  let srcs = [`Dir ~/"src/kit"] in
   let requires = [unix; cmdliner; b0_std; b0_memo; b0_file] in
   B0_ocaml.lib b0_kit ~doc:"B0 toolkit library" ~srcs ~requires
 
 (* The b0 tool *)
 
-let bootstrap_env boot_root =
-  let env = Os.Env.current () |> Log.if_error ~use:Os.Env.empty in
+let add_bootstrap_env env boot_root =
   env
   |> Os.Env.add "B0_BOOTSTRAP" (Fpath.to_string boot_root)
   |> Os.Env.add "B0_DRIVER_BOOTSTRAP" (Fpath.to_string boot_root)
-  |> Os.Env.to_assignments
 
 let b0_tool_lib =
-  let srcs = Fpath.[`Dir (v "src/tool"); `X (v "src/tool/b0_main_run.ml")] in
+  let srcs = [ `Dir ~/"src/tool"; `X ~/"src/tool/b0_main_run.ml"] in
   let requires = [unix; cmdliner; b0_std; b0_memo; b0_file; b0_kit] in
   B0_ocaml.lib b0_tool ~doc:"b0 tool driver library" ~srcs ~requires
 
 let b0 =
-  let srcs = Fpath.[`File (v "src/tool/b0_main_run.ml")] in
+  let srcs = [`File ~/"src/tool/b0_main_run.ml"] in
   let requires = [b0_file; b0_tool] in
-  let meta =
-    let env b u =
-      (* FIXME need to access the root of the build. *)
-      Fut.return (bootstrap_env Fpath.(B0_build.build_dir b u / ".."))
+  let build_bootstrap_exec_env =
+    let env build unit =
+      (* FIXME need to access the root of the build and acces build env *)
+      let env = (Os.Env.current () |> Log.if_error ~use:Os.Env.empty) in
+      let boot_root = Fpath.(B0_build.build_dir build unit / "..") in
+      let env = add_bootstrap_env env boot_root in
+      (* If the build is locked via `b0 lock`, unlock it. *)
+      let env = String.Map.remove "B0_FILE" env in
+      let env = String.Map.remove "B0_DIR" env in
+      Fut.return env
     in
+    `Custom_env ("Bootstrap env set on the b0 build", env)
+  in
+  let meta =
     B0_meta.empty
-    |> B0_meta.add B0_unit.Action.exec_env env
+    |> B0_meta.add B0_unit.exec_env build_bootstrap_exec_env
   in
   B0_ocaml.exe "b0" ~doc:"The b0 tool" ~srcs ~requires ~meta
 
@@ -65,7 +70,7 @@ let b0 =
 
 let tool_exe n ~doc file =
   let requires = [cmdliner; b0_std; b0_memo; b0_file; b0_kit] in
-  let srcs = [`File Fpath.(v "src/lowtools" / file)] in
+  let srcs = [`File Fpath.(~/"src/lowtools" / file)] in
   B0_ocaml.exe n ~doc ~srcs ~requires
 
 let b0_cache_tool =
@@ -82,7 +87,7 @@ let show_uri_tool =
 
 (* Tests *)
 
-let test_src f = `File Fpath.(v "test" // f)
+let test_src f = `File Fpath.(~/"test" // f)
 let test_exe ?(requires = []) ?(more_srcs = []) file ~doc =
   let file = Fpath.v file in
   let more_srcs = List.map (fun v -> test_src (Fpath.v v)) more_srcs in
@@ -125,54 +130,64 @@ let test_b0_file =
 (* Packs *)
 
 let b0_pack =
-  B0_pack.v "b0" ~doc:"The B0 libraries" ~locked:true @@
+  B0_pack.make "b0" ~doc:"The B0 libraries" ~locked:true @@
   [b0_std_lib; b0_memo_lib; b0_file_lib; b0_kit_lib]
 
 let tool_pack =
-  B0_pack.v "b0-tools" ~doc:"The low-level B0 tools" ~locked:false @@
+  B0_pack.make "b0-tools" ~doc:"The low-level B0 tools" ~locked:false @@
   [b0_cache_tool; b0_hash_tool; b0_log_tool; show_uri_tool]
 
 let driver_pack =
-  B0_pack.v "b0-drivers" ~doc:"The B0 drivers" ~locked:false @@ [b0]
+  B0_pack.make "b0-drivers" ~doc:"The B0 drivers" ~locked:false @@ [b0]
 
 let default =
   let meta =
-    let open B0_meta in
-    empty
-    |> add authors ["The b0 programmers"]
-    |> add maintainers ["Daniel Bünzli <daniel.buenzl i@erratique.ch>"]
-    |> add homepage "https://erratique.ch/software/b0"
-    |> add online_doc "https://erratique.ch/software/b0/doc"
-    |> add licenses ["ISC"; "BSD-2-Clause"]
-    |> add repo "git+https://erratique.ch/repos/b0.git"
-    |> add issues "https://github.com/b0-system/b0/issues"
-    |> add description_tags ["dev"; "org:erratique"; "org:b0-system"; "build"]
-    |> add B0_opam.Meta.build
+    B0_meta.empty
+    |> B0_meta.(add authors) ["The b0 programmers"]
+    |> B0_meta.(add maintainers)
+      ["Daniel Bünzli <daniel.buenzl i@erratique.ch>"]
+    |> B0_meta.(add homepage) "https://erratique.ch/software/b0"
+    |> B0_meta.(add online_doc) "https://erratique.ch/software/b0/doc"
+    |> B0_meta.(add licenses) ["ISC"; "BSD-2-Clause"]
+    |> B0_meta.(add repo) "git+https://erratique.ch/repos/b0.git"
+    |> B0_meta.(add issues) "https://github.com/b0-system/b0/issues"
+    |> B0_meta.(add description_tags)
+      ["dev"; "org:erratique"; "org:b0-system"; "build"]
+    |> B0_meta.tag B0_opam.tag
+    |> B0_meta.add B0_opam.build
       {|[["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]]|}
-    |> add B0_opam.Meta.depends [
+    |> B0_meta.add B0_opam.depends [
       "ocaml", {|>= "4.08.0"|};
       "ocamlfind", {|build|};
       "ocamlbuild", {|build|};
       "topkg", {|build & >= "1.0.3"|};
       "cmdliner", {|>= "1.1.0"|}; ]
-    |> tag B0_opam.tag
+    |> B0_meta.tag B0_release.tag
   in
-  B0_pack.v "default" ~doc:"The B0 system" ~meta ~locked:true @@
+  B0_pack.make "default" ~doc:"The B0 system" ~meta ~locked:true @@
   B0_unit.list ()
 
 (* Actions *)
 
-let b0wl =
-  B0_action.v "b0wl" ~doc:"Run built b0 in the b0wl directory" @@
-  fun env args ->
-  let cwd = Fpath.(B0_action.Env.scope_dir env / "b0wl") in
-  let b0_dir = B0_action.Env.b0_dir env in
-  let variant = "user" in (* FIXME access to current variant *)
-  let bootstrap_root = B0_dir.build_dir ~b0_dir ~variant in
-  let env = bootstrap_env bootstrap_root in
-  let b0_exec = Fpath.(bootstrap_root / "b0-exe" / "b0") in
-  Os.Exit.exec ~env ~cwd b0_exec Cmd.(arg "b0" %% args)
-
 let strap =
-  B0_action.v "strap" ~doc:"Run boot/strap" @@
-  B0_action.exec_file (Fpath.v "boot/strap")
+  B0_action.make "strap" ~doc:"Run boot/strap" @@
+  B0_action.exec_file' ~/"boot/strap"
+
+let bowl =
+  let doc = "Run built b0 in the bowl directory" in
+  B0_action.make "bowl" ~units:[b0] ~doc @@
+  fun _ env ~args ->
+  match B0_env.unit_file_exe env b0 with (* FIXME b0 error struct *)
+  | Error e -> Log.err (fun m -> m "%s" e); B0_cli.Exit.some_error
+  | Ok exec ->
+      let bootstrap_root =
+        (* FIXME b0 access to current variant *)
+        let b0_dir = B0_env.b0_dir env in
+        let variant = "user" in
+        B0_dir.build_dir ~b0_dir ~variant
+      in
+      let cwd = B0_env.in_scope_dir env ~/"bowl" in
+      let env = Os.Env.current () |> Log.if_error ~use:Os.Env.empty in
+      let env = add_bootstrap_env env bootstrap_root |> Os.Env.to_assignments in
+      (* FIXME b0 B0_env.exec_file allow to choose name of args ? *)
+      Os.Exit.exec ~cwd ~env exec Cmd.(path exec %% args)

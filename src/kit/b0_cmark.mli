@@ -3,10 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** [cmark] support.
-
-    This models the {{:https://github.com/commonmark/cmark}[cmark]}
-    tool. There's not much to model though.
+(** {{:https://github.com/commonmark/cmark}[cmark]} support.
 
     An {{!extract}extraction} function is also provided. *)
 
@@ -41,15 +38,3 @@ val to_html :
     [mds] to an HTML fragment [o_frag] and then to an HTML page [o] by
     invoking {!cmd} with [opts] and {!B0_web_page.write}; for
     the documentation of optional arguments see the later. *)
-
-(** {1:extract Extraction} *)
-
-val first_section : preamble:bool -> string -> (string * string) option
-(** [first_section src] is [Some (title, content)] where [title] is
-    the content of first CommonMark header found in CommonMark source
-    [src] and [content] everything that follows until the next header
-    ([preamble] is [true]) or next header of the same of smaller level
-    ([preamble] is [false]). Trailing blank lines are discarded.
-
-    {b Warning.} This function may break on valid CommonMark inputs in
-    all sorts of fashion. *)

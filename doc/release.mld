@@ -1,3 +1,213 @@
 {0 B0 release support manual}
 
-{1:src Source releases}
+
+This manual describes the tools provided to perform source software
+releases. While the release support is rather generic, the release
+script here specifically talks about submitting the software to the
+opam repository. You can skip these steps if you are doing something
+different.
+
+{b TODO.} Review an adapt. Mainly taken from the topkg-release man page.
+
+{1:script Release script}
+
+This assumes you are using opam. In the simplest case if you just have
+one package to release:
+
+{v
+b0 browse issues          # Review remaining outstanding issues
+b0 -- .release status     # Review the changes since last version
+$EDITOR CHANGES.md        # Edit the release notes
+git commit -m 'Prepare for release.'
+b0 -- .release tag        # Tag the release with a version
+b0 -- .release archive    # Create the release archive
+b0 -- .release publish    # Publish it on the WWW with its documentation
+b0 -- .opam submit
+v}
+
+Note the tools allow to handle the following cases:
+
+- Your B0 file gathers the `B0.ml` file of multiple projects in
+   different VCSs.
+- You need to publish multiple packages from a single release archive.
+
+We do not describe this advanced usage here but checkout the
+the [--help] of the various commands to see how they behave.
+
+{2:preparing Preparing the release}
+
+First have a look at the outstanding issues the package may have by
+checking the issue tracker with this command.
+
+{v
+b0 browse issues
+v}
+
+This open the URLs specified in the {!B0_meta.issues} field of the
+packs of the [B0.ml] file.
+
+If the package's delegate supports issue tracker interaction (see
+topkg-delegate(7)), you can consult them directly in the terminal with:
+
+{v
+topkg issue list
+v}
+
+Basic checks are performed on the release archive when it is created,
+but save time by catching errors early. Hence test that your source
+repository lints and that it builds in the current build environment
+and that the package tests pass.
+
+{v
+b0 -- .opam file  # Regenerate opam file
+b0                # Build the project
+b0 lint           # Lint the project
+b0 test           # Run the default test suite
+v}
+
+{2:release_notes Write the release notes}
+
+Carefully write the release notes in the package's change log, these
+are essential time savers for users of the package. It may help to
+consult the list of changes that were committed since the last VCS
+version tag with:
+
+{v
+b0 -- .release status
+v}
+
+You can then write the release notes and commit them to the VCS with:
+
+{v
+topkg log edit
+topkg log commit
+v}
+
+The next step is simplified if the change log follows a certain
+format, see topkg-log(1) for details.
+
+The last two commands mentioned perform no magic, it is entirely up to
+you to use them or not. The first one simply opens the change log of
+the package in your $EDITOR and the second one commits it to your VCS
+with a dull, canned, commit message.
+
+{2:tag_the_release VCS tag the release}
+
+Here again topkg provides a magic-less command that will simply extract
+the latest version tag from the package's change log and tag the VCS
+HEAD commit with it:
+
+{v
+b0 -- .release tag
+v}
+
+This will only work if the change log follows a certain format, see
+tokpg-log(1) for details. You can check the extracted tag is the one
+you wish before with:
+
+{v
+b0 -- .release tag --dry-run
+v}
+
+If you do not want to rely on [B0_release] broken extraction
+algorithms just specify it on the command line:
+
+{v
+b0 -- .release tag v1.0.1
+v}
+
+You can also choose to use your VCS directly. But this worfklow
+ensures that your wrote up-to-date release releases notes describing a
+correct version number.
+
+{2:archive Create the release archive and publish it}
+
+Now that the release is tagged in your VCS, generate a distribution
+archive for it in the build directory with:
+
+{v
+b0 -- .release archive
+v}
+
+This uses the source tree of the HEAD commit for creating a
+distribution in the build directory. The distribution version string
+is the VCS tag description (e.g. git-describe(1)) of the HEAD commit.
+Alternatively it can be specified on the command line.
+
+If everything went well you can now publish the distribution and its
+documentation on the WWW. The exact actions that happen here depend on
+the package's delegate, see topkg-delegate(7) for more details.
+
+{v
+b0 -- .release publish
+v}
+
+The release archive is now public. This also pushes the VCS repo
+and its tags.
+
+{2:submit_opam Submit to OCaml's opam repository}
+
+To publish the archive to the OCaml opam repository it's now
+simply a matter of:
+
+{v
+b0 -- .opam publish
+v}
+
+There are however details you need to be aware and some setup
+will be needed in the first time. See the details in the
+{{:page-opam}B0 opam manual}.
+
+Also this will download the software you just published back to your
+computer. It may seem wasteful but it makes sure everything is
+properly setup.
+
+{1:troubleshooting Troubleshooting}
+
+Here are a few troubleshooting scenarios and possible resolution.
+
+{2:before Before publishing}
+
+Anything that happens before the [.release publish] step, like a
+failing [.release archive], is easy to resolve. Delete the version tag
+of your VCS e.g. with:
+
+{v
+b0 -- .release tag -d
+b0 -- .release tag -d --dry-run # If you are unsure
+v}
+
+Add some commits, adjust your release notes and start over.
+
+{1:note_repro On reproducible archives}
+
+Given the archive name, the release commit identifier and the version
+string, archive produced by [.release archive] command should always
+generate the same archive:
+
+- Files are added to the archive using a well defined
+  order on paths.
+- File permissions are [0o664] or [0o775] for directories and files that
+  are executable for the user.
+- File modification times are set to the commit date (note that if git is
+  used, [git-log(1)] shows the author date which may not coincide).
+- No other file metadata is recorded in the tar archive.
+
+This should ensure that the resulting archive is bit-wise identical
+regardless of the context in which it is created. However this may
+fail for one or more of the following reasons:
+
+- Non-reproducible archive hook. If the archive hook relies on
+  external factors that are not captured by the source repository
+  checkout. For example external data files, environment variables,
+  etc.
+- File paths with non US-ASCII characters. These paths are encoded in
+  UTF-8, different file systems may return the paths with different Unicode
+  normalization forms which could yield different byte serializations in
+  the archive (this could be lifted at the cost of
+  a dependency on a Unicode normalization library).
+- The compression utility. The archive is compressed using the [bzip2] utility.
+  Reproducibility relies on [bzip2] to be a reproducible function across
+  platforms.
+- [B0_release] changes. {!B0_release} could change its distribution procedure
+  in the future, for example to correct bugs.

@@ -6,7 +6,7 @@
 open B0_std
 open Result.Syntax
 
-let log c details format op_selector =
+let log details format op_selector c =
   Log.if_error ~use:B0_cli.Exit.some_error @@
   let don't = B0_driver.Conf.no_pager c || format = `Trace_event in
   let b0_dir = B0_driver.Conf.b0_dir c in
@@ -25,17 +25,14 @@ open Cmdliner
 
 let cmd =
   let doc = "Show build logs" in
-  let exits = B0_driver.Exit.infos in
-  let man = [
-    `S Manpage.s_description;
+  let descr = [
     `P "The $(iname) command shows build information and operations in \
         various formats.";
-    `S Manpage.s_options;
     `S B0_cli.s_output_format_options;
     `S B0_cli.Op.s_selection_options;
-    `Blocks B0_cli.Op.query_man;
-    B0_tool_std.Cli.man_see_manual; ]
+    `Blocks B0_cli.Op.query_man ]
   in
-  Cmd.v (Cmd.info "log" ~doc ~exits ~man) @@
-  Term.(const log $ B0_driver.Cli.conf $ B0_cli.output_format () $
+  let descr = `Blocks descr in
+  B0_tool_std.Cli.subcmd_with_driver_conf "log" ~doc ~descr @@
+  Term.(const log $ B0_cli.output_format () $
         B0_cli.Memo.Log.out_format_cli () $ B0_cli.Op.query_cli ())

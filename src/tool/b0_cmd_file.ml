@@ -156,7 +156,7 @@ let path c =
   Ok B0_cli.Exit.ok
 
 let requires root c =
-  let pp_require = Fmt.using fst B0_ocaml.Lib.Name.pp in
+  let pp_require = Fmt.using fst B0_ocaml.Libname.pp in
   get_b0_file_src c @@ fun src ->
   let* reqs = match root with
   | true -> Ok (B0_file.requires src)
@@ -175,7 +175,8 @@ let source root c =
   match root with
   | true ->
       let* s = Os.File.read b0_file in
-      Log.app (fun m -> m "%s" s); Ok B0_cli.Exit.ok
+      Log.app (fun m -> m "%s" s);
+      Ok B0_cli.Exit.ok
   | false ->
       let* s = Os.File.read b0_file in
       let* src = B0_file.of_string ~file:b0_file s in
@@ -189,14 +190,10 @@ let source root c =
 open Cmdliner
 
 let root =
-  let doc = "Apply operation on the root B0 file only rather than on \
-             its expansion."
+  let doc =
+    "Apply operation on the root B0 file only rather than on its expansion."
   in
   Arg.(value & flag & info ["root"] ~doc)
-
-let path_term = Term.(const path)
-
-(* Commands *)
 
 let boot =
   let doc = "Install libraries needed for the B0 file" in
@@ -286,15 +283,15 @@ let log =
       `S B0_cli.Op.s_selection_options;
       `Blocks B0_cli.Op.query_man; ]
   in
-  let envs = B0_tool_std.Cli.pager_envs in
-  B0_tool_std.Cli.subcmd_with_driver_conf "log" ~doc ~descr ~envs @@
+  B0_tool_std.Cli.subcmd_with_driver_conf "log" ~doc ~descr @@
   Term.(const log $ B0_cli.output_format () $
         B0_cli.Memo.Log.out_format_cli () $ B0_cli.Op.query_cli ())
 
 let path =
   let doc = "Output the B0 file path (default command)" in
   let descr = `P "$(iname) outputs the B0 file path." in
-  B0_tool_std.Cli.subcmd_with_driver_conf "path" ~doc ~descr path_term
+  B0_tool_std.Cli.subcmd_with_driver_conf "path" ~doc ~descr @@
+  Term.(const path)
 
 let requires =
   let doc = "Output the OCaml libraries required by the B0 file" in
@@ -314,13 +311,9 @@ let source =
   B0_tool_std.Cli.subcmd_with_driver_conf "source" ~doc ~descr @@
   Term.(const source $ root)
 
-let subs = [boot; compile; edit; gather; gather_dirs;
-            includes; log; path; requires; source ]
-
 let cmd =
   let doc = "Operate on the B0 file" in
-  let descr =
-    `P "$(iname) operates on the B0 file. The default command is $(b,path).";
-  in
-  let default = path_term in
-  B0_tool_std.Cli.cmd_group_with_driver_conf "file" ~doc ~descr ~default subs
+  let descr = `P "$(iname) operates on the B0 file." in
+  B0_tool_std.Cli.cmd_group "file" ~doc ~descr @@
+  [ boot; compile; edit; gather; gather_dirs; includes; log; path; requires;
+    source ]

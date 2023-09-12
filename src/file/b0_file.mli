@@ -29,7 +29,7 @@ type b0_include = (string * smeta) * (Fpath.t * smeta)
 (** The type for [@@@B0.include] directive data. The scope name and
     the included file. *)
 
-type require = B0_ocaml.Lib.Name.t * smeta
+type require = B0_ocaml.Libname.t * smeta
 (** The type for #require directive data. The library name. *)
 
 type mod_use = Fpath.t * smeta

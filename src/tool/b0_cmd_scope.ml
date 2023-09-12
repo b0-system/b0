@@ -46,7 +46,8 @@ let exec_when cond c topmost includes excludes keep_going cmd =
           Log.app (fun m -> m "@[%a: %a@]" pp_name name pp_dir dir);
           match Os.Cmd.run ~cwd:dir cmd with
           | Error e when not keep_going -> err s e
-          | Error _ | Ok () -> Log.app (fun m -> m ""); loop ss
+          | Error _
+          | Ok () -> Log.app (fun m -> m ""); loop ss
   in
   loop (get_scopes c ~topmost ~includes ~excludes)
 
@@ -79,8 +80,11 @@ let symlink topmost includes excludes dir rm c =
     let* stat = Os.Path.symlink_stat symlink in
     if stat.st_kind = Unix.S_LNK
     then Os.Path.symlink ~force ~make_path ~src:path symlink else
-    (Log.warn (fun m -> m "%a: exists and not a symlink, skipped."
-                  Fpath.pp symlink); Ok ())
+    begin
+      (Log.warn @@ fun m ->
+       m "%a: exists and not a symlink, skipped." Fpath.pp symlink);
+      Ok ()
+    end
   in
   let remove_scope_symlink (scope, _) =
     if scope = "" (* root scope *) then Ok () else
@@ -101,12 +105,12 @@ let symlink topmost includes excludes dir rm c =
 
 let vcs root includes excludes all keep_going vcs_kind vcs_args c =
   let vcs_cmd = match vcs_kind with
-  | B0_vcs.Git -> Cmd.(arg "git" %% list vcs_args)
-  | B0_vcs.Hg -> Cmd.(arg "hg" %% list vcs_args)
+  | B0_vcs_repo.Git -> Cmd.(arg "git" %% list vcs_args)
+  | B0_vcs_repo.Hg -> Cmd.(arg "hg" %% list vcs_args)
   in
-  let is_vcs_kind (_, dir) = match B0_vcs.find ~kind:vcs_kind ~dir () with
+  let is_vcs_kind (_, dir) = match B0_vcs_repo.find ~kind:vcs_kind ~dir () with
   | Ok None -> Ok false
-  | Ok (Some vcs) -> if all then Ok true else B0_vcs.is_dirty vcs
+  | Ok (Some vcs) -> if all then Ok true else B0_vcs_repo.is_dirty vcs
   | Error _ as e -> e
   in
   exec_when is_vcs_kind c root includes excludes keep_going vcs_cmd
@@ -116,23 +120,22 @@ let vcs root includes excludes all keep_going vcs_kind vcs_args c =
 open Cmdliner
 
 let topmost =
-  let doc = "Only consider topmost scopes included by the root B0 file. Those \
-             recursively included by these are excluded."
+  let doc =
+    "Only consider topmost scopes included by the root B0 file. Those \
+     recursively included by these are excluded."
   in
   let docs = B0_tool_std.Cli.s_scope_selection in
   Arg.(value & flag & info ["topmost"] ~doc ~docs)
 
 let excludes =
   let doc = "Exclude scope $(docv) from the request. Repeatable." in
-  let docs = B0_tool_std.Cli.s_scope_selection in
-  Arg.(value & opt_all string [] &
-       info ["x"; "exclude"] ~doc ~docv:"SCOPE" ~docs)
+  let docs = B0_tool_std.Cli.s_scope_selection and docv = "SCOPE" in
+  Arg.(value & opt_all string [] & info ["x"; "exclude"] ~doc ~docv ~docs)
 
 let includes =
   let doc = "Include scope $(docv) in the request. Repeatable." in
-  let docs = B0_tool_std.Cli.s_scope_selection in
-  Arg.(value & opt_all string [] &
-       info ["i"; "include"] ~doc ~docv:"SCOPE" ~docs)
+  let docs = B0_tool_std.Cli.s_scope_selection and docv = "SCOPE" in
+  Arg.(value & opt_all string [] & info ["i"; "include"] ~doc ~docv ~docs)
 
 let keep_going =
   let doc = "Do not stop if a tool invocation exits with non-zero (default)." in
@@ -150,7 +153,7 @@ let all =
   Arg.(value & flag & info ["a"; "all"] ~doc)
 
 let vcs_kind =
-  let vcss = ["git", B0_vcs.Git; "hg", B0_vcs.Hg] in
+  let vcss = ["git", B0_vcs_repo.Git; "hg", B0_vcs_repo.Hg] in
   let doc =
     Fmt.str "Invoke vcs $(docv). Must be one of %s." (Arg.doc_alts_enum vcss)
   in
@@ -168,8 +171,6 @@ let tool_args =
 
 let vcs_syn =
   "$(iname) [$(i,OPTION)]… $(b,--) $(i,SUBCMD) [$(i,ARG)]…"
-
-(* Commands *)
 
 let select_doc =
   `P "By default all scopes are considered and options $(b,--topmost) \
@@ -197,12 +198,11 @@ let list =
           If $(b,--path) is specified only paths are listed.";
       select_doc ]
   in
-  let envs = B0_tool_std.Cli.pager_envs in
   let path =
     let doc = "Only print the scope paths." in
     Arg.(value & flag & info ["path"] ~doc)
   in
-  B0_tool_std.Cli.subcmd_with_b0_file "list" ~doc ~descr ~envs @@
+  B0_tool_std.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
   Term.(const list $ topmost $ includes $ excludes $ B0_tool_std.Cli.format $
         path)
 
@@ -216,8 +216,7 @@ let symlink =
           intact";
       `P "If the $(b,--rm) flag is specified removes the symlinks that \
           would be created, only if they exist and are symlinks.";
-      select_doc;
-    ]
+      select_doc ]
   in
   let dir =
     let doc =
@@ -229,8 +228,8 @@ let symlink =
          info ["d"; "in-dir"] ~doc ~docv)
   in
   let rm =
-    let doc = "Remove symlinks rather than create them. If they exist and \
-               are symlinks."
+    let doc =
+      "Remove symlinks rather than create them. If they exist and are symlinks."
     in
     Arg.(value & flag & info ["rm"] ~doc)
   in
@@ -265,13 +264,13 @@ let vcs =
   Term.(const vcs $ topmost $ includes $ excludes $ all $ keep_going $
         vcs_kind $ tool_args)
 
-let subs = [exec; list; symlink (* vcs *) ]
 let cmd =
-  let doc = "Operate on B0 scopes" in
+  let doc = "Operate on scopes" in
   let descr =
     `P "The command $(iname) operates on scopes. The $(b,b0 scope exec) \
         command allows to fold over scope directories and invoke an \
         arbitary tool. Use the $(b,b0 vcs) command to invokes a vcs operation \
         on scope directories that are managed by it and dirty.";
   in
-  B0_tool_std.Cli.cmd_group_with_b0_file "scope" ~doc ~descr subs
+  B0_tool_std.Cli.cmd_group "scope" ~doc ~descr @@
+  [exec; list; symlink (* vcs *) ]

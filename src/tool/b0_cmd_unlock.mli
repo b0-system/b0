@@ -3,4 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** OCaml eco-system support. *)
+(** B0 [root] command. *)
+
+val cmd : B0_std.Os.Exit.t Cmdliner.Cmd.t
+(** [cmd] is the command line for [root]. *)

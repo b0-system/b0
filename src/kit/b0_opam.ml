@@ -100,39 +100,39 @@ module File = struct
 
   let name_field =
     let doc = "opam file name: field" in
-    B0_meta.Key.v "opam-name" ~doc ~pp_value:Fmt.string
+    B0_meta.Key.make "opam-name" ~doc ~pp_value:Fmt.string
 
   let file_addendum =
     let doc = "opam file fragment added at the end" in
-    B0_meta.Key.v "opam-file-addendum" ~doc ~pp_value:_pp
+    B0_meta.Key.make "opam-file-addendum" ~doc ~pp_value:_pp
 
   let available_field =
     let doc = "opam file available: field" in
-    B0_meta.Key.v "opam-available" ~doc ~pp_value:Fmt.string
+    B0_meta.Key.make "opam-available" ~doc ~pp_value:Fmt.string
 
   let build_field =
     let doc = "opam file build: field" in
-    B0_meta.Key.v "opam-build" ~doc ~pp_value:Fmt.string
+    B0_meta.Key.make "opam-build" ~doc ~pp_value:Fmt.string
 
   let conflicts_field =
     let doc = "opam file conflicts: field" in
-    B0_meta.Key.v "opam-conflicts" ~doc ~pp_value:pp_pkg_spec_list
+    B0_meta.Key.make "opam-conflicts" ~doc ~pp_value:pp_pkg_spec_list
 
   let depends_field =
     let doc = "opam file depends: field" in
-    B0_meta.Key.v "opam-depends" ~doc ~pp_value:pp_pkg_spec_list
+    B0_meta.Key.make "opam-depends" ~doc ~pp_value:pp_pkg_spec_list
 
   let depopts_field =
     let doc = "opam file depopts: field" in
-    B0_meta.Key.v "opam-depopts" ~doc ~pp_value:pp_pkg_spec_list
+    B0_meta.Key.make "opam-depopts" ~doc ~pp_value:pp_pkg_spec_list
 
   let install_field =
     let doc = "opam file install: field" in
-    B0_meta.Key.v "opam-install" ~doc ~pp_value:Fmt.string
+    B0_meta.Key.make "opam-install" ~doc ~pp_value:Fmt.string
 
   let pin_depends =
     let doc = "opam file pin-depends: field" in
-    B0_meta.Key.v "opam-pin-depends" ~doc ~pp_value:pp_pkg_url_list
+    B0_meta.Key.make "opam-pin-depends" ~doc ~pp_value:pp_pkg_url_list
 
   let pkg_of_meta ~with_name m =
     let string field k m acc = match B0_meta.find k m with
@@ -193,7 +193,7 @@ end
 
 (* opam metadata *)
 
-let tag = B0_meta.Key.tag "opam" ~doc:"opam related entity"
+let tag = B0_meta.Key.make_tag "opam" ~doc:"opam related entity"
 let pkg_name_of_pack p =
   match B0_meta.find File.name_field (B0_pack.meta p) with
   | Some n -> n
@@ -204,88 +204,50 @@ let pkg_name_of_pack p =
       | None -> "unknown" (* unlikely, libraries should not do this. *)
       | Some d -> Fpath.basename d
 
-module Meta = struct
-  type pkg_spec = string * string
-  let available = File.available_field
-  let build = File.build_field
-  let conflicts = File.conflicts_field
-  let depends = File.depends_field
-  let depopts = File.depopts_field
-  let file_addendum = File.file_addendum
-  let install = File.install_field
-  let name = File.name_field
-  let pin_depends = File.pin_depends
 
-  (* Metadata derivation *)
+type pkg_spec = string * string
+let available = File.available_field
+let build = File.build_field
+let conflicts = File.conflicts_field
+let depends = File.depends_field
+let depopts = File.depopts_field
+let file_addendum = File.file_addendum
+let install = File.install_field
+let name = File.name_field
+let pin_depends = File.pin_depends
 
-  let synopsis_and_description_of_cmark file =
-    let syn_of_title t = (* Get $SYN in "$NAME $SEP $SYN" *)
-      let ws = Char.Ascii.is_white and tok c = not @@ Char.Ascii.is_white c in
-      let skip = String.lose_left in
-      let d = t |> skip ws |> skip tok |> skip ws |> skip tok |> skip ws in
-      if d <> "" then Some d else None
-    in
-    let descr_of_section s =
-      (* XXX This is only here because of the person who wrote this.
-         This shouldn't exist. *)
-      let prefix = "\x25%VERSION%%" in
-      if not (String.starts_with ~prefix s) then String.trim s else
-      String.trim (String.subrange ~first:(String.length prefix) s)
-    in
-    let contents = Os.File.read file |> Log.if_error ~use:"" in
-    let convert (t, d) = syn_of_title t, descr_of_section d in
-    Option.map convert (B0_cmark.first_section ~preamble:true contents)
+(* Metadata derivation *)
 
-  let derive_synopsis_and_description p m =
-    match B0_meta.(mem synopsis m, mem description m) with
-    | true, true -> m
-    | has_syn, has_descr ->
-        let extracted = match B0_def.scope_dir (B0_pack.def p) with
-        | None -> None
-        | Some scope_dir ->
-            let readme = Fpath.(scope_dir / "README.md") in
-            let exists = Os.File.exists readme |> Log.if_error ~use:false in
-            if exists then synopsis_and_description_of_cmark readme else None
-        in
-        match extracted with
-        | None -> m
-        | Some (syn, d) ->
-            let syn = Option.value ~default:"" syn in
-            let m = if has_syn then m else B0_meta.(add synopsis syn m) in
-            let m = if has_descr then m else B0_meta.(add description d m) in
-            m
+let derive_build p m =
+  if B0_meta.mem build m then m else
+  let b = Fmt.str {|[[ "b0" "--lock" "-p" "%s" ]]|} (B0_pack.basename p) in
+  B0_meta.add build b m
 
-  let derive_build p m =
-    if B0_meta.mem build m then m else
-    let b = Fmt.str {|[[ "b0" "--lock" "-p" "%s" ]]|} (B0_pack.basename p) in
-    B0_meta.add build b m
-
-  let derive_depends p m =
-    if B0_meta.mem depends m then m else
-    let unit_pkg_deps u = match B0_unit.find_meta B0_ocaml.Meta.requires u with
-    | None -> [] | Some libs ->
-        (* FIXME This is a poc and not subtle enough, we should likely
+let derive_depends p m =
+  if B0_meta.mem depends m then m else
+  let unit_pkg_deps u = match B0_unit.find_meta B0_ocaml.requires u with
+  | None -> [] | Some libs ->
+      (* FIXME This is a poc and not subtle enough, we should likely
            enrich library name declarations with versions and/or
            package membership. Also this makes dependencies on self at the
            moment. Also we can easily derive {build} and {test} deps by
            looking up unit tags. *)
-        List.rev_map (fun l -> B0_ocaml.Lib.Name.last l) libs
-    in
-    let pkg_deps = List.concat_map unit_pkg_deps (B0_pack.units p) in
-    let pkg_deps = List.map (fun n -> n, "") (String.distinct pkg_deps) in
-    B0_meta.add depends pkg_deps m
+      List.rev_map (fun l -> B0_ocaml.Libname.root l) libs
+  in
+  let pkg_deps = List.concat_map unit_pkg_deps (B0_pack.units p) in
+  let pkg_deps = List.map (fun n -> n, "") (String.distinct pkg_deps) in
+  B0_meta.add depends pkg_deps m
 
-  let derive_name p m =
-    if B0_meta.mem name m then m else B0_meta.add name (pkg_name_of_pack p) m
+let derive_name p m =
+  if B0_meta.mem name m then m else B0_meta.add name (pkg_name_of_pack p) m
 
-  let pkg_of_pack p =
-    let m = B0_pack.meta p in
-    let m = derive_name p m in
-    let m = derive_synopsis_and_description p m in
-    let m = derive_build p m in
-    let m = derive_depends p m in
-    m
-end
+let pkg_meta_of_pack p =
+  let m = B0_pack.meta p in
+  let m = derive_name p m in
+  let m = B0_pack.derive_synopsis_and_description p m in
+  let m = derive_build p m in
+  let m = derive_depends p m in
+  m
 
 (* Package definition via packs and their lookup. *)
 
@@ -300,7 +262,7 @@ module Pkg = struct
     Fmt.pf ppf "Package %a: Pack %a" pp_name pkg B0_pack.pp_name (pack pkg)
 
   let file ~with_name pkg =
-    let meta = Meta.pkg_of_pack (pack pkg) in
+    let meta = pkg_meta_of_pack (pack pkg) in
     let file = File.v2 :: File.pkg_of_meta ~with_name meta in
     meta, file
 
@@ -315,7 +277,7 @@ module Pkg = struct
     String.concat "\n" (List.rev (String.Set.fold add unknown []))
 
   let get_list_or_hints pkgs =
-    let add_pack p = match B0_pack.has_meta tag p with
+    let add_pack p = match B0_pack.has_tag tag p with
     | true -> Some (pkg_name_of_pack p, p) | false -> None
     in
     let packs = List.filter_map add_pack (B0_pack.list ()) in
@@ -331,7 +293,8 @@ module Pkg = struct
     else Error (name_hints ~dom ~unknown)
 
   let get_unique_list_or_hints ~constraints pkgs =
-    let* constraints = B0_pack.get_list_or_hint constraints in
+    let all_if_empty = false in
+    let* constraints = B0_pack.get_list_or_hint ~all_if_empty constraints in
     let constraints = B0_pack.Set.of_list constraints in
     let* pkg_packs = get_list_or_hints pkgs in
     let by_name =
@@ -403,7 +366,7 @@ let lint_files ~normalize pkgs =
     Pkg.lint_opam_file ~normalize pkg (snd (Pkg.file ~with_name:false pkg))
   in
   let* _ = collect_results (List.map lint pkgs) in
-  Log.app (fun m -> m "%a" (Fmt.tty_string [`Fg `Green]) "Passed.");
+  Log.app (fun m -> m "%a" (Fmt.tty' [`Fg `Green]) "Passed.");
   Ok B0_cli.Exit.ok
 
 let gen_files pkgs ~normalize ~with_name ~dst =
@@ -487,7 +450,7 @@ module Publish = struct
     Result.map_error (Fmt.str "%a: %s" Pkg.pp_err_pack pkg) @@
     let* version = match version with
     | Some version -> Ok version
-    | None -> B0_release.version_of_pack (Pkg.pack pkg)
+    | None -> B0_release.vcs_repo_version_of_pack (Pkg.pack pkg)
     in
     let* file_meta, file =
       let file_meta, file = Pkg.file ~with_name:false pkg in
@@ -629,11 +592,11 @@ module Publish = struct
     | Some csum -> acc, add csum i :: is
     | None ->
         let meth = if check_only then `HEAD else `GET in
-        let request = Http.Request.v ~url:i.url meth in
+        let request = Http.Request.make ~url:i.url meth in
         let csum =
           Result.error_to_failure @@
           Result.map_error (Fmt.str "%a: %s" Pkg.pp_err i.pkg) @@
-          let* response = Http_client.request http request in
+          let* response = Http_client.fetch http request in
           match Http.Response.status response with
           | 200 -> checksum shasum (Http.Response.body response)
           | c -> Fmt.error "[%a] %s" Fmt.(tty [`Fg `Red] int) c i.url
@@ -645,8 +608,8 @@ module Publish = struct
     | _, is -> Ok (List.rev is)
 
   let log_start is incs check_only =
-    let pp_add ppf () = Fmt.tty_string [`Fg `Green] ppf "Add:" in
-    let pp_inc ppf () = Fmt.tty_string [`Fg `Yellow] ppf "Incompatible:" in
+    let pp_add ppf () = Fmt.tty' [`Fg `Green] ppf "Add:" in
+    let pp_inc ppf () = Fmt.tty' [`Fg `Yellow] ppf "Incompatible:" in
     let pp_info ppf i =
       Fmt.pf ppf "@[<v>%a %a@,     %s@]"
         pp_add () Fmt.(code string) (versioned_name i) i.url
@@ -663,21 +626,21 @@ module Publish = struct
     m "@[<v>%a%a%a@]" Fmt.(list pp_info) is pp_incs incs pp_download check_only
 
   let log_check_success () = Log.app @@ fun m ->
-    m "%a" (Fmt.tty_string [`Fg `Green]) "All checks succeeded"
+    m "%a" (Fmt.tty' [`Fg `Green]) "All checks succeeded"
 
   let stdout_logging () =
-    (* Bof bof, maybe we should rather have something in B0_vcs.t *)
+    (* Bof bof, maybe we should rather have something in B0_vcs_repo.t *)
     if Log.level () >= Log.Info then None, None else
     Some Os.Cmd.out_null, Some Os.Cmd.out_null
 
   let rec get_updated_local_repo git ~pkgs_repo ~local_repo:dir =
     let stdout, stderr = stdout_logging () in
     let master = "master" in
-    let* local = B0_vcs.Git.find ~dir () in
+    let* local = B0_vcs_repo.Git.find ~dir () in
     match local with
     | Some repo ->
         Log.app (fun m -> m "Updating %a" Fpath.pp dir);
-        let git = B0_vcs.repo_cmd repo in
+        let git = B0_vcs_repo.repo_cmd repo in
         let fetch = Cmd.(arg "fetch" % "origin" % master) in
         let* () = Os.Cmd.run ?stdout ?stderr Cmd.(git %% fetch) in
         Ok repo
@@ -697,7 +660,7 @@ module Publish = struct
     let fetch_head = Some "FETCH_HEAD" and force = true in
     Log.app (fun m -> m "Branching %s…" branch);
     Result.join @@
-    B0_vcs.Git.with_transient_checkout
+    B0_vcs_repo.Git.with_transient_checkout
       ?stdout ?stderr repo ~force ~branch fetch_head
     @@ fun r ->
     let rec add_pkgs ~base_dir acc = function
@@ -711,14 +674,14 @@ module Publish = struct
         | Error _ as e -> e
         | Ok () -> add_pkgs ~base_dir (file :: acc) is
     in
-    let base_dir = Fpath.(B0_vcs.work_dir r / pkgs_dir) in
+    let base_dir = Fpath.(B0_vcs_repo.work_dir r / pkgs_dir) in
     let* files = add_pkgs ~base_dir [] is in
     (* XXX at that point once we get a usable opam admin add-constraint
        use appropriately with _incs, see
        https://github.com/ocaml/opam/issues/3077 *)
     let msg = msg_title is in
-    let* () = B0_vcs.Git.add ?stdout ?stderr r ~force:false files in
-    let* () = B0_vcs.commit_files ?stdout ?stderr ~msg r files in
+    let* () = B0_vcs_repo.Git.add ?stdout ?stderr r ~force:false files in
+    let* () = B0_vcs_repo.commit_files ?stdout ?stderr ~msg r files in
     Ok ()
 
   let github_auth_env ~github_auth:a =
@@ -730,7 +693,7 @@ module Publish = struct
   let push_branch ~github_auth ~local_repo ~branch ~fork_repo  =
     Log.app (fun m -> m "Pushing %s on %s" branch fork_repo);
     let stdout, stderr = stdout_logging () in
-    let repo_cmd = B0_vcs.repo_cmd local_repo in
+    let repo_cmd = B0_vcs_repo.repo_cmd local_repo in
     let env_creds = (* XXX Windows :-( ? *)
       "!f() { echo \"username=${B0_GITHUB_USER}\n\
                      password=${B0_GITHUB_TOKEN}\"; }; f"
@@ -740,7 +703,7 @@ module Publish = struct
     let* env = github_auth_env ~github_auth in
     let src = branch and dst = branch in
     let remote = fork_repo in
-    B0_vcs.Git.remote_branch_push
+    B0_vcs_repo.Git.remote_branch_push
       ?stdout ?stderr local_repo ~env ~force:true ~src ~remote ~dst
 
   let publish_pkgs
@@ -753,7 +716,7 @@ module Publish = struct
     end;
     let* httpc = B0_http.Http_client.get () in
     let* shasum = Os.Cmd.get (Cmd.arg "shasum") in
-    let* git = B0_vcs.Git.get_cmd () in
+    let* git = B0_vcs_repo.Git.get_cmd () in
     let* is = collect_results (List.map info_of_pkg pkgs) in
     let title, msg = msg_for_publish is incompats in
     log_start is incompats check_only;
@@ -809,11 +772,11 @@ module Publish = struct
 end
 
 
-(* .opam cmd command line interface  *)
+(* .opam action command line interface  *)
 
 open Cmdliner
 
-let opam_cmd env =
+let opam_cmd action env =
   let man =
     [ `S Manpage.s_see_also;
       `P "Consult $(b,odig doc b0) for the B0 opam manual."]
@@ -938,11 +901,12 @@ let opam_cmd env =
                   information.";
               `Blocks man]
   in
-  Cmd.group (Cmd.info ".opam" ~doc:"B0 opam support" ~man) @@
+  let name = B0_action.name action and doc = B0_action.doc action in
+  Cmd.group (Cmd.info name ~doc ~man) @@
   [file_cmd; list_cmd; publish_cmd]
 
 let action =
-  let doc = "opam support, use --help for more information" in
+  let doc = "opam support" in
   B0_action.of_cmdliner_cmd "" opam_cmd ~doc
 
 let () = B0_def.Scope.close ()

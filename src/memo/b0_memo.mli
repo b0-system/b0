@@ -73,10 +73,10 @@ module Tool : sig
   type t
   (** The type for tools. *)
 
-  val v :
+  val make :
     ?response_file:response_file -> ?unstamped_vars:env_vars ->
     ?vars:env_vars -> Cmd.tool -> t
-  (** [v ~response_file ~unstamped_vars ~vars cmd] is a tool specified
+  (** [make ~response_file ~unstamped_vars ~vars cmd] is a tool specified
       by [cmd]. [vars] are the stamped variables accessed by the
       tool (defaults to [[]]). [unstamped_vars] are the unstamped
       variables accessed by the tool (defaults to {!tmp_vars}).

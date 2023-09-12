@@ -11,30 +11,36 @@ arbitrary build abstraction with reliable, efficient incremental rebuilds.
 
 {1:manuals Manuals}
 
-For B0 users.
+{2:manuals_all For all users}
 
-{ul
-{- The {{!page-manual}B0 manual} is a conceptual overview of the
-   B0 system and B0 files. It is recommended reading.}
-{- The {{!page-unit_manual}build unit manual} describes how to
-   create your own build units.}
-{- The {{!page-action_manual}action manual} describes how to define
-   your own actions.}
-{- The {{!page-memo_manual}B0_memo manual} describes the [b0.memo] build
-   library.}
-{- The {{!page-release}B0 release manual} describes B0 support
-   for releasing software.}}
 
-For B0 programmers.
+- The {{!page-manual}B0 manual} is a conceptual overview of the
+   B0 system and B0 files. It is recommended reading.
+- The {{!page-action}action manual} describes how to define
+   your own actions.
+- The {{!page-unit}build unit manual} describes how to
+   create your own build units.
+- The {{!page-memo}memo manual} describes the [b0.memo] build
+   library.
+- The {{!page-release}release manual} describes B0 support
+   for releasing source software.
 
-{ul
-{- The {{!page-driver_dev}B0 driver development manual} describes
-   how to make your own drivers to operate on B0 files.}
-{- The {{!page-todo}TODO} page}
-{- {{!page-old_manual}Old manual fragments} and TODO which will eventually
-   disapear.}
-{- The {{!page-rationale}rationale} of B0, written a long time ago but
-   still relevant}}
+{2:manuals_ocaml For OCaml users}
+
+- The {{!page-ocaml}B0 OCaml manual} describes the built-in support
+  for handling your OCaml projects.
+- The {{!page-opam}B0 opam manual} describes the [opam] support
+  to generate opam package files and publish them in repositories.
+
+{2:manuals_dev For B0 developers}
+
+- The {{!page-driver}B0 driver manual} describes
+  how to make your own drivers to operate on B0 files.
+- The {{!page-todo}TODO} page
+- {{!page-old_manual}Old manual fragments} and TODO which will eventually
+   disappear.
+- The {{!page-rationale}rationale} of B0, written a long time ago but
+  still relevant
 
 {1:b0_std Library [b0.std]}
 
@@ -53,6 +59,7 @@ B0_base64
 B0_html
 B0_json
 B0_sexp
+B0_tar
 B0_text
 }
 
@@ -65,11 +72,12 @@ B0_pdf_viewer
 B0_web_browser
 }
 
-{2:net Networking}
+{2:tools Tools}
 
 {!modules:
 B0_http
 B0_rsync
+B0_vcs_repo
 }
 
 {1:b0_memo Library [b0.memo]}
@@ -93,7 +101,6 @@ and deployments via {{!page-manual.b0_file}B0 files}.
 B0_build_trace
 B0_cli
 B0_file_exts
-B0_ocaml
 B0_srcs
 }
 
@@ -104,6 +111,7 @@ B0_action
 B0_build
 B0_def
 B0_dir
+B0_env
 B0_meta
 B0_pack
 B0_store
@@ -113,8 +121,7 @@ B0_unit
 {2:driver Driver support}
 
 The following is only needed if you want to process B0 files
-your own own way. See the {{!page-driver_dev}B0 driver development
-manual}.
+your own own way. See the {{!page-driver}driver manual}.
 
 {!modules:
 B0_file
@@ -134,8 +141,9 @@ B0_cmark
 
 {2:vcs VCS and code hosting}
 
+See also {!B0_vcs_repo}.
+
 {!modules:
-B0_vcs
 B0_github
 }
 
@@ -148,15 +156,11 @@ B0_release
 
 {2:ocaml OCaml support}
 
-{ul
-{- The {{!page-opam}B0 [opam] manual} describes the [opam] support
-   to generate opam package files and publish them in repositories.}}
-
 {!modules:
-B0_ocaml
+B0_dune
 B0_jsoo
+B0_ocaml
 B0_odoc
-B0_ocaml_eco
 B0_opam
 }
 

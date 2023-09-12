@@ -7,8 +7,8 @@ open B0_std
 open Result.Syntax
 
 let driver =
-  let libs = [B0_ocaml.Lib.Name.v "b0.tool"] in
-  B0_driver.create ~name:"b0" ~version:"%%VERSION%%" ~libs
+  let libs = [B0_ocaml.Libname.v "b0.tool"] in
+  B0_driver.make ~name:"b0" ~version:"%%VERSION%%" ~libs
 
 let def_list : (module B0_def.S) list =
   [(module B0_action); (module B0_pack); (module B0_unit)]
@@ -47,8 +47,8 @@ let def_list_get_or_hint def_list name =
   in
   loop [] String.Set.empty def_list
 
-let def_list_get_list_or_hint def_list ~empty_means_all names =
-  if empty_means_all && names = [] then Ok (def_list_list def_list) else
+let def_list_get_list_or_hint def_list ~all_if_empty names =
+  if all_if_empty && names = [] then Ok (def_list_list def_list) else
   let rec loop vs es = function
   | [] ->
       if es <> []
@@ -69,7 +69,7 @@ module Def = struct
     | `Long -> Def.pp, Fmt.(cut ++ cut)
     in
     Log.if_error ~use:B0_cli.Exit.no_such_name @@
-    let* ds = Def.get_list_or_hint ~empty_means_all:true ds in
+    let* ds = Def.get_list_or_hint ~all_if_empty:true ds in
     Log.if_error' ~use:B0_cli.Exit.some_error @@
     let don't = B0_driver.Conf.no_pager c in
     let* pager = B0_pager.find ~don't () in
@@ -87,7 +87,7 @@ module Def = struct
     in
     let edit_all = ds = [] in
     Log.if_error ~use:B0_cli.Exit.no_such_name @@
-    let* ds = Def.get_list_or_hint ~empty_means_all:true ds in
+    let* ds = Def.get_list_or_hint ~all_if_empty:true ds in
     let not_found, files = find_files Def.Set.empty [] ds in
     Log.if_error' ~use:B0_cli.Exit.some_error @@
     match not edit_all && not (Def.Set.is_empty not_found) with
@@ -105,7 +105,7 @@ module Def = struct
   let get_meta_key (module Def : B0_def.S) c format key ds =
     Log.if_error ~use:B0_cli.Exit.no_such_name @@
     let* B0_meta.Key.V key = B0_meta.Key.get_or_hint key in
-    let* ds = Def.get_list_or_hint ~empty_means_all:true ds in
+    let* ds = Def.get_list_or_hint ~all_if_empty:true ds in
     let add_meta acc d = match B0_meta.find_binding key (Def.meta d) with
     | None -> acc | Some v -> (d, v) :: acc
     in
@@ -138,15 +138,16 @@ module Cli = struct
         `P "Consult $(b,odig doc b0) for manuals and more details."]
 
   let man_with_descr ?synopsis descr =
-    let man = [`S Manpage.s_description;
-               descr;
-               `S Manpage.s_commands;
-               `S Manpage.s_arguments;
-               `S Manpage.s_options;
-               `S B0_cli.s_output_format_options;
-               `S s_scope_selection;
-               `S Manpage.s_common_options;
-               man_see_manual]
+    let man =
+      [ `S Manpage.s_description;
+        descr;
+        `S Manpage.s_commands;
+        `S Manpage.s_arguments;
+        `S Manpage.s_options;
+        `S B0_cli.s_output_format_options;
+        `S s_scope_selection;
+        `S Manpage.s_common_options;
+       man_see_manual ]
     in
     match synopsis with
     | None -> man
@@ -155,17 +156,50 @@ module Cli = struct
   let editor_envs = B0_editor.Env.infos
   let pager_envs = B0_pager.Env.infos
   let format = B0_cli.output_format ()
+  let no_pager = B0_driver.Cli.no_pager
   let pos_key =
     let doc = "The metadata key $(docv) to get." and docv = "KEY" in
     Arg.(required & pos 0 (some string) None & info [] ~doc ~docv)
+
+  let minimal_setup =
+    let minimal_setup_with_cli log_level tty_cap =
+      let tty_cap = B0_cli.B0_std.get_tty_cap tty_cap in
+      let log_level = B0_cli.B0_std.get_log_level log_level in
+      B0_cli.B0_std.setup tty_cap log_level ~log_spawns:Log.Debug;
+    in
+    Term.(const minimal_setup_with_cli $ B0_driver.Cli.log_level $
+          B0_driver.Cli.tty_cap)
+
+  let subcmd ?exits ?(envs = []) ?synopsis name ~doc ~descr term =
+    let man = man_with_descr ?synopsis descr in
+    let term = Term.(term $ minimal_setup) in
+    Cmd.v (Cmd.info name ~doc ?exits ~envs ~man) term
+
+  let subcmd_with_driver_conf
+      ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
+      term
+    =
+    let man = man_with_descr ?synopsis descr in
+    let envs = List.rev_append envs pager_envs (* driver conf has no-pager *)in
+    let term = Term.(term $ B0_driver.Cli.conf) in
+    Cmd.v (Cmd.info name ~doc ~exits ~envs ~man) term
 
   let subcmd_with_b0_file
       ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
       term
     =
     let man = man_with_descr ?synopsis descr in
+    let envs = List.rev_append envs pager_envs (* driver conf has no-pager *)in
     let term = B0_driver.with_b0_file ~driver term in
     Cmd.v (Cmd.info name ~doc ~exits ~envs ~man) term
+
+  let cmd_group ?exits ?(envs = []) ?synopsis name ~doc ~descr ?default subs =
+    let man = man_with_descr ?synopsis descr in
+    Cmd.group (Cmd.info name ~doc ?exits ~envs ~man) ?default subs
+
+  (*
+
+   Let's keep that here for now
 
   let cmd_group_with_b0_file
       ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
@@ -178,14 +212,6 @@ module Cli = struct
     in
     Cmd.group (Cmd.info name ~doc ~exits ~envs ~man) ?default subs
 
-  let subcmd_with_driver_conf
-      ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
-      term
-    =
-    let man = man_with_descr ?synopsis descr in
-    let term = Term.(term $ B0_driver.Cli.conf) in
-    Cmd.v (Cmd.info name ~doc ~exits ~envs ~man) term
-
   let cmd_group_with_driver_conf
       ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
       ?default subs
@@ -196,4 +222,6 @@ module Cli = struct
     | None -> None
     in
     Cmd.group (Cmd.info name ~doc ~exits ~envs ~man) ?default subs
+  *)
+
 end

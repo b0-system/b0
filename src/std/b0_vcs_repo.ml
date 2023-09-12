@@ -6,13 +6,12 @@
 open B0_std
 open Result.Syntax
 
-let parse_changes lines =
-  try
-    let parse_line l = match String.cut_left ~sep:" " l with
-    | None -> Fmt.failwith "%S: can't parse log line" l
-    | Some cut -> cut
-    in
-    Ok (List.(rev @@ rev_map parse_line lines))
+let parse_changes s =
+  let line n acc line = match String.cut_left ~sep:" " line with
+  | None -> Fmt.failwith "line %d: %S: can't parse log line" n line
+  | Some cut -> cut :: acc
+  in
+  try Ok (List.rev (String.fold_ascii_lines ~strip_newlines:true line [] s))
   with Failure e -> Error e
 
 let parse_ptime ptime = try Ok (int_of_string ptime) with
@@ -25,13 +24,14 @@ let parse_files ~err o =
 
 let dirtify id = id ^ "-dirty"
 
+type dry_run = Cmd.t -> unit
+
 (* VCS kind *)
 
 type kind = Git | Hg
 let kind_to_string = function Git -> "git" | Hg -> "hg"
 let pp_kind ppf k = Fmt.string ppf (kind_to_string k)
 let pp_kind_option = Fmt.option ~none:(Fmt.any "VCS") pp_kind
-
 
 let kinds = [Git; Hg]
 
@@ -43,6 +43,7 @@ type tag = string
 
 type r =
   { kind : kind;
+    bare_cmd : Cmd.t;
     cmd : Cmd.t;
     repo_dir : Fpath.t;
     work_dir : Fpath.t }
@@ -59,7 +60,7 @@ module type VCS = sig
   val commit_ptime_s : r -> commit_ish -> (int, string) result
   val describe : r -> dirty_mark:bool -> commit_ish -> (string, string) result
   val changes :
-    r -> after:commit_ish -> until:commit_ish ->
+    r -> ?after:commit_ish -> ?last:commit_ish -> unit ->
     ((string * string) list, string) result
 
   val tracked_files : r -> tree_ish:string -> (Fpath.t list, string) result
@@ -78,10 +79,12 @@ module type VCS = sig
 
   val tags : r -> (tag list, string) result
   val tag :
+    ?dry_run:(Cmd.t -> unit) ->
     ?msg:string -> r ->  force:bool -> sign:bool -> commit_ish -> tag ->
     (unit, string) result
 
-  val delete_tag : r -> tag -> (unit, string) result
+  val delete_tag :
+    ?dry_run:(Cmd.t -> unit) -> r -> tag -> (unit, string) result
   val latest_tag : r -> commit_ish -> (tag option, string) result
 end
 
@@ -94,11 +97,21 @@ let run ?stderr r cmd_args =
   | `Exited 0, v -> Ok v
   | status, _ -> err vcs status
 
-let run_status ?stdout ?stderr r cmd_args =
-  let vcs = Cmd.(r.cmd %% cmd_args) in
-  Result.bind (Os.Cmd.run_status ?stdout ?stderr vcs) @@ function
-  | `Exited 0 -> Ok ()
-  | status -> err vcs status
+
+let _run_status ?dry_run ?stdout ?stderr r cmd =
+  match dry_run with
+  | Some dry_run -> dry_run cmd; Ok ()
+  | None ->
+      let* status = Os.Cmd.run_status ?stdout ?stderr cmd in
+      match status with
+      | `Exited 0 -> Ok ()
+      | status -> err cmd status
+
+let bare_run_status ?dry_run ?stdout ?stderr repo cmd_args =
+  _run_status ?dry_run ?stdout ?stderr repo Cmd.(repo.bare_cmd %% cmd_args)
+
+let run_status ?dry_run ?stdout ?stderr repo cmd_args =
+  _run_status ?dry_run ?stdout ?stderr repo Cmd.(repo.cmd %% cmd_args)
 
 (* Git support *)
 
@@ -136,7 +149,7 @@ module Git_vcs = struct
             let default = Fpath.null (* for bare repos *) in
             let work_dir = Option.value ~default work_dir in
             let cmd = repo_cmd git repo_dir work_dir in
-            Ok (Some { kind = Git; cmd; repo_dir; work_dir })
+            Ok (Some { kind = Git; bare_cmd = git; cmd; repo_dir; work_dir })
 
   let repo_cmd r = r.cmd
 
@@ -164,11 +177,14 @@ module Git_vcs = struct
     let args = Cmd.(arg "show" % "-s" % "--format=%ct" % commit_ish) in
     Result.bind (run r args) parse_ptime
 
-  let changes r ~after ~until =
-    let range = if after = "" then until else Fmt.str "%s..%s" after until in
+  let changes r ?after ?(last = "HEAD") () =
+    let range = match after with
+    | None -> last
+    | Some after -> Fmt.str "%s..%s" after last
+    in
     let args = Cmd.(arg "log" % "--oneline" % "--no-decorate" % range) in
-    Result.bind (run r args) @@ fun o ->
-    parse_changes (String.cuts_left ~sep:"\n" o)
+    let* lines = run r args in
+    parse_changes lines
 
   let tracked_files r ~tree_ish =
     let args = Cmd.(arg "ls-tree" % "--name-only" % "-r" % tree_ish) in
@@ -196,8 +212,9 @@ module Git_vcs = struct
 
   let local_clone r ~dir =
     let args = Cmd.(arg "clone" % "--local" %% path r.repo_dir %% path dir) in
-    Result.bind (run_status r args) @@ fun () ->
-    Result.bind (find ~dir ()) @@ function
+    let* () = bare_run_status r args in
+    let* clone = find ~dir () in
+    match clone with
     | Some r -> Ok r
     | None -> Fmt.error "%a: no clone found" Fpath.pp_quoted dir
 
@@ -207,15 +224,15 @@ module Git_vcs = struct
     let args = Cmd.(arg "tag" % "--list") in
     Result.bind (run r args) @@ fun o -> Ok (String.cuts_left ~sep:"\n" o)
 
-  let tag ?msg:m r ~force ~sign commit_ish tag =
+  let tag ?dry_run ?msg:m r ~force ~sign commit_ish tag =
     let msg = match m with None -> Cmd.empty | Some m -> Cmd.(arg "-m" % m) in
     let flags = Cmd.(if' force (arg "-f") %% if' sign (arg "-s")) in
     let args = Cmd.(arg "tag" % "-a" %% flags %% msg % tag % commit_ish) in
-    run_status r args
+    run_status ?dry_run r args
 
-  let delete_tag r tag =
+  let delete_tag ?dry_run r tag =
     let args = Cmd.(arg "tag" % "-d" % tag) in
-    run_status r args
+    run_status ?dry_run r args
 
   let describe r ~dirty_mark commit_ish =
     let args = Cmd.(arg "describe" % "--always" % commit_ish) in
@@ -247,7 +264,9 @@ module Hg_vcs = struct
         | true ->
             Result.bind (Lazy.force hg) @@ function
             | Some hg ->
-                Ok (Some { kind = Hg; cmd = repo_cmd hg repo_dir; repo_dir;
+                Ok (Some { kind = Hg;
+                           bare_cmd = hg;
+                           cmd = repo_cmd hg repo_dir; repo_dir;
                            work_dir})
             | None ->
               Fmt.error "%a: repo found but no hg executable in PATH"
@@ -264,7 +283,8 @@ module Hg_vcs = struct
           | `Exited 0, repo_dir ->
               Result.bind (Fpath.of_string repo_dir) @@ fun repo_dir ->
               let work_dir = Fpath.parent repo_dir in
-              Ok (Some { kind = Hg; cmd = repo_cmd hg repo_dir; repo_dir;
+              Ok (Some { kind = Hg; bare_cmd = hg;
+                         cmd = repo_cmd hg repo_dir; repo_dir;
                          work_dir })
           | _ -> Ok None
 
@@ -301,13 +321,17 @@ module Hg_vcs = struct
     let args = Cmd.(arg "log" % "--template" % date % "--rev" % rev) in
     Result.bind (run r args) parse_ptime
 
-  let changes r ~after ~until =
-    let after = revision after and until = revision until in
-    let rev = Fmt.str "%s::%s" after until in
+  let changes r ?after ?(last = "HEAD") () =
+    let last = revision last in
+    let rev = match after with
+    | None -> last
+    | Some after -> Fmt.str "%s::%s" (revision after) last
+    in
     let template = "{node|short} {desc|firstline}\\n" in
     let args = Cmd.(arg "log" % "--template" % template % "--rev" % rev) in
-    Result.bind (run r args) @@ fun o ->
-    Result.bind (parse_changes (String.cuts_left ~sep:"\n" o)) @@ function
+    let* lines = run r args in
+    let* changes = parse_changes lines in
+    match changes with
     | [] -> Ok []
     | after :: rest -> Ok (List.rev rest) (* hg order is reverse from git *)
 
@@ -350,17 +374,17 @@ module Hg_vcs = struct
     let args = Cmd.(arg "tags" % "--quiet" (* sic *)) in
     Result.bind (run r args) @@ fun o -> Ok (String.cuts_left ~sep:"\n" o)
 
-  let tag ?msg:m r ~force ~sign commit_ish tag =
+  let tag ?dry_run ?msg:m r ~force ~sign commit_ish tag =
     if sign then Error "Tag signing is not supported by hg" else
     let rev = revision commit_ish in
     let msg = match m with None -> Cmd.empty | Some m -> Cmd.(arg "-m" % m) in
     let may_force = Cmd.(if' force (arg "-f")) in
     let args = Cmd.(arg "tag" %% may_force %% msg % "--rev" % rev % tag) in
-    run_status r args
+    run_status ?dry_run r args
 
-  let delete_tag r tag =
+  let delete_tag ?dry_run r tag =
     let args = Cmd.(arg "tag" % "--remove" % tag) in
-    run_status r args
+    run_status ?dry_run r args
 
   let describe r ~dirty_mark commit_ish =
     let get_distance s = try Ok (int_of_string s) with
@@ -390,8 +414,12 @@ let kind (r, _) = r.kind
 let repo_dir (r, _) = r.repo_dir
 let work_dir (r, _) = r.work_dir
 let repo_cmd (r, (module Vcs : VCS)) = Vcs.repo_cmd r
+
 let pp ppf (r, _) =
-  Fmt.pf ppf "(%a, %a)" pp_kind r.kind Fpath.pp_quoted r.repo_dir
+  Fmt.pf ppf "%a" (Fmt.tty [`Bold] Fpath.pp) r.repo_dir
+
+let pp_long ppf (r, _ as vcs) =
+  Fmt.pf ppf "%a %a" pp_kind r.kind pp vcs
 
 (* Finding reposistories *)
 
@@ -418,8 +446,8 @@ let get ?kind ?dir () =
   | Some r -> Ok r
   | None ->
       let* dir = match dir with None -> Os.Dir.cwd () | Some dir -> Ok dir in
-      Fmt.error "%a: No %a repository found"
-        Fpath.pp_quoted dir pp_kind_option kind
+      Fmt.error
+        "%a: No %a repository found" Fpath.pp_quoted dir pp_kind_option kind
 
 (* Commits *)
 
@@ -430,6 +458,8 @@ let changes (r, (module Vcs : VCS)) = Vcs.changes r
 let tracked_files (r, (module Vcs : VCS)) = Vcs.tracked_files r
 let commit_files ?stdout ?stderr ?msg (r, (module Vcs : VCS)) =
   Vcs.commit_files ?stdout ?stderr ?msg r
+
+let pp_commit = Fmt.tty' [`Fg `Yellow]
 
 (* Working directory *)
 
@@ -443,13 +473,25 @@ let checkout ?and_branch (r, (module Vcs : VCS)) = Vcs.checkout ?and_branch r
 let local_clone (r, (module Vcs : VCS)) ~dir =
   Result.bind (Vcs.local_clone r ~dir) @@ fun r -> Ok (r, (module Vcs : VCS))
 
+let pp_dirty ppf () = Fmt.tty' [`Fg `Red] ppf "dirty"
+
 (* Tags *)
 
 let tags (r, (module Vcs : VCS)) = Vcs.tags r
-let tag ?msg (r, (module Vcs : VCS)) = Vcs.tag ?msg r
-let delete_tag (r, (module Vcs : VCS)) = Vcs.delete_tag r
+let tag ?dry_run ?msg (r, (module Vcs : VCS)) = Vcs.tag ?dry_run ?msg r
+let delete_tag ?dry_run (r, (module Vcs : VCS)) = Vcs.delete_tag ?dry_run r
 let describe (r, (module Vcs : VCS)) = Vcs.describe r
 let latest_tag (r, (module Vcs : VCS)) = Vcs.latest_tag r
+let find_greatest_version_tag vcs =
+  let* tags = tags vcs in
+  let rev_compare v v' = -1 * compare v v' in
+  let parse_tag acc tag = match String.to_version tag with
+  | None -> acc
+  | Some version -> (version, tag) :: acc
+  in
+  match List.(sort rev_compare (fold_left parse_tag [] tags)) with
+  | (_, latest) :: _ -> Ok (Some latest)
+  | [] -> Ok None
 
 (* Git specific *)
 
@@ -468,7 +510,7 @@ module Git = struct
   type remote = string
   type branch = string
 
-  let pp_branch = Fmt.tty_string [`Fg `Green; `Bold;]
+  let pp_branch = Fmt.tty' [`Fg `Green; `Bold;]
   let pp_remote_branch =
     Fmt.tty [`Fg `Red; `Bold] (fun ppf (r, b) -> Fmt.pf ppf "%s/%s" r b)
 

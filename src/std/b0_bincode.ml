@@ -30,7 +30,7 @@ let dec_eoi s i =
 (* Codecs *)
 
 type 'a t = { enc : 'a enc; dec : 'a dec }
-let v enc dec = { enc; dec }
+let make enc dec = { enc; dec }
 let enc c = c.enc
 let dec c = c.dec
 
@@ -51,7 +51,7 @@ let dec_magic magic s i =
   if String.equal magic magic' then next, () else
   err i "magic mismatch: %S but expected %S" magic' magic
 
-let magic magic = v (enc_magic magic) (dec_magic magic)
+let magic magic = make (enc_magic magic) (dec_magic magic)
 
 (* Bytes *)
 
@@ -64,7 +64,7 @@ let[@inline] dec_byte ~kind s i =
   let b = get_byte s i in
   next, b
 
-let byte ~kind = v enc_byte (dec_byte ~kind)
+let byte ~kind = make enc_byte (dec_byte ~kind)
 
 (* unit *)
 
@@ -76,7 +76,7 @@ let dec_unit s i =
   | 0 -> next, ()
   | b -> err_byte ~kind i b
 
-let unit = v enc_unit dec_unit
+let unit = make enc_unit dec_unit
 
 (* bool *)
 
@@ -89,7 +89,7 @@ let dec_bool s i =
   | 1 -> next, true
   | b -> err_byte ~kind i b
 
-let bool = v enc_bool dec_bool
+let bool = make enc_bool dec_bool
 
 (* int *)
 
@@ -111,7 +111,7 @@ let dec_int s i =
   and b6 = r s (i + 6) and b7 = r s (i + 7) in
   next, (b7 lsl 56) lor (b6 lsl 48) lor (b5 lsl 40) lor (b4 lsl 32) lor n
 
-let int = v enc_int dec_int
+let int = make enc_int dec_int
 
 (* int64 *)
 
@@ -138,7 +138,7 @@ let dec_int64 s i =
   check_next ~kind:"int64" s i next;
   next, unsafe_get_int64_le s i
 
-let int64 = v enc_int64 dec_int64
+let int64 = make enc_int64 dec_int64
 
 (* string *)
 
@@ -149,7 +149,7 @@ let dec_string s i =
   check_next ~kind:"string" s i next;
   next, String.sub s i len
 
-let string = v enc_string dec_string
+let string = make enc_string dec_string
 
 (* fpath *)
 
@@ -160,7 +160,7 @@ let dec_fpath s i =
   | Error e -> err i "corrupted file path value: %s" e
   | Ok p -> next, p
 
-let fpath = v enc_fpath dec_fpath
+let fpath = make enc_fpath dec_fpath
 
 (* list *)
 
@@ -183,7 +183,7 @@ let dec_list el s i  =
   in
   loop el s i count []
 
-let list c = v (enc_list c.enc) (dec_list c.dec)
+let list c = make (enc_list c.enc) (dec_list c.dec)
 
 (* option *)
 
@@ -199,7 +199,7 @@ let dec_option some s i =
   | 1 -> let i, v = some s next in i, Some v
   | b -> err_byte ~kind i b
 
-let option c = v (enc_option c.enc) (dec_option c.dec)
+let option c = make (enc_option c.enc) (dec_option c.dec)
 
 (* result *)
 
@@ -215,8 +215,8 @@ let dec_result ~ok ~error s i =
   | 1 -> let i, e = error s next in i, Error e
   | b -> err_byte ~kind i b
 
-let result ~ok ~error =
-  v (enc_result ~ok:ok.enc ~error:error.enc)
+let result ~ok ~error = make
+    (enc_result ~ok:ok.enc ~error:error.enc)
     (dec_result ~ok:ok.dec ~error:error.dec)
 
 (* set *)
@@ -239,13 +239,13 @@ let dec_set
   let i, count = dec_int s i in
   loop S.empty count s i
 
-let set s c = v (enc_set s c.enc) (dec_set s c.dec)
+let set s c = make (enc_set s c.enc) (dec_set s c.dec)
 
 (* Hash.t *)
 
 let enc_hash b h = enc_string b (Hash.to_binary_string h)
 let dec_hash s i = let i, h = dec_string s i in i, (Hash.of_binary_string h)
-let hash = v enc_hash dec_hash
+let hash = make enc_hash dec_hash
 
 (* Time.span *)
 
@@ -253,7 +253,7 @@ let enc_mtime_span b s = enc_int64 b (Mtime.Span.to_uint64_ns s)
 let dec_mtime_span s i =
   let i, s = dec_int64 s i in i, Mtime.Span.of_uint64_ns s
 
-let mtime_span = v enc_mtime_span dec_mtime_span
+let mtime_span = make enc_mtime_span dec_mtime_span
 
 (* Time.cpu_span *)
 
@@ -268,6 +268,6 @@ let dec_cpu_time_span s i  =
   let i, stime = dec_mtime_span s i in
   let i, children_utime = dec_mtime_span s i in
   let i, children_stime = dec_mtime_span s i in
-  i, Os.Cpu.Time.Span.v ~utime ~stime ~children_utime ~children_stime
+  i, Os.Cpu.Time.Span.make ~utime ~stime ~children_utime ~children_stime
 
-let cpu_time_span = v enc_cpu_time_span dec_cpu_time_span
+let cpu_time_span = make enc_cpu_time_span dec_cpu_time_span

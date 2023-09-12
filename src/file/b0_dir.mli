@@ -3,7 +3,9 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** [_b0] directory structured access. *)
+(** [_b0] directory structured access.
+
+    {b FIXME.} Try to get rid or meld this somewhere else. *)
 
 open B0_std
 

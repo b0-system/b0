@@ -33,23 +33,29 @@ let cmds =
   [ B0_cmd_action.cmd;
     B0_cmd_build.cmd;
     B0_cmd_blueprint.cmd;
+    B0_cmd_browse.cmd;
     B0_cmd_delete.cmd;
     B0_cmd_edit.cmd;
-    B0_cmd_export.cmd;
     B0_cmd_file.cmd;
     B0_cmd_list.cmd;
+    B0_cmd_lock.cmd;
     B0_cmd_log.cmd;
     B0_cmd_pack.cmd;
     B0_cmd_root.cmd;
     B0_cmd_scope.cmd;
     B0_cmd_show.cmd;
+    B0_cmd_tool.cmd;
     B0_cmd_unit.cmd;
-    B0_cmd_vcs.cmd;
-  ]
+    B0_cmd_unlock.cmd;
+    B0_cmd_vcs.cmd; ]
 
 let b0 =
   let info = Cmd.info "b0" ~version:"%%VERSION%%" ~doc ~sdocs ~exits ~man in
-  Cmd.group info ~default:B0_cmd_build.term cmds
+  let default =
+    B0_driver.with_b0_file ~driver:B0_tool_std.driver @@
+    B0_cmd_build.term
+  in
+  Cmd.group info ~default cmds
 
 let main () = Cmd.eval_value b0
 let () = B0_driver.set ~driver:B0_tool_std.driver ~main

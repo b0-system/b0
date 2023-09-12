@@ -8,7 +8,7 @@ open B0_std
 type t = String.Set.t
 type map = Fpath.t list String.Map.t
 
-let v = String.Set.of_list
+let make = String.Set.of_list
 let ext = String.Set.singleton
 
 let find_files exts m =
@@ -35,23 +35,23 @@ let ( - ) = String.Set.diff
 
 (* Constants *)
 
-let c_lang = v [".c"; ".h"]
-let cmark = v [".md"]
-let css = v [".css"]
-let data = v [".json"; ".xml"]
-let font = v [".otf"; ".ttf"; ".woff"; ".woff2" ]
-let html = v [".html"]
-let html_lang = v [".html"; ".css"; ".js"; ]
+let c_lang = make [".c"; ".h"]
+let cmark = make [".md"]
+let css = make [".css"]
+let data = make [".json"; ".xml"]
+let font = make [".otf"; ".ttf"; ".woff"; ".woff2" ]
+let html = make [".html"]
+let html_lang = make [".html"; ".css"; ".js"; ]
 let image =
-  v [".eps"; ".gif"; ".ico"; ".jpeg"; ".jpg"; ".pdf"; ".png"; ".ps"; ".svg";
-     ".tiff"]
+  make [".eps"; ".gif"; ".ico"; ".jpeg"; ".jpg"; ".pdf"; ".png"; ".ps"; ".svg";
+        ".tiff"]
 
-let js = v [".js"]
-let latex_lang = v [".tex"; ".sty"; ".bib"; ".bibdoi"]
-let ocaml_lang = v [".ml"; ".mld"; ".mli"; ".mll"; ".mly"]
-let sound = v [".aiff"; ".flac"; ".mp3"; ".wav"]
-let tex = v [".tex"]
-let video = v [".flv"; ".mov"; ".mp4"]
+let js = make [".js"]
+let latex_lang = make [".tex"; ".sty"; ".bib"; ".bibdoi"]
+let ocaml_lang = make [".ml"; ".mld"; ".mli"; ".mll"; ".mly"]
+let sound = make [".aiff"; ".flac"; ".mp3"; ".wav"]
+let tex = make [".tex"]
+let video = make [".flv"; ".mov"; ".mp4"]
 let www = data + font + html_lang + image + sound + video
 let all =
   c_lang + cmark + css + data + font + html_lang + image + js +

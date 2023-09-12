@@ -8,7 +8,7 @@ open B0_std.Fut.Syntax
 open Test_memo_setup
 
 let lookup_b0_os build_dir m =
-  let store = B0_store.create m ~dir:build_dir [] in
+  let store = B0_store.make m ~dir:build_dir [] in
   let* n = B0_store.get store B0_os.name in
   let* v = B0_store.get store B0_os.version in
   let* d = B0_store.get store B0_os.distribution in

@@ -113,7 +113,7 @@ module Auth = struct
   type t = { user : string; token : string; token_src : token_src }
   let user a = a.user
   let token a = a.token
-  let v ~user () =
+  let make ~user () =
     let* conf_dir = conf_dir () in
     let* user = get_user conf_dir ~user in
     let* token, token_src = get_token conf_dir ~user in
@@ -124,7 +124,7 @@ module Auth = struct
       Cmdliner.Cmd.Env.info token_env ~doc:"The GitHub personal access token." ]
 
   let cli ?opts:(o = ["u";"github-user"]) ()  =
-    let auth user = v ~user () in
+    let auth user = make ~user () in
     let doc = "The GitHub $(docv). If unspecified this is, \
                in order, the value of the $(b,B0_GITHUB_USER) variable, \
                the contents of $(b,XDG_CONFIG_HOME/b0/github/default-user), \
@@ -179,8 +179,8 @@ let req_json_v3 ?(headers = []) http auth ~path m body =
   | `Empty -> headers, ""
   in
   let url = v3_api_url ^ path in
-  let request = Http.Request.v ~url m ~headers ~body in
-  let* response = Http_client.request http request in
+  let request = Http.Request.make ~url m ~headers ~body in
+  let* response = Http_client.fetch http request in
   response_success auth request response
 
 let query_v4 http auth q =
@@ -189,15 +189,15 @@ let query_v4 http auth q =
   let query = Jsong.(obj |> mem "query" (string q) |> obj_end) in
   let headers = req_v4_headers auth in
   let body = Jsong.to_string query in
-  let request = Http.Request.v ~url:v4_api_url `POST ~headers ~body in
-  let* response = Http_client.request http request in
+  let request = Http.Request.make ~url:v4_api_url `POST ~headers ~body in
+  let* response = Http_client.fetch http request in
   response_success auth request response
 
 (* Higher-level interfaces *)
 
 module Repo = struct
   type t = { owner : string; name : string }
-  let v ~owner name = { owner; name }
+  let make ~owner name = { owner; name }
   let of_url url =
     let err () = Fmt.error "%S: Can't parse GitHub owner and repo." url in
     match Url.path_and_query url with
@@ -208,7 +208,7 @@ module Repo = struct
             let repo = match String.cut_right ~sep:"." repo with
             | Some (r, "git") -> r | _ -> repo
             in
-            Ok (v ~owner repo)
+            Ok (make ~owner repo)
         | _ -> err ()
 
   let owner r = r.owner
@@ -263,7 +263,7 @@ module Issue = struct
     let issue n uri = n, uri in
     Jsonq.(succeed issue $ mem "number" int $ mem "url" string)
 
-  let create_g ~title ~body =
+  let open_g ~title ~body =
     Jsong.(obj |> mem "title" (string title) |> mem "body" (string body) |>
            obj_end)
 
@@ -275,8 +275,8 @@ module Issue = struct
     let* resp = Repo.query_v4 http auth repo issue_list_gql in
     Jsonq.query issue_list_q resp
 
-  let create http auth repo ~title ~body () =
-    let body = `Json (create_g ~title ~body) in
+  let open' http auth repo ~title ~body () =
+    let body = `Json (open_g ~title ~body) in
     let* resp = Repo.req_json_v3 http auth repo ~path:"/issues" `POST body in
     Jsonq.query issue_id_q resp
 
@@ -349,27 +349,28 @@ module Pages = struct
   let nojekyll = update ~src:(Some Fpath.null) (Fpath.v ".nojekyll")
 
   let fetch_branch r ~log ~remote ~branch =
-    let* exists = B0_vcs.Git.remote_branch_exists r ~remote ~branch in
+    let* exists = B0_vcs_repo.Git.remote_branch_exists r ~remote ~branch in
     match exists with
     | false -> Ok None
     | true ->
         Log.msg log begin fun m ->
-          m ~header "Fetching %a" B0_vcs.Git.pp_remote_branch (remote, branch)
+          m ~header
+            "Fetching %a" B0_vcs_repo.Git.pp_remote_branch (remote, branch)
         end;
-        let fetch = B0_vcs.Git.remote_branch_fetch r ~remote ~branch in
+        let fetch = B0_vcs_repo.Git.remote_branch_fetch r ~remote ~branch in
         Result.bind fetch @@ fun () -> Ok (Some (Fmt.str "%s/%s" remote branch))
 
   let do_commit r ~log ~amend ~msg =
-    Result.bind (B0_vcs.Git.has_staged_changes r) @@ function
+    Result.bind (B0_vcs_repo.Git.has_staged_changes r) @@ function
     | true ->
         Log.msg log begin fun m ->
           m ~header "%s changes." (if amend then "Amending" else "Commiting")
         end;
-        Result.bind (B0_vcs.Git.commit_exists r "HEAD") @@ fun has_commit ->
+        Result.bind (B0_vcs_repo.Git.commit_exists r "HEAD") @@ fun has_commit ->
         let amend = has_commit && amend in
         let reset_author = amend in
         let stdout = Os.Cmd.out_null in
-        Result.bind (B0_vcs.Git.commit ~amend ~reset_author ~stdout ~msg r)
+        Result.bind (B0_vcs_repo.Git.commit ~amend ~reset_author ~stdout ~msg r)
         @@ fun () -> Ok true
     | false ->
         Log.msg log (fun m -> m ~header "No changes to commit.");
@@ -379,11 +380,11 @@ module Pages = struct
     Log.msg log (fun m -> m ~header "Copying updates.");
     let rm p = (* This makes sure [p] is in the repo *)
       let stdout = Os.Cmd.out_null in
-      B0_vcs.Git.rm r ~stdout ~force:true ~recurse:true ~ignore_unmatch:true
+      B0_vcs_repo.Git.rm r ~stdout ~force:true ~recurse:true ~ignore_unmatch:true
         [p]
     in
     let cp r ~follow_symlinks src dst =
-      let dst = Fpath.(B0_vcs.(work_dir r) // dst) in
+      let dst = Fpath.(B0_vcs_repo.(work_dir r) // dst) in
       Os.Path.copy ~follow_symlinks ~make_path:true ~recurse:true ~src dst
     in
     let rec loop r = function
@@ -395,7 +396,8 @@ module Pages = struct
             (rm u.dst |> Result.error_to_failure);
             (cp r ~follow_symlinks:u.follow_symlinks src u.dst
              |> Result.error_to_failure);
-            (B0_vcs.Git.add r ~force:false [u.dst] |> Result.error_to_failure);
+            (B0_vcs_repo.Git.add r ~force:false [u.dst]
+             |> Result.error_to_failure);
             loop r us
     in
     try loop r us with
@@ -403,7 +405,7 @@ module Pages = struct
 
   let update_in_branch r ~log ~amend ~force ~branch cish ~msg us =
     Result.join @@
-    B0_vcs.Git.with_transient_checkout r ~force ~branch cish
+    B0_vcs_repo.Git.with_transient_checkout r ~force ~branch cish
       (perform_updates ~log ~amend ~msg us)
 
   let default_branch = "gh-pages"
@@ -414,10 +416,10 @@ module Pages = struct
     =
     let cleanup ~commited r =
       let stdout = Os.Cmd.out_null in
-      Result.bind (B0_vcs.Git.branch_delete r ~stdout ~force ~branch:ubr) @@
-      fun () -> Ok commited
+      let* () = B0_vcs_repo.Git.branch_delete r ~stdout ~force ~branch:ubr in
+      Ok commited
     in
-    let* () = B0_vcs.Git.check_kind r in
+    let* () = B0_vcs_repo.Git.check_kind r in
     let* cish = fetch_branch r ~log ~remote ~branch:br in
     match
       update_in_branch r ~log ~amend ~force ~branch:ubr cish ~msg us
@@ -426,9 +428,10 @@ module Pages = struct
     | Ok false -> cleanup ~commited:false r
     | Ok true ->
         Log.msg log begin fun m ->
-          m ~header "Pushing %a" B0_vcs.Git.pp_remote_branch (remote, br)
+          m ~header "Pushing %a" B0_vcs_repo.Git.pp_remote_branch (remote, br)
         end;
-        match B0_vcs.Git.remote_branch_push r ~force ~src:ubr ~remote ~dst:br
+        match
+          B0_vcs_repo.Git.remote_branch_push r ~force ~src:ubr ~remote ~dst:br
         with
         | Error _ as e -> ignore (cleanup ~commited:true r); e
         | Ok () -> cleanup ~commited:true r
@@ -493,7 +496,7 @@ module Pull_request = struct
         in
         Ok ("Opened", url)
     in
-    let pp_action ppf a = Fmt.tty_string [`Fg `Green] ppf a in
+    let pp_action ppf a = Fmt.tty' [`Fg `Green] ppf a in
     (* TODO we sould return this rather than log *)
     Log.app begin fun m ->
       m "%a pull request %a" pp_action action Fmt.(code string) url

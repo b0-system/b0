@@ -49,7 +49,7 @@ module Op = struct
   let pp_file_write = Fmt.tty style_file_write pp_file
   let pp_file_delete = Fmt.tty style_file_delete pp_file
   let pp_hash = Fmt.tty style_hash Hash.pp
-  let pp_subfield_label = Fmt.tty_string style_subfield
+  let pp_subfield_label = Fmt.tty' style_subfield
   let pp_subfield s f pp = Fmt.field ~label:pp_subfield_label ~sep:Fmt.sp s f pp
   let pp_did_not_write ppf fs =
     Fmt.pf ppf "@[<v>Did not write:@,%a@]" (Fmt.list pp_file_write) fs
@@ -66,10 +66,10 @@ module Op = struct
     let args = Cmd.to_list (Op.Spawn.args s) in
     let quote = Filename.quote in
     let pquote p = Filename.quote (Fpath.to_string p) in
-    let pp_brack = Fmt.tty_string style_cmd_brackets in
-    let pp_tool ppf t = Fmt.tty_string style_cmd_tool ppf (pquote t) in
+    let pp_brack = Fmt.tty' style_cmd_brackets in
+    let pp_tool ppf t = Fmt.tty' style_cmd_tool ppf (pquote t) in
     let pp_arg ppf a = Fmt.pf ppf "%s" (quote a) in
-    let pp_o_arg ppf a = Fmt.tty_string style_file_write ppf (quote a) in
+    let pp_o_arg ppf a = Fmt.tty' style_file_write ppf (quote a) in
     let pp_sep ppf ~last = match last with
     | "-I" | "-L" | "-o" | "-f" | "-d" -> Fmt.char ppf ' '
     | _ -> Fmt.sp ppf ()
@@ -117,25 +117,25 @@ module Op = struct
     | "" -> () | m -> Fmt.sp ppf (); Fmt.pf ppf "[%a]" Fmt.(code string) m
     in
     Fmt.pf ppf "@[@[<h>[%a]%a@]:@ @[%a@]@]"
-      (Fmt.tty_string s) label pp_mark o Fmt.lines (Op.Notify.msg n)
+      (Fmt.tty' s) label pp_mark o Fmt.lines (Op.Notify.msg n)
 
   let pp_header ppf o =
     let pp_status ppf o = match Op.status o with
     | Op.Done -> ()
-    | Op.Failed _ -> Fmt.tty_string style_status_failed ppf "FAILED "
-    | Op.Aborted -> Fmt.tty_string style_status_aborted ppf "ABORTED "
-    | Op.Waiting -> Fmt.tty_string style_status_waiting ppf "WAITING "
+    | Op.Failed _ -> Fmt.tty' style_status_failed ppf "FAILED "
+    | Op.Aborted -> Fmt.tty' style_status_aborted ppf "ABORTED "
+    | Op.Waiting -> Fmt.tty' style_status_waiting ppf "WAITING "
     in
     let pp_id ppf o =
       let pp_id ppf id = Fmt.pf ppf "%03d" id in
       Fmt.tty style_op_id pp_id ppf (Op.id o)
     in
     let pp_kind_name ppf o =
-      (Fmt.tty_string style_kind_name) ppf (Op.kind_name (Op.kind o))
+      (Fmt.tty' style_kind_name) ppf (Op.kind_name (Op.kind o))
     in
     let pp_revived ppf o = match Op.revived o with
-    | false -> Fmt.tty_string style_status_exec ppf "e"
-    | true -> Fmt.tty_string style_status_exec_revived ppf "r"
+    | false -> Fmt.tty' style_status_exec ppf "e"
+    | true -> Fmt.tty' style_status_exec_revived ppf "r"
     in
     let pp_op_hash ppf o =
       let h = Op.hash o in if Hash.is_nil h then () else
@@ -157,7 +157,7 @@ module Op = struct
     | Some (Ok d) -> Fmt.lines ppf (String.trim d)
     | Some (Error e) ->
         Fmt.pf ppf "@[%a: @[%a@]@]"
-          (Fmt.tty_string style_err) "error" Fmt.lines e
+          (Fmt.tty' style_err) "error" Fmt.lines e
     in
     begin match Op.kind o with
     | Op.Spawn s ->
@@ -211,7 +211,7 @@ module Op = struct
       let pp_ui_kind ppf o = match Op.kind o with
       | Op.Spawn s ->
           let name = Fpath.basename (Op.Spawn.tool s) in
-          (Fmt.tty_string style_cmd_tool) ppf name
+          (Fmt.tty' style_cmd_tool) ppf name
       | k -> pp_kind_line ppf o
       in
       let pp_mark ppf o = match Op.mark o with
@@ -219,7 +219,7 @@ module Op = struct
       in
       let pp_status ppf o = match Op.status o with
       | Op.Failed _ ->
-          Fmt.pf ppf "[%a] " (Fmt.tty_string style_status_failed) "FAIL"
+          Fmt.pf ppf "[%a] " (Fmt.tty' style_status_failed) "FAIL"
       | _ -> ()
       in
       let if_spawn_pp_spawn_exit ppf o = match Op.kind o with
@@ -267,7 +267,7 @@ module Op = struct
       | Op.Exec None -> ()
       | Op.Exec (Some e) ->
           Fmt.pf ppf "@[%a: @[%a@]@]@,"
-            (Fmt.tty_string style_err) "error" Fmt.lines e;
+            (Fmt.tty' style_err) "error" Fmt.lines e;
       | Op.Missing_writes fs -> pp_did_not_write ppf fs; Fmt.cut ppf ()
       | Op.Missing_reads fs -> pp_cannot_read ppf fs; Fmt.cut ppf ()
       end;
@@ -442,12 +442,12 @@ module Op = struct
     let i, dst = B0_bincode.dec_fpath s i in
     let i, mode = B0_bincode.dec_int s i in
     let i, linenum = B0_bincode.dec_option B0_bincode.dec_int s i in
-    i, Op.Copy.v ~src ~dst ~mode ~linenum
+    i, Op.Copy.make ~src ~dst ~mode ~linenum
 
   let enc_delete b d = B0_bincode.enc_fpath b (Op.Delete.path d)
   let dec_delete s i =
     let i, path = B0_bincode.dec_fpath s i in
-    i, Op.Delete.v ~path
+    i, Op.Delete.make ~path
 
   let enc_mkdir b m =
     B0_bincode.enc_fpath b (Op.Mkdir.dir m);
@@ -456,7 +456,7 @@ module Op = struct
   let dec_mkdir s i =
     let i, dir = B0_bincode.dec_fpath s i in
     let i, mode = B0_bincode.dec_int s i in
-    i, Op.Mkdir.v ~mode ~dir
+    i, Op.Mkdir.make ~mode ~dir
 
   let enc_notify_kind b = function
   | `End -> B0_bincode.enc_byte b 0
@@ -483,12 +483,12 @@ module Op = struct
   let dec_notify s i =
     let i, kind = dec_notify_kind s i in
     let i, msg = B0_bincode.dec_string s i in
-    i, Op.Notify.v ~kind ~msg
+    i, Op.Notify.make ~kind ~msg
 
   let enc_read b r = B0_bincode.enc_fpath b (Op.Read.file r)
   let dec_read s i =
     let i, file = B0_bincode.dec_fpath s i in
-    i, Op.Read.v ~file ~data:""
+    i, Op.Read.make ~file ~data:""
 
   let enc_spawn_stdo b = function
   | `Ui -> B0_bincode.enc_byte b 0
@@ -568,13 +568,13 @@ module Op = struct
       B0_bincode.dec_option (B0_bincode.dec_result ~ok ~error) s i
     in
     let i, exit = B0_bincode.dec_option dec_os_cmd_status s i in
-    i, Op.Spawn.v ~env ~stamped_env ~cwd ~stdin ~stdout ~stderr ~success_exits
-      tool args ~stamp ~stdo_ui ~exit
+    i, Op.Spawn.make ~env ~stamped_env ~cwd ~stdin ~stdout ~stderr
+      ~success_exits tool args ~stamp ~stdo_ui ~exit
 
   let enc_wait_files b wait = B0_bincode.enc_unit b ()
   let dec_wait_files s i =
     let i, () = B0_bincode.dec_unit s i in
-    i, Op.Wait_files.v ()
+    i, Op.Wait_files.make ()
 
   let enc_write b w =
     B0_bincode.enc_string b (Op.Write.stamp w);
@@ -586,7 +586,7 @@ module Op = struct
     let i, mode = B0_bincode.dec_int s i in
     let i, file = B0_bincode.dec_fpath s i in
     let data () = Error "deserialized op, data fun not available" in
-    i, Op.Write.v ~stamp ~mode ~file ~data
+    i, Op.Write.make ~stamp ~mode ~file ~data
 
   let enc_kind b = function
   | Op.Copy c -> B0_bincode.enc_byte b 0; enc_copy b c
@@ -642,10 +642,10 @@ module Op = struct
       (B0_bincode.dec_option B0_bincode.dec_fpath) s i in
     let i, hash = B0_bincode.dec_hash s i in
     let i, kind = dec_kind s i in
-    i, Op.v id ~mark ~time_created ~time_started ~duration ~revived
+    i, Op.make id ~mark ~time_created ~time_started ~duration ~revived
       ~status ~reads ~writes ~writes_manifest_root ~hash ~k kind
 
-  let bincode = B0_bincode.v enc dec
+  let bincode = B0_bincode.make enc dec
 
   (* Aggregate errors *)
 

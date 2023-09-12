@@ -15,8 +15,8 @@ type t = String.Set.t
 type map = Fpath.t list String.Map.t
 (** The type for files mapped by their extension. *)
 
-val v : Fpath.ext list -> t
-(** [v exts] is a set for the given extensions. *)
+val make : Fpath.ext list -> t
+(** [make exts] is a set for the given extensions. *)
 
 val ext : Fpath.ext -> t
 (** [ext e] is the set that containes only [e]. *)

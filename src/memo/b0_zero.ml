@@ -10,7 +10,7 @@ let uerror = Unix.error_message
 
 module Trash = struct
   type t = { dir : Fpath.t }
-  let create dir = { dir }
+  let make dir = { dir }
   let dir t = t.dir
   let trash t p =
     Result.map_error (Fmt.str "trashing %a: %s" Fpath.pp p) @@
@@ -202,7 +202,7 @@ module File_cache = struct
   type key = string
   type t = { dir : string; }
 
-  let create dir =
+  let make dir =
     let* _exists = Os.Dir.create ~make_path:true dir in
     let dir = Fpath.add_dir_sep dir (* assumed e.g. by key_dir *) in
     Ok { dir = Fpath.to_string dir }
@@ -519,14 +519,14 @@ module Op = struct
       kind : kind }
 
   type op = t
-  let v
+  let make
       id ~mark ~time_created ~time_started ~duration ~revived ~status ~reads
       ~writes ~writes_manifest_root ~hash ?post_exec ?k kind
     =
     { id; mark; time_created; time_started; duration; revived; status; reads;
       writes; writes_manifest_root; hash; post_exec; k; kind; }
 
-  let v_kind
+  let make_kind
       ~id ~mark ~created ~reads ~writes ?writes_manifest_root ?post_exec ?k
       kind
     =
@@ -584,7 +584,7 @@ module Op = struct
 
   module Copy = struct
     type t = copy
-    let v ~src ~dst ~mode ~linenum:l =
+    let make ~src ~dst ~mode ~linenum:l =
       { copy_src = src; copy_dst = dst; copy_mode = mode; copy_linenum = l }
 
     let get o = match o.kind with Copy c -> c | _ -> assert false
@@ -592,60 +592,60 @@ module Op = struct
     let dst c = c.copy_dst
     let mode c = c.copy_mode
     let linenum c = c.copy_linenum
-    let v_op ~id ~mark ~created ?post_exec ?k ~mode ~linenum ~src dst
+    let make_op ~id ~mark ~created ?post_exec ?k ~mode ~linenum ~src dst
       =
       let c = { copy_src = src; copy_dst = dst; copy_mode = mode;
                 copy_linenum = linenum }
       in
       let reads = [src] and writes = [dst] in
-      v_kind ~id ~mark ~created ~reads ~writes ?post_exec ?k (Copy c)
+      make_kind ~id ~mark ~created ~reads ~writes ?post_exec ?k (Copy c)
   end
 
   module Delete = struct
     type t = delete
-    let v ~path = { delete_path = path }
+    let make ~path = { delete_path = path }
     let get o = match o.kind with Delete d -> d | _ -> assert false
     let path d = d.delete_path
-    let v_op ~id ~mark ~created ?post_exec ?k delete_path =
+    let make_op ~id ~mark ~created ?post_exec ?k delete_path =
       let d = { delete_path } in
-      v_kind ~id ~mark ~created ~reads:[] ~writes:[] ?post_exec ?k (Delete d)
+      make_kind ~id ~mark ~created ~reads:[] ~writes:[] ?post_exec ?k (Delete d)
   end
 
   module Mkdir = struct
     type t = mkdir
-    let v ~dir ~mode = { mkdir_dir = dir; mkdir_mode = mode }
+    let make ~dir ~mode = { mkdir_dir = dir; mkdir_mode = mode }
     let get o = match o.kind with Mkdir mk -> mk | _ -> assert false
     let dir mk = mk.mkdir_dir
     let mode mk = mk.mkdir_mode
-    let v_op ~id ~mark ~mode ~created ?post_exec ?k dir =
+    let make_op ~id ~mark ~mode ~created ?post_exec ?k dir =
       let mkdir = { mkdir_dir = dir; mkdir_mode = mode } in
-      v_kind
+      make_kind
         ~id ~mark ~created ~reads:[] ~writes:[dir] ?post_exec ?k (Mkdir mkdir)
   end
 
   module Notify = struct
     type kind = notify_kind
     type t = notify
-    let v ~kind ~msg = { notify_kind = kind; notify_msg = msg }
+    let make ~kind ~msg = { notify_kind = kind; notify_msg = msg }
     let get o = match o.kind with Notify n -> n | _ -> assert false
     let kind n = n.notify_kind
     let msg n = n.notify_msg
-    let v_op ~id ~mark ~created ?post_exec ?k notify_kind notify_msg =
+    let make_op ~id ~mark ~created ?post_exec ?k notify_kind notify_msg =
       let n = { notify_kind; notify_msg } in
-      v_kind ~id ~mark ~created ~reads:[] ~writes:[] ?post_exec ?k (Notify n)
+      make_kind ~id ~mark ~created ~reads:[] ~writes:[] ?post_exec ?k (Notify n)
   end
 
   module Read = struct
     type t = read
-    let v ~file ~data = { read_file = file; read_data = data }
+    let make ~file ~data = { read_file = file; read_data = data }
     let get o = match o.kind with Read r -> r | _ -> assert false
     let file r = r.read_file
     let data r = r.read_data
     let set_data r d = r.read_data <- d
     let discard_data r = r.read_data <- ""
-    let v_op ~id ~mark ~created ?post_exec ?k file =
+    let make_op ~id ~mark ~created ?post_exec ?k file =
       let read = { read_file = file; read_data = "" } in
-      v_kind
+      make_kind
         ~id ~mark ~created ~reads:[file] ~writes:[] ?post_exec ?k (Read read)
   end
 
@@ -653,7 +653,7 @@ module Op = struct
     type stdo = spawn_stdo
     type success_exits = spawn_success_exits
     type t = spawn
-    let v
+    let make
         ~env ~stamped_env ~cwd ~stdin ~stdout ~stderr ~success_exits tool
         args ~stamp ~stdo_ui ~exit
       =
@@ -685,7 +685,7 @@ module Op = struct
         | cs when List.mem c cs -> Done
         | cs -> Failed (Exec None)
 
-    let v_op
+    let make_op
         ~id ~mark ~created ~reads ~writes ?writes_manifest_root ?post_exec
         ?k ~stamp ~env ~stamped_env ~cwd ~stdin ~stdout ~stderr ~success_exits
         tool args
@@ -695,21 +695,22 @@ module Op = struct
                 tool; args; spawn_stamp = stamp; stdo_ui = None;
                 spawn_exit = None }
       in
-      v_kind
+      make_kind
         ~id ~mark ~created ~reads ~writes ?writes_manifest_root ?post_exec ?k
         spawn
   end
 
   module Wait_files = struct
     type t = wait_files
-    let v () = ()
-    let v_op ~id ~mark ~created ?post_exec ?k reads =
-      v_kind ~id ~mark ~created ~reads ~writes:[] ?post_exec ?k (Wait_files ())
+    let make () = ()
+    let make_op ~id ~mark ~created ?post_exec ?k reads =
+      make_kind ~id ~mark ~created ~reads ~writes:[] ?post_exec ?k
+        (Wait_files ())
   end
 
   module Write = struct
     type t = write
-    let v ~stamp ~mode ~file ~data =
+    let make ~stamp ~mode ~file ~data =
       { write_stamp = stamp; write_mode = mode; write_file = file;
         write_data = data }
 
@@ -732,12 +733,12 @@ module Op = struct
           Fmt.error "[@<v>Write function raised:@,%a@]"
             Fmt.exn_backtrace (e, bt)
 
-    let v_op
+    let make_op
         ~id ~mark ~created ?post_exec ?k ~stamp:write_stamp ~reads ~mode
         ~write:f write_data
       =
       let w = { write_stamp; write_mode = mode; write_file = f; write_data } in
-      v_kind ~id ~mark ~created ~reads ~writes:[f] ?post_exec ?k (Write w)
+      make_kind ~id ~mark ~created ~reads ~writes:[f] ?post_exec ?k (Write w)
   end
 
   let abort o =
@@ -870,7 +871,7 @@ module Reviver = struct
       mutable file_hashes : Hash.t Fpath.Map.t; (* file hash cache *)
       mutable file_hash_dur : Mtime.Span.t; (* total file hash duration *) }
 
-  let create clock hash_fun cache =
+  let make clock hash_fun cache =
     let buffer = Buffer.create 1024 in
     let file_hashes = Fpath.Map.empty in
     let file_hash_dur = Mtime.Span.zero in
@@ -1080,7 +1081,7 @@ module Guard = struct
     { allowed : Op.t Queue.t;
       mutable files : file_status Fpath.Map.t }
 
-  let create () = { allowed = Queue.create (); files = Fpath.Map.empty; }
+  let make () = { allowed = Queue.create (); files = Fpath.Map.empty; }
 
   let set_file_ready g f = match Fpath.Map.find f g.files with
   | exception Not_found -> g.files <- Fpath.Map.add f Ready g.files
@@ -1149,7 +1150,7 @@ module Exec = struct
       mutable spawn_count : int; (* Number of spawned processes *)
       mutable spawns : (Os.Cmd.pid * Fpath.t option * Op.t) list; }
 
-  let create ?clock ?rand ?tmp_dir:tmp ?feedback ~trash ~jobs () =
+  let make ?clock ?rand ?tmp_dir:tmp ?feedback ~trash ~jobs () =
     let feedback = match feedback with None -> fun _ -> () | Some f -> f in
     let clock = match clock with None -> Os.Mtime.counter () | Some c -> c in
     let tmp_dir = match tmp with None -> Os.Dir.default_tmp () | Some t -> t in

@@ -48,8 +48,8 @@ module Http : sig
     type t
     (** The type for HTTP requests. *)
 
-    val v : ?headers:headers -> ?body:string -> url:string -> method' -> t
-    (** [v uri m ~headers ~body] is a request on [url] with method [m],
+    val make : ?headers:headers -> ?body:string -> url:string -> method' -> t
+    (** [make uri m ~headers ~body] is a request on [url] with method [m],
         headers [headers] (defaults to [[]]) and body [body] (defaults to
         [""]). *)
 
@@ -72,8 +72,8 @@ module Http : sig
     type t
     (** The type for HTTP responses. *)
 
-    val v : ?headers:headers -> ?body:string -> int -> t
-    (** [v status ~headers ~body] is a response with status [status],
+    val make : ?headers:headers -> ?body:string -> int -> t
+    (** [make status ~headers ~body] is a response with status [status],
         headers [headers] (defaults to [[]]) and body [body]
         (defaults to [""]). *)
 
@@ -100,10 +100,10 @@ module Http_client : sig
   val get : ?search:Fpath.t list -> ?curl:Cmd.t -> unit -> (t, string) result
   (** [get ()] looks for [curl] (defaults to "curl") in [search]. *)
 
-  val request :
+  val fetch :
     ?insecure:bool -> ?follow:bool -> t -> Http.Request.t ->
     (Http.Response.t, string) result
-  (** [perform httpr r] performs request [r] via [httpr].  If [follow]
+  (** [fetch httpr r] performs request [r] via [httpr].  If [follow]
       is [true] (default) HTTP redirects for GET and HEAD requests
       that return 301, 302, 303, 305 or 307 are automatically
       followed. If [insecure] is [true] (defaults to [false]) TLS

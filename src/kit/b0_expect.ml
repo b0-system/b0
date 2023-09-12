@@ -40,24 +40,24 @@ end
 
 type t =
   { base : Fpath.t;
-    env : B0_action.Env.t;
+    env : B0_env.t;
     log_absolute : bool;
     log_diffs : bool;
     mutable outcomes : Outcome.t list;
     mutable seen : Fpath.Set.t;
     time : Os.Mtime.counter;
-    vcs : B0_vcs.t; }
+    vcs_repo : B0_vcs_repo.t; }
 
-let make ?vcs ?(log_absolute = false) ?(log_diffs = true) env ~base =
-  let scope_dir = B0_action.Env.scope_dir env in
+let make ?vcs_repo ?(log_absolute = false) ?(log_diffs = true) env ~base =
+  let scope_dir = B0_env.scope_dir env in
   let base = Fpath.(scope_dir // base) in
   let outcomes = [] and seen = Fpath.Set.empty in
   let time = Os.Mtime.counter () in
-  let vcs = match vcs with
-  | None -> B0_vcs.get ~dir:scope_dir () |> result_to_abort
+  let vcs_repo = match vcs_repo with
+  | None -> B0_vcs_repo.get ~dir:scope_dir () |> result_to_abort
   | Some vcs -> vcs
   in
-  { base; env; log_absolute; log_diffs; outcomes; seen; time; vcs }
+  { base; env; log_absolute; log_diffs; outcomes; seen; time; vcs_repo }
 
 let base ctx = ctx.base
 let base_files ?rel ctx ~recurse =
@@ -68,27 +68,27 @@ let dur ctx = Os.Mtime.count ctx.time
 let env ctx = ctx.env
 let log_absolute ctx = ctx.log_absolute
 let log_diffs ctx = ctx.log_diffs
-let vcs ctx = ctx.vcs
+let vcs_repo ctx = ctx.vcs_repo
 let outcomes ctx = ctx.outcomes
 
-let cwd_rel_path ctx p = Fpath.relative ~to_dir:(B0_action.Env.cwd ctx.env) p
+let cwd_rel_path ctx p = Fpath.relative ~to_dir:(B0_env.cwd ctx.env) p
 let path_for_user ctx p = if ctx.log_absolute then p else cwd_rel_path ctx p
 let pp_path_for_user ctx ppf p = match ctx.log_absolute with
-| true -> fpath_pp_high_suffix (B0_action.Env.scope_dir ctx.env) ppf p
+| true -> fpath_pp_high_suffix (B0_env.scope_dir ctx.env) ppf p
 | false -> (Fmt.code Fpath.pp) ppf (cwd_rel_path ctx p)
 
 (* Showing results *)
 
-let log_diff ctx file =  match B0_vcs.kind ctx.vcs with
+let log_diff ctx file =  match B0_vcs_repo.kind ctx.vcs_repo with
 | Git ->
-    let git = B0_vcs.repo_cmd ctx.vcs in
+    let git = B0_vcs_repo.repo_cmd ctx.vcs_repo in
     let cmd = Cmd.(git % "diff" %% path file) in
     Log.if_error ~use:() (Os.Cmd.run cmd)
 | Hg ->
     failwith "Hg support is TODO"
 
 let log_outcome ctx o =
-  let label ppf st l = Fmt.tty_string st ppf (String.concat " " ["";l;""]) in
+  let label ppf st l = Fmt.tty' st ppf (String.concat " " ["";l;""]) in
   let pp_label ppf = function
   | `Unexpected -> label ppf [`Bg `Red; `Fg `White] "M"
   | `New -> label ppf [`Bg `Yellow; `Fg `Black] "?"
@@ -111,23 +111,23 @@ let pp_vcs_cmd vcs ?(file = false) ppf cmd =
 let pp_git = pp_vcs_cmd "git"
 let pp_hg = pp_vcs_cmd "hg"
 
-let pp_new_cmd ppf vcs = match B0_vcs.kind vcs with
+let pp_new_cmd ppf vcs = match B0_vcs_repo.kind vcs with
 | Git -> pp_git ~file:true ppf "add"
 | Hg -> pp_hg ppf ~file:true "TODO"
 
-let pp_correct_cmd ppf vcs = match B0_vcs.kind vcs with
+let pp_correct_cmd ppf vcs = match B0_vcs_repo.kind vcs with
 | Git -> pp_git ~file:true ppf "add -p"
 | Hg -> pp_hg ~file:true ppf "TODO"
 
-let pp_unexpected_cmd ppf vcs = match B0_vcs.kind vcs with
+let pp_unexpected_cmd ppf vcs = match B0_vcs_repo.kind vcs with
 | Git -> pp_git ~file:true ppf "diff"
 | Hg -> pp_hg ppf ~file:true "TODO"
 
-let pp_status_cmd ppf (vcs, dir) = match B0_vcs.kind vcs with
+let pp_status_cmd ppf (vcs, dir) = match B0_vcs_repo.kind vcs with
 | Git -> pp_git ppf ("status -s " ^ Fpath.to_string dir)
 | Hg -> pp_hg ppf "TODO"
 
-let pp_diff_cmd ppf (vcs, dir) = match B0_vcs.kind vcs with
+let pp_diff_cmd ppf (vcs, dir) = match B0_vcs_repo.kind vcs with
 | Git -> pp_git ppf ("diff " ^ Fpath.to_string dir)
 | Hg -> pp_hg ppf "TODO"
 
@@ -158,7 +158,7 @@ let pp_all_pass ppf (count, corr, dur) =
   let test = if count > 1 then "tests expected" else "test expected" in
   let green = [`Fg `Green] in
   Fmt.pf ppf "%a %a%a in %a"
-    (Fmt.tty_string green) "All" (pp_status green test) count
+    (Fmt.tty' green) "All" (pp_status green test) count
     pp_corrected corr Mtime.Span.pp dur
 
 let pp_total ppf (count, dur) =
@@ -183,20 +183,20 @@ let log_summary ctx =
       Log.app (fun m ->
           m "@[<v> @[<v>%a%a%a%a%a@]@,@,\
              Summary with %a@,Details with %a@]"
-            pp_expected (!expected, !corrected) pp_new (!new', ctx.vcs)
-            pp_unknown !unknown pp_unexpected (!unexpected, ctx.vcs)
+            pp_expected (!expected, !corrected) pp_new (!new', ctx.vcs_repo)
+            pp_unknown !unknown pp_unexpected (!unexpected, ctx.vcs_repo)
             pp_total (count, dur ctx)
-            pp_status_cmd (ctx.vcs, path_for_user ctx ctx.base)
-            pp_diff_cmd (ctx.vcs, path_for_user ctx ctx.base));
+            pp_status_cmd (ctx.vcs_repo, path_for_user ctx ctx.base)
+            pp_diff_cmd (ctx.vcs_repo, path_for_user ctx ctx.base));
       Os.Exit.code 1
 
 (* Primitives *)
 
 let outcome_of_file ?(diff = true) ctx file =
   let file = Fpath.(ctx.base // file) in
-  match B0_vcs.kind ctx.vcs with
+  match B0_vcs_repo.kind ctx.vcs_repo with
   | Git ->
-      let git = B0_vcs.repo_cmd ctx.vcs in
+      let git = B0_vcs_repo.repo_cmd ctx.vcs_repo in
       let cmd = Cmd.(git % "status" % "--porcelain" %% path file) in
       let status = Os.Cmd.run_out ~trim:false cmd |> result_to_abort in
       let status = match String.take_left 2 status with
@@ -259,7 +259,7 @@ let run f env base short log_absolute =
   let ctx = make env ~log_absolute ~log_diffs:(not short) ~base in
   f ctx; finish ctx
 
-let action env cmd ~base f =
+let action_func ~base f action env ~args =
   let run = run f env base in
   let run = Cmdliner.Term.(const run $ short $ log_absolute_arg) in
-  B0_action.eval ~exits env cmd run
+  B0_action.eval_cmdliner_term ~exits action env run ~args

@@ -81,6 +81,9 @@ module Scope : sig
       {b Warning.} Scope unicity is not checked by the module this is
       expected to be handled by the client.*)
 
+  val is_root : unit -> bool
+  (** [is_root ()] is [true] if we are in the root scope. *)
+
   (** {2:sealing Definition sealing} *)
 
   val seal : unit -> unit
@@ -175,7 +178,8 @@ module type S = sig
   (** [def v] is the definition of value [v]. *)
 
   val name : t -> string
-  (** [name v] is [v]'s name. *)
+  (** [name v] is [v]'s name. Note that this name changes depending
+      on how the definition is scoped. *)
 
   val basename : t -> string
   (** [basename v] is [v]'s name without the scope. *)
@@ -194,11 +198,18 @@ module type S = sig
   val meta : t -> B0_meta.t
   (** [meta v] is [v]'s metadata. *)
 
-  val has_meta : 'a B0_meta.key -> t -> bool
-  (** [has_meta k u] is [B0_meta.mem k (B0_unit.meta u)]. *)
+  val mem_meta : 'a B0_meta.key -> t -> bool
+  (** [mem_meta k v] is [B0_meta.mem k (B0_def.meta v)]. *)
+
+  val has_tag : bool B0_meta.key -> t -> bool
+  (** [has_tag k v] is [B0_meta.has_tag k (B0_def.meta v)]. *)
 
   val find_meta : 'a B0_meta.key -> t -> 'a option
-  (** [find_meta k u] is [B0_meta.find k (B0_unit.meta u)]. *)
+  (** [find_meta k v] is [B0_meta.find k (B0_def.meta v)]. *)
+
+  val find_or_default_meta : 'a B0_meta.key -> t -> 'a
+  (** [find_or_default_meta k u] is
+      [B0_meta.find_or_default k (B0_unit.meta u)]. *)
 
   val get_meta : 'a B0_meta.key -> t -> ('a, string) result
   (** [get_meta m k u] is [Ok v] if {!find_meta}[ k u] is [Some v] and
@@ -209,30 +220,64 @@ module type S = sig
   val add : t -> unit
   (** [add v] adds the value [v] to the list of defined values. *)
 
+  val fold : (t -> 'a -> 'a) -> 'a -> 'a
+  (** [fold f acc] folds over the list of units. *)
+
   val list : unit -> t list
   (** [list ()] is the list of units. *)
 
   val find : string -> t option
-  (** [find n] is the value named [n] (if any). *)
+  (** [find name] is the value named [name] (if any). *)
 
   val get : string -> t
-  (** [get n] looks up the value named [n] and errors the B0 file
-      if there no such [n]. *)
+  (** [get name] looks up the value named [name] and errors the B0 file
+      if there no such [name]. *)
 
   val get_or_suggest : string -> (t, t list) result
-  (** [get_or_suggest n] is the value named [n] or a (possibly empty)
-      list of suggested values whose name could match [n]. *)
+  (** [get_or_suggest name] is the value named [name] or a (possibly empty)
+      list of suggested values whose name could match [name]. *)
 
   val get_or_hint : string -> (t, string) result
-  (** [get_or_hint n] is the value named [n] or an error message that
-      indicates that [n] could not be found with suggested names. *)
+  (** [get_or_hint name] is the value named [name] or an error message
+      that indicates that [name] could not be found with suggested
+      names. *)
 
   val get_list_or_hint :
-    ?empty_means_all:bool -> string list -> (t list, string) result
-  (** [get_list_or_hint ns] are the value named [ns] or an error that
-      indicates the names that could not be found with suggested names.
-      If [empty_means_all] is [true] (defaults to [false]) an empty [ns]
-      returns [list ()] sorted by name. *)
+    all_if_empty:bool -> string list -> (t list, string) result
+  (** [get_list_or_hint ~all_if_empty names] are the value named after
+      [names] or an error that indicates the names that could not be
+      found with suggested names. If [all_if_empty] is [true] an empty
+      [ns] returns [list ()] sorted by name. *)
+
+  (** {1:scope Scope} *)
+
+  val scope_path : t -> string list
+  (** [scope_path v] are the scopes in which [v] is defined
+      starting from the root. If [v] is defined in the root scope this
+      is [[]], if [v] is defined in a library scope [lib] this is
+      [[[""]; lib]] *)
+
+  val in_root_scope : t -> bool
+  (** [in_root_scope v] is [true] iff [v] is in the root scope. *)
+
+  val in_current_scope : t -> bool
+  (** [in_current_scope v] is [true] iff [v] is in the current scope. *)
+
+  val scope_dir : t -> Fpath.t option
+  (** [scope_dir v] is the scope directory in which [v] is defined. *)
+
+  val scope_dir' : t -> (Fpath.t, string) result
+  (** [scope_dir' v] is like {!scope_dir} but errors with an
+      end-user message if [None]. *)
+
+  val in_scope_dir : t -> Fpath.t -> Fpath.t option
+  (** [in_scope_dir v path] makes the path [path] absolute with respect
+      to the scope directory in which [v] is defined. This is [None]
+      if [v]'s scope has no directory (e.g. on library scopes). *)
+
+  val in_scope_dir' : t -> Fpath.t -> (Fpath.t, string) result
+  (** [in_scope_dir'] is like {!in_scope_dir} but errors with an end-user
+      message if [None]. *)
 
   (** {1:fmt Formatters} *)
 

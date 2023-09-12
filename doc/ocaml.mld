@@ -1,0 +1,15 @@
+{0 [ocaml] B0 manual}
+
+B0 obviously supports compiling OCaml projects. The support is spread
+in a set of modules aligned on the different tools of the eco-system:
+
+- {!B0_ocaml}, has support for the basic OCaml toolchain and libary
+   eco system. It provides build units for executable and libraries
+   and basic support OCaml compilation.
+- {!B0_jsoo}, has support for the [js_of_ocaml] compiler. It provides
+   support for compiling OCaml bytecode to JavaScript and easily
+   create single page web application.
+- {!B0_odoc}, has
+- {!B0_opam} has support for describing opam packages via build pack
+   metadata and publishing to the public OCaml opam repository. It
+   has its own {{!page-opam_manual}manual}

@@ -1,56 +1,63 @@
 description = "Software construction and deployment kit"
 version = "%%VERSION_NUM%%"
-
-package "std" (
-  directory = "std"
-  description = "B0 stdlib"
-  version = "%%VERSION_NUM%%"
-  requires = "unix cmdliner"
-  archive(byte) = "b0_std.cma"
-  archive(native) = "b0_std.cmxa"
-  plugin(byte) = "b0_std.cma"
-  plugin(native) = "b0_std.cmxs"
-)
-
-package "memo" (
-directory = "memo"
-version = "%%VERSION_NUM%%"
-requires = "unix cmdliner b0.std"
-archive(byte) = "b0_memo.cma"
-archive(native) = "b0_memo.cmxa"
-plugin(byte) = "b0_memo.cma"
-plugin(native) = "b0_memo.cmxs"
-)
+requires = ""
 
 package "file" (
   directory = "file"
-  description = "B0 file support"
+  description = "B0 build file library"
   version = "%%VERSION_NUM%%"
   requires = "unix cmdliner b0.std b0.memo"
   archive(byte) = "b0_file.cma"
   archive(native) = "b0_file.cmxa"
   plugin(byte) = "b0_file.cma"
   plugin(native) = "b0_file.cmxs"
+  exists_if = "b0_file.cma"
 )
 
 package "kit" (
   directory = "kit"
-  description = "B0 toolkit"
+  description = "B0 toolkit library"
   version = "%%VERSION_NUM%%"
   requires = "unix cmdliner b0.std b0.memo b0.file"
   archive(byte) = "b0_kit.cma"
   archive(native) = "b0_kit.cmxa"
   plugin(byte) = "b0_kit.cma"
   plugin(native) = "b0_kit.cmxs"
+  exists_if = "b0_kit.cma"
+)
+
+package "memo" (
+  directory = "memo"
+  description = "B0 build library"
+  version = "%%VERSION_NUM%%"
+  requires = "unix cmdliner b0.std"
+  archive(byte) = "b0_memo.cma"
+  archive(native) = "b0_memo.cmxa"
+  plugin(byte) = "b0_memo.cma"
+  plugin(native) = "b0_memo.cmxs"
+  exists_if = "b0_memo.cma"
+)
+
+package "std" (
+  directory = "std"
+  description = "B0 standard library"
+  version = "%%VERSION_NUM%%"
+  requires = "unix cmdliner"
+  archive(byte) = "b0_std.cma"
+  archive(native) = "b0_std.cmxa"
+  plugin(byte) = "b0_std.cma"
+  plugin(native) = "b0_std.cmxs"
+  exists_if = "b0_std.cma"
 )
 
 package "tool" (
   directory = "tool"
-  description = "b0 tool driver"
+  description = "b0 tool driver library"
   version = "%%VERSION_NUM%%"
   requires = "unix cmdliner b0.std b0.memo b0.file b0.kit"
   archive(byte) = "b0_tool.cma"
   archive(native) = "b0_tool.cmxa"
   plugin(byte) = "b0_tool.cma"
   plugin(native) = "b0_tool.cmxs"
+  exists_if = "b0_tool.cma"
 )

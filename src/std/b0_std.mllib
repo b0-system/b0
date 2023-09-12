@@ -9,6 +9,7 @@ B0_pdf_viewer
 B0_rsync
 B0_sexp
 B0_std
+B0_tar
 B0_text
-B0_vcs
+B0_vcs_repo
 B0_web_browser

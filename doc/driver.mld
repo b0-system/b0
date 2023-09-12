@@ -1,8 +1,13 @@
-{0 B0 driver development manual}
+{0 B0 driver manual}
 
 A B0 driver like [b0] is an executable that provides a service on the
 definitions of a B0 file. This manual shows how to develop a custom
 driver for B0 files.
+
+Note that it is unlikely you will need to create your own custom
+driver, a lot can be achieved by simply devising {!B0_action}, read
+the {{!page-action}action manual}. But if you are interested in
+understanding the [b0] tool machinery in more details, read on.
 
 {1:overview Overview}
 
@@ -68,7 +73,7 @@ A few things to note:
 
 {ul
 {- Your driver library must be installed and available in the [OCAMLPATH]
-   under the name you gave in to {!B0_driver}.}
+   under the name you gave in to {!B0_driver}. FIXME lib resolution info.}
 {- The driver library's directory is not added to the includes for
    compiling the B0 file. This prevents drivers from adding declarations
    to the compilation environment since using them in a B0 file would

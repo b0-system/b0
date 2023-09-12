@@ -6,7 +6,7 @@
 open B0_std
 
 let exit_b0_file_error = 121 (* See B0_driver.Exit.b0_file_error *)
-let pp_error_str ppf () = Fmt.tty_string [`Fg `Red; `Bold] ppf "Error"
+let pp_error_str ppf () = Fmt.tty' [`Fg `Red; `Bold] ppf "Error"
 
 (* Scopes *)
 
@@ -127,7 +127,6 @@ module Scope = struct
       current := File ((pre, file, Fpath.parent file) :: ss)
   | _ -> invalid_arg "Illegal scope context, no root"
 
-
   let is_root () = match !current with
   | File (["", _, _]) -> true | _ -> false
 
@@ -187,17 +186,29 @@ module type S = sig
   val equal : t -> t -> bool
   val compare : t -> t -> int
   val meta : t -> B0_meta.t
-  val has_meta : 'a B0_meta.key -> t -> bool
+  val mem_meta : 'a B0_meta.key -> t -> bool
+  val has_tag : bool B0_meta.key -> t -> bool
   val find_meta : 'a B0_meta.key -> t -> 'a option
+  val find_or_default_meta : 'a B0_meta.key -> t -> 'a
   val get_meta : 'a B0_meta.key -> t -> ('a, string) result
   val add : t -> unit
+  val fold : (t -> 'a -> 'a) -> 'a -> 'a
   val list : unit -> t list
   val find : string -> t option
   val get : string -> t
   val get_or_suggest : string -> (t, t list) result
   val get_or_hint : string -> (t, string) result
   val get_list_or_hint :
-    ?empty_means_all:bool -> string list -> (t list, string) result
+    all_if_empty:bool -> string list -> (t list, string) result
+
+  val scope_path : t -> string list
+  val in_root_scope : t -> bool
+  val in_current_scope : t -> bool
+  val scope_dir : t -> Fpath.t option
+  val scope_dir' : t -> (Fpath.t, string) result
+  val in_scope_dir : t -> Fpath.t -> Fpath.t option
+  val in_scope_dir' : t -> Fpath.t -> (Fpath.t, string) result
+
   val pp_name_str : string Fmt.t
   val pp_name : t Fmt.t
   val pp_doc : t Fmt.t
@@ -214,14 +225,15 @@ module Make (V : VALUE) = struct
   let name v = name (V.def v)
   let basename v = basename (V.def v)
   let doc v = doc (V.def v)
-
   let scope v = scope (V.def v)
   let equal v0 v1 = String.equal (name v0) (name v1)
   let compare v0 v1 = String.compare (name v0) (name v1)
 
   let meta v = meta (V.def v)
-  let has_meta k v = B0_meta.mem k (meta v)
+  let mem_meta k v = B0_meta.mem k (meta v)
+  let has_tag k v = B0_meta.has_tag k (meta v)
   let find_meta k v = B0_meta.find k (meta v)
+  let find_or_default_meta k v = B0_meta.find_or_default k (meta v)
   let get_meta k v = match find_meta k v with
   | Some v -> Ok v
   | None ->
@@ -229,29 +241,38 @@ module Make (V : VALUE) = struct
         (String.Ascii.capitalize V.def_kind)
         V.pp_name_str (name v) B0_meta.Key.pp_name k
 
+  let pp_name_str = V.pp_name_str
+  let pp_name = Fmt.using name pp_name_str
+  let pp_doc = Fmt.using doc (Fmt.tty' [])
+  let pp_synopsis ppf v = Fmt.pf ppf "%a  %a" pp_name v pp_doc v
+  let pp ppf v =
+    let pp_non_empty ppf m = match B0_meta.is_empty m with
+    | true -> () | false -> Fmt.pf ppf "@, %a" B0_meta.pp m in
+    Fmt.pf ppf "@[<v>@[%a@]%a@]" pp_synopsis v pp_non_empty (meta v)
+
   let defs = ref String.Map.empty
   let add v = defs := String.Map.add (name v) v !defs
 
-  let is_name n = String.for_all (fun c -> c <> '.') n
-  let illegal_name_error n =
+  let is_name name = String.for_all (fun c -> c <> '.') name
+  let illegal_name_error name =
     Fmt.str "%a is not a legal %s name, dots are not allowed."
-      Fmt.(code string) n V.def_kind
+      Fmt.(code string) name V.def_kind
 
-  let seal_error n =
+  let seal_error name =
     Fmt.str "%s %a illegaly created after B0 file initialization."
-      (String.Ascii.capitalize V.def_kind) V.pp_name_str n
+      (String.Ascii.capitalize V.def_kind) V.pp_name_str name
 
-  let duplicate_error n =
+  let duplicate_error name =
     Fmt.str "%s %a already defined in scope."
-      (String.Ascii.capitalize V.def_kind) V.pp_name_str n
+      (String.Ascii.capitalize V.def_kind) V.pp_name_str name
 
-  let err_undefined n =
+  let err_undefined name =
     Fmt.str "%s %a undefined in scope."
-      (String.Ascii.capitalize V.def_kind) V.pp_name_str n
+      (String.Ascii.capitalize V.def_kind) V.pp_name_str name
 
-  let qualify_name n =
-    if not (is_name n) then raise (Err (illegal_name_error n)) else
-    Scope.qualify_name n
+  let qualify_name name =
+    if not (is_name name) then raise (Err (illegal_name_error name)) else
+    Scope.qualify_name name
 
   let define ?(doc = "undocumented") ?(meta = B0_meta.empty) n =
     match !Scope.sealed with
@@ -265,41 +286,40 @@ module Make (V : VALUE) = struct
         | true -> raise (Err (duplicate_error n))
         | false -> { scope; name; basename = n; doc; meta }
 
-  let scoped_find n = match String.Map.find (Scope.qualify_name n) !defs with
-  | exception Not_found -> None
-  | v -> Some v
-
+  let scoped_find name = String.Map.find_opt (Scope.qualify_name name) !defs
   let find = scoped_find
-  let get n = match scoped_find n with
-  | Some v -> v | None -> raise (Err (err_undefined n))
+  let get name = match scoped_find name with
+  | Some v -> v | None -> raise (Err (err_undefined name))
 
-  let get_or_suggest n = match scoped_find n with
+  let get_or_suggest name = match scoped_find name with
   | Some v -> Ok v
   | None ->
       let add_sugg k v acc =
-        if String.edit_distance k n <= 2 then v :: acc else acc
+        if String.edit_distance k name <= 2 then v :: acc else acc
       in
       Error (List.rev (String.Map.fold add_sugg !defs []))
 
-  let get_or_hint n = match get_or_suggest n with
+  let get_or_hint candidate = match get_or_suggest candidate with
   | Ok _ as v -> v
   | Error suggs ->
       let kind ppf () = Fmt.pf ppf "%s" def_kind in
       let hint = Fmt.did_you_mean in
       let pp = Fmt.unknown' ~kind V.pp_name_str ~hint in
-      Fmt.error "@[%a@]" pp (n, List.map name suggs)
+      Fmt.error "@[%a@]" pp (candidate, List.map name suggs)
 
-  let list () = match Scope.is_root () with
+  let fold f acc = match Scope.is_root () with
   | true ->
-      let add _ v vs = v :: vs in
-      String.Map.fold add !defs []
+      let add _ v acc = f v acc in
+      String.Map.fold add !defs acc
   | false ->
       let prefix = Scope.qualify_name "" in
-      let add k v vs = if String.starts_with ~prefix k then v :: vs else vs in
-      String.Map.fold add !defs []
+      let add k v acc = if String.starts_with ~prefix k then f v acc else acc in
+      String.Map.fold add !defs acc
 
-  let get_list_or_hint ?(empty_means_all = false) ns =
-    if empty_means_all && ns = [] then Ok (List.sort compare (list ())) else
+  let list () = List.rev (fold List.cons [])
+
+  let get_list_or_hint ~all_if_empty names =
+    if all_if_empty && names = [] then Ok (List.sort compare (list ())) else
     let rec loop vs es = function
     | [] ->
         if es <> []
@@ -310,21 +330,41 @@ module Make (V : VALUE) = struct
         | Ok v -> loop (v :: vs) es ns
         | Error e -> loop vs (e :: es) ns
     in
-    loop [] [] ns
+    loop [] [] names
 
-  let pp_name_str = V.pp_name_str
-  let pp_name = Fmt.using name pp_name_str
-  let pp_doc = Fmt.using doc (Fmt.tty_string [])
-  let pp_synopsis ppf v = Fmt.pf ppf "%a  %a" pp_name v pp_doc v
-  let pp ppf v =
-    let pp_non_empty ppf m = match B0_meta.is_empty m with
-    | true -> () | false -> Fmt.pf ppf "@, %a" B0_meta.pp m in
-    Fmt.pf ppf "@[<v>@[%a@]%a@]" pp_synopsis v pp_non_empty (meta v)
+  let scope_path v = match scope v with
+  | Scope.File (["", _, _]) -> []
+  | Scope.File ((pre, _, _) :: _) -> String.split_on_char '.' pre
+  | Scope.Lib lib -> String.split_on_char '.' lib
+  | Scope.File []
+  | Scope.Nil -> assert false
+
+  let in_root_scope v = match scope v with
+  | Scope.File (["", _, _]) -> true | _ -> false
+
+  let in_current_scope v =
+    let prefix = Scope.qualify_name "" in
+    String.starts_with ~prefix (name v)
+
+  let scope_dir v = scope_dir (def v)
+  let scope_dir' v = match scope_dir v with
+  | None -> Fmt.error "%s %a has no scope directory." def_kind pp_name v
+  | Some dir -> Ok dir
+
+  let in_scope_dir v path = match scope_dir v with
+  | None -> None | Some dir -> Some Fpath.(dir // path)
+
+  let in_scope_dir' v path = match in_scope_dir v path with
+  | Some v -> Ok v
+  | None ->
+      Fmt.error "%s %a has no scope directory, cannot lookup %a in it."
+        def_kind pp_name v Fpath.pp path
+
+
 
   module T = struct type nonrec t = t let compare = compare end
   module Set = Set.Make(T)
   module Map = Map.Make(T)
 end
-
 
 type value = V : (module S with type t = 'a) * 'a -> value

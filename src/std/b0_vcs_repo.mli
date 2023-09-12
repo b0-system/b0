@@ -5,33 +5,41 @@
 
 (** Version control system (VCS) repositories.
 
-    {b XXX.} This likely needs a cleanup design round. Also
-    make clear that this is not command oriented but repo oriented
-    should make things more clear. *)
+    The toplevel module abstracts operations over VCS.  The {!Hg} and
+    {!Git} modules offer VCS specific operations. *)
 
 open B0_std
 
+(** {1:dry_run Dry runs} *)
+
+type dry_run = Cmd.t -> unit
+(** The type for dry runs. In dry run for effectful operations, the
+    actual command is given to this function and the operation
+    succeeds without performing it. *)
+
 (** {1:kind VCS kinds} *)
 
-type kind = Git | Hg (** *)
-(** The type for VCS supported by the module. *)
+type kind =
+| Git (** {{:https://git-scm.com/}[git]} *)
+| Hg (** {{:https://www.mercurial-scm.org/}[hg]} *)
+(** The type of VCS supported by the module. *)
 
 val pp_kind : kind Fmt.t
-(** [pp_kind] formats types of VCS. *)
+(** [pp_kind] formats kinds of VCS. *)
 
 val kind_to_string : kind -> string
 (** [kind_to_string k] is a string for [k]. *)
 
 val kinds : kind list
-(** [kinds] is the list of supported vcs. *)
+(** [kinds] is the list of supported VCS. *)
 
-(** {1:repos Version control system repositories} *)
+(** {1:repos Repositories} *)
 
 type t
 (** The type for VCS repositories. *)
 
 val kind : t -> kind
-(** [kind r] is [r]'s kind. *)
+(** [kind r] is [r]'s VCS kind. *)
 
 val repo_dir : t -> Fpath.t
 (** [repo_dir r] is [r]'s repository directory (not the working directory). *)
@@ -42,87 +50,103 @@ val work_dir : t -> Fpath.t
 
 val repo_cmd : t -> Cmd.t
 (** [repo_cmd r] is the base command to use to act on [r]. Use only if you
-    need VCS specific functionality not provided by the module. *)
+    need VCS specific functionality not provided by the module. See also
+    {!Git} and {!Hg}. *)
 
 val pp : t Fmt.t
-(** [pp] formats a repository. *)
+(** [pp] formats a repository. This formats {!repo_dir}. *)
+
+val pp_long : t Fmt.t
+(** [pp_long] formats a repository. This formats {!kind} followed by
+    {!repo_dir}. *)
 
 (** {1:get Finding local repositories} *)
 
-val find : ?kind:kind -> ?dir:Fpath.t -> unit -> (t option, string) result
+val find :
+  ?kind:kind -> ?dir:Fpath.t -> unit -> (t option, string) result
 (** [find ~dir ()] finds, using VCS functionality, a repository
     starting in directory [dir] (if unspecified this is the [cwd]). If [kind]
-    is specified, will only look for a vcs of kind [kind]. *)
+    is specified, will only look for a vcs of kind [kind].
+*)
 
-val get : ?kind:kind -> ?dir:Fpath.t -> unit -> (t, string) result
+val get :
+  ?kind:kind -> ?dir:Fpath.t -> unit -> (t, string) result
 (** [get] is like {!find} but errors if no VCS was found. *)
 
 (** {1:commits Commits} *)
 
 type commit_ish = string
-(** The type for {e symbols} resolving to a commit. {b Important}, the
-    module uses {{!head}["HEAD"]} for specifying the commit currently
-    checkout in the working directory; use this symbol even if the
-    underlying VCS is [Hg]. *)
+(** The type for {e symbols} resolving to a commit.
+
+    {b Important}, the module uses {{!head}["HEAD"]} for specifying
+    the commit currently checkout in the working directory; use this
+    symbol even if the underlying VCS is [Hg]. *)
 
 type commit_id = string
-(** The type for commit identifiers. Note that the module sometimes
-    appends the string ["-dirty"] to these identifiers in which
-    case they are no longer. *)
+(** The type for commit identifiers.
+
+    {b Note.} The module sometimes appends the string ["-dirty"] to
+    these identifiers in which case they are no longer proper
+    identifiers. *)
 
 val head : commit_ish
 (** [head] is ["HEAD"]. A symbol to represent the commit currently
     checked out in the working directory. *)
 
 val commit_id : t -> dirty_mark:bool -> commit_ish -> (commit_id, string) result
-(** [commit_id r ~dirty_mark ~commit_ish] is the object name
+(** [commit_id repo ~dirty_mark ~commit_ish] is the object name
     (identifier) of [commit_ish]. If [commit_ish] is ["HEAD"] and
-    [dirty_mark] is [true] (default) and the working tree of [r]
-    {!is_dirty}, a mark gets appended to the commit identifier. *)
+    [dirty_mark] is [true] and the working tree of [repo] {!is_dirty},
+    a mark gets appended to the commit identifier. *)
 
 val commit_ptime_s : t -> commit_ish -> (int, string) result
-(** [commit_ptime_s t commit_ish] is the POSIX time in seconds of
-    commit [commit_ish] of repository [r]. *)
+(** [commit_ptime_s repo commit_ish] is the POSIX time in seconds of
+    commit [commit_ish] of repository [repo]. *)
 
 val changes :
-  t -> after:commit_ish -> until:commit_ish ->
+  t -> ?after:commit_ish -> ?last:commit_ish -> unit ->
   ((commit_id * string) list, string) result
-(** [changes r ~after ~until] is the list of commits with their
-    one-line synopsis from commit-ish [after] to commit-ish
-    [until]. *)
+(** [changes repo ~after ~last] is the list of commits with their
+    one-line synopsis from commit-ish [after] (defaults to the start
+    of the branch) to commit-ish [last] (defaults to {!head}). *)
 
 val tracked_files : t -> tree_ish:string -> (Fpath.t list, string) result
-(** [tracked_files ~tree_ish r] are the files tracked by the tree
+(** [tracked_files repo ~tree_ish] are the files tracked by the tree
     object [tree_ish]. *)
 
 val commit_files :
   ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo -> ?msg:string -> t ->
   Fpath.t list -> (unit, string) result
-(** [commit_files r ~msg files] commits the file [files] with message
+(** [commit_files rrepo ~msg files] commits the file [files] with message
     [msg] (if unspecified the VCS should prompt). *)
+
+val pp_commit : commit_ish Fmt.t
+(** [pp_commit] formats a commit. *)
 
 (** {1:work_dir Working directory} *)
 
 val is_dirty : t -> (bool, string) result
-(** [is_dirty r] is [Ok true] iff the working directory of [r] has
+(** [is_dirty repo] is [Ok true] iff the working directory of [repo] has
     uncommited changes. *)
 
 val not_dirty : t -> (unit, string) result
-(** [not_dirty] is [Ok ()] iff the working directory of [r] is not dirty and
-    an error that enjoins to stash or commit otherwise. *)
+(** [not_dirty repo] is [Ok ()] iff the working directory of [repo] is not dirty
+    and an error that enjoins to stash or commit otherwise. *)
 
 val file_is_dirty : t -> Fpath.t -> (bool, string) result
-(** [file_is_dirty r f] is [Ok true] iff [f] has uncommited changes. *)
+(** [file_is_dirty repo file] is [Ok true] iff [file] has uncommited changes. *)
 
 val checkout : ?and_branch:string -> t -> commit_ish -> (unit, string) result
-(** [checkout r ~and_branch commit_ish] checks out [commit_ish] in the
-    working directory of [r]. Checks out in a new branch [and_branch]
-    if provided. This fails if the current working directory
-    {!is_dirty}. *)
+(** [checkout repo ~and_branch commit_ish] checks out [commit_ish] in the
+    working directory of [repo]. Checks out in a new branch [and_branch]
+    if provided. This fails if the current working directory {!is_dirty}. *)
 
 val local_clone : t -> dir:Fpath.t -> (t, string) result
-(** [local_clone r ~dir] clones [r] to a working directory [dir] and returns
-    a repo to operate on it. *)
+(** [local_clone repo ~dir] clones [repo] to a working directory [dir] and
+    returns a repo to operate on it. *)
+
+val pp_dirty : unit Fmt.t
+(** [pp_dirty] formats the string ["dirty"]. *)
 
 (** {1:tags Tags} *)
 
@@ -130,37 +154,44 @@ type tag = string
 (** The type for VCS tags. *)
 
 val tags : t -> (tag list, string) result
-(** [tags r] is the list of tags in the repo [r]. *)
+(** [tags repo] is the list of tags in the repo [repo]. *)
 
 val tag :
-  ?msg:string -> t -> force:bool -> sign:bool -> commit_ish -> tag ->
-  (unit, string) result
-(** [tag r ~force ~sign ~msg commit_ish t] tags [commit_ish] with [t]
+  ?dry_run:dry_run -> ?msg:string -> t -> force:bool -> sign:bool ->
+  commit_ish -> tag -> (unit, string) result
+(** [tag repo ~force ~sign ~msg commit_ish t] tags [commit_ish] with [t]
     and message [msg] (if unspecified the VCS should prompt). If
     [sign] is [true] (defaults to [false]) signs the tag ([`Git] repos
     only).  If [force] is [true] (default to [false]) doesn't fail if
     the tag already exists. *)
 
-val delete_tag : t -> tag -> (unit, string) result
-(** [delete_tag r t] deletes tag [t] in repo [r]. *)
+val delete_tag :
+  ?dry_run:dry_run -> t -> tag -> (unit, string) result
+(** [delete_tag repo t] deletes tag [t] in [repo]. *)
 
 val describe : t -> dirty_mark:bool -> commit_ish -> (string, string) result
-(** [describe r dirty_mark commit_ish] identifies [commit_ish] using
-    tags from the repository [r]. If [commit_ish] is ["HEAD"] and
-    [dirty_mark] is [true] (default) and the working tree of [r]
+(** [describe repo dirty_mark commit_ish] identifies [commit_ish]
+    using tags from [repo]. If [commit_ish] is ["HEAD"] and
+    [dirty_mark] is [true] (default) and the working tree of [repo]
     {!is_dirty}, a mark gets appended to the description. *)
 
 val latest_tag : t -> commit_ish -> (tag option, string) result
-(** [latest_tag r commit_ish] finds the latest tag in the current branch
+(** [latest_tag repo commit_ish] finds the latest tag in the current branch
     describing [commit_ish]. *)
 
-(** {1:git Git specific operations} *)
+val find_greatest_version_tag : t -> (tag option, string) result
+(** [find_latest_version_tag repo] lists tags with {!tags} sorts
+    those who parse with {!String.to_version} in increasing order
+    and takes the greatest ones. *)
+
+(** {1:vcs VCS specific operations} *)
 
 (** Git specific operations.
 
     All the following operations assume the repository is of kind [Git].
-    Use {!Git.check_kind} to assert this first otherwise the operations
-    will fail in a non-user friendly way. *)
+    Use the repository lookup functions of this module or {!Git.check_kind}
+    to assert this first otherwise the operations will fail in non-user
+    friendly ways. *)
 module Git : sig
 
   val get_cmd :
@@ -303,6 +334,7 @@ module Git : sig
       {!Os.Cmd.run_status}. *)
 end
 
+(** Mercurial specific operations. *)
 module Hg : sig
   val get_cmd :
     ?search:Fpath.t list -> ?cmd:Cmd.t -> unit -> (Cmd.t, string) result

@@ -44,7 +44,7 @@ module Conf = struct
       b0_file : Fpath.t option;
       cache_dir : Fpath.t;
       cwd : Fpath.t;
-      code : B0_ocaml.Conf.code option;
+      code : B0_ocaml.Code.t option;
       hash_fun : (module Hash.T);
       jobs : int;
       log_level : Log.level;
@@ -61,7 +61,7 @@ module Conf = struct
     in
     B0_memo.make ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs ~feedback ()
 
-  let v
+  let make
       ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~hash_fun ~jobs
       ~log_level ~no_pager ~tty_cap ()
     =
@@ -121,7 +121,7 @@ module Conf = struct
     let cache_dir = B0_cli.Memo.get_cache_dir ~cwd ~b0_dir ~cache_dir in
     let hash_fun = B0_cli.Memo.get_hash_fun ~hash_fun in
     let jobs = B0_cli.Memo.get_jobs ~jobs in
-    Ok (v ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~hash_fun
+    Ok (make ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~hash_fun
           ~jobs ~log_level ~no_pager ~tty_cap ())
 end
 
@@ -178,9 +178,9 @@ type main =
 type t =
   { name : string;
     version : string;
-    libs : B0_ocaml.Lib.Name.t list }
+    libs : B0_ocaml.Libname.t list }
 
-let create ~name ~version ~libs = { name; version; libs }
+let make ~name ~version ~libs = { name; version; libs }
 let name d = d.name
 let version d = d.version
 let libs d = d.libs
@@ -233,28 +233,28 @@ module Compile = struct
     Ok (B0_file.expanded_src esrc)
 
   let base_ext_libs =
-    [ B0_ocaml.Lib.Name.v "cmdliner";
-      B0_ocaml.Lib.Name.v "unix"; ]
+    [ B0_ocaml.Libname.v "cmdliner";
+      B0_ocaml.Libname.v "unix"; ]
 
   let base_libs =
-    [ B0_ocaml.Lib.Name.v "b0.std";
-      B0_ocaml.Lib.Name.v "b0.memo";
-      B0_ocaml.Lib.Name.v "b0.file";
-      B0_ocaml.Lib.Name.v "b0.kit"; ]
+    [ B0_ocaml.Libname.v "b0.std";
+      B0_ocaml.Libname.v "b0.memo";
+      B0_ocaml.Libname.v "b0.file";
+      B0_ocaml.Libname.v "b0.kit"; ]
 
   let find_libs m r libs =
-    Fut.of_list @@ List.map (B0_ocaml.Lib.Resolver.get r) libs
+    Fut.of_list @@ List.map (B0_ocaml.Libresolver.get r) libs
 
   let find_boot_libs m ~clib_ext ~env libs r =
     match Os.Env.find ~empty_is_none:true "B0_BOOTSTRAP" with
     | None -> find_libs m r libs
     | Some bdir ->
         let bdir = Fpath.v bdir in
-        let boot_lib name =
-          let dir = Fpath.(bdir / B0_ocaml.Lib.Name.undot ~rep:'-' name) in
-          let archive = Some (B0_ocaml.Lib.Name.to_archive_name name) in
+        let boot_lib libname =
+          let dir = Fpath.(bdir / B0_ocaml.Libname.undot ~rep:'-' libname) in
+          let archive = Some (B0_ocaml.Libname.to_archive_name libname) in
           let* lib =
-            B0_ocaml.Lib.of_dir m ~clib_ext ~name ~requires:[] ~archive ~dir
+            B0_ocaml.Lib.of_dir m ~clib_ext ~libname ~requires:[] ~archive ~dir
               ~js_stubs:[]
           in
           match lib with
@@ -264,11 +264,13 @@ module Compile = struct
         Fut.of_list (List.map boot_lib libs)
 
   let find_libs m ocaml_conf ~build_dir ~driver ~requires =
-    let cache_dir = Fpath.(build_dir / B0_ocaml.Lib.Resolver.cache_dir_name) in
-    (* let ocamlpath = B0_ocaml.Lib.Resolver.ocamlpath ~cache_dir in *)
-    let ocamlfind = B0_ocaml.Lib.Resolver.ocamlfind ~cache_dir in
+    let cache_dir =
+      Fpath.(build_dir / B0_ocaml.Libresolver.Scope.cache_dir_name)
+    in
+    (* let ocamlpath = B0_ocaml.Libresolver.Scope.ocamlpath ~cache_dir in *)
+    let ocamlfind = B0_ocaml.Libresolver.Scope.ocamlfind ~cache_dir in
     let scopes = [(*ocamlpath;*) ocamlfind] in
-    let r = B0_ocaml.Lib.Resolver.create m ocaml_conf scopes in
+    let r = B0_ocaml.Libresolver.make m ocaml_conf scopes in
     let requires = List.map fst requires in
     let* requires = find_libs m r requires in
     (* FIXME we are loosing locations here would be nice to

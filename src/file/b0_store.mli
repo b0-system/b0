@@ -31,8 +31,8 @@ type binding = B : 'a key * 'a -> binding (** *)
 type t
 (** The type for stores. *)
 
-val create : B0_memo.t -> dir:Fpath.t -> binding list -> t
-(** [create memo ~dir bs] is a store with predefined bindings [bs].
+val make : B0_memo.t -> dir:Fpath.t -> binding list -> t
+(** [make memo ~dir bs] is a store with predefined bindings [bs].
     If a key is mentioned more than once in [bs] the last binding
     takes over. The store uses [memo] to determine other keys as
     {{!get}needed}.  [dir] is a scratch directory used by key determination

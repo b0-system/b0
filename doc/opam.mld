@@ -1,25 +1,23 @@
-{0 [opam] support manual}
+{0 [opam] B0 manual}
 
 {!B0_opam} has support for {{:http://opam.ocaml.org/}[opam]}, the
 OCaml package manager. It provides:
 
-- A convention to represent [opam] packages in the metadata of [B0]
-  packs.
-- The [.opam] cmdlet to generate opam package files and publish
-  packages on the OCaml [opam] repository.
+- A convention to represent [opam] packages in the metadata of B0 packs.
+- The [b0 -- .opam] action to generate opam package files and publish
+  packages on the public OCaml [opam] repository.
 
 {1:representation Package representation}
 
-[opam] packages are represented in [B0] by {{!page-manual.packs}build
-packs} tagged with the {!B0_opam.tag}. The name of the defined [opam]
-package is the basename of the pack or the value of the
-{!B0_opam.Meta.name} metadata key; see {!B0_opam.pkg_name_of_pack} for
-the full details.
+[opam] packages are represented by {{!page-manual.packs}build packs}
+tagged with the {!B0_opam.tag}. The name of the defined [opam] package
+is the basename of the pack or the value of the {!B0_opam.Meta.name}
+meta key; see {!B0_opam.pkg_name_of_pack} for the full details.
 
-The metadata of the [opam] package is defined by the pack's
-{{!B0_meta.std}standard} and {{!B0_opam.Meta}[opam] specific} metadata
-key values. The map between metadata key and opam fields is described
-in {!B0_opam.File.pkg_of_meta}. Some keys are derived by
+The final metadata of the [opam] package is defined by
+{{!B0_meta.std}standard} and {{!B0_opam.Meta}[opam] specific} meta key
+values. The map between metadata key and opam fields is described in
+{!B0_opam.File.pkg_of_meta}. Some keys are derived by
 {!B0_opam.Meta.pkg_of_pack} if unspecified.
 
 The pack {e should} contain exactly the build units that must be built
@@ -30,18 +28,17 @@ Here's an example:
 {[
 let mypkg =
   let meta =
-    let open B0_meta in
-    empty
-    |> tag B0_opam.tag
-    |> add authors ["The mylib programmers"]
-    |> add maintainers ["mylib@example.org"]
-    |> add homepage "https://example.org/software/mylib"
-    |> add online_doc "https://example.org/software/mylib/doc"
-    |> add license ["MIT"]
-    |> add repo "git+https://example.org/repos/mylib.git"
-    |> add issues "https://github.com/mylib/mylib/issues"
-    |> add B0_opam.Meta.depends [
-       "ocaml", {|>= "4.10.0" |} ]
+    B0_meta.empty
+    |> B0_meta.(add authors) ["The mylib programmers"]
+    |> B0_meta.(add maintainers) ["mylib@example.org"]
+    |> B0_meta.(add homepage) "https://example.org/software/mylib"
+    |> B0_meta.(add online_doc) "https://example.org/software/mylib/doc"
+    |> B0_meta.(add license) ["MIT"]
+    |> B0_meta.(add repo) "git+https://example.org/repos/mylib.git"
+    |> B0_meta.(add issues) "https://github.com/mylib/mylib/issues"
+    |> B0_meta.tag B0_opam.tag
+    |> B0_meta.add B0_opam.Meta.depends [
+       "ocaml", {|>= "4.14.0" |} ]
   in
   B0_pack.v "mypkg" ~doc:"opam package mypkg" ~meta ~locked:true @@
   B0_unit.list () (* You likely want to be more refined than that *)
@@ -155,7 +152,7 @@ If everything worked well it continues with:
 {- Opens a pull request for the branch on the OCaml [opam]
    repository on GitHub.}}
 
-Invoking the cmdlet with [--check-only] outputs on stdout the various
+Invoking the action with [--check-only] outputs on stdout the various
 bits that are being derived and performs various checks; e.g. it lints
 [opam] files and HTTP HEADs archives to checks that they are not 404.
 
@@ -176,7 +173,7 @@ its pack and {{!det_version}version} via
 Note that the archive name defaults to the pack name when
 unspecified. If you want to define multiple packages for the same
 source archive you will need to define the
-{!B0_release.Meta.src_archive_name} appropriately.
+{!B0_release.src_archive_name} appropriately.
 
 For example suppose that in addition to [mypkg] you publish on [opam]
 a separate package [mypkg-unix] which compiles the [Unix] library
@@ -187,10 +184,9 @@ pack defining the package [mypkg-unix] you can add:
 let mypkg = ...
 let mypkg_unix =
   let meta =
-    let open B0_meta in
-    empty
+    B0_meta.empty
     ...
-    |> add B0_release.Meta.src_archive_name (B0_pack.basename mypkg)
+    |> B0_meta.(add B0_release.src_archive_name) (B0_pack.basename mypkg)
   in
   B0_pack.v "mypkg-unix" ~meta @@ mypkg_unix_units
 ]}
@@ -249,6 +245,36 @@ this updates the existing pull request.
 
 In particular gradually {{!incompatibilities}stating incompatibilites}
 will update the pull request.
+
+{2:opam_publish opam submission build failure}
+
+
+{b TODO.} Review.
+
+If the build failure is due to a missing constraint, follow the
+instruction of the next item to correct the opam file. If the
+failure is due to a defect in the distribution archive, call it a
+day and start over with a patch version release that corrects the
+problem. Do not try to reuse the version string of the failed
+release, other systems may already have picked up the broken
+archive.
+
+{2:opam_complaints opam repository maintainer and robot complaints}
+
+{b TODO.} Review.
+
+These pesky but loved maintainers and robots... If they complain about
+certain aspects of your opam submission, you can either try to correct
+it manually from the opam package description found in the build
+directory and reinvoke topkg opam submit or edit the opam file of the
+source repository and regenerate the opam Package description with
+topkg opam pkg and the --pkg-opam option. Note that if the VCS moved
+meanwhile you may have to use the various command line options of
+topkg-opam(1) to make sure you point to the right package version and
+distribution archive. In either case you should be aware that there
+will be a mismatch between the opam file in the distribution archive
+and the one you submitted to the opam repository. If this happens to
+be a problem, start over with a new patch version release.
 
 {1:cookbook Cookbook}
 

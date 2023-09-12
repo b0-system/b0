@@ -3,9 +3,9 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** [opam] support.
+(** {{:https://opam.ocaml.org/}[opam]} support.
 
-    See the {{!page-opam}B0 [opam] manual} for more details. *)
+    See the B0 {{!page-opam}B0 opam manual} for more details. *)
 
 open B0_std
 
@@ -14,7 +14,9 @@ open B0_std
 val get_cmd :
   ?search:Fpath.t list -> ?cmd:B0_std.Cmd.t -> unit ->
   (Cmd.t, string) result
-(** [get_cmd ()] looks for [opam] wih {!B0_std.Os.Cmd.get}. *)
+(** [get_cmd ()] looks for [opam] wih {!B0_std.Os.Cmd.get}.
+
+    FIXME what is this doing here ?  *)
 
 (** {1:file [opam] files} *)
 
@@ -64,33 +66,96 @@ module File : sig
       metadata keys.
       {ul
       {- ["authors:"], {!B0_meta.authors}.}
-      {- ["available:"], {!B0_opam.Meta.available}.}
-      {- ["build:"], {!B0_opam.Meta.build}.}
+      {- ["available:"], {!B0_opam.available}.}
+      {- ["build:"], {!B0_opam.build}.}
       {- ["bug-report:"], {!B0_meta.issues}.}
-      {- ["conflicts:"], {!B0_opam.Meta.conflicts}.}
+      {- ["conflicts:"], {!B0_opam.conflicts}.}
       {- ["description:"], {!B0_meta.description}.}
-      {- ["depends:"], {!B0_opam.Meta.depends}.}
-      {- ["depopts:"], {!B0_opam.Meta.depopts}.}
+      {- ["depends:"], {!B0_opam.depends}.}
+      {- ["depopts:"], {!B0_opam.depopts}.}
       {- ["dev-repo:"], {!B0_meta.repo}.}
       {- ["doc:"], {!B0_meta.online_doc}.}
       {- ["homepage:"], {!B0_meta.homepage}.}
-      {- ["install:"], {!B0_opam.Meta.install}.}
+      {- ["install:"], {!B0_opam.install}.}
       {- ["license:"], {!B0_meta.licenses}.}
       {- ["maintainer:"], {!B0_meta.maintainers}.}
-      {- ["name:"], {!B0_opam.Meta.name} iff [with_name] is [true].}
+      {- ["name:"], {!B0_opam.name} iff [with_name] is [true].}
       {- ["synopsis:"], {!B0_meta.synopsis}.}
       {- ["tags:"], {!B0_meta.description_tags}.}}
-      Finally the contents of {!B0_opam.Meta.file_addendum} is appended
+      Finally the contents of {!B0_opam.file_addendum} is appended
       after the definition of these fields.
 
-      See {!Meta.pkg_of_pack} for deriving metadata from build packs. *)
+      See {!B0_opam.pkg_meta_of_pack} for deriving metadata from build
+      packs. *)
 end
 
-(** {1:meta [opam] Metadata} *)
+(** {1:metadata Metadata}
 
-val tag : unit B0_meta.key
+    These metadata keys can be specified to define opam file fields.
+    Some of the metadata is covered by {{!B0_meta.std}standard keys}.
+    The full map is documented in {!File.pkg_of_meta}. *)
+
+type pkg_spec = string * string
+(** The type for package specifications. A package name and a
+    {{:http://opam.ocaml.org/doc/Manual.html#Filtered-package-formulas}
+    filtered package formula}, use [""] if you don't have any constraint. *)
+
+val tag : bool B0_meta.key
 (** [tag] indicates the entity is related to [opam]. Adding this tag
     to a pack makes it represent an opam package for B0's opam tooling. *)
+
+val available : string B0_meta.key
+(** [available] is an opam
+    {{:https://opam.ocaml.org/doc/Manual.html#opamfield-available}
+    [available:]} field value. This is a raw string in opam sntax
+    that defines the whole field. *)
+
+val build : string B0_meta.key
+(** [build] is an opam
+    {{:https://opam.ocaml.org/doc/Manual.html#opamfield-build}
+    [build:]} field value. This is a raw string in
+    opam syntax that defines the whole field. Used to override
+    automatic opam file generation, see {!pkg_of_pack}.  *)
+
+val depends : pkg_spec list B0_meta.key
+(** [depends] is an opam
+    {{:https://opam.ocaml.org/doc/Manual.html#opamfield-depends}
+    [depends:]} field value. Used to override automatic opam file
+    dependency generation, see {!pkg_of_pack}. *)
+
+val depopts : pkg_spec list B0_meta.key
+(** [depopts] is an opam
+    {{:https://opam.ocaml.org/doc/Manual.html#opamfield-depopts}
+    [depopts:]} field value. *)
+
+val conflicts : pkg_spec list B0_meta.key
+(** [conflicts] is an opam
+    {{:https://opam.ocaml.org/doc/Manual.html#opamfield-conflicts}
+    [conflicts:]} field value. *)
+
+val file_addendum : File.t B0_meta.key
+(** [file_addendum] is an [opam] file fragment appended at the end
+    of a generated [opam] file. See {!B0_opam.File.pkg_of_meta}. *)
+
+val install : string B0_meta.key
+(** [install] is an opam
+    {{:https://opam.ocaml.org/doc/Manual.html#opamfield-install}
+    [install:]} field value. This is a raw
+    string in opam syntax that defines the whole field. Used to
+    override automatic opam file generation, see {!pkg_of_pack}. *)
+
+val name : string B0_meta.key
+(** [name] is an [opam]
+    {{:https://opam.ocaml.org/doc/Manual.html#opamfield-name}
+    [name:]} field value. Use to override
+    automatic [opam] package name generation, see {!pkg_of_pack}. *)
+
+val pin_depends : (string * string) list B0_meta.key
+(** [pin_depends] is an opam
+    {{:https://opam.ocaml.org/doc/Manual.html#opamfield-pindepends}
+    [pin-depends:]} field value. *)
+
+(** {1:pkg_derivation Package derivation} *)
 
 val pkg_name_of_pack : B0_pack.t -> string
 (** [pkg_name_of_pack p] derives an opam package name for [p].
@@ -100,98 +165,29 @@ val pkg_name_of_pack : B0_pack.t -> string
     {- The {!B0_pack.basename} of [p] if not equal to ["default"].}
     {- The basename of [p]'s scope directory.}} *)
 
-(** [opam] metadata.
+val pkg_meta_of_pack : B0_pack.t -> B0_meta.t
+(** [pkg_meta_of_pack p] is [opam] package metadata for pack [p] ready
+    to be used with {!File.pkg_of_meta} to derive an opam package
+    file.
 
-    Some of the metadata is covered by {{!B0_meta.std}standard keys}. *)
-module Meta : sig
+    This is [p]'s metadata with the following fields added if they
+    are unspecified:
+    {ul
+    {- {!name}, the value of {!B0_opam.pkg_name_of_pack}[ p].}
+    {- {!B0_meta.synopsis} and {!B0_meta.description}. The fields
+       are tentatively derived using
+       {!B0_pack.derive_synopsis_and_description}.}
+    {- {!build}, a locked b0 build of the pack is defined.}
+    {- {!depends}, we collect the OCaml libraries required by units
+       in the pack, derive a package names out of them.
+       {b FIXME.} This is the poc but it's
+       not workable for now we don't have enough metadata in library
+       names.}} *)
 
-  type pkg_spec = string * string
-  (** The type for package specifications. A package name and
-      a
-      {{:http://opam.ocaml.org/doc/Manual.html#Filtered-package-formulas}
-      filtered package formula}, use [""] if you don't have any constraint. *)
-
-  val available : string B0_meta.key
-  (** [available] is an opam
-      {{:https://opam.ocaml.org/doc/Manual.html#opamfield-available}
-      [available:]} field value. This is a raw string in opam sntax
-      that defines the whole field. *)
-
-  val build : string B0_meta.key
-  (** [build] is an opam
-      {{:https://opam.ocaml.org/doc/Manual.html#opamfield-build}
-      [build:]} field value. This is a raw string in
-      opam syntax that defines the whole field. Used to override
-      automatic opam file generation, see {!pkg_of_pack}.  *)
-
-  val depends : pkg_spec list B0_meta.key
-  (** [depends] is an opam
-      {{:https://opam.ocaml.org/doc/Manual.html#opamfield-depends}
-      [depends:]} field value. Used to override
-      automatic opam file dependency generation, see
-      {!pkg_of_pack}. *)
-
-  val depopts : pkg_spec list B0_meta.key
-  (** [depopts] is an opam
-      {{:https://opam.ocaml.org/doc/Manual.html#opamfield-depopts}
-      [depopts:]} field value. *)
-
-  val conflicts : pkg_spec list B0_meta.key
-  (** [conflicts] is an opam
-      {{:https://opam.ocaml.org/doc/Manual.html#opamfield-conflicts}
-      [conflicts:]} field value. *)
-
-  val file_addendum : File.t B0_meta.key
-  (** [file_addendum] is an [opam] file fragment appended at the end
-      of a generated [opam] file. See {!B0_opam.File.pkg_of_meta}. *)
-
-  val install : string B0_meta.key
-  (** [install] is an opam
-      {{:https://opam.ocaml.org/doc/Manual.html#opamfield-install}
-      [install:]} field value. This is a raw
-      string in opam syntax that defines the whole field. Used to
-      override automatic opam file generation, see {!pkg_of_pack}. *)
-
-  val name : string B0_meta.key
-  (** [name] is an [opam]
-      {{:https://opam.ocaml.org/doc/Manual.html#opamfield-name}
-      [name:]} field value. Use to override
-      automatic [opam] package name generation, see {!pkg_of_pack}. *)
-
-  val pin_depends : (string * string) list B0_meta.key
-  (** [pin_depends] is an opam
-      {{:https://opam.ocaml.org/doc/Manual.html#opamfield-pindepends}
-      [pin-depends:]} field value. *)
-
-  (** {1:pkg_derivation Package derivation} *)
-
-  val pkg_of_pack : B0_pack.t -> B0_meta.t
-  (** [pkg_of_pack p] is [opam] package metadata for pack [p] ready
-      to be used with {!File.pkg_of_meta} to derive an opam package
-      file.
-
-      This is [p]'s metadata with the following fields added if they
-      are unspecified:
-      {ul
-      {- {!name}, the value of {!B0_opam.pkg_name_of_pack}[ p].}
-      {- {!B0_meta.synopsis} and {!B0_meta.description}. The fields
-         are tentatively derived from an existing [README.md] in the
-         {{!page-manual.scope_dir} scope directory} of [p]. The first
-         marked up section of the file is extracted, its title is
-         parsed according to the pattern '$(NAME) $(SEP) $(SYNOPSIS)'
-         to get a synopsis line and the body up to the next (sub)section
-         defines the description.}
-      {- {!build}, a locked b0 build of the pack is defined.}
-      {- {!depends}, we collect the OCaml libraries required by units
-         in the pack, derive a package names out of them.
-         {b FIXME.} This is the poc but it's
-         not workable for now we don't have enough metadata in library
-         names.}} *)
-end
-
-(** {1:cmdlets [.opam] cmdlet} *)
+(** {1:action [.opam] action} *)
 
 val action : B0_action.t
-(** [action] is the [.opam] action. See the
-    {{!page-opam}B0 [opam] manual} and [b0 -- .opam --help] for
-    more information. *)
+(** [action] is the [.opam] action.
+
+    See [b0 -- .opam --help] and the {{!page-opam}B0 [opam] manual}
+    for more information. *)

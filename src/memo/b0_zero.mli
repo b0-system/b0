@@ -20,8 +20,8 @@ module Trash : sig
   type t
   (** The type for trashes. *)
 
-  val create : Fpath.t -> t
-  (** [create dir] is a trash using directory [dir] for data
+  val make : Fpath.t -> t
+  (** [make dir] is a trash using directory [dir] for data
       storage. [dir] may not exist. *)
 
   val dir : t -> Fpath.t
@@ -74,8 +74,8 @@ module File_cache : sig
   type t
   (** The type for file caches. *)
 
-  val create : Fpath.t -> (t, string) result
-  (** [create dir] is a file cache using directory [dir] for data
+  val make : Fpath.t -> (t, string) result
+  (** [make dir] is a file cache using directory [dir] for data
       storage. The full path to [dir] is created by the call if [dir]
       doesn't exist. *)
 
@@ -208,15 +208,15 @@ module Op : sig
     type t
     (** The type for file copies. *)
 
-    val v_op :
+    val make_op :
       id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> mode:int -> linenum:int option -> src:Fpath.t ->
       Fpath.t -> op
-    (** [v] declares a file copy operation, see the corresponding
+    (** [make_op] declares a file copy operation, see the corresponding
         accessors for the semantics of various arguments. *)
 
-    val v : src:Fpath.t -> dst:Fpath.t -> mode:int -> linenum:int option -> t
-    (** [v] constructs a bare copy operation. *)
+    val make : src:Fpath.t -> dst:Fpath.t -> mode:int -> linenum:int option -> t
+    (** [make] constructs a bare copy operation. *)
 
     val get : op -> t
     (** [get o] is the copy operation [o]. Raises [Invalid_argument] if [o]
@@ -244,14 +244,14 @@ module Op : sig
     type t
     (** The type for path deletion operations. *)
 
-    val v_op :
+    val make_op :
       id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> Fpath.t -> op
-    (** [v_op] declares a path deletion operation, see the corresponding
+    (** [make_op] declares a path deletion operation, see the corresponding
         accessors for the semantics of the various arguments. *)
 
-    val v : path:Fpath.t -> t
-    (** [v] constructs a bare deletion operation. *)
+    val make : path:Fpath.t -> t
+    (** [make] constructs a bare deletion operation. *)
 
     val get : op -> t
     (** [get o] is the delete operation [o]. Raises [Invalid_argument] if [o]
@@ -269,15 +269,15 @@ module Op : sig
     type t
     (** The type for directory creation operations. *)
 
-    val v_op :
+    val make_op :
       id:id -> mark:mark -> mode:int -> created:Mtime.Span.t ->
       ?post_exec:(op -> unit) -> ?k:(op -> unit) -> Fpath.t -> op
-    (** [v_op] declares a directory creation operation, see the
+    (** [make_op] declares a directory creation operation, see the
         corresponding accessors for the semantics of the various
         arguments. *)
 
-    val v : dir:Fpath.t -> mode:int -> t
-    (** [v] constructs a bare mkdir operation. *)
+    val make : dir:Fpath.t -> mode:int -> t
+    (** [make] constructs a bare mkdir operation. *)
 
     val get : op -> t
     (** [get o] is the mkdir [o]. Raises [Invalid_argument] if [o] is not
@@ -301,14 +301,14 @@ module Op : sig
     type kind = [ `End | `Fail | `Info | `Start | `Warn ]
     (** The type for kinds of notifications. *)
 
-    val v_op :
+    val make_op :
       id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> kind -> string -> op
-    (** [v_op] declares a notification operation see the corresponding
+    (** [make_op] declares a notification operation see the corresponding
         accessors for the semantics of the various arguments. *)
 
-    val v : kind:kind -> msg:string -> t
-    (** [v] constructs a notification operation. *)
+    val make : kind:kind -> msg:string -> t
+    (** [make] constructs a notification operation. *)
 
     val get : op -> t
     (** [get o] is the notification [o]. Raise [Invalid_argument] if [o]
@@ -329,14 +329,14 @@ module Op : sig
     type t
     (** The type for file read operations. *)
 
-    val v_op :
+    val make_op :
       id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> Fpath.t -> op
-    (** [v_op] declares a file read operation, see the corresponding
+    (** [make_op] declares a file read operation, see the corresponding
         accessors for the semantics of the various arguments. *)
 
-    val v : file:Fpath.t -> data:string -> t
-    (** [v] constructs a bare read operation. *)
+    val make : file:Fpath.t -> data:string -> t
+    (** [make] constructs a bare read operation. *)
 
     val get : op -> t
     (** [get o] is the read [o]. Raise [Invalid_argument] if [o]
@@ -378,7 +378,7 @@ module Op : sig
     type t
     (** The type for process spawn operations. *)
 
-    val v_op :
+    val make_op :
       id:id -> mark:mark -> created:Mtime.Span.t -> reads:Fpath.t list ->
       writes:Fpath.t list -> ?writes_manifest_root:Fpath.t ->
       ?post_exec:(op -> unit) -> ?k:(op -> unit) ->
@@ -386,16 +386,16 @@ module Op : sig
       stamped_env:Os.Env.assignments -> cwd:Fpath.t ->
       stdin:Fpath.t option -> stdout:stdo -> stderr:stdo ->
       success_exits:success_exits -> Cmd.tool -> Cmd.t -> op
-    (** [v_op] declares a spawn build operation, see the corresponding
+    (** [make_op] declares a spawn build operation, see the corresponding
         accessors for the semantics of the various arguments. *)
 
-    val v :
+    val make :
       env:Os.Env.assignments -> stamped_env:Os.Env.assignments ->
       cwd:Fpath.t -> stdin:Fpath.t option -> stdout:stdo ->
       stderr:stdo -> success_exits:success_exits -> Cmd.tool ->
       Cmd.t -> stamp:string -> stdo_ui:(string, string) result option ->
       exit:Os.Cmd.status option -> t
-    (** [v] constructs a bare spawn operation. *)
+    (** [make] constructs a bare spawn operation. *)
 
     val get : op -> t
     (** [get o] is the spawn [o]. Raises [Invalid_argument] if [o] is
@@ -466,14 +466,14 @@ module Op : sig
     type t
     (** The type for wait files operations. *)
 
-    val v_op :
+    val make_op :
       id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> Fpath.t list -> op
     (** [v] declares a wait files operation, these are stored in
           {!reads}. *)
 
-    val v : unit -> t
-    (** [v] constructs a bare wait files operation. *)
+    val make : unit -> t
+    (** [make] constructs a bare wait files operation. *)
   end
 
   (** File writes. *)
@@ -484,17 +484,17 @@ module Op : sig
     type t
     (** The type for file write operations. *)
 
-    val v_op :
+    val make_op :
       id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
       ?k:(op -> unit) -> stamp:string -> reads:Fpath.t list -> mode:int ->
       write:Fpath.t -> (unit -> (string, string) result) -> op
     (** [write] declares a file write operations, see the corresponding
         accessors for the semantics of the various arguments. *)
 
-    val v :
+    val make :
       stamp:string -> mode:int -> file:Fpath.t ->
       data:(unit -> (string, string) result) -> t
-    (** [v] constructs a bare write operation. *)
+    (** [make] constructs a bare write operation. *)
 
     val get : op -> t
     (** [geo o] is the write [o]. Raises [Invalid_argument] if [o] is
@@ -531,13 +531,13 @@ module Op : sig
   val kind_name : kind -> string
   (** [kind_name k] is an end user name for kind [k]. *)
 
-  val v :
+  val make :
     id -> mark:mark -> time_created:Mtime.Span.t -> time_started:Mtime.Span.t ->
     duration:Mtime.Span.t -> revived:bool -> status:status ->
     reads:Fpath.t list -> writes:Fpath.t list ->
     writes_manifest_root:Fpath.t option -> hash:Hash.t ->
     ?post_exec:(op -> unit) -> ?k:(op -> unit) -> kind -> t
-  (** [v] constructs an operation. See the corresponding accessors
+  (** [make] constructs an operation. See the corresponding accessors
       for the semantics of various arguments. *)
 
   val kind : t -> kind
@@ -735,8 +735,8 @@ module Reviver : sig
   type t
   (** The type for build operation revivers. *)
 
-  val create : Os.Mtime.counter -> (module Hash.T) -> File_cache.t -> t
-  (** [create clock hash_fun cache] is a reviver with
+  val make : Os.Mtime.counter -> (module Hash.T) -> File_cache.t -> t
+  (** [make clock hash_fun cache] is a reviver with
       {ul
       {- [clock] the clock used to {{!file_hash_dur}measure} file hashing
          time and {{!B0_zero.Op.set_time_started}timestamp} revived operations.}
@@ -825,8 +825,8 @@ module Guard : sig
   type t
   (** The type for build operations guards. *)
 
-  val create : unit -> t
-  (** [create ()] is a new guard. *)
+  val make : unit -> t
+  (** [make ()] is a new guard. *)
 
   val set_file_ready : t -> Fpath.t -> unit
   (** [set_file_ready g f] indicates to [g] that file [f] is ready,
@@ -862,10 +862,10 @@ module Exec : sig
   type t
   (** The type for executors. *)
 
-  val create :
+  val make :
     ?clock:Os.Mtime.counter -> ?rand:Random.State.t -> ?tmp_dir:Fpath.t ->
     ?feedback:(feedback -> unit) -> trash:Trash.t -> jobs:int -> unit -> t
-  (** [create ~clock ~rand ~tmp_dir ~feedback ~trash ~jobs] with:
+  (** [make ~clock ~rand ~tmp_dir ~feedback ~trash ~jobs] with:
       {ul
       {- [clock], the clock used to timestamp build operations;
          defaults to {!val:B0_std.Os.Mtime.counter}[ ()].}

@@ -27,13 +27,13 @@ module Tool = struct
       unstamped_vars : env_vars;
       response_file : response_file option; }
 
-  let v ?response_file ?(unstamped_vars = tmp_vars) ?(vars = []) name =
+  let make ?response_file ?(unstamped_vars = tmp_vars) ?(vars = []) name =
     { name; vars; unstamped_vars; response_file }
 
   let by_name ?response_file ?unstamped_vars ?vars name =
     match Fpath.is_seg name with
     | false -> Fmt.invalid_arg "%S: tool is not a path segment" name
-    | true -> v ?unstamped_vars ?vars (Fpath.v name)
+    | true -> make ?unstamped_vars ?vars (Fpath.v name)
 
   let name t = t.name
   let vars t = t.vars
@@ -149,11 +149,11 @@ let make
   let fb_memo = (feedback :> feedback -> unit) in
   let clock = Os.Mtime.counter () in
   let* cwd = match cwd with None -> Os.Dir.cwd () | Some cwd -> Ok cwd in
-  let* cache = File_cache.create cache_dir in
-  let guard = Guard.create () in
-  let reviver = Reviver.create clock hash_fun cache in
-  let trash = Trash.create trash_dir in
-  let exec = Exec.create ~clock ~feedback:fb_exec ~trash ~jobs () in
+  let* cache = File_cache.make cache_dir in
+  let guard = Guard.make () in
+  let reviver = Reviver.make clock hash_fun cache in
+  let trash = Trash.make trash_dir in
+  let exec = Exec.make ~clock ~feedback:fb_exec ~trash ~jobs () in
   make_zero ~clock ~feedback:fb_memo ~cwd ?win_exe ?tool_lookup ?env
     ?forced_env_vars guard reviver exec
 
@@ -179,7 +179,7 @@ let timestamp m = Os.Mtime.count m.m.clock
 let notify_op m ?k kind msg =
   let k = match k with None -> None | Some k -> Some (fun o -> k ()) in
   let id = new_op_id m and created = timestamp m in
-  let o = Op.Notify.v_op ~id ~mark:m.c.mark ~created ?k kind msg in
+  let o = Op.Notify.make_op ~id ~mark:m.c.mark ~created ?k kind msg in
   add_op m o
 
 let notify_reviver_error m kind o e =
@@ -320,44 +320,44 @@ let notify_if_error m kind ~use = function
 
 let read m file =
   let id = new_op_id m and created = timestamp m in
-  let r, set = Fut.create () in
+  let r, set = Fut.make () in
   let k o =
     let r = Op.Read.get o in
     let data = Op.Read.data r in
     Op.Read.discard_data r; set data
   in
-  let o = Op.Read.v_op ~id ~mark:m.c.mark ~created ~k file in
+  let o = Op.Read.make_op ~id ~mark:m.c.mark ~created ~k file in
   add_op_and_stir m o; r
 
 let wait_files m files =
   let id = new_op_id m and created = timestamp m in
-  let r, set = Fut.create () in
+  let r, set = Fut.make () in
   let k o = set () in
-  let o = Op.Wait_files.v_op ~id ~mark:m.c.mark ~created ~k files in
+  let o = Op.Wait_files.make_op ~id ~mark:m.c.mark ~created ~k files in
   add_op_and_stir m o; r
 
 let write m ?(stamp = "") ?(reads = []) ?(mode = 0o644) write d =
   let id = new_op_id m and mark = m.c.mark and created = timestamp m in
-  let o = Op.Write.v_op ~id ~mark ~created ~stamp ~reads ~mode ~write d in
+  let o = Op.Write.make_op ~id ~mark ~created ~stamp ~reads ~mode ~write d in
   add_op_and_stir m o
 
 let copy m ?(mode = 0o644) ?linenum ~src dst =
   let id = new_op_id m and mark = m.c.mark and created = timestamp m in
-  let o = Op.Copy.v_op ~id ~mark ~created ~mode ~linenum ~src dst in
+  let o = Op.Copy.make_op ~id ~mark ~created ~mode ~linenum ~src dst in
   add_op_and_stir m o
 
 let mkdir m ?(mode = 0o755) dir =
   let id = new_op_id m and mark = m.c.mark and created = timestamp m in
-  let r, set = Fut.create () in
+  let r, set = Fut.make () in
   let k o = set () in
-  let o = Op.Mkdir.v_op ~id ~mark ~created ~k ~mode dir in
+  let o = Op.Mkdir.make_op ~id ~mark ~created ~k ~mode dir in
   add_op_and_stir m o; r
 
 let delete m p =
   let id = new_op_id m and mark = m.c.mark and created = timestamp m in
-  let r, set = Fut.create () in
+  let r, set = Fut.make () in
   let k o = set () in
-  let o = Op.Delete.v_op ~id ~mark ~created ~k p in
+  let o = Op.Delete.make_op ~id ~mark ~created ~k p in
   add_op_and_stir m o;
   r
 
@@ -443,7 +443,7 @@ let _spawn
           | _ -> assert false
       in
       let o =
-        Op.Spawn.v_op
+        Op.Spawn.make_op
           ~id ~mark:m.c.mark ~created ~reads ~writes ?writes_manifest_root
           ?post_exec ~k ~stamp ~env ~stamped_env ~cwd ~stdin ~stdout ~stderr
           ~success_exits tool.tool_file cmd.cmd_args

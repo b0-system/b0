@@ -75,7 +75,7 @@ module Http = struct
         headers : headers;
         body : string; }
 
-    let v ?(headers = []) ?(body = "") ~url method' =
+    let make ?(headers = []) ?(body = "") ~url method' =
       { url; method'; headers; body }
 
     let url r = r.url
@@ -91,7 +91,7 @@ module Http = struct
         headers : headers;
         body : string; }
 
-    let v ?(headers = []) ?(body = "") status = { status; headers; body }
+    let make ?(headers = []) ?(body = "") status = { status; headers; body }
     let status r = r.status
     let headers r = r.headers
     let body r = r.body
@@ -152,7 +152,7 @@ module Http_client = struct
         Ok (Some { request with url })
     | _ -> Ok None
 
-  let request ?(insecure = false) ?(follow = true) curl request =
+  let fetch ?(insecure = false) ?(follow = true) curl request =
     let rec loop follow visited request =
       let method' = Http.Request.method' request in
       let is_head = method' = `HEAD in

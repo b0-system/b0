@@ -26,15 +26,16 @@ let () =
     Pkg.bin "src/lowtools/show_uri" ~dst:"show-uri";
 
     (* Doc *)
+    Pkg.doc "doc/action.mld" ~dst:"odoc-pages/action.mld";
+    Pkg.doc "doc/driver.mld" ~dst:"odoc-pages/driver.mld";
     Pkg.doc "doc/index.mld" ~dst:"odoc-pages/index.mld";
-    Pkg.doc "doc/memo_manual.mld" ~dst:"odoc-pages/memo_manual.mld";
     Pkg.doc "doc/manual.mld" ~dst:"odoc-pages/manual.mld";
-    Pkg.doc "doc/driver_dev.mld" ~dst:"odoc-pages/driver_dev.mld";
+    Pkg.doc "doc/memo.mld" ~dst:"odoc-pages/memo.mld";
+    Pkg.doc "doc/ocaml.mld" ~dst:"odoc-pages/ocaml.mld";
     Pkg.doc "doc/old_manual.mld" ~dst:"odoc-pages/old_manual.mld";
-    Pkg.doc "doc/unit_manual.mld" ~dst:"odoc-pages/unit_manual.mld";
-    Pkg.doc "doc/action_manual.mld" ~dst:"odoc-pages/action_manual.mld";
-    Pkg.doc "doc/rationale.mld" ~dst:"odoc-pages/rationale.mld";
-    Pkg.doc "doc/todo.mld" ~dst:"odoc-pages/todo.mld";
     Pkg.doc "doc/opam.mld" ~dst:"odoc-pages/opam.mld";
+    Pkg.doc "doc/rationale.mld" ~dst:"odoc-pages/rationale.mld";
     Pkg.doc "doc/release.mld" ~dst:"odoc-pages/release.mld";
+    Pkg.doc "doc/todo.mld" ~dst:"odoc-pages/todo.mld";
+    Pkg.doc "doc/unit.mld" ~dst:"odoc-pages/unit.mld";
   ]

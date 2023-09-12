@@ -24,75 +24,108 @@ val proc_nop : proc
 
 (** {1:units Units} *)
 
-type action = build -> t -> args:string list -> Os.Exit.t Fut.t
-(** The type for unit outcome actions. Defines an action to perform on
-    build results. [args] are command line argument passed on the
-    command line.
-
-    For example for executables a natural action is to [execv] them
-    directly or via their runtime (see {!Action.exec}). For built
-    document files it can be to (re)load them in their corresponding
-    viewer application, etc.
-
-    {b TODO.} This is not a final design, {{!page-todo.unit_action}see
-    unit actions}. *)
-
-and t
+type t
 (** The type for build units. *)
 
-val v : ?doc:string -> ?meta:B0_meta.t -> ?action:action -> string -> proc -> t
-(** [v n proc ~doc ~meta ~action] is a build unit named [n] with build
+val make : ?doc:string -> ?meta:B0_meta.t -> string -> proc -> t
+(** [make n proc ~doc ~meta ~action] is a build unit named [n] with build
     procedure [proc], synopsis [doc] and metada [meta]. *)
 
 val proc : t -> proc
 (** [proc u] are the unit's build procedure. *)
 
-val action : t -> action option
-(** [action] is the unit's outcome action. *)
+(** {1:meta Unit executions}
 
-(** {1:action Action} *)
+    These properties pertain to the interface that allows to execute
+    units after they have been built as is done for example
+    by the [b0] command.
 
-module Action : sig
+    {b XXX.} Custom key find an error strategy.
 
-  (** {1:prog_exec Program execution} *)
+    Execution procedure, will likely be refined when we get proper
+    build environments and cross.
 
-  val exec_cwd : (build -> t -> Fpath.t Fut.t) B0_meta.key
-  (** [exec_cwd] is a function to determine a current working directory
-      for {!exec} actions. *)
+    {ul
+    {- If the unit's {!exec} is defined this is invoked. If appropriate it
+       should lookup {!get_exec_env} and {!get_exec_cwd} (should we give it
+       as args ?).}
+    {- Otherwise {!exe_file} is executed with cwd and environemts
+       defined y {!get_exec_env} and {!get_exec_cwd}}} *)
 
-  val scope_cwd : build -> t -> Fpath.t Fut.t
-  (** [scope_cwd] is function that determines the unit's scope. *)
+(** {2:env Environment} *)
 
-  val exec_env : (build -> t -> Os.Env.assignments Fut.t) B0_meta.key
-  (** [exec_env] is a function to determine an environement for {!exec}
-      actions. *)
+type exec_env =
+[ `Build_env (** The build's environment. *)
+| `Build_env_override of Os.Env.t
+    (** The build's environment overriden by give values. *)
+| `Custom_env of string * (build -> t -> Os.Env.t Fut.t)
+    (** Doc string and function. *)
+| `Env of Os.Env.t (** This exact environment. *) ]
+(** The type for execution environments. *)
 
-  val exec : action
-  (** [exec] is an action that {!B0_std.Os.Exit.exec}'s a unit's outcome
-      as follows:
-      {ul
-      {- The executed file is the unit's {!B0_meta.exe_file}.}
-      {- The arguments have {!B0_std.Fpath.basename} of
-         {!B0_meta.exe_file} as the program name and the action's [args]
-         as arguments.}
-      {- If the unit defines {!exec_cwd}, it is used to determine the
-         [cwd] otherwise the default of {!B0_std.Os.Exit.exec} is used.}
-      {- If the unit defines {!exec_env}, it is used to determine the
-         environment otherwise the default {!B0_std.Os.Exit.exec} is used.}} *)
+val exec_env : exec_env B0_meta.key
+(** [exec_env] is the default execution environment. If unspecified this
+    is [`Build].  *)
 
-  val exec_file : build -> t -> Fpath.t -> Cmd.t -> Os.Exit.t Fut.t
-  (** [exec_file u file argv] is a {!B0_std.Os.Exit.exec} with
-      [file] and [argv] and:
-      {ul
-      {- If the unit [u] defines {!exec_cwd}, it is used to determine the
-         [cwd] otherwise the default of {!B0_std.Os.Exit.exec} is used.}
-      {- If the unit [u] defines {!exec_env}, it is used to determine the
-         environment otherwise the default {!B0_std.Os.Exit.exec} is used.}} *)
-end
+val get_exec_env : build -> t -> Os.Env.t option Fut.t
+(** [get_exec_env b u] performs the logic to get the execution environment. *)
+
+(** {2:cwd Cwd} *)
+
+type exec_cwd =
+[ `Build_dir (** The entity's build directory. *)
+| `Cwd (** The user's current working directory. *)
+| `Custom_dir of string * (build -> t -> Fpath.t Fut.t)
+   (** Doc string and function. *)
+| `In of [ `Build_dir | `Root_dir | `Scope_dir ] * Fpath.t
+| `Root_dir (** The root B0 file directory. *)
+| `Scope_dir (** The directory of the scope where the entity is defined. *) ]
+
+
+val exec_cwd : exec_cwd B0_meta.key
+(** [exec_cwd] is the default current working directory for executing
+    an entity. If unspecified this should be [`Cwd] which should be
+    the users's current working directory. *)
+
+val get_exec_cwd : build -> t -> Fpath.t option Fut.t
+(** [get_exec_cwd b u] performs the logic to get the cwd. *)
+
+(** {2:exec Execution} *)
+
+val tool_name : string B0_meta.key
+(** [tool_name] is an executable name without the platform specific
+    executable extension. *)
+
+val exe_file : Fpath.t Fut.t B0_meta.key
+(** [exe_file] is an absolute file path to an executable build by the unit. *)
+
+val exec : (string *
+            (build -> ?env:Os.Env.t -> ?cwd:Fpath.t -> t -> args:Cmd.t ->
+             Os.Exit.t Fut.t)) B0_meta.key
+(** [exec] is a metadata key to store a custom execution procedure. *)
+
+val find_exec : t -> (build -> t -> args:Cmd.t -> Os.Exit.t Fut.t) option
+(** [find_exec b u] if either {!exec_file} or {!exec} is defined
+    returns a function to call that  determines
+    {!get_exec_env} and {!get_exec_cwd} and runs {!exec} or
+    {!Os.Exit.execs} with {!exe_file}. *)
+
+val is_public : t -> bool
+(** [is_public u] is [true] iff [u]'s meta has {!B0_meta.public}
+    set to [true]. *)
+
+val get_or_suggest_tool : keep:(t -> bool) -> string -> (t list, t list) result
+(** [get_or_suggest_tool tool_name] are tools names whose
+    {!tool_name} match [tool_name] and are filtered by [keep] *)
+
+
+val tool_is_user_accessible : t -> bool
+(** [tool_is_user_accessible u] assumes [u] has a tool name. This then
+    returns [true] iff [u] {!is_public} or {!in_root_scope}. *)
 
 (** {1:b0_def B0 definition API} *)
 
-include B0_def.S with type t := t
+include B0_def.S with type t := t (** @inline *)
 
 (**/**)
 module Build : sig
@@ -101,6 +134,7 @@ module Build : sig
   val memo : t -> B0_memo.t
   val must_build : t -> Set.t
   val may_build : t -> Set.t
+  val did_build : t -> Set.t
   val require : t -> build_unit -> unit
   val current : t -> build_unit
   val current_meta : t -> B0_meta.t
@@ -112,13 +146,15 @@ module Build : sig
   val in_build_dir : t -> Fpath.t -> Fpath.t
   val in_scope_dir : t -> Fpath.t -> Fpath.t
   val in_shared_build_dir : t -> Fpath.t -> Fpath.t
-  val create :
-    root_dir:Fpath.t -> b0_dir:Fpath.t -> variant:string -> B0_memo.t ->
+  val make :
+    root_dir:Fpath.t -> b0_dir:Fpath.t -> variant:string ->
+    store:B0_store.binding list -> B0_memo.t ->
     may_build:Set.t -> must_build:Set.t -> t
 
   val store : t -> B0_store.t
   val get : t -> 'a B0_store.key -> 'a Fut.t
   val self : t B0_store.key
   val run : t -> (unit, unit) result
+  val did_build : t -> Set.t
 end
 (**/**)

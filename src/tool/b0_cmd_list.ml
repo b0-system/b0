@@ -10,8 +10,8 @@ let get_defs names ~with_lib_defs =
   let keep_lib_defs ~keep (B0_def.V ((module Def), v)) =
     keep || not (String.starts_with ~prefix:"." (Def.name v))
   in
-  let defs = B0_tool_std.def_list and empty_means_all = true in
-  let* vs = B0_tool_std.def_list_get_list_or_hint defs ~empty_means_all names in
+  let defs = B0_tool_std.def_list and all_if_empty = true in
+  let* vs = B0_tool_std.def_list_get_list_or_hint defs ~all_if_empty names in
   Ok (List.filter (keep_lib_defs ~keep:(with_lib_defs || names <> [])) vs)
 
 let edit names conf =
@@ -24,8 +24,8 @@ let edit names conf =
   in
   Log.if_error ~use:B0_cli.Exit.no_such_name @@
   let* vs = get_defs names ~with_lib_defs:false in
-  let defs = B0_tool_std.def_list and empty_means_all = true in
-  let* vs = B0_tool_std.def_list_get_list_or_hint defs ~empty_means_all names in
+  let defs = B0_tool_std.def_list and all_if_empty = true in
+  let* vs = B0_tool_std.def_list_get_list_or_hint defs ~all_if_empty names in
   let not_found, files = find_files [] [] vs in
   Log.if_error' ~use:B0_cli.Exit.some_error @@
   let edit_all = names = [] in
@@ -76,35 +76,35 @@ let all =
   Arg.(value & flag & info ["a"; "all"] ~doc)
 
 let names =
-  let doc = "The $(docv) to act on. All of them except library definitions \
-             if unspecified." in
+  let doc =
+    "The $(docv) to act on. All of them except library definitions \
+     if unspecified."
+  in
   Arg.(value & pos_all string [] & info [] ~doc ~docv:"DEF")
 
 let cmd =
-  let doc = "List b0 definitions" in
+  let doc = "List definitions" in
   let descr =
     `P "$(iname) list all or given b0 definitions. By default library \
         definitions are not listed, invoke with $(b,--all) include them."
   in
-  let envs = B0_tool_std.Cli.pager_envs in
-  let term = Term.(const list $ B0_tool_std.Cli.format $ names $ all) in
-  B0_tool_std.Cli.subcmd_with_b0_file "list" ~envs ~doc ~descr term
+  B0_tool_std.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
+  Term.(const list $ B0_tool_std.Cli.format $ names $ all)
 
 let cmd_show =
-  let doc = "Show b0 definition metadata" in
+  let doc = "Show definition metadata" in
   let descr =
     `P "$(iname) is $(mname) $(b,list -l), it outputs metadata of given
         definitions. By default library definitions are \
         not listed, invoke with $(b,--all) include them."
   in
-  let envs = B0_tool_std.Cli.pager_envs in
-  let term = Term.(const show $ B0_tool_std.Cli.format $ names $ all) in
-  B0_tool_std.Cli.subcmd_with_b0_file "show" ~envs ~doc ~descr term
+  B0_tool_std.Cli.subcmd_with_b0_file "show" ~doc ~descr @@
+  Term.(const show $ B0_tool_std.Cli.format $ names $ all)
 
 let cmd_edit =
-  let doc = "Edit b0 definitions" in
+  let doc = "Edit definitions" in
   let descr = `P "$(iname) opens in your editor the B0 files where given \
                   definitions are defined." in
   let envs = B0_tool_std.Cli.editor_envs in
-  let term = Term.(const edit $ names) in
-  B0_tool_std.Cli.subcmd_with_b0_file "edit" ~doc ~descr ~envs term
+  B0_tool_std.Cli.subcmd_with_b0_file "edit" ~doc ~descr ~envs @@
+  Term.(const edit $ names)

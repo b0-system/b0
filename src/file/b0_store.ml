@@ -34,7 +34,7 @@ type 'a key = 'a Key.typed
 type binding = B : 'a key * 'a -> binding
 type t = Store.t
 
-let create memo ~dir bs =
+let make memo ~dir bs =
   let add m (B (k, v)) =
     Store.Kmap.add k.untyped (Store.B (k, Fut.return v)) m
   in
@@ -59,7 +59,7 @@ let get : type a. t -> a key -> a Fut.t =
          this key will occur before we get to indicate in the map that
          the key is being determined. Using our own future here makes
          sure all further [get]s end up in the other branch. *)
-      let fut, set = Fut.create () in
+      let fut, set = Fut.make () in
       s.map <- Store.Kmap.add k.Key.untyped (Store.B (k, fut)) s.map;
       let memo =
         (* XXX maybe it would be interesting to have a stack of marks

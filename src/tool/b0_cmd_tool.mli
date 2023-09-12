@@ -1,10 +1,9 @@
 (*---------------------------------------------------------------------------
-   Copyright (c) 2019 The b0 programmers. All rights reserved.
+   Copyright (c) 2020 The b0 programmers. All rights reserved.
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-open B0_std
+(** B0 [tool] command. *)
 
-(** Parse text lines.
-
-    And do it regardless of the platform line ending convention. *)
+val cmd : B0_std.Os.Exit.t Cmdliner.Cmd.t
+(** [cmd] is the command line for [tool]. *)

@@ -17,8 +17,8 @@ module Auth : sig
   type t
   (** The type for GitHub authentication. *)
 
-  val v : user:string option -> unit -> (t, string) result
-  (** [auth ~http ~user ()] determines authentication via personal
+  val make : user:string option -> unit -> (t, string) result
+  (** [make ~http ~user ()] determines authentication via personal
       access token for user [user]. It the latter is unspecified it
       first looks up the contents of the [B0_GITHUB_TOKEN] environment
       variable if that fails it looks up for an existing token in the
@@ -77,8 +77,8 @@ module Repo : sig
   type t
   (** The type for GitHub repositories. *)
 
-  val v : owner:string -> string -> t
-  (** [repo ~owner name] identifiers a GitHub repository. *)
+  val make : owner:string -> string -> t
+  (** [make ~owner name] identifiers a GitHub repository. *)
 
   val of_url : Url.t -> (t, string) result
   (** [of_url url] parses an owner and repo name from the first
@@ -140,10 +140,10 @@ module Issue : sig
 
   (** {1:req Requests} *)
 
-  val create :
+  val open' :
     Http_client.t -> Auth.t -> Repo.t -> title:string -> body:string -> unit ->
     (num * uri, string) result
-  (** [create auth repo] opens an issue on the repository [repo] with
+  (** [open' auth repo] opens an issue on the repository [repo] with
       the given [title] and [body]. *)
 
   val close :
@@ -228,14 +228,14 @@ module Pages : sig
       Add this to the updtaes to prevent the Jekyll processing that is
       automatically performed on GitHub pages. *)
 
-  val default_branch : B0_vcs.Git.branch
+  val default_branch : B0_vcs_repo.Git.branch
   (** [default_branch] is ["gh-pages"], GitHub's default publication branch
       for GitHub pages. *)
 
   val commit_updates :
-    ?log:Log.level -> ?branch:B0_vcs.Git.branch -> B0_vcs.t -> amend:bool ->
-    force:bool -> remote:B0_vcs.Git.remote -> msg:string -> update list ->
-    (bool, string) result
+    ?log:Log.level -> ?branch:B0_vcs_repo.Git.branch -> B0_vcs_repo.t ->
+    amend:bool -> force:bool -> remote:B0_vcs_repo.Git.remote ->
+    msg:string -> update list -> (bool, string) result
   (** [commit_updates vcs ~log ~remote ~branch ~msg us] updates [branch]
       (defaults to [gh-pages]) on [remote] according to updates [us]
       with commit message [msg]. [Ok false] is returned if there was
@@ -249,7 +249,7 @@ module Pages : sig
       More precisely this:
       {ol
       {- Fetches [remote/branch] if it exists.}
-      {- Creates a {{!B0_vcs.Git.transient_checkout}transient checkout} with
+      {- Creates a {{!B0_vcs_repo.Git.transient_checkout}transient checkout} with
          a temporary workdir in {!B0_std.Os.Dir.default_tmp}
          and a branch called [_b0-update-gh-pages] reset to [remote/branch].}
       {- Commits changes with message [msg] according to [us] which

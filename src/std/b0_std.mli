@@ -405,16 +405,19 @@ module Fmt : sig
   val tty_cap : unit -> Tty.cap
   (** [tty_cap ()] is the global styling capability. *)
 
-  val tty_string : Tty.style list -> string t
-  (** [tty_string styles ppf s] prints [s] on [ppf] according to [styles]
-      and the value of {!tty_styling_cap}. *)
-
   val tty : Tty.style list -> 'a t -> 'a t
   (** [tty styles pp_v ppf v] prints [v] with [pp_v] on [ppf]
       according to [styles] and the value of {!tty_styling_cap}. *)
 
+  val tty' : Tty.style list -> string t
+  (** [tty' styles ppf s] prints [s] on [ppf] according to [styles]
+      and the value of {!tty_styling_cap}. *)
+
   val code : 'a t -> 'a t
-  (** [code] is [tty `Bold]. *)
+  (** [code] is [tty [`Bold]]. *)
+
+  val code' : string t
+  (** [code'] is [tty' [`Bold]]. *)
 end
 
 (** Result values *)
@@ -1004,6 +1007,25 @@ let escape_dquotes s =
   val drop_initial_v : string -> string
   (** [drop_initial_v s] drops a leading ['v'] or ['V'] from [s]. *)
 
+  val pp_version : version Fmt.t
+  (** [pp_version] formats a version. *)
+
+  val pp_version_str : string Fmt.t
+  (** [pp_version_str] formats a version string. *)
+
+  (** {1:commonmark_extraction Commonmark extraction} *)
+
+  val commonmark_first_section :
+    preamble:bool -> string -> (string * string) option
+  (** [first_section src] is [Some (title, content)] where [title] is
+      the content of the first CommonMark header found in CommonMark source
+      [src] and [content] everything that follows until the next header
+      ([preamble] is [true]) or next header of the same of smaller level
+      ([preamble] is [false]). Trailing blank lines are discarded.
+
+      {b Warning.} This function may break on valid CommonMark inputs in
+      all sorts of fashion. *)
+
   (** {1:setmap Sets and maps} *)
 
   (** String sets. *)
@@ -1414,6 +1436,11 @@ module Fpath : sig
       {{:https://dev.w3.org/html5/spec-LC/urls.html#parsing-urls}
       definition} of URL parsing. *)
 
+  val to_segments : t -> string list
+  (** [to_segments p] is [p]'s {e non-empty} list of segments. Absolute
+      paths have an empty stirng added, this allows to recover the path's
+      string with [String.concat dir_sep]. *)
+
   (** {1:fmt Formatting} *)
 
   val pp : t Fmt.t
@@ -1676,6 +1703,12 @@ module Mtime : sig
 
     val compare : t -> t -> int
     (** [compare s0 s1] orders span by increasing duration. *)
+
+    val is_shorter : t -> than:t -> bool
+    (** [is_shorter span ~than] is [true] iff [span] lasts less than [than]. *)
+
+    val is_longer : t -> than:t -> bool
+   (** [is_longer span ~than] is [true] iff [span] lasts more than [than]. *)
 
     (** {1:const Durations} *)
 
@@ -2002,8 +2035,8 @@ module Fut : sig
   type 'a t
   (** The type for futures with values of type ['a]. *)
 
-  val create : unit -> 'a t * ('a -> unit)
-  (** [create ()] is [(f, set)] with [f] the future value and [set]
+  val make : unit -> 'a t * ('a -> unit)
+  (** [make ()] is [(f, set)] with [f] the future value and [set]
       the function to [set] it. The latter can be called only once,
       [Invalid_argument] is raised otherwise. *)
 
@@ -2047,176 +2080,7 @@ end
 (** OS interaction. *)
 module Os : sig
 
-  val sleep : Mtime.Span.t -> Mtime.Span.t
-  (** [sleep dur] sleeps for duration [dur] and returns the duration
-      slept. The latter may be smaller than [dur] if the call was
-      interrupted by a signal. This becomes imprecise if [dur] is
-      greater than ~104 days. *)
-
-  val relax : unit -> unit
-  (** [relax] sleeps for a very small duration. Can be used
-      for relaxed busy waiting. *)
-
-  (** CPU time and information. *)
-  module Cpu : sig
-    val logical_count : unit -> int
-    (** [logical_count ()] is the number of logical CPUs available
-        on the running machine. *)
-
-    (** Measuring CPU user and system time. *)
-    module Time : sig
-
-      (** {1:cpu_span CPU time spans} *)
-
-      (** CPU time spans. *)
-      module Span : sig
-
-        type t
-        (** The type for CPU execution time spans. *)
-
-        val v :
-          utime:Mtime.Span.t -> stime:Mtime.Span.t ->
-          children_utime:Mtime.Span.t -> children_stime:Mtime.Span.t -> t
-        (** [v ~utime ~stime ~children_utime ~children_stime] is a cpu
-            span with the given fields. See accessors for
-            semantics. *)
-
-        val zero : t
-        (** [zero] is zero CPU times. *)
-
-        val utime : t -> Mtime.Span.t
-        (** [utime cpu] is the user time of [cpu]. *)
-
-        val stime : t -> Mtime.Span.t
-        (** [stime cpu] is the system time of [cpu]. *)
-
-        val children_utime : t -> Mtime.Span.t
-        (** [children_utime cpu] is the user time for children processes
-            of [cpu]. *)
-
-        val children_stime : t -> Mtime.Span.t
-        (** [children_stime cpu] is the system time for children processes
-            of [cpu]. *)
-      end
-      (** {1:counter CPU time counters} *)
-
-      type counter
-      (** The type for CPU time counters. *)
-
-      val counter : unit -> counter
-      (** [counter ()] is a counter counting from now on. *)
-
-      val count : counter -> Span.t
-      (** [count c] are CPU times since [c] was created. *)
-    end
-  end
-
-  (** Monotonic time clock and sleep.
-
-      See {!B0_std.Mtime} for a discussion about monotonic time. *)
-  module Mtime : sig
-
-    (** {1:monotonic_clock Monotonic clock} *)
-
-    val now : unit -> Mtime.t
-    (** [now ()] is the current system-relative monotonic timestamp. Its
-        absolute value is meaningless. *)
-
-    val elapsed : unit -> Mtime.Span.t
-    (** [elapsed ()] is the monotonic time span elapsed since the
-        beginning of the program. *)
-
-    (** {1:monotonic_counters Monotonic wall-clock time counters} *)
-
-    type counter
-    (** The type for monotonic wall-clock time counters. *)
-
-    val counter : unit -> counter
-    (** [counter ()] is a counter counting from now on. *)
-
-    val count : counter -> Mtime.Span.t
-    (** [count c] is the monotonic time span elapsed since [c] was created. *)
-
-    (** {1:err Error handling}
-
-        The functions {!elapsed}, {!now}, {!val-counter},
-        raise [Sys_error] whenever they can't determine the
-        current time or that it doesn't fit in [Mtime]'s range. Usually
-        this exception should only be catched at the toplevel of your
-        program to log it and abort the program. It indicates a serious
-        error condition in the system.
-
-        {1:platform_support Platform support}
-
-        {ul
-        {- Platforms with a POSIX clock (includes Linux) use
-        {{:http://pubs.opengroup.org/onlinepubs/9699919799/functions/clock_gettime.html}[clock_gettime]}
-        with CLOCK_MONOTONIC.}
-        {- Darwin uses
-        {{:https://developer.apple.com/library/mac/qa/qa1398/_index.html}[mach_absolute_time]}.}
-        {- Windows uses
-        {{:https://msdn.microsoft.com/en-us/library/windows/desktop/aa373083%28v=vs.85%29.aspx}Performance counters}.}} *)
-  end
-
-  (** Environment variables. *)
-  module Env : sig
-
-    (** {1:var Variables} *)
-
-    type var_name = string
-    (** The type for environment variable names. *)
-
-    val find : empty_is_none:bool -> var_name -> string option
-    (** [find ~empty_is_none name] is the value of the environment
-        variable [name] in the current process environment, if
-        defined. If [empty_is_none] is [true], [None] is returned if
-        the variable value is the empty string. *)
-
-    val find' :
-      empty_is_none:bool -> (var_name -> ('a, string) result) -> var_name ->
-      ('a option, string) result
-    (** [find' ~empty_is_none parse name] is like {!find} but
-        the value is parsed with [parse]. If the latter errors
-        with [Error e], [Error (Fmt.str "%s env: %s" name e)]
-        is returned. *)
-
-    (** {1:env Process environement} *)
-
-    type t = string String.Map.t
-    (** The type for process environments. *)
-
-    val empty : t
-    (** [empty] is {!String.Map.empty}. *)
-
-    val override : t -> by:t -> t
-    (** [override env ~by:o] overrides the definitions in [env] by [o]. *)
-
-    val add : var_name -> string -> t -> t
-    (** [add] is {!String.Map.val-add}. *)
-
-    val current : unit -> (t, string) result
-    (** [current ()] is the current process environment. *)
-
-    (** {1:assign Process environments as assignments} *)
-
-    type assignments = string list
-    (** The type for environments as lists of strings of the form
-        ["var=value"]. *)
-
-    val current_assignments : unit -> (assignments, string) result
-    (** [current_assignments ()] is the current process environment as
-        assignments. *)
-
-    val of_assignments : ?init:t -> string list -> (t, string) result
-    (** [of_assignments ~init ss] folds over strings in [ss],
-        {{!String.cut}cuts} them at the leftmost ['='] character and
-        adds the resulting pair to [init] (defaults to {!empty}). If
-        the same variable is bound more than once, the last one takes
-        over. *)
-
-    val to_assignments : t -> assignments
-    (** [to_assignments env] is [env]'s bindings as assignments. *)
-  end
+  (** {1:file_system File system} *)
 
   (** File system path operations.
 
@@ -2769,6 +2633,8 @@ module Os : sig
         {- The value of {!default_tmp}.}} *)
   end
 
+  (** {1:fd File descriptors and sockets} *)
+
   (** File descriptors operations. *)
   module Fd : sig
 
@@ -2801,10 +2667,128 @@ module Os : sig
         mentions [fn]. *)
   end
 
+    (** Socket operations. *)
+  module Socket : sig
+
+    (** Endpoints. *)
+    module Endpoint : sig
+      type t =
+      [ `Host of string * int (** Hostname and port. *)
+      | `Sockaddr of Unix.sockaddr (** Given socket address. *)
+      | `Fd of Unix.file_descr (** Direct file descriptor. *) ]
+      (** The type for specifying a socket endpoint to connect or to listen
+          to on. *)
+
+      val of_string : default_port:int -> string -> (t, string) result
+      (** [of_string ~default_port s] parses a socket endpoint
+          specification from [s]. The format is [ADDR[:PORT]] or [PATH] for
+          a Unix domain socket (detected by the the presence of a
+          {{!Stdlib.Filename.dir_sep}directory separator}). [default_port]
+          port is used if no [PORT] is specified. *)
+
+      val pp : Format.formatter -> t -> unit
+      (** [pp] formats endpoints. *)
+
+      val wait_connectable :
+        ?socket_type:Unix.socket_type -> timeout:Mtime.Span.t -> t ->
+        ([`Ready | `Timeout], string) result
+      (** [wait_connectable ~timeout ep st] blocks until [fd]
+          becomes connectable or duration [timeout] elapses.
+
+          [socket_type] defines the kind of socket, it defaults to
+          {!Unix.SOCK_STREAM}. *)
+
+      val wait_connectable' :
+        ?socket_type:Unix.socket_type -> timeout:Mtime.Span.t -> t ->
+        (unit, string) result
+        (** [wait_connectable'] is like {!busy_await} but errors with a
+            message on timeout. *)
+    end
+
+    val of_endpoint :
+      Endpoint.t -> Unix.socket_type ->
+      (Unix.sockaddr option * Unix.file_descr * bool, string) result
+    (** [socket_of_endpoint e st] is [Ok (addr, fd, close)] with:
+        {ul
+        {- [addr], the address for the socket, if any.}
+        {- [fd], the file descriptor for the socket. If [c] is [`Fd fd]
+           this is [fd] untouched. Otherwise [fd] is a new file descriptor
+           set to {{!Unix.set_nonblock}non-blocking mode} and has
+           {{!Unix.set_close_on_exec}close on exec} set to [true].}
+        {- [close] is [true] if the caller is in charge of closing it. This
+           is [false] iff [c] is [`Fd _].}} *)
+  end
+
+  (** {1:process Processes} *)
+
+    (** Environment variables. *)
+  module Env : sig
+
+    (** {1:var Variables} *)
+
+    type var_name = string
+    (** The type for environment variable names. *)
+
+    val find : empty_is_none:bool -> var_name -> string option
+    (** [find ~empty_is_none name] is the value of the environment
+        variable [name] in the current process environment, if
+        defined. If [empty_is_none] is [true], [None] is returned if
+        the variable value is the empty string. *)
+
+    val find' :
+      empty_is_none:bool -> (var_name -> ('a, string) result) -> var_name ->
+      ('a option, string) result
+    (** [find' ~empty_is_none parse name] is like {!find} but
+        the value is parsed with [parse]. If the latter errors
+        with [Error e], [Error (Fmt.str "%s env: %s" name e)]
+        is returned. *)
+
+    (** {1:env Process environement} *)
+
+    type t = string String.Map.t
+    (** The type for process environments. *)
+
+    val empty : t
+    (** [empty] is {!String.Map.empty}. *)
+
+    val override : t -> by:t -> t
+    (** [override env ~by:o] overrides the definitions in [env] by [o]. *)
+
+    val add : var_name -> string -> t -> t
+    (** [add] is {!String.Map.val-add}. *)
+
+    val current : unit -> (t, string) result
+    (** [current ()] is the current process environment. *)
+
+    (** {1:assign Process environments as assignments} *)
+
+    type assignments = string list
+    (** The type for environments as lists of strings of the form
+        ["var=value"]. *)
+
+    val current_assignments : unit -> (assignments, string) result
+    (** [current_assignments ()] is the current process environment as
+        assignments. *)
+
+    val of_assignments : ?init:t -> string list -> (t, string) result
+    (** [of_assignments ~init ss] folds over strings in [ss],
+        {{!String.cut}cuts} them at the leftmost ['='] character and
+        adds the resulting pair to [init] (defaults to {!empty}). If
+        the same variable is bound more than once, the last one takes
+        over. *)
+
+    val to_assignments : t -> assignments
+    (** [to_assignments env] is [env]'s bindings as assignments. *)
+  end
+
   (** Executing commands. *)
   module Cmd : sig
 
     (** {1:search Tool search}  *)
+
+    type search = Fpath.t -> (Fpath.t, string) result
+    (** The type for tool lookup. FIXME this should be integrated instead
+        of search paths. *)
 
     val find_tool :
       ?win_exe:bool -> ?search:Fpath.t list -> Cmd.tool ->
@@ -3102,6 +3086,121 @@ module Os : sig
         {b Note.} Since {!Stdlib.exit} is called {!Stdlib.at_exit}
         functions are called if a [SIGINT] occurs during the call to
         [f]. This is not the case on an unhandled [SIGINT]. *)
+  end
+
+
+    (** {1:sleeping_and_timing Sleeping and timing} *)
+
+  val sleep : Mtime.Span.t -> Mtime.Span.t
+  (** [sleep dur] sleeps for duration [dur] and returns the duration
+      slept. The latter may be smaller than [dur] if the call was
+      interrupted by a signal. This becomes imprecise if [dur] is
+      greater than ~104 days. *)
+
+  val relax : unit -> unit
+  (** [relax] sleeps for a very small duration. Can be used
+      for relaxed busy waiting. *)
+
+  (** CPU time and information. *)
+  module Cpu : sig
+
+    val logical_count : unit -> int
+    (** [logical_count ()] is the number of logical CPUs available
+        on the running machine. *)
+
+    (** Measuring CPU user and system time. *)
+    module Time : sig
+
+      (** {1:cpu_span CPU time spans} *)
+
+      (** CPU time spans. *)
+      module Span : sig
+
+        type t
+        (** The type for CPU execution time spans. *)
+
+        val make :
+          utime:Mtime.Span.t -> stime:Mtime.Span.t ->
+          children_utime:Mtime.Span.t -> children_stime:Mtime.Span.t -> t
+        (** [make ~utime ~stime ~children_utime ~children_stime] is a cpu
+            span with the given fields. See accessors for
+            semantics. *)
+
+        val zero : t
+        (** [zero] is zero CPU times. *)
+
+        val utime : t -> Mtime.Span.t
+        (** [utime cpu] is the user time of [cpu]. *)
+
+        val stime : t -> Mtime.Span.t
+        (** [stime cpu] is the system time of [cpu]. *)
+
+        val children_utime : t -> Mtime.Span.t
+        (** [children_utime cpu] is the user time for children processes
+            of [cpu]. *)
+
+        val children_stime : t -> Mtime.Span.t
+        (** [children_stime cpu] is the system time for children processes
+            of [cpu]. *)
+      end
+      (** {1:counter CPU time counters} *)
+
+      type counter
+      (** The type for CPU time counters. *)
+
+      val counter : unit -> counter
+      (** [counter ()] is a counter counting from now on. *)
+
+      val count : counter -> Span.t
+      (** [count c] are CPU times since [c] was created. *)
+    end
+  end
+
+  (** Monotonic time clock and sleep.
+
+      See {!B0_std.Mtime} for a discussion about monotonic time. *)
+  module Mtime : sig
+
+    (** {1:monotonic_clock Monotonic clock} *)
+
+    val now : unit -> Mtime.t
+    (** [now ()] is the current system-relative monotonic timestamp. Its
+        absolute value is meaningless. *)
+
+    val elapsed : unit -> Mtime.Span.t
+    (** [elapsed ()] is the monotonic time span elapsed since the
+        beginning of the program. *)
+
+    (** {1:monotonic_counters Monotonic wall-clock time counters} *)
+
+    type counter
+    (** The type for monotonic wall-clock time counters. *)
+
+    val counter : unit -> counter
+    (** [counter ()] is a counter counting from now on. *)
+
+    val count : counter -> Mtime.Span.t
+    (** [count c] is the monotonic time span elapsed since [c] was created. *)
+
+    (** {1:err Error handling}
+
+        The functions {!elapsed}, {!now}, {!val-counter},
+        raise [Sys_error] whenever they can't determine the
+        current time or that it doesn't fit in [Mtime]'s range. Usually
+        this exception should only be catched at the toplevel of your
+        program to log it and abort the program. It indicates a serious
+        error condition in the system.
+
+        {1:platform_support Platform support}
+
+        {ul
+        {- Platforms with a POSIX clock (includes Linux) use
+        {{:http://pubs.opengroup.org/onlinepubs/9699919799/functions/clock_gettime.html}[clock_gettime]}
+        with CLOCK_MONOTONIC.}
+        {- Darwin uses
+        {{:https://developer.apple.com/library/mac/qa/qa1398/_index.html}[mach_absolute_time]}.}
+        {- Windows uses
+        {{:https://msdn.microsoft.com/en-us/library/windows/desktop/aa373083%28v=vs.85%29.aspx}Performance counters}.}} *)
   end
 end
 

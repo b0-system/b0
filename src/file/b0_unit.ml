@@ -17,7 +17,8 @@ module rec Build_def : sig
       build_dir : Fpath.t;
       shared_build_dir : Fpath.t;
       store : B0_store.t;
-      must_build : Unit.Set.t; may_build : Unit.Set.t;
+      must_build : Unit.Set.t;
+      may_build : Unit.Set.t;
       mutable requested : Unit.t String.Map.t;
       mutable waiting : Unit.t Random_queue.t; }
 end = struct
@@ -29,20 +30,19 @@ end = struct
       build_dir : Fpath.t;
       shared_build_dir : Fpath.t;
       store : B0_store.t;
-      must_build : Unit.Set.t; may_build : Unit.Set.t;
+      must_build : Unit.Set.t;
+      may_build : Unit.Set.t;
       mutable requested : Unit.t String.Map.t;
       mutable waiting : Unit.t Random_queue.t; }
 end
 
 and Unit_def : sig
   type proc = Build_def.t -> unit Fut.t
-  type action = Build_def.t -> t -> args:string list -> Os.Exit.t Fut.t
-  and t = { def : B0_def.t; proc : proc; action : action option }
+  and t = { def : B0_def.t; proc : proc; }
   include B0_def.VALUE with type t := t
 end = struct
   type proc = Build_def.t -> unit Fut.t
-  type action = Build_def.t -> t -> args:string list -> Os.Exit.t Fut.t
-  and t = { def : B0_def.t; proc : proc; action : action option }
+  and t = { def : B0_def.t; proc : proc; }
   let def_kind = "unit"
   let def u = u.def
   let pp_name_str = Fmt.(code string)
@@ -59,27 +59,37 @@ let proc_nop b = Fut.return ()
 
 (* Build units *)
 
-type action = Unit_def.action
 include Unit
 
-let v ?doc ?meta ?action n proc =
+(* We also maintain a tool name index for build tools. *)
+
+let tool_name =
+  let doc = "Executable tool name without platform specific extension" in
+  B0_meta.Key.make "tool-name" ~doc ~pp_value:Fmt.string
+
+let tool_name_index = ref String.Map.empty
+
+let add_tool_name u = match find_meta tool_name u with
+| None -> ()
+| Some n -> tool_name_index := String.Map.add_to_list n u !tool_name_index
+
+let make ?doc ?meta n proc =
   let def = define ?doc ?meta n in
-  let u = { Unit_def.def; proc; action } in add u; u
+  let u = { Unit_def.def; proc } in add u; add_tool_name u; u
 
 let proc u = u.Unit_def.proc
-let action u = u.Unit_def.action
 
 let pp_synopsis ppf v =
   let pp_tag ppf u =
     let tag, style =
-      (if has_meta B0_meta.exe u then "u", [`Fg `Green] else
-       if has_meta B0_meta.lib u then "u", [`Fg `Magenta] else
-       if has_meta B0_meta.doc u then "u", [`Fg `Yellow] else
+      (if has_tag B0_meta.exe u then "u", [`Fg `Green] else
+       if has_tag B0_meta.lib u then "u", [`Fg `Magenta] else
+       if has_tag B0_meta.doc u then "u", [`Fg `Yellow] else
        "u", [])
     in
-    Fmt.tty_string style ppf "[";
+    Fmt.tty' style ppf "[";
     Fmt.string ppf tag;
-    Fmt.tty_string style ppf "]";
+    Fmt.tty' style ppf "]";
   in
   Fmt.pf ppf "@[%a %a@]" pp_tag v pp_synopsis v
 
@@ -89,42 +99,6 @@ let pp ppf v =
   Fmt.pf ppf "@[<v>%a%a@]" pp_synopsis v pp_non_empty (meta v)
 
 (* Predefined actions *)
-
-module Action = struct
-  let exec_cwd =
-    let doc = "Current working directory for outcome action." in
-    let pp_value = Fmt.any "<built value>" in
-    B0_meta.Key.v "action-cwd" ~doc ~pp_value
-
-  let scope_cwd b u =
-    (* FIXME c&p with B0_build.scope_dir *)
-    Fut.return @@
-    match B0_def.scope_dir (def u) with
-    | None -> b.Build_def.b.root_dir
-    | Some dir -> dir
-
-  let exec_env =
-    let doc = "Process environment for outcome action." in
-    let pp_value = Fmt.any "<built value>" in
-    B0_meta.Key.v "action-env" ~doc ~pp_value
-
-  let exec_file build u exe_file cmd =
-    let get_exec_meta = function
-    | None -> Fut.return None
-    | Some f -> Fut.map Option.some (f build u)
-    in
-    let* cwd = get_exec_meta (find_meta exec_cwd u) in
-    let* env = get_exec_meta (find_meta exec_env u) in
-    Fut.return (Os.Exit.exec ?env ?cwd exe_file cmd)
-
-  let exec build u ~args = match get_meta B0_meta.exe_file u with
-  | Error e -> Log.err (fun m -> m "%s" e); Fut.return B0_cli.Exit.some_error
-  | Ok exe_file ->
-      let* exe_file = exe_file in
-      let exe = Fpath.basename exe_file in
-      let cmd = Cmd.(arg exe %% list args) in
-      exec_file build u exe_file cmd
-end
 
 (* Builds *)
 
@@ -184,11 +158,11 @@ module Build = struct
 
   (* Create *)
 
-  let create ~root_dir ~b0_dir ~variant m ~may_build ~must_build =
+  let make ~root_dir ~b0_dir ~variant ~store m ~may_build ~must_build =
     let u = { current = None; m } in
     let build_dir = B0_dir.build_dir ~b0_dir ~variant in
     let shared_build_dir = B0_dir.shared_build_dir ~build_dir in
-    let store = B0_store.create m ~dir:(B0_dir.store_dir ~build_dir) [] in
+    let store = B0_store.make m ~dir:(B0_dir.store_dir ~build_dir) store in
     let may_build = Set.union may_build must_build in
     let add_requested u acc = String.Map.add (name u) u acc in
     let requested = Unit.Set.fold add_requested must_build String.Map.empty in
@@ -256,4 +230,120 @@ module Build = struct
       write_log_file ~log_file b.u.m;
       ret
     end
+
+  let did_build b =
+    String.Map.fold (fun _ u acc -> Set.add u acc) b.b.requested Set.empty
 end
+
+(* Executing *)
+
+type exec_cwd =
+[ `Build_dir
+| `Cwd
+| `Custom_dir of string * (build -> t -> Fpath.t Fut.t)
+| `In of [ `Build_dir | `Root_dir | `Scope_dir ] * Fpath.t
+| `Root_dir
+| `Scope_dir ]
+
+let pp_exec_cwd ppf = function
+| `Build_dir -> Fmt.string ppf "Unit build directory"
+| `Cwd -> Fmt.string ppf "User current working directory"
+| `Custom_dir (doc, _) -> Fmt.string ppf doc
+| `In (`Build_dir, p) -> Fmt.pf ppf "%a in unit build directory" Fpath.pp p
+| `In (`Scope_dir, p) -> Fmt.pf ppf "%a in scope directory" Fpath.pp p
+| `In (`Root_dir, p) -> Fmt.pf ppf "%a in root directory" Fpath.pp p
+| `Scope_dir -> Fmt.string ppf "Scope directory"
+| `Root_dir -> Fmt.string ppf "Root directory"
+
+let exec_cwd =
+  let doc = "Process current working directory for an execution." in
+  B0_meta.Key.make "exec-cwd" ~doc ~pp_value:pp_exec_cwd
+
+let get_exec_cwd build u = match find_meta exec_cwd u with
+| None | Some `Cwd -> Fut.return None
+| Some `Build_dir -> Fut.return (Some (Build.build_dir build u))
+| Some (`In (`Build_dir, p)) ->
+    Fut.return (Some Fpath.(Build.build_dir build u // p))
+| Some `Root_dir -> failwith "TODO"
+| Some (`In (`Root_dir, p)) -> failwith "TODO"
+| Some `Scope_dir -> Fut.return (Some (Build.scope_dir build u))
+| Some (`In (`Scope_dir, p)) ->
+    Fut.return (Some Fpath.(Build.scope_dir build u // p))
+| Some (`Custom_dir (_doc, f)) -> Fut.map Option.some (f build u)
+
+type exec_env =
+[ `Build_env
+| `Build_env_override of Os.Env.t
+| `Custom_env of string * (build -> t -> Os.Env.t Fut.t)
+| `Env of Os.Env.t ]
+
+let pp_exec_env ppf = function
+| `Build_env -> Fmt.string ppf "Build environment"
+| `Build_env_override env ->
+    Fmt.pf ppf "@[<v>Build environment override with:@,%a@]"
+      Fmt.(list string) (Os.Env.to_assignments env)
+| `Custom_env (doc, _) -> Fmt.string ppf doc
+| `Env env ->
+    Fmt.pf ppf "@[<v>%a@]" Fmt.(list string) (Os.Env.to_assignments env)
+
+let exec_env =
+  let doc = "Process environment for an execution." in
+  B0_meta.Key.make "exec-env" ~doc ~pp_value:pp_exec_env
+
+let get_exec_env build u = match find_meta exec_env u with
+| None | Some `Build_env -> Fut.return None
+| Some `Build_env_override env ->
+    (* FIXME proper environment lookup *)
+    let e = Os.Env.current () |> Log.if_error ~use:Os.Env.empty in
+    Fut.return (Some (Os.Env.override e ~by:env))
+| Some (`Custom_env (_doc, f)) -> Fut.map Option.some (f build u)
+| Some (`Env env) -> Fut.return (Some env)
+
+let exe_file =
+  let doc = "Absolute file path to a built executable." in
+  let pp_value = Fmt.any "<built value>" in
+  B0_meta.Key.make "exe-file" ~doc ~pp_value
+
+let run_exe_file exe_file build u ~args =
+  let* exe_file = exe_file in
+  let* env = get_exec_env build u in
+  let* cwd = get_exec_cwd build u in
+  let env = Option.map Os.Env.to_assignments env in
+  let cmd = Cmd.(path exe_file (* exe_name ? *) %% args) in
+  Fut.return (Os.Exit.exec ?env ?cwd exe_file cmd)
+
+let exec =
+  let doc = "Unit execution function." in
+  let pp_value ppf (doc, _) = Fmt.string ppf doc in
+  B0_meta.Key.make "unit-exec" ~doc ~pp_value
+
+let run_exec exec build u ~args =
+  let* cwd = get_exec_cwd build u in
+  let* env = get_exec_env build u in
+  exec build ?env ?cwd u ~args
+
+let find_exec u = match find_meta exec u with
+| Some (_, exec) -> Some (run_exec exec)
+| None ->
+    match find_meta exe_file u with
+    | None -> None
+    | Some exe_file -> Some (run_exe_file exe_file)
+
+let is_public u = match find_meta B0_meta.public u with
+| None -> false | Some b -> b
+
+let get_or_suggest_tool ~keep n =
+  let is_root = B0_def.Scope.is_root () in
+  let keep = if is_root then keep else fun u -> in_current_scope u && keep u in
+  let us = Option.value ~default:[] (String.Map.find_opt n !tool_name_index) in
+  match List.filter keep us with
+  | _ :: _ as us -> Ok us
+  | [] ->
+      let add_sugg acc u = if keep u then u :: acc else acc in
+      let add_suggs k us acc =
+        if String.edit_distance k n > 2 then acc else
+        List.fold_left add_sugg acc us
+      in
+      Error (List.rev (String.Map.fold add_suggs !tool_name_index []))
+
+let tool_is_user_accessible u = is_public u || in_root_scope u

@@ -41,15 +41,16 @@ open B0_kit.V000
 
 let cmdliner = B0_ocaml.libname "cmdliner"
 let hello =
-  let srcs = [`File "src/hello.ml"] in
+  let doc = "Greeting tool" in
+  let srcs = [`File ~/"src/hello.ml"] in
   let requires = [cmdliner] in
-  B0_ocaml.exe "hello" ~doc:"Greeting tool" ~srcs ~requires
+  B0_ocaml.exe "hello" ~srcs ~requires ~doc
 ]}
 
 The definitions of B0 files are consulted and processed by {e
-drivers}. The [b0] and [d0] tools distributed with B0 are examples of
-drivers. An API is provided to create custom driver, details can
-be found in the {{!page-driver_dev}B0 driver development manual}.
+drivers}. The [b0] tool distributed with B0 is an examples of
+a driver. An API is provided to create custom driver, details can be
+found in the {{!page-driver_dev}B0 driver development manual}.
 
 {2:root_b0_file Root B0 file}
 
@@ -76,8 +77,8 @@ The {e root directory} is the directory in which the
 shows that directly:
 
 {v
-b0 root  # Show the absolute path to the root directory, effectively
-         # this is: dirname $(b0 file path)
+b0 root # Show the absolute path to the root directory, effectively
+        # this is: dirname $(b0 file path)
 v}
 
 Most of the time the root directory is the root of a project's source
@@ -98,7 +99,22 @@ echo _b0 >> .gitignore  # Let git ignore the _b0 directory
 echo _b0 >> .hgignore   # Let hg ignore the _b0 directory
 v}
 
-{2:rel_paths Relative file paths}
+{3:root_locking Locking}
+
+Sometimes it may be useful to lock [b0] invocation on a particular b0
+root. For example so that you can move into your file system and still
+have [b0] lookup and run entities described therein. In order to do so
+you can in your project's directory do a
+
+{v
+b0 -- mytool ~/elsewhere/input  # Running mytool
+eval $(b0 lock)  # Locks b0 on the current B0 root
+cd ~/elsewhere
+b0 -- mytool input    # Because of the lock that works.
+eval $(b0 unlock)     # Unlock a locked B0 root
+v}
+
+{2:rel_paths Relative file paths and scope directory}
 
 Unless otherwise indicated relative file paths specified in
 definitions and directives of a specific B0 file are {e always}

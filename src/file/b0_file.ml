@@ -16,7 +16,7 @@ let loc m = m
 let pp_loc = Tloc.pp_ocaml
 let loc_err_fmt ffmt m fmt =
   ffmt ("@[<v>%a:@,@[%a: " ^^ fmt ^^ "@]@]")
-    pp_loc (loc m) (Fmt.tty_string [`Fg `Red; `Bold ]) "Error"
+    pp_loc (loc m) (Fmt.tty' [`Fg `Red; `Bold ]) "Error"
 
 let loc_errf m fmt = loc_err_fmt Fmt.str m fmt
 let loc_error m fmt = loc_err_fmt Fmt.error m fmt
@@ -25,7 +25,7 @@ let loc_error m fmt = loc_err_fmt Fmt.error m fmt
 
 type b0_boot = (string * smeta) list
 type b0_include = (string * smeta) * (Fpath.t * smeta)
-type require = B0_ocaml.Lib.Name.t * smeta
+type require = B0_ocaml.Libname.t * smeta
 type mod_use = Fpath.t * smeta
 type t =
   { file : Fpath.t;
@@ -54,7 +54,7 @@ let pp_dump ppf s =
     in
     Fmt.(vbox @@ list pp_include)
   in
-  let pp_reqs = Fmt.(list ~sep:sp (pp_fst B0_ocaml.Lib.Name.pp)) in
+  let pp_reqs = Fmt.(list ~sep:sp (pp_fst B0_ocaml.Libname.pp)) in
   let pp_mod_uses = Fmt.(list (pp_fst Fpath.pp_unquoted)) in
   Fmt.record
     [ Fmt.field "file" file Fpath.pp_quoted;
@@ -189,7 +189,7 @@ let parse_include_directive d ~sbyte ~sline =
       | _ -> err_exp_eodir d ~sbyte ~sline
 
 let parse_require_directive d ~sbyte ~sline =
-  string_to B0_ocaml.Lib.Name.of_string (parse_string d)
+  string_to B0_ocaml.Libname.of_string (parse_string d)
 
 let parse_mod_use_directive d ~sbyte ~sline =
   string_to Fpath.of_string (parse_string d)
@@ -297,7 +297,7 @@ let w_src b (file, src) =
 
 let w_mod_use b b0_file manif (p, _ as mod_use) =
   let manif, intf, impl = get_mod_use_srcs b0_file manif mod_use in
-  let mod_name = B0_ocaml.Mod.Name.of_mangled_filename (Fpath.basename p) in
+  let mod_name = B0_ocaml.Modname.of_mangled_filename (Fpath.basename p) in
   let b = match intf with
   | None -> w b (Fmt.str "module %s = struct" mod_name)
   | Some intf ->

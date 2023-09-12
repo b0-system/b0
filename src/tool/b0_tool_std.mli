@@ -20,7 +20,7 @@ val def_list_list : (module B0_def.S) list -> B0_def.value list
     first by name then by kind. *)
 
 val def_list_get_list_or_hint :
-    (module B0_def.S) list -> empty_means_all:bool -> string list ->
+    (module B0_def.S) list -> all_if_empty:bool -> string list ->
     (B0_def.value list, string) result
 
 (** {!B0_def} generic support.
@@ -56,31 +56,38 @@ module Cli : sig
 
   val man_see_manual : Manpage.block
   val editor_envs : Cmd.Env.info list
-  val pager_envs : Cmd.Env.info list
+
   val format : [ `Long | `Normal | `Short ] Term.t
   val pos_key : string Term.t
 
+  val no_pager : bool Term.t
+  (** N.B. only useful for {!subcmd}, it's already in the driver conf. *)
+
   val s_scope_selection : string
 
-  val subcmd_with_b0_file :
+  val subcmd :
     ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
     ?synopsis:Manpage.block -> string -> doc:string -> descr:Manpage.block ->
-    (B0_driver.Conf.t -> Os.Exit.t) Term.t -> Os.Exit.t Cmd.t
+    (unit -> Os.Exit.t) Term.t -> Os.Exit.t Cmd.t
+  (** [subcmd] does not require driver configuration options or a B0 file
+      it justs setups logging and the tty stuff. *)
 
   val subcmd_with_driver_conf :
     ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
     ?synopsis:Manpage.block -> string -> doc:string -> descr:Manpage.block ->
     (B0_driver.Conf.t -> Os.Exit.t) Term.t -> Os.Exit.t Cmd.t
+  (** [subcmd_with_driver_conf] gives the options for a driver
+      configuration value. *)
 
-  val cmd_group_with_b0_file :
-    ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
-    ?synopsis:Manpage.block ->  string -> doc:string -> descr:Manpage.block ->
-    ?default:(B0_driver.Conf.t -> Os.Exit.t) Term.t ->
-    Os.Exit.t Cmd.t list -> Os.Exit.t Cmd.t
-
-  val cmd_group_with_driver_conf :
+  val subcmd_with_b0_file :
     ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
     ?synopsis:Manpage.block -> string -> doc:string -> descr:Manpage.block ->
-    ?default:(B0_driver.Conf.t -> Os.Exit.t) Term.t ->
-    Os.Exit.t Cmd.t list -> Os.Exit.t Cmd.t
+    (B0_driver.Conf.t -> Os.Exit.t) Term.t -> Os.Exit.t Cmd.t
+  (** [subcmd_with_b0_file] requires a functioning b0 file. *)
+
+  val cmd_group :
+    ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
+    ?synopsis:Manpage.block -> string -> doc:string -> descr:Manpage.block ->
+    ?default:Os.Exit.t Term.t -> Os.Exit.t Cmd.t list -> Os.Exit.t Cmd.t
+  (** [cmd_group] just groups without requiring anything particular. *)
 end

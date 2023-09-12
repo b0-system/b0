@@ -87,10 +87,11 @@ val self : t B0_store.key
 
 (** {1:run Creating and running} *)
 
-val create :
+val make :
   root_dir:Fpath.t -> b0_dir:Fpath.t -> variant:string ->
-  B0_memo.t -> may_build:B0_unit.Set.t -> must_build:B0_unit.Set.t -> t
-(** [create ~root_dir ~b0_dir m ~may_build ~must_build]
+  store:B0_store.binding list -> B0_memo.t ->
+  may_build:B0_unit.Set.t -> must_build:B0_unit.Set.t -> t
+(** [make ~root_dir ~b0_dir m ~may_build ~must_build]
     {ul
     {- [must_build] are the build units that must be build by [b].}
     {- [may_build] are the build units that may build in [b]. [must] units
@@ -98,3 +99,7 @@ val create :
 
 val run : t -> (unit, unit) result
 (** [run b] runs the build. *)
+
+val did_build : t -> B0_unit.Set.t
+(** [did_build b] are the units that did build. This is meaningless before
+    {!run} has finished. *)
