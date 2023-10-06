@@ -86,6 +86,8 @@ let tool_lookup m = m.m.tool_lookup
 let trash m = Exec.trash m.m.exec
 let win_exe m = m.m.win_exe
 
+let with_feedback m feedback = { m with m = { m.m with feedback }}
+
 (* Tool lookup *)
 
 let file_ready m p =

@@ -51,7 +51,7 @@ val of_dir :
     followed.
 
     In the archive, members of [dir] are rerooted at [root] and sorted
-    according to {!Fpath.compare} (for determinism). They have their
+    according to {!B0_std.Fpath.compare} (for determinism). They have their
     modification time set to [mtime] and their file permissions are
     [0o775] for directories and files executable by the user and
     [0o664] for other files. No other file metadata is preserved. *)

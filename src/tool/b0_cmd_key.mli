@@ -3,7 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** B0 [blueprint] command. *)
+(** B0 [key] command. *)
 
 val cmd : B0_std.Os.Exit.t Cmdliner.Cmd.t
-(** [cmd] is the command line for [blueprint]. *)
+(** [cmd] is the command line for [key]. *)

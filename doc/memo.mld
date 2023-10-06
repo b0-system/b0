@@ -25,12 +25,11 @@ Concepts dropped and to be seen how we can recover them at a higher level:
 
 {ul
 {- Build aims for cross compilation (build/host OS distinction). This
-   should be capturable as two separate {!B0_memo.Memo}s.}
+   should be capturable as two separate {!B0_memo.t}s.}
 {- Build units (named sets of build operation with metadata),
-   {!B0_zero.Op.group} where now introduced though but they have
-   only have UI semantics.}
+   were now introduced though but they have only have UI semantics.}
 {- Build operation synchronisation, only files for now, we had
-   unit-level. Did introduce {!B0_memo.Memo.Fut} for odig.}
+   unit-level. Did introduce [B0_memo.Fut] (?) for odig.}
 {- Build configuration.}
 {- Build unit/config definition localisation (multiple B0.ml files)}
 {- Build directory structuring}
@@ -42,7 +41,7 @@ Concepts dropped and to be seen how we can recover them at a higher level:
 
 {ul
 {- Memo.spawn redirections, consider supporting all the options
-   of {!B0_std.Os.Cmd.spawn}}
+   of {!B0_std.Os.Cmd.val-spawn}}
 {- The concept of response file in {!B0_memo.Tool} should likely appear at
    the {!B0_zero.Op.module-Spawn} level aswell so that we can simply have the
    sequence of {!B0_zero.Op.t} value for a potential build log
@@ -61,7 +60,7 @@ hampers correctness.
 {- Clean builds. Usually builds are performed in a dedicated
    directory, always delete the previous directory at the beginning
    of the build and restart from scratch. Deleting is slow and should not
-   impede the build, hence the {!B0_memo.Memo.trash} that simply renames
+   impede the build, hence the {!B0_memo.trash} that simply renames
    to a trash directory and the asynchronous deletion at the end of the build.}
 {- Diffing. If we know which files were generated in the previous run
    (easy to get from the build build log), we can remove stale artefacts
@@ -118,7 +117,7 @@ and we indicate them in [writes]. This serves three purposes:
 In the first case we don't really need the information beforehand and
 we can determine it after the spawn occured, just before caching, for
 example by scanning the file system (a
-{{!val:B0_memo.Memo.spawn}[post_exec] hook} -- that executes after the
+{{!B0_memo.spawn}[post_exec] hook} -- that executes after the
 build operation execution but before cache recording -- can be used
 for that). It's also quite clear the third purpose does not
 fundametally need the information beforehand.
@@ -284,7 +283,7 @@ characterize whether a build operation is up-to-date without being
 able to precisely or say reasonably characterize it's actual inputs.
 
 The situation is similar to dealing with
-{{!unpredicatable_writes}unpredicatable written file paths}.
+{{!unpredictable_writes}unpredicatable written file paths}.
 
 A tool with predicatable reads is invoked as follows:
 {[
@@ -304,7 +303,7 @@ it's the [reads] we are not able to}}
 It should be possible to precisely characterize [gcc -M]'s inputs
 by indexing all include directories in order, hash all the data that
 might be looked up in these. This produced a [stamp] to be
-used with {!Memp.spawn ~stamp}.
+used with [Memo.spawn ~stamp].
 
 
 {2:mutable_iter Mutable writes and fix points}

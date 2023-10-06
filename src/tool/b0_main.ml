@@ -32,16 +32,17 @@ let man = [
 let cmds =
   [ B0_cmd_action.cmd;
     B0_cmd_build.cmd;
-    B0_cmd_blueprint.cmd;
     B0_cmd_browse.cmd;
     B0_cmd_delete.cmd;
     B0_cmd_edit.cmd;
     B0_cmd_file.cmd;
+    B0_cmd_key.cmd;
     B0_cmd_list.cmd;
     B0_cmd_lock.cmd;
     B0_cmd_log.cmd;
     B0_cmd_pack.cmd;
     B0_cmd_root.cmd;
+    B0_cmd_scaffold.cmd;
     B0_cmd_scope.cmd;
     B0_cmd_show.cmd;
     B0_cmd_tool.cmd;

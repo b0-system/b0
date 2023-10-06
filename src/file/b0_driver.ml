@@ -4,6 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
+open Result.Syntax
 
 module Exit = struct
   open Cmdliner
@@ -205,7 +206,7 @@ let run ~has_b0_file:b0_file =
       end @@ fun () ->
       B0_cli.Exit.of_eval_result @@
       try main ()
-      with B0_def.Scope.After_seal e ->
+      with B0_scope.After_seal e ->
         (* FIXME I suspect we may never see this it will be catched
            by memo protection. At least make a good error msg. *)
         let bt = Printexc.get_raw_backtrace () in
@@ -226,20 +227,22 @@ module Compile = struct
   let exe c ~driver =
     Fpath.(Conf.b0_dir c / Conf.drivers_dir_name / name driver / "exe")
 
-  let write_src m c esrc ~src_file  =
-    let reads = B0_file.expanded_file_manifest esrc in
-    List.iter (B0_memo.file_ready m) reads;
+  let write_src m c expanded_src ~file_api_stamp ~src_file =
+    let src_reads = B0_file.expanded_file_manifest expanded_src in
+    let reads = List.rev_append file_api_stamp src_reads in
+    List.iter (B0_memo.file_ready m) src_reads;
     B0_memo.write m ~reads src_file @@ fun () ->
-    Ok (B0_file.expanded_src esrc)
+    Ok (B0_file.expanded_src expanded_src)
 
   let base_ext_libs =
     [ B0_ocaml.Libname.v "cmdliner";
       B0_ocaml.Libname.v "unix"; ]
 
+  let b0_file_lib = B0_ocaml.Libname.v "b0.file"
   let base_libs =
     [ B0_ocaml.Libname.v "b0.std";
       B0_ocaml.Libname.v "b0.memo";
-      B0_ocaml.Libname.v "b0.file";
+      b0_file_lib;
       B0_ocaml.Libname.v "b0.kit"; ]
 
   let find_libs m r libs =
@@ -284,9 +287,15 @@ module Compile = struct
     let* base_libs =
       find_boot_libs m ~clib_ext ~env:"B0_BOOTSTRAP" base_libs r
     in
+    let b0_file_lib =
+      let is_b0_file_lib l =
+        B0_ocaml.Libname.equal (B0_ocaml.Lib.libname l) b0_file_lib
+      in
+      List.find_opt is_b0_file_lib base_libs |> Option.get
+    in
     let all_libs = base_ext_libs @ base_libs @ driver_libs @ requires in
     let seen_libs = base_ext_libs @ base_libs @ requires in
-    Fut.return (all_libs, seen_libs)
+    Fut.return (b0_file_lib, all_libs, seen_libs)
 
   let find_compiler c m = match Conf.code c with
   | Some (`Byte as c) -> Fut.return (B0_ocaml.Tool.ocamlc, c)
@@ -304,13 +313,17 @@ module Compile = struct
     let* ocaml_conf = B0_ocaml.Conf.read m ocaml_conf in
     let obj_ext = B0_ocaml.Conf.obj_ext ocaml_conf in
     let comp = B0_memo.tool m comp in
-    let esrc = B0_memo.fail_if_error m (B0_file.expand src) in
-    let requires = B0_file.expanded_requires esrc in
-    let* all_libs, seen_libs =
+    let expanded_src = B0_memo.fail_if_error m (B0_file.expand src) in
+    let requires = B0_file.expanded_requires expanded_src in
+    let* b0_file_lib, all_libs, seen_libs =
       find_libs m ocaml_conf ~build_dir ~driver ~requires
     in
     let src_file = Fpath.(build_dir / "src.ml") in
-    write_src m c esrc ~src_file;
+    let file_api_stamp = match code with (* archive changes when API does *)
+    | `Byte -> Option.to_list (B0_ocaml.Lib.cma b0_file_lib)
+    | `Native -> Option.to_list (B0_ocaml.Lib.cmxa b0_file_lib)
+    in
+    write_src m c expanded_src ~file_api_stamp ~src_file;
     let writes =
       let base = Fpath.strip_ext src_file in
       let base ext = Fpath.(base + ext) in
@@ -340,8 +353,9 @@ module Compile = struct
   let write_log_file ~log_file m =
     Log.if_error ~use:() @@ B0_cli.Memo.Log.(write log_file (of_memo m))
 
-  let compile c ~driver src =
+  let compile c ~driver ~feedback src =
     Result.bind (Conf.memo c) @@ fun m ->
+    let m = if feedback then m else B0_memo.with_feedback m ignore in
     let build_dir = build_dir c ~driver in
     let log_file = build_log c ~driver in
     let exe = exe c ~driver in
@@ -363,24 +377,47 @@ module Compile = struct
         let dopt = if name = "b0" then "" else Fmt.str " --driver %s" name in
         let read_howto ppf _ = Fmt.pf ppf "b0 file log%s -r " dopt in
         let write_howto ppf _ = Fmt.pf ppf "b0 file log%s -w " dopt in
-        B0_zero_conv.Op.pp_aggregate_error
-          ~read_howto ~write_howto () Fmt.stderr e;
+        if feedback then
+          B0_zero_conv.Op.pp_aggregate_error
+            ~read_howto ~write_howto () Fmt.stderr e;
         Fmt.error "Could not compile B0 file %a"
           Fmt.(code Fpath.pp) (B0_file.file src)
 end
 
+let compile_b0_file conf ~driver ~feedback b0_file =
+  let* src = Os.File.read b0_file in
+  let* src = B0_file.of_string ~file:b0_file src in
+  Compile.compile conf ~driver ~feedback src
+
 let with_b0_file ~driver cmd =
- let open B0_std.Result.Syntax in
-  let run conf cmd = match has_b0_file () with
-  | true -> cmd conf
-  | false ->
-      Log.if_error ~use:Exit.no_b0_file @@
-      let* b0_file = Conf.get_b0_file conf in
-      Log.if_error' ~use:Exit.b0_file_error @@
-      let* s = Os.File.read b0_file in
-      let* src = B0_file.of_string ~file:b0_file s in
-      let* exe = Compile.compile conf ~driver src in
-      let argv = Cmd.of_list (fun x -> x) (Array.to_list Sys.argv) in
-      Ok (Os.Exit.exec exe argv)
+  let run conf cmd =
+    if has_b0_file () then cmd conf else
+    Log.if_error ~use:Exit.no_b0_file @@
+    let* b0_file = Conf.get_b0_file conf in
+    Log.if_error' ~use:Exit.b0_file_error @@
+    let* exe = compile_b0_file conf ~driver ~feedback:true b0_file in
+    let argv = Cmd.list (Array.to_list Sys.argv) in
+    Ok (Os.Exit.exec exe argv)
   in
   Cmdliner.Term.(const run $ Cli.conf $ cmd)
+
+let has_failed_b0_file = ref false
+
+let with_b0_file_if_any ~driver cmd =
+  let run conf cmd =
+    if has_b0_file () then cmd conf else
+    match Conf.b0_file conf with
+    | None -> cmd conf
+    | Some b0_file ->
+        match compile_b0_file conf ~driver ~feedback:false b0_file with
+        | Error e ->
+            (Log.warn @@ fun m -> m "%s. See %a." e Fmt.code' "b0 file log -e");
+            has_failed_b0_file := true;
+            cmd conf
+        | Ok exe ->
+            let argv = Cmd.list (Array.to_list Sys.argv) in
+            Os.Exit.exec exe argv
+  in
+  Cmdliner.Term.(const run $ Cli.conf $ cmd)
+
+let has_failed_b0_file () = !has_failed_b0_file

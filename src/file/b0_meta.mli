@@ -56,6 +56,10 @@ module Key : sig
   val default : 'a key -> 'a option
   (** [default k] is a default value for the key (if any). *)
 
+  val get_default : 'a key -> 'a
+  (** [get_default k] is the default value of [k]. Raises [Invalid_argument]
+      if [k] has no default. *)
+
   val doc : 'a key -> string
   (** [doc k] is [k]'s documentation string. *)
 
@@ -107,6 +111,13 @@ module Key : sig
   val get_or_hint : string -> (t, string) result
   (** [get_or_hint n] is the key named [n] or an error message that
       indicates that [n] could not be found with suggested names. *)
+
+  val list : unit -> t list
+
+  val fold : (t -> 'a -> 'a) -> 'a -> 'a
+
+  val get_list_or_hint :
+    all_if_empty:bool -> string list -> (t list, string) result
 end
 
 (** {1:meta Metadata} *)
@@ -233,9 +244,15 @@ val homepage : string key
 val issues : string key
 (** [issues] is an URL to an issue tracker. *)
 
-val licenses : string list key
-(** [licenses] describes a list of licenses. Each license {e should}
-    be a {{:https://spdx.org/licenses/}SPDX license identifier}. *)
+type spdxid = string
+(** The type for {{:https://spdx.org/licenses/}SPDX license identifiers}.
+    If your license is not in the list you can use anything if
+    prefixed by ["LicenseRef-"]. *)
+
+val licenses : spdxid list key
+(** [licenses] describes a list of licenses. Some processors like
+    {{!B0_scaffold}scaffolders} consider the first license of this list
+    to be the main license of your project and use it accordingly. *)
 
 val maintainers : string list key
 (** [maintainers] describe a list of persons with maintainership. *)

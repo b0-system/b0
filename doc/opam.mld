@@ -11,17 +11,17 @@ OCaml package manager. It provides:
 
 [opam] packages are represented by {{!page-manual.packs}build packs}
 tagged with the {!B0_opam.tag}. The name of the defined [opam] package
-is the basename of the pack or the value of the {!B0_opam.Meta.name}
+is the basename of the pack or the value of the {!B0_opam.name}
 meta key; see {!B0_opam.pkg_name_of_pack} for the full details.
 
 The final metadata of the [opam] package is defined by
-{{!B0_meta.std}standard} and {{!B0_opam.Meta}[opam] specific} meta key
+{{!B0_meta.std}standard} and {{!B0_opam.metadata}[opam] specific} meta key
 values. The map between metadata key and opam fields is described in
 {!B0_opam.File.pkg_of_meta}. Some keys are derived by
-{!B0_opam.Meta.pkg_of_pack} if unspecified.
+{!B0_opam.pkg_meta_of_pack} if unspecified.
 
 The pack {e should} contain exactly the build units that must be built
-by the [opam] package, this allows {!B0_opam.Meta.pkg_of_pack} to
+by the [opam] package, this allows {!B0_opam.pkg_meta_of_pack} to
 automatically infer some of the fields (e.g. [build:] or [depends:]).
 
 Here's an example:
@@ -55,7 +55,7 @@ v}
 {1:file_generation Package file generation}
 
 The [opam] file for a package is generated from its pack metadata via
-{!B0_opam.Meta.pkg_of_pack} and {!B0_opam.File.pkg_of_meta}.
+{!B0_opam.pkg_meta_of_pack} and {!B0_opam.File.pkg_of_meta}.
 
 The [.opam file] command outputs the generated files in various ways.
 
@@ -162,7 +162,7 @@ The version number of a package can be specified explicitely on the
 command line by separating it with a dot from the [opam] package
 name. For example [mypkg.2.0.1] publishes version [2.0.1] of the
 package. If no version number is explicitely given it is defined by
-using {!B0_release.version_of_pack} on its pack.
+using {!B0_release.vcs_repo_version_of_pack} on its pack.
 
 {2:det_archive_url Release archive URL determination}
 

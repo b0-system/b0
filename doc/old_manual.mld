@@ -44,7 +44,7 @@ notion of {e build variant} is added on top of that. Build variant
 allow builds with different configurations to live next to each other
 or be performed in containers or on remote machines. They define a
 basic directory layout in which the build occurs and setup the
-{{!Env}build environment} in which the configuration occurs and build
+build environment in which the configuration occurs and build
 tools are looked up. More {{!variants}on variants}.
 
 {2:concept_deploy Deployments}
@@ -100,23 +100,22 @@ The structure of a deployment [n] is as follows:
 
 {1:configuration Configuration}
 
-A {{!Conf}{e configuration}} is a set of typed key-value bindings
-consulted by descriptions and build procedures to adjust their
-outcomes to the build environment and desires of the end user.
+A {e configuration} is a set of typed key-value bindings consulted by
+descriptions and build procedures to adjust their outcomes to the
+build environment and desires of the end user.
 
-A {{!Conf.key}configuration key} the user did not explicitely set
-has a {e default} value, specified in the description at key
-creation time.  This value is either {{!Conf.const}constant} or
-{{!Conf.discover}discovered} via a function.
+A configuration key the user did not explicitely set has
+a {e default} value, specified in the description at key creation
+time.  This value is either constant or discovered via a function.
 
-A key can belong to at most one {{!Conf.Group}{e group}} which is
+A key can belong to at most one {e group} which is
 simply a named set of related keys. Groups are used to easily
 select a subset of keys for user interaction. For example on [b0
 key get] command invocations, using the [-g ocaml] option will
 report the value of all configuration keys that declared
 themselves to be part of the [ocaml] group.
 
-Configuration {{!Conf.Preset}{e presets}} are named sets of
+Configuration {e presets} are named sets of
 key-value bindings defined in descriptions. They are a convenience
 to set key subsets in bulk in configurations.
 
@@ -149,7 +148,7 @@ no stored or environment value (see below). If the default
 value is discovered, the discovered value gets saved in the
 stored which is persisted at the end of the build to avoid
 repeated discovery; this behaviour may however be prevented by
-the default value {{!Conf.discover}definition}.}
+the default value definition.}
 {- {e Environment value}. The value found, if any, for a key named
 [key] in a [B0_C_$KEY] environment variable where [$KEY] is
 [key] uppercased and with ['.'] replaced by ['_']. In a build
@@ -160,7 +159,7 @@ get saved in the stored configuration.}
 build: the environment value or if undefined, the stored value
 or if undefined, the default value.}
 {- {e Preset value}. The value of the key in a configuration
-{{!Conf.Preset}preset}. This is either a constant or a discovered
+[preset]. This is either a constant or a discovered
 value. It is used to set the stored value of a key to a user
 preference defined in the description.}}
 
@@ -202,7 +201,7 @@ error.
 
 {2:nop The nop variant scheme}
 
-The variant scheme {!Variant.Scheme.nop} available under the name
+The variant scheme [Variant.Scheme.nop] available under the name
 [nop] is the simplest variant scheme. It does nothing, it runs builds in
 the environment where the build tool [b0] itself is run.
 {2:default_variant The default variant and variant schemes}
@@ -244,7 +243,7 @@ following must be guaranteed:
 {- Values and their names need to be defined during the toplevel
    initialization phase of the program without being conditioned
    by external factors [B0] may not be aware of (FIXME implement
-   {!Def} locking).}
+   Def locking).}
 {- Values names need to be unique to ensure all the values are
    accessible and can be operated on.}}
 
@@ -669,7 +668,7 @@ context, run runner, goal.
 
 In general the behaviour of [b0] tries to be as independent from
 the operating context as possible. However some
-{{!Conf}configuration keys} and/or actions are sensitive to the
+configuration keys and/or actions are sensitive to the
 what is called the {e build context}. This makes the invocations
 to specify on the command line and in package descriptions
 (e.g. the [build:] field of [opam] files) terser and thus generally
@@ -687,9 +686,9 @@ More specifically [b0] distinguishes between the following contexts:
    This is happening for example if the developer is building the
    software in her working source repository by invoking [b0].}
 {- [`Dev_pkg] iff [(vcs c) && (dev_pkg c)]. This is a package manager
-       development build. In this case the repository checkout may need
-       to be massaged into a pseudo-distribution for the software to be
-       installed. This meas that distribution watermaking and massaging
-       should be performed. See {{!distrib}distribution description}
-       and the [prepare_on_pin] argument. Besides existing configuration
-       bits should be setup according to the build environment.}}
+   development build. In this case the repository checkout may need to
+   be massaged into a pseudo-distribution for the software to be
+   installed. This meas that distribution watermaking and massaging
+   should be performed. See distribution description and
+   the [prepare_on_pin] argument. Besides existing configuration bits
+   should be setup according to the build environment.}}

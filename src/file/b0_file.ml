@@ -330,7 +330,7 @@ let rec w_include b b0_file id npre manif boots incs reqs ((n, nm), inc_file) =
   let b = w b (Fmt.str "module Inc_%03d : sig end = struct" id) in
   let b =
     let f = Fpath.to_string (file b0_file) in
-    w b (Fmt.str "let () = B0_def.Scope.open_file %S (B0_std.Fpath.v %S)" n f)
+    w b (Fmt.str "let () = B0_scope.open_file %S (B0_std.Fpath.v %S)" n f)
   in
   let b, id, manif, boots, incs, reqs =
     let id = id + 1 in
@@ -342,7 +342,7 @@ let rec w_include b b0_file id npre manif boots incs reqs ((n, nm), inc_file) =
   let b, manif = w_mod_uses b b0_file manif in
   let b = w_ocaml_unit b (ocaml_unit b0_file) in
   let b = w b nil_loc in
-  let b = w b "let () = B0_def.Scope.close ()" in
+  let b = w b "let () = B0_scope.close ()" in
   let b = w b "end" in
   b, id, manif, boots, incs, reqs
 
@@ -375,14 +375,14 @@ let expand b0_file =
     let b = w [] nil_loc in
     let r = Fpath.to_string (file b0_file) in
     let b = w b
-        (Fmt.str "let () = B0_def.Scope.open_root (B0_std.Fpath.v %S)" r)
+        (Fmt.str "let () = B0_scope.open_root (B0_std.Fpath.v %S)" r)
     in
     let b, _, manif, boots, incs, reqs = w_includes b b0_file 0 "" [] [] [][] in
     let b, manif = w_mod_uses b b0_file manif in
     let b = w_ocaml_unit b (ocaml_unit b0_file) in
     let b = w b nil_loc in
-    let b = w b "let () = B0_def.Scope.close ()" in
-    let b = w b "let () = B0_def.Scope.seal ()" in
+    let b = w b "let () = B0_scope.close ()" in
+    let b = w b "let () = B0_scope.seal ()" in
     let b = w b "let () = B0_driver.run ~has_b0_file:true" in
     Ok { expanded_file_manifest = List.rev manif;
          expanded_b0_boots = List.rev boots;

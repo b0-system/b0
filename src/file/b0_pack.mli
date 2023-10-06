@@ -29,6 +29,12 @@ val units : t -> B0_unit.t list
 
 (** {1:meta_derivation Metadata derivation} *)
 
+val find_default : unit -> t option
+(** [find_default ()] is a default pack.
+
+    {b FIXME} This is likely not a good idea. There's no context to
+    override the default. *)
+
 val derive_synopsis_and_description : t -> B0_meta.t -> B0_meta.t
 (** [derive_synopsis_and_description p m] if {!B0_meta.synopsis} or
     {!B0_meta.description} are undefined in [m] it tries to fill them

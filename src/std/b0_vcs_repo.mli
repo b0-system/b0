@@ -5,8 +5,9 @@
 
 (** Version control system (VCS) repositories.
 
-    The toplevel module abstracts operations over VCS.  The {!Hg} and
-    {!Git} modules offer VCS specific operations. *)
+    The toplevel module abstracts operations over VCS. The
+    {!module-Hg} and {!module-Git} modules offer VCS specific
+    operations. *)
 
 open B0_std
 
@@ -46,18 +47,18 @@ val repo_dir : t -> Fpath.t
 
 val work_dir : t -> Fpath.t
 (** [work_dir r] is [r]'s working directory. On a git bare repo this
-    may be {!Fpath.null}. *)
+    may be {!B0_std.Fpath.null}. *)
 
 val repo_cmd : t -> Cmd.t
 (** [repo_cmd r] is the base command to use to act on [r]. Use only if you
     need VCS specific functionality not provided by the module. See also
-    {!Git} and {!Hg}. *)
+    {!module-Git} and {!module-Hg}. *)
 
 val pp : t Fmt.t
 (** [pp] formats a repository. This formats {!repo_dir}. *)
 
 val pp_long : t Fmt.t
-(** [pp_long] formats a repository. This formats {!kind} followed by
+(** [pp_long] formats a repository. This formats {!val-kind} followed by
     {!repo_dir}. *)
 
 (** {1:get Finding local repositories} *)
@@ -180,8 +181,8 @@ val latest_tag : t -> commit_ish -> (tag option, string) result
     describing [commit_ish]. *)
 
 val find_greatest_version_tag : t -> (tag option, string) result
-(** [find_latest_version_tag repo] lists tags with {!tags} sorts
-    those who parse with {!String.to_version} in increasing order
+(** [find_latest_version_tag repo] lists tags with {!val-tags} sorts
+    those who parse with {!B0_std.String.to_version} in increasing order
     and takes the greatest ones. *)
 
 (** {1:vcs VCS specific operations} *)
@@ -196,7 +197,7 @@ module Git : sig
 
   val get_cmd :
     ?search:Fpath.t list -> ?cmd:Cmd.t -> unit -> (Cmd.t, string) result
-  (** [cmd ()] looks for [git] with {!Os.Cmd.get}. *)
+  (** [cmd ()] looks for [git] with {!B0_std.Os.Cmd.get}. *)
 
   val find : ?dir:Fpath.t -> unit -> (t option, string) result
   (** [find ~dir ()] finds, using VCS functionality, a git repository
@@ -231,7 +232,7 @@ module Git : sig
     t -> remote:remote -> branch:branch -> (unit, string) result
   (** [remote_branch_fetch r remote branch] fetches [branch] of [remote].
       [stderr] and [stdout] indicates where they should be redirected,
-      defaults to the values of {!Os.Cmd.run_status}. *)
+      defaults to the values of {!B0_std.Os.Cmd.run_status}. *)
 
   val remote_branch_push :
     ?env:Os.Env.assignments -> ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo ->
@@ -241,7 +242,7 @@ module Git : sig
       [src] on [dst] of [remote]. If [dst] does not exist on [remote]
       a new branch is created. If [force] is [true] this is a forced
       update. [stderr] and [stdout] indicates where they should be redirected,
-      defaults to the values of {!Os.Cmd.run_status}. *)
+      defaults to the values of {!B0_std.Os.Cmd.run_status}. *)
 
   val remote_branch_delete :
     ?env:Os.Env.assignments -> ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo ->
@@ -249,7 +250,7 @@ module Git : sig
   (** [remote_branch_delete r ~remote ~branch] deletes [branch] on
       [remote]. If [force] is [true] this is a forced update.
       [stderr] and [stdout] indicates where they should be redirected,
-      defaults to the values of {!Os.Cmd.run_status}. *)
+      defaults to the values of {!B0_std.Os.Cmd.run_status}. *)
 
   val branch_delete :
     ?env:Os.Env.assignments -> ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo ->
@@ -315,7 +316,7 @@ module Git : sig
   (** [commit r ~sign ~msg ~ammend ~reset_author] is basically
       [git commit], see [git-commit(1)] for the semantics of options.
       [stderr] and [stdout] indicates where they should be redirected,
-      defaults to the values of {!Os.Cmd.run_status}. *)
+      defaults to the values of {!B0_std.Os.Cmd.run_status}. *)
 
   val commit_exists : t -> commit_ish -> (bool, string) result
   (** [commit_exists r cish] checks whether [cish] exists in [r].
@@ -331,7 +332,7 @@ module Git : sig
       recursively if [true]. If [ignore_unmatch] does not error if elements
       of [files] do not match files. [stderr] and [stdout] indicates
       where they should be redirected, defaults to the values of
-      {!Os.Cmd.run_status}. *)
+      {!B0_std.Os.Cmd.run_status}. *)
 end
 
 (** Mercurial specific operations. *)

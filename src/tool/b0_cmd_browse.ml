@@ -71,12 +71,12 @@ let packs ~right:r =
 let packs_tail = packs ~right:0
 let packs_all = packs ~right:(-1)
 
-let browser = B0_web_browser.browser ~opts:["b"; "browser"] ()
-let background = B0_web_browser.background ~opts:["g"; "background"] ()
-let prefix = B0_web_browser.prefix ~opts:["p"; "prefix"] ()
+let browser = B0_web_browser.browser ()
+let background = B0_web_browser.background ()
+let prefix = B0_web_browser.prefix ~default:false ()
 let show_url =
   let doc = "Output URLs rather than opening them." in
-  Arg.(value & flag & info ["u"; "show-urls"] ~doc)
+  Arg.(value & flag & info ["s"; "show-urls"] ~doc)
 
 let no_pager = B0_tool_std.Cli.no_pager
 
@@ -109,7 +109,11 @@ let online_doc =
 
 let url =
   let doc = "Browse URLs" in
-  let descr = `P "$(iname) opens the given URLs" in
+  let descr =
+    `Blocks
+      (`P "$(iname) opens the given URLs." ::
+       B0_web_browser.man_best_effort_reload)
+  in
   let urls =
     let doc = "The $(docv) to open." in
     Arg.(non_empty & pos_all string [] & info [] ~doc ~docv:"URL")

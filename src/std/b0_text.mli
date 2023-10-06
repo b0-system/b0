@@ -119,7 +119,7 @@ end
     token buffer used for lexing. *)
 module Tdec : sig
 
-  (** {1:dec Decoder} *)
+  (** {1:decoder Decoder} *)
 
   type t
   (** The type for UTF-8 text decoders. *)
@@ -177,7 +177,7 @@ module Tdec : sig
 
   val err_suggest : ?dist:int -> string list -> string -> string list
   (** [err_suggest ~dist candidates s] are the elements of [candidates]
-      whose {{!edit_distance}edit distance} is the smallest to [s] and
+      whose edit distance is the smallest to [s] and
       at most at a distance of [dist] of [s] (defaults to [2]). If
       multiple results are returned the order of [candidates] is
       preserved. *)
@@ -188,32 +188,32 @@ module Tdec : sig
   val pp_and_enum : ?empty:unit fmt -> 'a fmt -> 'a list fmt
   (** [and_enum ~empty pp_v ppf l] formats [l] according to its length.
       {ul
-      {- [0], formats {!empty} (defaults to {!nop}).}
+      {- [0], formats [empty] (defaults to [nop]).}
       {- [1], formats the element with [pp_v].}
       {- [2], formats ["%a and %a"] with the list elements}
       {- [n], formats ["%a, ... and %a"] with the list elements}} *)
 
   val pp_or_enum : ?empty:unit fmt -> 'a fmt -> 'a list fmt
-  (** [or_enum] is like {!and_enum} but uses "or" instead of "and". *)
+  (** [or_enum] is like {!pp_and_enum} but uses "or" instead of "and". *)
 
   val pp_did_you_mean : 'a fmt -> 'a list fmt
-  (** [did_you_mean pp_v] formats ["Did you mean %a ?"] with {!or_enum}
-      if the list is non-empty and {!nop} otherwise. *)
+  (** [did_you_mean pp_v] formats ["Did you mean %a ?"] with {!pp_or_enum}
+      if the list is non-empty and [nop] otherwise. *)
 
   val pp_must_be : 'a fmt -> 'a list fmt
-  (** [must_be pp_v] formats ["Must be %a."] with {!or_enum} if the list
-      is non-empty and {!nop} otherwise. *)
+  (** [must_be pp_v] formats ["Must be %a."] with {!pp_or_enum} if the list
+      is non-empty and [nop] otherwise. *)
 
   val pp_unknown : kind:unit fmt -> 'a fmt -> 'a fmt
-  (** [unknown ~kind pp_v] formats ["Unknown %a %a." kind () pp_v]. *)
+  (** [pp_unknown ~kind pp_v] formats ["Unknown %a %a." kind () pp_v]. *)
 
   val pp_unknown' :
     kind:unit fmt -> 'a fmt -> hint:('a fmt -> 'a list fmt) ->
     ('a * 'a list) fmt
-  (** [unknown ~kind pp_v ~hint (v, hints)] formats {!unknown} followed
+  (** [pp_unknown' ~kind pp_v ~hint (v, hints)] formats {!pp_unknown} followed
       by a space and [hint pp_v hints] if [hints] is non-empty. *)
 
-  (** {1:dec Decoding} *)
+  (** {1:decoding Decoding} *)
 
   val eoi : t -> bool
   (** [eoi d] is [true] iff the decoder is at the end of input. *)

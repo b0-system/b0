@@ -63,6 +63,8 @@ include Unit
 
 (* We also maintain a tool name index for build tools. *)
 
+let () = B0_scope.open_lib ~module':__MODULE__ "unit"
+
 let tool_name =
   let doc = "Executable tool name without platform specific extension" in
   B0_meta.Key.make "tool-name" ~doc ~pp_value:Fmt.string
@@ -315,7 +317,7 @@ let run_exe_file exe_file build u ~args =
 let exec =
   let doc = "Unit execution function." in
   let pp_value ppf (doc, _) = Fmt.string ppf doc in
-  B0_meta.Key.make "unit-exec" ~doc ~pp_value
+  B0_meta.Key.make "exec" ~doc ~pp_value
 
 let run_exec exec build u ~args =
   let* cwd = get_exec_cwd build u in
@@ -333,7 +335,8 @@ let is_public u = match find_meta B0_meta.public u with
 | None -> false | Some b -> b
 
 let get_or_suggest_tool ~keep n =
-  let is_root = B0_def.Scope.is_root () in
+  (* XXX I don't understand how this current_is_root () can work. *)
+  let is_root = B0_scope.current_is_root () in
   let keep = if is_root then keep else fun u -> in_current_scope u && keep u in
   let us = Option.value ~default:[] (String.Map.find_opt n !tool_name_index) in
   match List.filter keep us with
@@ -347,3 +350,34 @@ let get_or_suggest_tool ~keep n =
       Error (List.rev (String.Map.fold add_suggs !tool_name_index []))
 
 let tool_is_user_accessible u = is_public u || in_root_scope u
+
+
+let tool_name_map units =
+  let warn_dup_tool use ign n =
+    Log.warn @@ fun m ->
+    m "@[<v>Tool %a defined both by unit %a and %a.@,\
+       Ignoring definition in unit %a.@]"
+      Fmt.code' n pp_name use pp_name ign pp_name ign
+  in
+  let warn_no_exe_file u n =
+    Log.warn @@ fun m ->
+    m "@[<v>Tool %a defined by unit %a does not specify a@,\
+       B0_meta.exe_file key. It will not be used in the build (if needed).@]"
+      Fmt.code' n pp_name u
+  in
+  let add_unit u acc =
+    if not (is_public u || in_root_scope u) then acc else
+    match B0_meta.find tool_name (meta u) with
+    | None -> acc
+    | Some t ->
+        match String.Map.find_opt t acc with
+        | Some u' -> warn_dup_tool u u' t; acc
+        | None ->
+            if B0_meta.mem exe_file (meta u)
+            then String.Map.add t u acc
+            else (warn_no_exe_file u t; acc)
+  in
+  Set.fold add_unit units String.Map.empty
+
+
+let () = B0_scope.close ()

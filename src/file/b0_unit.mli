@@ -65,7 +65,7 @@ type exec_env =
 
 val exec_env : exec_env B0_meta.key
 (** [exec_env] is the default execution environment. If unspecified this
-    is [`Build].  *)
+    is [`Build_env].  *)
 
 val get_exec_env : build -> t -> Os.Env.t option Fut.t
 (** [get_exec_env b u] performs the logic to get the execution environment. *)
@@ -90,7 +90,7 @@ val exec_cwd : exec_cwd B0_meta.key
 val get_exec_cwd : build -> t -> Fpath.t option Fut.t
 (** [get_exec_cwd b u] performs the logic to get the cwd. *)
 
-(** {2:exec Execution} *)
+(** {2:execution Execution} *)
 
 val tool_name : string B0_meta.key
 (** [tool_name] is an executable name without the platform specific
@@ -105,10 +105,10 @@ val exec : (string *
 (** [exec] is a metadata key to store a custom execution procedure. *)
 
 val find_exec : t -> (build -> t -> args:Cmd.t -> Os.Exit.t Fut.t) option
-(** [find_exec b u] if either {!exec_file} or {!exec} is defined
+(** [find_exec b u] if either {!val-exe_file} or {!val-exec} is defined
     returns a function to call that  determines
-    {!get_exec_env} and {!get_exec_cwd} and runs {!exec} or
-    {!Os.Exit.execs} with {!exe_file}. *)
+    {!get_exec_env} and {!get_exec_cwd} and runs {!val-exec} or
+    {!B0_std.Os.Exit.exec} with {!exe_file}. *)
 
 val is_public : t -> bool
 (** [is_public u] is [true] iff [u]'s meta has {!B0_meta.public}
@@ -118,14 +118,18 @@ val get_or_suggest_tool : keep:(t -> bool) -> string -> (t list, t list) result
 (** [get_or_suggest_tool tool_name] are tools names whose
     {!tool_name} match [tool_name] and are filtered by [keep] *)
 
-
 val tool_is_user_accessible : t -> bool
 (** [tool_is_user_accessible u] assumes [u] has a tool name. This then
     returns [true] iff [u] {!is_public} or {!in_root_scope}. *)
 
+
 (** {1:b0_def B0 definition API} *)
 
 include B0_def.S with type t := t (** @inline *)
+
+val tool_name_map : Set.t -> t String.Map.t
+(** [tool_name_map units] are the user accessible tools defined by the
+    set of units [units]. *)
 
 (**/**)
 module Build : sig

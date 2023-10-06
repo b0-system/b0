@@ -6,7 +6,7 @@
 (** B0 file drivers.
 
     B0 file drivers access the definitions of B0 files.
-    See {{!page-driver_dev}this manual} for an
+    See {{!page-driver}this manual} for an
     overview and a minimal example. *)
 
 open B0_std
@@ -198,8 +198,21 @@ val with_b0_file :
 (** [with_b0_file ~driver cmd] wraps [cmd] to make sure it runs with
     the B0 file compiled and linked in as specified by [driver]. *)
 
+val with_b0_file_if_any :
+  driver:t -> (Conf.t -> Os.Exit.t) Cmdliner.Term.t -> Os.Exit.t Cmdliner.Term.t
+(** [with_b0_file_if_any ~driver cmd] is like {!with_b0_file} however
+    it doesn't error if the B0 file does not exist or if it fails to
+    compile (a warning is generated in this case). The driver code can
+    use {!B0_driver.has_b0_file} to see if one is linked and
+    {!B0_driver.has_failed_b0_file} to check if there was an error in linking
+    it. *)
+
 val has_b0_file : unit -> bool
 (** [has_b0_file ()] is [true] if {!run} is called with [has_b0_file]. *)
+
+val has_failed_b0_file : unit -> bool
+(** [has_failed_b0_file ()] is [true] for {!with_b0_file_if_any} when
+    there is a B0 file but it file to compile. *)
 
 (** {1:compile Compilation} *)
 
@@ -220,8 +233,10 @@ module Compile : sig
   (** [exe c ~driver] is the driver executable for driver [driver]
       in configuration [c]. *)
 
-  val compile : Conf.t -> driver:t -> B0_file.t -> (Fpath.t, string) result
+  val compile :
+    Conf.t -> driver:t -> feedback:bool -> B0_file.t -> (Fpath.t, string) result
   (** [compile c ~driver b0_file] compiles [b0_file] with driver [driver]
       in configuration [c]. If all is well the executable file path is
-      returned. *)
+      returned. [feedback] indicates whether errors are reported
+      interactively. *)
 end

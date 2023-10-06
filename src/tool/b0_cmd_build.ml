@@ -6,7 +6,13 @@
 open B0_std
 open Result.Syntax
 
-let err_nothing = "Nothing to build with this invocation."
+let err_nothing () = match B0_unit.list () with
+| _ :: _ -> "Nothing to build with this invocation."
+| [] ->
+    Fmt.str "No units are defined in the %a file"
+      Fmt.code' B0_driver.Conf.b0_file_name
+
+(* XXX more needs to go the library here *)
 
 (* Explaining what gets into the build *)
 
@@ -45,7 +51,7 @@ let show_what ~lock ~is_locked ~locked_packs ~must_build ~may_build c =
   let* pager = B0_pager.find ~don't () in
   let* () = B0_pager.page_stdout pager in
   if B0_unit.Set.is_empty must_build
-  then (Log.app (fun m -> m "%s" err_nothing); Ok B0_cli.Exit.ok)
+  then (Log.app (fun m -> m "%s" (err_nothing ())); Ok B0_cli.Exit.ok)
   else begin
     log_explain_lock ~is_locked ~lock ~locked_packs;
     log_units red ~kind:"Must" must_build;
@@ -137,7 +143,7 @@ let check_tool_ambiguities tool_name us =
   in
   u
 
-let find_store_and_execution = function
+let find_store_and_execution args = function
 | None -> Ok ([], None, [], [])
 | Some name ->
     let keep = B0_unit.tool_is_user_accessible in
@@ -158,7 +164,10 @@ let find_store_and_execution = function
             Ok ([], Some (`Unit u), [u], [])
         | Error _, Ok a ->
             let store = B0_action.store a in
-            Ok (store, Some (`Action a), B0_action.units a, B0_action.packs a)
+            let units = B0_action.units a in
+            let dyn_units = B0_action.dyn_units a ~args:(Cmd.list args) in
+            let units = dyn_units @ units in
+            Ok (store, Some (`Action a), units, B0_action.packs a)
         | Error us, Error cs ->
             let tname u = Option.get (B0_unit.find_meta B0_unit.tool_name u) in
             let ts = List.rev_map tname tool_suggs in
@@ -177,51 +186,21 @@ let find_store_and_execution = function
             (* XXX show how to list available actions if there's no typo *)
             Fmt.error "@[%a@]" pp (name, suggs)
 
-(* Look for tools in the build first. XXX cross *)
-
-let warn_dup_tool use ign n =
-  Log.warn @@ fun m ->
-  m "@[<v>Tool %a defined both by unit %a and %a.@,\
-     Ignoring definition in unit %a.@]"
-    Fmt.code' n B0_unit.pp_name use B0_unit.pp_name ign B0_unit.pp_name ign
-
-let warn_no_exe_file u n =
-  Log.warn @@ fun m ->
-  m "@[<v>Tool %a defined by unit %a does not specify a@,\
-     B0_meta.exe_file key. It will not be used in the build (if needed).@]"
-    Fmt.code' n B0_unit.pp_name u
-
-let build_tool_name_map ~may_build ~must_build =
-  let add_unit u acc =
-    (* FIXME we likely want some kind of scoped based visibility control.
-       Add B0_meta.install or B0_meta.tool or B0_meta.public. *)
-    if not (B0_unit.is_public u || B0_unit.in_root_scope u) then acc else
-    match B0_meta.find B0_unit.tool_name (B0_unit.meta u) with
-    | None -> acc
-    | Some t ->
-        match String.Map.find_opt t acc with
-        | Some u' -> warn_dup_tool u u' t; acc
-        | None ->
-            if B0_meta.mem B0_unit.exe_file (B0_unit.meta u)
-            then String.Map.add t u acc
-            else (warn_no_exe_file u t; acc)
-  in
-  let units = B0_unit.Set.union may_build must_build in
-  B0_unit.Set.fold add_unit units String.Map.empty
-
-let tool_lookup ~may_build ~must_build ~env =
-  let lookup = B0_memo.tool_lookup_of_os_env env in
-  let build_map = build_tool_name_map ~may_build ~must_build  in
-  (* We first look into the build and then in [m]'s environment. *)
-  fun m t -> match String.Map.find_opt (Fpath.to_string t) build_map with
-  | None -> lookup m t
-  | Some u ->
-      (* FIXME, not there yet we need to require that to build !
+let memo c ~may_build ~must_build =
+  (* Look for tools in the build first. XXX cross *)
+  let tool_lookup ~may_build ~must_build ~env =
+    let lookup = B0_memo.tool_lookup_of_os_env env in
+    let units = B0_unit.Set.union may_build must_build in
+    let tool_map = B0_unit.tool_name_map units  in
+    (* We first look into the build and then in [m]'s environment. *)
+    fun m t -> match String.Map.find_opt (Fpath.to_string t) tool_map with
+    | None -> lookup m t
+    | Some u ->
+        (* FIXME, not there yet we need to require that to build !
            we need to push the whole [memo c] thing into B0_build so that
            we can access the store to get B0_build.t *)
-      Fut.map Result.ok (B0_meta.get B0_unit.exe_file (B0_unit.meta u))
-
-let memo c ~may_build ~must_build =
+        Fut.map Result.ok (B0_meta.get B0_unit.exe_file (B0_unit.meta u))
+  in
   let hash_fun = B0_driver.Conf.hash_fun c in
   let cwd = B0_driver.Conf.cwd c in
   let cache_dir = B0_driver.Conf.cache_dir c in
@@ -293,7 +272,9 @@ let error_executor_needs ~exec_needs ~must_build exec =
 
 let build units x_units packs x_packs what lock show_path action args c =
   Log.if_error ~use:B0_cli.Exit.no_such_name @@
-  let* store, exec, exec_units, exec_packs = find_store_and_execution action in
+  let* store, exec, exec_units, exec_packs =
+    find_store_and_execution args action
+  in
   let* x_units = get_excluded_units ~x_units ~x_packs in
   let* units, locked_packs =
     get_must_units_and_locked_packs ~exec ~exec_units ~exec_packs ~units ~packs
@@ -317,7 +298,7 @@ let build units x_units packs x_packs what lock show_path action args c =
       error_executor_needs ~exec_needs ~must_build exec
   | Some (`Action a) -> action_executor show_path build a c
   | Some (`Unit u) -> unit_executor show_path build u
-  | None when B0_unit.Set.is_empty must_build -> Fmt.error "%s" err_nothing
+  | None when B0_unit.Set.is_empty must_build -> Fmt.error "%s" (err_nothing ())
   | None -> Ok None
   in
   match B0_build.run build with

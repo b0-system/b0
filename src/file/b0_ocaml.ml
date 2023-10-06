@@ -3,12 +3,12 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
+let () = B0_scope.open_lib ~module':__MODULE__ "ocaml"
+
 open B0_std
 open Fut.Syntax
 
 let add_if c v l = if c then v :: l else l
-
-let () = B0_def.Scope.open_lib "ocaml"
 
 module Tool = struct
 
@@ -61,12 +61,12 @@ module Code = struct
   let needs =
     let doc = "Needed built code" in
     let pp_value = pp_built in
-    B0_meta.Key.make "ocaml-code-needed" ~doc ~pp_value
+    B0_meta.Key.make "code-needed" ~doc ~pp_value
 
   let supported =
     let doc = "Supported built code" in
     let pp_value = pp_built in
-    B0_meta.Key.make "ocaml-supported-code" ~default:`All ~doc ~pp_value
+    B0_meta.Key.make "code-supported" ~default:`All ~doc ~pp_value
 
   let needed store memo =
     let find_need u acc =
@@ -566,7 +566,7 @@ let libname = Libname.v
 
 (* Metadata *)
 
-let tag = B0_meta.Key.make_tag "ocaml" ~doc:"OCaml related entity"
+let tag = B0_meta.Key.make_tag "tag" ~doc:"OCaml related entity"
 
 let c_requires =
   let doc = "Required C libraries" in
@@ -576,12 +576,12 @@ let c_requires =
 let requires =
   let doc = "Required OCaml libraries" in
   let pp_value = Fmt.(box @@ list ~sep:sp Libname.pp) in
-  B0_meta.Key.make "ocaml-requires" ~default:[] ~doc ~pp_value
+  B0_meta.Key.make "requires" ~default:[] ~doc ~pp_value
 
 let library =
   let doc = "Defined OCaml library name" in
   let pp_value = Fmt.using Libname.to_string Fmt.string in
-  B0_meta.Key.make "ocaml-library" ~doc ~pp_value
+  B0_meta.Key.make "library" ~doc ~pp_value
 
 let deprecated_library =
   let doc = "Deprecated library" in
@@ -589,7 +589,7 @@ let deprecated_library =
   | `For lib -> Fmt.pf ppf "For library: %s" (Libname.to_string lib)
   | `Msg msg -> Fmt.string ppf msg
   in
-  B0_meta.Key.make "ocaml-deprecated-library" ~doc ~pp_value
+  B0_meta.Key.make "deprecated-library" ~doc ~pp_value
 
 let modsrcs = (* FIXME don't do that. *)
   let pp_value = Fmt.any "<dynamic>" in
@@ -1374,6 +1374,11 @@ let exe
     ?(public = false) ?name tool_name ~srcs
   =
   let name = Option.value ~default:tool_name name in
+  let doc = match doc with
+  | Some _ as doc -> doc
+  | None when public -> Some (Fmt.str "The %s tool" tool_name)
+  | None -> None
+  in
   let fut_modsrcs, set_modsrcs = Fut.make () in
   let exe_path, set_exe_path = Fut.make () in
   let base =
@@ -1588,6 +1593,9 @@ module Cobj = struct
 end
 
 module Crunch = struct
+  let id_of_filename s =
+    String.Ascii.uncapitalize (Modname.of_mangled_filename s)
+
   let string_to_string ~id ~data:s =
     let len = String.length s in
     let len = len * 4 + (len / 18) * (3 + 2) in
@@ -1608,6 +1616,18 @@ end
 (* Actions *)
 
 open Result.Syntax
+
+let crunch id file =
+  Log.if_error ~use:B0_cli.Exit.some_error @@
+  let* data = Os.File.read file in
+  let id = match id with
+  | Some id -> id
+  | None when Fpath.equal file Fpath.dash -> "stdin"
+  | None -> Crunch.id_of_filename (Fpath.basename file)
+  in
+  let crunch = Crunch.string_to_string ~id ~data in
+  let* () = Os.File.write ~force:false ~make_path:false Fpath.dash crunch in
+  Ok B0_cli.Exit.ok
 
 let list format pager_don't =
   let keep u =
@@ -1884,6 +1904,21 @@ let ocaml_cmd action env =
     [ `S Manpage.s_see_also;
       `P "Consult $(b,odig doc b0) for the B0 release manual." ]
   in
+  let crunch =
+    let doc = "Crunch bytes into an OCaml string" in
+    let exits = B0_cli.Exit.infos in
+    let infile =
+      let doc = "Input bytes from file $(docv). Use $(b,-) for $(b,stdin)." in
+      Arg.(value & pos 0 B0_cli.fpath Fpath.dash & info [] ~doc ~docv:"INPUT")
+    in
+    let id =
+      let doc = "OCaml identifier to use for the crunch." in
+      let docv = "ID" and absent = "Derived from the basename of $(i,INPUT)" in
+      Arg.(value & opt (some string) None & info ["id"] ~doc ~docv ~absent)
+    in
+    Cmd.v (Cmd.info "crunch" ~doc ~man ~exits) @@
+    Term.(const crunch $ id $ infile)
+  in
   let list =
     let doc = "List buildable OCaml libraries" in
     let man =
@@ -1922,7 +1957,7 @@ let ocaml_cmd action env =
   in
   let name = B0_action.name action and doc = B0_action.doc action in
   Cmd.group (Cmd.info name ~doc ~man) @@
-  [ list; meta ]
+  [ crunch; list; meta ]
 
 let action =
   let doc = "OCaml support" in
@@ -1966,4 +2001,4 @@ let action_ocaml =
   let store = B0_store.[B (Code.built, Fut.return `Byte)] in
   B0_action.of_cmdliner_cmd ~store "ocaml" ocaml_ocaml_cmd ~doc
 
-let () = B0_def.Scope.close ()
+let () = B0_scope.close ()

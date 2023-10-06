@@ -92,5 +92,5 @@ val expanded_requires : expanded -> require list
     has duplicates. *)
 
 val expanded_src : expanded -> string
-(** [expanded_src e] is the expanded source with {!B0_def.Scope}ing
+(** [expanded_src e] is the expanded source with {!B0_scope}ing
     and mod_uses spliced in instructions and the call to {!B0_driver.main}. *)

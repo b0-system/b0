@@ -173,7 +173,7 @@ module Conf : sig
   (** [conf] is a memo key store with the OCaml configuration. *)
 
   val version' : B0_build.t -> (int * int * int * string option) Fut.t
-  (** [version' b] gets {!Tool.Conf.version} from {!key}. *)
+  (** [version' b] gets {!Conf.version} from {!key}. *)
 end
 
 (** {1:modules Modules} *)
@@ -1110,6 +1110,9 @@ end
 
 (** Crunching data into OCaml values. *)
 module Crunch : sig
+  val id_of_filename : string -> string
+  (** [id_of_filename] is {!Modname.of_mangled_filename} uncapitalized.*)
+
   val string_to_string : id:string -> data:string -> string
   (** [string_to_string ~id ~data] let binds binary [data] to [id] using
       a string. *)

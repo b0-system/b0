@@ -61,6 +61,7 @@ let derive_synopsis_and_description p m =
           let m = if has_descr then m else B0_meta.(add description d m) in
           m
 
+let find_default () = find "default"
 
 (* Formatting *)
 

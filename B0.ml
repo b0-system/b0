@@ -1,5 +1,6 @@
 open B0_kit.V000
 open Result.Syntax
+
 (* OCaml library names *)
 
 let unix = B0_ocaml.libname "unix"
@@ -82,8 +83,8 @@ let b0_hash_tool =
 let b0_log_tool =
   tool_exe "b0-log" ~doc:"Operate on b0 logs" "b0_log.ml"
 
-let show_uri_tool =
-  tool_exe "show-uri" ~doc:"Show URIs in web browsers" "show_uri.ml"
+let show_url_tool =
+  tool_exe "show-url" ~doc:"Show URLs in web browsers" "show_url.ml"
 
 (* Tests *)
 
@@ -135,7 +136,7 @@ let b0_pack =
 
 let tool_pack =
   B0_pack.make "b0-tools" ~doc:"The low-level B0 tools" ~locked:false @@
-  [b0_cache_tool; b0_hash_tool; b0_log_tool; show_uri_tool]
+  [b0_cache_tool; b0_hash_tool; b0_log_tool; show_url_tool]
 
 let driver_pack =
   B0_pack.make "b0-drivers" ~doc:"The B0 drivers" ~locked:false @@ [b0]
@@ -191,3 +192,10 @@ let bowl =
       let env = add_bootstrap_env env bootstrap_root |> Os.Env.to_assignments in
       (* FIXME b0 B0_env.exec_file allow to choose name of args ? *)
       Os.Exit.exec ~cwd ~env exec Cmd.(path exec %% args)
+
+let vendor_htmlit =
+  let doc = "Vendor Htmlit and expose it as B0_html" in
+  B0_action.make' "vendor-htmlit" ~doc @@
+  fun _ env ~args ->
+  Log.app (fun m -> m "TODO");
+  Os.Exit.exit (Code 0)

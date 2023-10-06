@@ -23,7 +23,7 @@ let () =
     Pkg.bin "src/lowtools/b0_cache" ~dst:"b0-cache";
     Pkg.bin "src/lowtools/b0_log" ~dst:"b0-log";
     Pkg.bin "src/lowtools/b0_hash" ~dst:"b0-hash";
-    Pkg.bin "src/lowtools/show_uri" ~dst:"show-uri";
+    Pkg.bin "src/lowtools/show_url" ~dst:"show-url";
 
     (* Doc *)
     Pkg.doc "doc/action.mld" ~dst:"odoc-pages/action.mld";

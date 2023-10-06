@@ -3,14 +3,14 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
+let () = B0_scope.open_lib ~module':__MODULE__ "release"
+
 open B0_std
 open Result.Syntax
 
-let () = B0_def.Scope.open_lib "release"
-
 (* Metadata *)
 
-let tag = B0_meta.Key.make_tag "release" ~doc:"Releasable entity"
+let tag = B0_meta.Key.make_tag "tag" ~doc:"Releasable entity"
 
 (* VCS repository *)
 
@@ -81,7 +81,7 @@ let gather_repos packs =
 
 let src_archive_name =
   let doc = "Source release archive (base) name" in
-  B0_meta.Key.make "release-archive-name" ~doc ~pp_value:Fmt.string
+  B0_meta.Key.make "archive-name" ~doc ~pp_value:Fmt.string
 
 let src_archive_name_of_pack p =
   match B0_pack.find_meta src_archive_name p with
@@ -96,14 +96,14 @@ let src_archive_name_of_pack p =
 let src_archive_ext =
   let doc = "Source release archive file extension" in
   let default = ".tbz" and pp_value = Fmt.string in
-  B0_meta.Key.make "release-archive-name" ~default ~doc ~pp_value
+  B0_meta.Key.make "archive-ext" ~default ~doc ~pp_value
 
 let default_archive =
   "\x25%ARCHIVE_NAME%\x25-\x25%VERSION_NUM%\x25\x25%ARCHIVE_EXT%\x25"
 
 let src_archive_url =
   let doc = "Source release archive URL pattern" in
-  B0_meta.Key.make "release-archive-name" ~doc ~pp_value:Fmt.string
+  B0_meta.Key.make "archive-url" ~doc ~pp_value:Fmt.string
 
 let default_src_archive_url homepage =
   let drop_final_slash s =
@@ -582,4 +582,4 @@ let action =
   let doc = "Source software release support" in
   B0_action.of_cmdliner_cmd "" release_cmd ~doc
 
-let () = B0_def.Scope.close ()
+let () = B0_scope.close ()

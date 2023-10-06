@@ -1971,7 +1971,13 @@ module Fpath = struct
     | Some q -> q
     | None ->
         let rec loop loc dir =
-          if is_current_dir dir || is_root dir then p else
+          if is_current_dir dir then p else
+          if is_root dir then
+            begin match strip_prefix "/" p with
+            | None -> p
+            | Some rel_root -> append loc rel_root
+            end
+          else
           match strip_prefix dir p with
           | Some q -> append loc q
           | None -> loop (add_seg loc "..") (parent dir)

@@ -2701,7 +2701,7 @@ module Os : sig
       val wait_connectable' :
         ?socket_type:Unix.socket_type -> timeout:Mtime.Span.t -> t ->
         (unit, string) result
-        (** [wait_connectable'] is like {!busy_await} but errors with a
+        (** [wait_connectable'] is like {!wait_connectable} but errors with a
             message on timeout. *)
     end
 
@@ -2772,7 +2772,7 @@ module Os : sig
 
     val of_assignments : ?init:t -> string list -> (t, string) result
     (** [of_assignments ~init ss] folds over strings in [ss],
-        {{!String.cut}cuts} them at the leftmost ['='] character and
+        {{!B0_std.String.cut_left}cuts} them at the leftmost ['='] character and
         adds the resulting pair to [init] (defaults to {!empty}). If
         the same variable is bound more than once, the last one takes
         over. *)
@@ -3031,7 +3031,7 @@ module Os : sig
         program not the first argument to the program). The function
         only recturns in case of error. [env] defaults to
         {!B0_std.Os.Env.current_assignments}[ ()],
-        [cwd] to {!B0_std.Dir.cwd}[ ()]. *)
+        [cwd] to {!B0_std.Os.Dir.cwd}[ ()]. *)
 
     type t = Cmd.t
     (** {!Exit} needs that alias to refer to {!B0_std.Cmd.t}. *)
@@ -3046,7 +3046,7 @@ module Os : sig
     | Code : int -> t (** [exit] with code. *)
     | Exec : (unit -> ('a, string) result) -> t (** exit with [execv] *)
     (** The type for specifying program exits. Either an exit code or a
-        function (that should be) calling {!B0_std.Cmd.execv}. *)
+        function (that should be) calling {!B0_std.Os.Cmd.execv}. *)
 
     val code : int -> t
     (** [code c] is [Code c]. *)
@@ -3208,9 +3208,9 @@ end
 
     Support for program logging. Not to be used by build logic.
 
-    The module is modelled after {!Logs} logging, see
+    The module is modelled after [Logs] logging, see
     {{!Logs.basics}this quick introduction}. It can be made
-    to log on a {!Logs} source, see {{!Log.logger}here}. *)
+    to log on a [Logs] source, see {{!Log.logger}here}. *)
 module Log : sig
 
   (** {1:levels Reporting levels} *)

@@ -35,9 +35,9 @@ let get_tool ?(no_build = false) env cmd = Os.Cmd.get_tool cmd
 let get_cmd ?(no_build = false) env cmd = Os.Cmd.get cmd
 
 let unit_file_exe env u =
-  (* XXX meta may depend on build without that being explicit,
-     i.e. we access nothing of [env] here.
-     This may become problematic if we start doing shortcut rebuilds. *)
-  Result.map Fut.sync (B0_unit.get_meta B0_unit.exe_file u)
+  if B0_unit.Set.mem u (B0_build.did_build env.build)
+  then Result.map Fut.sync (B0_unit.get_meta B0_unit.exe_file u) else
+  Fmt.error "Cannot get executable of unit %a: it did not build."
+    B0_unit.pp_name u
 
 let unit_cmd env u = Result.map Cmd.path (unit_file_exe env u)

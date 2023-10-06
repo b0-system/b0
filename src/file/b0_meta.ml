@@ -15,36 +15,32 @@ module Key = struct
       id : 'a Type.Id.t;
       name : string;
       pp_value : 'a Fmt.t;
+      scope : B0_scope.t;
       untyped : t; }
 
   let[@inline] uid k = Type.Id.uid k.id
 
-  let by_name = ref String.Map.empty
-  let ensure_unique n =
-    let err_too_many n = Fmt.str
-        "@[<v>Too many attempts to rename B0_meta.key %s to make it unique@,\
-         There is a bug in the program.@]" n
-    in
-    if not (String.Map.mem n !by_name) then n else
-    let rec loop n i =
-      if i > 100 then err_too_many n else
-      let r = Fmt.str "%s~%d" n i in
-      if String.Map.mem r !by_name then loop n (i + 1) else r
-    in
-    loop n 1
+  let defs = ref String.Map.empty
+  let add k = defs := String.Map.add k.name k.untyped !defs
 
   (* Typed keys *)
 
+  let kind = "key"
+
   let make ?(doc = "undocumented") ?default name ~pp_value =
-    let id = Type.Id.make () and name = ensure_unique name in
-    let rec k = { default; doc; id; name; pp_value; untyped }
+    let id = Type.Id.make () in
+    let name, scope =
+      B0_scope.current_make_unique_qualified_name ~defs:!defs ~kind name
+    in
+    let rec k = { default; doc; id; name; pp_value; scope; untyped }
     and untyped = V k in
-    by_name := String.Map.add name untyped !by_name; k
+    add k; k
 
   let make_tag ?doc name = make ?doc name ~default:false ~pp_value:Fmt.bool
 
   let name k = k.name
   let default k = k.default
+  let get_default k = Option.get k.default
   let doc k = k.doc
   let pp_value k = k.pp_value
 
@@ -52,13 +48,14 @@ module Key = struct
 
   let equal (V k0) (V k1) = Int.equal (uid k0) (uid k1)
   let compare (V k0) (V k1) = Int.compare (uid k0) (uid k1)
+  let compare_by_name (V k0) (V k1) = String.compare (name k0) (name k1)
   let pp_name_str = Fmt.tty' [`Fg `Yellow]
   let pp_name ppf k = pp_name_str ppf k.name
   let pp ppf (V k) = pp_name_str ppf k.name
 
   (* Lookup keys by name *)
 
-  let find n = match String.Map.find n !by_name with
+  let find n = match String.Map.find n !defs with
   | exception Not_found -> None | k -> Some k
 
   let get n = match find n with
@@ -70,7 +67,7 @@ module Key = struct
       let add_sugg k v acc =
         if String.edit_distance k n <= 2 then v :: acc else acc
       in
-      Error (List.rev (String.Map.fold add_sugg !by_name []))
+      Error (List.rev (String.Map.fold add_sugg !defs []))
 
   let get_or_hint n = match get_or_suggest n with
   | Ok _ as v -> v
@@ -79,6 +76,31 @@ module Key = struct
       let pp = Fmt.unknown' ~kind pp_name_str ~hint in
       let name (V k) = name k in
       Fmt.error "@[%a@]" pp (n, List.map name suggs)
+
+  let fold f acc = match B0_scope.current_is_root () with
+  | true ->
+      let add _ v acc = f v acc in
+      String.Map.fold add !defs acc
+  | false ->
+      let prefix = B0_scope.current_scope_prefix () in
+      let add k v acc = if String.starts_with ~prefix k then f v acc else acc in
+      String.Map.fold add !defs acc
+
+  let list () = List.sort compare_by_name (fold List.cons [])
+
+  let get_list_or_hint ~all_if_empty names =
+    if all_if_empty && names = [] then Ok (list ()) else
+    let rec loop vs es = function
+    | [] ->
+        if es <> []
+        then Error (String.concat "\n" (List.rev es))
+        else Ok (List.rev vs)
+    | n :: ns ->
+        match get_or_hint n with
+        | Ok v -> loop (v :: vs) es ns
+        | Error e -> loop vs (e :: es) ns
+    in
+    loop [] [] names
 end
 
 type 'a key = 'a Key.typed
@@ -197,11 +219,15 @@ let string_key ?default k ~doc = Key.make k ?default ~doc ~pp_value:Fmt.string
 
 (* End-user information. *)
 
+let () = B0_scope.open_lib ~module':__MODULE__ "meta"
+
 let authors = string_list_key "authors" ~doc:"Author list"
 let description = string_key "description" ~doc:"Description"
 let description_tags = string_list_key "descr-tags" ~doc:"Description tags"
 let homepage = string_key "homepage" ~doc:"Homepage URI"
 let issues = string_key "issues" ~doc:"Issue tracker URI"
+
+type spdxid = string
 let licenses = string_list_key "licenses" ~doc:"License list (SPDX ids)"
 let maintainers = string_list_key "maintainers" ~doc:"Maintainer list"
 let online_doc = string_key "online-doc" ~doc:"Online documentation URI"
@@ -219,3 +245,5 @@ let exe = Key.make_tag "exe" ~doc:"Executable entity"
 let test = Key.make_tag "test" ~doc:"Testing entity"
 let lib = Key.make_tag "lib" ~doc:"Library entity"
 let public = Key.make_tag "public" ~doc:"Public entity"
+
+let () = B0_scope.close ()

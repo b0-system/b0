@@ -3,22 +3,22 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
+let () = B0_scope.open_lib ~module':__MODULE__ "jsoo"
+
 open B0_std
 open B0_std.Fut.Syntax
-
-let () = B0_def.Scope.open_lib "jsoo"
 
 let env_vars = ["BUILD_PATH_PREFIX_MAP"]
 let tool = B0_memo.Tool.by_name ~vars:env_vars "js_of_ocaml"
 
 (* Meta keys *)
 
-let tag = B0_meta.Key.make_tag "jsoo" ~doc:"js_of_ocaml related entity"
+let tag = B0_meta.Key.make_tag "tag" ~doc:"js_of_ocaml related entity"
 
 let assets_root =
   let doc = "Root path from which assets are rerooted." in
   let pp_value = Fpath.pp_unquoted in
-  B0_meta.Key.make "jsoo-assets-root" ~pp_value ~doc
+  B0_meta.Key.make "assets-root" ~pp_value ~doc
 
 type compilation_mode = [ `Separate | `Whole ]
 let pp_compilation_mode ppf = function
@@ -27,17 +27,17 @@ let pp_compilation_mode ppf = function
 let compilation_mode =
   let doc = "Compilation mode" in
   let default = `Whole and pp_value = pp_compilation_mode in
-  B0_meta.Key.make "jsoo-comp-mode" ~default ~pp_value ~doc
+  B0_meta.Key.make "comp-mode" ~default ~pp_value ~doc
 
 let compile_opts =
   let doc = "Options added to the js_of_ocaml compile command" in
   let pp_value = Cmd.pp in
-  B0_meta.Key.make "jsoo-comp" ~default:Cmd.empty ~pp_value ~doc
+  B0_meta.Key.make "comp" ~default:Cmd.empty ~pp_value ~doc
 
 let link_opts =
   let doc = "Options added to the js_of_ocaml link command" in
   let pp_value = Cmd.pp in
-  B0_meta.Key.make "jsoo-link" ~default:Cmd.empty ~pp_value ~doc
+  B0_meta.Key.make "link" ~default:Cmd.empty ~pp_value ~doc
 
 type source_map = [`Inline | `File ] option
 let pp_source_map ppf = function
@@ -47,12 +47,12 @@ let pp_source_map ppf = function
 
 let source_map =
   let pp_value = pp_source_map in
-  B0_meta.Key.make "jsoo-src-map" ~pp_value ~doc:"Source map desires"
+  B0_meta.Key.make "src-map" ~pp_value ~doc:"Source map desires"
 
 let toplevel =
   let doc = "Compile with toplevel support" in
   let pp_value = Fmt.bool in
-  B0_meta.Key.make "jsoo-toplevel" ~default:false ~doc ~pp_value
+  B0_meta.Key.make "toplevel" ~default:false ~doc ~pp_value
 
 (* Build fragments *)
 
@@ -331,7 +331,7 @@ let show_uri_action build ?env ?cwd u ~args =
   | Error e -> err e
   | Ok exe_file ->
       let* exe_file = exe_file in
-      let show_uri = Fpath.v "show-uri" in
+      let show_uri = Fpath.v "show-url" in
       match Os.Cmd.get_tool (* FIXME search in build *) show_uri with
       | Error e -> err e
       | Ok show_uri_exe ->
@@ -391,4 +391,4 @@ let web
   let proc = wrap (web_proc set_exe_path set_modsrcs srcs) in
   B0_unit.make ?doc ~meta name proc
 
-let () = B0_def.Scope.close ()
+let () = B0_scope.close ()

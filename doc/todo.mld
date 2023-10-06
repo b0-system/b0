@@ -10,7 +10,7 @@
 
 {1:design_b0 [b0.memo] library}
 
-- The signature of {!B0_memo.Memo.write} looks wrong you want a fut. E.g.
+- The signature of {!B0_memo.write} looks wrong you want a fut. E.g.
   we don't want to the [Fut.sync] here.
 
   {[
@@ -39,7 +39,8 @@ let crunch_file m file ~in_dir =
    coherence with [@@@B0.include]s. Also we could require to specify
    say [#require "b0.kit.v000"]. Write down a few properties
    we would like to have w.r.t. opam and/or inclusion and end-user
-   support.}
+   support. If we use [@@@B0.version] rather than open we might get
+   in trouble with merlin. }
 {- Scope name for libraries the [lib] think may not be that
    good and rather confusing. Maybe devise a specific notation
    to access library definitions and allow dots in their name.
@@ -92,6 +93,13 @@ For now as a temporary hack we add the [wrap] parameter to units.
   with a unit warn if it's not the same unit. We should again add a
   [b0 unit exec], we should also maybe add a [b0 tool] command.
 
+- The current scheme is not yet what we want.  One rason is that it's
+  not a good idea to first build and then parse the cli args, we
+  should error asap. The second one is that we really want some actions
+  to be able to define what to build dynamically. This is unconvenient
+  to do right now.
+
+
 {2:b0_unit [B0_unit]}
 
 For now we used ['a Fut B0_meta.key].
@@ -102,13 +110,12 @@ For now we used ['a Fut B0_meta.key].
 
 {2:b0_meta [B0_meta]}
 
-- Should we maybe have a default for key ? It would be nice
-  to distinguish it at the type level so that we can avoid options
-  when we get or rather a new get_has_default that invalid argumetns
-  if the key has no default.
 - They used to be serializable, see if we don't want that again. Especially
   in the optic of a merge with B0_store.
-- I think keys should be B0_defs.
+- I think keys should be scoped or B0_defs (but that depends on B0_meta)
+- In the context of a merge with [B0_store] it should be possible
+  to determine keys in various ways without needing to be explicit
+  about it like the datatype of {!B0_unit.val-exec_env} is.
 
 {2:b0_store [B0_store]}
 
@@ -155,10 +162,26 @@ the build variant level.
 - Add filtering to selectively test expecations. Based on group names
   and file globs.
 - Logging maybe move to:
-  - normal, paths but no diff
-  - long, paths and diffs
-  - short, only final summary
+  {ul
+  {- normal, paths but no diff}
+  {- long, paths and diffs}
+  {- short, only final summary}}
 - Add a small manual to the action.
+
+{2:b0_show_url [B0_show_url]}
+
+{ul
+{- For now only toolname defined in units (as defined by [b0 tool list]) can
+   be used for the URL/tool execution form.
+
+   We likely want to be able to use it with actions aswell. But this
+   needs a bit of twisting around since currently the action bit gets
+   invoked at the end of the build. We need to be able to influence
+   the build itself (especially since actions can influence the store)
+   and for example the pack and units requires need to be able to be
+   defined dynamically.
+
+   Basically currently it's difficult for actions to invoke actions.}}
 
 {1:doc Documentation overhaul}
 

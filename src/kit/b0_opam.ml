@@ -3,10 +3,10 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
+let () = B0_scope.open_lib ~module':__MODULE__ "opam"
+
 open B0_std
 open Result.Syntax
-
-let () = B0_def.Scope.open_lib "opam"
 
 let collect_results rs =
   let rec loop ok err = function
@@ -100,39 +100,39 @@ module File = struct
 
   let name_field =
     let doc = "opam file name: field" in
-    B0_meta.Key.make "opam-name" ~doc ~pp_value:Fmt.string
+    B0_meta.Key.make "name" ~doc ~pp_value:Fmt.string
 
   let file_addendum =
     let doc = "opam file fragment added at the end" in
-    B0_meta.Key.make "opam-file-addendum" ~doc ~pp_value:_pp
+    B0_meta.Key.make "file-addendum" ~doc ~pp_value:_pp
 
   let available_field =
     let doc = "opam file available: field" in
-    B0_meta.Key.make "opam-available" ~doc ~pp_value:Fmt.string
+    B0_meta.Key.make "available" ~doc ~pp_value:Fmt.string
 
   let build_field =
     let doc = "opam file build: field" in
-    B0_meta.Key.make "opam-build" ~doc ~pp_value:Fmt.string
+    B0_meta.Key.make "build" ~doc ~pp_value:Fmt.string
 
   let conflicts_field =
     let doc = "opam file conflicts: field" in
-    B0_meta.Key.make "opam-conflicts" ~doc ~pp_value:pp_pkg_spec_list
+    B0_meta.Key.make "conflicts" ~doc ~pp_value:pp_pkg_spec_list
 
   let depends_field =
     let doc = "opam file depends: field" in
-    B0_meta.Key.make "opam-depends" ~doc ~pp_value:pp_pkg_spec_list
+    B0_meta.Key.make "depends" ~doc ~pp_value:pp_pkg_spec_list
 
   let depopts_field =
     let doc = "opam file depopts: field" in
-    B0_meta.Key.make "opam-depopts" ~doc ~pp_value:pp_pkg_spec_list
+    B0_meta.Key.make "depopts" ~doc ~pp_value:pp_pkg_spec_list
 
   let install_field =
     let doc = "opam file install: field" in
-    B0_meta.Key.make "opam-install" ~doc ~pp_value:Fmt.string
+    B0_meta.Key.make "install" ~doc ~pp_value:Fmt.string
 
   let pin_depends =
     let doc = "opam file pin-depends: field" in
-    B0_meta.Key.make "opam-pin-depends" ~doc ~pp_value:pp_pkg_url_list
+    B0_meta.Key.make "pin-depends" ~doc ~pp_value:pp_pkg_url_list
 
   let pkg_of_meta ~with_name m =
     let string field k m acc = match B0_meta.find k m with
@@ -193,7 +193,7 @@ end
 
 (* opam metadata *)
 
-let tag = B0_meta.Key.make_tag "opam" ~doc:"opam related entity"
+let tag = B0_meta.Key.make_tag "tag" ~doc:"opam related entity"
 let pkg_name_of_pack p =
   match B0_meta.find File.name_field (B0_pack.meta p) with
   | Some n -> n
@@ -909,4 +909,4 @@ let action =
   let doc = "opam support" in
   B0_action.of_cmdliner_cmd "" opam_cmd ~doc
 
-let () = B0_def.Scope.close ()
+let () = B0_scope.close ()

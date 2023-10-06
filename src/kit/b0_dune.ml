@@ -3,10 +3,10 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
+let () = B0_scope.open_lib ~module':__MODULE__ "dune"
+
 open B0_std
 open Result.Syntax
-
-let () = B0_def.Scope.open_lib "dune"
 
 let write_file ~dry_run file content =
   let* () =
@@ -119,4 +119,4 @@ let action =
   let doc = "dune support" in
   B0_action.of_cmdliner_cmd "" dune_cmd ~doc
 
-let () = B0_def.Scope.close ()
+let () = B0_scope.close ()

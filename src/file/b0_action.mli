@@ -26,7 +26,8 @@ type func = t -> B0_env.t -> args:Cmd.t -> Os.Exit.t
 
 val make :
   ?store:B0_store.binding list -> ?packs:B0_pack.t list ->
-  ?units:B0_unit.t list -> ?doc:string -> ?meta:B0_meta.t -> string -> func -> t
+  ?units:B0_unit.t list -> ?dyn_units:(args:Cmd.t -> B0_unit.t list) ->
+  ?doc:string -> ?meta:B0_meta.t -> string -> func -> t
 (** [make name func] is an action named [name] implemented with action
     function [func]. [units] and [packs] are units and packs that must
     be built to run the action. [store] are store bindings that must
@@ -34,7 +35,8 @@ val make :
 
 val make' :
   ?store:B0_store.binding list -> ?packs:B0_pack.t list ->
-  ?units:B0_unit.t list -> ?doc:string -> ?meta:B0_meta.t -> string ->
+  ?units:B0_unit.t list -> ?dyn_units:(args:Cmd.t -> B0_unit.t list) ->
+  ?doc:string -> ?meta:B0_meta.t -> string ->
   (t -> B0_env.t -> args:Cmd.t -> (unit, string) result) -> t
 (** [make'] is like {!make} but with a function whose result
     is turned into an error code via {!exit_of_result}. *)
@@ -44,6 +46,11 @@ val func : t -> func
 
 val units : t -> B0_unit.t list
 (** [units a] are the units that must build for running the action. *)
+
+val dyn_units : t -> args:Cmd.t -> B0_unit.t list
+(** [dyn_units a args] are the dynamic units of the action.
+
+    {b FIXME.} This is a temporary hack. *)
 
 val packs : t -> B0_pack.t list
 (** [packs a] are the packs that must build for running the action. *)
@@ -68,7 +75,7 @@ val exec_file :
   ?env:Os.Env.assignments -> ?cwd:Fpath.t ->
   B0_env.t -> Fpath.t -> args:Cmd.t -> Os.Exit.t
 (** [exec_file env file ~args] executes [file] with arguments [args].
-    The {{!Env.scope_dir}scope directory} is used
+    The {{!B0_env.scope_dir}scope directory} is used
     as the default [cwd] and to resolve [file] if it is relative. *)
 
 val exec_file' :
@@ -79,14 +86,14 @@ val exec_file' :
     {[
 let myscript =
   B0_action.make "myscript" @@
-  B0_action.exec_file' (Fpath.v "scripts/myscript"))
+  B0_action.exec_file' ~/"scripts/myscript"
     ]} *)
 
 val exec_tool :
   ?env:Os.Env.assignments -> ?cwd:Fpath.t ->
   B0_env.t -> Cmd.tool -> args:Cmd.t -> Os.Exit.t
 (** [exec_tool tool e args] executes the tool [exe] with arguments
-    [cmd] The {{!Env.scope_dir}scope directory} is used as the default
+    [cmd] The {{!B0_env.scope_dir}scope directory} is used as the default
     [cwd]. [exe] is looked up using {!B0_std.Os.Cmd.get_tool}, if
     that fails the error is logged and we exit we and exits with
     {!B0_cli.Exit.some_error}. *)
@@ -101,7 +108,8 @@ val exec_tool :
 
 val of_cmdliner_cmd :
   ?store:B0_store.binding list -> ?packs:B0_pack.t list ->
-  ?units:B0_unit.t list -> ?doc:string -> ?meta:B0_meta.t -> string ->
+  ?units:B0_unit.t list -> ?dyn_units:(args:Cmd.t -> B0_unit.t list) ->
+  ?doc:string -> ?meta:B0_meta.t -> string ->
   (t -> B0_env.t -> Os.Exit.t Cmdliner.Cmd.t) -> t
 (** [of_cli_cmd name cmd] is like {!make} is an action from the
     Cmdliner command [cmd]. See also {!eval_cmdliner_term}.

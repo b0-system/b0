@@ -897,7 +897,7 @@ module Exec : sig
   val schedule : t -> Op.t -> unit
   (** [schedule e o] schedules [o] for execution in [e]. When [o]
       starts executing it is given to the [feedback] callback of [e]
-      (see {!create}). *)
+      (see {!make}). *)
 
   val collect : t -> block:bool -> Op.t option
   (** [collect e ~block] removes from [e] an operation that has

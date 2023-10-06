@@ -114,6 +114,7 @@ B0_dir
 B0_env
 B0_meta
 B0_pack
+B0_scope
 B0_store
 B0_unit
 }
@@ -134,9 +135,10 @@ All the convenience you need for writing B0 files.
 
 {!modules:
 B0_kit
-B0_findex
-B0_srcs
 B0_cmark
+B0_findex
+B0_scaffold
+B0_srcs
 }
 
 {2:vcs VCS and code hosting}

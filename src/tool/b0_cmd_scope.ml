@@ -6,20 +6,20 @@
 open B0_std
 open Result.Syntax
 
-let pp_name = B0_def.Scope.pp_name
+let pp_name = B0_scope.pp_name
 let pp_dir = Fmt.tty [`Fg `Blue] Fpath.pp
 let pp_scope_dir ppf (_, dir) = pp_dir ppf dir
-let pp_scope_name ppf (name, _) = B0_def.Scope.pp_name ppf name
+let pp_scope_name ppf (name, _) = B0_scope.pp_name ppf name
 let pp_scope_all ppf (name, dir) =
-  Fmt.pf ppf "@[%a %a@]" B0_def.Scope.pp_name name Fpath.pp dir
+  Fmt.pf ppf "@[%a %a@]" B0_scope.pp_name name Fpath.pp dir
 
 let warn_incl_excl n =
   Log.warn @@ fun m ->
   m "@[Scope %a is both included and excluded. Excluding.@]"
-    B0_def.Scope.pp_name n
+    B0_scope.pp_name n
 
 let get_scopes c ~topmost ~includes ~excludes =
-  let scopes = List.sort compare (B0_def.Scope.name_list ()) in
+  let scopes = List.sort compare (B0_scope.name_list ()) in
   let scopes = List.map (fun (n, file) -> (n, Fpath.parent file)) scopes in
   let keep (name, _) =
     if topmost && (String.contains name '.') then false else match includes with

@@ -28,7 +28,9 @@ let boot root c =
 
 let compile c =
   get_b0_file_src c @@ fun f ->
-  let* _ = B0_driver.Compile.compile c ~driver:B0_tool_std.driver f in
+  let* _ =
+    B0_driver.Compile.compile c ~driver:B0_tool_std.driver ~feedback:true f
+  in
   Ok B0_cli.Exit.ok
 
 let edit all c =
@@ -51,75 +53,80 @@ let edit all c =
   | `Exited 0 -> Ok B0_cli.Exit.ok
   | _ -> Ok B0_cli.Exit.some_error
 
-let pp_inc ppf (s, f) =
-  Fmt.pf ppf {|@[[@@@@@@B0.include "%s" "%a"]@]|} s Fpath.pp_unquoted f
-
-let gather_b0_file ~cwd ~rel ~keep_symlinks ~keep_going dir =
-  let* exists = Os.Dir.exists dir in
-  if not exists && keep_going then Ok None else
-  let* () = Os.Dir.must_exist dir in
-  let b0_file = Fpath.(dir / B0_driver.Conf.b0_file_name) in
-  let* exists = Os.File.exists b0_file in
-  if not exists && keep_going then Ok None else
-  let* b0_file' = Os.Path.realpath b0_file in
-  let b0_file = match keep_symlinks with
-  | true when rel -> Fpath.relative b0_file ~to_dir:cwd
-  | true -> Fpath.(cwd // b0_file)
-  | false when rel -> Fpath.relative b0_file' ~to_dir:cwd
-  | false -> b0_file'
+let gather dest dirs force keep_symlinks keep_going relative symlink_scopes c =
+  let pp_inc_directive ppf (s, f) =
+    Fmt.pf ppf {|@[[@@@@@@B0.include "%s" "%a"]@]|} s Fpath.pp_unquoted f
   in
-  Ok (Some (b0_file))
-
-let scope_for_b0_file ~seen b0_file =
-  let scope = Fpath.(basename @@ parent b0_file) in
-  let scope = String.map (function '.' -> '_' | c -> c) scope in
-  match String.Set.mem scope seen with
-  | false -> scope, String.Set.add scope seen
-  | true ->
-      let exists s = String.Set.mem s seen in
-      let scope' = String.unique ~exists scope in
-      scope', String.Set.add scope' seen
-
-let gather rel keep_symlinks keep_going dirs c =
-  Log.if_error ~use:B0_cli.Exit.some_error @@
-  let cwd = B0_driver.Conf.cwd c in
-  let rec gather seen b0s = function
+  let gather_b0_file ~dest ~relative ~keep_symlinks ~keep_going ~seen dir =
+    let* exists = Os.Dir.exists dir in
+    if not exists && keep_going then Ok None else
+    let* () = Os.Dir.must_exist dir in (* For the error message *)
+    let b0_file = Fpath.(dir / B0_driver.Conf.b0_file_name) in
+    let* exists = Os.File.exists b0_file in
+    if not exists && keep_going then Ok None else
+    let* b0_file' = Os.Path.realpath b0_file in
+    let b0_file = match keep_symlinks with
+    | true when relative -> Fpath.relative ~to_dir:dest b0_file
+    | true -> Fpath.(dest // b0_file)
+    | false when relative -> Fpath.relative ~to_dir:dest b0_file'
+    | false -> b0_file'
+    in
+    let* scope =
+      if not keep_symlinks then Ok (Fpath.(basename @@ parent b0_file')) else
+      match Fpath.basename dir with
+      | ".." | "." ->
+          Fmt.error "Cannot determine a scope name for %a" Fpath.pp dir
+      | scope -> Ok scope
+    in
+    let scope = String.map (function '.' -> '_' | c -> c) scope in
+    let scope, seen = match String.Set.mem scope seen with
+    | false -> scope, String.Set.add scope seen
+    | true ->
+        let exists s = String.Set.mem s seen in
+        let scope' = String.unique ~exists scope in
+        scope', String.Set.add scope' seen
+    in
+    Ok (Some (scope, b0_file, seen))
+  in
+  let rec gather_dirs dest seen acc = function
   | dir :: dirs ->
-      let* b0_file = gather_b0_file ~cwd ~rel ~keep_symlinks ~keep_going dir in
-      begin match b0_file with
-      | None -> gather seen b0s dirs
-      | Some b0_file ->
-          let scope, seen = scope_for_b0_file ~seen b0_file in
-          gather seen ((scope, b0_file) :: b0s) dirs
+      let* info =
+        gather_b0_file ~dest ~relative ~keep_symlinks ~keep_going ~seen dir
+      in
+      begin match info with
+      | None -> gather_dirs dest seen acc dirs
+      | Some (scope, b0_file, seen) when not symlink_scopes ->
+          gather_dirs dest seen ((scope, b0_file) :: acc) dirs
+      | Some (scope, b0_file, seen) ->
+          let src = Fpath.parent b0_file and dst = Fpath.(dest / scope) in
+          let* () = Os.Path.symlink ~force ~make_path:false ~src dst in
+          let b0_file = Fpath.(v scope / B0_driver.Conf.b0_file_name) in
+          gather_dirs dest seen ((scope, b0_file) :: acc) dirs
       end
-  | [] -> Ok (List.sort Stdlib.compare b0s)
+  | [] -> Ok (List.sort compare acc)
   in
-  let* incs = gather String.Set.empty [] dirs in
-  Log.app (fun m -> m "@[<v>%a@]" (Fmt.list pp_inc) incs);
-  Ok B0_cli.Exit.ok
-
-let gather_dirs rel keep_symlinks keep_going dirs c =
   Log.if_error ~use:B0_cli.Exit.some_error @@
-  let cwd = B0_driver.Conf.cwd c in
-  let rec gather seen = function
-  | dir :: dirs ->
-      let* b0_file = gather_b0_file ~cwd ~rel ~keep_symlinks ~keep_going dir in
-      begin match b0_file with
-      | None -> gather seen dirs
-      | Some b0_file ->
-          let scope, seen = scope_for_b0_file ~seen b0_file in
-          let src = Fpath.parent b0_file and dst = Fpath.v scope in
-          let* () = Os.Path.symlink ~force:false ~make_path:false ~src dst in
-          gather seen dirs
-      end
-  | [] -> Ok (String.Set.elements seen)
+  let* dest, dest_b0_file = match dest with
+  | None when symlink_scopes ->
+      Fmt.error "Will not symlink scopes without option %a" Fmt.code' "--dest"
+  | None -> Ok (B0_driver.Conf.cwd c, None)
+  | Some dest ->
+      let* _exists = Os.Dir.create ~make_path:true dest in
+      let dest_b0_file = Fpath.(dest / B0_driver.Conf.b0_file_name) in
+      let* exists = Os.File.exists dest_b0_file in
+      if exists && not force then
+        Fmt.error "%a: file exists, use option %a to overwrite."
+          Fpath.pp dest_b0_file Fmt.code' "--force"
+      else
+      Ok (dest, Some dest_b0_file)
   in
-  let* scopes = gather String.Set.empty dirs in
-  let inc_of_scope s = s, Fpath.(v s / B0_driver.Conf.b0_file_name) in
-  let incs = List.map inc_of_scope scopes in
-  let incs = Fmt.str "@[<v>%a@]" (Fmt.list pp_inc) incs in
-  let b0_file = Fpath.v B0_driver.Conf.b0_file_name in
-  let* () = Os.File.write ~force:false ~make_path:false b0_file incs in
+  let* incs = gather_dirs dest String.Set.empty [] dirs in
+  let incs = Fmt.str "@[<v>%a@]" (Fmt.list pp_inc_directive) incs in
+  let b0_file = match dest_b0_file with
+  | None -> Fpath.dash | Some file -> file
+  in
+  let force = true (* The force logic was handled above *) in
+  let* () = Os.File.write ~force ~make_path:false b0_file incs in
   Ok B0_cli.Exit.ok
 
 let includes root format c =
@@ -219,49 +226,63 @@ let edit =
   B0_tool_std.Cli.subcmd_with_driver_conf "edit" ~doc ~descr @@
   Term.(const edit $ all)
 
-let keep_going =
-  let doc = "Skip directories that have no B0 file (default)." in
-  let keep_going = true, Arg.info ["k"; "keep-going"] ~doc in
-  let doc = "Stop if a directory has no B0 file" in
-  let fail_stop = false, Arg.info ["f"; "fail-stop"] ~doc in
-  Arg.(value & vflag true [keep_going; fail_stop])
-
-let dirs =
-  let doc = "Gather the $(docv)$(b,/B0.ml) file." in
-  Arg.(non_empty & pos_all B0_cli.fpath [] & info [] ~doc ~docv:"DIR")
-
-let rel =
-  let doc = "Make file paths relative to the cwd." in
-  Arg.(value & flag & info ["relative"] ~doc)
-
-let keep_symlinks =
-  let doc = "Don't resolve symlinks." in
-  Arg.(value & flag & info ["s"; "keep-symlinks"] ~doc)
-
 let gather =
-  let doc = "Gathers B0 files from directories into a single one" in
+  let doc = "Gathers and scope B0 files into a single B0.ml file" in
   let descr = `Blocks [
-      `P "$(iname) outputs a B0 file that includes the B0 files
-           in given $(i,DIR) directories. Typical usage:";
-      `P "$(b,mkdir aggregate)"; `Noblank;
-      `P "$(iname) $(b,myproject repos/mylib > aggregate/B0.ml)"; `Noblank;
-      `P "$(b,cd aggregate) && $(mname)"; ]
+      `P "$(iname) outputs on $(b,stdout) a B0 file that includes and scopes \
+          the B0 files existing in given $(i,DIR)… directories.";
+      `P "If the $(b,-d) $(i,DEST) option is specified, the B0 file is written \
+          in the $(i,DEST) destination directory and, if the $(b,-s) option \
+          is specified it symlinks the scope names to their directory \
+          in $(i,DEST).";
+      `P "Examples:";
+      `Pre "$(iname) $(b,/path/to/repos/*)"; `Noblank;
+      `Pre "$(iname) $(b,-s -d /tmp/gather) $(b,/path/to/repos/*)"; ]
+  in
+  let dest =
+    let doc = "Directory in which the $(b,B0.ml) is written. If unspecified \
+               the file is written on $(b,stdout)."
+    in
+    let docv = "DIR" in
+    Arg.(value & opt (some B0_cli.fpath) None & info ["d"; "dest"] ~doc ~docv)
+  in
+  let dirs =
+    let doc = "Gather the $(docv)$(b,/B0.ml) file." in
+    Arg.(non_empty & pos_all B0_cli.fpath [] & info [] ~doc ~docv:"DIR")
+  in
+  let force =
+    let doc = "Write the $(b,B0.ml) file even if it exists in the \
+               destination directory of $(b,--dest) and force symlinks \
+               creation if $(b,--symlink-scopes) is specified."
+    in
+    Arg.(value & flag & info ["force"] ~doc)
+  in
+  let keep_going =
+    let doc = "Skip input directories that have no B0 file (default)." in
+    let keep_going = true, Arg.info ["k"; "keep-going"] ~doc in
+    let doc = "Stop if an input directory has no B0 file." in
+    let fail_stop = false, Arg.info ["f"; "fail-stop"] ~doc in
+    Arg.(value & vflag true [keep_going; fail_stop])
+  in
+  let keep_symlinks =
+    let doc = "Don't resolve symlinks in input directories." in
+    Arg.(value & flag & info ["keep-symlinks"] ~doc)
+  in
+  let relative =
+    let doc = "Make include paths and scope symlinks relative to \
+               the cwd or the $(b,--dest) directory." in
+    Arg.(value & flag & info ["relative"] ~doc)
+  in
+  let symlink_scopes =
+    let doc =
+      "Symlink scopes in the destination directory specified via $(b,--dest) \
+       and use these directories as include paths."
+    in
+    Arg.(value & flag & info ["s"; "symlink-scopes"] ~doc)
   in
   B0_tool_std.Cli.subcmd_with_driver_conf "gather" ~doc ~descr @@
-  Term.(const gather $ rel $ keep_symlinks $ keep_going $ dirs)
-
-let gather_dirs =
-  let doc = "Gathers and symlinks B0 managed directories into a directory" in
-  let descr = `Blocks [
-      `P "$(iname) symlinks $(i,DIR) directories that have a $(b,B0.ml) \
-          in the current directory and generates a $(b,B0.ml) file that \
-          gathers. Typical usage:";
-      `P "$(b,mkdir aggregate && cd aggregate)"; `Noblank;
-      `P "$(iname) $(b,/path/to/repos/*)";
-    ]
-  in
-  B0_tool_std.Cli.subcmd_with_driver_conf "gather-dirs" ~doc ~descr @@
-  Term.(const gather_dirs $ rel $ keep_symlinks $ keep_going $ dirs)
+  Term.(const gather $ dest $ dirs $ force $ keep_symlinks $ keep_going $
+        relative $ symlink_scopes)
 
 let includes =
   let doc = "Output scope name and paths of included B0 files" in
@@ -315,5 +336,4 @@ let cmd =
   let doc = "Operate on the B0 file" in
   let descr = `P "$(iname) operates on the B0 file." in
   B0_tool_std.Cli.cmd_group "file" ~doc ~descr @@
-  [ boot; compile; edit; gather; gather_dirs; includes; log; path; requires;
-    source ]
+  [ boot; compile; edit; gather; includes; log; path; requires; source ]

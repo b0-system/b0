@@ -11,6 +11,7 @@ B0_meta
 B0_pack
 B0_unit
 B0_file_exts
+B0_scope
 B0_srcs
 B0_ocaml
 B0_store

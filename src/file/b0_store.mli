@@ -10,7 +10,7 @@
 
     The value of a key in a store is defined either:
     {ul
-    {- Explicitly when the store is {{!B0_store.create}created}.}
+    {- Explicitly when the store is {{!B0_store.make}created}.}
     {- Lazily on the first key {{!B0_store.get}access} via a key determination
        function
        specified at {{!B0_store.val-key}key creation time}.}}
@@ -37,7 +37,7 @@ val make : B0_memo.t -> dir:Fpath.t -> binding list -> t
     functions to write memoized file outputs. *)
 
 val memo : t -> B0_memo.t
-(** [memo s] is [s]'s memo as given on {!create}. *)
+(** [memo s] is [s]'s memo as given on {!make}. *)
 
 val dir : t -> Fpath.t
 (** [dir s] is the scratch directory of [s]. Key determination functions

@@ -6,16 +6,8 @@ WARNING this package is unstable and work in progress, do not depend on it.
 B0 describes software construction and deployments using modular and
 customizable definitions written in OCaml.
 
-B0 describes:
-
-* Build environments.
-* Software configuration, build and testing.
-* Source and binary deployments.
-* Software life-cycle procedures.
-
-The core build library of B0 provides abitrary build abstraction with
-reliable and efficient incremental rebuilds. It can be – and has been
-– used on its own to devise domain specific build systems.
+At the core of B0 is the `b0.memo` library which provides arbitrary 
+build abstraction with reliable, efficient incremental rebuilds.
 
 B0 is distributed under the ISC license. It depends on [cmdliner][cmdliner].
 

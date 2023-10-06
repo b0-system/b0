@@ -33,7 +33,7 @@ let srcs =
        segments are prefixed by [src/not.ml] and [src/not].}}
 
     Relative file paths are expressed relative to the build unit's
-    {{!B0_build.Unit.scope_dir}scope directory}.
+    {{!B0_unit.scope_dir}scope directory}.
 
     The prefix relation for exclusions respects path segments
     boundaries. In the example any file whose path matches
@@ -80,7 +80,7 @@ type sel =
        maybe we should return a {!t} itself and merge the results}}
 
     Except for [`Fut], any relative path is made absolute to the
-    current build unit with {!B0_build.Unit.root_dir}. *)
+    current build unit with {!B0_unit.root_dir}. *)
 
 type sels = sel list
 (** The type for source selection. *)
@@ -93,7 +93,7 @@ val select : B0_build.t -> sels -> t Fut.t
 
     {b Important.} All files in the map that were selected via
     [`File], [`D] and [`D_rec] are automatically
-    {{!B0_memo.Memo.file_ready}made ready} in [b]. For those selected via
+    {{!B0_memo.file_ready}made ready} in [b]. For those selected via
     [`Fut] readyness determination is left to the invoked funtion.
 
     {b FIXME.} Provide ordering guarantes and avoid non-det from the

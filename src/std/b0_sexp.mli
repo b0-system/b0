@@ -491,7 +491,7 @@ module Sexpq : sig
   val list : 'a t -> 'a list t
   (** [list q] queries the elements of a list with [q]. *)
 
-  (** {2:qlist List index queries} *)
+  (** {2:list_index_queries List index queries} *)
 
   val nth : ?absent:'a -> int -> 'a t -> 'a t
   (** [nth ?absent n q] queries the [n]th index of a list with [q]. If
@@ -508,7 +508,7 @@ module Sexpq : sig
 
   (** {1:qdict Dictionary queries}
 
-      Queries for s-expression {{!sex_dictionaries}dictionaries}. These queries
+      Queries for s-expression dictionaries. These queries
       fail on atoms. *)
 
   val key : ?absent:'a -> string -> 'a t -> 'a t

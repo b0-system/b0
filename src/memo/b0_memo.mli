@@ -346,6 +346,9 @@ val make :
     {- [feedback] defaults to a nop.}
     {- [forced_env_vars], defaults to [[]].}} *)
 
+val with_feedback : t -> (feedback -> unit) -> t
+(** [with_feedback m feedback] is [m] with feedback replaced by [feedback]. *)
+
 (** {1:low Low-level operations} *)
 
 val delete_trash : block:bool -> t -> (unit, string) result

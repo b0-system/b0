@@ -25,85 +25,13 @@
 
 open B0_std
 
-(** Scopes are used to track and scope B0 definitions created
-    by libraries and B0 files. *)
-module Scope : sig
-
-  (** {1:scope_names Scope names} *)
-
-  type name = string
-  (** The type for scope names. *)
-
-  val pp_name : name Fmt.t
-  (** [pp_name] formats a scope name. *)
-
-  (** {1:scopes Scopes} *)
-
-  type t
-  (** The type for scopes. *)
-
-  val name_list : unit -> (name * Fpath.t) list
-  (** [name_list ()] is the list of file scopes names tupled with the file
-      that defines it. This function can only be called once
-      definitions are {!seal}ed otherwise it raises [Invalid_argument]. *)
-
-  val close : unit -> unit
-  (** [close ()] closes the last opened scope. *)
-
-  (** {2:library Library scopes} *)
-
-  val open_lib : name -> unit
-  (** [open_lib l] opens a scope for library [l]. Must be called
-      before making any static definition in a library. No other scope
-      can be opened before a {!close}. *)
-
-  (** {2:b0_file B0 file scopes}
-
-      {b Note.} This is used by the implementation of the driver
-      API, if you are fiddling with this you are likely doing
-      something wrong. *)
-
-  val open_root : Fpath.t -> unit
-  (** [open_root file] initializes B0 file scoping and opens a root scope
-      for the root B0 file at the {e absolute} file path [file].
-
-      Only file scope can be opened from now on.
-
-      This installs a {!Printexc.set_uncaught_exception_handler} to
-      handle uncaught and {!Duplicate}. If that happens the error is
-      logged and the program {!Stdlib.exit}s with
-      {!B0_driver.Exit.b0_file_error}. *)
-
-  val open_file : string -> Fpath.t -> unit
-  (** [open' name] opens a scope named [name] (unqualified) to add the
-      definitions of the {e absolute} file path [file].
-
-      {b Warning.} Scope unicity is not checked by the module this is
-      expected to be handled by the client.*)
-
-  val is_root : unit -> bool
-  (** [is_root ()] is [true] if we are in the root scope. *)
-
-  (** {2:sealing Definition sealing} *)
-
-  val seal : unit -> unit
-  (** [seal ()] prevents further definitions from being made. This function
-      is called at the end of the root B0 file. *)
-
-  exception After_seal of string
-  (** Exception thrown if a definition is made after {!seal} was
-      invoked. The argument is an error message to print. The
-      backtrace should point to the location of the illegal
-      definition. *)
-end
-
 type t
 (** The type for definition names and their scoping information. *)
 
 type def = t
 (** See {!t}. *)
 
-val scope : t -> Scope.t
+val scope : t -> B0_scope.t
 (** [scope d] is the scope in which [d] is defined. *)
 
 val file : t -> Fpath.t option
@@ -121,15 +49,6 @@ val doc : t -> string
 
 val meta : t -> B0_meta.t
 (** [meta] is the metadata associated to the definition. *)
-
-exception Err of string
-(** Exception thrown if a definition error occurs. This can be due to
-    {ul
-    {- Duplicate name.}
-    {- Malformed name.}}
-    The argument is an error message to print as is. The
-    backtrace should point to the redefinition (it is unfortunately
-    difficult to keep track of the previous definition). *)
 
 (** {1:def_value Defining values} *)
 

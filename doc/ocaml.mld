@@ -12,4 +12,4 @@ in a set of modules aligned on the different tools of the eco-system:
 - {!B0_odoc}, has
 - {!B0_opam} has support for describing opam packages via build pack
    metadata and publishing to the public OCaml opam repository. It
-   has its own {{!page-opam_manual}manual}
+   has its own {{!page-opam}manual}

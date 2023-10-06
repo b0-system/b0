@@ -20,6 +20,7 @@ and t =
   { def : B0_def.t;
     func : func;
     units : B0_unit.t list;
+    dyn_units : args:Cmd.t -> B0_unit.t list;
     packs : B0_pack.t list;
     store : B0_store.binding list; }
 
@@ -32,17 +33,21 @@ end
 
 include (B0_def.Make (T) : B0_def.S with type t := t)
 
-let make ?(store = []) ?(packs = []) ?(units = []) ?doc ?meta name func =
+let make
+    ?(store = []) ?(packs = []) ?(units = []) ?(dyn_units = fun ~args:_ -> [])
+    ?doc ?meta name func
+  =
   let def = define ?doc ?meta name in
-  let p = { def; func; units; packs; store } in
+  let p = { def; func; units; dyn_units; packs; store } in
   add p; p
 
-let make' ?store ?packs ?units ?doc ?meta name func =
+let make' ?store ?packs ?units ?dyn_units ?doc ?meta name func =
   let func action env ~args = exit_of_result (func action env ~args) in
-  make ?store ?packs ?units ?doc ?meta name func
+  make ?store ?packs ?units ?dyn_units ?doc ?meta name func
 
 let func action = action.func
 let units action = action.units
+let dyn_units action = action.dyn_units
 let packs action = action.packs
 let store action = action.store
 
@@ -81,13 +86,13 @@ let exec_tool ?env:e ?cwd env tool ~args = match Os.Cmd.get_tool tool with
 
 (* Command line interaction. *)
 
-let of_cmdliner_cmd ?store ?packs ?units ?doc ?meta name cmd =
+let of_cmdliner_cmd ?store ?packs ?units ?dyn_units ?doc ?meta name cmd =
   let func action env ~args =
     let argv = Array.of_list (name :: Cmd.to_list args) in
     let cmd = cmd action env in
     B0_cli.Exit.of_eval_result (Cmdliner.Cmd.eval_value ~argv cmd)
   in
-  make ?store ?packs ?units ?doc ?meta name func
+  make ?store ?packs ?units ?dyn_units ?doc ?meta name func
 
 let eval_cmdliner_term
     ?man_xrefs ?man ?envs ?exits ?sdocs ?docs ?doc:d ?version

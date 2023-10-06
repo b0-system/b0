@@ -79,6 +79,16 @@ module Cli : sig
   (** [subcmd_with_driver_conf] gives the options for a driver
       configuration value. *)
 
+  val subcmd_with_b0_file_if_any :
+    ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
+    ?synopsis:Manpage.block -> string -> doc:string -> descr:Manpage.block ->
+    (B0_driver.Conf.t -> Os.Exit.t) Term.t -> Os.Exit.t Cmd.t
+  (** [subcmd_with_b0_if_any] will have a b0 file if it exists and can
+      be compiled. It will still execute if non of this is true.
+      The command can check {!B0_driver.has_b0_file} and
+      {!B0_driver.has_failed_b0_file} to understand the status at runtime.
+      If the compilation fails a warning is automatically logged. *)
+
   val subcmd_with_b0_file :
     ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
     ?synopsis:Manpage.block -> string -> doc:string -> descr:Manpage.block ->

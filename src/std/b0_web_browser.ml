@@ -82,27 +82,27 @@ let find ?search ~browser () =
 
 (* Show *)
 
-let show_cmd ~background ~prefix cmd uri = Os.Cmd.run Cmd.(cmd % uri)
-let show_macos_open ~background ~prefix:_ open_tool ~appid uri =
+let show_cmd ~background ~prefix cmd url = Os.Cmd.run Cmd.(cmd % url)
+let show_macos_open ~background ~prefix:_ open_tool ~appid url =
   let appid = match appid with
   | None -> Cmd.empty
   | Some appid -> Cmd.(arg "-b" % appid)
   in
   let cmd = Cmd.(path open_tool %% if' background (arg "-g") %% appid) in
-  Os.Cmd.run Cmd.(cmd % uri)
+  Os.Cmd.run Cmd.(cmd % url)
 
-let show_macos_jxa name  ~background ~prefix jxa uri script =
+let show_macos_jxa name  ~background ~prefix jxa url script =
   let bool = string_of_bool in
-  let args = Cmd.(arg (bool background) %% arg (bool prefix) % uri) in
+  let args = Cmd.(arg (bool background) %% arg (bool prefix) % url) in
   match macos_jxa_run jxa script args with
   | Ok _ -> Ok ()
   | Error e -> Fmt.error "%s jxa: %s" name e
 
-let show_macos_chrome ~background ~prefix jxa uri =
+let show_macos_chrome ~background ~prefix jxa url =
   (* It seems we no longer mange to bring the window to front.
      using win.index = 1 doesn't work. Maybe we should only consider
      windows[0]. *)
-  show_macos_jxa "chrome" ~background ~prefix jxa uri {|
+  show_macos_jxa "chrome" ~background ~prefix jxa url {|
 function is_equal (s0, s1) { return s0 === s1; }
 function is_prefix (p, s) { return s && s.lastIndexOf (p, 0) === 0; }
 function run(argv) {
@@ -128,10 +128,10 @@ function run(argv) {
   else { app.windows[0].tabs.push(app.Tab ({ url : uri })); }
 }|}
 
-let show_macos_safari ~background ~prefix jxa uri =
+let show_macos_safari ~background ~prefix jxa url =
   (* win.index = 1 also (see chrome) doesn't work here and sadly opening
-     a directory file URI opens the finder. *)
-  show_macos_jxa "safari" ~background ~prefix jxa uri {|
+     a directory file URL opens the finder. *)
+  show_macos_jxa "safari" ~background ~prefix jxa url {|
 function is_equal (s0, s1) { return s0 === s1; }
 function is_prefix (p, s) { return s && s.lastIndexOf (p, 0) === 0; }
 function run(argv) {
@@ -158,30 +158,30 @@ function run(argv) {
          app.windows[0].tabs[app.windows[0].tabs.length-1]; }
 }|}
 
-let show ~background ~prefix browser uri =
-  Result.map_error (fun e -> Fmt.str "show uri %s: %s" uri e) @@
+let show ~background ~prefix browser url =
+  Result.map_error (fun e -> Fmt.str "show url %s: %s" url e) @@
   match browser with
   | None -> Error "No browser found. Use the BROWSER env var to set one."
   | Some b ->
       match b with
-      | Cmd cmd -> show_cmd ~background ~prefix cmd uri
-      | Macos_chrome jxa -> show_macos_chrome ~background ~prefix jxa uri
-      | Macos_safari jxa -> show_macos_safari ~background ~prefix jxa uri
+      | Cmd cmd -> show_cmd ~background ~prefix cmd url
+      | Macos_chrome jxa -> show_macos_chrome ~background ~prefix jxa url
+      | Macos_safari jxa -> show_macos_safari ~background ~prefix jxa url
       | Macos_open (open_tool, appid) ->
-          show_macos_open ~background ~prefix open_tool ~appid uri
+          show_macos_open ~background ~prefix open_tool ~appid url
 
 (* Cli interaction *)
 
 open Cmdliner
 
-let browser ?docs ?(opts = ["browser"]) () =
+let browser ?docs ?(opts = ["b"; "browser"]) () =
   let env = Cmd.Env.info Env.browser in
   let doc =
     "The WWW browser command $(docv) to use. The value may be interpreted \
      and massaged depending on the OS. On macOS: the names $(b,firefox), \
      $(b,chrome) and $(b,safari) are interpreted specially; use $(b,open) \
      if you would like to use $(b,open\\(2\\)); if absent the application that \
-     handles the $(b,http) URI scheme is used. On other platforms if
+     handles the $(b,http) URL scheme is used. On other platforms if
      $(b,xdg-open\\(1\\)) is found in $(b,PATH) this is the program used by
      default."
   in
@@ -190,17 +190,39 @@ let browser ?docs ?(opts = ["browser"]) () =
   Arg.(value & opt (Arg.some cmd) None &
        info opts ~absent ~env ~doc ?docs ~docv:"CMD")
 
-let prefix ?docs ?(opts = ["prefix"]) () =
-  let doc =
-    "Rather than the exact URI, reload if possible, the first browser tab \
-     which has the URI as a prefix. Platform and browser support for this \
-     feature is severly limited."
+let prefix ?docs ~default () =
+  let default_str = " (default)" in
+  let prefix =
+    let opts = ["prefix"] in
+    let opts = if not default then "p" :: opts else opts in
+    let doc =
+      Fmt.str
+        "Reload first tab which has the URL as a prefix or create new tab%s. \
+         See also $(b,--exact). \
+         Platform and browser support for this feature is severly limited."
+        (if default then default_str else "")
+    in
+    true, Arg.info opts ~doc ?docs
   in
-  Arg.(value & flag & info opts ~doc ?docs)
+  let exact =
+    let opts = ["exact"] in
+    let doc =
+      Fmt.str "Reload first tab which has the exact URL or create new tab%s. \
+               See also $(b,--prefix)."
+        (if default then "" else default_str)
+    in
+    false, Arg.info opts ~doc ?docs
+  in
+  Arg.(value & vflag default [prefix; exact])
 
-let background ?docs ?(opts = ["background"]) () =
+let background ?docs ?(opts = ["g"; "background"]) () =
   let doc =
     "Keep launched applications in the background. Platform support for \
      this feature is limited."
   in
   Arg.(value & flag & info opts ~doc ?docs)
+
+let man_best_effort_reload =
+  [ `P "Up to severe platform and browser limitation, $(iname) tries to limit \
+        the creation of new tabs by reloading existing ones which have the \
+        same URL or are prefixed by the URL (see $(b,--prefix))." ]
