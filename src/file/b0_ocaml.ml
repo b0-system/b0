@@ -1963,7 +1963,7 @@ let ocaml_ocaml_cmd action env =
 
 let action_ocaml =
   let doc = "Load your build in the ocaml repl" in
-  let store = B0_store.[B (Code.built, `Byte)] in
+  let store = B0_store.[B (Code.built, Fut.return `Byte)] in
   B0_action.of_cmdliner_cmd ~store "ocaml" ocaml_ocaml_cmd ~doc
 
 let () = B0_def.Scope.close ()

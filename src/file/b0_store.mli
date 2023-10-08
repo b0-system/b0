@@ -14,9 +14,7 @@
     {- Lazily on the first key {{!B0_store.get}access} via a key determination
        function
        specified at {{!B0_store.val-key}key creation time}.}}
-    Once determined the value of a key in the store never changes.
-
-    {b XXX.} Maybe move that at the B0 level. *)
+    Once determined the value of a key in the store never changes. *)
 
 open B0_std
 
@@ -25,7 +23,7 @@ open B0_std
 type 'a key
 (** The type for keys binding values of type ['a]. *)
 
-type binding = B : 'a key * 'a -> binding (** *)
+type binding = B : 'a key * 'a Fut.t -> binding (** *)
 (** The type for store bindings. A key and its value. *)
 
 type t
