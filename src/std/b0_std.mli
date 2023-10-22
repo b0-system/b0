@@ -2482,6 +2482,11 @@ module Os : sig
     (** [fold_dirs] is like {!fold} but [f] is only applied
         to directory files. *)
 
+    val prune_denied : (Unix.stats -> string -> Fpath.t -> 'a -> bool)
+    (** [prune_denied] is a [prune] function for {!fold}s to
+        skip directories for which the user has no [R_OK] and [X_OK]
+        permissions. *)
+
     val path_list :
       Unix.stats -> string -> Fpath.t -> Fpath.t list -> Fpath.t list
     (** [path_list] is a {{!fold}folding} function to get a (reverse w.r.t.

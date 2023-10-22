@@ -3540,6 +3540,10 @@ module Os = struct
     | Unix.S_DIR -> Fpath.add_dir_sep f :: acc
     | _ -> f :: acc
 
+    let prune_denied _ _ p _ =
+      try (Unix.access p Unix.[R_OK; X_OK]; false) with
+      | Unix.Unix_error ((EACCES|EPERM(* may happen *)), _, _) -> true
+
     (* copy *)
 
     let copy
