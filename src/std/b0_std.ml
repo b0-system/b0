@@ -3464,9 +3464,7 @@ module Os = struct
               | _ ->
                   loop stat f acc adir ns
               end
-          | exception Unix.Unix_error (Unix.ENOENT, _, _) ->
-              loop stat f acc adir ns
-          | exception Unix.Unix_error (Unix.ENOTDIR, _, _) ->
+          | exception Unix.Unix_error ((ENOENT|ENOTDIR|EBADF|EPERM), _, _) ->
               loop stat f acc adir ns
       in
       let stat = if follow_symlinks then stat else lstat in
@@ -3502,9 +3500,7 @@ module Os = struct
               | _ ->
                   loop stat todo adir rdir f acc ns
               end
-          | exception Unix.Unix_error (Unix.ENOENT, _, _) ->
-              loop stat todo adir rdir f acc ns
-          | exception Unix.Unix_error (Unix.ENOTDIR, _, _) ->
+          | exception Unix.Unix_error ((ENOENT|ENOTDIR|EBADF|EPERM), _, _) ->
               loop stat todo adir rdir f acc ns
           end
       in
