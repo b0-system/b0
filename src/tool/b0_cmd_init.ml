@@ -22,7 +22,7 @@ let find_copyright_holder ~cwd _meta = function
 
 (* b0 file init *)
 
-let b0_file file _conf =
+let b0_file file force _conf =
   (* TODO this needs to be made much better. *)
   Log.if_error ~use:B0_cli.Exit.some_error @@
   let b0_file =
@@ -41,21 +41,21 @@ let b0_file file _conf =
     \ B0_unit.list ()\n\
     "
   in
-  let* () = Os.File.write ~force:false ~make_path:true file b0_file in
+  let* () = Os.File.write ~force ~make_path:true file b0_file in
   Ok B0_cli.Exit.ok
 
 (* Changes file init *)
 
-let changes file _conf =
+let changes file force _conf =
   Log.if_error ~use:B0_cli.Exit.some_error @@
   let* changes = B0_init.find_changes_generator file in
   let changes = changes () in
-  let* () = Os.File.write ~force:false ~make_path:true file changes in
+  let* () = Os.File.write ~force ~make_path:true file changes in
   Ok B0_cli.Exit.ok
 
 (* License file init *)
 
-let license years holder license file conf =
+let license years holder license file force conf =
   Log.if_error ~use:B0_cli.Exit.some_error @@
   let cwd = B0_driver.Conf.cwd conf in
   let meta = B0_init.get_project_meta () in
@@ -65,7 +65,7 @@ let license years holder license file conf =
   let* text = B0_init.download_license_template ~strip_meta:true license in
   let license, warns = B0_init.license text ~years ~holder in
   List.iter (fun warn -> Log.warn (fun m -> m "%s" warn)) warns;
-  let* () = Os.File.write ~force:false ~make_path:true file license in
+  let* () = Os.File.write ~force ~make_path:true file license in
   Ok B0_cli.Exit.ok
 
 (* Readme file init *)
@@ -81,14 +81,14 @@ let get_readme_project_name ~cwd = function
           "@[<v>Could not find a project name to use.@,\
            Use option %a to specify a project name.@]" Fmt.code' "--name"
 
-let readme name synopsis file conf =
+let readme name synopsis file force conf =
   Log.if_error ~use:B0_cli.Exit.some_error @@
   let cwd = B0_driver.Conf.cwd conf in
   let meta = B0_init.get_project_meta () in
   let* project_name = get_readme_project_name ~cwd name in
   let* readme = B0_init.find_readme_generator file in
   let readme = readme ~project_name ~synopsis meta in
-  let* () = Os.File.write ~force:false ~make_path:true file readme in
+  let* () = Os.File.write ~force ~make_path:true file readme in
   Ok B0_cli.Exit.ok
 
 (* Source file init *)
@@ -105,7 +105,7 @@ let get_lang ~file ~lang = match lang with
           "@[<v>Could not find a language for extension %a@,\
            Use option %a to specify one.@]" Fmt.code' ext Fmt.code' "--lang"
 
-let src years holder license lang files example conf =
+let src years holder license lang files example force conf =
   Log.if_error ~use:B0_cli.Exit.some_error @@
   let files = match files with [] -> [Fpath.dash] | files -> files in
   let cwd = B0_driver.Conf.cwd conf in
@@ -117,12 +117,16 @@ let src years holder license lang files example conf =
     let* lang = get_lang ~file ~lang in
     let src = B0_init.src_generator lang in
     let src = src ~years ~holder ~license in
-    Os.File.write ~force:false ~make_path:true file src
+    Os.File.write ~force ~make_path:true file src
   in
   let* () = List.iter_stop_on_error write_file files in
   Ok B0_cli.Exit.ok
 
 open Cmdliner
+
+let force =
+  let doc = "Overwrite any existing file rather than error." in
+  Arg.(value & flag & info ["f"; "force"] ~doc)
 
 let file =
   let doc = "Generate to file $(docv). Standard output if unspecified." in
@@ -136,7 +140,7 @@ let license_opt =
     "$(b,ISC) or the first license of $(b,.meta.licenses) in the default pack."
   in
   Arg.(value & opt (some string) None &
-       info ["l"; "license"] ~doc ~docv:"SPDXID" ~absent)
+       info ["L"; "license"] ~doc ~docv:"SPDXID" ~absent)
 
 let holder =
   let doc =
@@ -165,7 +169,7 @@ let b0_file =
       `P "TODO unastisfactory for now."]
   in
   B0_tool_std.Cli.subcmd_with_b0_file_if_any "b0-file" ~doc ~descr @@
-  Term.(const b0_file $ file)
+  Term.(const b0_file $ file $ force)
 
 let changes =
   let doc = "Generate a $(b,CHANGES) file" in
@@ -177,7 +181,7 @@ let changes =
       `Pre "$(iname) $(b,CHANGES.md)"; ]
   in
   B0_tool_std.Cli.subcmd_with_b0_file_if_any "changes" ~doc ~descr @@
-  Term.(const changes $ file)
+  Term.(const changes $ file $ force)
 
 let license =
   let doc = "Generate a $(b,LICENSE) file" in
@@ -196,7 +200,7 @@ let license =
           if $(b,--license) is unspecified." ]
   in
   B0_tool_std.Cli.subcmd_with_b0_file_if_any "license" ~doc ~descr @@
-  Term.(const license $ years $ holder $ license_opt $ file)
+  Term.(const license $ years $ holder $ license_opt $ file $ force)
 
 let readme =
   let doc = "Generate a $(b,README) file" in
@@ -226,7 +230,7 @@ let readme =
          info ["s"; "synopsis"] ~doc ~docv:"SYNOPSIS")
   in
   B0_tool_std.Cli.subcmd_with_b0_file_if_any "readme" ~doc ~descr @@
-  Term.(const readme $ name' $ synopsis $ file )
+  Term.(const readme $ name' $ synopsis $ file $ force)
 
 let src =
   let files =
@@ -240,7 +244,7 @@ let src =
     let doc = "$(docv) is the source language." in
     let absent = "derived from file extension or $(b,ocaml) on stdout" in
     Arg.(value & opt (some lang_conv) None &
-         info ["lang"] ~doc ~docv:"LANG" ~absent )
+         info ["l"; "lang"] ~doc ~docv:"LANG" ~absent )
   in
   let example =
     let doc =
@@ -258,14 +262,15 @@ let src =
       `P "$(iname) $(b,-x) $(b,example.c)"; `Noblank;
       `P "$(iname) $(b,-y 2038 mysrc.mli mysrc.ml) "; `Noblank;
       `P "$(iname) $(b,-h Unknown > mysrc.ml)"; `Noblank;
-      `P "$(iname) $(b,--lang c > mysrc.h)";
+      `P "$(iname) $(b,-l c > mysrc.h)";
       `P "The command makes best-effort guesses to derive the file's language,
            the copyright year, the copyright holder and the SPDX license. \
           See the corresponding options for more details.";
       `P "The output format is fixed, it cannot be tweaked." ]
   in
   B0_tool_std.Cli.subcmd_with_b0_file_if_any "src" ~doc ~descr @@
-  Term.(const src $ years $ holder $ license_opt $ lang $ files $ example)
+  Term.(const src $ years $ holder $ license_opt $ lang $ files $ example $
+        force)
 
 let cmd =
   let doc = "Generate files from templates" in

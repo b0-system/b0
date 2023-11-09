@@ -93,11 +93,11 @@ For now as a temporary hack we add the [wrap] parameter to units.
   with a unit warn if it's not the same unit. We should again add a
   [b0 unit exec], we should also maybe add a [b0 tool] command.
 
-- The current scheme is not yet what we want.  One rason is that it's
+- The current scheme is not yet what we want.  One reason is that it's
   not a good idea to first build and then parse the cli args, we
-  should error asap. The second one is that we really want some actions
-  to be able to define what to build dynamically. This is unconvenient
-  to do right now.
+  should error asap. The second one is that we really want some
+  actions to be able to define what to build dynamically. This is
+  unconvenient to do right now.
 
 
 {2:b0_unit [B0_unit]}
@@ -106,7 +106,9 @@ For now we used ['a Fut B0_meta.key].
 {ul
 {- See how it goes fares for sync. Push/pull.}
 {- What about serializing them so that it can be read
-   by `b0 unit get` ?}}
+   by `b0 unit get` ?}
+{- Why do unit exec not use {!B0_env} ? There is logic
+   we want to reuse there, e.g. lookup for tools in the build.}}
 
 {2:b0_meta [B0_meta]}
 

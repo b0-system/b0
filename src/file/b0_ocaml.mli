@@ -787,9 +787,9 @@ end
 (** {2:exec Executables} *)
 
 val exe :
-  ?wrap:(B0_unit.proc -> B0_unit.proc) -> ?doc:string -> ?meta:B0_meta.t ->
-  ?c_requires:Cmd.t -> ?requires:Libname.t list -> ?public:bool ->
-  ?name:string -> string -> srcs:B0_srcs.sels -> B0_unit.t
+  ?wrap:(B0_unit.build_proc -> B0_unit.build_proc) -> ?doc:string ->
+  ?meta:B0_meta.t -> ?c_requires:Cmd.t -> ?requires:Libname.t list ->
+  ?public:bool -> ?name:string -> string -> srcs:B0_srcs.sels -> B0_unit.t
 (** [exe tool_name] is a build unit for an executable tool named [tool_name]
     (without the platform specific extension).
     {ul
@@ -810,9 +810,9 @@ val exe :
 (** {2:libs Libraries} *)
 
 val lib :
-  ?wrap:(B0_unit.proc -> B0_unit.proc) -> ?doc:string -> ?meta:B0_meta.t ->
-  ?c_requires:Cmd.t -> ?requires:Libname.t list -> ?public:bool ->
-  ?name:string -> Libname.t -> srcs:B0_srcs.sels -> B0_unit.t
+  ?wrap:(B0_unit.build_proc -> B0_unit.build_proc) -> ?doc:string ->
+  ?meta:B0_meta.t -> ?c_requires:Cmd.t -> ?requires:Libname.t list ->
+  ?public:bool -> ?name:string -> Libname.t -> srcs:B0_srcs.sels -> B0_unit.t
 (** [lib n ~srcs] is a built unit for a library named [l] made of
     sources [src].
     {ul

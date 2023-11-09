@@ -1325,7 +1325,6 @@ module String = struct
     in
     find_heading [] (List.rev rev_lines)
 
-
   (* String map and sets *)
 
   module Set = struct

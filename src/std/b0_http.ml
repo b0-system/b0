@@ -53,6 +53,58 @@ module Url = struct
               | exception Not_found -> None
               | i -> Some (String.subrange ~first:i u)
 
+  let find s =
+    let rec find_stop s i max stop =
+      if i > max then i else
+      if stop s.[i] then i else find_stop s (i + 1) max stop
+    in
+    let parse_att s i max =
+      let j = find_stop s i max (Fun.negate Char.Ascii.is_white) in
+      if not (j < max && s.[j] = '=') then None else
+      let k = find_stop s (j + 1) max (Fun.negate Char.Ascii.is_white) in
+      if not (k < max && (s.[k] = '\'' || s.[k] = '\"')) then None else
+      let l = find_stop s (k + 1) max (Char.equal s.[k]) in
+      if not (l <= max) then None else
+      let url = String.trim (String.subrange ~first:(k + 1) ~last:(l - 1) s) in
+      if url = "" then None else Some (url, l + 1)
+    in
+    let rec find_next acc s i max =
+      if i > max then List.rev acc else
+      match s.[i] with
+      | 's' when i + 5 <= max && s.[i+1] = 'r' && s.[i+2] = 'c' ->
+          begin match parse_att s (i + 3) max with
+          | None -> find_next acc s (i + 3) max
+          | Some (url, next) -> find_next (url :: acc) s next max
+          end
+      | 'h' when i + 6 <= max &&
+                 s.[i+1] = 'r' && s.[i+2] = 'e' && s.[i+3] = 'f' ->
+          begin match parse_att s (i + 4) max with
+          | None -> find_next acc s (i + 4) max
+          | Some (url, next) -> find_next (url :: acc) s next max
+          end
+      | 'h' when i + 7 <= max &&
+                 s.[i+1] = 't' && s.[i+2] = 't' && s.[i+3] = 'p' ->
+          let stop =
+            if i = 0 then Some Char.Ascii.is_white else
+            match s.[i - 1] with
+            | '\"' | '\'' as c -> Some (Char.equal c)
+            | '<' -> Some (Char.equal '>')
+            | c when Char.Ascii.is_white c -> Some Char.Ascii.is_white
+            | _ -> None
+          in
+          begin match stop with
+          | None -> find_next acc s (i + 1) max
+          | Some stop ->
+              let stop = find_stop s i max stop in
+              let url = String.subrange ~first:i ~last:(stop - 1) s in
+              if not (String.starts_with ~prefix:"http://" url ||
+                      String.starts_with ~prefix:"https://" url)
+              then find_next acc s (i + 1) max
+              else find_next (url :: acc) s stop max
+          end
+      | _ -> find_next acc s (i + 1) max
+    in
+    find_next [] s 0 (String.length s - 1)
 end
 
 module Http = struct

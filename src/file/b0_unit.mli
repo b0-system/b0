@@ -15,40 +15,37 @@ open B0_std
 type build
 (** The type for builds, see {!B0_build}. *)
 
-type proc = build -> unit Fut.t
+type build_proc = build -> unit Fut.t
 (** The type for unit build procedures. Note that when the future
     determines the build may not be finished. *)
 
-val proc_nop : proc
-(** [proc_nop] does nothing. *)
+val build_nop : build_proc
+(** [build_nop] does nothing. *)
 
 (** {1:units Units} *)
 
 type t
 (** The type for build units. *)
 
-val make : ?doc:string -> ?meta:B0_meta.t -> string -> proc -> t
+val make : ?doc:string -> ?meta:B0_meta.t -> string -> build_proc -> t
 (** [make n proc ~doc ~meta ~action] is a build unit named [n] with build
     procedure [proc], synopsis [doc] and metada [meta]. *)
 
-val proc : t -> proc
+val build_proc : t -> build_proc
 (** [proc u] are the unit's build procedure. *)
 
 (** {1:meta Unit executions}
 
     These properties pertain to the interface that allows to execute
-    units after they have been built as is done for example
-    by the [b0] command.
-
-    {b XXX.} Custom key find an error strategy.
+    units after they have been built as is done for example by the
+    [b0] command.
 
     Execution procedure, will likely be refined when we get proper
     build environments and cross.
 
     {ul
-    {- If the unit's {!exec} is defined this is invoked. If appropriate it
-       should lookup {!get_exec_env} and {!get_exec_cwd} (should we give it
-       as args ?).}
+    {- If the unit's {!exec} is defined this is invoked with
+       the result of {!get_exec_env} and {!get_exec_cwd}.}
     {- Otherwise {!exe_file} is executed with cwd and environemts
        defined y {!get_exec_env} and {!get_exec_cwd}}} *)
 
@@ -57,9 +54,9 @@ val proc : t -> proc
 type exec_env =
 [ `Build_env (** The build's environment. *)
 | `Build_env_override of Os.Env.t
-    (** The build's environment overriden by give values. *)
+   (** The build's environment overriden by give values. *)
 | `Custom_env of string * (build -> t -> Os.Env.t Fut.t)
-    (** Doc string and function. *)
+   (** Doc string and function. *)
 | `Env of Os.Env.t (** This exact environment. *) ]
 (** The type for execution environments. *)
 
@@ -80,7 +77,7 @@ type exec_cwd =
 | `In of [ `Build_dir | `Root_dir | `Scope_dir ] * Fpath.t
 | `Root_dir (** The root B0 file directory. *)
 | `Scope_dir (** The directory of the scope where the entity is defined. *) ]
-
+(** The type for specifying execution's current working directory. *)
 
 val exec_cwd : exec_cwd B0_meta.key
 (** [exec_cwd] is the default current working directory for executing
@@ -99,10 +96,14 @@ val tool_name : string B0_meta.key
 val exe_file : Fpath.t Fut.t B0_meta.key
 (** [exe_file] is an absolute file path to an executable build by the unit. *)
 
-val exec : (string *
-            (build -> ?env:Os.Env.t -> ?cwd:Fpath.t -> t -> args:Cmd.t ->
-             Os.Exit.t Fut.t)) B0_meta.key
-(** [exec] is a metadata key to store a custom execution procedure. *)
+val exec :
+  (string *
+   (build -> ?env:Os.Env.t -> ?cwd:Fpath.t -> t -> args:Cmd.t ->
+    Os.Exit.t Fut.t)) B0_meta.key
+(** [exec] is a metadata key to store a custom execution procedure.
+    The string is a doc string for the procedure.
+    The function is given the build, the result of {!get_exec_env} and
+    {!get_exec_cwd} and the arguments to give to the procedure. *)
 
 val find_exec : t -> (build -> t -> args:Cmd.t -> Os.Exit.t Fut.t) option
 (** [find_exec b u] if either {!val-exe_file} or {!val-exec} is defined
@@ -121,7 +122,6 @@ val get_or_suggest_tool : keep:(t -> bool) -> string -> (t list, t list) result
 val tool_is_user_accessible : t -> bool
 (** [tool_is_user_accessible u] assumes [u] has a tool name. This then
     returns [true] iff [u] {!is_public} or {!in_root_scope}. *)
-
 
 (** {1:b0_def B0 definition API} *)
 

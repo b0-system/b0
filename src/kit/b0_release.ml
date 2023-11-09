@@ -352,6 +352,12 @@ module Tag = struct
     Log.if_error ~use:B0_cli.Exit.no_such_name @@
     let* packs = select_packs packs x_packs in
     Log.if_error' ~use:B0_cli.Exit.some_error @@
+    let* () =
+      if packs <> [] then Ok () else
+      Fmt.error
+        "@[<v>No pack found. Specify one with option %a or define@,\
+         a pack named %a.@]" Fmt.code' "-p" Fmt.code' "default"
+    in
     let* repos_tags = gather_repos_and_tags version packs in
     let rec loop = function
     | [] -> Ok B0_cli.Exit.ok

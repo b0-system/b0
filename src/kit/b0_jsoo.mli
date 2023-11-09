@@ -60,9 +60,10 @@ val link_opts : Cmd.t B0_meta.key
 (** {2:exec JavaScript file} *)
 
 val exe :
-  ?wrap:(B0_unit.proc -> B0_unit.proc) -> ?doc:string -> ?meta:B0_meta.t ->
-  ?assets_root:Fpath.t -> ?requires:B0_ocaml.Libname.t list -> ?public:bool ->
-  ?name:string -> string -> srcs:B0_srcs.sels -> B0_unit.t
+  ?wrap:(B0_unit.build_proc -> B0_unit.build_proc) -> ?doc:string ->
+  ?meta:B0_meta.t -> ?assets_root:Fpath.t ->
+  ?requires:B0_ocaml.Libname.t list -> ?public:bool -> ?name:string ->
+  string -> srcs:B0_srcs.sels -> B0_unit.t
 (** [exe name] is a JavaScript "executable" file named [name].
     {ul
     {- [doc] is the unit doc string.}
@@ -84,8 +85,9 @@ val exe :
 (** {2:web Web of files} *)
 
 val web :
-  ?wrap:(B0_unit.proc -> B0_unit.proc) -> ?doc:string -> ?meta:B0_meta.t ->
-  ?assets_root:Fpath.t -> ?requires:B0_ocaml.Libname.t list -> ?public:bool ->
+  ?wrap:(B0_unit.build_proc -> B0_unit.build_proc) -> ?doc:string ->
+  ?meta:B0_meta.t -> ?assets_root:Fpath.t ->
+  ?requires:B0_ocaml.Libname.t list -> ?public:bool ->
   ?name:string -> string -> srcs:B0_srcs.sels -> B0_unit.t
 (** [web name] is an HTML page named [name] (without the [.html] extension FIXME
     review that).

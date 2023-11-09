@@ -1013,7 +1013,7 @@ let escape_dquotes s =
   val pp_version_str : string Fmt.t
   (** [pp_version_str] formats a version string. *)
 
-  (** {1:commonmark_extraction Commonmark extraction} *)
+  (** {1:ad_hoc_data_extraction Ad-hoc data extraction} *)
 
   val commonmark_first_section :
     preamble:bool -> string -> (string * string) option

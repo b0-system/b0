@@ -37,12 +37,12 @@ end = struct
 end
 
 and Unit_def : sig
-  type proc = Build_def.t -> unit Fut.t
-  and t = { def : B0_def.t; proc : proc; }
+  type build_proc = Build_def.t -> unit Fut.t
+  and t = { def : B0_def.t; build_proc : build_proc; }
   include B0_def.VALUE with type t := t
 end = struct
-  type proc = Build_def.t -> unit Fut.t
-  and t = { def : B0_def.t; proc : proc; }
+  type build_proc = Build_def.t -> unit Fut.t
+  and t = { def : B0_def.t; build_proc : build_proc; }
   let def_kind = "unit"
   let def u = u.def
   let pp_name_str = Fmt.(code string)
@@ -54,8 +54,8 @@ and Unit : sig include B0_def.S with type t = Unit_def.t end
 (* Build procedures *)
 
 type build = Build_def.t
-type proc = Unit_def.proc
-let proc_nop b = Fut.return ()
+type build_proc = Unit_def.build_proc
+let build_nop b = Fut.return ()
 
 (* Build units *)
 
@@ -75,11 +75,11 @@ let add_tool_name u = match find_meta tool_name u with
 | None -> ()
 | Some n -> tool_name_index := String.Map.add_to_list n u !tool_name_index
 
-let make ?doc ?meta n proc =
+let make ?doc ?meta n build_proc =
   let def = define ?doc ?meta n in
-  let u = { Unit_def.def; proc } in add u; add_tool_name u; u
+  let u = { Unit_def.def; build_proc } in add u; add_tool_name u; u
 
-let proc u = u.Unit_def.proc
+let build_proc u = u.Unit_def.build_proc
 
 let pp_synopsis ppf v =
   let pp_tag ppf u =
@@ -188,7 +188,7 @@ module Build = struct
     let b = { b with u } in
     B0_memo.run_proc m begin fun () ->
       let* () = B0_memo.mkdir b.u.m (build_dir b unit) in
-      (proc unit) b
+      (build_proc unit) b
     end
 
   let rec run_units b = match Random_queue.take b.b.waiting with

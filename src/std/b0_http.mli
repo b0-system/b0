@@ -25,6 +25,17 @@ module Url : sig
   val path_and_query : string -> string option
   (** [path_and_query u] tries to extract an URL path and query part
       from [u]. *)
+
+  val find : string -> string list
+  (** [find s] roughly finds URLs and relative or absolute paths in [s] by
+      looking in order:
+      {ol
+      {- For the next [href] or [src] substring then tries to parses the
+         content of an HTML attribute. This may result in relative
+         or absolute paths.}
+      {- For next [http] substrings in [s] and then delimits an URL
+         depending on the previous characters and checks that the delimited
+         URL starts with [http://] or [https://].}} *)
 end
 
 (** HTTP datatypes. *)
