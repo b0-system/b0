@@ -137,7 +137,7 @@ All the convenience you need for writing B0 files.
 B0_kit
 B0_cmark
 B0_findex
-B0_scaffold
+B0_init
 B0_srcs
 }
 

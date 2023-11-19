@@ -251,7 +251,7 @@ type spdxid = string
 
 val licenses : spdxid list key
 (** [licenses] describes a list of licenses. Some processors like
-    {{!B0_scaffold}scaffolders} consider the first license of this list
+    {{!B0_init}file generators} consider the first license of this list
     to be the main license of your project and use it accordingly. *)
 
 val maintainers : string list key

@@ -11,7 +11,7 @@ let find_copyright_holder ~cwd _meta = function
 | None ->
     (* We could look into B0_meta.authors but this tends to be unwiedly
        `git config user.name` could be something else. *)
-    let* name = B0_scaffold.find_project_name ~cwd () in
+    let* name = B0_init.find_project_name ~cwd () in
     match name with
     | Some name -> Ok (Fmt.str "The %s programmers" name)
     | None ->
@@ -20,7 +20,7 @@ let find_copyright_holder ~cwd _meta = function
            Use option %a to specify a copyright holder.@]"
           Fmt.code' "--holder"
 
-(* b0 file scaffold *)
+(* b0 file init *)
 
 let b0_file file _conf =
   (* TODO this needs to be made much better. *)
@@ -44,36 +44,36 @@ let b0_file file _conf =
   let* () = Os.File.write ~force:false ~make_path:true file b0_file in
   Ok B0_cli.Exit.ok
 
-(* Changes file scaffold *)
+(* Changes file init *)
 
 let changes file _conf =
   Log.if_error ~use:B0_cli.Exit.some_error @@
-  let* changes = B0_scaffold.find_changes_scaffolder file in
+  let* changes = B0_init.find_changes_generator file in
   let changes = changes () in
   let* () = Os.File.write ~force:false ~make_path:true file changes in
   Ok B0_cli.Exit.ok
 
-(* License file scaffold *)
+(* License file init *)
 
 let license years holder license file conf =
   Log.if_error ~use:B0_cli.Exit.some_error @@
   let cwd = B0_driver.Conf.cwd conf in
-  let meta = B0_scaffold.get_project_meta () in
-  let years = B0_scaffold.get_copyright_years years in
+  let meta = B0_init.get_project_meta () in
+  let years = B0_init.get_copyright_years years in
   let* holder = find_copyright_holder ~cwd meta holder in
-  let license = B0_scaffold.get_license meta license in
-  let* text = B0_scaffold.download_license_template ~strip_meta:true license in
-  let license, warns = B0_scaffold.license text ~years ~holder in
+  let license = B0_init.get_license meta license in
+  let* text = B0_init.download_license_template ~strip_meta:true license in
+  let license, warns = B0_init.license text ~years ~holder in
   List.iter (fun warn -> Log.warn (fun m -> m "%s" warn)) warns;
   let* () = Os.File.write ~force:false ~make_path:true file license in
   Ok B0_cli.Exit.ok
 
-(* Readme file scaffold *)
+(* Readme file init *)
 
 let get_readme_project_name ~cwd = function
 | Some name -> Ok name
 | None ->
-    let* name = B0_scaffold.find_project_name ~cwd () in
+    let* name = B0_init.find_project_name ~cwd () in
     match name with
     | Some name -> Ok name
     | None ->
@@ -84,21 +84,21 @@ let get_readme_project_name ~cwd = function
 let readme name synopsis file conf =
   Log.if_error ~use:B0_cli.Exit.some_error @@
   let cwd = B0_driver.Conf.cwd conf in
-  let meta = B0_scaffold.get_project_meta () in
+  let meta = B0_init.get_project_meta () in
   let* project_name = get_readme_project_name ~cwd name in
-  let* readme = B0_scaffold.find_readme_scaffolder file in
+  let* readme = B0_init.find_readme_generator file in
   let readme = readme ~project_name ~synopsis meta in
   let* () = Os.File.write ~force:false ~make_path:true file readme in
   Ok B0_cli.Exit.ok
 
-(* Source file scaffolds *)
+(* Source file init *)
 
 let get_lang ~file ~lang = match lang with
 | Some lang -> Ok lang
 | None when Fpath.equal file Fpath.dash -> Ok `Ocaml
 | None ->
     let ext = Fpath.get_ext file in
-    match B0_scaffold.lang_of_file_ext ext with
+    match B0_init.lang_of_file_ext ext with
     | Some lang -> Ok lang
     | None ->
         Fmt.error
@@ -109,13 +109,13 @@ let src years holder license lang files example conf =
   Log.if_error ~use:B0_cli.Exit.some_error @@
   let files = match files with [] -> [Fpath.dash] | files -> files in
   let cwd = B0_driver.Conf.cwd conf in
-  let meta = B0_scaffold.get_project_meta () in
-  let years = B0_scaffold.get_copyright_years years in
+  let meta = B0_init.get_project_meta () in
+  let years = B0_init.get_copyright_years years in
   let* holder = find_copyright_holder ~cwd meta holder in
-  let license = B0_scaffold.get_src_license meta ~example license in
+  let license = B0_init.get_src_license meta ~example license in
   let write_file file =
     let* lang = get_lang ~file ~lang in
-    let src = B0_scaffold.src_scaffolder lang in
+    let src = B0_init.src_generator lang in
     let src = src ~years ~holder ~license in
     Os.File.write ~force:false ~make_path:true file src
   in
@@ -185,7 +185,7 @@ let license =
     `Blocks [
       `P "The $(iname) command generates a $(b,LICENSE) file \
           for a software project. It downloads the license text \
-          from the $(b,choosealicense.com) project data and subsitutes \
+          from the $(b,choosealicense.com) project data and substitutes \
           the years and copyright holder in it. For example:";
       `Pre "$(iname) $(b,> LICENSE.md)"; `Noblank;
       `Pre "$(iname) $(b,-l ISC > LICENSE.md)"; `Noblank;
@@ -236,7 +236,7 @@ let src =
     Arg.(value & pos_all B0_cli.fpath [] & info [] ~doc ~docv:"PATH")
   in
   let lang =
-    let lang_conv = Arg.conv' (B0_scaffold.(lang_of_id, pp_lang_id)) in
+    let lang_conv = Arg.conv' (B0_init.(lang_of_id, pp_lang_id)) in
     let doc = "$(docv) is the source language." in
     let absent = "derived from file extension or $(b,ocaml) on stdout" in
     Arg.(value & opt (some lang_conv) None &
@@ -270,5 +270,5 @@ let src =
 let cmd =
   let doc = "Generate files from templates" in
   let descr = `P "The $(iname) command generates files from templates." in
-  B0_tool_std.Cli.cmd_group "scaffold" ~doc ~descr @@
+  B0_tool_std.Cli.cmd_group "init" ~doc ~descr @@
   [b0_file; changes; license; readme; src]

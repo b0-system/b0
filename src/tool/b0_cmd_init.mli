@@ -3,7 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** B0 [scaffold] command. *)
+(** B0 [init] command. *)
 
 val cmd : B0_std.Os.Exit.t Cmdliner.Cmd.t
-(** [cmd] is the command line for [scaffold]. *)
+(** [cmd] is the command line for [init]. *)

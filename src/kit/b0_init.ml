@@ -55,7 +55,7 @@ let changes_md () =
    --------------------------\n\n\
    First release.\n"
 
-let find_changes_scaffolder _file = Ok changes_md
+let find_changes_generator _file = Ok changes_md
 
 (* License files *)
 
@@ -171,7 +171,7 @@ let readme_md ~project_name ~synopsis meta =
   let examples = Fmt.str "## Examples\n\n%s needs some examples.\n" name in
   String.concat "\n\n" [title; preamble; installation; documentation; examples]
 
-let find_readme_scaffolder _file = Ok readme_md
+let find_readme_generator _file = Ok readme_md
 
 (* Source files *)
 
@@ -271,7 +271,7 @@ let racket = multiline "#|" "|#"
 let sh ~years ~holder ~license =
   String.concat "\n" ["#!/bin/sh"; header ~indent:"# " years holder license; ""]
 
-let src_scaffolder = function
+let src_generator = function
 | `C -> c | `Css -> css | `Haskell -> haskell | `Html -> html
 | `Javascript -> js | `Java -> java | `Ocaml -> ocaml
 | `Racket -> racket | `Rust -> c | `Sh -> sh

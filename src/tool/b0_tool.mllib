@@ -12,7 +12,7 @@ B0_cmd_log
 B0_cmd_pack
 B0_cmd_root
 B0_cmd_show
-B0_cmd_scaffold
+B0_cmd_init
 B0_cmd_scope
 B0_cmd_tool
 B0_cmd_unit

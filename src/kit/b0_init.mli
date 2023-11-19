@@ -5,10 +5,10 @@
 
 (** Generate files from templates.
 
-    Exposes, functions initially used by [b0 scaffold].
+    Exposes, functions initially used by [b0 init].
 
     Likely needs a few design rounds. Some of the project lookup
-    stuff could be migrated elsewhere. Eventually adds something
+    stuff could be migrated elsewhere. Eventually add something
     than can be easily extended via install dir lookups like [carcass]
     did. *)
 
@@ -47,10 +47,10 @@ val get_copyright_years : string option -> string
 (** {1:changes_files [CHANGES] files} *)
 
 type changes = unit -> string
-(** The type for changes scaffolders. *)
+(** The type for changes generators. *)
 
-val find_changes_scaffolder : Fpath.t -> (changes, string) result
-(** [find_changes_scaffolder f] is a changes scaffolder for a file
+val find_changes_generator : Fpath.t -> (changes, string) result
+(** [find_changes_generator f] is a changes generator for a file
     [file] (ignored for now). *)
 
 (** {1:license_files [LICENSE] files} *)
@@ -92,10 +92,10 @@ val license :
 
 type readme =
   project_name:string -> synopsis:string option -> B0_meta.t -> string
-(** The type for [README] scaffolders. *)
+(** The type for [README] generators. *)
 
-val find_readme_scaffolder : Fpath.t -> (readme, string) result
-(** [find_readme_scaffolder file] is a readme scaffolder for a file [file]
+val find_readme_generator : Fpath.t -> (readme, string) result
+(** [find_readme_generator file] is a README generator for a file [file]
     (ignored for now). *)
 
 (** {1:sources Source files} *)
@@ -124,7 +124,7 @@ val lang_of_file_ext : Fpath.ext -> lang option
     extension. *)
 
 type src = years:string -> holder:string -> license:B0_meta.spdxid -> string
-(** The type for source scaffolders. *)
+(** The type for source generators. *)
 
-val src_scaffolder : lang -> src
-(** [src_scaffolder lang] is a source scaffolder for language [lang]. *)
+val src_generator : lang -> src
+(** [src_generator lang] is a source generator for language [lang]. *)
