@@ -400,7 +400,7 @@ module Fmt : sig
   val set_tty_cap : ?cap:Tty.cap -> unit -> unit
   (** [set_tty_cap ?cap ()] sets the global TTY formatting capabilities to
       [cap] if specified and to [Tty.(cap (of_fd Unix.stdout))] otherwise.
-      . Affects the output of {!tty_str} and {!val-tty}. *)
+      Affects the output of {!tty_str} and {!val-tty}. *)
 
   val tty_cap : unit -> Tty.cap
   (** [tty_cap ()] is the global styling capability. *)

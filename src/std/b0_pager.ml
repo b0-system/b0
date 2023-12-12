@@ -114,6 +114,6 @@ let page_files pager files = match pager with
 let don't ?(docs = Manpage.s_common_options) () =
   let doc =
     "Do not display the output in a pager. This automatically happens \
-     if the $(b,TERM) environment variable is $(b,dumb) or unset."
+     if the $(b,TERM) environment variable is $(b,dumb) or undefined."
   in
   Arg.(value & flag & info ["no-pager"] ~docs ~doc)

@@ -82,7 +82,9 @@ let pp_path_for_user ctx ppf p = match ctx.log_absolute with
 let log_diff ctx file =  match B0_vcs_repo.kind ctx.vcs_repo with
 | Git ->
     let git = B0_vcs_repo.repo_cmd ctx.vcs_repo in
-    let cmd = Cmd.(git % "diff" %% path file) in
+    let color = match Fmt.tty_cap () with `Ansi -> true | _ -> false in
+    let color = Cmd.(if' color (arg "--color=always")) in
+    let cmd = Cmd.(git % "--no-pager" % "diff" %% color %% path file) in
     Log.if_error ~use:() (Os.Cmd.run cmd)
 | Hg ->
     failwith "Hg support is TODO"
@@ -253,13 +255,16 @@ let exits =
   Cmdliner.Cmd.Exit.info 1 ~doc:"on unexpected expectations." ::
   Cmdliner.Cmd.Exit.defaults
 
-let run f env base short log_absolute =
+let run f env base short log_absolute no_pager =
   B0_action.exit_of_result' @@
+  let* pager = B0_pager.find ~don't:no_pager () in
+  let* () = B0_pager.page_stdout pager in
   abort_to_result @@ fun () ->
   let ctx = make env ~log_absolute ~log_diffs:(not short) ~base in
   f ctx; finish ctx
 
 let action_func ~base f action env ~args =
   let run = run f env base in
-  let run = Cmdliner.Term.(const run $ short $ log_absolute_arg) in
+  let no_pager = B0_pager.don't () in
+  let run = Cmdliner.Term.(const run $ short $ log_absolute_arg $ no_pager) in
   B0_action.eval_cmdliner_term ~exits action env run ~args
