@@ -87,13 +87,13 @@ let homepage =
   let doc = "Browse homepage" in
   let descr = `P "$(iname) opens the $(b,B0_meta.homepage) URL." in
   B0_tool_std.Cli.subcmd_with_b0_file "homepage" ~doc ~descr @@
-  browse_conf Term.(const browse $ const "homepage" $ packs_all)
+  browse_conf Term.(const browse $ const ".meta.homepage" $ packs_all)
 
 let issues =
   let doc = "Browse issues" in
   let descr = `P "$(iname) opens the $(b,B0_meta.issues) URL." in
   B0_tool_std.Cli.subcmd_with_b0_file "issues" ~doc ~descr @@
-  browse_conf Term.(const browse $ const "issues" $ packs_all)
+  browse_conf Term.(const browse $ const ".meta.issues" $ packs_all)
 
 let key =
   let doc = "Browse a metadata key value" in
@@ -105,7 +105,7 @@ let online_doc =
   let doc = "Browse online documentation" in
   let descr = `P "$(iname) opens the $(b,B0_meta.online_doc) URL." in
   B0_tool_std.Cli.subcmd_with_b0_file "online-doc" ~doc ~descr @@
-  browse_conf Term.(const browse $ const "online-doc" $ packs_all)
+  browse_conf Term.(const browse $ const ".meta.online-doc" $ packs_all)
 
 let url =
   let doc = "Browse URLs" in
