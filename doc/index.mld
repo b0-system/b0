@@ -90,7 +90,9 @@ devise domain specific build system – see for example the [brzo] or
 {!modules:
 B0_zero
 B0_zero_conv
-B0_memo}
+B0_memo
+B0_memo_kit
+}
 
 {1:b0_file Library [b0.file]}
 
@@ -138,7 +140,9 @@ B0_kit
 B0_cmark
 B0_findex
 B0_init
+B0_os
 B0_srcs
+B0_web_page
 }
 
 {2:vcs VCS and code hosting}
@@ -154,6 +158,7 @@ B0_github
 {!modules:
 B0_expect
 B0_release
+B0_show_url
 }
 
 {2:ocaml OCaml support}
