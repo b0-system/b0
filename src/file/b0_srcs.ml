@@ -76,9 +76,9 @@ let select_files_in_dirs m u xs (seen, by_ext as acc) ds =
           let pp_dir = Fmt.(code Fpath.pp) in
           B0_memo.fail m "Source directory@ %a@ does not exist." pp_dir d
       | true ->
-          let prune _ dname dir _ = exclude dname dir  in
+          let prune_dir _ dname dir _ = exclude dname dir  in
           let dotfiles = true (* exclusions handled by prune *) in
-          let acc = Os.Dir.fold ~dotfiles ~prune ~recurse add_file d acc in
+          let acc = Os.Dir.fold ~dotfiles ~prune_dir ~recurse add_file d acc in
           loop m u xs (acc |> fail_if_error m u) ds
   in
   loop m u xs acc ds

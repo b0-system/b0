@@ -98,11 +98,11 @@ let to_string t =
 let of_dir ~dir ~exclude_paths ~root ~mtime =
   let path_set_of_dir dir ~exclude_paths =
     let excluded p = Fpath.Set.mem p exclude_paths in
-    let prune _ _ p _ = excluded p in
+    let prune_dir _ _ p _ = excluded p in
     let add _ _ p acc = if excluded p then acc else Fpath.Set.add p acc in
     let rel = true and dotfiles = true and follow_symlinks = true in
     let recurse = true and init = Fpath.Set.empty in
-    Os.Dir.fold ~rel ~dotfiles ~follow_symlinks ~prune ~recurse add dir init
+    Os.Dir.fold ~rel ~dotfiles ~follow_symlinks ~prune_dir ~recurse add dir init
   in
   Result.map_error (fun e -> Fmt.str "Tar archive creation failed: %s" e) @@
   let tar_add path tar =

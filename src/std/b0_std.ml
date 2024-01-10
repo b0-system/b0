@@ -3470,7 +3470,7 @@ module Os = struct
       let stat = if follow_symlinks then stat else lstat in
       loop stat f acc dir (readdir ~dotfiles dir)
 
-    let fold_rec ~filter ~rel ~dotfiles ~follow_symlinks ~prune dir f acc =
+    let fold_rec ~prune_dir ~filter ~rel ~dotfiles ~follow_symlinks dir f acc =
       let rec loop stat todo adir rdir f acc = function
       | [] ->
           begin match todo with
@@ -3487,7 +3487,7 @@ module Os = struct
                   | None -> Fpath.v n | Some rdir -> Fpath.(rdir / n)
                   in
                   let p = if not rel then full else rp in
-                  if prune st n p acc
+                  if prune_dir st n p acc
                   then loop stat todo adir rdir f acc ns else
                   let acc = if filter = `Non_dir then acc else f st n p acc in
                   let todo = (adir, rdir, ns) :: todo in
@@ -3509,14 +3509,13 @@ module Os = struct
 
     let _fold
         ~(filter : [`Any | `Non_dir | `Dir]) ?(rel = false) ?(dotfiles = false)
-        ?(follow_symlinks = true) ?(prune = fun _ _ _ _ -> false) ~recurse
+        ?(follow_symlinks = true) ?(prune_dir = fun _ _ _ _ -> false) ~recurse
         f dir acc
       =
       let listing_op = "Listing" in
       try
-        if recurse
-        then fold_rec ~filter ~rel ~dotfiles ~follow_symlinks ~prune dir f acc
-        else fold_no_rec ~filter ~rel ~dotfiles ~follow_symlinks dir f acc
+        let fold = if recurse then fold_rec ~prune_dir else fold_no_rec in
+        fold ~filter ~rel ~dotfiles ~follow_symlinks dir f acc
       with
       | Failure e -> ferr dir (err_doing listing_op e)
       | Unix.Unix_error (e, _, ep) ->
@@ -3524,16 +3523,19 @@ module Os = struct
           then ferr dir (err_doing listing_op @@ uerror e)
           else ferr dir (err_doing listing_op @@ Fmt.str "%s: %s" ep (uerror e))
 
-    let fold ?rel ?dotfiles ?follow_symlinks ?prune ~recurse f dir acc =
-      _fold ~filter:`Any ?rel ?dotfiles ?follow_symlinks ?prune ~recurse
+    let fold ?rel ?dotfiles ?follow_symlinks ?prune_dir ~recurse f dir acc =
+      _fold ~filter:`Any ?rel ?dotfiles ?follow_symlinks ?prune_dir ~recurse
         f dir acc
 
-    let fold_files ?rel ?dotfiles ?follow_symlinks ?prune ~recurse f dir acc =
-      _fold ~filter:`Non_dir ?rel ?dotfiles ?follow_symlinks ?prune ~recurse
+    let fold_files
+        ?rel ?dotfiles ?follow_symlinks ?prune_dir ~recurse f dir acc
+      =
+      _fold ~filter:`Non_dir ?rel ?dotfiles ?follow_symlinks ?prune_dir ~recurse
         f dir acc
 
-    let fold_dirs ?rel ?dotfiles ?follow_symlinks ?prune ~recurse f dir acc =
-      _fold ~filter:`Dir ?rel ?dotfiles ?follow_symlinks ?prune ~recurse
+    let fold_dirs
+        ?rel ?dotfiles ?follow_symlinks ?prune_dir ~recurse f dir acc =
+      _fold ~filter:`Dir ?rel ?dotfiles ?follow_symlinks ?prune_dir ~recurse
         f dir acc
 
     let path_list stat _ f acc = match stat.Unix.st_kind with
@@ -3619,7 +3621,7 @@ module Os = struct
             in
             let chmods =
               _fold ~filter:`Any ~rel:true ~dotfiles:true ~follow_symlinks
-                ~prune ~recurse (copy tdst) src ([tdst, src_mode])
+                ~prune_dir:prune ~recurse (copy tdst) src ([tdst, src_mode])
               |> Result.error_to_failure
             in
             chmod_dirs chmods;

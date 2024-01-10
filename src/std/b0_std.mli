@@ -2431,10 +2431,10 @@ module Os : sig
 
     val fold :
       ?rel:bool -> ?dotfiles:bool -> ?follow_symlinks:bool ->
-      ?prune:(Unix.stats -> string -> Fpath.t -> 'a -> bool) -> recurse:bool ->
-      (Unix.stats -> string -> Fpath.t -> 'a -> 'a) -> Fpath.t -> 'a ->
-      ('a, string) result
-    (** [fold ~rel ~dotfiles ~follow_symlinks ~prune ~recurse f dir
+      ?prune_dir:(Unix.stats -> string -> Fpath.t -> 'a -> bool) ->
+      recurse:bool -> (Unix.stats -> string -> Fpath.t -> 'a -> 'a) ->
+      Fpath.t -> 'a -> ('a, string) result
+    (** [fold ~rel ~dotfiles ~follow_symlinks ~prune_dir ~recurse f dir
         acc] folds [f] over the contents of [dir] starting with
         [acc]. If [dir] does not exist the function errors.
         Paths given to [prune] and [f] do not have a trailing [/].
@@ -2445,7 +2445,7 @@ module Os : sig
         {- If [recurse] is [true] sub-directories [dir] are
            folded over recursively modulo [prune] (see below). If [recurse]
            is false only the direct contents of [dir] is folded over.}
-        {- [prune] is called only when [recurse] is [true] as [prune st d]
+        {- [prune_dir] is called only when [recurse] is [true] as [prune st d]
            with [d] any sub-directory to be folded over and [st] its stat
            information. If the result is [true] [d] and its contents
            are not folded over. Defaults to [fun _ _ _ _ -> false]}
@@ -2468,17 +2468,17 @@ module Os : sig
 
     val fold_files :
       ?rel:bool -> ?dotfiles:bool -> ?follow_symlinks:bool ->
-      ?prune:(Unix.stats -> string -> Fpath.t -> 'a -> bool) -> recurse:bool ->
-      (Unix.stats -> string -> Fpath.t -> 'a -> 'a) -> Fpath.t -> 'a ->
-      ('a, string) result
+      ?prune_dir:(Unix.stats -> string -> Fpath.t -> 'a -> bool) ->
+      recurse:bool -> (Unix.stats -> string -> Fpath.t -> 'a -> 'a) ->
+      Fpath.t -> 'a -> ('a, string) result
     (** [fold_files] is like {!fold} but [f] is only applied to
         non-directory files. *)
 
     val fold_dirs :
       ?rel:bool -> ?dotfiles:bool -> ?follow_symlinks:bool ->
-      ?prune:(Unix.stats -> string -> Fpath.t -> 'a -> bool) -> recurse:bool ->
-      (Unix.stats -> string -> Fpath.t -> 'a -> 'a) -> Fpath.t -> 'a ->
-      ('a, string) result
+      ?prune_dir:(Unix.stats -> string -> Fpath.t -> 'a -> bool) ->
+      recurse:bool -> (Unix.stats -> string -> Fpath.t -> 'a -> 'a) ->
+      Fpath.t -> 'a -> ('a, string) result
     (** [fold_dirs] is like {!fold} but [f] is only applied
         to directory files. *)
 
