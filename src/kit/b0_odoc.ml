@@ -285,7 +285,7 @@ module Theme = struct
     (* XXX this is basically a copy dir we likely want to provide
        that in the API somewhere  *)
     let copy_file m ~src_root ~dst_root src =
-      let dst = Fpath.reroot ~root:src_root ~dst:dst_root src in
+      let dst = Fpath.reroot ~src_root ~dst_root src in
       B0_memo.file_ready m src;
       B0_memo.copy m ~src dst
     in

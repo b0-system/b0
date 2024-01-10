@@ -251,7 +251,7 @@ let build_setup ~srcs b = (* return a record maybe ? *)
       in
       match B0_meta.find assets_root (B0_build.current_meta b) with
       | Some r when Fpath.is_prefix r file ->
-          Fpath.reroot ~root:r ~dst:build_dir file
+          Fpath.reroot ~src_root:r ~dst_root:build_dir file
       | _ -> Fpath.(build_dir / Fpath.basename file)
   in
   Fut.return (srcs, modsrcs, jss, js, html)
@@ -270,7 +270,8 @@ let copy_assets m srcs ~exts ~assets_root ~dst =
   let assets = B0_file_exts.find_files exts srcs in
   let copy acc src =
     let dst = match assets_root with
-    | Some r when Fpath.is_prefix r src -> Fpath.reroot ~root:r ~dst src
+    | Some r when Fpath.is_prefix r src ->
+        Fpath.reroot ~src_root:r ~dst_root:dst src
     | _ -> Fpath.(dst / Fpath.basename src)
     in
     B0_memo.copy m ~src dst;

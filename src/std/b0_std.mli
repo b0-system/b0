@@ -1314,12 +1314,12 @@ module Fpath : sig
       preserved. Duplicates are not removed use {!uniquify} for
       this. *)
 
-  val reroot : root:t -> dst:t -> t -> t
-  (** [reroot ~root ~dst p] assumes [root] {{!is_prefix}prefixes} [p]
-      removes the prefix and prepends [dst] to the result.
+  val reroot : src_root:t -> dst_root:t -> t -> t
+  (** [reroot ~src_root ~dst_root p] assumes [src_root] {{!is_prefix}prefixes}
+      [p] removes the prefix and prepends [dst_root] to the result.
 
-      @raise Invalid_argument if [root] is not a prefix of [src].
-      In particular note that [p] cannot be [root]. *)
+      @raise Invalid_argument if [dst_root] is not a prefix of [src].
+      In particular note that [p] cannot be [src_root]. *)
 
   val relative : to_dir:t -> t -> t
   (** [relative ~to_dir p] is [q] such that [to_dir // q] represents

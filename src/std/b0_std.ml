@@ -1798,9 +1798,9 @@ module Fpath = struct
     let not_prefixed ~by:dirs d = not (List.exists (is_prefixed d) dirs) in
     List.filter (not_prefixed ~by:dirs) dirs
 
-  let reroot ~root ~dst src =
-    let rel_file = Option.get (strip_prefix root src) in
-    append dst rel_file
+  let reroot ~src_root ~dst_root src =
+    let rel_file = Option.get (strip_prefix src_root src) in
+    append dst_root rel_file
 
   (* Predicates and comparisons *)
 
