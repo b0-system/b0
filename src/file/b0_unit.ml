@@ -246,7 +246,7 @@ type env =
 type exec_cwd =
 [ `Build_dir
 | `Cwd
-| `Custom_dir of string * (build -> t -> Fpath.t Fut.t)
+| `Custom_dir of string * (env -> t -> Fpath.t Fut.t)
 | `In of [ `Build_dir | `Root_dir | `Scope_dir ] * Fpath.t
 | `Root_dir
 | `Scope_dir ]
@@ -265,22 +265,22 @@ let exec_cwd =
   let doc = "Process current working directory for an execution." in
   B0_meta.Key.make "exec-cwd" ~doc ~pp_value:pp_exec_cwd
 
-let get_exec_cwd build u = match find_meta exec_cwd u with
+let get_exec_cwd env u = match find_meta exec_cwd u with
 | None | Some `Cwd -> Fut.return None
-| Some `Build_dir -> Fut.return (Some (Build.build_dir build u))
+| Some `Build_dir -> Fut.return (Some (Build.build_dir env.build u))
 | Some (`In (`Build_dir, p)) ->
-    Fut.return (Some Fpath.(Build.build_dir build u // p))
-| Some `Root_dir -> failwith "TODO"
-| Some (`In (`Root_dir, p)) -> failwith "TODO"
-| Some `Scope_dir -> Fut.return (Some (Build.scope_dir build u))
+    Fut.return (Some Fpath.(Build.build_dir env.build u // p))
+| Some `Root_dir -> Fut.return (Some env.root_dir)
+| Some (`In (`Root_dir, p)) -> Fut.return (Some Fpath.(env.root_dir // p))
+| Some `Scope_dir -> Fut.return (Some (Build.scope_dir env.build u))
 | Some (`In (`Scope_dir, p)) ->
-    Fut.return (Some Fpath.(Build.scope_dir build u // p))
-| Some (`Custom_dir (_doc, f)) -> Fut.map Option.some (f build u)
+    Fut.return (Some Fpath.(Build.scope_dir env.build u // p))
+| Some (`Custom_dir (_doc, f)) -> Fut.map Option.some (f env u)
 
 type exec_env =
 [ `Build_env
 | `Build_env_override of Os.Env.t
-| `Custom_env of string * (build -> t -> Os.Env.t Fut.t)
+| `Custom_env of string * (env -> t -> Os.Env.t Fut.t)
 | `Env of Os.Env.t ]
 
 let pp_exec_env ppf = function
@@ -296,13 +296,13 @@ let exec_env =
   let doc = "Process environment for an execution." in
   B0_meta.Key.make "exec-env" ~doc ~pp_value:pp_exec_env
 
-let get_exec_env build u = match find_meta exec_env u with
+let get_exec_env env u = match find_meta exec_env u with
 | None | Some `Build_env -> Fut.return None
-| Some `Build_env_override env ->
+| Some `Build_env_override by ->
     (* FIXME proper environment lookup *)
     let e = Os.Env.current () |> Log.if_error ~use:Os.Env.empty in
-    Fut.return (Some (Os.Env.override e ~by:env))
-| Some (`Custom_env (_doc, f)) -> Fut.map Option.some (f build u)
+    Fut.return (Some (Os.Env.override e ~by))
+| Some (`Custom_env (_doc, f)) -> Fut.map Option.some (f env u)
 | Some (`Env env) -> Fut.return (Some env)
 
 let exe_file =
@@ -310,10 +310,10 @@ let exe_file =
   let pp_value = Fmt.any "<built value>" in
   B0_meta.Key.make "exe-file" ~doc ~pp_value
 
-let run_exe_file exe_file build u ~args =
+let run_exe_file exe_file env' u ~args =
   let* exe_file = exe_file in
-  let* env = get_exec_env build u in
-  let* cwd = get_exec_cwd build u in
+  let* env = get_exec_env env' u in
+  let* cwd = get_exec_cwd env' u in
   let env = Option.map Os.Env.to_assignments env in
   let cmd = Cmd.(path exe_file (* exe_name ? *) %% args) in
   Fut.return (Os.Exit.exec ?env ?cwd exe_file cmd)
@@ -323,10 +323,10 @@ let exec =
   let pp_value ppf (doc, _) = Fmt.string ppf doc in
   B0_meta.Key.make "exec" ~doc ~pp_value
 
-let run_exec exec build u ~args =
-  let* cwd = get_exec_cwd build u in
-  let* env = get_exec_env build u in
-  exec build ?env ?cwd u ~args
+let run_exec exec env' u ~args =
+  let* cwd = get_exec_cwd env' u in
+  let* env = get_exec_env env' u in
+  exec env' ?env ?cwd u ~args
 
 let find_exec u = match find_meta exec u with
 | Some (_, exec) -> Some (run_exec exec)

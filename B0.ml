@@ -49,8 +49,9 @@ let b0 =
   let srcs = [`File ~/"src/tool/b0_main_run.ml"] in
   let requires = [b0_file; b0_tool] in
   let build_bootstrap_exec_env =
-    let env build unit =
-      (* FIXME need to access the root of the build and acces build env *)
+    let env env unit =
+      (* FIXME need to access the root of the build and access build os env *)
+      let build = B0_env.build env in
       let env = (Os.Env.current () |> Log.if_error ~use:Os.Env.empty) in
       let boot_root = Fpath.(B0_build.build_dir build unit / "..") in
       let env = add_bootstrap_env env boot_root in

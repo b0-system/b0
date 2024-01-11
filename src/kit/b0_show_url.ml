@@ -121,7 +121,6 @@ let server_mode env timeout_cli no_exec ~url args =
                     in
                     Fmt.error "@[%a@]" pp (entity, suggs)
           in
-          let build = B0_env.build env in
           (* FIXME this should execute according to the build unit execution
              protocol. *)
           let* cmd = B0_env.unit_cmd env unit in
@@ -133,10 +132,10 @@ let server_mode env timeout_cli no_exec ~url args =
             (B0_unit.find_or_default_meta listen_args unit) ~authority
           in
           let cmd = make_server_cmd cmd args ~listen_args in
-          let cwd = Fut.sync (B0_unit.get_exec_cwd build unit) in
-          let env = Fut.sync (B0_unit.get_exec_env build unit) in
-          let env = Option.map Os.Env.to_assignments env in
-          Ok (`Show_url_server (endpoint, timeout, url, cmd, cwd, env))
+          let cwd = Fut.sync (B0_unit.get_exec_cwd env unit) in
+          let env' = Fut.sync (B0_unit.get_exec_env env unit) in
+          let env' = Option.map Os.Env.to_assignments env' in
+          Ok (`Show_url_server (endpoint, timeout, url, cmd, cwd, env'))
 
 let unit_file_mode env args =
   let parse_arg arg = match String.cut_left ~sep:":" arg with

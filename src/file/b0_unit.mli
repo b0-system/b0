@@ -58,7 +58,7 @@ type exec_env =
 [ `Build_env (** The build's environment. *)
 | `Build_env_override of Os.Env.t
    (** The build's environment overriden by give values. *)
-| `Custom_env of string * (build -> t -> Os.Env.t Fut.t)
+| `Custom_env of string * (env -> t -> Os.Env.t Fut.t)
    (** Doc string and function. *)
 | `Env of Os.Env.t (** This exact environment. *) ]
 (** The type for execution environments. *)
@@ -67,7 +67,7 @@ val exec_env : exec_env B0_meta.key
 (** [exec_env] is the default execution environment. If unspecified this
     is [`Build_env].  *)
 
-val get_exec_env : build -> t -> Os.Env.t option Fut.t
+val get_exec_env : env -> t -> Os.Env.t option Fut.t
 (** [get_exec_env b u] performs the logic to get the execution environment. *)
 
 (** {2:cwd Cwd} *)
@@ -75,7 +75,7 @@ val get_exec_env : build -> t -> Os.Env.t option Fut.t
 type exec_cwd =
 [ `Build_dir (** The entity's build directory. *)
 | `Cwd (** The user's current working directory. *)
-| `Custom_dir of string * (build -> t -> Fpath.t Fut.t)
+| `Custom_dir of string * (env -> t -> Fpath.t Fut.t)
    (** Doc string and function. *)
 | `In of [ `Build_dir | `Root_dir | `Scope_dir ] * Fpath.t
 | `Root_dir (** The root B0 file directory. *)
@@ -87,7 +87,7 @@ val exec_cwd : exec_cwd B0_meta.key
     an entity. If unspecified this should be [`Cwd] which should be
     the users's current working directory. *)
 
-val get_exec_cwd : build -> t -> Fpath.t option Fut.t
+val get_exec_cwd : env -> t -> Fpath.t option Fut.t
 (** [get_exec_cwd b u] performs the logic to get the cwd. *)
 
 (** {2:execution Execution} *)
@@ -101,14 +101,14 @@ val exe_file : Fpath.t Fut.t B0_meta.key
 
 val exec :
   (string *
-   (build -> ?env:Os.Env.t -> ?cwd:Fpath.t -> t -> args:Cmd.t ->
+   (env -> ?env:Os.Env.t -> ?cwd:Fpath.t -> t -> args:Cmd.t ->
     Os.Exit.t Fut.t)) B0_meta.key
 (** [exec] is a metadata key to store a custom execution procedure.
     The string is a doc string for the procedure.
     The function is given the build, the result of {!get_exec_env} and
     {!get_exec_cwd} and the arguments to give to the procedure. *)
 
-val find_exec : t -> (build -> t -> args:Cmd.t -> Os.Exit.t Fut.t) option
+val find_exec : t -> (env -> t -> args:Cmd.t -> Os.Exit.t Fut.t) option
 (** [find_exec b u] if either {!val-exe_file} or {!val-exec} is defined
     returns a function to call that  determines
     {!get_exec_env} and {!get_exec_cwd} and runs {!val-exec} or

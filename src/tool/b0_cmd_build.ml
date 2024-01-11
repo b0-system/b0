@@ -220,22 +220,24 @@ let memo c ~may_build ~must_build =
 
 (* Executing the action or the unit *)
 
+let executor_env build def c =
+  let cwd = B0_driver.Conf.cwd c in
+  let root_dir = Fpath.parent @@ Option.get @@ B0_driver.Conf.b0_file c in
+  let scope_dir = Option.value (B0_def.scope_dir def) ~default:root_dir in
+  let b0_dir = B0_driver.Conf.b0_dir c in
+  B0_env.make ~cwd ~scope_dir ~root_dir ~b0_dir ~build
+
 let action_executor show_path build action c = match show_path with
+| false ->
+    let func = B0_action.func action in
+    let env = executor_env build (B0_action.def action) c in
+    let exec ~args = func action env ~args in
+    Ok (Some exec)
 | true -> (* We could show the path to the b0 driver, bof. *)
     Fmt.error "%a has no path, it is an action not an executable unit"
       B0_action.pp_name action
-| false ->
-    let cwd = B0_driver.Conf.cwd c in
-    let root_dir = Fpath.parent @@ Option.get @@ B0_driver.Conf.b0_file c in
-    let scope_dir = B0_def.scope_dir (B0_action.def action) in
-    let scope_dir = Option.value scope_dir ~default:root_dir in
-    let b0_dir = B0_driver.Conf.b0_dir c in
-    let env = B0_env.make ~cwd ~scope_dir ~root_dir ~b0_dir ~build in
-    let func = B0_action.func action in
-    let exec ~args = func action env ~args in
-    Ok (Some exec)
 
-let unit_executor show_path build u =
+let unit_executor show_path build u c =
   let warn_noexec u =
     Log.warn @@ fun m ->
     m "Unit %a not executable: ignoring execution." B0_unit.pp_name u
@@ -249,13 +251,16 @@ let unit_executor show_path build u =
   match B0_unit.find_exec u with
   | None -> warn_noexec u; Ok None
   | Some exec ->
-      if not show_path
-      then Ok (Some (fun ~args -> Fut.sync (exec build u ~args))) else
-      match B0_unit.find_meta B0_unit.exe_file u with
-      | Some path -> Ok (Some (fun ~args -> show (Fut.sync path) ~args))
-      | None ->
-          Fmt.error "No executable outcome path found in executable unit %a"
-            B0_unit.pp_name u
+      match show_path with
+      | false ->
+          let env = executor_env build (B0_unit.def u) c in
+          Ok (Some (fun ~args -> Fut.sync (exec env u ~args)))
+      | true ->
+          match B0_unit.find_meta B0_unit.exe_file u with
+          | Some path -> Ok (Some (fun ~args -> show (Fut.sync path) ~args))
+          | None ->
+              Fmt.error "No executable outcome path found in executable unit %a"
+                B0_unit.pp_name u
 
 let error_executor_needs ~exec_needs ~must_build exec =
   let diff = B0_unit.Set.diff exec_needs must_build in
@@ -297,7 +302,7 @@ let build units x_units packs x_packs what lock show_path action args c =
   | Some exec when not (B0_unit.Set.subset exec_needs must_build) ->
       error_executor_needs ~exec_needs ~must_build exec
   | Some (`Action a) -> action_executor show_path build a c
-  | Some (`Unit u) -> unit_executor show_path build u
+  | Some (`Unit u) -> unit_executor show_path build u c
   | None when B0_unit.Set.is_empty must_build -> Fmt.error "%s" (err_nothing ())
   | None -> Ok None
   in
