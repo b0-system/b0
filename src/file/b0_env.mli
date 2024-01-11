@@ -11,7 +11,7 @@
 
 open B0_std
 
-type t
+type t = B0_unit.env
 (** The type for execution environments. *)
 
 val make :

@@ -61,7 +61,7 @@ let build_nop b = Fut.return ()
 
 include Unit
 
-(* We also maintain a tool name index for build tools. *)
+(* We also maintain a tool name index for built tools. *)
 
 let () = B0_scope.open_lib ~module':__MODULE__ "unit"
 
@@ -100,12 +100,9 @@ let pp ppf v =
   | true -> () | false -> Fmt.pf ppf "@, @[%a@]" B0_meta.pp m in
   Fmt.pf ppf "@[<v>%a%a@]" pp_synopsis v pp_non_empty (meta v)
 
-(* Predefined actions *)
-
 (* Builds *)
 
 module Build = struct
-  type build_unit = Unit.t
   include Build_def
 
   let memo b = b.u.m
@@ -237,6 +234,13 @@ module Build = struct
     String.Map.fold (fun _ u acc -> Set.add u acc) b.b.requested Set.empty
 end
 
+type env =
+  { b0_dir : Fpath.t;
+    build : Build.t;
+    cwd : Fpath.t;
+    root_dir : Fpath.t;
+    scope_dir : Fpath.t }
+
 (* Executing *)
 
 type exec_cwd =
@@ -351,7 +355,6 @@ let get_or_suggest_tool ~keep n =
 
 let tool_is_user_accessible u = is_public u || in_root_scope u
 
-
 let tool_name_map units =
   let warn_dup_tool use ign n =
     Log.warn @@ fun m ->
@@ -379,5 +382,37 @@ let tool_name_map units =
   in
   Set.fold add_unit units String.Map.empty
 
-
 let () = B0_scope.close ()
+
+module Env = struct
+  type t = env
+  let make ~b0_dir ~build ~cwd ~root_dir ~scope_dir =
+    { b0_dir; build; cwd; root_dir; scope_dir; }
+
+  let b0_dir env = env.b0_dir
+  let cwd env = env.cwd
+  let root_dir env = env.root_dir
+  let scope_dir env = env.scope_dir
+  let scratch_dir env = B0_dir.scratch_dir ~b0_dir:env.b0_dir
+  let unit_dir env u = Build.build_dir env.build u
+
+  let in_root_dir env p = Fpath.(root_dir env // p)
+  let in_scope_dir env p = Fpath.(scope_dir env // p)
+  let in_scratch_dir env p = Fpath.(scratch_dir env // p)
+  let in_unit_dir env u p = Fpath.(unit_dir env u // p)
+
+  let build env = env.build
+
+  (* TODO lookup the builds *)
+
+  let get_tool ?(no_build = false) env cmd = Os.Cmd.get_tool cmd
+  let get_cmd ?(no_build = false) env cmd = Os.Cmd.get cmd
+
+  let unit_file_exe env u =
+    if Set.mem u (Build.did_build env.build)
+    then Result.map Fut.sync (get_meta exe_file u) else
+    Fmt.error "Cannot get executable of unit %a: it did not build."
+      pp_name u
+
+  let unit_cmd env u = Result.map Cmd.path (unit_file_exe env u)
+end

@@ -49,6 +49,9 @@ val build_proc : t -> build_proc
     {- Otherwise {!exe_file} is executed with cwd and environemts
        defined y {!get_exec_env} and {!get_exec_cwd}}} *)
 
+type env
+(** The type for execution environments, see {!B0_env}. *)
+
 (** {2:env Environment} *)
 
 type exec_env =
@@ -133,7 +136,7 @@ val tool_name_map : Set.t -> t String.Map.t
 
 (**/**)
 module Build : sig
-  type build_unit = t
+  type build_unit := t
   type t = build
   val memo : t -> B0_memo.t
   val must_build : t -> Set.t
@@ -160,5 +163,33 @@ module Build : sig
   val self : t B0_store.key
   val run : t -> (unit, unit) result
   val did_build : t -> Set.t
+end
+
+module Env : sig
+  type build_unit := t
+  type t = env
+  val make :
+    b0_dir:Fpath.t ->
+    build:Build.t ->
+    cwd:Fpath.t ->
+    root_dir:Fpath.t -> scope_dir:Fpath.t -> t
+  val b0_dir : t -> Fpath.t
+  val cwd : t -> Fpath.t
+  val root_dir : t -> Fpath.t
+  val scope_dir : t -> Fpath.t
+  val scratch_dir : t -> Fpath.t
+  val unit_dir : t -> build_unit -> Fpath.t
+  val in_root_dir : t -> Fpath.t -> Fpath.t
+  val in_scope_dir : t -> Fpath.t -> Fpath.t
+  val in_scratch_dir : t -> Fpath.t -> Fpath.t
+  val in_unit_dir : t -> build_unit -> Fpath.t -> Fpath.t
+  val build : t -> Build.t
+  val get_tool :
+    ?no_build:bool ->
+    'a -> Cmd.tool -> (Fpath.t, string) result
+  val get_cmd :
+    ?no_build:bool -> 'a -> Cmd.t -> (Cmd.t, string) result
+  val unit_file_exe : t -> build_unit -> (Fpath.t, string) result
+  val unit_cmd : t -> Set.elt -> (Cmd.t, string) result
 end
 (**/**)
