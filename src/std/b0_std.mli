@@ -1078,6 +1078,21 @@ let escape_dquotes s =
         [S.add v (find k m)] if [k] was bound in [m] and [S.singleton [v]]
         otherwise. *)
 
+    (** {1:get_or_hint Get or hint} *)
+
+    val get_or_suggest : string -> 'a t -> ('a, string list) result
+    (** [get_or_suggest k m] is [Ok v] if [k] is bound to [v] in [m]
+        and otherwise a (possibly empty) list of suggested keys
+        whose name could match [name]. *)
+
+    val get_or_hint :
+      ?pp_key:string Fmt.t ->
+      kind:string -> key -> 'a t -> ('a, string) result
+    (** [get_or_hint] is like {!get_or_suggest} but it formats
+        an error message that indicate that the [kind] of key [k]
+        could not be found and suggests alternative names (if any).
+        [pp_key] is used to format the keys, it default to {!Fmt.code'}. *)
+
     (** {1:fmt Formatting} *)
 
     val pp : ?sep:unit Fmt.t -> (string * 'a) Fmt.t -> 'a t Fmt.t

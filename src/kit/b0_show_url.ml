@@ -29,22 +29,6 @@ let timeout_s =
 
 (* Action *)
 
-let get_tool_or_hint tool tool_map =
-  (* XXX should we have that in String.Map perhaps ? *)
-  match String.Map.find_opt tool tool_map with
-  | Some v -> Ok v
-  | None ->
-      let suggs =
-        let add_sugg k v acc =
-          if String.edit_distance k tool <= 2 then k :: acc else acc
-        in
-        List.rev (String.Map.fold add_sugg tool_map [])
-      in
-      let kind ppf () = Fmt.pf ppf "%s" "tool" in
-      let hint = Fmt.did_you_mean in
-      let pp = Fmt.unknown' ~kind Fmt.code' ~hint in
-      Fmt.error "@[%a@]" pp (tool, suggs)
-
 let make_server_cmd cmd args ~listen_args =
   (* Inserts ~listen_args at the end of args or before -- *)
   let prev, rest =

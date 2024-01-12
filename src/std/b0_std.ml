@@ -1349,6 +1349,23 @@ module String = struct
     | exception Not_found -> add k (S.singleton v) m
     | set -> add k (S.add v set) m
 
+    let get_or_suggest k m = match find_opt k m with
+    | Some v -> Ok v
+    | None ->
+        let add_sugg k' v acc =
+          if edit_distance k k' <= 2 then k' :: acc else acc
+        in
+        Error (List.rev (fold add_sugg m []))
+
+    let get_or_hint ?(pp_key = Fmt.code') ~kind k m =
+      match get_or_suggest k m with
+      | Ok _ as v -> v
+      | Error suggs ->
+          let kind ppf () = Fmt.string ppf kind in
+          let hint = Fmt.did_you_mean in
+          let pp = Fmt.unknown' ~kind pp_key ~hint in
+          Fmt.error "@[%a@]" pp (k, suggs)
+
     let pp ?sep pp_binding = Fmt.iter_bindings ?sep iter pp_binding
     let pp_dump_str = pp_dump
     let pp_dump pp_v ppf m =
