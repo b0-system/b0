@@ -3,8 +3,9 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
+let () = B0_scope.open_lib ~module':__MODULE__ "unit"
+
 open B0_std
-open B0_std.Fut.Syntax
 
 (* A bit of annoying recursive definition. *)
 
@@ -53,7 +54,7 @@ and Unit : sig include B0_def.S with type t = Unit_def.t end
 
 (* Build procedures *)
 
-type build = Build_def.t
+type b0_build = Build_def.t
 type build_proc = Unit_def.build_proc
 let build_nop b = Fut.return ()
 
@@ -63,13 +64,11 @@ include Unit
 
 (* We also maintain a tool name index for built tools. *)
 
-let () = B0_scope.open_lib ~module':__MODULE__ "unit"
-
 let tool_name =
   let doc = "Executable tool name without platform specific extension" in
   B0_meta.Key.make "tool-name" ~doc ~pp_value:Fmt.string
 
-let tool_name_index = ref String.Map.empty
+let tool_name_index : t list String.Map.t ref = ref String.Map.empty
 
 let add_tool_name u = match find_meta tool_name u with
 | None -> ()
@@ -103,6 +102,8 @@ let pp ppf v =
 (* Builds *)
 
 module Build = struct
+  open B0_std.Fut.Syntax
+
   include Build_def
 
   let memo b = b.u.m
@@ -234,112 +235,29 @@ module Build = struct
     String.Map.fold (fun _ u acc -> Set.add u acc) b.b.requested Set.empty
 end
 
-type env =
+type b0_unit = t
+type b0_env =
   { b0_dir : Fpath.t;
     build : Build.t;
+    built_tools : b0_unit String.Map.t Lazy.t;
     cwd : Fpath.t;
     root_dir : Fpath.t;
-    scope_dir : Fpath.t }
+    scope_dir : Fpath.t;
+    build_env : Os.Env.t;
+    driver_env : Os.Env.t; }
 
 (* Executing *)
-
-type exec_cwd =
-[ `Build_dir
-| `Cwd
-| `Custom_dir of string * (env -> t -> Fpath.t Fut.t)
-| `In of [ `Build_dir | `Root_dir | `Scope_dir ] * Fpath.t
-| `Root_dir
-| `Scope_dir ]
-
-let pp_exec_cwd ppf = function
-| `Build_dir -> Fmt.string ppf "Unit build directory"
-| `Cwd -> Fmt.string ppf "User current working directory"
-| `Custom_dir (doc, _) -> Fmt.string ppf doc
-| `In (`Build_dir, p) -> Fmt.pf ppf "%a in unit build directory" Fpath.pp p
-| `In (`Scope_dir, p) -> Fmt.pf ppf "%a in scope directory" Fpath.pp p
-| `In (`Root_dir, p) -> Fmt.pf ppf "%a in root directory" Fpath.pp p
-| `Scope_dir -> Fmt.string ppf "Scope directory"
-| `Root_dir -> Fmt.string ppf "Root directory"
-
-let exec_cwd =
-  let doc = "Process current working directory for an execution." in
-  B0_meta.Key.make "exec-cwd" ~doc ~pp_value:pp_exec_cwd
-
-let get_exec_cwd env u = match find_meta exec_cwd u with
-| None | Some `Cwd -> Fut.return None
-| Some `Build_dir -> Fut.return (Some (Build.build_dir env.build u))
-| Some (`In (`Build_dir, p)) ->
-    Fut.return (Some Fpath.(Build.build_dir env.build u // p))
-| Some `Root_dir -> Fut.return (Some env.root_dir)
-| Some (`In (`Root_dir, p)) -> Fut.return (Some Fpath.(env.root_dir // p))
-| Some `Scope_dir -> Fut.return (Some (Build.scope_dir env.build u))
-| Some (`In (`Scope_dir, p)) ->
-    Fut.return (Some Fpath.(Build.scope_dir env.build u // p))
-| Some (`Custom_dir (_doc, f)) -> Fut.map Option.some (f env u)
-
-type exec_env =
-[ `Build_env
-| `Build_env_override of Os.Env.t
-| `Custom_env of string * (env -> t -> Os.Env.t Fut.t)
-| `Env of Os.Env.t ]
-
-let pp_exec_env ppf = function
-| `Build_env -> Fmt.string ppf "Build environment"
-| `Build_env_override env ->
-    Fmt.pf ppf "@[<v>Build environment override with:@,%a@]"
-      Fmt.(list string) (Os.Env.to_assignments env)
-| `Custom_env (doc, _) -> Fmt.string ppf doc
-| `Env env ->
-    Fmt.pf ppf "@[<v>%a@]" Fmt.(list string) (Os.Env.to_assignments env)
-
-let exec_env =
-  let doc = "Process environment for an execution." in
-  B0_meta.Key.make "exec-env" ~doc ~pp_value:pp_exec_env
-
-let get_exec_env env u = match find_meta exec_env u with
-| None | Some `Build_env -> Fut.return None
-| Some `Build_env_override by ->
-    (* FIXME proper environment lookup *)
-    let e = Os.Env.current () |> Log.if_error ~use:Os.Env.empty in
-    Fut.return (Some (Os.Env.override e ~by))
-| Some (`Custom_env (_doc, f)) -> Fut.map Option.some (f env u)
-| Some (`Env env) -> Fut.return (Some env)
 
 let exe_file =
   let doc = "Absolute file path to a built executable." in
   let pp_value = Fmt.any "<built value>" in
   B0_meta.Key.make "exe-file" ~doc ~pp_value
 
-let run_exe_file exe_file env' u ~args =
-  let* exe_file = exe_file in
-  let* env = get_exec_env env' u in
-  let* cwd = get_exec_cwd env' u in
-  let env = Option.map Os.Env.to_assignments env in
-  let cmd = Cmd.(path exe_file (* exe_name ? *) %% args) in
-  Fut.return (Os.Exit.exec ?env ?cwd exe_file cmd)
-
-let exec =
-  let doc = "Unit execution function." in
-  let pp_value ppf (doc, _) = Fmt.string ppf doc in
-  B0_meta.Key.make "exec" ~doc ~pp_value
-
-let run_exec exec env' u ~args =
-  let* cwd = get_exec_cwd env' u in
-  let* env = get_exec_env env' u in
-  exec env' ?env ?cwd u ~args
-
-let find_exec u = match find_meta exec u with
-| Some (_, exec) -> Some (run_exec exec)
-| None ->
-    match find_meta exe_file u with
-    | None -> None
-    | Some exe_file -> Some (run_exe_file exe_file)
-
 let is_public u = match find_meta B0_meta.public u with
 | None -> false | Some b -> b
 
 let get_or_suggest_tool ~keep n =
-  (* XXX I don't understand how this current_is_root () can work. *)
+  (* XXX I don't 'understand how this current_is_root () can work. *)
   let is_root = B0_scope.current_is_root () in
   let keep = if is_root then keep else fun u -> in_current_scope u && keep u in
   let us = Option.value ~default:[] (String.Map.find_opt n !tool_name_index) in
@@ -369,7 +287,7 @@ let tool_name_map units =
       Fmt.code' n pp_name u
   in
   let add_unit u acc =
-    if not (is_public u || in_root_scope u) then acc else
+    if not (tool_is_user_accessible u) then acc else
     match B0_meta.find tool_name (meta u) with
     | None -> acc
     | Some t ->
@@ -382,12 +300,20 @@ let tool_name_map units =
   in
   Set.fold add_unit units String.Map.empty
 
-let () = B0_scope.close ()
-
 module Env = struct
-  type t = env
-  let make ~b0_dir ~build ~cwd ~root_dir ~scope_dir =
-    { b0_dir; build; cwd; root_dir; scope_dir; }
+  type t = b0_env
+  let make ~b0_dir ~build ~cwd ~root_dir ~scope_dir ~driver_env =
+    let build_env = B0_memo.env (Build.memo build) in
+    let built_tools = lazy begin
+      (* FIXME it would be nice to have a check that the build
+         finished here. *)
+      tool_name_map (Build.did_build build)
+    end
+    in
+    { b0_dir; build; built_tools; cwd; root_dir; scope_dir; build_env;
+      driver_env; }
+
+  (* Directories. *)
 
   let b0_dir env = env.b0_dir
   let cwd env = env.cwd
@@ -400,19 +326,151 @@ module Env = struct
   let in_scope_dir env p = Fpath.(scope_dir env // p)
   let in_scratch_dir env p = Fpath.(scratch_dir env // p)
   let in_unit_dir env u p = Fpath.(unit_dir env u // p)
-
   let build env = env.build
 
-  (* TODO lookup the builds *)
+  type dir = [`Cwd | `Root_dir | `Scope_dir | `Unit_dir ]
 
-  let get_tool ?(no_build = false) env cmd = Os.Cmd.get_tool cmd
-  let get_cmd ?(no_build = false) env cmd = Os.Cmd.get cmd
+  let pp_dir ppf = function
+  | `Cwd -> Fmt.string ppf "current working directory"
+  | `Scope_dir -> Fmt.string ppf "scope directory"
+  | `Unit_dir -> Fmt.string ppf "unit directory"
+  | `Root_dir -> Fmt.string ppf "root directory"
 
-  let unit_file_exe env u =
+  let dir env = function
+  | `Cwd -> cwd env
+  | `Root_dir -> root_dir env
+  | `Scope_dir -> scope_dir env
+  | `Unit_dir -> invalid_arg "Cannot lookup `Unit_dir"
+
+  let in_dir env d p = Fpath.(dir env d // p)
+
+  (* Process environments. *)
+
+  type env = [ `Build_env | `Driver_env ]
+  let build_env env = env.build_env
+  let driver_env env = env.driver_env
+  let env env = function
+  | `Build_env -> env.build_env
+  | `Driver_env -> env.driver_env
+
+  let pp_env ppf = function
+  | `Build_env -> Fmt.string ppf "build environment"
+  | `Driver_env -> Fmt.string ppf "b0 invocation environment"
+
+  (* Tool lookup *)
+
+  let get_tool ?(skip_build = false) env tool =
+    if skip_build then Os.Cmd.get_tool tool else
+    let tool_map = Lazy.force env.built_tools in
+    match String.Map.find_opt (Fpath.to_string tool) tool_map with
+    | Some u -> Result.map Fut.sync (get_meta exe_file u)
+    | None -> Os.Cmd.get_tool tool
+
+  let get_cmd ?skip_build env cmd = match Cmd.tool cmd with
+  | None -> Fmt.error "No tool to lookup: the command is empty"
+  | Some tool ->
+      match get_tool ?skip_build env tool with
+      | Error _ as e -> e | Ok tool -> Ok (Cmd.set_tool tool cmd)
+
+  let unit_exe_file env u =
     if Set.mem u (Build.did_build env.build)
     then Result.map Fut.sync (get_meta exe_file u) else
-    Fmt.error "Cannot get executable of unit %a: it did not build."
-      pp_name u
+    Fmt.error "Cannot get executable of unit %a: it did not build." pp_name u
 
-  let unit_cmd env u = Result.map Cmd.path (unit_file_exe env u)
+  let unit_cmd env u = Result.map Cmd.path (unit_exe_file env u)
 end
+
+module Exec = struct
+  type env =
+  [ Env.env
+  | `Override of Env.env * Os.Env.t
+  | `Env of Os.Env.t
+  | `Fun of string * (b0_env -> b0_unit -> (Os.Env.t, string) result) ]
+
+  let pp_env ppf = function
+  | #Env.env as env -> Env.pp_env ppf env
+  | `Override (#Env.env as env, by) ->
+      Fmt.pf ppf "@[<v>%a overriden by:@,%a@]" Env.pp_env env Os.Env.pp by
+  | `Env env -> Os.Env.pp ppf env
+  | `Fun (doc, _) -> Fmt.pf ppf "<fun> %s" doc
+
+  let env =
+    let doc = "Environment for an execution." in
+    let default = `Build_env in
+    B0_meta.Key.make "exec-env" ~default ~doc ~pp_value:pp_env
+
+  let get_env b0_env u = match find_or_default_meta env u with
+  | #Env.env as env -> Ok (Env.env b0_env env)
+  | `Override (env, by) -> Ok (Os.Env.override (Env.env b0_env env) ~by)
+  | `Env env -> Ok env
+  | `Fun (_doc, f) -> f b0_env u
+
+  type cwd =
+  [ Env.dir
+  | `In of Env.dir * Fpath.t
+  | `Fun of string * (b0_env -> b0_unit -> (Fpath.t, string) result) ]
+
+  let pp_cwd ppf = function
+  | #Env.dir as dir -> Env.pp_dir ppf dir
+  | `In (dir, p) -> Fmt.pf ppf "%a in %a" Fpath.pp p Env.pp_dir dir
+  | `Fun (doc, _) -> Fmt.pf ppf "<fun> %s" doc
+
+  let cwd =
+    let doc = "Current working directory for an execution." in
+    let default = `Cwd in
+    B0_meta.Key.make "exec-cwd" ~default ~doc ~pp_value:pp_cwd
+
+  let get_cwd b0_env u = match find_or_default_meta cwd u with
+  | #Env.dir as dir -> Ok (Env.dir b0_env dir)
+  | `In (#Env.dir as dir, p) -> Ok (Env.in_dir b0_env dir p)
+  | `Fun (_doc, f) -> f b0_env u
+
+  type t =
+  [ `Unit_exe
+  | `Cmd of string * (b0_env -> b0_unit -> args:Cmd.t -> (Cmd.t, string) result)
+  | `Fun of
+      string *
+      (b0_env -> ?env:Os.Env.assignments -> ?cwd:Fpath.t ->
+       b0_unit -> args:Cmd.t -> (Os.Exit.t, string) result) ]
+
+  let pp ppf = function
+  | `Unit_exe -> Fmt.pf ppf "file in %a" B0_meta.Key.pp_name exe_file
+  | `Cmd (doc, _) -> Fmt.pf ppf "<fun> %s" doc
+  | `Fun (doc, _) -> Fmt.pf ppf "<fun> %s" doc
+
+  let key : t B0_meta.key =
+    let doc = "Unit execution." in
+    let default = `Unit_exe in
+    B0_meta.Key.make "exec" ~default ~doc ~pp_value:pp
+
+  open Result.Syntax
+
+  let run_exe_file exe_file b0_env u ~args =
+    let* env = Result.map Os.Env.to_assignments (get_env b0_env u) in
+    let* cwd = get_cwd b0_env u in
+    let exe_file = Fut.sync exe_file in
+    let cmd = Cmd.(path exe_file (* exe_name ? *) %% args) in
+    Ok (Os.Exit.exec ~env ~cwd exe_file cmd)
+
+  let run_fun f b0_env u ~args =
+    let* env = Result.map Os.Env.to_assignments (get_env b0_env u) in
+    let* cwd = get_cwd b0_env u in
+    f b0_env ?env:(Some env) ?cwd:(Some cwd) u ~args
+
+  let run_cmd cmd b0_env u ~args =
+    let* env = Result.map Os.Env.to_assignments (get_env b0_env u) in
+    let* cwd = get_cwd b0_env u in
+    let* cmd = cmd b0_env u ~args in
+    let exe_file = Cmd.get_tool cmd in
+    Ok (Os.Exit.exec ~env ~cwd exe_file cmd)
+
+  let find u = match find_or_default_meta key u with
+  | `Cmd (_, cmd) -> Some (run_cmd cmd)
+  | `Fun (_, f) -> Some (run_fun f)
+  | `Unit_exe ->
+      match find_meta exe_file u with
+      | None -> None
+      | Some exe_file -> Some (run_exe_file exe_file)
+end
+
+let () = B0_scope.close ()

@@ -84,7 +84,7 @@ module Conf : sig
 
   val make :
     b0_dir:Fpath.t -> b0_file:Fpath.t option -> cache_dir:Fpath.t ->
-    cwd:Fpath.t -> code:B0_ocaml.Code.t option ->
+    cwd:Fpath.t -> code:B0_ocaml.Code.t option -> env:Os.Env.t ->
     hash_fun:(module Hash.T) -> jobs:int -> log_level:Log.level ->
     no_pager:bool -> tty_cap:Tty.cap -> unit -> t
   (** [make] constructs a configuration with given attributes. See the
@@ -104,6 +104,9 @@ module Conf : sig
 
   val code : t -> B0_ocaml.Code.t option
   (** [code] is the code to which the driver is compiled. *)
+
+  val env : t -> Os.Env.t
+  (** [env] is the process environment of the driver. *)
 
   val hash_fun : t -> (module Hash.T)
   (** [hash_fun] is the hash function to use for build caching. *)

@@ -11,12 +11,13 @@
     The module defines a few {{!std}standard keys}.
 
     The recommended way of formatting constant dictionaries is:
-{[
+    {[
+open B0_kit.V000 (* Defines the ~~ operator *)
 let meta =
   B0_meta.empty
-  |> B0_meta.(add authors) ["The project programmers"]
-  |> B0_meta.(add homepage) "https://example.org"
-  |> B0_meta.tag B0_opam.tag
+  |> ~~ B0_meta.authors ["The project programmers"]
+  |> ~~ B0_meta.homepage "https://example.org"
+  |> ~~ B0_meta.tag B0_opam.tag
 ]} *)
 
 open B0_std

@@ -35,10 +35,17 @@ let b0_kit_lib =
 
 (* The b0 tool *)
 
-let add_bootstrap_env env boot_root =
-  env
-  |> Os.Env.add "B0_BOOTSTRAP" (Fpath.to_string boot_root)
-  |> Os.Env.add "B0_DRIVER_BOOTSTRAP" (Fpath.to_string boot_root)
+let bootstrap_env env unit =
+  let boot_root = (* FIXME need to access the root of the build  *)
+    Fpath.to_string (B0_env.in_unit_dir env unit ~/"..")
+  in
+  B0_env.build_env env
+  (* If the build is locked via `b0 lock`, unlock it. *)
+  |> Os.Env.remove "B0_FILE"
+  |> Os.Env.remove "B0_DIR"
+  |> Os.Env.add "B0_BOOTSTRAP" boot_root
+  |> Os.Env.add "B0_DRIVER_BOOTSTRAP" boot_root
+  |> Result.ok
 
 let b0_tool_lib =
   let srcs = [ `Dir ~/"src/tool"; `X ~/"src/tool/b0_main_run.ml"] in
@@ -48,24 +55,8 @@ let b0_tool_lib =
 let b0 =
   let srcs = [`File ~/"src/tool/b0_main_run.ml"] in
   let requires = [b0_file; b0_tool] in
-  let build_bootstrap_exec_env =
-    let env env unit =
-      (* FIXME need to access the root of the build and access build os env *)
-      let build = B0_env.build env in
-      let env = (Os.Env.current () |> Log.if_error ~use:Os.Env.empty) in
-      let boot_root = Fpath.(B0_build.build_dir build unit / "..") in
-      let env = add_bootstrap_env env boot_root in
-      (* If the build is locked via `b0 lock`, unlock it. *)
-      let env = String.Map.remove "B0_FILE" env in
-      let env = String.Map.remove "B0_DIR" env in
-      Fut.return env
-    in
-    `Custom_env ("Bootstrap env set on the b0 build", env)
-  in
-  let meta =
-    B0_meta.empty
-    |> B0_meta.add B0_unit.exec_env build_bootstrap_exec_env
-  in
+  let exec_env = `Fun ("Bootstrap env on the b0 build", bootstrap_env) in
+  let meta = B0_meta.empty |> ~~ B0_unit.Exec.env exec_env in
   B0_ocaml.exe "b0" ~doc:"The b0 tool" ~srcs ~requires ~meta
 
 (* Low-level B0 tools *)
@@ -178,18 +169,12 @@ let bowl =
   let doc = "Run built b0 in the bowl directory" in
   B0_action.make "bowl" ~units:[b0] ~doc @@
   fun _ env ~args ->
-  match B0_env.unit_file_exe env b0 with (* FIXME b0 error struct *)
+  match B0_env.unit_exe_file env b0 with (* FIXME b0 error struct *)
   | Error e -> Log.err (fun m -> m "%s" e); B0_cli.Exit.some_error
   | Ok exec ->
-      let bootstrap_root =
-        (* FIXME b0 access to current variant *)
-        let b0_dir = B0_env.b0_dir env in
-        let variant = "user" in
-        B0_dir.build_dir ~b0_dir ~variant
-      in
       let cwd = B0_env.in_scope_dir env ~/"bowl" in
-      let env = Os.Env.current () |> Log.if_error ~use:Os.Env.empty in
-      let env = add_bootstrap_env env bootstrap_root |> Os.Env.to_assignments in
+      let env = bootstrap_env env b0 |> Result.get_ok in
+      let env = Os.Env.to_assignments env in
       (* FIXME b0 B0_env.exec_file allow to choose name of args ? *)
       Os.Exit.exec ~cwd ~env exec Cmd.(path exec %% args)
 

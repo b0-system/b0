@@ -2555,8 +2555,13 @@ module Cmd = struct
       in
       loop ls
 
+  let get_tool l = match tool l with
+  | Some t -> t
+  | None when is_empty l -> invalid_arg "empty command line"
+  | None -> Fmt.invalid_arg "cmd %s: tool parse error" (to_string l)
+
   let rec set_tool tool = function
-  | Rseq [] -> None
+  | Rseq [] -> path tool
   | l ->
       let rec loop = function
       | A a -> A (Fpath.to_string tool)
@@ -2566,12 +2571,7 @@ module Cmd = struct
           | arg :: args -> Rseq (List.rev @@ (loop arg) :: args)
           | [] -> assert false
       in
-      Some (loop l)
-
-  let get_tool l = match tool l with
-  | Some t -> t
-  | None when is_empty l -> invalid_arg "empty command line"
-  | None -> Fmt.invalid_arg "cmd %s: tool parse error" (to_string l)
+      loop l
 
   let pp_tool ppf t =
     Fmt.tty' [`Fg `Blue] ppf (Filename.quote (Fpath.to_string t))
@@ -2869,7 +2869,7 @@ module Os = struct
   end
 
 
-    module Env = struct
+  module Env = struct
     (* Variables *)
 
     type var_name = string
@@ -2891,6 +2891,8 @@ module Os = struct
     type t = string String.Map.t
     let empty = String.Map.empty
     let add = String.Map.add
+    let remove = String.Map.remove
+    let mem = String.Map.mem
     let override env ~by =
       if String.Map.is_empty by then env else
       let lean_right _ l r = match r with
@@ -2931,6 +2933,9 @@ module Os = struct
       | Error e -> env_err e
       | exception Sys_error e -> env_err e
       | exception Unix.Unix_error (e, _, _) -> env_err (uerror e)
+
+    let pp_assignments = Fmt.(vbox @@ list string)
+    let pp ppf env = pp_assignments ppf (to_assignments env)
   end
 
   module Fs_base = struct
@@ -3989,7 +3994,7 @@ module Os = struct
 
     let pp_search ppf = function
     | None -> Fmt.string ppf "PATH"
-    | Some dirs ->Fmt.(list ~sep:comma Fpath.pp) ppf dirs
+    | Some dirs -> Fmt.(list Fpath.pp) ppf dirs
 
     let get_tool ?win_exe ?search tool =
       match find_tool ?win_exe ?search tool with
@@ -3998,14 +4003,16 @@ module Os = struct
       | Ok None when tool_is_path tool ->
           Fmt.error "%s: No such executable file" tool
       | Ok None ->
-          Fmt.error "%s: No such tool found in %a" tool pp_search search
+          Fmt.error "@[<v1>%s: No such tool found in:@,%a@]"
+            tool pp_search search
 
     let rec get_first_tool ?win_exe ?search tools =
+      if tools = [] then Error "Tool list to lookup is empty" else
       let rec loop = function
       | [] ->
-          Fmt.error "%a:@[<v> No such tool found in %a@,@[as %a@]@]"
+          Fmt.error "@[<v1>%a: No such tool found in:%a@,neither as:@,%a@]"
             Fpath.pp (List.hd tools) pp_search search
-            (Fmt.or_enum Fpath.pp) tools
+            (Fmt.list Fpath.pp) tools
       | tool :: tools ->
           match find_tool ?win_exe ?search tool with
           | Ok (Some t) -> Ok t
@@ -4019,14 +4026,14 @@ module Os = struct
     | Some tool ->
         match find_tool ?win_exe ?search tool with
         | Ok None as v  -> v
-        | Ok (Some t) -> Ok (Cmd.set_tool (Fpath.to_string t) cmd)
+        | Ok (Some t) -> Ok (Some (Cmd.set_tool (Fpath.to_string t) cmd))
         | Error e -> e
 
     let get ?win_exe ?search cmd = match Cmd.tool cmd with
-    | None -> Fmt.error "No tool to lookup: empty command"
+    | None -> Fmt.error "No tool to lookup: the command is empty"
     | Some tool ->
         match get_tool ?win_exe ?search tool with
-        | Ok t -> Ok (Option.get @@ Cmd.set_tool (Fpath.to_string t) cmd)
+        | Ok t -> Ok (Cmd.set_tool (Fpath.to_string t) cmd)
         | Error _ as e -> e
 
     (* Process completion statuses *)

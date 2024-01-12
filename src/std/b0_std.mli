@@ -1959,7 +1959,9 @@ module Cmd : sig
   val of_list : ?slip:string -> ('a -> string) -> 'a list -> t
   (** [of_list ?slip conv l] is {!args}[ ?slip (List.map conv l)]. *)
 
-  (** {1:tool Tools} *)
+  (** {1:tool Tools}
+
+      Tools are the first argument of commands. *)
 
   type tool = Fpath.t
   (** The type for command line tools. A command line tool is
@@ -1975,13 +1977,13 @@ module Cmd : sig
   (** [tool l] is [l]'s first element. This is [None] if the line is
       {!empty} or if the first element can't be parsed to a {!type-tool}. *)
 
-  val set_tool : tool -> t -> t option
-  (** [set_tool tool l] replaces [l]'s first element with [tool]. This
-      is [None] if [l] is {!empty}. *)
-
   val get_tool : t -> tool
   (** [get_tool] is like {!val-tool} but raises {!Invalid_argument} in case
       of error. *)
+
+  val set_tool : tool -> t -> t
+  (** [set_tool tool l] replaces [l]'s first element with [tool]. This
+      is [path l] if [l] is {!empty}. *)
 
   val pp_tool : tool Fmt.t
   (** [pp_tool] formats a tool for the TTY. *)
@@ -2808,8 +2810,17 @@ module Os : sig
     val add : var_name -> string -> t -> t
     (** [add] is {!String.Map.val-add}. *)
 
+    val remove : var_name -> t -> t
+    (** [remove] is {!String.Map.val-remove}. *)
+
+    val mem : var_name -> t -> bool
+    (** [mem] is {!String.Map.val-mem}. *)
+
     val current : unit -> (t, string) result
     (** [current ()] is the current process environment. *)
+
+    val pp : t Fmt.t
+    (** [pp] formats environments for inspection. *)
 
     (** {1:assign Process environments as assignments} *)
 
@@ -2830,6 +2841,9 @@ module Os : sig
 
     val to_assignments : t -> assignments
     (** [to_assignments env] is [env]'s bindings as assignments. *)
+
+    val pp_assignments : assignments Fmt.t
+    (** [pp] formats assignments for inspection. *)
   end
 
   (** Executing commands. *)
@@ -2871,8 +2885,7 @@ module Os : sig
       ?win_exe:bool -> ?search:Fpath.t list -> Cmd.tool list ->
       (Fpath.t, string) result
     (** [get_first_tool tools] is the first tool that can be found in the list
-        with {!find_tool} or an error if none is found. [tools] must be
-        non-empty. *)
+        with {!find_tool} or an error if none is found. *)
 
     val find : ?win_exe:bool -> ?search:Fpath.t list -> Cmd.t ->
       (Cmd.t option, string) result

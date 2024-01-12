@@ -280,7 +280,7 @@ let copy_assets m srcs ~exts ~assets_root ~dst =
   List.iter (B0_memo.file_ready m) assets;
   List.fold_left copy Fpath.Set.empty assets
 
-let web_exe ~srcs ~js ~o b =
+let html_page_exe ~srcs ~js ~o b =
   let m = B0_build.memo b in
   let build_dir = B0_build.current_build_dir b in
   let assets_root =
@@ -297,7 +297,7 @@ let web_exe ~srcs ~js ~o b =
   write_page m ~styles ~scripts:[Fpath.basename js] ~o;
   Fut.return ()
 
-let web_proc set_exe_path set_modsrcs srcs b =
+let html_page_proc set_exe_path set_modsrcs srcs b =
   let* srcs, modsrcs, jss, js, html = build_setup ~srcs b in
   (* FIXME review all this. It's a mess. web_proc is called
      by web which sets the executable to the page name. build_setup
@@ -307,9 +307,7 @@ let web_proc set_exe_path set_modsrcs srcs b =
   set_modsrcs modsrcs;
   set_exe_path html;
   let* () = js_exe ~modsrcs ~jss ~o:js b in
-  web_exe ~srcs ~js ~o:html b
-
-(* FIXME lots to factorize *)
+  html_page_exe ~srcs ~js ~o:html b
 
 (*
 let node_action build u ~args =
@@ -326,20 +324,6 @@ let node_action build u ~args =
           B0_unit.Action.exec_file build u node_exe cmd
    *)
 
-let show_uri_action build ?env ?cwd u ~args =
-  let err e = Log.err (fun m -> m "%s" e); Fut.return B0_cli.Exit.some_error in
-  match B0_unit.get_meta B0_unit.exe_file u with
-  | Error e -> err e
-  | Ok exe_file ->
-      let* exe_file = exe_file in
-      let show_uri = Fpath.v "show-url" in
-      match Os.Cmd.get_tool (* FIXME search in build *) show_uri with
-      | Error e -> err e
-      | Ok show_uri_exe ->
-          let env = Option.map Os.Env.to_assignments env in
-          let cmd = Cmd.(path show_uri_exe %% path exe_file %% args) in
-          Fut.return (Os.Exit.exec ?env ?cwd show_uri_exe cmd)
-
 let meta_base
     ~name ~modsrcs ~tool_name ~public ~requires ~assets_root:ar ~exe_path
   =
@@ -355,7 +339,6 @@ let meta_base
   |> B0_meta.tag B0_meta.exe
   |> B0_meta.add B0_unit.tool_name tool_name
   |> B0_meta.add B0_unit.exe_file exe_path
-  |> B0_meta.add_if_undef B0_unit.exec ("show-uri", show_uri_action)
 
 let exe
     ?(wrap = fun proc b -> proc b) ?doc ?(meta = B0_meta.empty)
@@ -376,7 +359,22 @@ let exe
   let proc = wrap (exe_proc set_exe_path set_modsrcs srcs) in
   B0_unit.make ?doc ~meta name proc
 
-let web
+
+(* TODO this should be removed. *)
+let show_uri_action b0_env ?env ?cwd u ~args =
+  let err e = Log.err (fun m -> m "%s" e); Ok B0_cli.Exit.some_error in
+  match B0_unit.get_meta B0_unit.exe_file u with
+  | Error e -> err e
+  | Ok exe_file ->
+      let exe_file = Fut.sync exe_file in
+      let show_uri = Fpath.v "show-url" in
+      match Os.Cmd.get_tool (* FIXME search in build *) show_uri with
+      | Error e -> err e
+      | Ok show_uri_exe ->
+          let cmd = Cmd.(path show_uri_exe %% path exe_file %% args) in
+          Ok (Os.Exit.exec ?env ?cwd show_uri_exe cmd)
+
+let html_page
     ?(wrap = fun proc b -> proc b) ?doc ?(meta = B0_meta.empty)
     ?assets_root ?requires  ?(public = false) ?name page ~srcs
   =
@@ -385,11 +383,12 @@ let web
   let exe_path, set_exe_path = Fut.make () in
   let tool_name = page in
   let base =
-    meta_base ~name ~modsrcs ~tool_name ~requires ~assets_root
-      ~public ~exe_path
+    meta_base ~name ~modsrcs ~tool_name ~requires ~assets_root ~public ~exe_path
+    |> B0_meta.add_if_undef
+      B0_unit.Exec.key (`Fun ("show-uri", show_uri_action))
   in
   let meta = B0_meta.override base ~by:meta in
-  let proc = wrap (web_proc set_exe_path set_modsrcs srcs) in
+  let proc = wrap (html_page_proc set_exe_path set_modsrcs srcs) in
   B0_unit.make ?doc ~meta name proc
 
 let () = B0_scope.close ()

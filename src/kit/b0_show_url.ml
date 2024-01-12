@@ -10,9 +10,20 @@ open Result.Syntax
 
 (* Keys *)
 
-let path =
-  let doc = "The default path to show, relative to the unit's directory." in
-  B0_meta.Key.make "path" ~doc ~pp_value:Fpath.pp
+type url =
+[ `Url of Url.t
+| `In of B0_env.dir * Fpath.t
+| `Fun of string * (B0_env.t -> B0_unit.t -> (Url.t, string) result) ]
+
+let pp_url ppf = function
+| `Url u -> Fmt.pf ppf "URL %s" u
+| `In (dir, p) -> Fmt.pf ppf "%a in %a" Fpath.pp p B0_env.pp_dir dir
+| `Fun (doc, _) -> Fmt.pf ppf "<fun> %s" doc
+
+let url : url B0_meta.key =
+  let doc = "The default URL to show." in
+  let default = `In (`Unit_dir, Fpath.v ".") in
+  B0_meta.Key.make "url" ~default ~doc ~pp_value:pp_url
 
 let listen_args =
   let doc = "The command line arguments used to listen on an authority." in
@@ -27,7 +38,7 @@ let timeout_s =
   in
   B0_meta.Key.make "timeout-s" ~doc ~default:1 ~pp_value:Fmt.int
 
-(* Action *)
+(* Server mode *)
 
 let make_server_cmd cmd args ~listen_args =
   (* Inserts ~listen_args at the end of args or before -- *)
@@ -80,46 +91,47 @@ let find_server_mode_unit = function
             in
             Fmt.error "@[%a@]" pp (entity, suggs)
 
-let server_mode env timeout_cli no_exec ~url args =
-  match Url.authority url with
-  | None -> Fmt.error "Could not extract authority from %s" url
-  | Some authority ->
-      let* endpoint = endpoint_of_url_and_authority url authority in
-      let* unit = find_server_mode_unit args in
-      match unit with
-      | None ->
-          if not no_exec then
-            (Log.warn @@ fun m ->
-             m "@[<v>No tool specified but trying to connect to %s@,\
-                Use option %a to suppress this warning.@]"
-               authority Fmt.code' "--no-exec");
-          let timeout = match timeout_cli with
-          | Some timeout -> timeout
-          | None -> B0_meta.Key.get_default timeout_s
-          in
-          Ok (`Show_url_no_exec (endpoint, timeout, url))
-      | Some (unit, args) ->
-          (* XXX at somepoint we should be able to invoke the same
+let server_mode env timeout_cli no_exec ~url args = match Url.authority url with
+| None -> Fmt.error "Could not extract authority from %s" url
+| Some authority ->
+    let* endpoint = endpoint_of_url_and_authority url authority in
+    let* unit = find_server_mode_unit args in
+    match unit with
+    | None ->
+        if not no_exec then
+          (Log.warn @@ fun m ->
+           m "@[<v>No tool specified but trying to connect to %s@,\
+              Use option %a to suppress this warning.@]"
+             authority Fmt.code' "--no-exec");
+        let timeout = match timeout_cli with
+        | Some timeout -> timeout
+        | None -> B0_meta.Key.get_default timeout_s
+        in
+        Ok (`Show_url_no_exec (endpoint, timeout, url))
+    | Some (unit, args) ->
+        (* XXX at somepoint we should be able to invoke the same
              logic as [B0_cmd_build.find_store_and_execution]. *)
-          (* XXX We might actually want to look into actions aswell.
+        (* XXX We might actually want to look into actions aswell.
              See the todo.mld for more details.
              FIXME This is quite messy we need to clarify executable
              units ideally we should be using B0_unit.find_exec *)
-          (* FIXME this should execute according to the build unit execution
+        (* FIXME this should execute according to the build unit execution
              protocol. *)
-          let* cmd = B0_env.unit_cmd env unit in
-          let timeout = match timeout_cli with
-          | Some timeout -> timeout
-          | None -> B0_unit.find_or_default_meta timeout_s unit
-          in
-          let listen_args =
-            (B0_unit.find_or_default_meta listen_args unit) ~authority
-          in
-          let cmd = make_server_cmd cmd args ~listen_args in
-          let cwd = Fut.sync (B0_unit.get_exec_cwd env unit) in
-          let env' = Fut.sync (B0_unit.get_exec_env env unit) in
-          let env' = Option.map Os.Env.to_assignments env' in
-          Ok (`Show_url_server (endpoint, timeout, url, cmd, cwd, env'))
+        let* cmd = B0_env.unit_cmd env unit in
+        let timeout = match timeout_cli with
+        | Some timeout -> timeout
+        | None -> B0_unit.find_or_default_meta timeout_s unit
+        in
+        let listen_args =
+          (B0_unit.find_or_default_meta listen_args unit) ~authority
+        in
+        let cmd = make_server_cmd cmd args ~listen_args in
+        let* cwd = B0_unit.Exec.get_cwd env unit in
+        let* env' = B0_unit.Exec.get_env env unit in
+        let env' = Os.Env.to_assignments env' in
+        Ok (`Show_url_server (endpoint, timeout, url, cmd, cwd, env'))
+
+(* Unit .show-url.url mode *)
 
 let parse_unit_specs args =
   let parse_arg arg = match String.cut_left ~sep:":" arg with
@@ -128,7 +140,24 @@ let parse_unit_specs args =
   in
   List.map parse_arg args
 
-let unit_file_mode env args =
+let url_of_path _env path =
+  let* exists = Os.Path.exists path in (* FIXME remote build the build env *)
+  if not exists
+  then Fmt.error "%a: Not such path" Fpath.pp path
+  else Ok (Fmt.str "file://%s" (Fpath.to_string path))
+
+let url_of_unit env unit =
+  match B0_unit.find_meta url unit with
+  | None -> (* The key default has a `.` segment let's avoid that for now. *)
+      url_of_path env (B0_env.unit_dir env unit)
+  | Some url ->
+      match url with
+      | `Url url -> Ok url
+      | `In (`Unit_dir, p) -> url_of_path env (B0_env.in_unit_dir env unit p)
+      | `In (dir, p) -> url_of_path env (B0_env.in_dir env dir p)
+      | `Fun (_, f) -> f env unit
+
+let unit_mode env args =
   let specs = parse_unit_specs args in
   let unit_names, paths = List.split specs in
   let* units = B0_unit.get_list_or_hint ~all_if_empty:false unit_names in
@@ -137,34 +166,30 @@ let unit_file_mode env args =
     Result.error_to_failure @@
     Result.map_error (fun e -> Fmt.str "%a: %s" Fmt.code' arg e) @@
     let build_dir = B0_build.build_dir (B0_env.build env) unit in
-    let* path = match p with
-    | None -> Ok (B0_unit.find_meta path unit)
-    | Some p -> Result.map Option.some (Fpath.of_string p)
-    in
-    let path = match path with
-    | None -> build_dir | Some p -> Fpath.(build_dir // p)
-    in
-    (* FIXME remote build the build env *)
-    let* exists = Os.Path.exists path in
-    if not exists
-    then Fmt.error "%a: Not such file" Fpath.pp path
-    else Ok (Fmt.str "file://%s" (Fpath.to_string path))
+    match p with
+    | Some p -> url_of_path env Fpath.(build_dir // v p)
+    | None -> url_of_unit env unit
   in
-  try Ok (`Show_file_urls (List.map make_url specs)) with Failure e -> Error e
+  try Ok (`Show_unit_urls (List.map make_url specs)) with Failure e -> Error e
 
-let has_url args = String.includes ~affix:"://" (List.hd args)
+(* Action *)
+
+let first_is_url args =
+  if args = [] then false else String.includes ~affix:"://" (List.hd args)
 
 let find_mode env timeout noexec args =
-  if (has_url args)
+  if first_is_url args
   then server_mode env timeout noexec ~url:(List.hd args) (List.tl args)
-  else unit_file_mode env args
+  else unit_mode env args
 
-let dyn_units ~args = (* This is all very hackish and should be streamlines *)
+let dyn_units ~args =
+  (* XXX This is all very hackish we need a better mecanism.
+     Actions should be able to requests units after they parsed their cli. *)
   let args = Cmd.to_list args in
   let is_opt = String.starts_with ~prefix:"-" in
   let args = List.filter (Fun.negate is_opt) args in
   Log.if_error ~use:[] @@
-  let unit_file_mode_units args =
+  let unit_mode_units args =
     let units = List.map fst (parse_unit_specs args) in
     B0_unit.get_list_or_hint ~all_if_empty:false units
   in
@@ -173,9 +198,9 @@ let dyn_units ~args = (* This is all very hackish and should be streamlines *)
     match unit with
     | None -> Ok [] | Some (u, _) -> Ok [u]
   in
-  if has_url args
+  if first_is_url args
   then server_mode_unit args
-  else unit_file_mode_units args
+  else unit_mode_units args
 
 let show_url env browser prefix background timeout dry_run no_exec args =
   (* XXX need to fix search argument of B0_web_browser and lookup in build *)
@@ -195,7 +220,7 @@ let show_url env browser prefix background timeout dry_run no_exec args =
   | `Show_url_server (endpoint, timeout, url, cmd, cwd, env) ->
       if dry_run
       then (Log.app (fun m -> m "%a" Cmd.pp cmd); Ok B0_cli.Exit.ok) else
-      let* server = Os.Cmd.spawn ?cwd ?env cmd in
+      let* server = Os.Cmd.spawn ~cwd ~env cmd in
       let* () =
         let timeout = secs timeout in
         Os.Socket.Endpoint.wait_connectable' ~timeout endpoint
@@ -204,7 +229,7 @@ let show_url env browser prefix background timeout dry_run no_exec args =
       let* st = Os.Cmd.spawn_wait_status server in
       let code = match st with `Exited c -> c | `Signaled c -> 128 + c in
       Ok (Os.Exit.code code)
-  | `Show_file_urls urls ->
+  | `Show_unit_urls urls ->
       let* () =
         if dry_run
         then (Log.app (fun m -> m "@[<v>%a@]" Fmt.(list string) urls); Ok ())
@@ -232,9 +257,9 @@ let show_url_cmd action env =
           $(i,UNIT[:PATH]) argument, the $(i,UNIT) is built, $(i,PATH) \
           is made absolute in $(i,UNIT)'s build directory and turned \
           into a $(b,file://) URL. If $(i,PATH) is unspecified the value \
-          specified in the unit's $(b,B0_show_url.path) key is used; \
+          specified in the unit's $(b,B0_show_url.url) key is used; \
           defaults to the unit's build directory. \
-          Consult $(b,b0 get .show-url.path) $(i,UNIT) for \
+          Consult $(b,b0 get .show-url.url) $(i,UNIT) for \
           the concrete value.";
       `P "In the second mode of operation the given $(i,ENTITY) is built,
           this can be a tool name or an executable UNIT name (TODO eventually

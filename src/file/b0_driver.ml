@@ -45,6 +45,7 @@ module Conf = struct
       b0_file : Fpath.t option;
       cache_dir : Fpath.t;
       cwd : Fpath.t;
+      env : Os.Env.t;
       code : B0_ocaml.Code.t option;
       hash_fun : (module Hash.T);
       jobs : int;
@@ -53,22 +54,22 @@ module Conf = struct
       memo : (B0_memo.t, string) result Lazy.t;
       tty_cap : Tty.cap; }
 
-  let memo ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs =
+  let memo ~hash_fun ~cwd ~env ~cache_dir ~trash_dir ~jobs =
     let feedback =
       let op_howto ppf o = Fmt.pf ppf "b0 file log --id %d" (B0_zero.Op.id o) in
       let show_op = Log.Info and show_ui = Log.Error and level = Log.level () in
       B0_cli.Memo.pp_leveled_feedback ~op_howto ~show_op ~show_ui ~level
         Fmt.stderr
     in
-    B0_memo.make ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs ~feedback ()
+    B0_memo.make ~hash_fun ~cwd ~env ~cache_dir ~trash_dir ~jobs ~feedback ()
 
   let make
-      ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~hash_fun ~jobs
+      ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~env ~hash_fun ~jobs
       ~log_level ~no_pager ~tty_cap ()
     =
     let trash_dir = Fpath.(b0_dir / B0_cli.Memo.trash_dir_name) in
-    let memo = lazy (memo ~hash_fun ~cwd ~cache_dir ~trash_dir ~jobs) in
-    { b0_dir; b0_file; cache_dir; cwd; code; hash_fun; jobs;
+    let memo = lazy (memo ~hash_fun ~cwd ~env ~cache_dir ~trash_dir ~jobs) in
+    { b0_dir; b0_file; cache_dir; cwd; code; env; hash_fun; jobs;
       memo; log_level; no_pager; tty_cap }
 
   let b0_dir c = c.b0_dir
@@ -76,6 +77,7 @@ module Conf = struct
   let cache_dir c = c.cache_dir
   let cwd c = c.cwd
   let code c = c.code
+  let env c = c.env
   let hash_fun c = c.hash_fun
   let jobs c = c.jobs
   let log_level c = c.log_level
@@ -115,14 +117,15 @@ module Conf = struct
     let tty_cap = B0_cli.B0_std.get_tty_cap tty_cap in
     let log_level = B0_cli.B0_std.get_log_level log_level in
     B0_cli.B0_std.setup tty_cap log_level ~log_spawns:Log.Debug;
-    Result.bind (Os.Dir.cwd ()) @@ fun cwd ->
+    let* cwd = Os.Dir.cwd () in
+    let* env = Os.Env.current () in
     let b0_file = find_b0_file ~cwd ~b0_file in
     let root = match b0_file with Some f -> Fpath.parent f | None -> cwd  in
     let b0_dir = B0_cli.Memo.get_b0_dir ~cwd ~root ~b0_dir in
     let cache_dir = B0_cli.Memo.get_cache_dir ~cwd ~b0_dir ~cache_dir in
     let hash_fun = B0_cli.Memo.get_hash_fun ~hash_fun in
     let jobs = B0_cli.Memo.get_jobs ~jobs in
-    Ok (make ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~hash_fun
+    Ok (make ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~env ~hash_fun
           ~jobs ~log_level ~no_pager ~tty_cap ())
 end
 

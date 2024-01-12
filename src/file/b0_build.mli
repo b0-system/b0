@@ -11,7 +11,7 @@ open B0_std
 
 (** {1:builds Build} *)
 
-type t = B0_unit.build
+type t = B0_unit.b0_build
 (** The type for builds. *)
 
 val memo : t -> B0_memo.t

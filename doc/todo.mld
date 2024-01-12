@@ -1,18 +1,26 @@
 {0:design_todo Design considerations and todo}
 
+- [git grep] [XXX], [TODO] and [FIXME].
+
+{1:next Next}
+
+- Remove {!B0_dir}
 
 {1:b0_std [b0.std] library}
 
-{ul
-{- Review the tool lookup stuff. First we may want to
-   generalize the lookup path to a function (rather than list of paths).
-   Then maybe we should simply have a DLS global.}}
+- Review the tool lookup stuff. First we may want to generalize the
+  lookup path to a function (rather than list of paths).  Then maybe
+  we should simply have a DLS global (really ?).
+- {!B0_std.Os.Fd.copy} use [sendfile] on Unix. On macOS we could use
+  [clonefile] (> 10.12) or [copyfile] (> 10.5, uses clonefile if supported)
+  – note though that this work on paths.
+  See also {{:https://man7.org/linux/man-pages/man2/copy_file_range.2.html}
+  copy_file_range}.
 
 {1:design_b0 [b0.memo] library}
 
 - The signature of {!B0_memo.write} looks wrong you want a fut. E.g.
-  we don't want to the [Fut.sync] here.
-
+  we don't want to the [Fut.sync] here:
   {[
 let crunch_file m file ~in_dir =
   let open Fut.Syntax in
@@ -24,64 +32,65 @@ let crunch_file m file ~in_dir =
   Ok (B0_memo_ocaml.Crunch.string_to_string ~id:"file" ~data)
   end;
   Fut.return out
-
 ]}
 
 {1:design_b0_file [b0.file] library}
 
-{ul
-{- [B0.ml] file finding. Should we stop at the last B0.ml file upwards ?
-   This would be nice if you operate in a vendored dir. But this also
-   avoid problems like I do a checkout e.g. in a scratch directory in
-   [_b0] to build it. On the other hand we have [--b0-file] for these cases.}
-{- Should a [@@@B0.version] be added ? Think harder about
-   it an especially with respect to [B0_kit.V000] versioning. and
-   coherence with [@@@B0.include]s. Also we could require to specify
-   say [#require "b0.kit.v000"]. Write down a few properties
-   we would like to have w.r.t. opam and/or inclusion and end-user
-   support. If we use [@@@B0.version] rather than open we might get
-   in trouble with merlin. }
-{- Scope name for libraries the [lib] think may not be that
-   good and rather confusing. Maybe devise a specific notation
-   to access library definitions and allow dots in their name.
-   (["/my.def.bla"])}}
+- [B0.ml] file finding. Should we stop at the last (vs the first now)
+  B0.ml file upwards ? This would be nice if you operate in a vendored
+  dir. But this also avoid problems like I do a checkout e.g. in a
+  scratch directory in [_b0] to build it. On the other hand we have
+  [--b0-file] for these cases.
+
+- Should a [@@@B0.version] be added ? Think harder about
+  it an especially with respect to [B0_kit.V000] versioning. and
+  coherence with [@@@B0.include]s. Also we could require to specify
+  say [#require "b0.kit.v000"]. Write down a few properties
+  we would like to have w.r.t. opam and/or inclusion and end-user
+  support. Also if we use [@@@B0.version] rather than open we might get
+  in trouble with merlin. If would rather say no.
 
 {2:fragments Build fragments}
 
 At the B0 level we need to expose build fragments. It seems the build
-procedures of units is a good candidate but for now it's a bit unconvient
-to do that. We need to clarify the configuration store and dynamic
-metadata see {!b0_meta}.
+procedures of units is a good candidate but for now it's a bit
+unconvient to do that. We need to clarify the configuration store and
+dynamic metadata see {!b0_meta}. For now as a temporary hack we add
+the [wrap] parameter to units.
 
-For now as a temporary hack we add the [wrap] parameter to units.
+{2:b0_scope [B0_scope]}
+
+* Is still quite dirty. Review.
 
 {2:b0_env [B0_env]}
 
+- Consider merging [B0_build] into [B0_env]. Rethink that
+  when get back to redo build variants.
+
 - Maybe we should start exposing a mini [Os] in [B0_env] for
-  actions. This might be needed for remote builds. In fact
-  at some point we should indicate on which Os the action
-  happens [`Build], [`Host] or [`Driver] (b0 invocation).
-  Not sure we need the last one. Maybe it's then sufficient
-  to a proxy dance by executing the same b0 driver executable
-  on the remote platform, at which point the [Os] invocation
-  run on the right platform. Do we ever want mixed [`Build] and
-  [`Host] ? Not undoable but a bit cold feet on replacating all
-  the `Os` module.
+  actions. This might be needed for remote builds. In fact at some
+  point we should indicate on which Os the action happens [`Build],
+  [`Host] or [`Driver] (b0 invocation). Maybe it's then sufficient to
+  a do proxy dance by executing the same b0 driver executable on the
+  remote platform, at which point the [Os] invocation run on the right
+  platform. Do we ever want mixed [`Build] and [`Host] ? Not undoable
+  but a bit cold feet on replicating all the {!B0_std.Os} module
+  in {!B0_env} to allow that.
 
 {2:b0_action [B0_action]}
 
-- Maybe we could specify an option that an action always requires a
-  build and defaults to the default build if none is explicitely
-  specified. This could be useful or not for [.ocaml ocaml]. Though
-  you likely often only want to test an excutable so it's just a [b0
-  -u myexec -- .ocaml ocaml].
+- Maybe we could specify an option that allows an action to always
+  requires a build and defaults to the default build if none is
+  explicitely specified. This could be useful or not for [.ocaml
+  ocaml]. Though you likely often only want to test an excutable or
+  library so it's just a [b0 -u myexec -- .ocaml ocaml].
 
 - Store keys on the build of an action, that works but it means we
   can't do that on specific subcommands when the action is a cmdliner
-  group cmd. E.g. it would be nice to have everything for `ocaml`
-  under `.ocaml` but `.ocaml ocaml` or `.ocaml utop` will want a byte
-  code build and `.ocaml ocamlnat` will want a native code build. So
-  for now we have `.ocaml.ocaml`
+  group command. E.g. it would be nice to have everything for [ocaml]
+  under [.ocaml] but `.ocaml ocaml` will want a byte code build and
+  `.ocaml ocamlnat` will want a native code build. So for now we have
+  `.ocaml.ocaml`.
 
 - Access control. Maybe actions accessing the full builds opens a can
   of worms (or not) we could try to enforce more access control via
@@ -90,34 +99,49 @@ For now as a temporary hack we add the [wrap] parameter to units.
 - Execution logic. Unit name and action name conflicting should be
   resolved locally. If a tool conflicts with action warn but use tool,
   [b0 action exec] can be used for the action. If a tool conflicts
-  with a unit warn if it's not the same unit. We should again add a
-  [b0 unit exec], we should also maybe add a [b0 tool] command.
+  with a unit warn if it's not the same unit. We should have all of
+  [b0 unit exec], [b0 tool exec] and [b0 action exec] to resolve
+  conflicts.
 
 - The current scheme is not yet what we want.  One reason is that it's
   not a good idea to first build and then parse the cli args, we
   should error asap. The second one is that we really want some
-  actions to be able to define what to build dynamically. This is
-  unconvenient to do right now.
+  actions to be able to define what to build dynamically; but it's
+  likely a good thing to forbid new builds then the action runs. This
+  is unconvenient to do right now (there is a hack).
 
+- Action vs Unit exection. Look for signature unifications.
 
-{2:b0_unit [B0_unit]}
+{2:b0_build [B0_build]}
 
-For now we used ['a Fut B0_meta.key].
-{ul
-{- See how it goes fares for sync. Push/pull.}
-{- What about serializing them so that it can be read
-   by `b0 unit get` ?}
-{- Why do unit exec not use {!B0_env} ? There is logic
-   we want to reuse there, e.g. lookup for tools in the build.}}
+- More design is needed around {!B0_unit.tool_is_user_accessible} in
+  builds. The {!B0_unit.in_root_scope} logic entails that build
+  procedures may work when a build procedure may work when defined
+  in a [B0.ml] file and used as a root but no longer when it is
+  included. Not good.
 
 {2:b0_meta [B0_meta]}
 
+- Move {!B0_meta.Key} to [B0_key] ?
 - They used to be serializable, see if we don't want that again. Especially
-  in the optic of a merge with B0_store.
-- I think keys should be scoped or B0_defs (but that depends on B0_meta)
-- In the context of a merge with [B0_store] it should be possible
-  to determine keys in various ways without needing to be explicit
-  about it like the datatype of {!B0_unit.val-exec_env} is.
+  in the optic of a merge with B0_store. For dynamic keys it would also be
+  nice to see what a build determined.
+
+- Dynamic values. Comment dump.
+
+  In the context of a merge with [B0_store] it should be possible to
+  determine keys in various ways without needing to be explicit about
+  it like for example the datatype of {!B0_unit.Exec.type-env} is. But
+  If we build dynamics directly into keys, we should keep the option to
+  keep keys static only.
+
+  It remains we want to built-in dynamic keys. Maybe explicit better
+  as it allows to specify the dynamism scope on a key per key basis
+  via the arguments of the function. We should however agree on a
+  return type.
+
+  Dynamics. For now we used ['a Fut B0_meta.key] or functional
+  keys (see {!B0_unit.Exec}. See how it goes fares for sync. Push/pull.
 
 {2:b0_store [B0_store]}
 
@@ -133,19 +157,30 @@ the build variant level.
 
 - We should let constraints be defined on libraries. Then we can
   auto-generate opam constraints.
-- Implement the [public] visibility stuff in the library resolver.
+- In the library resolver implement a mecanism that allows
+  to specify public/private (scope), deprecation and block policies.
+- [.ocaml findmod MOD], some stuff of `omod` could be integrated.
+- Make libraries executable: load them in `ocaml` or `ocamlnat`.
+
+{2:b0_srcs [B0_srcs]}
+
+- Review.
+- Integrate watermarks, needs ini.
 
 {1:b0_kit [b0.kit] library}
 
-{2:b0_opam [B0_opam]}
+{2:b0_c [B0_c]}
 
-- Worfklow to easily check opam file in sync. Part of more general
-  workflow ? In fact it would be better to have
- {:https://github.com/ocaml/opam/issues/3797}
+Is missing.
 
-{2:b0_expect [B0_expect]}
+{2:b0_dune [B0_dune]}
 
-- Default cli driver, integrate with the plans on general actions.
+On hold until we get the {!B0_srcs} thing right.
+
+{2:b0_expect [B0_expect] and testing}
+
+- Default cli driver, needs a new design round now that we
+  have actions.
 - Parallel execution
 - Progress
 - VCS agnostic, i.e. fill-in the hg support
@@ -170,10 +205,22 @@ the build variant level.
   {- short, only final summary}}
 - Add a small manual to the action.
 
+{2:b0_opam [B0_opam]}
+
+- Worfklow to easily check opam file in sync. Part of more general
+  workflow ? In fact it would be better to have
+  {:https://github.com/ocaml/opam/issues/3797}
+
+{2:b0_release [B0_release]}
+
+- Finish the support. Notably implement archive linting and building.
+- Implement [.release publish].
+- Review and finish the docs.
+
 {2:b0_show_url [B0_show_url]}
 
 {ul
-{- For now only toolname defined in units (as defined by [b0 tool list]) can
+{- For now only tool names defined in units (as defined by [b0 tool list]) can
    be used for the URL/tool execution form.
 
    We likely want to be able to use it with actions aswell. But this
@@ -183,16 +230,62 @@ the build variant level.
    and for example the pack and units requires need to be able to be
    defined dynamically.
 
-   Basically currently it's difficult for actions to invoke actions.}}
+   Basically the larger problems seems to be that currently it's
+   difficult for actions to invoke actions.}}
+
+{2:b0_jsoo B0_jsoo}
+
+Got a bit stuck on trying to clean up the main units and getting
+rid of the [show-uri] bespoke action because [.show-url.url] has
+not future support and {!B0_jsoo.html_page} relies on that, but then
+maybe it shouldn't. Unit ideas:
+
+1. Unit exe (js only)
+2. Unit html_page or bundle (more or less what current {!B0_jsoo_html_page}.
+3. Unit packed_html_page (packs all resource for single file distribution).
+
+{1:tool Tool}
+
+- Add a `b0 dir` command.
+
+{2:deploy Deploy}
+
+For now let's see where the new actions bring us. But the idea. Is
+that a deploy is a way to selectively "save" the build.
+
+Units should have a function that list what they want to save
+given a deploy env. This should just be a predicate, with keys
+possibly depending on build logics.
+
+{v
+  b0 deploy web
+  b0 deploy install
+  b0 deploy -u unit install
+v}
+
+{2:test Test}
+
+- b0 test list
+- Add [b0 test] that run tests mark as such (or
+  rather skips those unmarked).
+- Testing executables, convention [test/$(unit)/suite.ini]
+  b0 test -u test -t
+  b0 bench -u bench -t
 
 {1:doc Documentation overhaul}
 
-- Howto on action/unit execution
+- How to on action/unit execution
 
-- B0.ml file style guide. Toplevel defs, constructor at the
-  end except for actions. doc strings either inline or first thing
-  after defining [let].
+- [B0.ml] file style guide. Toplevel defs, constructor at the
+  end except for actions. Doc strings either inline or first thing
+  defining [let] (lisp style).
 
 - Metadata convention. While it may entail user errors if certain
   meta is needed by build unit. It's better that the optional
   `meta` always provides a final override over any key.
+
+{1:dump Dump}
+
+- Profile stuff
+  {v xcrun xctrace record --template='Time Profiler' --launch -- \
+  $(b0 --path -- zipc unzip -t tmp/ebook.epub) v}

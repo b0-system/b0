@@ -6,16 +6,16 @@
 (** Build units.
 
     A build unit is a named build procedure with metadata associated
-    to it. Build units are the smallest unit of build in B0. *)
+    to it. Build units are the smallest unit of build in B0 files. *)
 
 open B0_std
 
 (** {1:proc Build procedures} *)
 
-type build
+type b0_build
 (** The type for builds, see {!B0_build}. *)
 
-type build_proc = build -> unit Fut.t
+type build_proc = b0_build -> unit Fut.t
 (** The type for unit build procedures. Note that when the future
     determines the build may not be finished. *)
 
@@ -34,63 +34,7 @@ val make : ?doc:string -> ?meta:B0_meta.t -> string -> build_proc -> t
 val build_proc : t -> build_proc
 (** [proc u] are the unit's build procedure. *)
 
-(** {1:meta Unit executions}
-
-    These properties pertain to the interface that allows to execute
-    units after they have been built as is done for example by the
-    [b0] command.
-
-    Execution procedure, will likely be refined when we get proper
-    build environments and cross.
-
-    {ul
-    {- If the unit's {!exec} is defined this is invoked with
-       the result of {!get_exec_env} and {!get_exec_cwd}.}
-    {- Otherwise {!exe_file} is executed with cwd and environemts
-       defined y {!get_exec_env} and {!get_exec_cwd}}} *)
-
-type env
-(** The type for execution environments, see {!B0_env}. *)
-
-(** {2:env Environment} *)
-
-type exec_env =
-[ `Build_env (** The build's environment. *)
-| `Build_env_override of Os.Env.t
-   (** The build's environment overriden by give values. *)
-| `Custom_env of string * (env -> t -> Os.Env.t Fut.t)
-   (** Doc string and function. *)
-| `Env of Os.Env.t (** This exact environment. *) ]
-(** The type for execution environments. *)
-
-val exec_env : exec_env B0_meta.key
-(** [exec_env] is the default execution environment. If unspecified this
-    is [`Build_env].  *)
-
-val get_exec_env : env -> t -> Os.Env.t option Fut.t
-(** [get_exec_env b u] performs the logic to get the execution environment. *)
-
-(** {2:cwd Cwd} *)
-
-type exec_cwd =
-[ `Build_dir (** The entity's build directory. *)
-| `Cwd (** The user's current working directory. *)
-| `Custom_dir of string * (env -> t -> Fpath.t Fut.t)
-   (** Doc string and function. *)
-| `In of [ `Build_dir | `Root_dir | `Scope_dir ] * Fpath.t
-| `Root_dir (** The root B0 file directory. *)
-| `Scope_dir (** The directory of the scope where the entity is defined. *) ]
-(** The type for specifying execution's current working directory. *)
-
-val exec_cwd : exec_cwd B0_meta.key
-(** [exec_cwd] is the default current working directory for executing
-    an entity. If unspecified this should be [`Cwd] which should be
-    the users's current working directory. *)
-
-val get_exec_cwd : env -> t -> Fpath.t option Fut.t
-(** [get_exec_cwd b u] performs the logic to get the cwd. *)
-
-(** {2:execution Execution} *)
+(** {2:executable Metadata for built executables} *)
 
 val tool_name : string B0_meta.key
 (** [tool_name] is an executable name without the platform specific
@@ -98,21 +42,6 @@ val tool_name : string B0_meta.key
 
 val exe_file : Fpath.t Fut.t B0_meta.key
 (** [exe_file] is an absolute file path to an executable build by the unit. *)
-
-val exec :
-  (string *
-   (env -> ?env:Os.Env.t -> ?cwd:Fpath.t -> t -> args:Cmd.t ->
-    Os.Exit.t Fut.t)) B0_meta.key
-(** [exec] is a metadata key to store a custom execution procedure.
-    The string is a doc string for the procedure.
-    The function is given the build, the result of {!get_exec_env} and
-    {!get_exec_cwd} and the arguments to give to the procedure. *)
-
-val find_exec : t -> (env -> t -> args:Cmd.t -> Os.Exit.t Fut.t) option
-(** [find_exec b u] if either {!val-exe_file} or {!val-exec} is defined
-    returns a function to call that  determines
-    {!get_exec_env} and {!get_exec_cwd} and runs {!val-exec} or
-    {!B0_std.Os.Exit.exec} with {!exe_file}. *)
 
 val is_public : t -> bool
 (** [is_public u] is [true] iff [u]'s meta has {!B0_meta.public}
@@ -126,6 +55,101 @@ val tool_is_user_accessible : t -> bool
 (** [tool_is_user_accessible u] assumes [u] has a tool name. This then
     returns [true] iff [u] {!is_public} or {!in_root_scope}. *)
 
+(** {1:meta Unit executions}  *)
+
+type b0_env
+(** The type for execution environments, see {!B0_env}. *)
+
+(** Unit executions.
+
+    These properties pertain to the interface that allows to execute
+    units after they have been built as is done for example by the
+    [b0] command.
+
+    The execution procedure, will likely be refined when we get proper
+    build environments and cross but basically:
+
+    {ul
+    {- The environment and the cwd are respectively defined
+       by {!Exec.get_env} and {!Exec.get_cwd}. Additional
+       cli arguments may be provided by the driver.}
+    {- The actual entity to execute is either defined by {!Exec.key} if present
+       or by {!B0_unit.exe_file}}} *)
+module Exec : sig
+
+  type b0_unit := t
+
+  (** {1:env Environment} *)
+
+  type env =
+  [ `Build_env (** The build environment. *)
+  | `Driver_env (** The b0 invocation process environment. *)
+  | `Override of [`Build_env | `Driver_env] * Os.Env.t
+  (** Environment overriden by given values. *)
+  | `Env of Os.Env.t (** This exact environment. *)
+  | `Fun of string * (b0_env -> b0_unit -> (Os.Env.t, string) result)
+    (** Doc string and function. *) ]
+  (** The type for execution environments. *)
+
+  val env : env B0_meta.key
+  (** [env] specifies the environement for executing a unit. If unspecified
+      this is [`Build_env].  *)
+
+  val get_env : b0_env -> b0_unit -> (Os.Env.t, string) result
+  (** [get_env env u] performs the logic to get the execution
+      environment for unit [u] in environment [env]. *)
+
+  (** {1:cwd Cwd} *)
+
+  type cwd =
+  [ `Cwd (** The user's current working directory. *)
+  | `Root_dir (** The root B0 file directory. *)
+  | `Scope_dir (** The directory of the scope where the entity is defined. *)
+  | `Unit_dir (** The unit's build directory. *)
+  | `In of [ `Cwd | `Unit_dir | `Root_dir | `Scope_dir ] * Fpath.t
+  | `Fun of string * (b0_env -> b0_unit -> (Fpath.t, string) Result.t)
+    (** Doc string and function. *) ]
+  (** The type for execution working directories. *)
+
+  val cwd : cwd B0_meta.key
+  (** [cwd] specifies the current working directory for executing a unit.
+      If unspecified this is [`Cwd]. *)
+
+  val get_cwd : b0_env -> b0_unit -> (Fpath.t, string) result
+  (** [get_cwd env u] performs the logic to get the cwd for unit [u] in
+      environment [env]. *)
+
+  (** {1:execution Execution} *)
+
+  type t =
+    [ `Unit_exe (** The unit's {!exe_file} *)
+    | `Cmd of string *
+              (b0_env -> b0_unit -> args:Cmd.t -> (Cmd.t, string) result)
+      (** Doc string and a function that returns a command to execute *)
+    | `Fun of
+        string *
+        (b0_env -> ?env:Os.Env.assignments -> ?cwd:Fpath.t ->
+         b0_unit -> args:Cmd.t -> (Os.Exit.t, string) result)
+  (** Doc string and a function. The function is given the result
+      of {!get_cwd} and {!get_env}. *)
+   ]
+  (** The type for specifying unit executions. *)
+
+  val key : t B0_meta.key
+  (** [key] specifies the execution for a unit. If unspecified this is
+      [`Unit_exe]. *)
+
+  val find :
+    b0_unit ->
+    (b0_env -> b0_unit -> args:Cmd.t -> (Os.Exit.t, string) result) option
+    (** [find u] is a function, if any, for executing unit [u]. The
+        Given the environment, the unit and additional arguments potentially
+        provided by the driver it performs the full execution logic. *)
+(*
+val find_exec_cmd : env -> t -> (Cmd.t Fut.t option, string) result
+*)
+end
+
 (** {1:b0_def B0 definition API} *)
 
 include B0_def.S with type t := t (** @inline *)
@@ -137,7 +161,7 @@ val tool_name_map : Set.t -> t String.Map.t
 (**/**)
 module Build : sig
   type build_unit := t
-  type t = build
+  type t = b0_build
   val memo : t -> B0_memo.t
   val must_build : t -> Set.t
   val may_build : t -> Set.t
@@ -167,13 +191,13 @@ end
 
 module Env : sig
   type build_unit := t
-  type t = env
+  type t = b0_env
   val make :
-    b0_dir:Fpath.t ->
-    build:Build.t ->
-    cwd:Fpath.t ->
-    root_dir:Fpath.t -> scope_dir:Fpath.t -> t
+    b0_dir:Fpath.t -> build:Build.t -> cwd:Fpath.t -> root_dir:Fpath.t ->
+    scope_dir:Fpath.t -> driver_env:Os.Env.t -> t
+
   val b0_dir : t -> Fpath.t
+  val build : t -> Build.t
   val cwd : t -> Fpath.t
   val root_dir : t -> Fpath.t
   val scope_dir : t -> Fpath.t
@@ -183,13 +207,21 @@ module Env : sig
   val in_scope_dir : t -> Fpath.t -> Fpath.t
   val in_scratch_dir : t -> Fpath.t -> Fpath.t
   val in_unit_dir : t -> build_unit -> Fpath.t -> Fpath.t
-  val build : t -> Build.t
-  val get_tool :
-    ?no_build:bool ->
-    'a -> Cmd.tool -> (Fpath.t, string) result
-  val get_cmd :
-    ?no_build:bool -> 'a -> Cmd.t -> (Cmd.t, string) result
-  val unit_file_exe : t -> build_unit -> (Fpath.t, string) result
+
+  type dir = [`Cwd | `Root_dir | `Scope_dir | `Unit_dir ]
+  val pp_dir : dir Fmt.t
+  val dir : t -> dir -> Fpath.t
+  val in_dir : t -> dir -> Fpath.t -> Fpath.t
+
+  type env = [`Build_env | `Driver_env]
+  val pp_env : env Fmt.t
+  val build_env : t -> Os.Env.t
+  val driver_env : t -> Os.Env.t
+  val env : t -> env -> Os.Env.t
+
+  val get_tool : ?skip_build:bool -> t -> Cmd.tool -> (Fpath.t, string) result
+  val get_cmd : ?skip_build:bool -> t -> Cmd.t -> (Cmd.t, string) result
+  val unit_exe_file : t -> build_unit -> (Fpath.t, string) result
   val unit_cmd : t -> Set.elt -> (Cmd.t, string) result
 end
 (**/**)

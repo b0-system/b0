@@ -11,12 +11,12 @@
 
 open B0_std
 
-type t = B0_unit.env
+type t = B0_unit.b0_env
 (** The type for execution environments. *)
 
 val make :
   b0_dir:Fpath.t -> build:B0_build.t -> cwd:Fpath.t -> root_dir:Fpath.t ->
-  scope_dir:Fpath.t -> t
+  scope_dir:Fpath.t -> driver_env:Os.Env.t -> t
 (** [make ~cwd ~scope_dir ~root_dir ~action] is an execution context
     with given parameters. See corresponding accessors for semantics. *)
 
@@ -48,6 +48,16 @@ val unit_dir : t -> B0_unit.t -> Fpath.t
 (** [unit_dir env u] is the build directory if [u] in the
     build [build env]. That is {!B0_build.build_dir} [(build env) u]. *)
 
+type dir = [`Cwd | `Root_dir | `Scope_dir | `Unit_dir ]
+(** The type for speciying directories. *)
+
+val pp_dir : dir Fmt.t
+(** [pp_dir] formats directory specification for ui purposes. *)
+
+val dir : t -> dir -> Fpath.t
+(** [dir env d] looks up [d] in [env], raises [Invalid_argument]
+    on [`Unit_dir]. *)
+
 (** {1:rel Relative file resolution} *)
 
 val in_root_dir : t -> Fpath.t -> Fpath.t
@@ -62,6 +72,28 @@ val in_scratch_dir : t -> Fpath.t -> Fpath.t
 val in_unit_dir : t -> B0_unit.t -> Fpath.t -> Fpath.t
 (** [in_unit_dir env u p] is [Fpath.(unit_build_dir env // p)]. *)
 
+val in_dir : t -> dir -> Fpath.t -> Fpath.t
+(** [in_dir env d p] is [Fpath.(in_dir env d // p)]. *)
+
+(** {1:env Process environments} *)
+
+type env =
+[ `Build_env (** Base build process environment. *)
+| `Driver_env (** Environment of the [b0] invocation. *) ]
+(** The type for environments. *)
+
+val pp_env : env Fmt.t
+(** [pp_env] formats environments. *)
+
+val build_env : t -> Os.Env.t
+(** [build_env env] is the base build process environment. *)
+
+val driver_env : t -> Os.Env.t
+(** [driver_env env] is the environment with which [b0] was invoked. *)
+
+val env : t -> env -> Os.Env.t
+(** [env env e] is the environment [e] of [env]. *)
+
 (** {1:build Build} *)
 
 val build : t -> B0_build.t
@@ -69,7 +101,20 @@ val build : t -> B0_build.t
 
 (** {1:tool Tool lookup} *)
 
-val get_tool : ?no_build:bool -> t -> Fpath.t -> (Fpath.t, string) result
-val get_cmd : ?no_build:bool -> t -> Cmd.t -> (Cmd.t, string) result
-val unit_file_exe : t -> B0_unit.t -> (Fpath.t, string) result
+val get_tool : ?skip_build:bool -> t -> Cmd.tool -> (Cmd.tool, string) result
+(** [get_tool env tool] looks up the file path to of tool [tool] in
+    the environment. If [tool] is defined by a unit in the build and
+    is {!B0_unit.tool_is_user_accessible}, it comes first in the
+    search, unless [skip_build] is [true] (defaults to [false]. *)
+
+val get_cmd : ?skip_build:bool -> t -> Cmd.t -> (Cmd.t, string) result
+(** [get_cmd] performs {!get_tool} on the command's tool. *)
+
+val unit_exe_file : t -> B0_unit.t -> (Fpath.t, string) result
+(** [unit_exe_file env u] looks up the {!B0_unit.exe_file}
+    of [u] in [env]. This errors if [u] can't be found in the build
+    of if [u] has no such key. *)
+
 val unit_cmd : t -> B0_unit.t -> (Cmd.t, string) result
+(** [unit_cmd env u] is like {!unit_exe_file} but returns a command
+    instead. *)

@@ -225,13 +225,14 @@ let executor_env build def c =
   let root_dir = Fpath.parent @@ Option.get @@ B0_driver.Conf.b0_file c in
   let scope_dir = Option.value (B0_def.scope_dir def) ~default:root_dir in
   let b0_dir = B0_driver.Conf.b0_dir c in
-  B0_env.make ~cwd ~scope_dir ~root_dir ~b0_dir ~build
+  let driver_env = B0_driver.Conf.env c in
+  B0_env.make ~cwd ~scope_dir ~root_dir ~b0_dir ~build ~driver_env
 
 let action_executor show_path build action c = match show_path with
 | false ->
     let func = B0_action.func action in
     let env = executor_env build (B0_action.def action) c in
-    let exec ~args = func action env ~args in
+    let exec ~args = Ok (func action env ~args) in
     Ok (Some exec)
 | true -> (* We could show the path to the b0 driver, bof. *)
     Fmt.error "%a has no path, it is an action not an executable unit"
@@ -246,15 +247,15 @@ let unit_executor show_path build u c =
     (* N.B. it seems there's no way of quoting to make the shell notation $()
        work if args or p have spaces !? *)
     Log.app (fun m -> m "%a" Cmd.pp Cmd.(path p %% args));
-    B0_cli.Exit.ok
+    Ok B0_cli.Exit.ok
   in
-  match B0_unit.find_exec u with
+  match B0_unit.Exec.find u with
   | None -> warn_noexec u; Ok None
   | Some exec ->
       match show_path with
       | false ->
           let env = executor_env build (B0_unit.def u) c in
-          Ok (Some (fun ~args -> Fut.sync (exec env u ~args)))
+          Ok (Some (fun ~args -> exec env u ~args))
       | true ->
           match B0_unit.find_meta B0_unit.exe_file u with
           | Some path -> Ok (Some (fun ~args -> show (Fut.sync path) ~args))
@@ -311,7 +312,7 @@ let build units x_units packs x_packs what lock show_path action args c =
   | Ok () ->
       match executor with
       | None -> Ok B0_cli.Exit.ok
-      | Some executor -> Ok (executor ~args:(Cmd.list args))
+      | Some executor -> executor ~args:(Cmd.list args)
 
 (* Command line interface *)
 

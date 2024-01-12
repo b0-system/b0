@@ -82,15 +82,15 @@ val exe :
     }
 *)
 
-(** {2:web Web of files} *)
+(** {2:html_page HTML page} *)
 
-val web :
+val html_page :
   ?wrap:(B0_unit.build_proc -> B0_unit.build_proc) -> ?doc:string ->
   ?meta:B0_meta.t -> ?assets_root:Fpath.t ->
   ?requires:B0_ocaml.Libname.t list -> ?public:bool ->
   ?name:string -> string -> srcs:B0_srcs.sels -> B0_unit.t
-(** [web name] is an HTML page named [name] (without the [.html] extension FIXME
-    review that).
+(** [html_page name] is an HTML page named [name] (without the [.html]
+    extension FIXME review that).
     {ul
     {- [doc] is the unit doc string.}
     {- [meta] is the initial metadata.}
@@ -110,11 +110,9 @@ val web :
     {- [wrap] allows to extend the build procedure you must call the given
        build procedure. TODO maybe remove once we have good {!frag}.}}
 
-    {b TODO document.} The js file is [n.js], if there's no [.html] source
-    in the srcs a minimal HTML file is generated in which [n.js]
-    is linked as a script and any css file in [srcs] as a stylesheet.
-
-    {b TODO.} Rename to [html_page]. *)
+    {b TODO document.} The js file is [name.js], if there's no [.html] source
+    in the srcs a minimal HTML [name.html] file is generated in which [n.js]
+    is linked as a script and any css file in [srcs] as a stylesheet. *)
 
 (** {1:build_fragments Build fragments}
 

@@ -13,9 +13,15 @@ open B0_std
 
 (** {1:keys Keys} *)
 
-val path : Fpath.t B0_meta.key
-(** [path] defines the default file of the build unit to show when
-    [.show-url] is used to show a file. *)
+type url =
+[ `Url of Url.t (** The URL. *)
+| `In of B0_env.dir * Fpath.t (** The path in given directory. *)
+| `Fun of string * (B0_env.t -> B0_unit.t -> (Url.t, string) result) ]
+(** The type for dermining the URL to dhow. *)
+
+val url : url B0_meta.key
+(** [url] defines the default URL to show when
+    [.show-url] is used on a unit without specifying a path.*)
 
 val listen_args : (authority:string -> Cmd.t) B0_meta.key
 (** [listen_args] defines the arguments to specify for how to make the
