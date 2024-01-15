@@ -1284,11 +1284,11 @@ module Fpath : sig
       properties of paths. Given a path, these properties can be
       different from the ones your file system attributes to it. *)
 
-  val basename : ?no_ext:bool -> t -> string
+  val basename : ?strip_ext:bool -> t -> string
   (** [basename p] is the last non-empty segment of [p] or the empty
       string otherwise. The latter occurs only on root paths and on
       paths whose last non-empty segment is a {{!is_rel_seg}relative
-      segment}. If [no_ext] is [true] (default to [false]) the basename's
+      segment}. If [strip_ext] is [true] (default to [false]) the basename's
       {{!file_exts}multiple extension}, if any, is removed from the result. *)
 
   val parent : t -> t
@@ -1473,9 +1473,11 @@ module Fpath : sig
   (** [pp_dump ppf p] prints path [p] on [ppf] using {!String.dump}. *)
 
   val error :
-    ?file:t -> ('b, Format.formatter , unit, ('a, string) result) format4 -> 'b
-  (** [error ~file fmt …] is [Fmt.error ("%a:" ^^ fmt) pp_unquoted file … ].
-      [file] defaults to {!dash}. *)
+    t -> ('b, Format.formatter , unit, ('a, string) result) format4 -> 'b
+  (** [error p fmt …] is [Fmt.error ("%a:" ^^ fmt) pp_unquoted p … ]. *)
+
+  val prefix_msg : t -> string -> string
+  (** [prefix_msg p msg] is Fmt.str "%a: %s" pp_unquoted msg *)
 
   (** {1:unique Uniqueness} *)
 

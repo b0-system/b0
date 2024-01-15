@@ -97,7 +97,7 @@ let test_exe ?(requires = []) ?(more_srcs = []) file ~doc =
   let requires =
     b0_std :: b0_memo :: b0_file :: b0_kit :: cmdliner :: requires
   in
-  B0_ocaml.exe (Fpath.basename ~no_ext:true file) ~doc ~srcs ~requires
+  B0_ocaml.exe (Fpath.basename ~strip_ext:true file) ~doc ~srcs ~requires
 
 let test_memo ?requires ?(more_srcs = []) file ~doc =
   let more_srcs = "test_memo_setup.ml" :: more_srcs in

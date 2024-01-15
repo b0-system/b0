@@ -1928,7 +1928,7 @@ module Fpath = struct
 
   (* Basename and parent directory *)
 
-  let basename ?(no_ext = false) p =
+  let basename ?(strip_ext = false) p =
     let max = String.length p - 1 in
     let first, last = match String.rindex p dir_sep_char with
     | exception Not_found -> (* B *) path_start p, max
@@ -1942,7 +1942,7 @@ module Fpath = struct
     match last - first + 1 with
     | 1 when p.[first] = '.' -> ""
     | 2 when p.[first] = '.' && p.[first + 1] = '.' -> ""
-    | _ when not no_ext -> String.subrange ~first ~last p
+    | _ when not strip_ext -> String.subrange ~first ~last p
     | _ -> (* Drop multi ext *)
         let rec loop first last i = match i > last with
         | true -> String.subrange ~first ~last p
@@ -2014,7 +2014,8 @@ module Fpath = struct
 
   let pp_dump = String.pp_dump
 
-  let error ?(file = dash) fmt = Fmt.error ("%a:" ^^ fmt) pp_unquoted file
+  let error p fmt = Fmt.error ("%a:" ^^ fmt) pp_unquoted p
+  let prefix_msg p msg = Fmt.str "%a: %s" pp_unquoted p msg
 
   (* Uniqueness *)
 

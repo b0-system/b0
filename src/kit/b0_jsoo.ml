@@ -85,7 +85,7 @@ let write_page
     ?(lang = "") ?(generator = "") ?(styles = [])  ?(scripts = [])
     ?(title = "") m ~o
   =
-  let title = if title = "" then Fpath.basename ~no_ext:true o else title in
+  let title = if title = "" then Fpath.basename ~strip_ext:true o else title in
   let stamp = List.rev_append styles scripts in
   let stamp = String.concat "" (lang :: generator :: title :: stamp) in
   B0_memo.write m ~stamp o @@ fun () ->

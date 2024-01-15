@@ -85,7 +85,7 @@ module Auth = struct
 
   let user_of_token_file f =
     Result.map_error (Fmt.str "%a: %s" Fpath.pp_quoted f) @@
-    parse_user (Fpath.basename ~no_ext:true f)
+    parse_user (Fpath.basename ~strip_ext:true f)
 
   let get_user conf_dir ~user =
     let err default_file =

@@ -278,11 +278,12 @@ module El = struct
 
   (* Convenience *)
 
-  let title_of_fpath file = match B0_std.Fpath.basename ~no_ext:true file with
-  | "index" | "" ->
-      let title = B0_std.Fpath.(basename ~no_ext:true (parent file)) in
-      if title = "" then "Untitled" else title
-  | title -> title
+  let title_of_fpath file =
+    match B0_std.Fpath.basename ~strip_ext:true file with
+    | "index" | "" ->
+        let title = B0_std.Fpath.(basename ~strip_ext:true (parent file)) in
+        if title = "" then "Untitled" else title
+    | title -> title
 
   let basic_page
       ?(lang = "") ?(generator = "") ?(styles = []) ?(scripts = [])

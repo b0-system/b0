@@ -63,40 +63,40 @@ let test_is_prefix_strip_prefix () =
   ()
 
 let test_basename () =
-  let test p b ~no_ext:b' =
+  let test p b ~strip_ext:b' =
     let p = Fpath.v p in
     assert (Fpath.basename p = b);
-    assert (Fpath.basename ~no_ext:true p = b');
+    assert (Fpath.basename ~strip_ext:true p = b');
   in
-  test "bla" "bla" ~no_ext:"bla";
-  test "bla" "bla" ~no_ext:"bla";
-  test "/" "" ~no_ext:"";
-  test "/.." "" ~no_ext:"";
-  test "/." "" ~no_ext:"";
-  test "bla/.." "" ~no_ext:"";
-  test "bla/." "" ~no_ext:"";
-  test ".." "" ~no_ext:"";
-  test "." "" ~no_ext:"";
-  test "./a" "a" ~no_ext:"a";
-  test "./a/" "a" ~no_ext:"a";
-  test "./abla" "abla" ~no_ext:"abla";
-  test "./abla/" "abla" ~no_ext:"abla";
-  test "/abla" "abla" ~no_ext:"abla";
-  test "/abla/" "abla" ~no_ext:"abla";
-  test "/.ocamlinit" ".ocamlinit" ~no_ext:".ocamlinit";
-  test "/.ocamlinit/" ".ocamlinit" ~no_ext:".ocamlinit";
-  test "/..ocamlinit/" "..ocamlinit" ~no_ext:"..ocamlinit";
-  test "hop/.emacs.d" ".emacs.d" ~no_ext:".emacs";
-  test "hap/.emacs.d/" ".emacs.d" ~no_ext:".emacs";
-  test "hop/.emacs.d" ".emacs.d" ~no_ext:".emacs";
-  test "hap/.emacs.d/" ".emacs.d" ~no_ext:".emacs";
-  test "hap/archive.tar.gz/" "archive.tar.gz" ~no_ext:"archive";
-  test "hap/archive.tar.gz" "archive.tar.gz" ~no_ext:"archive";
-  test "/archive.tar.gz" "archive.tar.gz" ~no_ext:"archive";
-  test "archive.tar.gz/" "archive.tar.gz" ~no_ext:"archive";
-  test "archive.tar.gz" "archive.tar.gz" ~no_ext:"archive";
+  test "bla" "bla" ~strip_ext:"bla";
+  test "bla" "bla" ~strip_ext:"bla";
+  test "/" "" ~strip_ext:"";
+  test "/.." "" ~strip_ext:"";
+  test "/." "" ~strip_ext:"";
+  test "bla/.." "" ~strip_ext:"";
+  test "bla/." "" ~strip_ext:"";
+  test ".." "" ~strip_ext:"";
+  test "." "" ~strip_ext:"";
+  test "./a" "a" ~strip_ext:"a";
+  test "./a/" "a" ~strip_ext:"a";
+  test "./abla" "abla" ~strip_ext:"abla";
+  test "./abla/" "abla" ~strip_ext:"abla";
+  test "/abla" "abla" ~strip_ext:"abla";
+  test "/abla/" "abla" ~strip_ext:"abla";
+  test "/.ocamlinit" ".ocamlinit" ~strip_ext:".ocamlinit";
+  test "/.ocamlinit/" ".ocamlinit" ~strip_ext:".ocamlinit";
+  test "/..ocamlinit/" "..ocamlinit" ~strip_ext:"..ocamlinit";
+  test "hop/.emacs.d" ".emacs.d" ~strip_ext:".emacs";
+  test "hap/.emacs.d/" ".emacs.d" ~strip_ext:".emacs";
+  test "hop/.emacs.d" ".emacs.d" ~strip_ext:".emacs";
+  test "hap/.emacs.d/" ".emacs.d" ~strip_ext:".emacs";
+  test "hap/archive.tar.gz/" "archive.tar.gz" ~strip_ext:"archive";
+  test "hap/archive.tar.gz" "archive.tar.gz" ~strip_ext:"archive";
+  test "/archive.tar.gz" "archive.tar.gz" ~strip_ext:"archive";
+  test "archive.tar.gz/" "archive.tar.gz" ~strip_ext:"archive";
+  test "archive.tar.gz" "archive.tar.gz" ~strip_ext:"archive";
   if Sys.win32 then begin
-    test "C:archive.tar.gz" "archive.tar.gz" ~no_ext:"archive";
+    test "C:archive.tar.gz" "archive.tar.gz" ~strip_ext:"archive";
   end;
   ()
 

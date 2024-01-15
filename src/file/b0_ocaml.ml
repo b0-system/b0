@@ -156,7 +156,7 @@ module Conf = struct
 
   (* IO *)
 
-  let of_string ?file s =
+  let of_string ?(file = Fpath.dash) s =
     let parse_line _ acc l = match String.cut_left ~sep:":" l with
     | None -> acc (* XXX report an error *)
     | Some (k, v) -> String.Map.add (String.trim k) (String.trim v) acc
@@ -167,7 +167,7 @@ module Conf = struct
         String.fold_ascii_lines ~strip_newlines parse_line String.Map.empty s
       in
       Ok (of_string_map fields |> Result.error_to_failure)
-    with Failure e -> Fpath.error ?file " OCaml config: %s" e
+    with Failure e -> Fpath.error file " OCaml config: %s" e
 
   let write m ~comp ~o =
     let comp = B0_memo.tool m comp in
@@ -200,7 +200,7 @@ end
 
 module Modname = struct
   type t = string
-  let of_filename f = String.Ascii.capitalize (Fpath.basename ~no_ext:true f)
+  let of_filename f = String.Ascii.capitalize (Fpath.basename ~strip_ext:true f)
   let v n = String.Ascii.capitalize n
   let equal = String.equal
   let compare = String.compare
@@ -331,7 +331,7 @@ module Modsrc = struct
         let strip_newlines = true and parse = parse_line ~src_root in
         Ok (String.fold_ascii_lines ~strip_newlines parse Fpath.Map.empty s)
       with
-      | Failure e -> Fpath.error ~file "%s" e
+      | Failure e -> Fpath.error file "%s" e
 
     let write ?src_root m ~srcs ~o =
       let ocamldep = B0_memo.tool m Tool.ocamldep in
@@ -636,7 +636,7 @@ module Lib = struct
         | f :: fs ->
             let is_lib_archive f = match archive with
             | None -> false
-            | Some a -> String.equal (Fpath.basename ~no_ext:true f) a
+            | Some a -> String.equal (Fpath.basename ~strip_ext:true f) a
             in
             match Fpath.get_ext f with
             | ".cmi" ->
@@ -1166,7 +1166,7 @@ module Archive = struct
     let cstubs_opts, reads =
       if not has_cstubs then Cmd.empty, [cmxa; cmxa_clib] else
       (* Fixme do this on a cstubs path *)
-      let oname = Fpath.basename ~no_ext:true cmxa in
+      let oname = Fpath.basename ~strip_ext:true cmxa in
       let cstubs_dir = Fpath.(parent cmxa) in
       let cstubs = Fpath.(cstubs_dir / cstubs_clib oname lib_ext) in
       let inc = Cmd.(arg "-I" %% unstamp (path cstubs_dir)) in
@@ -1245,7 +1245,7 @@ let compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs =
   let rec loop os cunits hs = function
   | [] -> List.rev os
   | c :: cs ->
-      let cname = Fpath.basename ~no_ext:true c in
+      let cname = Fpath.basename ~strip_ext:true c in
       match String.Map.find cname cunits with
       | exception Not_found ->
           let o = Fpath.(build_dir / Fmt.str "%s%s" cname obj_ext) in
@@ -1575,11 +1575,11 @@ module Cobj = struct
         acc file Modref.Set.empty Modref.Set.empty String.Set.empty ls
   | l :: ls -> parse_files acc ls
 
-  let of_string ?file data =
+  let of_string ?(file = Fpath.dash) data =
     let line num acc l = (num, l) :: acc in
     let rev_lines = String.fold_ascii_lines ~strip_newlines:true line [] data in
     try Ok (parse_files [] (List.rev rev_lines)) with
-    | Failure e -> Fpath.error ?file "%s" e
+    | Failure e -> Fpath.error file "%s" e
 
   let write m ~cobjs ~o =
     (* FIXME add [src_root] so that we can properly unstamp. *)

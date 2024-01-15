@@ -14,7 +14,7 @@ let read_path_writes m file =
       | Ok p -> p :: acc
     in
     try Ok (String.fold_ascii_lines ~strip_newlines:true parse_line [] s)
-    with Failure e -> Fpath.error ~file "%s" e
+    with Failure e -> Fpath.error file "%s" e
   in
   let* lines = B0_memo.read m file in
   Fut.return (B0_memo.fail_if_error m (parse lines))
@@ -52,7 +52,7 @@ module Compile = struct
     let read m file =
       let parse lines =
         try Ok (String.fold_ascii_lines ~strip_newlines:true parse_dep [] lines)
-        with Failure e -> Fpath.error ~file "%s" e
+        with Failure e -> Fpath.error file "%s" e
       in
       let* lines = B0_memo.read m file in
       Fut.return (B0_memo.fail_if_error m (parse lines))
@@ -116,7 +116,7 @@ module Html = struct
     let read m file =
       let parse s =
         try Ok (String.fold_ascii_lines ~strip_newlines:true parse_dep [] s)
-        with Failure e -> Fpath.error ~file "%s" e
+        with Failure e -> Fpath.error file "%s" e
       in
       let* lines = B0_memo.read m file in
       Fut.return (B0_memo.fail_if_error m (parse lines))
