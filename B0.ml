@@ -145,25 +145,24 @@ let driver_pack =
 let default =
   let meta =
     B0_meta.empty
-    |> B0_meta.(add authors) ["The b0 programmers"]
-    |> B0_meta.(add maintainers)
-      ["Daniel Bünzli <daniel.buenzl i@erratique.ch>"]
-    |> B0_meta.(add homepage) "https://erratique.ch/software/b0"
-    |> B0_meta.(add online_doc) "https://erratique.ch/software/b0/doc"
-    |> B0_meta.(add licenses) ["ISC"; "BSD-2-Clause"]
-    |> B0_meta.(add repo) "git+https://erratique.ch/repos/b0.git"
-    |> B0_meta.(add issues) "https://github.com/b0-system/b0/issues"
-    |> B0_meta.(add description_tags)
+    |> ~~ B0_meta.authors ["The b0 programmers"]
+    |> ~~ B0_meta.maintainers ["Daniel Bünzli <daniel.buenzl i@erratique.ch>"]
+    |> ~~ B0_meta.homepage "https://erratique.ch/software/b0"
+    |> ~~ B0_meta.online_doc "https://erratique.ch/software/b0/doc"
+    |> ~~ B0_meta.licenses ["ISC"; "BSD-2-Clause"]
+    |> ~~ B0_meta.repo "git+https://erratique.ch/repos/b0.git"
+    |> ~~ B0_meta.issues "https://github.com/b0-system/b0/issues"
+    |> ~~ B0_meta.description_tags
       ["dev"; "org:erratique"; "org:b0-system"; "build"]
-    |> B0_meta.tag B0_opam.tag
-    |> B0_meta.add B0_opam.build
+    |> ~~ B0_opam.build
       {|[["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]]|}
-    |> B0_meta.add B0_opam.depends [
+    |> ~~ B0_opam.depends [
       "ocaml", {|>= "4.08.0"|};
       "ocamlfind", {|build|};
       "ocamlbuild", {|build|};
       "topkg", {|build & >= "1.0.3"|};
       "cmdliner", {|>= "1.1.0"|}; ]
+    |> B0_meta.tag B0_opam.tag
     |> B0_meta.tag B0_release.tag
   in
   B0_pack.make "default" ~doc:"The B0 system" ~meta ~locked:true @@
