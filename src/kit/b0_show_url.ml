@@ -52,13 +52,42 @@ let endpoint_of_url_and_authority url authority =
        m "Unknown scheme %a using 80 as the default port" Fmt.code' scheme);
       Os.Socket.Endpoint.of_string ~default_port:80 authority
 
+let find_server_mode_unit = function
+| [] -> Ok None
+| entity :: args ->
+    let keep = B0_unit.tool_is_user_accessible in
+    match B0_unit.get_or_suggest_tool ~keep entity with
+    | Ok us ->
+        (* FIXME let u = check_tool_ambiguities name us in *)
+        Ok (Some (List.hd us, args))
+    | Error tool_suggs ->
+        let u = B0_unit.get_or_suggest entity in
+        match u with
+        | Ok u -> Ok (Some (u, args))
+        | Error us ->
+            let tname u = Option.get (B0_unit.find_meta B0_unit.tool_name u) in
+            let ts = List.rev_map tname tool_suggs in
+            let us = List.rev_map B0_unit.name us in
+            let set = String.Set.of_list (List.concat [ts; us]) in
+            let suggs = String.Set.elements set in
+            let hint = Fmt.did_you_mean in
+            let nothing_to ppf v =
+              Fmt.pf ppf "Nothing to execute for %a." Fmt.code' v
+            in
+            let pp ppf (v, hints) = match hints with
+            | [] -> nothing_to ppf v
+            | hints -> Fmt.pf ppf "%a@ %a" nothing_to v (hint Fmt.code') hints
+            in
+            Fmt.error "@[%a@]" pp (entity, suggs)
+
 let server_mode env timeout_cli no_exec ~url args =
   match B0_http.Url.authority url with
   | None -> Fmt.error "Could not extract authority from %s" url
   | Some authority ->
       let* endpoint = endpoint_of_url_and_authority url authority in
-      match args with
-      | [] ->
+      let* unit = find_server_mode_unit args in
+      match unit with
+      | None ->
           if not no_exec then
             (Log.warn @@ fun m ->
              m "@[<v>No tool specified but trying to connect to %s@,\
@@ -69,42 +98,13 @@ let server_mode env timeout_cli no_exec ~url args =
           | None -> B0_meta.Key.get_default timeout_s
           in
           Ok (`Show_url_no_exec (endpoint, timeout, url))
-      | entity :: args ->
+      | Some (unit, args) ->
           (* XXX at somepoint we should be able to invoke the same
              logic as [B0_cmd_build.find_store_and_execution]. *)
           (* XXX We might actually want to look into actions aswell.
              See the todo.mld for more details.
              FIXME This is quite messy we need to clarify executable
              units ideally we should be using B0_unit.find_exec *)
-          let* unit =
-            let keep = B0_unit.tool_is_user_accessible in
-            match B0_unit.get_or_suggest_tool ~keep entity with
-            | Ok us ->
-                (* FIXME let u = check_tool_ambiguities name us in *)
-                Ok (List.hd us)
-            | Error tool_suggs ->
-                let u = B0_unit.get_or_suggest entity in
-                match u with
-                | Ok u -> Ok u
-                | Error us ->
-                    let tname u =
-                      Option.get (B0_unit.find_meta B0_unit.tool_name u)
-                    in
-                    let ts = List.rev_map tname tool_suggs in
-                    let us = List.rev_map B0_unit.name us in
-                    let set = String.Set.of_list (List.concat [ts; us]) in
-                    let suggs = String.Set.elements set in
-                    let hint = Fmt.did_you_mean in
-                    let nothing_to ppf v =
-                      Fmt.pf ppf "Nothing to execute for %a." Fmt.code' v
-                    in
-                    let pp ppf (v, hints) = match hints with
-                    | [] -> nothing_to ppf v
-                    | hints ->
-                        Fmt.pf ppf "%a@ %a" nothing_to v (hint Fmt.code') hints
-                    in
-                    Fmt.error "@[%a@]" pp (entity, suggs)
-          in
           (* FIXME this should execute according to the build unit execution
              protocol. *)
           let* cmd = B0_env.unit_cmd env unit in
@@ -121,12 +121,15 @@ let server_mode env timeout_cli no_exec ~url args =
           let env' = Option.map Os.Env.to_assignments env' in
           Ok (`Show_url_server (endpoint, timeout, url, cmd, cwd, env'))
 
-let unit_file_mode env args =
+let parse_unit_specs args =
   let parse_arg arg = match String.cut_left ~sep:":" arg with
   | None -> arg, (arg, None)
   | Some (uname, path) -> uname, (arg, Some path)
   in
-  let specs = List.map parse_arg args in
+  List.map parse_arg args
+
+let unit_file_mode env args =
+  let specs = parse_unit_specs args in
   let unit_names, paths = List.split specs in
   let* units = B0_unit.get_list_or_hint ~all_if_empty:false unit_names in
   let specs = List.combine units paths in
@@ -149,11 +152,30 @@ let unit_file_mode env args =
   in
   try Ok (`Show_file_urls (List.map make_url specs)) with Failure e -> Error e
 
+let has_url args = String.includes ~affix:"://" (List.hd args)
+
 let find_mode env timeout noexec args =
-  let is_url = String.includes ~affix:"://" (List.hd args) in
-  if is_url
+  if (has_url args)
   then server_mode env timeout noexec ~url:(List.hd args) (List.tl args)
   else unit_file_mode env args
+
+let dyn_units ~args = (* This is all very hackish and should be streamlines *)
+  let args = Cmd.to_list args in
+  let is_opt = String.starts_with ~prefix:"-" in
+  let args = List.filter (Fun.negate is_opt) args in
+  Log.if_error ~use:[] @@
+  let unit_file_mode_units args =
+    let units = List.map fst (parse_unit_specs args) in
+    B0_unit.get_list_or_hint ~all_if_empty:false units
+  in
+  let server_mode_unit args =
+    let* unit = find_server_mode_unit (List.tl args) in
+    match unit with
+    | None -> Ok [] | Some (u, _) -> Ok [u]
+  in
+  if has_url args
+  then server_mode_unit args
+  else unit_file_mode_units args
 
 let show_url env browser prefix background timeout dry_run no_exec args =
   (* XXX need to fix search argument of B0_web_browser and lookup in build *)
@@ -268,6 +290,6 @@ let show_url_cmd action env =
 
 let action =
   let doc = "Show URLs of files or server runs" in
-  B0_action.of_cmdliner_cmd "" show_url_cmd ~doc
+  B0_action.of_cmdliner_cmd "" ~dyn_units show_url_cmd ~doc
 
 let () = B0_scope.close ()
