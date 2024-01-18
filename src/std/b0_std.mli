@@ -1582,6 +1582,35 @@ module Fpath : sig
       matches the order from left to right in [s]. *)
 end
 
+(** URLs *)
+module Url : sig
+
+  type t = string
+  (** The type for URLs. *)
+
+  val scheme : string -> string option
+  (** [scheme u] tries to exract an URL scheme from [u]. *)
+
+  val authority : string -> string option
+  (** [authority u] tries to extract an URL authority ([HOST:PORT])
+      part from [u]. *)
+
+  val path_and_query : string -> string option
+  (** [path_and_query u] tries to extract an URL path and query part
+      from [u]. *)
+
+  val list_of_text_scrape : string -> string list
+  (** [list_of_text_scrape s] roughly finds URLs and relative or absolute
+      paths in [s] by looking in order:
+      {ol
+      {- For the next [href] or [src] substring then tries to parses the
+         content of an HTML attribute. This may result in relative
+         or absolute paths.}
+      {- For next [http] substrings in [s] and then delimits an URL
+         depending on the previous characters and checks that the delimited
+         URL starts with [http://] or [https://].}} *)
+end
+
 (** Hash values and functions.
 
     The property we want from these functions is speed and collision

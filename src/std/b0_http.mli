@@ -9,35 +9,6 @@
 
 open B0_std
 
-(** URLs. *)
-module Url : sig
-
-  type t = string
-  (** The type for URLs. *)
-
-  val scheme : string -> string option
-  (** [scheme u] tries to exract an URL scheme from [u]. *)
-
-  val authority : string -> string option
-  (** [authority u] tries to extract an URL authority ([HOST:PORT])
-      part from [u]. *)
-
-  val path_and_query : string -> string option
-  (** [path_and_query u] tries to extract an URL path and query part
-      from [u]. *)
-
-  val find : string -> string list
-  (** [find s] roughly finds URLs and relative or absolute paths in [s] by
-      looking in order:
-      {ol
-      {- For the next [href] or [src] substring then tries to parses the
-         content of an HTML attribute. This may result in relative
-         or absolute paths.}
-      {- For next [http] substrings in [s] and then delimits an URL
-         depending on the previous characters and checks that the delimited
-         URL starts with [http://] or [https://].}} *)
-end
-
 (** HTTP datatypes. *)
 module Http : sig
 
@@ -59,7 +30,7 @@ module Http : sig
     type t
     (** The type for HTTP requests. *)
 
-    val make : ?headers:headers -> ?body:string -> url:string -> method' -> t
+    val make : ?headers:headers -> ?body:string -> url:Url.t -> method' -> t
     (** [make uri m ~headers ~body] is a request on [url] with method [m],
         headers [headers] (defaults to [[]]) and body [body] (defaults to
         [""]). *)
