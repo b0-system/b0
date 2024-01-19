@@ -745,7 +745,16 @@ module Libresolver = struct
     end
 
     module Ocamlfind = struct
-      let tool = B0_memo.Tool.by_name "ocamlfind"
+      let tool =
+        let vars =
+          (* From https://projects.camlcity.org/projects/dl/findlib-1.9.6/\
+             doc/ref-html/r865.html#AEN897 *)
+          [ "OCAMLFIND_CONF"; "OCAMLFIND_TOOLCHAIN"; "OCAMLPATH";
+            "OCAMLFIND_DESTDIR"; "OCAMLFIND_METADIR"; "OCAMLFIND_COMMANDS";
+            "CAMLLIB"; "OCAMLLIB"; "OCAMLFIND_LDCONF";
+            "OCAMLFIND_IGNORE_DUPS_IN"; ]
+        in
+        B0_memo.Tool.by_name ~vars "ocamlfind"
 
       let parse_info m ?(file = Fpath.dash) ~libname:_ s =
         let parse_requires requires =
