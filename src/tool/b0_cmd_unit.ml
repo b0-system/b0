@@ -6,8 +6,9 @@
 open B0_std
 open Result.Syntax
 
-let build_dir us c =
+let dir us c =
   Log.if_error ~use:B0_cli.Exit.no_such_name @@
+  (* XXX Eventually we should use B0_env here. *)
   let* us = B0_unit.get_list_or_hint ~all_if_empty:true us in
   let b0_dir = B0_driver.Conf.b0_dir c in
   let build_dir = B0_dir.build_dir ~b0_dir ~variant:"user" (* FIXME *) in
@@ -45,8 +46,8 @@ let build_dir =
   let descr = `P "$(iname) outputs build directories of given build units. \
                   The paths may not exist."
   in
-  B0_tool_std.Cli.subcmd_with_b0_file "build-dir" ~doc ~descr @@
-  Term.(const build_dir $ units_all)
+  B0_tool_std.Cli.subcmd_with_b0_file "dir" ~doc ~descr @@
+  Term.(const dir $ units_all)
 
 let edit =
   let doc = "Edit build units" in

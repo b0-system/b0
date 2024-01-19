@@ -4,8 +4,6 @@
 
 {1:next Next}
 
-- Remove {!B0_dir}
-
 {1:b0_std [b0.std] library}
 
 - Review the tool lookup stuff. First we may want to generalize the
@@ -76,6 +74,8 @@ the [wrap] parameter to units.
   platform. Do we ever want mixed [`Build] and [`Host] ? Not undoable
   but a bit cold feet on replicating all the {!B0_std.Os} module
   in {!B0_env} to allow that.
+
+- Also see we what to do with {!B0_dir}.
 
 {2:b0_action [B0_action]}
 
@@ -245,8 +245,6 @@ maybe it shouldn't. Unit ideas:
 3. Unit packed_html_page (packs all resource for single file distribution).
 
 {1:tool Tool}
-
-- Add a `b0 dir` command.
 
 {2:deploy Deploy}
 
