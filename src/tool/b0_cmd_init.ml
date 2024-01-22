@@ -20,9 +20,9 @@ let find_copyright_holder ~cwd _meta = function
            Use option %a to specify a copyright holder.@]"
           Fmt.code' "--holder"
 
-(* b0 file init *)
+(* B0.ml file init *)
 
-let b0_file file force _conf =
+let b0_ml file force _conf =
   (* TODO this needs to be made much better. *)
   Log.if_error ~use:B0_cli.Exit.some_error @@
   let b0_file =
@@ -158,7 +158,7 @@ let years =
   let absent = "current year" in
   Arg.(value & opt (some string) None & info ["y"; "years"] ~doc ~docv ~absent)
 
-let b0_file =
+let b0_ml =
   let doc = "Generate a $(b,B0.ml) file" in
   let descr =
     `Blocks [
@@ -168,8 +168,8 @@ let b0_file =
       `Pre "$(iname) $(b,B0.ml)";
       `P "TODO unastisfactory for now."]
   in
-  B0_tool_std.Cli.subcmd_with_b0_file_if_any "b0-file" ~doc ~descr @@
-  Term.(const b0_file $ file $ force)
+  B0_tool_std.Cli.subcmd_with_b0_file_if_any "B0.ml" ~doc ~descr @@
+  Term.(const b0_ml $ file $ force)
 
 let changes =
   let doc = "Generate a $(b,CHANGES) file" in
@@ -276,4 +276,4 @@ let cmd =
   let doc = "Generate files from templates" in
   let descr = `P "The $(iname) command generates files from templates." in
   B0_tool_std.Cli.cmd_group "init" ~doc ~descr @@
-  [b0_file; changes; license; readme; src]
+  [b0_ml; changes; license; readme; src]

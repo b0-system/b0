@@ -17,7 +17,7 @@ let get_project_meta () =
   Option.value ~default:B0_meta.empty (find_project_meta ())
 
 let default_root_markers =
-  [ "BRZO"; "BRZO.toml"; "B0.ml"; "B0.toml"; "Makefile"; "dune-project"; ]
+  [ "BRZO"; "BRZO.ini"; "B0.ml"; "B0.ini"; "Makefile"; "dune-project"; ]
 
 let find_project_name ?(root_markers = default_root_markers) ~cwd () =
   let has_file dir file =
