@@ -811,8 +811,8 @@ val script :
   ?wrap:(B0_unit.build_proc -> B0_unit.build_proc) -> ?doc:string ->
   ?meta:B0_meta.t -> ?public:bool -> ?name:string -> Fpath.t -> B0_unit.t
 (** [script file] is a build unit for an OCaml script in [file].  The
-    build unit simply checks that it typechecks. Due to upstream
-    limitations this is a hack. You should invoke your main as:
+    build unit simply checks that it typechecks and is runnable. Due to
+    upstream limitations this is a hack. You should invoke your main as:
     {[
 let () = if !Sys.interactive then () else main ()
     ]}
@@ -822,7 +822,9 @@ let () = if !Sys.interactive then () else main ()
     {- [doc] is the unit doc string}
     {- [meta] is the initial metadata}
     {- [wrap] allows to extend the build procedure. You must call the
-       given build procedure.}} *)
+       given build procedure.}}
+
+    FIXME [file] should become a src so that it can be generated. *)
 
 (** {2:libs Libraries} *)
 

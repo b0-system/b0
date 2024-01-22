@@ -1337,10 +1337,28 @@ let exe_proc set_exe_path set_modsrcs srcs b =
   Fut.return ()
 
 let script_proc set_exe_path file b =
-  let _m = B0_build.memo b in
+  let m = B0_build.memo b in
   let scope_dir = B0_build.current_scope_dir b in
   let exe_file = Fpath.(scope_dir // file) in
+  B0_memo.file_ready m exe_file;
   set_exe_path exe_file;
+  let ocaml = B0_memo.tool m Tool.ocaml in
+  let stdout_file = Fpath.(B0_build.current_build_dir b / "ocaml.stdout") in
+  let stdin = Fpath.null and stderr = `File Fpath.null in
+  let stdout = `File stdout_file in
+  let nocolor = "-color=never" (* If this changes [find_error] must too *) in
+  let post_exec op = match Os.File.read stdout_file with
+  | Error _ as e -> Log.if_error ~use:() e
+  | Ok log ->
+      let find_error _ () s =
+        if String.starts_with ~prefix:"Error:" s then raise Exit else ()
+      in
+      try String.fold_ascii_lines ~strip_newlines:false find_error () log
+      with Exit -> B0_zero.Op.set_status op (Failed (Exec (Some log)))
+  in
+  let reads = [exe_file] and writes = [stdout_file] in
+  B0_memo.spawn m ~reads ~writes ~stdin ~stdout ~stderr ~post_exec @@
+  ocaml Cmd.(arg nocolor % "-init" %% path exe_file);
   Fut.return ()
 
 let lib_proc set_modsrcs srcs b =

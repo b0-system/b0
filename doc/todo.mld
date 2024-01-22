@@ -32,6 +32,9 @@ let crunch_file m file ~in_dir =
   Fut.return out
 ]}
 
+- [Bzero.Op.post_exec] we may want to error. See for example
+  {!B0_ocaml.script}.
+
 {1:design_b0_file [b0.file] library}
 
 - [B0.ml] file finding. Should we stop at the last (vs the first now)
