@@ -52,7 +52,7 @@ end
     because if both are produced the compilers may compete to
     produce some of the shared build artefacts. The following store
     keys allow to express build code {{!Code.wanted}desires} and
-    determine the actual {{!Code.built}decision}. Note the desires
+    determine the actual {{!Code.val-built}decision}. Note the desires
     may actually be altered units that may build FIXME maybe we
     should stick to must. *)
 module Code : sig
@@ -281,7 +281,7 @@ module Modref : sig
     val pp : ?sep:unit Fmt.t -> elt Fmt.t -> t Fmt.t
     (** [pp ~sep pp_elt ppf rs] formats the elements of [rs] on [ppf].
         Each element is formatted with [pp_elt] and elements are
-        separated by [~sep] (defaults to {!Fmt.cut}). If the set is
+        separated by [~sep] (defaults to {!B0_std.Fmt.cut}). If the set is
         empty leaves [ppf] untouched. *)
 
     val dump : t Fmt.t
@@ -364,10 +364,10 @@ module Modsrc : sig
     val read :
       ?src_root:Fpath.t -> B0_memo.t -> Fpath.t ->
       Modname.Set.t Fpath.Map.t Fut.t
-      (** [read ~src_root file] reads dependencies produced by {!write}
-          as a map from absolute file paths to their dependencies.
-          Relative file paths are made absolute relative to {!src_root}
-          if specified. *)
+    (** [read ~src_root file] reads dependencies produced by {!write}
+        as a map from absolute file paths to their dependencies.
+        Relative file paths are made absolute relative to [src_root]
+        if specified. *)
   end
 
   type t
@@ -554,7 +554,7 @@ module Libname : sig
 end
 
 val libname : string -> Libname.t
-(** [libname n] is [n] as an OCaml {{!Lib.Name}library name}. This is
+(** [libname n] is [n] as an OCaml {{!Libname}library name}. This is
     a shortcut for {!Libname.v} and should be used in [B0.ml] files *)
 
 (** Library information.
@@ -600,7 +600,7 @@ module Lib : sig
   val of_unit :
     B0_build.t -> Conf.t -> B0_unit.t -> t option Fut.t
   (** [lib_of_unit b ocaml_conf u] defines a library from unit [u] by
-      consulting {!Meta.requires}, {!Meta.library} and {!Meta.modsrcs}.
+      consulting {!requires}, {!library} and {!modsrcs}.
       As a side effect this {!B0_build.require}s [u]. *)
 
   (** {1:props Properties} *)
@@ -718,7 +718,7 @@ module Libresolver : sig
         libraries that can be built in [b]. For a unit [u] to be
         recognized as such it has to:
         {ul
-        {- It looks if the library name is {{!Meta.library}defined}
+        {- It looks if the library name is {{!library}defined}
            by a unit that {{!B0_build.may_build}may} be built. If that
            is the case it creates a library out of that build unit via
            {!Lib.of_unit} and resolves to library name to it.}
@@ -737,7 +737,7 @@ module Libresolver : sig
 
   val default : B0_store.t -> B0_memo.t -> t Fut.t
   (** [default store memo] determines a default library resolver for
-      {!key}.  It uses the {!conf} in [store] and uses an
+      {!key}.  It uses the {!Conf.key} in [store] and uses a
       {!Scope.build} with the build found in the store via
       {!B0_build.self} followed by an {!Scope.ocamlfind} in memo and a
       cache in the {{!B0_build.shared_build_dir}directory} of the
@@ -884,7 +884,7 @@ val requires : Libname.t list B0_meta.key
 
     See {{!page-TODO.b0_ocaml}TODO}. *)
 
-(** {2:toolchain Toolchain operations} *)
+(** {2:toolchain_ops Toolchain operations} *)
 
 (** Compiling. *)
 module Compile : sig

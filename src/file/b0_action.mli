@@ -11,7 +11,7 @@
     They can be used to run build artefacts, test suites,
     script or generic software life-cycle procedures.
 
-    See the {{!page-action_manual}action manual} for a short introduction. *)
+    See the {{!page-action}action manual} for a short introduction. *)
 
 open B0_std
 

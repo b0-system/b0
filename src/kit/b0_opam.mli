@@ -115,13 +115,13 @@ val build : string B0_meta.key
     {{:https://opam.ocaml.org/doc/Manual.html#opamfield-build}
     [build:]} field value. This is a raw string in
     opam syntax that defines the whole field. Used to override
-    automatic opam file generation, see {!pkg_of_pack}.  *)
+    automatic opam file generation, see {!pkg_meta_of_pack}.  *)
 
 val depends : pkg_spec list B0_meta.key
 (** [depends] is an opam
     {{:https://opam.ocaml.org/doc/Manual.html#opamfield-depends}
     [depends:]} field value. Used to override automatic opam file
-    dependency generation, see {!pkg_of_pack}. *)
+    dependency generation, see {!pkg_meta_of_pack}. *)
 
 val depopts : pkg_spec list B0_meta.key
 (** [depopts] is an opam
@@ -142,13 +142,13 @@ val install : string B0_meta.key
     {{:https://opam.ocaml.org/doc/Manual.html#opamfield-install}
     [install:]} field value. This is a raw
     string in opam syntax that defines the whole field. Used to
-    override automatic opam file generation, see {!pkg_of_pack}. *)
+    override automatic opam file generation, see {!pkg_meta_of_pack}. *)
 
 val name : string B0_meta.key
 (** [name] is an [opam]
     {{:https://opam.ocaml.org/doc/Manual.html#opamfield-name}
     [name:]} field value. Use to override
-    automatic [opam] package name generation, see {!pkg_of_pack}. *)
+    automatic [opam] package name generation, see {!pkg_meta_of_pack}. *)
 
 val pin_depends : (string * string) list B0_meta.key
 (** [pin_depends] is an opam
@@ -161,7 +161,7 @@ val pkg_name_of_pack : B0_pack.t -> string
 (** [pkg_name_of_pack p] derives an opam package name for [p].
     This is either in order:
     {ol
-    {- The {!Meta.name} field of [p]'s meta, if defined.}
+    {- The {!name} field of [p]'s meta, if defined.}
     {- The {!B0_pack.basename} of [p] if not equal to ["default"].}
     {- The basename of [p]'s scope directory.}} *)
 

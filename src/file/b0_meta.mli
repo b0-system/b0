@@ -219,7 +219,7 @@ val fold : (binding -> 'a -> 'a) -> t -> 'a -> 'a
 (** {1:fmt Formatting} *)
 
 val pp : t Fmt.t
-(** [pp] formats metadata using {!pp_bindings}. *)
+(** [pp] formats metadata using {!pp_binding}. *)
 
 val pp_non_empty : t Fmt.t
 (** [pp_non_empty] is {!B0_std.Fmt.cut} followed by {!pp} if metadata is non

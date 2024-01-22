@@ -1,24 +1,23 @@
-{0 B0 release support manual}
+{0 B0 release manual}
 
+This manual describes the tools to publish source software releases.
 
-This manual describes the tools provided to perform source software
-releases. While the release support is rather generic, the release
-script here specifically talks about submitting the software to the
-opam repository. You can skip these steps if you are doing something
+The release support is rather generic but the release script here
+specifically talks about submitting the software to the opam
+repository. You can skip these steps if you are doing something
 different.
 
 {b TODO.} Review an adapt. Mainly taken from the topkg-release man page.
 
 {1:script Release script}
 
-This assumes you are using opam. In the simplest case if you just have
-one package to release:
+In the simplest case if you just have one package to release:
 
 {v
 b0 browse issues          # Review remaining outstanding issues
 b0 -- .release status     # Review the changes since last version
 $EDITOR CHANGES.md        # Edit the release notes
-git commit -m 'Prepare for release.'
+git commit -m 'Prepare release.'
 b0 -- .release tag        # Tag the release with a version
 b0 -- .release archive    # Create the release archive
 b0 -- .release publish    # Publish it on the WWW with its documentation
@@ -27,7 +26,7 @@ v}
 
 Note the tools allow to handle the following cases:
 
-- Your B0 file gathers the `B0.ml` file of multiple projects in
+- Your B0 file gathers the [B0.ml] file of multiple projects in
    different VCSs.
 - You need to publish multiple packages from a single release archive.
 
@@ -44,33 +43,13 @@ b0 browse issues
 v}
 
 This open the URLs specified in the {!B0_meta.issues} field of the
-packs of the [B0.ml] file.
-
-If the package's delegate supports issue tracker interaction (see
-topkg-delegate(7)), you can consult them directly in the terminal with:
-
-{v
-topkg issue list
-v}
-
-Basic checks are performed on the release archive when it is created,
-but save time by catching errors early. Hence test that your source
-repository lints and that it builds in the current build environment
-and that the package tests pass.
-
-{v
-b0 -- .opam file  # Regenerate opam file
-b0                # Build the project
-b0 lint           # Lint the project
-b0 test           # Run the default test suite
-v}
+packs of the [B0.ml] file in your browser.
 
 {2:release_notes Write the release notes}
 
 Carefully write the release notes in the package's change log, these
-are essential time savers for users of the package. It may help to
-consult the list of changes that were committed since the last VCS
-version tag with:
+are essential time savers for users of the package. The list of
+changes that were comitted since the last VCS version tag can help:
 
 {v
 b0 -- .release status
@@ -79,37 +58,47 @@ v}
 You can then write the release notes and commit them to the VCS with:
 
 {v
-topkg log edit
-topkg log commit
+$EDITOR CHANGES.md
+git commit -m 'Prepare release."
 v}
-
-The next step is simplified if the change log follows a certain
-format, see topkg-log(1) for details.
-
-The last two commands mentioned perform no magic, it is entirely up to
-you to use them or not. The first one simply opens the change log of
-the package in your $EDITOR and the second one commits it to your VCS
-with a dull, canned, commit message.
 
 {2:tag_the_release VCS tag the release}
 
-Here again topkg provides a magic-less command that will simply extract
-the latest version tag from the package's change log and tag the VCS
-HEAD commit with it:
+Basic checks are performed on the release archive when it is created,
+but save time by catching errors early. Hence test that your source
+repository lints and that it builds in the current build environment
+and that the package tests pass. FIXME we should have a
+[.release check].
+
+{v
+b0 -- .opam file  # Regenerate opam file
+b0 -- .ocaml meta # Regenerate META file (TODO get rid of that)
+b0                # Build the project
+b0 lint           # Lint the project
+b0 test           # Run the default test suite
+v}
+
+
+The following command simply extracts the latest version tag from the
+package's change log and tag the VCS HEAD commit with it:
 
 {v
 b0 -- .release tag
 v}
 
 This will only work if the change log follows a certain format, see
-tokpg-log(1) for details. You can check the extracted tag is the one
-you wish before with:
+[b0 -- .release tag --help] for details. But bascially this extracts
+the first token of the first heading of the
+{{!B0_release.changes_file}changes file}.
+
+You can check the extracted
+tag is the one you wish before with:
 
 {v
 b0 -- .release tag --dry-run
 v}
 
-If you do not want to rely on [B0_release] broken extraction
+If you do not want to rely on [B0_release] appromative extraction
 algorithms just specify it on the command line:
 
 {v
@@ -117,8 +106,8 @@ b0 -- .release tag v1.0.1
 v}
 
 You can also choose to use your VCS directly. But this worfklow
-ensures that your wrote up-to-date release releases notes describing a
-correct version number.
+ensures that your wrote up-to-date release notes describing a correct
+version number.
 
 {2:archive Create the release archive and publish it}
 

@@ -91,7 +91,7 @@ module type S = sig
   (** [define ~doc ~meta n] defines name [n] in the current scope with
       documentation string [doc] (defaults to ["undocumented"])e
       and metadata [meta] (defaults to {!B0_meta.empty}).
-      Defining a duplicate value in a scope raises {!Err}. *)
+      Defining a duplicate value in a scope raises an exception. *)
 
   val def_kind : string
   (** [def_kind] is the kind of defined value. *)

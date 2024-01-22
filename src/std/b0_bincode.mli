@@ -20,7 +20,7 @@ type 'a dec = string -> int -> int * 'a
     must decode a value in [s] starting at [i] (which may be
     [String.length s]) and return the index of the byte in [s] after
     the decoded value (this can be [String.length s]). The function must
-    raise {!Failure} in case of error, use {!err} for this. *)
+    raise [Failure] in case of error, use {!err} for this. *)
 
 val err : int -> ('a, Format.formatter, unit, 'b) format4 -> 'a
 (** [err i fmt] reports a decoding error for position [i] formatted according

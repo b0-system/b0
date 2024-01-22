@@ -31,8 +31,9 @@ val require : t -> B0_unit.t -> unit
     memo if [b] is [u] is not in {!may_build}. *)
 
 val current : t -> B0_unit.t
-(** [current b] is [b]'s current unit. In the {{!B0_unit.type-proc}procedure}
-    of a build unit this is the unit itself. *)
+(** [current b] is [b]'s current unit. In the
+    {{!B0_unit.type-build_proc}build procedure} of a unit this is the
+    unit itself. *)
 
 val current_meta : t -> B0_meta.t
 (** [current_meta b] is [B0_unit.meta (current b)]. *)

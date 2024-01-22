@@ -89,7 +89,7 @@ module Sexp : sig
       returned. *)
 
   val get_list : t -> t list
-  (** [get_atom s] is like {!to_list} but raises {!Invalid_argument}
+  (** [get_atom s] is like {!to_list} but raises [Invalid_argument]
       if [s] is not an list. *)
 
   val to_splice : t -> t list

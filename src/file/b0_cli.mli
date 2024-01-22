@@ -48,7 +48,7 @@ module Exit : sig
 
   val exit : exec_error:Os.Exit.t -> Os.Exit.t -> 'a
   (** [exit e] exits with [e]. This uses {!B0_std.Os.Exit.exit} and
-      in case of [Error _] logs it and exits with {!exec_error} which
+      in case of [Error _] logs it and exits with [exec_error] which
       {b if given an exit code} is then guaranteed to exit. *)
 end
 
@@ -100,78 +100,13 @@ val x_packs :
 
 (** {1:fragments Cli commands and fragments} *)
 
-(** Fragments for setting up {!B0_std}.  *)
-module B0_std : sig
-
-  (** {1:setup Setup}
-
-      Configure {{!B0_std.Fmt.set_tty_styling_cap}colored output} and
-      {{!B0_std.Log.set_level}log verbosity} and the
-      {!B0_std.Os.Cmd.spawn_tracer}. *)
-
-  val get_tty_cap : Tty.cap option option -> Tty.cap
-  (** [get_tty_cap cap] determines [cap] with {!B0_std.Tty.cap} and
-      {!B0_std.Tty.of_fd} on {!Unix.stdout} if [cap] is [None] or [Some
-      None]. *)
-
-  val get_log_level : Log.level option -> Log.level
-  (** [get_log_level level] determines [level] with {!B0_std.Log.Warning} if
-      [level] is [None]. *)
-
-  val setup : Tty.cap -> Log.level -> log_spawns:Log.level -> unit
-  (** [setup tty_cap log_level ~log_spawns] sets:
-      {ul
-      {- {!B0_std.Fmt.set_tty_styling_cap} with [tty_cap].}
-      {- {!B0_std.Log.set_level} with [log_level].}
-      {- {!B0_std.Os.Cmd.set_spawn_tracer} with
-        {!B0_std.Log.spawn_tracer}[ log_spawns]
-         iff [level >= log_spawn].}}
-      {b Warning.} If [level < log_spawn] but {!Log.level} is
-      increased after this call, the spawns won't be traced (most cli
-      programs do not change after the initial setup). Do your own
-      setup if that is a problem for you. *)
-
-  (** {1:cli Cli arguments} *)
-
-  val tty_cap_of_string : string -> (Tty.cap option, string) result
-  (** [tty_cap_of_string v] parses:
-      {ul
-      {- [""], ["auto"] into [None]}
-      {- ["always"] into [Some `Ansi]}
-      {- ["never"] into [Some `None]}} *)
-
-  val tty_cap :
-    ?docs:string -> ?env:Cmdliner.Cmd.Env.info -> unit ->
-    Tty.cap option option Cmdliner.Term.t
-  (** [tty_cap ~docs ~env ()] is a cli interface for specifiying a TTY
-      capability with a [--color] option. [docs] is where
-      the options are documented (defaults to
-      {!Cmdliner.Manpage.s_common_options}). [env], if provided, is an
-      environment variable to set the value (use something like
-      ["MYPROGRAM_COLOR"]). [None] is returned if the value is not set
-      on the cli or via the env var. *)
-
-  val log_level :
-    ?none:Log.level -> ?docs:string -> ?env:Cmdliner.Cmd.Env.info -> unit ->
-    Log.level option Cmdliner.Term.t
-   (** [log_level ~none ~docs ~env ()] is a cli interface for
-       specifiying a logging level with various options. [docs] is
-       where the options are documented (defaults to
-      {!Cmdliner.Manpage.s_common_options}). [env], if provided, is an
-       environment variable to set the value (use something like
-       ["MYPROGRAM_VERBOSITY"]). [none] is used to document the level
-       when the log level is unspecified (defaults to
-       [Log.Warning]). [None] is returned if the value is not set on
-       the cli or via the env var. *)
-end
-
 (** {!B0_zero.File_cache} interaction. *)
 module File_cache : sig
 
   (** {1:high-level High-level commands.}
 
       These commands act on a cache directory. They avoid to create
-      it via {!B0_zero.File_cache.create} if it doesn't exists and return
+      it via {!B0_zero.File_cache.make} if it doesn't exists and return
       [Ok false] in that case. *)
 
   val keys_of_done_ops : B0_zero.Op.t list -> String.Set.t
@@ -325,7 +260,7 @@ module Op : sig
   (** [query_man] is a manual fragment for {!query_cli}. *)
 end
 
-(** {!B0_memo.Memo} interaction. *)
+(** {!B0_memo} interaction. *)
 module Memo : sig
 
   (** {1:feedback Memo feedback} *)
@@ -506,20 +441,20 @@ module Memo : sig
 
   val get_hash_fun : hash_fun:(module Hash.T) option -> (module Hash.T)
   (** [get_hash_fun ~hash_fun] determines a hash function. If [hash_fun]
-      is [None] then {!B0_std.Hash.Xxh3_64} is used. *)
+      is [None] then {!B0_std.Hash} is used. *)
 
   (** {1:logs Logs} *)
 
-  (** {!B0_memo.Memo} log.
+  (** {!B0_memo} log.
 
-      A {!B0_memo.Memo} log has all the build operations, the hashed
+      A {!B0_memo} log has all the build operations, the hashed
       file paths and a few global timings. *)
   module Log : sig
 
     (** {1:logs Logs} *)
 
     type t
-    (** The type for {!B0_memo.Memo} logs. *)
+    (** The type for {!B0_memo} logs. *)
 
     val of_memo : B0_memo.t -> t
     (** [of_memo m] is a log for memo [m]. *)
@@ -534,11 +469,11 @@ module Memo : sig
     (** [hash_dur l] is the time span spent hashing. *)
 
     val total_dur : t -> Mtime.Span.t
-    (** [total_dur l] is the time spanning from {!B0_memo.create} to
+    (** [total_dur l] is the time spanning from {!B0_memo.make} to
         {!of_memo}. *)
 
     val cpu_dur : t -> Os.Cpu.Time.Span.t
-    (** [cpu_dur l] is the CPU time spanning from {!B0_memo.create} to
+    (** [cpu_dur l] is the CPU time spanning from {!B0_memo.make} to
         {!of_memo}. *)
 
     val jobs : t -> int
@@ -586,4 +521,69 @@ module Memo : sig
         alternate output formats. [docs] is the manual section in which
         options are documented, defaults to {!s_output_format_options} *)
   end
+end
+
+(** Fragments for setting up {!B0_std}.  *)
+module B0_std : sig
+
+  (** {1:setup Setup}
+
+      Configure {{!B0_std.Fmt.set_tty_styling_cap}colored output} and
+      {{!B0_std.Log.set_level}log verbosity} and the
+      {!B0_std.Os.Cmd.spawn_tracer}. *)
+
+  val get_tty_cap : Tty.cap option option -> Tty.cap
+  (** [get_tty_cap cap] determines [cap] with {!B0_std.Tty.cap} and
+      {!B0_std.Tty.of_fd} on {!Unix.stdout} if [cap] is [None] or [Some
+      None]. *)
+
+  val get_log_level : Log.level option -> Log.level
+  (** [get_log_level level] determines [level] with {!B0_std.Log.Warning} if
+      [level] is [None]. *)
+
+  val setup : Tty.cap -> Log.level -> log_spawns:Log.level -> unit
+  (** [setup tty_cap log_level ~log_spawns] sets:
+      {ul
+      {- {!B0_std.Fmt.set_tty_styling_cap} with [tty_cap].}
+      {- {!B0_std.Log.set_level} with [log_level].}
+      {- {!B0_std.Os.Cmd.set_spawn_tracer} with
+        {!B0_std.Log.spawn_tracer}[ log_spawns]
+         iff [level >= log_spawn].}}
+      {b Warning.} If [level < log_spawn] but {!B0_std.Log.level} is
+      increased after this call, the spawns won't be traced (most cli
+      programs do not change after the initial setup). Do your own
+      setup if that is a problem for you. *)
+
+  (** {1:cli Cli arguments} *)
+
+  val tty_cap_of_string : string -> (Tty.cap option, string) result
+  (** [tty_cap_of_string v] parses:
+      {ul
+      {- [""], ["auto"] into [None]}
+      {- ["always"] into [Some `Ansi]}
+      {- ["never"] into [Some `None]}} *)
+
+  val tty_cap :
+    ?docs:string -> ?env:Cmdliner.Cmd.Env.info -> unit ->
+    Tty.cap option option Cmdliner.Term.t
+  (** [tty_cap ~docs ~env ()] is a cli interface for specifiying a TTY
+      capability with a [--color] option. [docs] is where
+      the options are documented (defaults to
+      {!Cmdliner.Manpage.s_common_options}). [env], if provided, is an
+      environment variable to set the value (use something like
+      ["MYPROGRAM_COLOR"]). [None] is returned if the value is not set
+      on the cli or via the env var. *)
+
+  val log_level :
+    ?none:Log.level -> ?docs:string -> ?env:Cmdliner.Cmd.Env.info -> unit ->
+    Log.level option Cmdliner.Term.t
+   (** [log_level ~none ~docs ~env ()] is a cli interface for
+       specifiying a logging level with various options. [docs] is
+       where the options are documented (defaults to
+      {!Cmdliner.Manpage.s_common_options}). [env], if provided, is an
+       environment variable to set the value (use something like
+       ["MYPROGRAM_VERBOSITY"]). [none] is used to document the level
+       when the log level is unspecified (defaults to
+       [Log.Warning]). [None] is returned if the value is not set on
+       the cli or via the env var. *)
 end

@@ -131,8 +131,8 @@ val open_root : Fpath.t -> unit
     Only file scope can be opened from now on.
 
     This installs a {!Printexc.set_uncaught_exception_handler} to
-    handle uncaught and {!Duplicate}. If that happens the error is
-    logged and the program {!Stdlib.exit}s with
+    handle uncaught and {{!section-error}definition errors}. If that happens
+    the error is logged and the program {!Stdlib.exit}s with
     {!B0_driver.Exit.b0_file_error}. *)
 
 val open_file : name -> Fpath.t -> unit
@@ -175,7 +175,7 @@ val raise_invalid_name_error : kind:string -> name:string -> 'a
 
 val raise_duplicate_error : kind:string -> name:string -> 'a
 (** [raise_duplicate_error ~kind ~name] raises an error for
-    a duplciate name [name] for an entity of kind [kind]. *)
+    a dupliciate name [name] for an entity of kind [kind]. *)
 
 (** {1:sealing Sealing}
 

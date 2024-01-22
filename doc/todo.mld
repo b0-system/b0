@@ -216,9 +216,14 @@ On hold until we get the {!B0_srcs} thing right.
 
 {2:b0_release [B0_release]}
 
-- Finish the support. Notably implement archive linting and building.
+- Finish archive creation. Need to solve watermarks. Need to
+  allow custom exclusion and possibly a cusom massage hook.
+- Need to implement archive linting/building/testing.
 - Implement [.release publish].
 - Review and finish the docs.
+- The topkg delegate had a way to list issues on the cli. Maybe
+  integrate something like (along with open PRs) in `.release status`.
+
 
 {2:b0_show_url [B0_show_url]}
 
@@ -240,11 +245,11 @@ On hold until we get the {!B0_srcs} thing right.
 
 Got a bit stuck on trying to clean up the main units and getting
 rid of the [show-uri] bespoke action because [.show-url.url] has
-not future support and {!B0_jsoo.html_page} relies on that, but then
+not future support and {!B0_jsoo.val-html_page} relies on that, but then
 maybe it shouldn't. Unit ideas:
 
 1. Unit exe (js only)
-2. Unit html_page or bundle (more or less what current {!B0_jsoo_html_page}.
+2. Unit html_page or bundle (more or less what current {!B0_jsoo.val-html_page}.
 3. Unit packed_html_page (packs all resource for single file distribution).
 
 {1:tool Tool}

@@ -9,7 +9,7 @@
     {e expectation files} tracked by your VCS. The VCS can then be used to
     track and correct expectations.
 
-    See the {{!page-TODO.expect}TODO}. *)
+    See the {{!page-todo.b0_expect}TODO}. *)
 
 open B0_std
 
@@ -40,7 +40,7 @@ val file : ?diff:bool -> t -> Fpath.t -> unit
     A relative [file] is made absolute with {!base}.
 
     If [diff] is [true] (default) a diff is shown on a new or
-    unexpected [file] whenever {!log_diff} is [true]. If [false] no
+    unexpected [file] whenever {!log_diffs} is [true]. If [false] no
     diff is ever shown for [file].
 
     Raises [Invalid_argument] if [file] was already added to [ctx]. *)
@@ -76,7 +76,7 @@ val abortf : ('a, Format.formatter, unit, 'b) format4 -> 'a
     to [fmt].*)
 
 val result_to_abort : ('a, string) result -> 'a
-(** [result_to_abort r] raises {!Error} if [r] is [Error e] and
+(** [result_to_abort r] raises {!Abort} if [r] is [Error e] and
     returns [v] if [r] is [Ok v]. *)
 
 val abort_to_result : (unit -> 'a) -> ('a, string) result
@@ -133,7 +133,7 @@ val make :
     {- [log_absolute], if [false] (default) paths are logged relative
        to the cwd of [env]. If [true] all paths are made absolute.}
     {- [repo] is the VCS repository to use. By default looked up with
-       {!B0_vcs_repo.find} in {!B0_cmdlet.Env.scope_dir}.}}
+       {!B0_vcs_repo.find} in {!B0_env.scope_dir}.}}
 
     Raises {!Abort} if VCS detection fails. *)
 

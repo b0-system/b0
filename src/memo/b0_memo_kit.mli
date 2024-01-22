@@ -12,5 +12,5 @@ val ready_and_copy_dir :
   ?prune:(Unix.stats -> string -> Fpath.t -> bool) ->
   B0_memo.t -> recurse:bool -> src:Fpath.t -> Fpath.t -> unit
 (** [ready_and_copy_dir m ~recurse ~src dst] is the moral equivalent
-    of {!B0_std.Os.Dir.copy}. It makes ready and copies the contents
+    of {!B0_std.Os.Dir.val-copy}. It makes ready and copies the contents
     of [src] to [dst] using the same conventions. *)

@@ -3,9 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** {{:https://github.com/commonmark/cmark}[cmark]} support.
-
-    An {{!extract}extraction} function is also provided. *)
+(** {{:https://github.com/commonmark/cmark}[cmark]} support. *)
 
 open B0_std
 

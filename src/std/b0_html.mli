@@ -308,7 +308,7 @@ module El : sig
       pre-applied element name. *)
 
   type void_cons = ?at:At.t list -> unit -> frag
-  (** The type for void element constructors. This is simply {!el}
+  (** The type for void element constructors. This is simply {!v}
       with a pre-applied element name and without children. *)
 
   val a : cons

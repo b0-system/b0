@@ -76,11 +76,11 @@ type sel =
        directory separators in [x] is removed.}
     {- [`Fut f] uses the given future during the build to determine
        a set of files unconditionally added to the selection.
-       FIXME this s not the right interface, see {!root_of_file},
+       FIXME this s not the right interface,
        maybe we should return a {!t} itself and merge the results}}
 
     Except for [`Fut], any relative path is made absolute to the
-    current build unit with {!B0_unit.root_dir}. *)
+    current build unit with {!B0_unit.scope_dir}. *)
 
 type sels = sel list
 (** The type for source selection. *)

@@ -268,7 +268,7 @@ module Theme : sig
 
   val config_file : Fpath.t
   (** [config_file] is the file relative to the user's
-      {!Os.Dir.config} directory for specifying the odoc theme. *)
+      {!B0_std.Os.Dir.config} directory for specifying the odoc theme. *)
 
   val get_user_preference : unit -> (name option, string) result
   (** [get_user_preference ()] is the user prefered theme name (if any). *)

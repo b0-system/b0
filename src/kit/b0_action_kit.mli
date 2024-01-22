@@ -20,4 +20,4 @@ val fetch_url :
     [file]. [progress] indicates whether progress should be reported
     on [stderr] (defaults to [true]), [args] are arguments added to
     the invocation, [env] and [stderr] are given to the corresponding
-    {!Os.Cmd.run}. *)
+    {!B0_std.Os.Cmd.val-run}. *)

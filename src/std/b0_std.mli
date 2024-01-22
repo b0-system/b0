@@ -371,7 +371,7 @@ module Fmt : sig
   val and_enum : ?empty:unit t -> 'a t -> 'a list t
   (** [and_enum ~empty pp_v ppf l] formats [l] according to its length.
       {ul
-      {- [0], formats {!empty} (defaults to {!nop}).}
+      {- [0], formats [empty] (defaults to {!nop}).}
       {- [1], formats the element with [pp_v].}
       {- [2], formats ["%a and %a"] with the list elements}
       {- [n], formats ["%a, ... and %a"] with the list elements}} *)
@@ -400,18 +400,18 @@ module Fmt : sig
   val set_tty_cap : ?cap:Tty.cap -> unit -> unit
   (** [set_tty_cap ?cap ()] sets the global TTY formatting capabilities to
       [cap] if specified and to [Tty.(cap (of_fd Unix.stdout))] otherwise.
-      Affects the output of {!tty_str} and {!val-tty}. *)
+      Affects the output of {!val-tty} and {!val-tty'}. *)
 
   val tty_cap : unit -> Tty.cap
   (** [tty_cap ()] is the global styling capability. *)
 
   val tty : Tty.style list -> 'a t -> 'a t
   (** [tty styles pp_v ppf v] prints [v] with [pp_v] on [ppf]
-      according to [styles] and the value of {!tty_styling_cap}. *)
+      according to [styles] and the value of {!tty_cap}. *)
 
   val tty' : Tty.style list -> string t
   (** [tty' styles ppf s] prints [s] on [ppf] according to [styles]
-      and the value of {!tty_styling_cap}. *)
+      and the value of {!tty_cap}. *)
 
   val code : 'a t -> 'a t
   (** [code] is [tty [`Bold]]. *)
@@ -439,13 +439,13 @@ module Result : sig
     (** [( let* )] is {!bind}. *)
 
     val ( and* ) : ('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e) result
-    (** [( and* )] is {!product}. *)
+    (** [( and* )] is [product]. *)
 
     val ( let+ ) : ('a, 'e) result -> ('a -> 'b) -> ('b, 'e) result
     (** [( let+ )] is {!map}. *)
 
     val ( and+ ) : ('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e) result
-    (** [( and* )] is {!product}. *)
+    (** [( and* )] is [product]. *)
   end
 end
 
@@ -486,7 +486,7 @@ module Char : sig
 
     val hex_digit_value : char -> int
     (** [hex_digit_value c] is the numerical value of a digit that
-        satisfies {!is_hex_digit}. Raises {!Invalid_argument} if
+        satisfies {!is_hex_digit}. Raises [Invalid_argument] if
         [is_hex_digit c] is [false]. *)
 
     val lower_hex_digit : int -> char
@@ -820,7 +820,7 @@ let escape_dquotes s =
       a byte can be substituted by another one by [set_char]. *)
 
   exception Illegal_escape of int
-  (** See {!unescaper}. *)
+  (** See {!byte_unescaper}. *)
 
   val byte_unescaper :
     (string -> int -> int) -> (bytes -> int -> string -> int -> int) ->
@@ -829,7 +829,7 @@ let escape_dquotes s =
       {ul
       {- [char_len_at s i] is the length of an escaped byte at index
          [i] of [s]. If [1] is returned then the byte is assumed
-         to be unchanged by the unescape, use {!byte_unreplace}
+         to be unchanged by the unescape, use {!byte_unreplacer}
          if that does not hold.}
       {- [set_char b k s i] sets at index [k] in [b] the unescaped
          byte read at index [i] in [s] and returns the next readable
@@ -1176,10 +1176,10 @@ end
 
     {ol
     {- An optional, platform-dependent, volume.}
-    {- An optional root directory separator {!dir_sep} whose presence
+    {- An optional root directory separator {!Fpath.dir_sep} whose presence
        distinguishes absolute paths (["/a"]) from {e relative} ones
        (["a"])}
-    {- A non-empty list of {!dir_sep} separated segments. {e Segments}
+    {- A non-empty list of {!Fpath.dir_sep} separated segments. {e Segments}
        are non empty strings except for maybe the last one. The latter
        syntactically distinguishes {e directory paths} (["a/b/"]) from
        file paths (["a/b"]).}}
@@ -1224,7 +1224,7 @@ module Fpath : sig
       even on Windows platforms (don't be upset, the module gives them
       back to you with backslashes).
 
-      @raise Invalid_argument if [s] is not a {{!of_string}valid
+      Raises [Invalid_argument] if [s] is not a {{!of_string}valid
       path}. Use {!of_string} to deal with untrusted input. *)
 
   val add_seg : t -> string -> t
@@ -1232,7 +1232,7 @@ module Fpath : sig
       [p] with [seg] added. If [p]'s last segment is empty, this is
       [p] with the empty segment replaced by [seg].
 
-      @raise Invalid_argument if [is_seg seg] is [false]. *)
+      Raises [Invalid_argument] if [is_seg seg] is [false]. *)
 
   val append : t -> t -> t
   (** [append p q] appends [q] to [p] as follows:
@@ -1326,14 +1326,14 @@ module Fpath : sig
   val drop_prefixed : t list -> t list
   (** [drop_prefixed ps] is [ps] without elements that have a
       {{!is_prefix}strict prefixes} in [ps]. The list order is
-      preserved. Duplicates are not removed use {!uniquify} for
+      preserved. Duplicates are not removed use {!distinct} for
       this. *)
 
   val reroot : src_root:t -> dst_root:t -> t -> t
   (** [reroot ~src_root ~dst_root p] assumes [src_root] {{!is_prefix}prefixes}
       [p] removes the prefix and prepends [dst_root] to the result.
 
-      @raise Invalid_argument if [dst_root] is not a prefix of [src].
+      Raises [Invalid_argument] if [dst_root] is not a prefix of [src].
       In particular note that [p] cannot be [src_root]. *)
 
   val relative : to_dir:t -> t -> t
@@ -1343,7 +1343,7 @@ module Fpath : sig
 
       {b Warning.} This function is mostly broken at the moment.
 
-      @raise Invalid_argument if path [to_dir] contains "..". *)
+      Raises [Invalid_argument] if path [to_dir] contains "..". *)
 
   (** {1:preds Predicates and comparison} *)
 
@@ -1470,7 +1470,7 @@ module Fpath : sig
   (** [pp_unquoted ppf p] prints path [p] on [ppf] using {!to_string}. *)
 
   val pp_dump : t Fmt.t
-  (** [pp_dump ppf p] prints path [p] on [ppf] using {!String.dump}. *)
+  (** [pp_dump ppf p] prints path [p] on [ppf] using {!String.pp_dump}. *)
 
   val error :
     t -> ('b, Format.formatter , unit, ('a, string) result) format4 -> 'b
@@ -1957,7 +1957,7 @@ module Cmd : sig
   (** [paths ?slip ps] is {!of_list}[ ?slip Fpath.to_string ps]. *)
 
   val of_list : ?slip:string -> ('a -> string) -> 'a list -> t
-  (** [of_list ?slip conv l] is {!args}[ ?slip (List.map conv l)]. *)
+  (** [of_list ?slip conv l] is {!list}[ ?slip (List.map conv l)]. *)
 
   (** {1:tool Tools}
 
@@ -1978,7 +1978,7 @@ module Cmd : sig
       {!empty} or if the first element can't be parsed to a {!type-tool}. *)
 
   val get_tool : t -> tool
-  (** [get_tool] is like {!val-tool} but raises {!Invalid_argument} in case
+  (** [get_tool] is like {!val-tool} but raises [Invalid_argument] in case
       of error. *)
 
   val set_tool : tool -> t -> t
@@ -2260,7 +2260,7 @@ module Os : sig
         {- [name] is used to construct the filename of the file,
            see {!type:tmp_name} for details. It defaults to ["tmp-%s"].}
         {- [dir] is the directory in which the temporary file is created.
-           It defaults to {!Os.Dir.default_tmp}[ ()].}
+           It defaults to {!B0_std.Os.Dir.default_tmp}[ ()].}
         {- If [make_path] is [true] (default) and [dir] does not exist the
            whole path to it is created as needed with permission [0o755]
            (readable and traversable by everyone, writable by the user).}} *)
@@ -2325,7 +2325,7 @@ module Os : sig
     val read_with_fd :
       Fpath.t -> (Unix.file_descr -> 'b) -> ('b, string) result
     (** [read_with_ic file f] opens [file] as a file descriptor [fdi]
-        and returns [Ok (f ic)]. If [file] is {!dash}, [ic] is
+        and returns [Ok (f ic)]. If [file] is {!Fpath.dash}, [ic] is
         {!stdin}.  After the function returns (normally or via an
         exception raised by [f]), [ic] is ensured to be closed, except
         if it is {!stdin}. The function errors if opening [file]
@@ -2337,7 +2337,7 @@ module Os : sig
 
     val read : Fpath.t -> (string, string) result
     (** [read file] is [file]'s content as a string. If [file] is
-        {!dash} the contents of {!stdin} is read. {b Warning.} The
+        {!Fpath.dash} the contents of {!stdin} is read. {b Warning.} The
         signature of this function limits files to be at most
         {!Sys.max_string_length} in size. On 32-bit platforms this is
         {b only around [16MB]}. Errors have the form
@@ -2350,7 +2350,7 @@ module Os : sig
       (Unix.file_descr -> ('a, 'b) result) -> (('a, 'b) result, string) result
     (** [write_with_fd ~atomic ~mode ~force ~make_path file f] opens
         an output file descriptor [fdo] to write to [file] and returns
-        [Ok (f fdo)].  If [file] is {!dash}, [fdo] is
+        [Ok (f fdo)].  If [file] is {!Fpath.dash}, [fdo] is
         {!Unix.stdout}. After the function returns (normally or via an
         exception) [fdo] is ensured to be closed except if it is
         {!Unix.stdout}.
@@ -2393,8 +2393,9 @@ module Os : sig
       src:Fpath.t -> Fpath.t -> (unit, string) result
     (** [copy ~atomic ~mode ~force ~path ~make_path ~src file]
         operates like {!write_with_fd} but directly writes the content
-        of [src] (or {!stdin} if [src] is {!dash}) to [file]. [mode] defaults
-        to the permissions of [src] if available and [0o644] otherwise. *)
+        of [src] (or {!stdin} if [src] is {!Fpath.dash}) to [file].
+        [mode] defaults to the permissions of [src] if available and
+        [0o644] otherwise. *)
 
     (** {1:tmpfiles Temporary files}
 
@@ -2410,9 +2411,9 @@ module Os : sig
         ensured to be closed and the temporary file is deleted.
         {ul
         {- [name] is used to construct the filename of the file,
-           see {!type:tmp_name} for details. It defaults to ["tmp-%s"].}
+           see {!type:Path.tmp_name} for details. It defaults to ["tmp-%s"].}
         {- [dir] is the directory in which the temporary file is created.
-           It defaults to {!Dir.default_tmp ()}.}
+           It defaults to {!B0_std.Os.Dir.default_tmp}.}
         {- If [make_path] is [true] (default) and [dir] doesn't exist the
            whole path to it is created as needed with permission [0o755]
            (readable and traversable by everyone, writable by the user).}
@@ -2624,10 +2625,10 @@ module Os : sig
         (normally or via an exception) [t] and its content are deleted.
         {ul
         {- [name] is used to construct the filename of the directory,
-           see {!type:File.tmp_name} for details. It defaults to
+           see {!type:B0_std.Os.Path.tmp_name} for details. It defaults to
            ["tmp-%s"].}
         {- [dir] is the directory in which the temporary file is created.
-           It defaults to {!Dir.default_tmp ()}.}
+           It defaults to {!B0_std.Os.Dir.default_tmp}.}
         {- If [make_path] is [true] (default) and [dir] doesn't exist the
            whole path to it is created as needed with permission [0o755]
            (readable and traversable by everyone, writable by the user).}
@@ -2714,10 +2715,8 @@ module Os : sig
 
     val read_file : string -> Unix.file_descr -> string
     (** [read_file fn fd] reads [fd] to a string assuming it is a file
-        descriptor open on file path [fn].
-
-        @raise Failure in case of error with an error message that
-        mentions [fn]. *)
+        descriptor open on file path [fn]. Raises [Failure] in case of error
+        with an error message that mentions [fn]. *)
   end
 
     (** Socket operations. *)
@@ -3095,7 +3094,7 @@ module Os : sig
         program not the first argument to the program). The function
         only recturns in case of error. [env] defaults to
         {!B0_std.Os.Env.current_assignments}[ ()],
-        [cwd] to {!B0_std.Os.Dir.cwd}[ ()]. *)
+        [cwd] to {!B0_std.Os.Dir.val-cwd}[ ()]. *)
 
     type t = Cmd.t
     (** {!Exit} needs that alias to refer to {!B0_std.Cmd.t}. *)

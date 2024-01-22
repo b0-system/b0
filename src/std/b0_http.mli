@@ -91,7 +91,7 @@ module Http_client : sig
       followed. If [insecure] is [true] (defaults to [false]) TLS
       server certificates are not checked.
 
-      The response's {!Http.resp_headers} are lowercased. *)
+      The response's {!Http.Response.headers} are lowercased. *)
 
   (** {1:cli Command line interface} *)
 

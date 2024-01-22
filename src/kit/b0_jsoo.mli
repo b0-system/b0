@@ -36,12 +36,12 @@ val compilation_mode : compilation_mode B0_meta.key
 
 val compile_opts : Cmd.t B0_meta.key
 (** [compile] are options added to the [js_of_ocaml compile] subcommand.
-    Defaults to {!Cmd.empty}. *)
+    Defaults to {!B0_std.Cmd.empty}. *)
 
 type source_map = [`Inline | `File ] option
 (** The type for specifying source maps desires.
 
-    {b FIXME} Like {!compilation_mode} this should possibly be associated
+    {b FIXME} Like {!type-compilation_mode} this should possibly be associated
     the build. *)
 
 val source_map : source_map B0_meta.key
@@ -98,7 +98,7 @@ val html_page :
     {- [name] is the name of the unit (defaults to [n]).}
     {- [srcs] are the executable sources. All files with extension [.ml],
        [.mli] and [.js] are considered for compiling and linking the
-       executable. The files {!B0_fexts.www} in [srcs] minus [.js] files are
+       executable. The files {!B0_file_exts.www} in [srcs] minus [.js] files are
        copied over the build directory. If these files are can be rerooted
        to the build dir according to [assets_dir] they are copied as such
        otherwise they are copied
@@ -108,7 +108,8 @@ val html_page :
         is likely something that will play better with generated assets.
         It's also sligthly borderline with deployements.}
     {- [wrap] allows to extend the build procedure you must call the given
-       build procedure. TODO maybe remove once we have good {!frag}.}}
+       build procedure. TODO maybe remove once we have good
+       {!build_fragments}.}}
 
     {b TODO document.} The js file is [name.js], if there's no [.html] source
     in the srcs a minimal HTML [name.html] file is generated in which [n.js]

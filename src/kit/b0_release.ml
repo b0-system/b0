@@ -259,16 +259,15 @@ module Archive = struct
     Log.app (fun m -> m "TODO Testing release");
     let* _exists = Os.Path.delete ~recurse:true archive_dir in
     (Log.app @@ fun m ->
-    m "@[<v>Release: %a %a@,Commit:  %a@,Archive: %a@]"
+    m "@[<v>Release: %a %a@,Commit:  %a@,Archive: %a@]@."
       Fmt.code' name String.pp_version_str version
       B0_vcs_repo.pp_commit commit_id
       (Fmt.code Fpath.pp) archive_file);
     if is_dirty then
       (Log.warn @@ fun m ->
        m "@[<v>%a repo in scope directory %a@,\
-          Did you forget to commit some changes ?@]"
+          Did you forget to commit some changes ?@]@."
          B0_vcs_repo.pp_dirty () (Fmt.code Fpath.pp) scope_dir);
-    Log.app (fun m -> m ""); (* Add a newline in case of multi archiving. *)
     Ok ()
 
   let cmd env commit_ish packs x_packs =
@@ -470,7 +469,7 @@ let release_cmd action env =
             default package configuration so it may fail in the current \
             environment without this necessarily implying an actual \
             problem with the distribution; one should still worry about \
-            it thoughh These checks can be prevented by using the \
+            it though These checks can be prevented by using the \
             $(b,--skip-lint) and $(b,--skip-build) options.";
         `Blocks man ]
     in
@@ -528,7 +527,7 @@ let release_cmd action env =
       let doc =
         "The version tag to use. If absent, automatically extracted \
          from the changes file of a pack: the first token of the first
-         title of the changes file is taken. E.g. $(b,vX.Y.Z) for a markdown \
+         heading of the changes file is taken. E.g. $(b,vX.Y.Z) for a markdown \
          file with a first heading $(b,# vX.X.X YYYY-MM-DD). Use \
          $(b,--dry-run) to check out the extraction."
       in

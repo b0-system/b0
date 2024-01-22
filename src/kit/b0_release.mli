@@ -58,7 +58,7 @@ val src_archive_url : string B0_meta.key
 val src_archive_url_of_pack :
   version:string -> B0_pack.t -> (string, string) result
 (** [src_url_of_meta ~version p] derives a source URL for the pack [p].
-    This looks up {!Meta.src_archive_url} [p] and substitute the variables
+    This looks up {!src_archive_url} [p] and substitute the variables
     as follows:
     {ul
     {- [%‌%ARCHIVE_NAME%‌%] with the value of {!src_archive_name_of_pack}.}
@@ -118,7 +118,8 @@ val get_changes_file_of_pack : B0_pack.t -> (Fpath.t, string) result
 val changes_latest_of_file :
   Fpath.t -> ((string * string) option, string) result
 (** [changes_latest_of_file f] extracts the latest release notes as the
-    {{!B0_cmark.first_section}first markdown section} of file [f]. *)
+    {{!B0_std.String.commonmark_first_section}first markdown section} of
+    file [f]. *)
 
 val changes_latest_version_of_title : string -> string option
 (** [changes_latest_version title] extracts the first token of [title]

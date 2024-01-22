@@ -86,9 +86,9 @@ module Tool : sig
   val by_name :
     ?response_file:response_file -> ?unstamped_vars:env_vars ->
     ?vars:env_vars -> string -> t
-  (** [by_name] is like {!v} but reference the tool directly via a name.
+  (** [by_name] is like {!make} but reference the tool directly via a name.
 
-      @raise Invalid_argument if {!B0_std.Fpath.is_seg} [name] is [false]. *)
+      Raises [Invalid_argument] if {!B0_std.Fpath.is_seg} [name] is [false]. *)
 
   val name : t -> Cmd.tool
   (** [name t] is [t]'s tool name. If this is a relative file path
@@ -119,18 +119,18 @@ end
 module Env : sig
 
   val find : empty_is_none:bool -> Os.Env.var_name -> t -> string option
-  (** [find var m] looks up [var] in [m]'s {!env} and parses
-      it with {!parse}. This {!B0_memo.fail}s the memo in case of error. *)
+  (** [find var m] looks up [var] in [m]'s {!env}.
+      This {!B0_memo.fail}s the memo in case of error. *)
 
   val find' : empty_is_none:bool ->
     (Os.Env.var_name -> ('a, string) result) -> Os.Env.var_name -> t ->
     'a option
   (** [find' m parse var] looks up [var] in [m]'s {!env} and
-      parses it with {!parse}. This {!B0_memo.fail}s the memo in case of
+      parses it with [parse]. This {!B0_memo.fail}s the memo in case of
       error. *)
 
   val mem : Os.Env.var_name -> t -> bool
-  (** [mem var m] is [true] if [var] is defined in [m]'s environment,
+  (** [mem var m] is [true] if [var] is defined in [m]'s {!env},
       even if empty. *)
 end
 
@@ -189,8 +189,8 @@ val spawn :
     {- [env], environment variables added to the build environment.
        This overrides environment variables read by the tool in the
        build environment except for forced one. It also allows to
-       specify environment that may not be mentioned by the running
-       tool's {{!Tool.v}environment specification}.}
+       specify enovironment that may not be mentioned by the running
+       tool's {{!Tool.make}environment specification}.}
     {- [cwd] the current working directory. Default is the memo's [cwd]. In
        general it's better to avoid using relative file paths and
        tweaking the [cwd]. Construct make your paths absolute
