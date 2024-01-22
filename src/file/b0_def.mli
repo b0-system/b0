@@ -81,6 +81,9 @@ module type S = sig
 
   (** {1:value Named values} *)
 
+  val mangle_basename : string -> string
+  (** [mangle_basename s] is a basename that can be used with {!define}. *)
+
   type t
   (** The type of defined values. *)
 

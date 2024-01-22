@@ -189,11 +189,11 @@ module Modname : sig
   val v : string -> t
   (** [v n] is a module name for [n], the result is capitalized. *)
 
-  val of_filename : Fpath.t -> t
-  (** [of_filename f] is the basename of [f], without extension, capitalized.
-      This assumes the basename of [f] follows the OCaml file naming
-      convention mandated by the toolchain. If you know that may not
-      be the case use {!of_mangled_filename}. *)
+  val of_path_filename : Fpath.t -> t
+  (** [of_path_filename f] is the basename of [f], without extension,
+      capitalized. This assumes the basename of [f] follows the OCaml file
+      naming convention mandated by the toolchain. If you know that may not
+      be the case use {!mangle_filename}. *)
 
   val equal : t -> t -> bool
   (** [equal n0 n1] is [true] iff [n0] and [n1] are the same module name. *)
@@ -213,9 +213,9 @@ module Modname : sig
 
   (** {1:mangled Filename mangling} *)
 
-  val of_mangled_filename : string -> t
-  (** [of_mangled_filename s] is module name obtained by mangling
-      the filename of [s] as follows:
+  val mangle_filename : string -> t
+  (** [mangle_filename s] is module name obtained by mangling
+      the filename [s] as follows:
 
       {ol
       {- Remove any trailing [.ml] or [.mli].}
@@ -227,7 +227,7 @@ module Modname : sig
          the unit name with ['M'].}
       {- Capitalize the first letter.}}
 
-      The transformation is consistent with {!of_filename} on files
+      The transformation is consistent with {!of_path_filename} on files
       that follows the OCaml toolchain convention. However the
       transformation is not injective. Here are a few examples:
 
@@ -807,6 +807,23 @@ val exe :
     {- [wrap] allows to extend the build procedure you must call the given
        build procedure. TODO maybe remove once we have good {!frag}.}} *)
 
+val script :
+  ?wrap:(B0_unit.build_proc -> B0_unit.build_proc) -> ?doc:string ->
+  ?meta:B0_meta.t -> ?public:bool -> ?name:string -> Fpath.t -> B0_unit.t
+(** [script file] is a build unit for an OCaml script in [file].  The
+    build unit simply checks that it typechecks. Due to upstream
+    limitations this is a hack. You should invoke your main as:
+    {[
+let () = if !Sys.interactive then () else main ()
+    ]}
+    {ul
+    {- [public] indicates whether the basename of [file] is made available
+       unscoped outside the unit definition scope (defaults to [false]).}
+    {- [doc] is the unit doc string}
+    {- [meta] is the initial metadata}
+    {- [wrap] allows to extend the build procedure. You must call the
+       given build procedure.}} *)
+
 (** {2:libs Libraries} *)
 
 val lib :
@@ -1111,7 +1128,7 @@ end
 (** Crunching data into OCaml values. *)
 module Crunch : sig
   val id_of_filename : string -> string
-  (** [id_of_filename] is {!Modname.of_mangled_filename} uncapitalized.*)
+  (** [id_of_filename] is {!Modname.mangle_filename} uncapitalized.*)
 
   val string_to_string : id:string -> data:string -> string
   (** [string_to_string ~id ~data] let binds binary [data] to [id] using

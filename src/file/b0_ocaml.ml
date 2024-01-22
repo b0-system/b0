@@ -200,7 +200,9 @@ end
 
 module Modname = struct
   type t = string
-  let of_filename f = String.Ascii.capitalize (Fpath.basename ~strip_ext:true f)
+  let of_path_filename f =
+    String.Ascii.capitalize (Fpath.basename ~strip_ext:true f)
+
   let v n = String.Ascii.capitalize n
   let equal = String.equal
   let compare = String.compare
@@ -210,7 +212,7 @@ module Modname = struct
 
   (* Filename mangling *)
 
-  let of_mangled_filename s =
+  let mangle_filename s =
     let rem_ocaml_ext s = match String.cut_right ~sep:"." s with
     | None -> s | Some (s, ("ml" | ".mli")) -> s | Some _ -> s
     in
@@ -411,7 +413,7 @@ module Modsrc = struct
 
   let modname_map m ~kind files =
     let add acc f =
-      let mname = Modname.of_filename f in
+      let mname = Modname.of_path_filename f in
       match Modname.Map.find_opt mname acc with
       | None -> Modname.Map.add mname f acc
       | Some f' ->
@@ -1334,6 +1336,13 @@ let exe_proc set_exe_path set_modsrcs srcs b =
   end;
   Fut.return ()
 
+let script_proc set_exe_path file b =
+  let _m = B0_build.memo b in
+  let scope_dir = B0_build.current_scope_dir b in
+  let exe_file = Fpath.(scope_dir // file) in
+  set_exe_path exe_file;
+  Fut.return ()
+
 let lib_proc set_modsrcs srcs b =
   (* XXX we are still missing cmxs here *)
   let m = B0_build.memo b in
@@ -1403,6 +1412,31 @@ let exe
   in
   let meta = B0_meta.override base ~by:meta in
   let proc = wrap (exe_proc set_exe_path set_modsrcs srcs) in
+  B0_unit.make ?doc ~meta name proc
+
+let script
+    ?(wrap = fun proc b -> proc b) ?doc ?(meta = B0_meta.empty)
+    ?(public = false) ?name file
+  =
+  let script_name = Fpath.basename file in
+  let basename = B0_unit.mangle_basename script_name in
+  let name = Option.value ~default:basename name in
+  let doc = match doc with
+  | Some _ as doc -> doc
+  | None when public -> Some (Fmt.str "The %s script" script_name)
+  | None -> None
+  in
+  let exe_path, set_exe_path = Fut.make () in
+  let base =
+    B0_meta.empty
+    |> B0_meta.tag tag
+    |> B0_meta.tag B0_meta.exe
+    |> B0_meta.add B0_unit.tool_name script_name
+    |> B0_meta.add B0_meta.public public
+    |> B0_meta.add B0_unit.exe_file exe_path
+  in
+  let meta = B0_meta.override base ~by:meta in
+  let proc = wrap (script_proc set_exe_path file) in
   B0_unit.make ?doc ~meta name proc
 
 let lib
@@ -1603,7 +1637,7 @@ end
 
 module Crunch = struct
   let id_of_filename s =
-    String.Ascii.uncapitalize (Modname.of_mangled_filename s)
+    String.Ascii.uncapitalize (Modname.mangle_filename s)
 
   let string_to_string ~id ~data:s =
     let len = String.length s in

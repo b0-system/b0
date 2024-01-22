@@ -297,7 +297,7 @@ let w_src b (file, src) =
 
 let w_mod_use b b0_file manif (p, _ as mod_use) =
   let manif, intf, impl = get_mod_use_srcs b0_file manif mod_use in
-  let mod_name = B0_ocaml.Modname.of_mangled_filename (Fpath.basename p) in
+  let mod_name = B0_ocaml.Modname.mangle_filename (Fpath.basename p) in
   let b = match intf with
   | None -> w b (Fmt.str "module %s = struct" mod_name)
   | Some intf ->

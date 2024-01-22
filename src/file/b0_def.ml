@@ -33,6 +33,7 @@ module type VALUE = sig
 end
 
 module type S = sig
+  val mangle_basename : string -> string
   type t
   val define : ?doc:string -> ?meta:B0_meta.t -> string -> def
   val def_kind : string
@@ -76,6 +77,14 @@ module type S = sig
 end
 
 module Make (V : VALUE) = struct
+  let mangle_basename s =
+    try
+      for i = 0 to String.length s - 1
+      do if s.[i] = B0_scope.sep.[0] then raise Exit; done;
+      s
+    with
+    | Exit -> String.map (function '.' -> '-' | c -> c) s
+
   type t = V.t
   let def_kind = V.def_kind
   let def = V.def
