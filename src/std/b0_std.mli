@@ -1227,6 +1227,9 @@ module Fpath : sig
       Raises [Invalid_argument] if [s] is not a {{!of_string}valid
       path}. Use {!of_string} to deal with untrusted input. *)
 
+  val fmt : ('a, Format.formatter, unit, t) format4 -> 'a
+  (** [fmt …] is [Fmt.kstr v …]. *)
+
   val add_seg : t -> string -> t
   (** [add_seg p seg] if [p]'s last segment is non-empty this is
       [p] with [seg] added. If [p]'s last segment is empty, this is

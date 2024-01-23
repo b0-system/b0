@@ -1745,6 +1745,7 @@ module Fpath = struct
   let of_string = if Sys.win32 then Windows.of_string else Posix.of_string
   let to_string p = p
   let v s = match of_string s with Ok p -> p | Error m -> invalid_arg m
+  let fmt fmt = Fmt.kstr v fmt
   let add_seg p seg =
     if not (is_seg seg) then invalid_arg (err_invalid_seg seg) else
     let sep = if last_is_dir_sep p then "" else dir_sep in
