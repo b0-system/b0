@@ -8,7 +8,13 @@ let () = B0_scope.open_lib ~module':__MODULE__ "show-url"
 open B0_std
 open Result.Syntax
 
-(* Keys *)
+let url_of_path _env path =
+  let* exists = Os.Path.exists path in (* FIXME remote build the build env *)
+  if not exists
+  then Fmt.error "%a: Not such path" Fpath.pp path
+  else Ok (Fmt.str "file://%s" (Fpath.to_string path))
+
+(* URLs *)
 
 type url =
 [ `Url of Url.t
@@ -25,6 +31,17 @@ let url : url B0_meta.key =
   let default = `In (`Unit_dir, Fpath.v ".") in
   B0_meta.Key.make "url" ~default ~doc ~pp_value:pp_url
 
+let get_url env unit = match B0_unit.find_or_default_meta url unit with
+| `Url url -> Ok url
+| `In (`Unit_dir, p) ->
+    let dir = B0_env.unit_dir env unit in
+    let p = if Fpath.is_current_dir p then dir else Fpath.(dir // p) in
+    url_of_path env (B0_env.in_unit_dir env unit p)
+| `In (dir, p) -> url_of_path env (B0_env.in_dir env dir p)
+| `Fun (_, f) -> f env unit
+
+(* Server mode *)
+
 let listen_args =
   let doc = "The command line arguments used to listen on an authority." in
   let default = fun ~authority -> Cmd.(arg "--listen" % authority) in
@@ -37,8 +54,6 @@ let timeout_s =
      before showing the URL."
   in
   B0_meta.Key.make "timeout-s" ~doc ~default:1 ~pp_value:Fmt.int
-
-(* Server mode *)
 
 let make_server_cmd cmd args ~listen_args =
   (* Inserts ~listen_args at the end of args or before -- *)
@@ -140,23 +155,6 @@ let parse_unit_specs args =
   in
   List.map parse_arg args
 
-let url_of_path _env path =
-  let* exists = Os.Path.exists path in (* FIXME remote build the build env *)
-  if not exists
-  then Fmt.error "%a: Not such path" Fpath.pp path
-  else Ok (Fmt.str "file://%s" (Fpath.to_string path))
-
-let url_of_unit env unit =
-  match B0_unit.find_meta url unit with
-  | None -> (* The key default has a `.` segment let's avoid that for now. *)
-      url_of_path env (B0_env.unit_dir env unit)
-  | Some url ->
-      match url with
-      | `Url url -> Ok url
-      | `In (`Unit_dir, p) -> url_of_path env (B0_env.in_unit_dir env unit p)
-      | `In (dir, p) -> url_of_path env (B0_env.in_dir env dir p)
-      | `Fun (_, f) -> f env unit
-
 let unit_mode env args =
   let specs = parse_unit_specs args in
   let unit_names, paths = List.split specs in
@@ -168,7 +166,7 @@ let unit_mode env args =
     let build_dir = B0_build.build_dir (B0_env.build env) unit in
     match p with
     | Some p -> url_of_path env Fpath.(build_dir // v p)
-    | None -> url_of_unit env unit
+    | None -> get_url env unit
   in
   try Ok (`Show_unit_urls (List.map make_url specs)) with Failure e -> Error e
 
@@ -239,11 +237,9 @@ let show_url env browser background prefix timeout dry_run no_exec args =
 
 (* .show-url action command line interface  *)
 
-open Cmdliner
-
-let doc = "Show URLs of files or servers in browsers"
-
 let show_url_cmd action env =
+  let open Cmdliner in
+  let doc = "Show URLs of files or servers in browsers" in
   let man =
     [
       `S Manpage.s_synopsis;
@@ -316,5 +312,23 @@ let show_url_cmd action env =
 let action =
   let doc = "Show URLs of files or server runs" in
   B0_action.of_cmdliner_cmd "" ~dyn_units show_url_cmd ~doc
+
+(* Unit exec *)
+
+let unit_exec =
+  let exec b0_env ?env ?cwd u ~args =
+    let err e = Log.err (fun m -> m "%s" e); Ok B0_cli.Exit.some_error in
+    match B0_unit.get_meta (* or default ? *) url u with
+    | Error e -> err e
+    | Ok url ->
+        let* url = get_url b0_env u in
+        match B0_env.get_tool b0_env (Fpath.v "show-url") with
+        | Error e -> err e
+        | Ok show_url_exe ->
+            let cmd = Cmd.(path show_url_exe % url %% args) in
+            Ok (Os.Exit.exec ?env ?cwd show_url_exe cmd)
+  in
+  `Fun ("show-url", exec)
+
 
 let () = B0_scope.close ()

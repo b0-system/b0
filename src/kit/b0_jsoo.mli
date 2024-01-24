@@ -64,7 +64,7 @@ val exe :
   ?meta:B0_meta.t -> ?assets_root:Fpath.t ->
   ?requires:B0_ocaml.Libname.t list -> ?public:bool -> ?name:string ->
   string -> srcs:B0_srcs.sels -> B0_unit.t
-(** [exe name] is a JavaScript "executable" file named [name].
+(** [exe exename] is a JavaScript "executable" file named [exename].
     {ul
     {- [doc] is the unit doc string.}
     {- [requires] are the OCaml libraries required to compile the JavaScript.
@@ -87,33 +87,45 @@ val exe :
 val html_page :
   ?wrap:(B0_unit.build_proc -> B0_unit.build_proc) -> ?doc:string ->
   ?meta:B0_meta.t -> ?assets_root:Fpath.t ->
-  ?requires:B0_ocaml.Libname.t list -> ?public:bool ->
-  ?name:string -> string -> srcs:B0_srcs.sels -> B0_unit.t
-(** [html_page name] is an HTML page named [name] (without the [.html]
-    extension FIXME review that).
+  ?requires:B0_ocaml.Libname.t list -> ?name:string ->
+  ?js_file:string -> string -> srcs:B0_srcs.sels ->
+  B0_unit.t
+(** [html_page ?js_file page] constructs in the unit directory an HTML
+    file named [page.html], a JavaScript file named [js_file] (defaults
+    to [page.js]) and copies over (or generates) {!B0_file_exts.www} files
+    of [srcs] as follows:
+    {ul
+    {- [page.html], if a file exists with that name in [srcs], this
+       file is used. Otherwise a minimal HTML document linking [pagename.js]
+       and [.css] assets is generated.}
+    {- [js_file] is compiled by considering all files with extension
+       [.ml], [.mli] and [.js] and linked against required libraries
+       [requires].}
+    {- The files {!B0_file_exts.www} in [srcs] minus [.js] files are
+       copied over to the unit directory. If these files can be rerooted
+       to the build directory according to [assets_root] they are copied
+       in a hierarchy otherwise they are copied at the root of the
+       directory
+
+       {b FIXME.} Make that comprehensible.
+
+       {b FIXME.} A competing idea was to have a notion of root induced
+        by {!B0_srcs} selection. See the commented stuff there. This
+        is likely something that will play better with generated assets.
+        It's also sligthly borderline with deployements.}}
+    The other arguments are as follows:
     {ul
     {- [doc] is the unit doc string.}
     {- [meta] is the initial metadata.}
     {- [requires] are the OCaml libraries required to compile the JavaScript.}
-    {- [name] is the name of the unit (defaults to [n]).}
-    {- [srcs] are the executable sources. All files with extension [.ml],
-       [.mli] and [.js] are considered for compiling and linking the
-       executable. The files {!B0_file_exts.www} in [srcs] minus [.js] files are
-       copied over the build directory. If these files are can be rerooted
-       to the build dir according to [assets_dir] they are copied as such
-       otherwise they are copied
-       [assets_dir]
-       {b FIXME.} A competing idea was to have a notion of root induced
-        by {!B0_srcs} selection. See the commented stuff there. This
-        is likely something that will play better with generated assets.
-        It's also sligthly borderline with deployements.}
+    {- [name] is the name of the unit (defaults to [pagename]).}
+    {- [jsname] is the basename of the JavaScript file, defaults to
+       [pagename].}
+    {- [srcs] are the sources to lookup, see above.}
     {- [wrap] allows to extend the build procedure you must call the given
        build procedure. TODO maybe remove once we have good
        {!build_fragments}.}}
-
-    {b TODO document.} The js file is [name.js], if there's no [.html] source
-    in the srcs a minimal HTML [name.html] file is generated in which [n.js]
-    is linked as a script and any css file in [srcs] as a stylesheet. *)
+*)
 
 (** {1:build_fragments Build fragments}
 

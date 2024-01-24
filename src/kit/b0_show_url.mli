@@ -3,7 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** Action to show URLs after builds.
+(** Action and unit execution to show URLs after builds.
 
     This module provides the [.show-url] action which allows to reload
     URLs in your browser when you build static websites or web
@@ -11,23 +11,29 @@
 
 open B0_std
 
-(** {1:keys Keys} *)
+(** {1:urls URLs} *)
 
 type url =
 [ `Url of Url.t (** The URL. *)
 | `In of B0_env.dir * Fpath.t (** The path in given directory. *)
 | `Fun of string * (B0_env.t -> B0_unit.t -> (Url.t, string) result) ]
-(** The type for dermining the URL to dhow. *)
+(** The type for dermining the URL to show. *)
 
 val url : url B0_meta.key
 (** [url] defines the default URL to show when
     [.show-url] is used on a unit without specifying a path.*)
 
+val get_url : B0_env.t -> B0_unit.t -> (Url.t, string) result
+(** [get_url env u] performs the logic to get the {!url} for unit [u]
+    in environment [env]. *)
+
+(** {1:keys Server keys} *)
+
 val listen_args : (authority:string -> Cmd.t) B0_meta.key
 (** [listen_args] defines the arguments to specify for how to make the
-    server listen on [authority] for connections. These arguments
-    are added at the end of the sevrver tool invocation or before a [--] token
-    if there is one. *)
+    server listen on [authority] for connections. These arguments are
+    added at the end of the server tool invocation or before a [--]
+    token if there is one. *)
 
 val timeout_s : int B0_meta.key
 (** [timeout_s] defines the maximal number of seconds to wait for the
@@ -39,3 +45,9 @@ val action : B0_action.t
 (** [action] is the [.show-url] action.
 
     See [b0 -- .show-url --help] for more information. *)
+
+(** {1:unit_exec Unit execution} *)
+
+val unit_exec : B0_unit.Exec.t
+(** [unit_exec] is a unit execution that invokes the [show-url]
+    tool on the unit's {!url}. *)

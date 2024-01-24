@@ -37,11 +37,11 @@ let doc = "Show URLs in web browsers"
 
 let man = [
   `S Manpage.s_description;
-  `P "The $(iname) command show URIs specified on the command line.";
+  `P "The $(iname) command show URLs specified on the command line.";
   `Blocks B0_web_browser.man_best_effort_reload; ]
 
 let exits =
-  Cmd.Exit.info 1 ~doc:"if the URI failed to load in some way" ::
+  Cmd.Exit.info 1 ~doc:"if the URL failed to load in some way" ::
   Cmd.Exit.defaults
 
 let uris =

@@ -97,7 +97,7 @@ module Exec : sig
 
   val get_env : b0_env -> b0_unit -> (Os.Env.t, string) result
   (** [get_env env u] performs the logic to get the execution
-      environment for unit [u] in environment [env]. *)
+      environment {!val-env} for unit [u] in environment [env]. *)
 
   (** {1:cwd Cwd} *)
 
@@ -116,8 +116,8 @@ module Exec : sig
       If unspecified this is [`Cwd]. *)
 
   val get_cwd : b0_env -> b0_unit -> (Fpath.t, string) result
-  (** [get_cwd env u] performs the logic to get the cwd for unit [u] in
-      environment [env]. *)
+  (** [get_cwd env u] performs the logic to get the cwd {!val-cwd}
+      for unit [u] in environment [env]. *)
 
   (** {1:execution Execution} *)
 
@@ -142,12 +142,10 @@ module Exec : sig
   val find :
     b0_unit ->
     (b0_env -> b0_unit -> args:Cmd.t -> (Os.Exit.t, string) result) option
-    (** [find u] is a function, if any, for executing unit [u]. The
-        Given the environment, the unit and additional arguments potentially
-        provided by the driver it performs the full execution logic. *)
-(*
-val find_exec_cmd : env -> t -> (Cmd.t Fut.t option, string) result
-*)
+    (** [find u] is a function, if any, for executing unit [u]
+        according to {val-key}.  Given the environment, the unit and
+        additional arguments potentially provided by the driver it
+        performs the full execution logic. *)
 end
 
 (** {1:b0_def B0 definition API} *)
