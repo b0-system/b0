@@ -202,7 +202,7 @@ let dyn_units ~args =
   then server_mode_unit args
   else unit_mode_units args
 
-let show_url env browser prefix background timeout dry_run no_exec args =
+let show_url env browser background prefix timeout dry_run no_exec args =
   (* XXX need to fix search argument of B0_web_browser and lookup in build *)
   let secs timeout = Mtime.Span.(timeout * s) in
   Log.if_error ~use:B0_cli.Exit.some_error @@
