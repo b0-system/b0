@@ -21,7 +21,7 @@ let show_urls tty_cap log_level background prefix browser urls =
   let log_level = B0_cli.B0_std.get_log_level log_level in
   B0_cli.B0_std.setup tty_cap log_level ~log_spawns:Log.Debug;
   Log.if_error ~use:1 @@
-  let* browser = B0_web_browser.find ~browser () in
+  let* browser = B0_web_browser.find ?cmd:browser () in
   let open_url u = B0_web_browser.show ~background ~prefix browser (urify u) in
   let rec loop = function
   | [] -> Ok 0

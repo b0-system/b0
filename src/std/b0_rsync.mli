@@ -10,9 +10,9 @@ open B0_std
 type t
 (** The type for rsync clients. *)
 
-val get :
-  ?search:Fpath.t list -> ?cmd:Cmd.t -> unit -> (t, string) result
-(** [get ()] looks for [rsync] with {!B0_std.Os.Cmd.get}. *)
+val get : ?search:Cmd.tool_search -> ?cmd:Cmd.t -> unit -> (t, string) result
+(** [get ~search ~cmd ()] looks for the rsync command [cmd] (defaults to
+    [Cmd.tool "rsync"]) in [search] (defaults to [Os.Cmd.get search]). *)
 
 val copy :
   t -> ?opts:Cmd.t -> ?stats:bool -> ?progress:bool -> delete:bool ->

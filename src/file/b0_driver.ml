@@ -399,8 +399,12 @@ let with_b0_file ~driver cmd =
     let* b0_file = Conf.get_b0_file conf in
     Log.if_error' ~use:Exit.b0_file_error @@
     let* exe = compile_b0_file conf ~driver ~feedback:true b0_file in
-    let argv = Cmd.list (Array.to_list Sys.argv) in
-    Ok (Os.Exit.exec exe argv)
+    let exe = Fpath.to_string exe in
+    let cmd = match Array.to_list Sys.argv with
+    | [] -> Cmd.arg exe
+    | _ :: args -> Cmd.list (exe :: args)
+    in
+    Ok (Os.Exit.exec cmd)
   in
   Cmdliner.Term.(const run $ Cli.conf $ cmd)
 
@@ -418,8 +422,12 @@ let with_b0_file_if_any ~driver cmd =
             has_failed_b0_file := true;
             cmd conf
         | Ok exe ->
-            let argv = Cmd.list (Array.to_list Sys.argv) in
-            Os.Exit.exec exe argv
+            let exe = Fpath.to_string exe in
+            let cmd = match Array.to_list Sys.argv with
+            | [] -> Cmd.arg exe
+            | _ :: args -> Cmd.list (exe :: args)
+            in
+            Os.Exit.exec cmd
   in
   Cmdliner.Term.(const run $ Cli.conf $ cmd)
 

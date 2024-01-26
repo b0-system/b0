@@ -72,31 +72,24 @@ val exit_of_result' : (Os.Exit.t, string) result -> Os.Exit.t
 (** {1:script Action functions for script execution} *)
 
 val exec_file :
-  ?env:Os.Env.assignments -> ?cwd:Fpath.t ->
-  B0_env.t -> Fpath.t -> args:Cmd.t -> Os.Exit.t
-(** [exec_file env file ~args] executes [file] with arguments [args].
-    The {{!B0_env.scope_dir}scope directory} is used
-    as the default [cwd] and to resolve [file] if it is relative. *)
-
-val exec_file' :
-  ?env:Os.Env.assignments -> ?cwd:Fpath.t -> Fpath.t -> func
-(** [exec_file'] is {!exec_file} twisted a bit differently so
-    that if you don't need to tweak arguments or lookup the environment
-    you can simply write:
+  ?env:Os.Env.assignments -> ?cwd:Fpath.t -> Cmd.t -> func
+(** [exec_file env cmd] executes [cmd] using
+    the {{!B0_env.scope_dir}scope directory} is used
+    as the default [cwd] and to resolve [file] if it is relative. This
+    signature is twisted so that you can simply write:
     {[
 let myscript =
   B0_action.make "myscript" @@
   B0_action.exec_file' ~/"scripts/myscript"
-    ]} *)
+    ]}
+*)
 
-val exec_tool :
-  ?env:Os.Env.assignments -> ?cwd:Fpath.t ->
-  B0_env.t -> Cmd.tool -> args:Cmd.t -> Os.Exit.t
-(** [exec_tool tool e args] executes the tool [exe] with arguments
-    [cmd] The {{!B0_env.scope_dir}scope directory} is used as the default
-    [cwd]. [exe] is looked up using {!B0_std.Os.Cmd.get_tool}, if
-    that fails the error is logged and we exit we and exits with
-    {!B0_cli.Exit.some_error}. *)
+val exec_cmd :
+  ?env:Os.Env.assignments -> ?cwd:Fpath.t -> B0_env.t -> Cmd.t -> Os.Exit.t
+(** [exec_tool tool cmd] executes [cmd]. The {{!B0_env.scope_dir}scope
+    directory} is used as the default [cwd]. The tool of [cmd] is looked up
+    using {!B0_env.get_cmd}, if that fails the error is logged and we exit
+    we and exits with {!B0_cli.Exit.some_error}. *)
 
 (** {1:cli Command line interaction}
 

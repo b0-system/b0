@@ -23,20 +23,17 @@ end
 (** {1:show Show URLs} *)
 
 type t
-(** The type for specifying a browser. *)
+(** The type for browsers. *)
 
 val find :
-  ?search:Fpath.t list -> browser:Cmd.t option -> unit ->
-  (t option, string) result
-(** [find ~search ~browser] tries to find a browser in a rather
+  ?search:Cmd.tool_search -> ?cmd:Cmd.t -> unit -> (t, string) result
+(** [find ~search ~cmd] tries to find a browser in a rather
     complex and platform dependent way. *)
 
 val show :
-  background:bool -> prefix:bool -> t option -> string ->
-  (unit, string) result
+  background:bool -> prefix:bool -> t -> string -> (unit, string) result
 (** [show ~background ~prefix browser url] shows URL using browser
-    [browser] (if [None] an error message is returned mentioning
-    that no browser was found. If [background] is [true] tries to
+    [browser]. If [background] is [true] tries to
     keep the browser application in the background, if [false]
     brings it in user focus.
 

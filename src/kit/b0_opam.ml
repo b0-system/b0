@@ -25,8 +25,8 @@ let list_iter_stop_on_error f vs =
 
 (* opam tool *)
 
-let get_cmd ?search ?(cmd = Cmd.arg "opam") () = Os.Cmd.get ?search cmd
-let opam = lazy (get_cmd ())
+type t = Cmd.t
+let get ?search ?(cmd = Cmd.arg "opam") () = Os.Cmd.get ?search cmd
 
 (* opam files *)
 
@@ -75,13 +75,12 @@ module File = struct
     and pp_file ppf file = (Fmt.vbox (Fmt.list pp_item)) ppf file in
     pp_file ppf file; Fmt.flush ppf ()
 
-  let to_string ~normalize file =
+  let to_string opam ~normalize file =
     (* The way this fun works on normalize errors is not optimal. *)
     let b = Buffer.create (10 * 1024) in
     let file = _pp (Format.formatter_of_buffer b) file; Buffer.contents b in
     if not normalize then Ok file else
     let stdin = Os.Cmd.in_string file in
-    let* opam = Lazy.force opam in
     Os.Cmd.run_out ~stdin ~trim:true @@
     Cmd.(opam % "lint" % "-" % "--normalise")
 
@@ -321,18 +320,17 @@ module Pkg = struct
     | pkg_packs, [] -> Ok pkg_packs
     | _, errs -> Error (String.concat "\n" (List.rev errs))
 
-  let write_opam_file ~normalize pkg ~version file ~dir =
-    let* file = File.to_string ~normalize file in
+  let write_opam_file opam ~normalize pkg ~version file ~dir =
+    let* file = File.to_string opam ~normalize file in
     let fname = match version with
     | None -> name pkg ^ ".opam"
     | Some v -> String.concat "." [name pkg; v]
     in
     Os.File.write ~force:true ~make_path:true Fpath.(dir / fname) file
 
-  let lint_opam_file ~normalize pkg file =
-    let* opam = Lazy.force opam in
+  let lint_opam_file opam ~normalize pkg file =
     let opam_lint = Cmd.(opam % "lint" % "-" % "--normalise") in
-    let* file = File.to_string ~normalize file in
+    let* file = File.to_string opam ~normalize file in
     let stdin = Os.Cmd.in_string file in
     let* e = Os.Cmd.run_status_out ~trim:false ~stdin opam_lint in
     match e with
@@ -361,15 +359,17 @@ let list_cmd env pkgs format =
 (* .opam file command *)
 
 let lint_files ~normalize pkgs =
+  let* opam = get () in
   let lint pkg =
     Result.map_error (Fmt.str "%a: %s" Pkg.pp_err_pack pkg) @@
-    Pkg.lint_opam_file ~normalize pkg (snd (Pkg.file ~with_name:false pkg))
+    Pkg.lint_opam_file opam ~normalize pkg (snd (Pkg.file ~with_name:false pkg))
   in
   let* _ = collect_results (List.map lint pkgs) in
   Log.app (fun m -> m "%a" (Fmt.tty' [`Fg `Green]) "Passed.");
   Ok B0_cli.Exit.ok
 
 let gen_files pkgs ~normalize ~with_name ~dst =
+  let* opam = get () in
   let gen_file ~normalize ~with_name ~dst pkg =
     Result.map_error (Fmt.str "%a: %s" Pkg.pp_err_pack pkg) @@
     let* dir = match dst with
@@ -385,10 +385,10 @@ let gen_files pkgs ~normalize ~with_name ~dst =
     let _, file = Pkg.file ~with_name pkg in
     match dir with
     | None ->
-        let* file = File.to_string ~normalize file in
+        let* file = File.to_string opam ~normalize file in
         Log.app (fun m -> m "@[%s@]" file); Ok ()
     | Some dir ->
-        Pkg.write_opam_file ~normalize pkg ~version:None file ~dir
+        Pkg.write_opam_file opam ~normalize pkg ~version:None file ~dir
   in
   let gen = gen_file ~normalize ~with_name ~dst in
   let* () = list_iter_stop_on_error gen pkgs in
@@ -446,7 +446,7 @@ module Publish = struct
             Fmt.str "@[<v>Could not parse latest changes from:@, %a@]"
               Fpath.pp f
 
-  let info_of_pkg (pkg, version) =
+  let info_of_pkg opam (pkg, version) =
     Result.map_error (Fmt.str "%a: %s" Pkg.pp_err_pack pkg) @@
     let* version = match version with
     | Some version -> Ok version
@@ -454,7 +454,7 @@ module Publish = struct
     in
     let* file_meta, file =
       let file_meta, file = Pkg.file ~with_name:false pkg in
-      let* () = Pkg.lint_opam_file ~normalize:true pkg file in
+      let* () = Pkg.lint_opam_file opam ~normalize:true pkg file in
       Ok (file_meta, file)
     in
     let* changes_file = B0_release.changes_file_of_pack (Pkg.pack pkg) in
@@ -655,7 +655,7 @@ module Publish = struct
            fetch and FETCH_HEAD becomes defined *)
         get_updated_local_repo git ~pkgs_repo ~local_repo:dir
 
-  let commit ~local_repo:repo ~branch ~pkgs_dir is _incs =
+  let commit opam ~local_repo:repo ~branch ~pkgs_dir is _incs =
     let stdout, stderr = stdout_logging () in
     let fetch_head = Some "FETCH_HEAD" and force = true in
     Log.app (fun m -> m "Branching %s…" branch);
@@ -669,7 +669,7 @@ module Publish = struct
         let file =
           Fpath.(base_dir / Pkg.name i.pkg / versioned_name i / "opam")
         in
-        let* contents = File.to_string ~normalize:true i.file in
+        let* contents = File.to_string opam ~normalize:true i.file in
         match Os.File.write ~force:true ~make_path:true file contents with
         | Error _ as e -> e
         | Ok () -> add_pkgs ~base_dir (file :: acc) is
@@ -714,17 +714,18 @@ module Publish = struct
        m "@[<v>Incompatibility statements unsupported for now. Ignored.@,\
           See https://github.com/ocaml/opam/issues/3077@]"
     end;
+    let* opam = get () in
     let* httpc = B0_http.Http_client.get () in
-    let* shasum = Os.Cmd.get (Cmd.arg "shasum") in
+    let* shasum = Os.Cmd.get (Cmd.tool "shasum") in
     let* git = B0_vcs_repo.Git.get_cmd () in
-    let* is = collect_results (List.map info_of_pkg pkgs) in
+    let* is = collect_results (List.map (info_of_pkg opam) pkgs) in
     let title, msg = msg_for_publish is incompats in
     log_start is incompats check_only;
     let* is = add_url_checksums httpc shasum ~check_only is in
     if check_only then (log_check_success (); Ok ()) else
     let* local_repo = get_updated_local_repo git ~pkgs_repo ~local_repo in
     let branch = branch_name_of_pkgs is in
-    let* () = commit ~local_repo ~branch ~pkgs_dir is incompats in
+    let* () = commit opam ~local_repo ~branch ~pkgs_dir is incompats in
     let* () = push_branch ~github_auth ~local_repo ~branch ~fork_repo in
     let* () =
       if no_pr then Ok () else
@@ -770,7 +771,6 @@ module Publish = struct
         in
         Ok B0_cli.Exit.ok
 end
-
 
 (* .opam action command line interface  *)
 

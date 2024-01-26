@@ -128,44 +128,39 @@ let of_dir ~dir ~exclude_paths ~root ~mtime =
 
 (* Compressing and unarchiving *)
 
-type search = Fpath.t -> (Fpath.t, string) result
-
-let compress_tool_for_file_ext ~search file = match Fpath.get_ext file with
-| ".tar" -> None
-| ".tgz" | ".gz" -> Some (search (Fpath.v "gzip"))
-| ".tbz" | ".bzip2" -> Some (search (Fpath.v "bzip2"))
-| ".xz" -> Some (search (Fpath.v "lzma"))
-| ".zst" -> Some (search (Fpath.v "zstd"))
-| ext -> Some (Fmt.error "Unknown extension %a, cannot compress" Fmt.code' ext)
-
-let tool_search = function
-| None -> (fun tool -> Os.Cmd.get_tool tool)
-| Some search -> search
+let compress_tool_for_file_ext ?(de = "") file = match Fpath.get_ext file with
+| ".tar" -> Ok None
+| ".tgz" | ".gz" -> Ok (Some (Cmd.tool "gzip"))
+| ".tbz" | ".bzip2" -> Ok (Some (Cmd.tool "bzip2"))
+| ".xz" -> Ok (Some (Cmd.tool "lzma"))
+| ".zst" -> Ok (Some (Cmd.tool "zstd"))
+| ext ->
+    Fpath.error file "Unknown extension %a, cannot %scompress" Fmt.code' ext de
 
 let compress ?search ~force ~make_path file ~archive =
-  match compress_tool_for_file_ext ~search:(tool_search search) file with
-  | Some (Error e) -> Fmt.error "Writing %a: %s" Fpath.pp file e
+  let* compress = compress_tool_for_file_ext file in
+  match compress with
   | None -> Os.File.write ~force ~make_path file archive
-  | Some (Ok compress) ->
-      let stdin = Os.Cmd.in_string archive in
-      let stdout = Os.Cmd.out_file ~force ~make_path file in
-      Os.Cmd.run ~stdin ~stdout (Cmd.path compress)
+  | Some compress ->
+     let* compress = Os.Cmd.get ?search compress in
+     let stdin = Os.Cmd.in_string archive in
+     let stdout = Os.Cmd.out_file ~force ~make_path file in
+     Os.Cmd.run ~stdin ~stdout compress
 
 let unarchive ?search ~make_path ~verbose ~src ~in_dir () =
-  let search = tool_search search in
-  let* tar = search (Fpath.v "tar") in
+  let* tar = Os.Cmd.get ?search (Cmd.tool "tar") in
   let untar file ~in_dir =
-    let tar = Cmd.(path tar %% if' verbose (arg "-v") % "-xf" %% path file) in
+    let tar = Cmd.(tar %% if' verbose (arg "-v") % "-xf" %% path file) in
     let* _ = Os.Dir.create ~make_path in_dir in
     Os.Cmd.run ~cwd:in_dir tar
   in
   Result.join @@
-  match compress_tool_for_file_ext ~search src with
-  | Some (Error e) -> Fmt.error "Unarchiving %a: %s" Fpath.pp src e
+  let* compress = compress_tool_for_file_ext ~de:"de" src in
+  match compress with
   | None -> Ok (untar src ~in_dir)
-  | Some (Ok compress) ->
+  | Some compress ->
       Os.File.with_tmp_fd @@ fun tmpfile fd ->
       let stdin = Os.Cmd.in_file src in
       let stdout = Os.Cmd.out_fd ~close:false fd in
-      let* () = Os.Cmd.run ~stdin ~stdout Cmd.(path compress % "-d") in
+      let* () = Os.Cmd.run ~stdin ~stdout Cmd.(compress % "-d") in
       untar tmpfile ~in_dir

@@ -21,7 +21,7 @@ let urlify u =
 let process_url browser background prefix show_url no_pager =
   match show_url with
   | false ->
-      let* browser = B0_web_browser.find ~browser () in
+      let* browser = B0_web_browser.find ?cmd:browser () in
       Ok (fun u -> B0_web_browser.show ~background ~prefix browser (urlify u))
   | true ->
       let* pager = B0_pager.find ~don't:no_pager () in

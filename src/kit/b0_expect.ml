@@ -66,6 +66,9 @@ let base_files ?rel ctx ~recurse =
 
 let dur ctx = Os.Mtime.count ctx.time
 let env ctx = ctx.env
+let get_unit_exe_file_cmd ctx u =
+  B0_env.unit_exe_file_cmd ctx.env u |> result_to_abort
+
 let log_absolute ctx = ctx.log_absolute
 let log_diffs ctx = ctx.log_diffs
 let vcs_repo ctx = ctx.vcs_repo
@@ -230,8 +233,9 @@ let finish ctx = log_summary ctx
 let file ?diff ctx file = add_outcome ctx (outcome_of_file ctx file)
 let stdout ?diff ctx ?env ?cwd ?stdout cmd =
   let out = match stdout with
-  | None -> Fpath.v (Fpath.basename (Cmd.get_tool cmd) ^ ".stdout")
   | Some stdout -> stdout
+  | None ->
+      Fpath.v (Fpath.basename (Cmd.find_tool cmd |> Option.get) ^ ".stdout")
   in
   let out = Fpath.(ctx.base // out) in
   let stdout = Os.Cmd.out_file ~force:true ~make_path:true out in

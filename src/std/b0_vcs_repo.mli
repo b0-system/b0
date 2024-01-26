@@ -64,14 +64,16 @@ val pp_long : t Fmt.t
 (** {1:get Finding local repositories} *)
 
 val find :
-  ?kind:kind -> ?dir:Fpath.t -> unit -> (t option, string) result
+  ?search:Cmd.tool_search -> ?kind:kind -> ?dir:Fpath.t -> unit ->
+  (t option, string) result
 (** [find ~dir ()] finds, using VCS functionality, a repository
     starting in directory [dir] (if unspecified this is the [cwd]). If [kind]
-    is specified, will only look for a vcs of kind [kind].
-*)
+    is specified, will only look for a vcs of kind [kind]. The VCS tool
+    is looked up with [search] (default to [Os.Cmd.find ?search]. *)
 
 val get :
-  ?kind:kind -> ?dir:Fpath.t -> unit -> (t, string) result
+  ?search:Cmd.tool_search -> ?kind:kind -> ?dir:Fpath.t -> unit ->
+  (t, string) result
 (** [get] is like {!find} but errors if no VCS was found. *)
 
 (** {1:commits Commits} *)
@@ -196,10 +198,11 @@ val find_greatest_version_tag : t -> (tag option, string) result
 module Git : sig
 
   val get_cmd :
-    ?search:Fpath.t list -> ?cmd:Cmd.t -> unit -> (Cmd.t, string) result
-  (** [cmd ()] looks for [git] with {!B0_std.Os.Cmd.get}. *)
+    ?search:Cmd.tool_search -> ?cmd:Cmd.t -> unit -> (Cmd.t, string) result
+  (** [cmd ()] looks for [git] with [Os.Cmd.get ?search]. *)
 
-  val find : ?dir:Fpath.t -> unit -> (t option, string) result
+  val find :
+    ?search:Cmd.tool_search -> ?dir:Fpath.t -> unit -> (t option, string) result
   (** [find ~dir ()] finds, using VCS functionality, a git repository
       starting in directory [dir] (if unspecified this is the [cwd]). *)
 
@@ -338,10 +341,11 @@ end
 (** Mercurial specific operations. *)
 module Hg : sig
   val get_cmd :
-    ?search:Fpath.t list -> ?cmd:Cmd.t -> unit -> (Cmd.t, string) result
-  (** [get_cmd ()] looks for [hg] with {!B0_std.Os.Cmd.get}. *)
+    ?search:Cmd.tool_search -> ?cmd:Cmd.t -> unit -> (Cmd.t, string) result
+  (** [get_cmd ()] looks for [hg] with [Os.Cmd.get ?search]. *)
 
-  val find : ?dir:Fpath.t -> unit -> (t option, string) result
+  val find :
+    ?search:Cmd.tool_search -> ?dir:Fpath.t -> unit -> (t option, string) result
   (** [find ~dir ()] finds, using VCS functionality, an hg repository
       starting in directory [dir] (if unspecified this is the [cwd]). *)
 end

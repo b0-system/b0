@@ -2545,21 +2545,22 @@ module Cmd = struct
 
   type tool = Fpath.t
 
-  let rec tool = function
+  let tool = arg
+  let rec find_tool = function
   | A a -> Result.to_option (Fpath.of_string a)
-  | Unstamp l -> tool l
+  | Unstamp l -> find_tool l
   | Rseq ls ->
       let rec loop = function
-      | [l] -> tool l
+      | [l] -> find_tool l
       | l :: ls -> loop ls
       | [] -> None
       in
       loop ls
 
-  let get_tool l = match tool l with
-  | Some t -> t
-  | None when is_empty l -> invalid_arg "empty command line"
-  | None -> Fmt.invalid_arg "cmd %s: tool parse error" (to_string l)
+  let get_tool l = match find_tool l with
+  | Some t -> Ok t
+  | None when is_empty l -> Error "The command is empty"
+  | None -> Fmt.error "%s: Not a tool" (to_string l)
 
   let rec set_tool tool = function
   | Rseq [] -> path tool
@@ -2574,8 +2575,7 @@ module Cmd = struct
       in
       loop l
 
-  let pp_tool ppf t =
-    Fmt.tty' [`Fg `Blue] ppf (Filename.quote (Fpath.to_string t))
+  type tool_search = t -> (t, string) result
 
   (* Predicates *)
 
@@ -3942,100 +3942,91 @@ module Os = struct
 
   module Cmd = struct
 
-    (* Tool search *)
+    (* Tool search in PATH *)
 
-    type search = Fpath.t -> (Fpath.t, string) result
-
+    let tool_is_path t = String.contains t Fpath.dir_sep_char
     let tool_file ~dir tool = match dir.[String.length dir - 1] with
     | c when Fpath.char_is_dir_sep c -> dir ^ tool
     | _ -> String.concat Fpath.dir_sep [dir; tool]
 
-    let search_in_path tool =
-      let rec loop tool = function
-      | "" -> None
-      | p ->
-          let dir, p = match String.cut_left ~sep:Fpath.search_path_sep p with
-          | None -> p, ""
-          | Some (dir, p) -> dir, p
-          in
-          if dir = "" then loop tool p else
-          let tool_file = tool_file ~dir tool in
-          match File.is_executable tool_file with
-          | false -> loop tool p
-          | true -> Some (Fpath.v tool_file)
-      in
-      match Unix.getenv "PATH" with
-      | p -> loop tool p
-      | exception Not_found -> None
+    let search_in_path_env_var tool = match Unix.getenv "PATH" with
+    | exception Not_found ->
+        Error (`Msg "The PATH environment variable is undefined")
+    | p ->
+        let rec loop tool = function
+        | "" ->
+            Error (`Dirs (String.split_on_char Fpath.search_path_sep.[0] p))
+        | p ->
+            let dir, p = match String.cut_left ~sep:Fpath.search_path_sep p with
+            | None -> p, ""
+            | Some (dir, p) -> dir, p
+            in
+            if dir = "" then loop tool p else
+            let tool_file = tool_file ~dir tool in
+            match File.is_executable tool_file with
+            | false -> loop tool p
+            | true -> Ok (Fpath.v tool_file)
+        in
+        loop tool p
 
     let search_in_dirs ~dirs tool =
       let rec loop tool = function
-      | [] -> None
+      | [] -> Error (`Dirs (List.map Fpath.to_string dirs))
       | d :: dirs ->
           let tool_file = tool_file ~dir:(Fpath.to_string d) tool in
           match File.is_executable tool_file with
           | false -> loop tool dirs
-          | true -> Some (Fpath.v tool_file)
+          | true -> Ok (Fpath.v tool_file)
       in
       loop tool dirs
 
-    let tool_is_path t = String.contains t Fpath.dir_sep_char
-    let find_tool ?(win_exe = Sys.win32) ?search tool =
-      let tool =
-        let suffix = ".exe" in
-        if not win_exe || String.ends_with ~suffix tool then tool else
-        (tool ^ suffix)
-      in
-      match tool_is_path tool with
-      | true -> if File.is_executable tool then Ok (Some tool) else Ok None
-      | false ->
-          match search with
-          | None -> Ok (search_in_path tool)
-          | Some dirs -> Ok (search_in_dirs ~dirs tool)
+    let path_search ?(win_exe = Sys.win32) ?path () = fun cmd ->
+      match Cmd.find_tool cmd with
+      | None -> Fmt.error "No tool to lookup: the command is empty"
+      | Some tool ->
+          let tool =
+            let tool = Fpath.to_string tool and suffix = ".exe" in
+            if not win_exe || String.ends_with ~suffix tool then tool else
+            (tool ^ suffix)
+          in
+          match tool_is_path tool with
+          | true ->
+              if File.is_executable tool
+              then Ok (Cmd.set_tool (Fpath.v tool) cmd)
+              else Fmt.error "%s: No such executable file" tool
+          | false ->
+              let file = match path with
+              | None -> search_in_path_env_var tool
+              | Some dirs -> search_in_dirs ~dirs tool
+              in
+              match file with
+              | Ok file -> Ok (Cmd.set_tool file cmd)
+              | Error (`Msg e) -> Fmt.error "%s: %s" tool e
+              | Error (`Dirs dirs) ->
+                  Fmt.error "@[<v1>%s: No such tool found in:@,%a@]"
+                    tool (Fmt.(list string)) dirs
 
-    let pp_search ppf = function
-    | None -> Fmt.string ppf "PATH"
-    | Some dirs -> Fmt.(list Fpath.pp) ppf dirs
+    (* Tool search *)
 
-    let get_tool ?win_exe ?search tool =
-      match find_tool ?win_exe ?search tool with
-      | Ok (Some t) -> Ok t
-      | Error _ as e -> e
-      | Ok None when tool_is_path tool ->
-          Fmt.error "%s: No such executable file" tool
-      | Ok None ->
-          Fmt.error "@[<v1>%s: No such tool found in:@,%a@]"
-            tool pp_search search
-
-    let rec get_first_tool ?win_exe ?search tools =
-      if tools = [] then Error "Tool list to lookup is empty" else
-      let rec loop = function
-      | [] ->
-          Fmt.error "@[<v1>%a: No such tool found in:%a@,neither as:@,%a@]"
-            Fpath.pp (List.hd tools) pp_search search
-            (Fmt.list Fpath.pp) tools
-      | tool :: tools ->
-          match find_tool ?win_exe ?search tool with
-          | Ok (Some t) -> Ok t
-          | Ok None -> loop tools
-          | Error _ as e -> e
-      in
-      loop tools
-
-    let find ?win_exe ?search cmd = match Cmd.tool cmd with
-    | None -> Ok None
-    | Some tool ->
-        match find_tool ?win_exe ?search tool with
-        | Ok None as v  -> v
-        | Ok (Some t) -> Ok (Some (Cmd.set_tool (Fpath.to_string t) cmd))
-        | Error e -> e
-
-    let get ?win_exe ?search cmd = match Cmd.tool cmd with
-    | None -> Fmt.error "No tool to lookup: the command is empty"
-    | Some tool ->
-        match get_tool ?win_exe ?search tool with
-        | Ok t -> Ok (Cmd.set_tool (Fpath.to_string t) cmd)
-        | Error _ as e -> e
+    let default_search = path_search ()
+    let find ?(search = default_search) cmd = Result.to_option (search cmd)
+    let find_first ?search cmds = List.find_map (find ?search) cmds
+    let get ?(search = default_search) cmd = search cmd
+    let rec get_first ?(search = default_search) cmds =
+      if cmds = [] then Error "No tool to lookup: tool list is empty" else
+      match search (List.hd cmds) with
+      | Ok _ as v -> v
+      | Error e ->
+          let rec loop = function
+          | [] ->
+              Fmt.error "@[<v1>%a@,neither as:@,%a@]"
+                Fmt.lines e (Fmt.list Cmd.pp) (List.tl cmds)
+          | cmd :: cmds ->
+              match search cmd with
+              | Ok _ as v -> v
+              | Error _ -> loop cmds
+          in
+          loop (List.tl cmds)
 
     (* Process completion statuses *)
 
@@ -4289,22 +4280,26 @@ module Os = struct
 
     let _execv = if Sys.win32 then _execv_win32 else _execv_posix
 
-    let execv ?env ?cwd file cmd =
+    let execv ?env ?cwd ?argv0 cmd =
       let err_execv f e = Fmt.error "execv %a: %s" Fpath.pp f e in
-      try
-        let file = Path._realpath (Fpath.to_string file) in
-        let reset_cwd = match cwd with
-        | None -> Fun.id
-        | Some cwd ->
-            let old_cwd = getcwd () in
-            chdir cwd; fun () -> try chdir old_cwd with Failure _ -> ()
-        in
-        Fun.protect ~finally:reset_cwd @@ fun () ->
-        !_spawn_tracer None env ~cwd cmd;
-        _execv ~env file (Array.of_list @@ Cmd.to_list cmd)
-      with
-      | Failure e -> err_execv file e
-      | Unix.Unix_error (e, _, _) -> err_execv file (uerror e)
+      match Cmd.to_list cmd with
+      | [] -> Error "execv: empty command line"
+      | file :: args as all ->
+          let args = match argv0 with None -> all | Some n -> n :: args in
+          try
+            let file = Path._realpath (Fpath.to_string file) in
+            let reset_cwd = match cwd with
+            | None -> Fun.id
+            | Some cwd ->
+              let old_cwd = getcwd () in
+              chdir cwd; fun () -> try chdir old_cwd with Failure _ -> ()
+            in
+            Fun.protect ~finally:reset_cwd @@ fun () ->
+            !_spawn_tracer None env ~cwd cmd;
+            _execv ~env file (Array.of_list args)
+          with
+          | Failure e -> err_execv file e
+          | Unix.Unix_error (e, _, _) -> err_execv file (uerror e)
 
     type t = Cmd.t
   end
@@ -4313,7 +4308,9 @@ module Os = struct
     type t = Code : int -> t | Exec : (unit -> ('a, string) result) -> t
 
     let code c = Code c
-    let exec ?env ?cwd file cmd = Exec (fun () -> Cmd.execv ?env ?cwd file cmd)
+    let exec ?env ?cwd ?argv0 cmd =
+      Exec (fun () -> Cmd.execv ?env ?cwd ?argv0 cmd)
+
     let get_code = function Code c -> c | _ -> invalid_arg "not an Exit.Code"
 
     let exit = function

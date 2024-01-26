@@ -132,7 +132,7 @@ let server_mode env timeout_cli no_exec ~url args = match Url.authority url with
              units ideally we should be using B0_unit.find_exec *)
         (* FIXME this should execute according to the build unit execution
              protocol. *)
-        let* cmd = B0_env.unit_cmd env unit in
+        let* cmd = Result.map Cmd.path (B0_env.unit_exe_file env unit) in
         let timeout = match timeout_cli with
         | Some timeout -> timeout
         | None -> B0_unit.find_or_default_meta timeout_s unit
@@ -201,10 +201,10 @@ let dyn_units ~args =
   else unit_mode_units args
 
 let show_url env browser background prefix timeout dry_run no_exec args =
-  (* XXX need to fix search argument of B0_web_browser and lookup in build *)
   let secs timeout = Mtime.Span.(timeout * s) in
   Log.if_error ~use:B0_cli.Exit.some_error @@
-  let* browser = B0_web_browser.find ~browser () in
+  let search = B0_env.get_cmd env in
+  let* browser = B0_web_browser.find ~search ?cmd:browser () in
   let show url = B0_web_browser.show ~background ~prefix browser url in
   let* mode = find_mode env timeout no_exec args in
   match mode with
@@ -322,11 +322,11 @@ let unit_exec =
     | Error e -> err e
     | Ok url ->
         let* url = get_url b0_env u in
-        match B0_env.get_tool b0_env (Fpath.v "show-url") with
+        match B0_env.get_cmd b0_env (Cmd.tool "show-url") with
         | Error e -> err e
-        | Ok show_url_exe ->
-            let cmd = Cmd.(path show_url_exe % url %% args) in
-            Ok (Os.Exit.exec ?env ?cwd show_url_exe cmd)
+        | Ok show_url ->
+            let cmd = Cmd.(show_url % url %% args) in
+            Ok (Os.Exit.exec ?env ?cwd cmd)
   in
   `Fun ("show-url", exec)
 

@@ -9,19 +9,23 @@
 
 open B0_std
 
-(** {1:tool [opam] tool} *)
 
-val get_cmd :
-  ?search:Fpath.t list -> ?cmd:B0_std.Cmd.t -> unit ->
-  (Cmd.t, string) result
-(** [get_cmd ()] looks for [opam] wih {!B0_std.Os.Cmd.get}.
+(** {1:opam [opam]} *)
 
-    FIXME what is this doing here ?  *)
+type t
+(** The type for opam. *)
+
+val get : ?search:Cmd.tool_search -> ?cmd:Cmd.t -> unit -> (t, string) result
+(** [get ~search cmd ()] looks for the opam command [cmd]
+    (defaults to [Cmd.tool "opam"]) in [search] (defaults to
+    [Os.Cmd.get ?search]). *)
 
 (** {1:file [opam] files} *)
 
 (** [opam] file generation. *)
 module File : sig
+
+  type opam := t
 
   (** {1:gen Generic representation} *)
 
@@ -54,7 +58,7 @@ module File : sig
   val v2 : item
   (** [v2] is [opam-version: "2.0"]. *)
 
-  val to_string : normalize:bool -> t -> (string, string) result
+  val to_string : opam -> normalize:bool -> t -> (string, string) result
   (** [to_string] formats file contents to a string. If [normalize]
       is [true] this calls [opam] to lint and normalize the result. *)
 

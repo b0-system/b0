@@ -59,30 +59,30 @@ val of_dir :
 (** {1:compressing Compressing} *)
 
 val compress :
-  ?search:Os.Cmd.search -> force:bool -> make_path:bool ->
+  ?search:Cmd.tool_search -> force:bool -> make_path:bool ->
   Fpath.t -> archive:string -> (unit, string) result
 (** [compress ~force ~make_path file ~archive] compresses archive
     [archive] to [file]. For [force] and [make_path] see
     {!B0_std.Os.Cmd.out_file}.
 
-    The compression algorithm and tool looked up with [search] depends
-    on the file extension of [file]:
+    The compression algorithm and tool looked up with [search] (defaults
+    to [Os.Cmd.get ?search]) depends on the file extension of [file]:
     {ul
     {- For [.tar] no tool is used.}
-    {- For [.tgz] or [.gz] the [gzip] tool is used.}
-    {- For [.tbz] or [.bzip2] the [bzip2] tool is used.}
-    {- For [.xz] then the [lzma] tool is used.}
-    {- For [.zst] then the [zstd] tool is used.}
+    {- For [.tgz] or [.gz] the [Cmd.tool "gzip"] tool is used.}
+    {- For [.tbz] or [.bzip2] the [Cmd.tool "bzip2"] tool is used.}
+    {- For [.xz] then the [Cmd.tool "lzma"] tool is used.}
+    {- For [.zst] then the [Cmt.tool "zstd"] tool is used.}
     {- Otherwise the function errors.}} *)
 
 (** {1:unarchive Unarchiving} *)
 
 val unarchive :
-  ?search:Os.Cmd.search ->
-  make_path:bool -> verbose:bool -> src:Fpath.t -> in_dir:Fpath.t -> unit ->
-  (unit, string) result
+  ?search:Cmd.tool_search -> make_path:bool -> verbose:bool -> src:Fpath.t ->
+  in_dir:Fpath.t -> unit -> (unit, string) result
 (** [unarchive ~make_path ~src ~in_dir] unarchives [src] in directory
     [in_dir] which is created if it doesn't exist. For [make_path]
-    see {!B0_std.Os.Dir.create}. If [verbose] is [true] [-v] is passed to [tar].
+    see {!Os.Dir.create}. If [verbose] is [true] [-v] is passed to [tar].
 
-    The compression algorithm and tool is looked up like in {!compress}. *)
+    The compression algorithm and tool is to use is looked up with [search]
+    like in {!compress}. *)

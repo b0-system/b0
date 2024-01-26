@@ -79,8 +79,9 @@ module Http_client : sig
   type t
   (** The type for HTTP clients. *)
 
-  val get : ?search:Fpath.t list -> ?curl:Cmd.t -> unit -> (t, string) result
-  (** [get ()] looks for [curl] (defaults to "curl") in [search]. *)
+  val get : ?search:Cmd.tool_search -> ?cmd:Cmd.t -> unit -> (t, string) result
+  (** [get ~search ~cmd ()] looks for [cmd] (defaults to [Cmd.tool "curl"])
+      in [search] (defaults to [Os.Cmd.get ~search]). *)
 
   val fetch :
     ?insecure:bool -> ?follow:bool -> t -> Http.Request.t ->

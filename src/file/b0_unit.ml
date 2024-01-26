@@ -359,25 +359,23 @@ module Env = struct
 
   (* Tool lookup *)
 
-  let get_tool ?(skip_build = false) env tool =
-    if skip_build then Os.Cmd.get_tool tool else
+  let get_cmd ?(skip_build = false) env cmd =
+    if skip_build then Os.Cmd.get cmd else
     let tool_map = Lazy.force env.built_tools in
-    match String.Map.find_opt (Fpath.to_string tool) tool_map with
-    | Some u -> Result.map Fut.sync (get_meta exe_file u)
-    | None -> Os.Cmd.get_tool tool
-
-  let get_cmd ?skip_build env cmd = match Cmd.tool cmd with
-  | None -> Fmt.error "No tool to lookup: the command is empty"
-  | Some tool ->
-      match get_tool ?skip_build env tool with
-      | Error _ as e -> e | Ok tool -> Ok (Cmd.set_tool tool cmd)
+    match Cmd.find_tool cmd with
+    | None -> Fmt.error "No tool to lookup: the command is empty"
+    | Some tool ->
+        match String.Map.find_opt (Fpath.to_string tool) tool_map with
+        | None -> Os.Cmd.get cmd
+        | Some u ->
+            Result.map (fun v -> Cmd.path (Fut.sync v)) (get_meta exe_file u)
 
   let unit_exe_file env u =
     if Set.mem u (Build.did_build env.build)
     then Result.map Fut.sync (get_meta exe_file u) else
     Fmt.error "Cannot get executable of unit %a: it did not build." pp_name u
 
-  let unit_cmd env u = Result.map Cmd.path (unit_exe_file env u)
+  let unit_exe_file_cmd env u = Result.map Cmd.path (unit_exe_file env u)
 end
 
 module Exec = struct
@@ -449,8 +447,8 @@ module Exec = struct
     let* env = Result.map Os.Env.to_assignments (get_env b0_env u) in
     let* cwd = get_cwd b0_env u in
     let exe_file = Fut.sync exe_file in
-    let cmd = Cmd.(path exe_file (* exe_name ? *) %% args) in
-    Ok (Os.Exit.exec ~env ~cwd exe_file cmd)
+    let cmd = Cmd.(path exe_file %% args) in
+    Ok (Os.Exit.exec ~env ~cwd cmd)
 
   let run_fun f b0_env u ~args =
     let* env = Result.map Os.Env.to_assignments (get_env b0_env u) in
@@ -461,8 +459,7 @@ module Exec = struct
     let* env = Result.map Os.Env.to_assignments (get_env b0_env u) in
     let* cwd = get_cwd b0_env u in
     let* cmd = cmd b0_env u ~args in
-    let exe_file = Cmd.get_tool cmd in
-    Ok (Os.Exit.exec ~env ~cwd exe_file cmd)
+    Ok (Os.Exit.exec ~env ~cwd cmd)
 
   let find u = match find_or_default_meta key u with
   | `Cmd (_, cmd) -> Some (run_cmd cmd)

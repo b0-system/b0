@@ -68,21 +68,21 @@ let pp ppf v =
 
 (* Script and tool execution *)
 
-let exec_file ?env:e ?cwd env file ~args =
+let exec_file ?env:e ?cwd cmd t env ~args =
   let scope_dir = B0_env.scope_dir env in
   let cwd = Option.value ~default:scope_dir cwd in
-  let file = Fpath.(scope_dir // file) in
-  Os.Exit.exec ?env:e ~cwd file Cmd.(path file %% args)
+  match Cmd.get_tool cmd with
+  | Error e -> exit_some_error e
+  | Ok file ->
+      let file = Fpath.(scope_dir // file) in
+      Os.Exit.exec ?env:e ~cwd Cmd.(set_tool file cmd %% args)
 
-let exec_file' ?env:e ?cwd file =
-  fun _ env ~args -> exec_file ?env:e ?cwd env file ~args
-
-let exec_tool ?env:e ?cwd env tool ~args = match Os.Cmd.get_tool tool with
+let exec_cmd ?env:e ?cwd env cmd = match B0_env.get_cmd env cmd with
 | Error e -> exit_some_error e
-| Ok exe ->
+| Ok cmd ->
     let scope_dir = B0_env.scope_dir env in
     let cwd = Option.value ~default:scope_dir cwd in
-    Os.Exit.exec ?env:e ~cwd exe Cmd.(path exe %% args)
+    Os.Exit.exec ?env:e ~cwd cmd
 
 (* Command line interaction. *)
 

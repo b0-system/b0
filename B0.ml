@@ -36,7 +36,7 @@ let b0_kit_lib =
 (* The b0 tool *)
 
 let bootstrap_env env unit =
-  let boot_root = (* FIXME need to access the root of the build  *)
+  let boot_root = (* TODO b0: need to access the root of the build  *)
     Fpath.to_string (B0_env.in_unit_dir env unit ~/"..")
   in
   B0_env.build_env env
@@ -163,20 +163,19 @@ let default =
 
 let strap =
   B0_action.make "strap" ~doc:"Run boot/strap" @@
-  B0_action.exec_file' ~/"boot/strap"
+  B0_action.exec_file (Cmd.tool "boot/strap")
 
 let bowl =
   let doc = "Run built b0 in the bowl directory" in
   B0_action.make "bowl" ~units:[b0] ~doc @@
   fun _ env ~args ->
-  match B0_env.unit_exe_file env b0 with (* FIXME b0 error struct *)
+  match B0_env.unit_exe_file_cmd env b0 with (* TODO b0: error struct *)
   | Error e -> Log.err (fun m -> m "%s" e); B0_cli.Exit.some_error
-  | Ok exec ->
+  | Ok b0_exe ->
       let cwd = B0_env.in_scope_dir env ~/"bowl" in
       let env = bootstrap_env env b0 |> Result.get_ok in
       let env = Os.Env.to_assignments env in
-      (* FIXME b0 B0_env.exec_file allow to choose name of args ? *)
-      Os.Exit.exec ~cwd ~env exec Cmd.(path exec %% args)
+      Os.Exit.exec ~cwd ~env Cmd.(b0_exe %% args)
 
 let vendor_htmlit =
   let doc = "Vendor Htmlit and expose it as B0_html" in

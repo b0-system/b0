@@ -4,15 +4,14 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
+open Result.Syntax
 
 (* macOS JavaScript automation *)
 
-let macos_jxa ?search () = Os.Cmd.find_tool ?search (Fpath.v "osascript")
-
-let macos_jxa_run jxa script cli_args =
-  let stdin = Os.Cmd.in_string script in
-  let cmd = Cmd.(path jxa % "-l" % "JavaScript" % "-" %% cli_args) in
-  Os.Cmd.(run_out ~stdin ~trim:true cmd)
+let macos_jxa ?search () = Os.Cmd.find ?search (Cmd.tool "osascript")
+let macos_jxa_run jxa script args =
+  let cmd = Cmd.(jxa % "-l" % "JavaScript" % "-" %% args) in
+  Os.Cmd.run_out ~stdin:(Os.Cmd.in_string script) ~trim:true cmd
 
 let macos_jxa_default_browser_appid jxa =
   Result.map_error (fun e -> Fmt.str "default lookup: %s" e) @@
@@ -30,55 +29,65 @@ end
 
 type t =
 | Cmd of Cmd.t
-| Macos_chrome of Cmd.tool (* this is osascript *)
-| Macos_safari of Cmd.tool (* this is osascript *)
-| Macos_open of Cmd.tool * string option
+| Macos_chrome of Cmd.t (* this is osascript *)
+| Macos_safari of Cmd.t (* this is osascript *)
+| Macos_open of Cmd.t * string option
 
 let browser_env_fallback browser = match browser with
 | Some _ as b -> Ok b
 | None -> Os.Env.find' ~empty_is_none:true Cmd.of_string Env.browser
 
-let find_browser_cmd ?search cmd =
-  Result.bind (Os.Cmd.find ?search cmd) @@ function
-  | None -> Ok None
-  | Some c -> Ok (Some (Cmd c))
+let find_browser_cmd ?search cmd = match Os.Cmd.find ?search cmd with
+| None -> None | Some c -> Some (Cmd c)
 
 let find_macos_open ?search ~appid () =
-  Result.bind (Os.Cmd.find_tool ?search (Fpath.v "open")) @@ function
-  | None -> Ok None
-  | Some tool -> Ok (Some (Macos_open (tool, appid)))
+  match Os.Cmd.find ?search (Cmd.tool "open") with
+  | None -> None
+  | Some tool -> Some (Macos_open (tool, appid))
 
 let find_with_macos_jxa ?search ~browser jxa = match browser with
-| Some cmd when not (Cmd.is_singleton cmd) -> find_browser_cmd ?search cmd
 | Some cmd ->
-    begin match String.Ascii.lowercase @@ List.hd (Cmd.to_list cmd) with
-    | "chrome" -> Ok (Some (Macos_chrome jxa))
-    | "firefox" ->
-        find_macos_open ?search ~appid:(Some "org.mozilla.firefox") ()
-    | "open" -> find_macos_open ?search ~appid:None ()
-    | "safari" -> Ok (Some (Macos_safari jxa))
-    | _ -> find_browser_cmd ?search cmd
+    Result.ok @@
+    begin match Cmd.is_singleton cmd with
+    | false -> find_browser_cmd ?search cmd
+    | true ->
+        begin match String.Ascii.lowercase @@ List.hd (Cmd.to_list cmd) with
+        | "chrome" -> Some (Macos_chrome jxa)
+        | "firefox" ->
+            find_macos_open ?search ~appid:(Some "org.mozilla.firefox") ()
+        | "open" -> find_macos_open ?search ~appid:None ()
+        | "safari" -> Some (Macos_safari jxa)
+        | _ -> find_browser_cmd ?search cmd
+        end
     end
 | None ->
-    Result.bind (macos_jxa_default_browser_appid jxa) @@ fun appid ->
+    let* appid = macos_jxa_default_browser_appid jxa in
+    Result.ok @@
     match String.Ascii.lowercase appid with
     | "" -> find_macos_open ?search ~appid:None ()
-    | "com.apple.safari" -> Ok (Some (Macos_safari jxa))
-    | "com.google.chrome" -> Ok (Some (Macos_chrome jxa))
+    | "com.apple.safari" -> Some (Macos_safari jxa)
+    | "com.google.chrome" -> Some (Macos_chrome jxa)
     | appid -> find_macos_open ?search ~appid:(Some appid) ()
 
-let find ?search ~browser () =
+let find ?search ?cmd () =
   Result.map_error (fun e -> Fmt.str "find browser: %s" e) @@
-  Result.bind (browser_env_fallback browser) @@ fun browser ->
-  Result.bind (macos_jxa ?search ()) @@ function
-  | Some jxa -> find_with_macos_jxa ?search ~browser jxa
-  | None ->
-      match browser with
-      | Some cmd -> find_browser_cmd cmd
-      | None ->
-          Result.bind (Os.Cmd.find Cmd.(arg "xdg-open")) @@ function
+  let* result =
+    let* browser = browser_env_fallback cmd in
+    match macos_jxa ?search () with
+    | Some jxa -> find_with_macos_jxa ?search ~browser jxa
+    | None ->
+        match browser with
+        | Some cmd -> Ok (find_browser_cmd cmd)
+        | None ->
+            match Os.Cmd.find Cmd.(arg "xdg-open") with
           | None -> Ok None
           | Some xdg -> Ok (Some (Cmd xdg))
+  in
+  match result with
+  | Some b -> Ok b
+  | None ->
+      Fmt.error "No browser found. Set the %a environment variable."
+        Fmt.code' Env.browser
 
 (* Show *)
 
@@ -88,7 +97,7 @@ let show_macos_open ~background ~prefix:_ open_tool ~appid url =
   | None -> Cmd.empty
   | Some appid -> Cmd.(arg "-b" % appid)
   in
-  let cmd = Cmd.(path open_tool %% if' background (arg "-g") %% appid) in
+  let cmd = Cmd.(open_tool %% if' background (arg "-g") %% appid) in
   Os.Cmd.run Cmd.(cmd % url)
 
 let show_macos_jxa name  ~background ~prefix jxa url script =
@@ -161,14 +170,11 @@ function run(argv) {
 let show ~background ~prefix browser url =
   Result.map_error (fun e -> Fmt.str "show url %s: %s" url e) @@
   match browser with
-  | None -> Error "No browser found. Use the BROWSER env var to set one."
-  | Some b ->
-      match b with
-      | Cmd cmd -> show_cmd ~background ~prefix cmd url
-      | Macos_chrome jxa -> show_macos_chrome ~background ~prefix jxa url
-      | Macos_safari jxa -> show_macos_safari ~background ~prefix jxa url
-      | Macos_open (open_tool, appid) ->
-          show_macos_open ~background ~prefix open_tool ~appid url
+  | Cmd cmd -> show_cmd ~background ~prefix cmd url
+  | Macos_chrome jxa -> show_macos_chrome ~background ~prefix jxa url
+  | Macos_safari jxa -> show_macos_safari ~background ~prefix jxa url
+  | Macos_open (open_tool, appid) ->
+      show_macos_open ~background ~prefix open_tool ~appid url
 
 (* Cli interaction *)
 

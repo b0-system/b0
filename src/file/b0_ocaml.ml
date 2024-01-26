@@ -1794,13 +1794,13 @@ let ocaml env use_utop dry_run args =
       m "Did build: @[%a@]"
         Fmt.(iter B0_unit.Set.iter ~sep:sp B0_unit.pp_name) units;
   end;
-  let top = if use_utop then Fpath.v "utop" else Fpath.v "ocaml" in
-  let* exe = B0_env.get_tool env top in
+  let top = Cmd.tool (if use_utop then "utop" else "ocaml") in
+  let* exe = B0_env.get_cmd env top in
   let* load_args = byte_code_build_load_args b (B0_unit.Set.elements units) in
   let args = Cmd.of_list Fun.id args in
-  let top = Cmd.(path exe %% load_args %% args) in
+  let top = Cmd.(exe %% load_args %% args) in
   match dry_run with
-  | false -> Ok (Os.Exit.exec exe top)
+  | false -> Ok (Os.Exit.exec top)
   | true ->
       Log.app (fun m -> m "%s" (Cmd.to_string top));
       Ok B0_cli.Exit.ok

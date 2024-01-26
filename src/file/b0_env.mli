@@ -101,20 +101,16 @@ val build : t -> B0_build.t
 
 (** {1:tool Tool lookup} *)
 
-val get_tool : ?skip_build:bool -> t -> Cmd.tool -> (Cmd.tool, string) result
-(** [get_tool env tool] looks up the file path to of tool [tool] in
-    the environment. If [tool] is defined by a unit in the build and
-    is {!B0_unit.tool_is_user_accessible}, it comes first in the
+val get_cmd : ?skip_build:bool -> t -> Cmd.tool_search
+(** [get_cmd env cmd] is [cmd] with its {!B0_std.Cmd.tool} resolved in
+    the environment. If [cmd]'s tool is defined by a unit in the build
+    and is {!B0_unit.tool_is_user_accessible}, it comes first in the
     search, unless [skip_build] is [true] (defaults to [false]. *)
-
-val get_cmd : ?skip_build:bool -> t -> Cmd.t -> (Cmd.t, string) result
-(** [get_cmd] performs {!get_tool} on the command's tool. *)
 
 val unit_exe_file : t -> B0_unit.t -> (Fpath.t, string) result
 (** [unit_exe_file env u] looks up the {!B0_unit.exe_file}
     of [u] in [env]. This errors if [u] can't be found in the build
     of if [u] has no such key. *)
 
-val unit_cmd : t -> B0_unit.t -> (Cmd.t, string) result
-(** [unit_cmd env u] is like {!unit_exe_file} but returns a command
-    instead. *)
+val unit_exe_file_cmd : t -> B0_unit.t -> (Cmd.t, string) result
+(** [unit_exe_file env u] is [Result.map Cmd.path (unit_exe_file env u)]. *)

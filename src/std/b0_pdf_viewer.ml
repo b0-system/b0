@@ -5,44 +5,35 @@
 
 open B0_std
 
-(* Environment variables. *)
+(* Show PDFs *)
+
+
+(* XXX support background reloads *)
 
 module Env = struct
   let pdfviewer = "PDFVIEWER"
 end
 
-(* Show PDFs *)
-
 type t = Cmd.t
 
-let find ?search ~pdf_viewer () =
-  Result.map_error (fun e -> Fmt.str "find PDF viewer: %s" e) @@
-  match pdf_viewer with
-  | Some cmd -> Os.Cmd.find ?search cmd
-  | None ->
-      Result.bind (Os.Cmd.find ?search Cmd.(arg "xdg-open")) @@ function
-      | Some xdg -> Ok (Some xdg)
-      | None ->
-          Result.bind (Os.Cmd.find ?search Cmd.(arg "open")) @@ function
-          | Some oopen -> Ok (Some oopen)
-          | None ->
-              if Sys.win32
-              then Ok (Some Cmd.(arg "start" % "")) (* XXX really ? *)
-              else Ok None
+let find ?search ?cmd () = match cmd with
+| Some cmd -> Os.Cmd.get ?search cmd
+| None ->
+    let cmds = [Cmd.tool "xdg-open"; Cmd.tool "open"] in
+    match Os.Cmd.find_first ?search cmds with
+    | Some v -> Ok v
+    | None ->
+        if Sys.win32
+        then Ok Cmd.(arg "start" % "") (* XXX really ? *) else
+        Fmt.error "No PDF viewer found. Set the %a environment variable."
+          Fmt.code' Env.pdfviewer
 
-(* XXX support background *)
-let show pdf_viewer file =
-  Result.map_error
-    (fun e -> Fmt.str "show PDF %a: %s" Fpath.pp_quoted file e) @@
-  match pdf_viewer with
-  | None -> Error "No PDF viewer found, use the PDFVIEWER env var to set one."
-  | Some cmd -> Os.Cmd.run Cmd.(cmd %% path file)
+let show pdf_viewer file = Os.Cmd.run Cmd.(pdf_viewer %% path file)
 
-(* Cli interaction. *)
-
-open Cmdliner
+(* Cli interface *)
 
 let pdf_viewer ?docs ?(opts = ["pdf-viewer"]) () =
+  let open Cmdliner in
   let env = Cmd.Env.info Env.pdfviewer in
   let doc =
     "The PDF viewer command $(docv) to use. If absent either one \

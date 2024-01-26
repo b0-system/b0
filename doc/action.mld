@@ -55,12 +55,12 @@ let mycmd =
 
 Even though you should rewrite all these scripts as OCaml actions a
 direct short cut for the above boilerplate is provided.  Use
-{!B0_action.exec_file'}:
+{!B0_action.exec_file}:
 
 {[
 let mycmd =
   B0_action.make "mycmd" ~doc:"Run mycmd" @@
-  B0_action.exec_file' ~/"scripts/mycmd"
+  B0_action.exec_file ~/"scripts/mycmd"
 ]}
 
 {1:howto Howto}

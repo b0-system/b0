@@ -8,8 +8,7 @@ open Result.Syntax
 
 type t = Cmd.t
 
-let get ?search ?(cmd = Cmd.arg "rsync") () = Os.Cmd.get ?search cmd
-
+let get ?search ?(cmd = Cmd.tool "rsync") () = Os.Cmd.get ?search cmd
 let copy
   rsyncc ?(opts = Cmd.arg "-azh") ?(stats = false) ?(progress = true) ~delete
   ?(src_host = "") ~src ?(dst_host = "") dst =

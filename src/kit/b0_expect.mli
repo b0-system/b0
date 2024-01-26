@@ -152,6 +152,10 @@ val dur : t -> Mtime.Span.t
 val env : t -> B0_env.t
 (** [env ctx] is the environment of [ctx]. *)
 
+val get_unit_exe_file_cmd : t -> B0_unit.t -> Cmd.t
+(**  [get_unit_exe ctx u] is the executable of unit [u]. Raises
+     {!Abort} in case of error. *)
+
 val log_absolute : t -> bool
 (** [log_absolute ctx] is [true] if absolute paths are logged. If [false]
     path are made relative with the cwd of {!env}. *)

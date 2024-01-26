@@ -115,10 +115,14 @@ let tool_lookup_of_os_env ?sep ?(var = "PATH") env =
   in
   match Fpath.list_of_search_path ?sep search_path with
   | Error _ as e -> fun _ _ -> Fut.return e
-  | Ok search ->
-      fun m t -> match Os.Cmd.get_tool ~win_exe:m.m.win_exe ~search t with
-      | Error _ as e -> Fut.return e
-      | Ok file as tool -> file_ready m file; Fut.return tool
+  | Ok path ->
+      fun m t ->
+        let search = Os.Cmd.path_search ~win_exe:m.m.win_exe ~path () in
+        match Os.Cmd.get ~search (Cmd.path t) with
+        | Error _ as e -> Fut.return e
+        | Ok cmd ->
+            let file = Cmd.find_tool cmd |> Option.get in
+            file_ready m file; Fut.return (Ok file)
 
 let make_zero
     ?clock ?cpu_clock:cc ~feedback ~cwd ?(win_exe = Sys.win32)

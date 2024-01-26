@@ -125,7 +125,8 @@ module Exec : sig
     [ `Unit_exe (** The unit's {!exe_file} *)
     | `Cmd of string *
               (b0_env -> b0_unit -> args:Cmd.t -> (Cmd.t, string) result)
-      (** Doc string and a function that returns a command to execute *)
+    (** Doc string and a function that returns a command to
+        execute with {!Os.Cmd.execv}. *)
     | `Fun of
         string *
         (b0_env -> ?env:Os.Env.assignments -> ?cwd:Fpath.t ->
@@ -143,7 +144,7 @@ module Exec : sig
     b0_unit ->
     (b0_env -> b0_unit -> args:Cmd.t -> (Os.Exit.t, string) result) option
     (** [find u] is a function, if any, for executing unit [u]
-        according to {val-key}.  Given the environment, the unit and
+        according to {!val-key}.  Given the environment, the unit and
         additional arguments potentially provided by the driver it
         performs the full execution logic. *)
 end
@@ -217,9 +218,8 @@ module Env : sig
   val driver_env : t -> Os.Env.t
   val env : t -> env -> Os.Env.t
 
-  val get_tool : ?skip_build:bool -> t -> Cmd.tool -> (Fpath.t, string) result
   val get_cmd : ?skip_build:bool -> t -> Cmd.t -> (Cmd.t, string) result
   val unit_exe_file : t -> build_unit -> (Fpath.t, string) result
-  val unit_cmd : t -> Set.elt -> (Cmd.t, string) result
+  val unit_exe_file_cmd : t -> build_unit -> (Cmd.t, string) result
 end
 (**/**)

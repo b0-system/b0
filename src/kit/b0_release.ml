@@ -242,7 +242,7 @@ module Archive = struct
       let archive_ext = B0_pack.find_or_default_meta src_archive_ext pack in
       B0_env.in_scratch_dir env Fpath.(archive_base + archive_ext)
     in
-    let search = B0_env.get_tool env ~skip_build:false in
+    let search = B0_env.get_cmd env ~skip_build:false in
     let force = true and make_path = true in
     let* () = B0_tar.compress ~search ~force ~make_path archive_file ~archive in
     let archive_dir = Fpath.strip_ext archive_file in

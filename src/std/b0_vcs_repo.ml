@@ -49,7 +49,9 @@ type r =
     work_dir : Fpath.t }
 
 module type VCS = sig
-  val find : ?dir:Fpath.t -> unit -> (r option, string) result
+  val find :
+    ?search:Cmd.tool_search -> ?dir:Fpath.t -> unit -> (r option, string) result
+
   val repo_cmd : r -> Cmd.t
 
   (* Commits *)
@@ -116,11 +118,11 @@ let run_status ?dry_run ?stdout ?stderr repo cmd_args =
 (* Git support *)
 
 module Git_vcs = struct
-  let git = lazy (Os.Cmd.find (Cmd.arg "git"))
+  let tool = Cmd.tool "git"
   let repo_cmd git repo_dir work_dir =
     Cmd.(git % "--git-dir" %% path repo_dir % "--work-tree" %% path work_dir)
 
-  let find ?dir () =
+  let find ?search ?dir () =
     let get_vcs_path cmd =
       let stderr = `Stdo Os.Cmd.out_null in
       let* status, repo_dir = Os.Cmd.run_status_out ~stderr ~trim:true cmd in
@@ -131,8 +133,7 @@ module Git_vcs = struct
           else Result.map Option.some (Fpath.of_string repo_dir)
       | status -> Ok None
     in
-    let* git = Lazy.force git in
-    match git with
+    match Os.Cmd.find ?search tool with
     | None -> Ok None
     | Some git ->
         let cwd = match dir with
@@ -251,10 +252,10 @@ end
 (* Hg support *)
 
 module Hg_vcs = struct
-  let hg = lazy (Os.Cmd.find (Cmd.arg "hg"))
+  let tool = Cmd.tool "hg"
   let repo_cmd hg repo_dir = Cmd.(hg % "--repository" %% path repo_dir)
 
-  let find ?dir () = match dir with
+  let find ?search ?dir () = match dir with
   | Some dir ->
       begin
         let work_dir = dir in
@@ -262,7 +263,7 @@ module Hg_vcs = struct
         Result.bind (Os.Dir.exists repo_dir) @@ function
         | false -> Ok None
         | true ->
-            Result.bind (Lazy.force hg) @@ function
+            match Os.Cmd.find ?search tool with
             | Some hg ->
                 Ok (Some { kind = Hg;
                            bare_cmd = hg;
@@ -273,7 +274,7 @@ module Hg_vcs = struct
                 Fpath.pp_quoted repo_dir
       end
   | None ->
-      Result.bind (Lazy.force hg) @@ function
+      match Os.Cmd.find ?search tool with
       | None -> Ok None
       | Some hg ->
           let hg_root = Cmd.(hg % "root") in
@@ -423,12 +424,12 @@ let pp_long ppf (r, _ as vcs) =
 
 (* Finding reposistories *)
 
-let find ?kind ?dir () =
-  let find_git () = match Git_vcs.find ?dir () with
+let find ?search ?kind ?dir () =
+  let find_git () = match Git_vcs.find ?search ?dir () with
   | Ok (Some r) -> Ok (Some (r, (module Git_vcs : VCS)))
   | (Ok None | Error _ as v) -> v
   in
-  let find_hg () = match Hg_vcs.find ?dir () with
+  let find_hg () = match Hg_vcs.find ?search ?dir () with
   | Ok (Some r) -> Ok (Some (r, (module Hg_vcs : VCS)))
   | (Ok None | Error _ as v) -> v
   in
@@ -440,8 +441,8 @@ let find ?kind ?dir () =
       | Ok None -> find_hg ()
       | ret -> ret
 
-let get ?kind ?dir () =
-  let* r = find ?kind ?dir () in
+let get ?search ?kind ?dir () =
+  let* r = find ?search ?kind ?dir () in
   match r with
   | Some r -> Ok r
   | None ->
@@ -497,8 +498,8 @@ let find_greatest_version_tag vcs =
 
 module Git = struct
   let get_cmd ?search ?(cmd = Cmd.arg "git") () = Os.Cmd.get ?search cmd
-  let find ?dir () =
-    let* vcs = Git_vcs.find ?dir () in
+  let find ?search ?dir () =
+    let* vcs = Git_vcs.find ?search ?dir () in
     Ok (Option.map (fun r -> r, (module Git_vcs : VCS)) vcs)
 
   let check_kind (r, _) = match r.kind with
@@ -621,7 +622,7 @@ end
 
 module Hg = struct
   let get_cmd ?search ?(cmd = Cmd.arg "hg") () = Os.Cmd.get ?search cmd
-  let find ?dir () =
-    let* vcs = Hg_vcs.find ?dir () in
+  let find ?search ?dir () =
+    let* vcs = Hg_vcs.find ?search ?dir () in
     Ok (Option.map (fun r -> r, (module Hg_vcs : VCS)) vcs)
 end

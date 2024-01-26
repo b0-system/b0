@@ -1885,34 +1885,24 @@ end
 (** Command lines.
 
     Command line values specify the command line arguments given to
-    tools spawns. In certain contexts the command line value is the
-    full specification of the tool spawn, in this case the first
-    element of the line defines the program to invoke. In other
-    contexts the tool to invoke and its arguments are kept separate.
+    tool spawns. Depending on the context this may represent either
+    only tool arguments or the full command specification with
+    the tool to spawn as the first argument.
 
-    {!Cmd.examples}.
-
-    {b B0 artefact.}  This module allows to {!Cmd.unstamp} command
-    arguments. Unstamped arguments have no special semantics as far as
-    the command line is concerned they simply indicate that the
-    argument value itself does not influence the outputs of the
-    tool. Unstamped arguments do not appear in the command line
-    {{!Cmd.to_list_and_stamp}stamp} which is used to memoize tool
-    spawns. A typical example of unstamped arguments are file paths to
-    inputs: it's often the file contents not the actual file path that
-    determines the tool output; beware though that some tool use both
-    the file path contents and the actual file path in their
-    outputs. *)
+    See {{!Cmd.examples}examples}. *)
 module Cmd : sig
 
   (** {1:cl Command lines} *)
 
   type t
-  (** The type for command lines. A command line is a list of command
-      line arguments. *)
+  (** The type for command lines.
+
+      A command line is a list of command line arguments. The first
+      argument usually denotes the {{!section-tool}tool or executable}
+      to invoke. *)
 
   val is_empty : t -> bool
-  (** [is_empty l] is [true] iff [l] is an empty list of arguments. *)
+  (** [is_empty cmd] is [true] iff [cmd] is an empty list of arguments. *)
 
   val empty : t
   (** [empty] is an empty list of arguments. *)
@@ -1921,23 +1911,24 @@ module Cmd : sig
   (** [arg a] is the atomic argument [a]. *)
 
   val append : t -> t -> t
-  (** [append l1 l2] appends arguments [l2] to [l1]. *)
+  (** [append cmd1 cmd2] appends arguments [cmd2] to [cmd1]. *)
 
   val unstamp : t -> t
-  (** [unstamp l] indicates that arguments [l] do not influence the
+  (** [unstamp cmd] indicates that arguments [cmd] do not influence the
       tool's invocation outputs. These arguments are omitted from
-      the command line's {{!to_list_and_stamp}stamp}. *)
+      the command line's {{!to_list_and_stamp}stamp}, see {!section-stamps}
+      for more details and {{!examples}examples}. *)
 
   (** {1:derived Derived combinators} *)
 
   val ( % ) : t -> string -> t
-  (** [l % a] is [append l (arg a)]. *)
+  (** [cmd % a] is [append cmd (arg a)]. *)
 
   val ( %% ) : t -> t -> t
-  (** [l1 % l2] is [append l1 l2]. *)
+  (** [cmd1 %% cmd2] is [append cmd1 cmd2]. *)
 
   val if' : bool -> t -> t
-  (** [if' cond l] is [l] if [cond] is [true] and {!empty} otherwise. *)
+  (** [if' cond cmd] is [cmd] if [cond] is [true] and {!empty} otherwise. *)
 
   val if_some : t option -> t
   (** [if_some o] is [cmd] if [o] is [Some cmd] and {!empty} otherwise. *)
@@ -1967,29 +1958,46 @@ module Cmd : sig
       Tools are the first argument of commands. *)
 
   type tool = Fpath.t
-  (** The type for command line tools. A command line tool is
-      represented by a file path according to the POSIX convention for
-      [exec(3)]. If it is made of a single segment, for example
-      [Fpath.v "ocaml"], it represents a program name to be looked up
-      via a search procedure; for example in the [PATH] environment
-      variable. If it is a file path with multiple segments (POSIX
-      would say if they contain a slash characters) the program is the
-      file itself. *)
+  (** The type for command line tools.
 
-  val tool : t -> tool option
-  (** [tool l] is [l]'s first element. This is [None] if the line is
-      {!empty} or if the first element can't be parsed to a {!type-tool}. *)
+      A command line tool is represented by a file path according to
+      the POSIX convention for [exec(3)]. If it is made of a single
+      segment, for example [Fpath.v "ocaml"], it represents a program
+      name to be looked up via a search procedure; for example in the
+      [PATH] environment variable. If it is a file path with multiple
+      segments (POSIX would say if they contain a slash characters)
+      the program is the file itself.
 
-  val get_tool : t -> tool
-  (** [get_tool] is like {!val-tool} but raises [Invalid_argument] in case
-      of error. *)
+      {b Note.} For portability one should not use the [.exe] suffix on
+      Windows on tools. This should be handled transparently by
+      {!tool_search} procedures. *)
+
+  val tool : string -> t
+  (** [tool t] is [arg t], used for reading clarity. *)
+
+  val find_tool : t -> tool option
+  (** [find_tool cmd] is [cmd]'s first argument. This is [None] if the
+      command is {!empty} or if the first element can't be parsed to a
+      {!type-tool}. *)
+
+  val get_tool : t -> (tool, string) result
+  (** [get_tool] is like {!val-find_tool} but returns an english [Error msg] on
+      [None]. *)
 
   val set_tool : tool -> t -> t
-  (** [set_tool tool l] replaces [l]'s first element with [tool]. This
-      is [path l] if [l] is {!empty}. *)
+  (** [set_tool t cmd] replaces [cmd]'s first element with [t]. This
+      is [path t] if [cmd] is {!empty}. *)
 
-  val pp_tool : tool Fmt.t
-  (** [pp_tool] formats a tool for the TTY. *)
+  (** {2:tool_search Tool search} *)
+
+  type tool_search = t -> (t, string) result
+  (** The type for tool search functions.
+
+      These are functions that resolve and {{!set_tool}set} the
+      {!tool} argument of commands to a concrete program executable.
+      Or return an error message if the tool cannot be resolved.
+      See {!B0_std.Os.Cmd.section-tool_search}
+      for implementations. *)
 
   (** {1:preds Predicates} *)
 
@@ -2046,12 +2054,29 @@ v}
       [squoted] and [dquoted] represent the bytes they enclose. *)
 
   val pp : t Fmt.t
-  (** [pp ppf l] formats an unspecified representation of [l] on
-      [ppf]. *)
+  (** [pp] is an unspecified formatter for commands. *)
 
   val pp_dump : t Fmt.t
-  (** [pp_dump ppf l] dumps and unspecified representation of [l]
-      on [ppf]. *)
+  (** [pp_dump] formats raw dadta for debugging. *)
+
+  (** {1:stamp Stamps}
+
+    This module allows to {!Cmd.unstamp} command arguments.
+
+    Unstamped arguments have no special semantics as far as
+    the command line is concerned they simply indicate that the
+    argument value itself does not influence the outputs of the
+    tool.
+
+    Unstamped arguments do not appear in the command line
+    {{!Cmd.to_list_and_stamp}stamp} which is used to memoize tool
+    spawns.
+
+    A typical example of unstamped arguments are file paths to
+    inputs: it's often the file contents not the actual file path that
+    determines the tool output; beware though that some tool use both
+    the file path contents and the actual file path in their
+    outputs. See {{!examples}examples}. *)
 
   (** {1:examples Examples}
 {[
@@ -2072,6 +2097,7 @@ let ocamlopt ?(profile = false) ?(debug = false) incs file =
   Cmd.(atom "ocamlopt" % "-c" %% debug %% profile %% incs %%
        unstamp (path file))
 ]} *)
+
 end
 
 (** Future values.
@@ -2851,53 +2877,48 @@ module Os : sig
   (** Executing commands. *)
   module Cmd : sig
 
-    (** {1:search Tool search}  *)
+    (** {1:tool_search Tool search}  *)
 
-    type search = Fpath.t -> (Fpath.t, string) result
-    (** The type for tool lookup. FIXME this should be integrated instead
-        of search paths. *)
+    val path_search :
+      ?win_exe:bool -> ?path:Fpath.t list -> unit -> Cmd.tool_search
+    (** [path_search ~win_exe ~path () cmd] searches the
+        {{!B0_std.Cmd.type-tool}tool} of [cmd] in the [path]
+        directories. If the tool:
 
-    val find_tool :
-      ?win_exe:bool -> ?search:Fpath.t list -> Cmd.tool ->
-      (Fpath.t option, string) result
-    (** [find_tool ~win_exe ~search tool] is the file path, if any, to the
-        program executable for the tool specification [tool]. For
-        portability do not add an [.exe] suffix to [tool] on Windows,
-        see the [win_exe] argument.
         {ul
-        {- If [tool] has a single path segment: the {e filename} [tool] is
-           searched, in list order, for the first matching executable
-           file in the directories of [search]. [search] defaults to
-           the env var [PATH] parsed with {!Fpath.list_of_search_path}.}
-        {- If [tool] has multiple path segments: the {e file path}
-           [tool] is simply tested for {{!File.is_executable}existence
-           and executability}. [Ok (Some tool)] is returned if that is
-           case and [Ok None] otherwise.}
-        {- If [win_exe] is [true] a [.exe] suffix is added to
-           [tool] if it doesn't already have one. Defaults to
-          {!Stdlib.Sys.win32}.}} *)
+        {- Has a single path segment: that {e filename} is
+           searched, in list order, for the first matching
+           {{!File.is_executable}executable file} in the directories
+           of [path]. [path] defaults to the environment variable
+           [PATH] parsed with {!Fpath.list_of_search_path}.}
+        {- Has multiple path segments: the {e file path} is simply tested for
+           {{!File.is_executable}existence and executability}
+           and [cmd] is returned if that is the case (possibly by altered
+           by the [win_exe] behaviour, see below). If the path is relative
+           it is tested relative to the process' current working directory.}}
 
-    val get_tool :
-      ?win_exe:bool -> ?search:Fpath.t list -> Cmd.tool ->
-      (Fpath.t, string) result
-    (** [get_tool] is like {!find_tool} except it errors if [Ok None]
+        If [win_exe] is [true] (defaults to {!Stdlib.Sys.win32}) an
+        [.exe] suffix is added to the command's tool if it doesn't
+        already have one. . *)
+
+    val find : ?search:Cmd.tool_search -> Cmd.t -> Cmd.t option
+    (** [find ~search cmd] is [cmd] with its {!B0_std.Cmd.val-tool}
+        resolved to the executable file for the tool specified by [cmd]
+        using [search] (defaults to [path_search ()]) or [Ok None] if
+        the tool cannot be found. *)
+
+    val find_first : ?search:Cmd.tool_search -> Cmd.t list -> Cmd.t option
+    (** [find_first ?search cmds] is [List.find_map (find ?search) cmds]. *)
+
+    val get : ?search:Cmd.tool_search -> Cmd.t ->
+      (Cmd.t, string) result
+    (** [get] is like {!tool} except but return an error message if [Ok None]
         is returned. *)
 
-    val get_first_tool :
-      ?win_exe:bool -> ?search:Fpath.t list -> Cmd.tool list ->
-      (Fpath.t, string) result
-    (** [get_first_tool tools] is the first tool that can be found in the list
-        with {!find_tool} or an error if none is found. *)
-
-    val find : ?win_exe:bool -> ?search:Fpath.t list -> Cmd.t ->
-      (Cmd.t option, string) result
-    (** [find cmd] is like {!find_tool} but looks and replaces
-        [cmd]'s {!B0_std.Cmd.val-tool}. *)
-
-    val get : ?win_exe:bool -> ?search:Fpath.t list -> Cmd.t ->
-      (Cmd.t, string) result
-    (** [get cmd] is like {!get_tool} but looks and replaces [cmd]'s
-        {!B0_std.Cmd.val-tool}. *)
+    val get_first :
+      ?search:Cmd.tool_search -> Cmd.t list -> (Cmd.t, string) result
+    (** [get_first_tool cmds] is the first command of [cmds] that can be found
+        with {!find} or an error if none is found. *)
 
     (** {1:statuses Process completion statuses} *)
 
@@ -3089,15 +3110,15 @@ module Os : sig
         child. *)
 
     val execv :
-      ?env:Env.assignments -> ?cwd:Fpath.t -> Fpath.t -> Cmd.t ->
-      ('a, string) result
-    (** [execv ~env ~cwd file argv] executes file [file] as a new process in
-        environment [env] with [args] as the {!Sys.argv} of this
-        process (in particular [Sys.argv.(0)] is the name of the
-        program not the first argument to the program). The function
-        only recturns in case of error. [env] defaults to
-        {!B0_std.Os.Env.current_assignments}[ ()],
-        [cwd] to {!B0_std.Os.Dir.val-cwd}[ ()]. *)
+      ?env:Env.assignments -> ?cwd:Fpath.t ->
+      ?argv0:string -> Cmd.t -> ('a, string) result
+    (** [execv ~env ~cwd cmd] executes the realpath pointed by
+        {!Cmd.tool cmd} as a new process in environment with [cmd] as
+        the {!Sys.argv} of this process. The function only returns in
+        case of error. [env] defaults to
+        {!B0_std.Os.Env.current_assignments}[ ()], [cwd] to
+        {!B0_std.Os.Dir.val-cwd}[ ()]. If [argv0] is specified
+        it is used instead of [cmd]'s tool for Sys.argv.(0). *)
 
     type t = Cmd.t
     (** {!Exit} needs that alias to refer to {!B0_std.Cmd.t}. *)
@@ -3117,8 +3138,9 @@ module Os : sig
     val code : int -> t
     (** [code c] is [Code c]. *)
 
-    val exec : ?env:Env.assignments -> ?cwd:Fpath.t -> Fpath.t -> Cmd.t -> t
-    (** [exec ?env ?cwd file argv] is an [Exec _]. That has a call to
+    val exec :
+      ?env:Env.assignments -> ?cwd:Fpath.t -> ?argv0:string -> Cmd.t -> t
+    (** [exec ?env ?cwd ?argv0 cmd] is an [Exec _]. That has a call to
         {!Os.Cmd.execv} with the corresponding arguments. *)
 
     val get_code : t -> int

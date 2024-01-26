@@ -76,8 +76,9 @@ module Http = struct
 end
 
 module Http_client = struct
-
   type t = Cmd.t
+  let default = Cmd.tool "curl"
+  let get ?search ?(cmd = default) () = Os.Cmd.get ?search cmd
 
   let find_location request response =
     match List.assoc_opt "location" (Http.Response.headers response) with
@@ -131,12 +132,11 @@ module Http_client = struct
     in
     loop follow [] request
 
-  let default = Cmd.arg "curl"
+  (* Command line interface *)
+
   let curl ?docs ?env () =
     let open Cmdliner in
     let doc = "The curl command $(docv) to use." in
     let cmd = Arg.conv' ~docv:"CMD" (B0_std.Cmd.of_string, B0_std.Cmd.pp_dump)in
     Arg.(value & opt cmd default & info ["curl"] ~doc ?docs ?env ~docv:"CMD")
-
-  let get ?search ?(curl = default) () = Os.Cmd.get ?search curl
 end

@@ -143,10 +143,10 @@ module type S = sig
   (** [add v] adds the value [v] to the list of defined values. *)
 
   val fold : (t -> 'a -> 'a) -> 'a -> 'a
-  (** [fold f acc] folds over the list of units. *)
+  (** [fold f acc] folds over the list of defined values. *)
 
   val list : unit -> t list
-  (** [list ()] is the list of units. *)
+  (** [list ()] is the list of defined values. *)
 
   val find : string -> t option
   (** [find name] is the value named [name] (if any). *)

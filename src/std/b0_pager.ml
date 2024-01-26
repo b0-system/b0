@@ -4,8 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
-open B0_std.Result.Syntax
-open Cmdliner
+open Result.Syntax
 
 (* Environment variables *)
 
@@ -15,6 +14,7 @@ module Env = struct
   let term = "TERM"
 
   let infos =
+    let open Cmdliner in
     Cmd.Env.info pager
       ~doc:"The pager used to display content. This is a command invocation \
             given to execvp(3)." ::
@@ -24,27 +24,26 @@ end
 
 (* Paging *)
 
-let find ?win_exe ?search ~don't () =
+type t = Cmd.t option
+let does_page = Option.is_some
+
+let find ?search ?cmd ~don't () =
   if don't then Ok None else
-  match Os.Env.find ~empty_is_none:true Env.term with
-  | Some "dumb" | None -> Ok None
-  | Some _ ->
-      let cmds = B0_std.[Cmd.arg "less"; Cmd.arg "more"] in
-      let* cmds =
-        let empty_is_none = true in
-        match Os.Env.find' ~empty_is_none B0_std.Cmd.of_string Env.pager with
-        | Error _ as e -> e
-        | Ok None -> Ok cmds
-        | Ok (Some cmd) -> Ok (cmd :: cmds)
-      in
-      let rec loop = function
-      | [] -> Ok None
-      | cmd :: cmds ->
-          match Os.Cmd.find ?win_exe ?search cmd with
-          | Ok None -> loop cmds
-          | v -> v
-      in
-      loop cmds
+  match cmd with
+  | Some cmd -> Ok (Os.Cmd.find ?search cmd)
+  | None ->
+      match Os.Env.find ~empty_is_none:true Env.term with
+      | Some "dumb" | None -> Ok None
+      | Some _ ->
+          let cmds = [Cmd.tool "less"; Cmd.tool "more"] in
+          let* cmds =
+            let empty_is_none = true in
+            match Os.Env.find' ~empty_is_none Cmd.of_string Env.pager with
+            | Error _ as e -> e
+            | Ok None -> Ok cmds
+            | Ok (Some cmd) -> Ok (cmd :: cmds)
+          in
+          Ok (Os.Cmd.find_first ?search cmds)
 
 let pager_env () = match Os.Env.find ~empty_is_none:false Env.less with
 | Some _ -> Ok None
@@ -71,12 +70,12 @@ let page_stdout = function
             let stdin = Os.Cmd.in_fd ~close:true pager_read in
             Unix.set_close_on_exec parent_write;
             Os.Fd.apply ~close:Unix.close parent_write @@ fun parent_write ->
-            Result.bind (Os.Cmd.spawn ?env ~stdin pager) @@ fun pid ->
-            Result.bind (dup2 parent_write Unix.stdout) @@ fun () ->
+            let* pid = Os.Cmd.spawn ?env ~stdin pager in
+            let* () = dup2 parent_write Unix.stdout in
             let parent_pid = Unix.getpid () in
             let on_parent_exit () =
               (* We need to be careful here, forked processes will also
-                 get execute to this. *)
+                 get to execute this. *)
               if parent_pid = Unix.getpid () then begin
                 (* Before closing Unix.stdout it's better to flush
                    formatter and channels. Otherwise it's done later
@@ -94,15 +93,15 @@ let page_stdout = function
 
 let page_files pager files = match pager with
 | Some pager when files = [] -> Ok ()
-| Some pager -> Os.Cmd.run B0_std.Cmd.(pager %% paths files)
+| Some pager -> Os.Cmd.run Cmd.(pager %% paths files)
 | None ->
     let rec loop = function
     | [] -> Ok ()
     | f :: fs ->
         match Os.File.read f with
         | Error _ as e -> e
-        | Ok d ->
-            Printf.printf "%s" d;
+        | Ok contents ->
+            Printf.printf "%s" contents;
             if fs <> [] then Printf.printf "\x1C" (* U+001C FS *);
             flush stdout;
             loop fs
@@ -111,7 +110,8 @@ let page_files pager files = match pager with
 
 (* Cli interaction *)
 
-let don't ?(docs = Manpage.s_common_options) () =
+let don't ?(docs = Cmdliner.Manpage.s_common_options) () =
+  let open Cmdliner in
   let doc =
     "Do not display the output in a pager. This automatically happens \
      if the $(b,TERM) environment variable is $(b,dumb) or undefined."
