@@ -249,7 +249,7 @@ module Compile = struct
       B0_ocaml.Libname.v "b0.kit"; ]
 
   let find_libs m r libs =
-    Fut.of_list @@ List.map (B0_ocaml.Libresolver.get r) libs
+    Fut.of_list @@ List.map (B0_ocaml.Libresolver.get m r) libs
 
   let find_boot_libs m ~clib_ext ~env libs r =
     match Os.Env.find ~empty_is_none:true "B0_BOOTSTRAP" with
@@ -259,9 +259,9 @@ module Compile = struct
         let boot_lib libname =
           let dir = Fpath.(bdir / B0_ocaml.Libname.undot ~rep:'-' libname) in
           let archive = Some (B0_ocaml.Libname.to_archive_name libname) in
-          let* lib =
-            B0_ocaml.Lib.of_dir m ~clib_ext ~libname ~requires:[] ~archive ~dir
-              ~js_stubs:[]
+          let lib =
+            B0_ocaml.Lib.of_dir m ~clib_ext ~libname ~requires:[]
+              ~represents:[] ~archive ~dir ~js_stubs:[] ~warning:None
           in
           match lib with
           | Error _ as e -> B0_memo.fail_if_error m e

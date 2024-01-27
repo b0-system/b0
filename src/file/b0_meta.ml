@@ -239,11 +239,14 @@ let synopsis =
 
 let bench = Key.make_tag "bench" ~doc:"Benchmarking entity"
 let build = Key.make_tag "build" ~doc:"A build system entity"
+let deprecated = Key.make_tag "deprecated" ~doc:"Deprecated entity"
 let dev = Key.make_tag "dev" ~doc:"Development entity"
 let doc = Key.make_tag "doc" ~doc:"Documentation entity"
 let exe = Key.make_tag "exe" ~doc:"Executable entity"
 let test = Key.make_tag "test" ~doc:"Testing entity"
 let lib = Key.make_tag "lib" ~doc:"Library entity"
 let public = Key.make_tag "public" ~doc:"Public entity"
+let warning =
+  string_key "warning" ~doc:"A warning shown when the entity is used"
 
 let () = B0_scope.close ()

@@ -104,12 +104,12 @@ let get_modsrcs b ~srcs =
   let src_root = B0_build.current_scope_dir b in
   B0_ocaml.Modsrc.map_of_files (B0_build.memo b) ~build_dir ~src_root ~srcs
 
-let get_link_objs ~code ~resolver ~requires ~modsrcs =
+let get_link_objs m ~code ~resolver ~requires ~modsrcs =
   let modsrcs =
     B0_ocaml.Modsrc.sort (* for link *) ~deps:B0_ocaml.Modsrc.ml_deps modsrcs in
   let mod_objs = List.filter_map (B0_ocaml.Modsrc.impl_file ~code) modsrcs  in
   let* link_requires =
-    B0_ocaml.Libresolver.get_list_and_deps resolver requires
+    B0_ocaml.Libresolver.get_list_and_deps m resolver requires
   in
   let lib_objs = List.filter_map B0_ocaml.Lib.cma link_requires in
   let lib_jss = List.concat_map B0_ocaml.Lib.js_stubs link_requires in
@@ -118,7 +118,7 @@ let get_link_objs ~code ~resolver ~requires ~modsrcs =
 let compile_byte m ~opts ~resolver ~requires ~modsrcs =
   let code = `Byte in
   let comp = B0_ocaml.Tool.ocamlc in
-  let* requires = B0_ocaml.Libresolver.get_list resolver requires in
+  let* requires = B0_ocaml.Libresolver.get_list_and_reprs m resolver requires in
   B0_ocaml.Compile.intfs ~and_cmti:true m ~comp ~opts ~requires ~modsrcs;
   B0_ocaml.Compile.impls ~and_cmt:true m ~code ~opts ~requires ~modsrcs;
   Fut.return ()
@@ -126,7 +126,7 @@ let compile_byte m ~opts ~resolver ~requires ~modsrcs =
 let link_byte m ~conf ~opts ~resolver ~requires ~modsrcs ~o =
   let code = `Byte in
   let* lib_objs, mod_objs, lib_jss =
-    get_link_objs ~code ~resolver ~requires ~modsrcs
+    get_link_objs m ~code ~resolver ~requires ~modsrcs
   in
   let cobjs = lib_objs @ mod_objs in
   B0_ocaml.Link.code m ~conf ~code ~opts ~c_objs:[] ~cobjs ~o;
@@ -169,7 +169,7 @@ let js_of_byte_objs ~jss ~modsrcs ~o b =
   let* () = compile_byte m ~opts ~resolver ~requires ~modsrcs in
   let code = `Byte in
   let* lib_objs, mod_objs, lib_jss =
-    get_link_objs ~code ~resolver ~requires ~modsrcs
+    get_link_objs m ~code ~resolver ~requires ~modsrcs
   in
   let jss = List.append lib_jss jss in
   let source_map = Option.join (B0_meta.find source_map meta) in

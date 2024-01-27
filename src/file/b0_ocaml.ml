@@ -575,32 +575,32 @@ let c_requires =
   let pp_value = Cmd.pp in
   B0_meta.Key.make "c-requires" ~default:Cmd.empty ~doc ~pp_value
 
-let requires =
-  let doc = "Required OCaml libraries" in
-  let pp_value = Fmt.(box @@ list ~sep:sp Libname.pp) in
-  B0_meta.Key.make "requires" ~default:[] ~doc ~pp_value
-
 let library =
   let doc = "Defined OCaml library name" in
   let pp_value = Fmt.using Libname.to_string Fmt.string in
   B0_meta.Key.make "library" ~doc ~pp_value
 
-let deprecated_library =
-  let doc = "Deprecated library" in
-  let pp_value ppf = function
-  | `For lib -> Fmt.pf ppf "For library: %s" (Libname.to_string lib)
-  | `Msg msg -> Fmt.string ppf msg
-  in
-  B0_meta.Key.make "deprecated-library" ~doc ~pp_value
-
 let modsrcs = (* FIXME don't do that. *)
   let pp_value = Fmt.any "<dynamic>" in
   B0_meta.Key.make "mod-srcs" ~doc:"Module sources" ~pp_value
+
+let pp_libname_list = Fmt.(box @@ list ~sep:sp Libname.pp)
+
+let requires =
+  let doc = "Required OCaml libraries" in
+  let pp_value = pp_libname_list in
+  B0_meta.Key.make "requires" ~default:[] ~doc ~pp_value
+
+let represents =
+  let doc = "Represented OCaml libraries" in
+  let pp_value = pp_libname_list in
+  B0_meta.Key.make "represents" ~default:[] ~doc ~pp_value
 
 module Lib = struct
   type t =
     { libname : Libname.t;
       requires : Libname.t list;
+      represents : Libname.t list;
       dir : Fpath.t;
       cmis : Fpath.t list;
       cmxs : Fpath.t list;
@@ -608,24 +608,27 @@ module Lib = struct
       cmxa : Fpath.t option;
       c_archive : Fpath.t option;
       c_stubs : Fpath.t list;
-      js_stubs : Fpath.t list;  }
+      js_stubs : Fpath.t list;
+      warning : string option }
 
   let make
-      ~libname ~requires ~dir ~cmis ~cmxs ~cma ~cmxa ~c_archive ~c_stubs
-      ~js_stubs
+      ~libname ~requires ~represents ~dir ~cmis ~cmxs ~cma ~cmxa ~c_archive
+      ~c_stubs ~js_stubs ~warning
     =
-    { libname; requires; dir; cmis; cmxs; cma; cmxa; c_archive; c_stubs;
-      js_stubs }
+    { libname; requires; represents; dir; cmis; cmxs; cma; cmxa; c_archive;
+      c_stubs; js_stubs; warning }
 
-  let of_dir m ~clib_ext ~libname ~requires ~dir ~archive ~js_stubs =
-    Fut.return @@
-    Result.map_error (fun e -> Fmt.str "library %a: %s" Libname.pp libname e) @@
+  let of_dir m
+      ~clib_ext ~libname ~requires ~represents ~dir ~archive ~js_stubs ~warning
+    =
+    Result.map_error (fun e -> Fmt.str "Library %a: %s" Libname.pp libname e) @@
     Result.bind (Os.Dir.exists dir) @@ function
     | false ->
-        B0_memo.notify m `Warn "library %a: no directory %a"
+        B0_memo.notify m `Warn "Library %a: %a: no such directory"
           Libname.pp libname Fpath.pp dir;
-        Ok (make ~libname ~requires ~dir ~cmis:[] ~cmxs:[] ~cma:None ~cmxa:None
-              ~c_archive:None ~c_stubs:[] ~js_stubs:[])
+        Ok (make ~libname ~requires ~represents ~dir ~cmis:[] ~cmxs:[]
+              ~cma:None ~cmxa:None ~c_archive:None ~c_stubs:[] ~js_stubs:[]
+              ~warning)
     | true ->
         Result.bind (Os.Dir.fold_files ~recurse:false Os.Dir.path_list dir [])
         @@ fun fs ->
@@ -633,8 +636,8 @@ module Lib = struct
         let () = List.iter (B0_memo.file_ready m) js_stubs in
         let rec loop cmis cmxs cma cmxa c_archive c_stubs = function
         | [] ->
-            make ~libname ~requires ~dir ~cmis ~cmxs ~cma ~cmxa ~c_archive
-              ~c_stubs ~js_stubs
+            make ~libname ~requires ~represents ~dir ~cmis ~cmxs ~cma ~cmxa
+              ~c_archive ~c_stubs ~js_stubs ~warning
         | f :: fs ->
             let is_lib_archive f = match archive with
             | None -> false
@@ -672,41 +675,57 @@ module Lib = struct
         Ok (loop [] [] None None None [] fs)
 
   let of_unit b ocaml_conf u =
-    (* TODO presence of archives should depend on built_code. *)
+    let get_or_fail m k u = B0_unit.get_meta k u |> B0_memo.fail_if_error m in
     B0_build.require b u;
     let m = B0_build.memo b in
-    let build_dir = B0_build.build_dir b u in
-    let libname = B0_unit.get_meta library u |> B0_memo.fail_if_error m in
-    let requires =
-      B0_unit.get_meta requires u |> B0_memo.fail_if_error m
+    let* built = B0_build.get b Code.built in
+    let* srcs = get_or_fail m modsrcs u in
+    let byte, native = match built with
+    | `Byte -> true, false | `Native -> false, true | `All -> true, true
     in
+    let has_srcs = not (Modname.Map.is_empty srcs) in
+    let has_cma = has_srcs && byte in
+    let has_cmxa = has_srcs && native in
+    let has_c_archive = has_cmxa in
+    let dir = B0_build.build_dir b u in
+    let libname = get_or_fail m library u in
+    let requires = get_or_fail m requires u in
+    let represents = get_or_fail m represents u in
     let archive = Libname.to_archive_name libname in
-    let base = Fpath.(build_dir / archive) in
-    let cma = Some Fpath.(base + ".cma") in
-    let cmxa = Some Fpath.(base + ".cmxa") in
-    let c_archive = Some Fpath.(base + (Conf.lib_ext ocaml_conf)) in
-    let c_stubs = [] (* FIXME *) in
-    let* srcs = B0_unit.get_meta modsrcs u |> B0_memo.fail_if_error m in
+    let base = Fpath.(dir / archive) in
+    let cma = if has_cma then Some Fpath.(base + ".cma") else None in
+    let cmxa = if has_cmxa then Some Fpath.(base + ".cmxa") else None in
+    let c_archive =
+      if has_c_archive then Some Fpath.(base + (Conf.lib_ext ocaml_conf)) else
+      None
+    in
     let cmis, cmxs =
       let rec loop cmis cmxs = function
       | [] -> cmis, cmxs
       | s :: ss ->
           let cmis = Modsrc.cmi_file s :: cmis in
-          let cmxs = match Modsrc.cmx_file s with
-          | None -> cmxs | Some cmx -> cmx :: cmxs
+          let cmxs = match native with
+          | false -> cmxs
+          | true ->
+              match Modsrc.cmx_file s with
+              | None -> cmxs | Some cmx -> cmx :: cmxs
           in
           loop cmis cmxs ss
       in
       loop [] [] (Modname.Map.fold (fun _ v acc -> v :: acc) srcs [])
     in
+    let c_stubs = [] (* FIXME *) in
     let js_stubs = [] (* FIXME *) in
-    Fut.return @@
-    Some (make ~libname ~requires ~dir:build_dir ~cmis ~cmxs ~cma ~cmxa
-            ~c_archive ~c_stubs ~js_stubs)
-
+    let warning = B0_unit.find_meta B0_meta.warning u in
+    let lib =
+      make ~libname ~requires ~represents ~dir ~cmis ~cmxs ~cma ~cmxa
+        ~c_archive ~c_stubs ~js_stubs ~warning
+    in
+    Fut.return (Some lib)
 
   let libname l = l.libname
   let requires l = l.requires
+  let represents l = l.represents
   let dir l = l.dir
   let cmis l = l.cmis
   let cmxs l = l.cmxs
@@ -715,6 +734,12 @@ module Lib = struct
   let c_archive l = l.c_archive
   let c_stubs l = l.c_stubs
   let js_stubs l = l.js_stubs
+  let warning l = l.warning
+  let handle_warning m l = match l.warning with
+  | None -> ()
+  | Some w ->
+      B0_memo.notify m `Warn "@[<v>Library %a: %a@]"
+        Libname.pp l.libname Fmt.lines w
 end
 
 (* Library resolvers *)
@@ -727,9 +752,8 @@ module Libresolver = struct
   (* Resolution scopes *)
 
   module Scope = struct
-
     type find = Conf.t -> B0_memo.t -> Libname.t -> Lib.t option Fut.t
-    type suggest = Conf.t -> B0_memo.t -> Libname.t -> string option Fut.t
+    type suggest = Conf.t -> B0_memo.t -> Libname.t -> string list option Fut.t
     type t = { name : string; find : find; suggest : suggest; }
 
     let name s = s.name
@@ -758,116 +782,120 @@ module Libresolver = struct
         in
         B0_memo.Tool.by_name ~vars "ocamlfind"
 
-      let parse_info m ?(file = Fpath.dash) ~libname:_ s =
-        let parse_requires requires =
-          let to_libname s =
-            Result.error_to_failure @@
-            Result.map_error (Fmt.str "required library: %s") @@
-            Libname.of_string s
-          in
-          if requires = "" then [] else
+      let lib_info_query =
+        (* We use %A otherwise whith %a we get a blank line if there's
+           no archive. Technically though we only support single library
+           archives *)
+        "%m:%d:%A:%(requires):%(represents):%(jsoo_runtime):%(warning)"
+
+      let parse_field field parse s = match parse s with
+      | Error e -> Fmt.failwith "%s: %s" field e
+      | Ok v -> v
+
+      let parse_requires = function
+      | "" -> []
+      | requires ->
+          let to_libname = parse_field "required library" Libname.of_string in
           (* ocamlfind does not normalize *)
           let skip_ws = String.lose_left Char.Ascii.is_white in
           let get_tok = String.span_left (Fun.negate Char.Ascii.is_white) in
           let rec rev_toks acc s =
-            let s = (skip_ws s) in
+            let s = skip_ws s in
             match get_tok s with
             | "", rest -> if rest = "" then acc else rest :: acc (* will err *)
             | tok, rest -> rev_toks (tok :: acc) rest
           in
           List.rev_map to_libname (rev_toks [] requires)
-        in
-        let parse_archive a =
-          if a = "" then None else
+
+      let parse_represents = parse_requires
+      let parse_archive = function
+      | "" -> None
+      | a ->
           match String.cut_right ~sep:"." a with
           | None -> Some a | Some (a, _ext) -> Some a
-        in
-        let parse_js_stubs js_stubs =
-          let stubs = String.cuts_left ~drop_empty:true ~sep:"," js_stubs in
-          let to_path s =
-            Result.error_to_failure @@
-            Result.map_error (Fmt.str "js stubs: %s") @@
-            Fpath.of_string s
-          in
-          List.map to_path stubs
-        in
-        try
-          match String.split_on_char ':' (String.trim s) with
-          | [meta; dir; archive; requires; js_stubs] ->
-              let requires = parse_requires requires in
-              let archive = parse_archive archive in
-              let dir =
-                Result.error_to_failure @@
-                Result.map_error (Fmt.str "library directory: %s") @@
-                Fpath.of_string dir
-              in
-              let js_stubs = parse_js_stubs js_stubs in
-              Ok (meta, requires, dir, archive, js_stubs)
-          | _ -> Fmt.failwith "could not parse %S" s
+
+      let parse_dir dir = parse_field "library directory" Fpath.of_string dir
+      let parse_js_stubs js_stubs =
+        let to_path s = parse_field "js stubs" Fpath.of_string s in
+        let stubs = String.cuts_left ~drop_empty:true ~sep:"," js_stubs in
+        List.map to_path stubs
+
+      let parse_warning = function "" -> None | w -> Some w
+
+      let lib_of_info m ~conf ~libname ~file info =
+        let clib_ext = Conf.lib_ext conf in
+        try match String.split_on_char ':' (String.trim info) with
+        | [_meta_file; dir; archive; requires; represents; js_stubs; warning] ->
+            let requires = parse_requires requires in
+            let represents = parse_represents represents in
+            let archive = parse_archive archive in
+            let dir = parse_dir dir in
+            let js_stubs = parse_js_stubs js_stubs in
+            let warning = parse_warning warning in
+            Lib.of_dir m
+              ~clib_ext ~libname ~requires ~represents
+              ~dir ~archive ~js_stubs ~warning
+        | _ -> Fmt.failwith "could not parse %S" info
         with
-        | Failure e -> Fmt.error "@[<v>%a: %s@]" Fpath.pp file e
+        | Failure e -> Fpath.error file "%s" e
 
-      (* FIXME need to solve the META file read.
-         FIXME post exec is still super messy, check if we can make it
-         to use Memo.t *)
+      let query_result o set_res op = match B0_zero.Op.status op with
+      | B0_zero.Op.Done ->
+          let spawn = B0_zero.Op.Spawn.get op in
+          let exit = Option.get (B0_zero.Op.Spawn.exit spawn) in
+          begin match exit with
+          | `Exited 0 -> ()
+          | `Exited 2 ->
+              (* FIXME checktypo *)
+              (* We need to fail it otherwise we memoize the result
+                 forever *)
+              B0_zero.Op.set_status op (B0_zero.Op.Failed (Exec (Some "bla")))
+          | _ -> ()
+          end
+      | _ -> ()
 
-      let write_info ~cache_dir conf m n =
-        (* FIXME better [n] not found error *)
+      let write_info ~cache_dir conf m name =
+        (* FIXME better [name] not found error
+           FIXME need to solve the META file read.
+           FIXME post exec is still super messy, check if we can make it
+           to use Memo.t *)
         let ocamlfind = B0_memo.tool m tool in
-        let fname, lib, predicates = match Libname.to_string n with
+        let fname, lib, predicates = match Libname.to_string name with
         | "ocaml.threads" | "threads" | "threads.posix" ->
             if Conf.version conf < (5, 0, 0, None)
             then "threads", "threads.posix", "byte,native,mt,mt_posix"
             else "threads", "threads", "byte,native"
         | n -> n, n, "byte,native"
         in
-        let post_exec op = match B0_zero.Op.status op with
-        | B0_zero.Op.Done ->
-            begin match
-              Option.get (B0_zero.Op.Spawn.exit (B0_zero.Op.Spawn.get op))
-            with
-            | `Exited 2 ->
-                (* FIXME checktypo *)
-                let err = Fmt.str "OCaml library %a not found" Libname.pp n in
-                B0_zero.Op.set_status op (B0_zero.Op.(Failed (Exec (Some err))))
-            | _ -> ()
-            end
-        | _ -> ()
-        in
-        let success_exits = [0; 2 (* not found *) ] in
-        let info =
-          (* We use %A otherwise whith %a we get a blank line if there's
-             no archive. Technically though we only support single library
-             archives *)
-          "%m:%d:%A:%(requires):%(jsoo_runtime)"
-        in
         let fname = Fmt.str "ocamlfind.%s" fname in
         let o = Fpath.(cache_dir / fname) in
-        let stdout = `File o in
-        B0_memo.spawn m
-          ~success_exits ~reads:[] ~writes:[o] ~stdout ~post_exec @@
+        let stdout = `File o and stderr = `File Fpath.null in
+        let res, set_res = Fut.make () in
+        let post_exec = query_result o set_res in
+        let success_exits = [0; 2 (* not found *) ] in
+        let k = function
+        | 0 -> set_res (Some o)
+        | 2 -> set_res None | _ -> assert false
+        in
+        B0_memo.spawn
+          m ~reads:[] ~writes:[o] ~stdout ~stderr ~post_exec ~success_exits ~k
+        @@
         ocamlfind Cmd.(arg "query" % lib % "-predicates" % predicates %
-                       "-format" % info);
-        o
+                       "-format" % lib_info_query);
+        res
 
-      let read_info m clib_ext libname file =
-        let* s = B0_memo.read m file in
-        match parse_info ~file m ~libname s with
-        | Error _ as e -> B0_memo.fail_if_error m e
-        | Ok (_meta, requires, dir, archive, js_stubs) ->
-            let* lib =
-              Lib.of_dir m ~clib_ext ~libname ~requires ~dir ~archive ~js_stubs
-            in
-            Fut.return (Some (B0_memo.fail_if_error m lib))
+      let read_info m conf libname file =
+        let* info = B0_memo.read m file in
+        let lib = lib_of_info m ~conf ~libname ~file info in
+        Fut.return (Some (B0_memo.fail_if_error m lib))
 
-      let find ~cache_dir conf m n =
-        (* This never returns None we should factor error reporting
-           in *)
-        let clib_ext = Conf.lib_ext conf in
-        let o = write_info ~cache_dir conf m n in
-        read_info m clib_ext n o
+      let find ~cache_dir conf m name =
+        let* outf = write_info ~cache_dir conf m name in
+        match outf with
+        | None -> Fut.return None
+        | Some o -> read_info m conf name o
 
-      let suggest conf m n = Fut.return None
+      let suggest conf m name = Fut.return None (* TODO *)
       let scope ~cache_dir =
         let find = find ~cache_dir in
         { name = "ocamlfind"; find; suggest }
@@ -886,7 +914,7 @@ module Libresolver = struct
                 Libname.Map.add lib_name (u, lib) acc
             | Some (lib_u, _) ->
                 B0_memo.notify (B0_build.memo b)
-                  `Warn "@[OCaml library %a already defined in unit %a.@,\
+                  `Warn "@[Library %a: already defined in unit %a.@,\
                          Ignoring definition in unit %a@]"
                   Libname.pp lib_name B0_unit.pp_name lib_u B0_unit.pp_name u;
                 acc
@@ -901,7 +929,7 @@ module Libresolver = struct
           | None -> Fut.return None
           | Some (_, lazy lib) -> lib
         in
-        let suggest ocaml_conf m n = Fut.return None in
+        let suggest ocaml_conf m n = Fut.return None (* TODO *) in
         make ~name ~find ~suggest
     end
 
@@ -918,7 +946,7 @@ module Libresolver = struct
       mutable lookups : Lib.t option Fut.t Libname.Map.t; }
 
   let make memo conf scopes =
-    let memo = B0_memo.with_mark memo "ocaml-resolver" in
+    let memo = B0_memo.with_mark memo "ocaml-libresolver" in
     { memo; conf; scopes; lookups = Libname.Map.empty }
 
   let default store m =
@@ -929,9 +957,10 @@ module Libresolver = struct
     (*  let ocamlpath = Lib.Resolver.ocamlpath ~cache_dir in *)
     let ocamlfind = Scope.ocamlfind ~cache_dir in
     let scopes = [build_scope; (* ocamlpath; *) ocamlfind] in
-    Fut.return (make m ocaml_conf scopes)
+    let resolver = make m ocaml_conf scopes in
+    Fut.return resolver
 
-  let key = B0_store.key ~mark:"ocaml.libresolver"  default
+  let key = B0_store.key ~mark:"ocaml.libresolver" default
 
   (* Properties *)
 
@@ -940,38 +969,60 @@ module Libresolver = struct
   let ocaml_conf r = r.conf
   let scopes r = r.scopes
 
-  let find_in_scopes r set n =
-    let rec loop r set n = function
+  (* Lookups *)
+
+  let find_in_scopes r set name =
+    let rec loop r set name = function
     | [] -> set None
     | s :: ss ->
-        Fut.await (Scope.find s r.conf r.memo n) @@ function
-        | None -> loop r set n ss
+        Fut.await (Scope.find s r.conf r.memo name) @@ function
+        | None -> loop r set name ss
         | Some _ as lib -> set lib
     in
-    loop r set n r.scopes
+    loop r set name r.scopes
 
-  let find r n = match Libname.Map.find_opt n r.lookups with
+  let find m r name = match Libname.Map.find_opt name r.lookups with
   | Some v -> v
   | None ->
       let fut, set = Fut.make () in
-      r.lookups <- Libname.Map.add n fut r.lookups;
-      find_in_scopes r set n;
+      r.lookups <- Libname.Map.add name fut r.lookups;
+      find_in_scopes r set name;
       fut
 
-  let get r n = Fut.bind (find r n) @@ function
-  | None -> B0_memo.fail r.memo "No OCaml library %a found" Libname.pp n
-  | Some lib -> Fut.return lib
+  let get m r name =
+    let* lib = find m r name in
+    match lib with
+    | None -> B0_memo.fail m "@[Library %a: Not found@]" Libname.pp name
+    | Some lib -> Fut.return lib
 
-  let get_list r ns = Fut.of_list (List.map (get r) ns)
-  let get_list_and_deps r ns =
+  let get_list_and_reprs m r ns =
+    (* In the future we want to get `requires` aswell to
+       get them into -H options (OCaml >= 5.2) *)
+    let rec loop seen acc = function
+    | [] -> Fut.return (seen, acc)
+    | l :: ls ->
+        if Libname.Set.mem l seen then loop seen acc ls else
+        let seen = Libname.Set.add l seen in
+        let* lib = get m r l in
+        let () = Lib.handle_warning m lib in
+        let not_seen n = not (Libname.Set.mem n seen) in
+        let reprs = List.filter not_seen (Lib.represents lib) in
+        let* seen, acc = loop seen acc reprs in
+        loop seen (lib :: acc) ls
+    in
+    let* _, libs = loop Libname.Set.empty [] ns in
+    Fut.return (List.rev libs)
+
+  let get_list_and_deps m r ns =
     let rec loop seen acc = function
     | [] -> Fut.return (seen, acc)
     | l :: ls  ->
         if Libname.Set.mem l seen then loop seen acc ls else
         let seen = Libname.Set.add l seen in
-        let* lib = get r l in
-        let not_seen n = not (Libname.Set.mem n seen) in
-        let deps = List.filter not_seen (Lib.requires lib) in
+        let* lib = get m r l in
+        let deps = Lib.represents lib in
+        let* seen, acc = loop seen acc deps in
+        let deps = Lib.requires lib in
         let* seen, acc = loop seen acc deps in
         loop seen (lib :: acc) ls
     in
@@ -1293,7 +1344,7 @@ let exe_proc set_exe_path set_modsrcs srcs b =
   let* unit_code = unit_code b m meta in
   let* conf = B0_build.get b Conf.key in
   let* resolver = B0_build.get b Libresolver.key in
-  let* comp_requires = Libresolver.get_list resolver requires in
+  let* comp_requires = Libresolver.get_list_and_reprs m resolver requires in
   let tool_name = B0_meta.get B0_unit.tool_name meta in
   let exe_ext = Conf.exe_ext conf in
   let opts = Cmd.(arg "-g") (* TODO *) in
@@ -1314,7 +1365,7 @@ let exe_proc set_exe_path set_modsrcs srcs b =
   let modsrcs =
     Modsrc.sort (* for link *) ~deps:Modsrc.ml_deps modsrcs
   in
-  let* link_requires = Libresolver.get_list_and_deps resolver requires in
+  let* link_requires = Libresolver.get_list_and_deps m resolver requires in
   let archive ~code lib = match code with
   | `Byte -> (match Lib.cma lib with None -> [] | Some cma -> [cma])
   | `Native ->
@@ -1377,7 +1428,7 @@ let lib_proc set_modsrcs srcs b =
   let* built_code = B0_build.get b Code.built in
   let* conf = B0_build.get b Conf.key in
   let* resolver = B0_build.get b Libresolver.key in
-  let* requires = Libresolver.get_list resolver requires in
+  let* requires = Libresolver.get_list_and_reprs m resolver requires in
   let code = match built_code with `All | `Native -> `Native |`Byte -> `Byte in
   let all_code = match built_code with `All -> true | _ -> false in
   let comp = match built_code with
@@ -1457,19 +1508,35 @@ let script
   let proc = wrap (script_proc set_exe_path file) in
   B0_unit.make ?doc ~meta name proc
 
+let unit_name_for_lib ~libname ~name = match name with
+| Some name -> name | None -> Libname.undot ~rep:'-' libname
+
+let unit_doc_for_lib ~deprecated ~libname ~doc = match doc with
+| Some doc -> doc
+| None ->
+    let pp_depr ppf d = if d then Fmt.string ppf " (deprecated)" else () in
+    Fmt.str "The %s library%a" (Libname.to_string libname) pp_depr deprecated
+
+let unit_warning_for_deprecated_lib ~represents ~warning = match warning with
+| Some warning -> warning
+| None ->
+    let pp_use_represents ppf = function
+    | None | Some [] -> ()
+    | Some [l] -> Fmt.pf ppf ", use the %s library." (Libname.to_string l)
+    | Some ls ->
+        let pp_libs = Fmt.list Fmt.string in
+        let ls = List.map Libname.to_string ls in
+        Fmt.pf ppf ", use the %a libraries." pp_libs ls
+    in
+    Fmt.str "Deprecated%a" pp_use_represents represents
+
 let lib
     ?(wrap = fun proc b -> proc b) ?doc ?(meta = B0_meta.empty)
-    ?c_requires:c_reqs ?requires:reqs ?(public = true)
+    ?c_requires:c_reqs ?requires:reqs ?represents:reps ?(public = true)
     ?name libname ~srcs
   =
-  let name = match name with
-  | None -> Libname.undot ~rep:'-' libname
-  | Some name -> name
-  in
-  let doc = match doc with
-  | None -> Fmt.str "The %s library" (Libname.to_string libname)
-  | Some doc -> doc
-  in
+  let name = unit_name_for_lib ~libname ~name in
+  let doc = unit_doc_for_lib ~deprecated:false ~libname ~doc in
   let fut_modsrcs, set_modsrcs = Fut.make () in
   let base =
     B0_meta.empty
@@ -1479,11 +1546,35 @@ let lib
     |> B0_meta.add B0_meta.public public
     |> B0_meta.add_some_or_default c_requires c_reqs
     |> B0_meta.add_some_or_default requires reqs
+    |> B0_meta.add_some_or_default represents reps
     |> B0_meta.add modsrcs fut_modsrcs
   in
   let meta = B0_meta.override base ~by:meta in
   let proc = wrap (lib_proc set_modsrcs srcs) in
   B0_unit.make ~doc ~meta name proc
+
+let deprecated_lib
+    ?(wrap = fun proc b -> proc b) ?doc ?(meta = B0_meta.empty)
+    ?represents:reprs ?warning ?(public = true) ?name libname
+  =
+  let name = unit_name_for_lib ~libname ~name in
+  let doc = unit_doc_for_lib ~deprecated:true ~libname ~doc in
+  let warning = unit_warning_for_deprecated_lib ~represents:reprs ~warning in
+  let base =
+    B0_meta.empty
+    |> B0_meta.tag tag
+    |> B0_meta.tag B0_meta.lib
+    |> B0_meta.tag B0_meta.deprecated
+    |> B0_meta.add library libname
+    |> B0_meta.add B0_meta.public public
+    |> B0_meta.add B0_meta.warning warning
+    |> B0_meta.add_some_or_default requires None
+    |> B0_meta.add_some_or_default represents reprs
+    |> B0_meta.add modsrcs (Fut.return Modname.Map.empty)
+  in
+  let meta = B0_meta.override base ~by:meta in
+  let proc = wrap B0_unit.build_nop in
+  B0_unit.make ~meta ~doc name proc
 
 (* Compiled object information *)
 
@@ -1775,7 +1866,8 @@ let byte_code_build_load_args b units =
       loop (Libname.Set.empty, []) Fpath.Set.empty Modname.Map.empty units
     in
     let resolver = Fut.sync (B0_build.get b Libresolver.key) in
-    let libs = Fut.sync (Libresolver.get_list_and_deps resolver libs) in
+    let m = B0_build.memo b in
+    let libs = Fut.sync (Libresolver.get_list_and_deps m resolver libs) in
     let lib_opts = List.fold_left add_lib_opts Cmd.empty libs in
     let inc_mods = Cmd.paths ~slip:"-I" (Fpath.Set.elements inc_mods) in
     Ok Cmd.(lib_opts %% inc_mods %% paths mods)
@@ -1809,10 +1901,11 @@ let ocaml env use_utop dry_run args =
 
 module Meta = struct
   type lib_info =
-    { archive_name : string; (* ignored in case of warning. *)
+    { archive_name : string; (* ignored in case warning = Some _ *)
       description : string;
       libname : Libname.t;
       requires : string list;
+      represents : string list;
       unit : B0_unit.t;
       warning : string option; }
 
@@ -1831,17 +1924,16 @@ module Meta = struct
     let archive_name = Libname.to_archive_name libname in
     let description = B0_unit.doc unit in
     let requires = B0_unit.find_or_default_meta requires unit in
-    let requires, warning = match B0_unit.find_meta deprecated_library unit with
-    | None -> requires, None
-    | Some (`Msg msg) -> requires, Some msg
-    | Some (`For lib) ->
-        let requires = requires @ [lib] in
-        let lib = Libname.to_string lib in
-        let msg = Fmt.str "Deprecated. Use the %s library." lib in
-        requires, Some msg
-    in
     let requires = List.map Libname.to_string requires in
-    { archive_name; description; libname; requires; unit; warning }
+    let warning = B0_unit.find_meta B0_meta.warning unit in
+    let requires, represents = match B0_unit.find_meta represents unit with
+    | None -> requires, []
+    | Some reprs ->
+        let represents = List.map Libname.to_string reprs in
+        let requires = requires @ represents (* for compat *) in
+        requires, represents
+    in
+    { archive_name; description; libname; requires; represents; unit; warning }
 
   let empty_node basename =
     { basename; children = String.Map.empty; lib_info = None }
@@ -1906,6 +1998,9 @@ module Meta = struct
       let requires = match lib.lib_info with
       | None -> "" | Some i -> (String.concat " " i.requires)
       in
+      let represents = match lib.lib_info with
+      | None -> "" | Some i -> (String.concat " " i.represents)
+      in
       let ls =
         if is_top || is_deprecated
         then ls
@@ -1914,6 +2009,10 @@ module Meta = struct
       let ls = field ls ~indent "description" description in
       let ls = field ls ~indent "version" meta.version in
       let ls = field ls ~indent "requires" requires in
+      let ls =
+        if represents = "" then ls else
+        field ls ~indent "represents" represents
+      in
       let ls = match lib.lib_info with
       | None -> ls
       | Some i ->

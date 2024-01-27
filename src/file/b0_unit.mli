@@ -126,13 +126,13 @@ module Exec : sig
     | `Cmd of string *
               (b0_env -> b0_unit -> args:Cmd.t -> (Cmd.t, string) result)
     (** Doc string and a function that returns a command to
-        execute with {!Os.Cmd.execv}. *)
+        execute with {!B0_std.Os.Cmd.execv}. *)
     | `Fun of
         string *
         (b0_env -> ?env:Os.Env.assignments -> ?cwd:Fpath.t ->
          b0_unit -> args:Cmd.t -> (Os.Exit.t, string) result)
-  (** Doc string and a function. The function is given the result
-      of {!get_cwd} and {!get_env}. *)
+        (** Doc string and a function. The function is given the result
+            of {!get_cwd} and {!get_env}. *)
    ]
   (** The type for specifying unit executions. *)
 

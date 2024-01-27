@@ -275,6 +275,9 @@ val bench : bool key
 val build : bool key
 (** [build] tags build system entities. Defaults to [false]. *)
 
+val deprecated : bool key
+(** [deprecated] tags deprectated entities. Defaults to [false]. *)
+
 val dev : bool key
 (** [dev] tags development entities. Defaults to [false]. *)
 
@@ -294,3 +297,6 @@ val public : bool key
 (** [public] indicates if an entity is public. Defaults to
     [false]. The semantics depends on the context but it usually means
     that it exports the entity in an underlying global namespace. *)
+
+val warning : string key
+(** [warning] is a warning shown on entity usage. *)
