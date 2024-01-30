@@ -390,8 +390,9 @@ module Op = struct
   let filter ~revived ~statuses ~kinds =
     let revived_filter = match revived with
     | None -> fun _ -> true
-    | Some revived -> fun o ->
-      Op.revived o = revived && not (Hash.equal Hash.nil (Op.hash o))
+    | Some `Revived -> Op.revived
+    | Some `Unrevived -> fun o -> not (Op.revived o) && Op.supports_reviving o
+    | Some `Executed -> fun o -> not (Op.revived o)
     in
     let status_filter = match statuses with
     | [] -> fun _ -> true
@@ -493,13 +494,17 @@ module Op = struct
     let revived =
       let revived =
         let doc = "Keep only revivable operations that were revived." in
-        Some true, Arg.info ["revived"] ~doc ?docs
+        Some `Revived, Arg.info ["revived"] ~doc ?docs
       in
       let unrevived =
-        let doc = "Keep only revivable operations that were not revived." in
-        Some false, Arg.info ["u"; "unrevived"] ~doc ?docs
+        let doc = "Keep only revivable operations that were executed." in
+        Some `Unrevived, Arg.info ["e";"unrevived"] ~doc ?docs
       in
-      Arg.(value & vflag None [revived; unrevived])
+      let executed =
+        let doc = "Keep only operations that were executed." in
+        Some `Executed, Arg.info ["E"; "executed"] ~doc ?docs
+      in
+      Arg.(value & vflag None [revived; unrevived; executed])
     in
     let statuses =
       let statuses =
@@ -516,10 +521,11 @@ module Op = struct
         Arg.(value & opt statuses [] & info ["status"] ~doc ?docs ~docv)
       in
       let errors =
-        let doc = "Keep only failed operations (errors). Equivalent
-                   to add $(b,failed) to the $(b,--status) option."
+        let doc =
+          "Keep only failed operations. Equivalent to add $(b,failed) to \
+           the $(b,--status) option."
         in
-        Arg.(value & flag & info ["e"; "errors"] ~doc ?docs)
+        Arg.(value & flag & info ["f"; "failed"] ~doc ?docs)
       in
       let sts statuses errs = if errs then `Failed :: statuses else statuses in
       Term.(const sts $ statuses $ errors)

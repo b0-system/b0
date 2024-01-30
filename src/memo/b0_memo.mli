@@ -110,7 +110,7 @@ module Tool : sig
   (** [read_env t env] is [(all, stamped)] such that:
       {ul
       {- [all] has the variables of [env] that are in [vars t]
-      and [unstamped_vars t]}
+         and [unstamped_vars t]}
       {- [unstamped] has the variables of [env] that are in
          [stamped t]  only.}} *)
 end

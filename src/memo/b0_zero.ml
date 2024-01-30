@@ -549,6 +549,7 @@ module Op = struct
   let writes o = o.writes
   let writes_manifest_root o = o.writes_manifest_root
   let hash o = o.hash
+  let supports_reviving o = not (Hash.is_nil o.hash)
   let discard_k o = o.k <- None
   let invoke_k o = match o.k with None -> () | Some k -> discard_k o; k o
   let discard_post_exec o = o.post_exec <- None

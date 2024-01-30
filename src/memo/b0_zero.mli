@@ -598,6 +598,11 @@ module Op : sig
       {!set_hash}. This remains {!B0_std.Hash.nil} for operations that are
       not revivable. *)
 
+  val supports_reviving : t -> bool
+  (** [supports_reviving o] is [true] if operation [o] can be revived.
+      This is only valid after the hash been effectively computed and
+      set via {!set_hash}. *)
+
   (** {1:upd Updating the build operation} *)
 
   val invoke_k : t -> unit

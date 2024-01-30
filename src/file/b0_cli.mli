@@ -202,7 +202,7 @@ module Op : sig
       if both [needs] and [enables] are [false]. *)
 
   val filter :
-    revived:bool option ->
+    revived:[`Executed | `Revived | `Unrevived ] option ->
     statuses:[ `Aborted | `Done | `Failed | `Waiting ] list ->
     kinds:[ `Copy | `Delete | `Mkdir | `Notify | `Read | `Spawn | `Wait_files
           | `Write ] list -> B0_zero.Op.t -> bool
