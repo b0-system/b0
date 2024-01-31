@@ -1214,13 +1214,18 @@ module Exec = struct
         | None -> Os.Cmd.in_fd ~close:false Unix.stdin (* XXX /dev/null no ? *)
         | Some f -> Os.Cmd.in_file f
         in
+        (* XXX the ui param is a bit messily used, in `Tee cases
+           it's not really used but used to denote that we have a ui.
+           Make that cleaner. *)
         let force = true and make_path = true in
         let stdout, ui = match Op.Spawn.stdout s with
-        | `File f | `Tee f -> Os.Cmd.out_file ~force ~make_path f, None
+        | `File f -> Os.Cmd.out_file ~force ~make_path f, None
+        | `Tee f -> Os.Cmd.out_file ~force ~make_path f, Some f (* not used *)
         | `Ui -> get_stdo_ui_file e
         in
         let stderr, ui = match Op.Spawn.stderr s with
-        | `File f | `Tee f -> Os.Cmd.out_file ~force ~make_path f, ui
+        | `File f -> Os.Cmd.out_file ~force ~make_path f, ui
+        | `Tee f -> Os.Cmd.out_file ~force ~make_path f, Some f (* not used *)
         | `Ui ->
             match ui with
             | Some _ -> stdout, ui

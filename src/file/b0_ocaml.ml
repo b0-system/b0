@@ -822,6 +822,10 @@ module Libresolver = struct
 
       let parse_warning = function "" -> None | w -> Some w
 
+      let get_meta_file data = match String.cut_left ~sep:":" data with
+      | None -> None
+      | Some (m, _) -> Result.to_option (Fpath.of_string m)
+
       let lib_of_info m ~conf ~libname ~file info =
         let clib_ext = Conf.lib_ext conf in
         try match String.split_on_char ':' (String.trim info) with
@@ -839,17 +843,33 @@ module Libresolver = struct
         with
         | Failure e -> Fpath.error file "%s" e
 
-      let query_result o set_res op = match B0_zero.Op.status op with
+      let query_result _o _set_res op = match B0_zero.Op.status op with
       | B0_zero.Op.Success ->
+          (* Ideally we could launch the read of the [o] file here.
+             Once we get effects we might. For now we are not
+             allowed to use memo. So we use the `Tee hack and don't use
+             set_res because it may trigger memo (the op's k does it). *)
           let spawn = B0_zero.Op.Spawn.get op in
-          let exit = Option.get (B0_zero.Op.Spawn.exit spawn) in
-          begin match exit with
-          | `Exited 0 -> ()
+          begin match Option.get (B0_zero.Op.Spawn.exit spawn) with
+          | `Exited 0 ->
+              begin match B0_zero.Op.Spawn.stdo_ui spawn with
+              | None | Some Error _ -> B0_zero.Op.disable_reviving op
+              | Some Ok data ->
+                  match get_meta_file data with
+                  | None ->
+                      B0_zero.Op.disable_reviving op
+                  | Some _file ->
+                      ()
+                      (*
+                      let reads = file :: B0_zero.Op.reads op in
+                      B0_zero.Op.set_reads op reads; *)
+              end;
+              B0_zero.Op.Spawn.set_stdo_ui spawn None;
           | `Exited 2 ->
-              (* FIXME checktypo *)
-              (* We need to fail it otherwise we memoize the result
-                 forever *)
-              B0_zero.Op.set_status op (B0_zero.Op.Failed (Exec (Some "bla")))
+              (* It could become available in another run and we don't
+                 have a file-based way to invalidate the cache. *)
+              B0_zero.Op.Spawn.set_stdo_ui spawn None;
+              B0_zero.Op.disable_reviving op
           | _ -> ()
           end
       | _ -> ()
@@ -869,11 +889,11 @@ module Libresolver = struct
         in
         let fname = Fmt.str "ocamlfind.%s" fname in
         let o = Fpath.(cache_dir / fname) in
-        let stdout = `File o and stderr = `File Fpath.null in
+        let stdout = `Tee (* hack *) o and stderr = `File Fpath.null in
         let res, set_res = Fut.make () in
         let post_exec = query_result o set_res in
         let success_exits = [0; 2 (* not found *) ] in
-        let k = function
+        let k = function (* Ideally we could do that in post_exec *)
         | 0 -> set_res (Some o)
         | 2 -> set_res None | _ -> assert false
         in
