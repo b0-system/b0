@@ -444,7 +444,7 @@ module Op = struct
   | Missing_writes of Fpath.t list
   | Missing_reads of Fpath.t list
 
-  type status = Aborted | Done | Failed of failure | Waiting
+  type status = Aborted | Success | Failed of failure | Waiting
 
   (* Operation kinds *)
 
@@ -580,7 +580,7 @@ module Op = struct
   let set_writes_manifest_root o m = o.writes_manifest_root <- m
   let set_hash o h = o.hash <- h
   let set_status_from_result o r =
-    let st = match r with Ok _ -> Done | Error e -> Failed (Exec (Some e))in
+    let st = match r with Ok _ -> Success | Error e -> Failed (Exec (Some e))in
     set_status o st
 
   module Copy = struct
@@ -682,8 +682,8 @@ module Op = struct
     | Some (`Signaled c) -> Failed (Exec None)
     | Some (`Exited c) ->
         match success_exits s with
-        | [] -> Done
-        | cs when List.mem c cs -> Done
+        | [] -> Success
+        | cs when List.mem c cs -> Success
         | cs -> Failed (Exec None)
 
     let make_op
@@ -853,7 +853,7 @@ module Op = struct
         end
     | o :: os ->
         match status o with
-        | Done -> loop ws os
+        | Success -> loop ws os
         | Waiting -> loop (o :: ws) os
         | Aborted | Failed _ -> Error Failures
     in
@@ -1012,7 +1012,7 @@ module Reviver = struct
     | Some _ ->
         op_kind kind;
         Op.set_revived o true;
-        Op.set_status o Op.Done;
+        Op.set_status o Op.Success;
         Op.invoke_post_exec o;
         Op.set_time_ended o (timestamp r);
         Ok true

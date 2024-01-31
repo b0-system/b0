@@ -38,7 +38,7 @@ let find_used_keys ~err ~cwd ~b0_dir ~log_file k =
       Log.if_error' ~use:err_no_log_file @@
       Result.map_error (Fmt.str "Cannot determine used keys: %s") @@
       let* l = B0_cli.Memo.Log.read file in
-      k (B0_cli.File_cache.keys_of_done_ops (B0_cli.Memo.Log.ops l))
+      k (B0_cli.File_cache.keys_of_success_ops (B0_cli.Memo.Log.ops l))
 
 let find_dirs ~b0_dir ~cache_dir =
   let* cwd = Os.Dir.cwd () in

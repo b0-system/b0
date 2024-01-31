@@ -840,7 +840,7 @@ module Libresolver = struct
         | Failure e -> Fpath.error file "%s" e
 
       let query_result o set_res op = match B0_zero.Op.status op with
-      | B0_zero.Op.Done ->
+      | B0_zero.Op.Success ->
           let spawn = B0_zero.Op.Spawn.get op in
           let exit = Option.get (B0_zero.Op.Spawn.exit spawn) in
           begin match exit with

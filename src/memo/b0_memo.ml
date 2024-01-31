@@ -250,7 +250,7 @@ let discontinue_op m o =
   Op.discard_k o; m.m.feedback (`Op_complete o)
 
 let finish_op m o = match Op.status o with
-| Op.Done ->
+| Op.Success ->
     if Op.revived o then continue_op m o else
     begin match Hash.equal (Op.hash o) Hash.nil with
     | true ->
@@ -301,7 +301,7 @@ let submit_op m o = match Op.status o with
             notify_reviver_error m `Info o e; Exec.schedule m.m.exec o
         end
     end
-| Op.Done | Op.Failed _ -> assert false
+| Op.Success | Op.Failed _ -> assert false
 
 (* XXX we may blow stack continuations can add which stirs.
    XXX futures make it even worse. *)
@@ -476,7 +476,7 @@ let spawn'
           Os.Dir.(fold_files ~dotfiles ~recurse path_list writes_root [])
   in
   let post_exec o =
-    if B0_zero.Op.revived o || B0_zero.Op.status o <> B0_zero.Op.Done
+    if B0_zero.Op.revived o || B0_zero.Op.status o <> B0_zero.Op.Success
     then ()
     else Op.set_writes o (writes o)
   in

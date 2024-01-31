@@ -109,9 +109,9 @@ module File_cache : sig
       it via {!B0_zero.File_cache.make} if it doesn't exists and return
       [Ok false] in that case. *)
 
-  val keys_of_done_ops : B0_zero.Op.t list -> String.Set.t
-  (** [keys_of_done_ops ops] are the non-nil hashes of the operations of
-      [ops] that are {!B0_zero.Op.Done}. *)
+  val keys_of_success_ops : B0_zero.Op.t list -> String.Set.t
+  (** [keys_of_success_ops ops] are the non-nil hashes of the operations of
+      [ops] that are {!B0_zero.Op.Success}. *)
 
   val delete :
     dir:Fpath.t -> [ `All | `Keys of B0_zero.File_cache.key list ] ->
@@ -203,7 +203,7 @@ module Op : sig
 
   val filter :
     revived:[`Executed | `Revived | `Unrevived ] option ->
-    statuses:[ `Aborted | `Done | `Failed | `Waiting ] list ->
+    statuses:[ `Aborted | `Success | `Failed | `Waiting ] list ->
     kinds:[ `Copy | `Delete | `Mkdir | `Notify | `Read | `Spawn | `Wait_files
           | `Write ] list -> B0_zero.Op.t -> bool
   (** [filter ~revived ~statuses ~kinds] is an operation filter for the

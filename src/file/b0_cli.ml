@@ -204,10 +204,10 @@ module File_cache = struct
 
   (* High-level commands *)
 
-  let keys_of_done_ops ops =
+  let keys_of_success_ops ops =
     let add_op acc o =
       let h = B0_zero.Op.hash o in
-      match not (Hash.is_nil h) && B0_zero.Op.status o = B0_zero.Op.Done with
+      match not (Hash.is_nil h) && B0_zero.Op.status o = B0_zero.Op.Success with
       | true -> String.Set.add (Hash.to_hex h) acc
       | false -> acc
     in
@@ -384,7 +384,7 @@ module Op = struct
   | Op.Wait_files _ -> `Wait_files | Op.Write _ -> `Write
 
   let op_status_enum o = match Op.status o with
-  | Op.Aborted -> `Aborted | Op.Done -> `Done | Op.Failed _ -> `Failed
+  | Op.Aborted -> `Aborted | Op.Success -> `Success | Op.Failed _ -> `Failed
   | Op.Waiting -> `Waiting
 
   let filter ~revived ~statuses ~kinds =
@@ -509,7 +509,7 @@ module Op = struct
     let statuses =
       let statuses =
         let status_enum =
-          [ "aborted", `Aborted; "done", `Done; "failed", `Failed;
+          [ "aborted", `Aborted; "success", `Success; "failed", `Failed;
             "waiting", `Waiting ]
         in
         let status = Arg.enum status_enum in

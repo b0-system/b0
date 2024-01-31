@@ -17,7 +17,7 @@ module Op = struct
       Fmt.str "@[<v>failed: Could not read:@,%a@]" (Fmt.list Fpath.pp_quoted) fs
 
   let status_to_string = function
-  | Op.Aborted -> "aborted" | Op.Done -> "done" | Op.Waiting -> "waiting"
+  | Op.Aborted -> "aborted" | Op.Success -> "success" | Op.Waiting -> "waiting"
   | Op.Failed f -> failure_to_string f
 
   let notify_kind_to_string = function
@@ -121,7 +121,7 @@ module Op = struct
 
   let pp_header ppf o =
     let pp_status ppf o = match Op.status o with
-    | Op.Done -> ()
+    | Op.Success -> ()
     | Op.Failed _ -> Fmt.tty' style_status_failed ppf "FAILED "
     | Op.Aborted -> Fmt.tty' style_status_aborted ppf "ABORTED "
     | Op.Waiting -> Fmt.tty' style_status_waiting ppf "WAITING "
@@ -145,7 +145,8 @@ module Op = struct
     | "" -> () | g -> Fmt.sp ppf (); Fmt.(code string) ppf g
     in
     let pp_dur ppf o = match Op.status o with
-    | Op.Failed _ | Op.Done -> Fmt.sp ppf (); Mtime.Span.pp ppf (Op.duration o)
+    | Op.Failed _ | Op.Success ->
+        Fmt.sp ppf (); Mtime.Span.pp ppf (Op.duration o)
     | _ -> ()
     in
     Fmt.pf ppf "[%a%a:%a%a%a%a]"
@@ -417,7 +418,7 @@ module Op = struct
 
   let enc_status b = function
   | Op.Aborted -> B0_bincode.enc_byte b 0
-  | Op.Done -> B0_bincode.enc_byte b 1
+  | Op.Success -> B0_bincode.enc_byte b 1
   | Op.Failed f -> B0_bincode.enc_byte b 2; enc_failure b f
   | Op.Waiting -> B0_bincode.enc_byte b 3
 
@@ -426,7 +427,7 @@ module Op = struct
     let next, b = B0_bincode.dec_byte ~kind s i in
     match b with
     | 0 -> next, Op.Aborted
-    | 1 -> next, Op.Done
+    | 1 -> next, Op.Success
     | 2 -> let i, f = dec_failure s next in i, Op.Failed f
     | 3 -> next, Op.Waiting
     | b -> B0_bincode.err_byte ~kind i b
