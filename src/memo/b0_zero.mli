@@ -600,8 +600,13 @@ module Op : sig
 
   val supports_reviving : t -> bool
   (** [supports_reviving o] is [true] if operation [o] can be revived.
-      This is only valid after the hash been effectively computed and
+      This is only valid after the hash of [o] been effectively computed and
       set via {!set_hash}. *)
+
+  val disable_reviving : t -> unit
+  (** [disable_reviving o] disables the ability to revive operation
+      [o]. This only works after the hash been effectively computed
+      and set via {!set_hash}, for example in post execution call backs. *)
 
   (** {1:upd Updating the build operation} *)
 
