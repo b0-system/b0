@@ -67,7 +67,7 @@ let header path mode mtime size typeflag =
     set_string        257 header "ustar";
     set_string        263 header "00";
     set_octal "devmajor" 329 8 header 0;
-    set_octal "devminor" 329 8 header 0;
+    set_octal "devminor" 337 8 header 0;
     let c = header_checksum header in
     set_octal "checksum" 148 9 (* not NULL terminated *) header c;
     Ok (Bytes.unsafe_to_string header)
