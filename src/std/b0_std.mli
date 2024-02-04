@@ -742,6 +742,13 @@ module String : sig
          if [s] has no such suffix.}
       {- [data] the bytes before [endline] such that [data ^ newline = s]}} *)
 
+  (** {2:tokenize Tokenize} *)
+
+  val tokens : ?is_sep:(char -> bool) -> string -> string list
+  (** [tokens s] are the strings separated by sequences of [is_sep]
+      characters (default to {!Char.Ascii.is_white}). The empty list is
+      returned if [s] is empty or made only of separators. *)
+
   (** {1:fmt Formatting} *)
 
   val pp : string Fmt.t

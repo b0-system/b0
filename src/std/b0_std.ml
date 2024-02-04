@@ -847,6 +847,23 @@ module String = struct
     in
     loop [] s
 
+  (* Tokenize *)
+
+  let tokens ?(is_sep = Char.Ascii.is_white) s =
+    let rec skip_seps s i =
+      if i < 0 || not (is_sep s.[i]) then i else skip_seps s (i - 1)
+    in
+    let rec find_sep s i =
+      if i < 0 || is_sep s.[i] then i else find_sep s (i - 1)
+    in
+    let rec loop acc s i =
+      let last = skip_seps s i in
+      if last < 0 then acc else
+      let first = find_sep s last + 1 in
+      loop (String.sub s first (last - first + 1) :: acc) s (first - 1)
+    in
+    loop [] s (String.length s - 1)
+
   (* Breaking lines *)
 
   let fold_ascii_lines ~strip_newlines:strip f acc s =
