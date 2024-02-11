@@ -100,8 +100,8 @@ let write_page
 (* Build fragments *)
 
 let get_modsrcs b ~srcs =
-  let build_dir = B0_build.current_build_dir b in
-  let src_root = B0_build.current_scope_dir b in
+  let build_dir = B0_build.current_dir b in
+  let src_root = B0_build.scope_dir b in
   B0_ocaml.Modsrc.map_of_files (B0_build.memo b) ~build_dir ~src_root ~srcs
 
 let get_link_objs m ~code ~resolver ~requires ~modsrcs =
@@ -176,7 +176,7 @@ let js_of_byte_objs ~jss ~modsrcs ~o b =
   let toplevel = Option.value ~default:false (B0_meta.find toplevel meta) in
   let ocamlrt_js =
     let opts = Cmd.empty in
-    let build_dir = B0_build.current_build_dir b in
+    let build_dir = B0_build.current_dir b in
     let o = Fpath.(build_dir / "ocamlrt.js") in
     build_runtime m ~opts ~jss ~o;
     o
@@ -187,7 +187,7 @@ let js_of_byte_objs ~jss ~modsrcs ~o b =
     (* We need a cache similar to B0_ocaml.Libresolver for jsing libs.
        The ops will be cached across units but not the file writes which
        we should do in the shared dir *)
-    let build_dir = B0_build.current_build_dir b in
+    let build_dir = B0_build.current_dir b in
     let compile obj =
       (* FIXME this won't work with lib convention we need to
          remember the lib_name and mangle. *)
@@ -200,9 +200,9 @@ let js_of_byte_objs ~jss ~modsrcs ~o b =
     let jss = List.rev (List.fold_left compile_lib [] lib_objs) in
     (* FIXME at least stdlib should be looked up via resolver *)
     let stdlib_cma = Fpath.(B0_ocaml.Conf.where conf / "stdlib.cma") in
-    let stdlib_js = B0_memo.file_ready m stdlib_cma; compile stdlib_cma in
+    let stdlib_js = B0_memo.ready_file m stdlib_cma; compile stdlib_cma in
     let std_exit_cmo = Fpath.(B0_ocaml.Conf.where conf / "std_exit.cmo") in
-    let std_exit_js = B0_memo.file_ready m std_exit_cmo; compile std_exit_cmo in
+    let std_exit_js = B0_memo.ready_file m std_exit_cmo; compile std_exit_cmo in
     stdlib_js :: jss, std_exit_js
   in
   let mod_obj_jss =
@@ -232,7 +232,7 @@ let build_setup ~srcs b = (* return a record maybe ? *)
   let* modsrcs = get_modsrcs b ~srcs in
   (* FIXME the lookup should be ordered here: *)
   let jss = B0_file_exts.find_files B0_file_exts.js srcs in
-  let build_dir = B0_build.current_build_dir b in
+  let build_dir = B0_build.current_dir b in
   let tool_name = B0_meta.get B0_unit.tool_name (B0_build.current_meta b) in
   let js = Fpath.(build_dir / tool_name) in
   let html = Fpath.(js -+ ".html") in
@@ -325,25 +325,25 @@ let copy_assets m srcs ~exts ~assets_root ~dst =
         Fpath.reroot ~src_root:r ~dst_root:dst src
     | _ -> Fpath.(dst / Fpath.basename src)
     in
-    B0_memo.copy m ~src dst;
+    B0_memo.copy m src ~dst;
     Fpath.Set.add dst acc
   in
-  List.iter (B0_memo.file_ready m) assets;
+  B0_memo.ready_files m assets;
   List.fold_left copy Fpath.Set.empty assets
 
 let copy_html_page_assets ~srcs b =
   let assets_root =
     match B0_meta.find assets_root (B0_build.current_meta b) with
     | None -> None
-    | Some r -> Some (Fpath.(B0_build.current_scope_dir b // r))
+    | Some r -> Some (Fpath.(B0_build.scope_dir b // r))
   in
-  let build_dir = B0_build.current_build_dir b in
+  let build_dir = B0_build.current_dir b in
   let exts = String.Set.remove ".js" B0_file_exts.www in
   copy_assets (B0_build.memo b) srcs ~exts ~assets_root ~dst:build_dir
 
 let html_page_proc ~html_file ~js_file set_modsrcs srcs b =
-  let html_file = B0_build.in_build_dir b html_file in
-  let js_file = B0_build.in_build_dir b js_file in
+  let html_file = B0_build.in_current_dir b html_file in
+  let js_file = B0_build.in_current_dir b js_file in
   let* srcs = B0_srcs.(Fut.map by_ext @@ select b srcs) in
   let* modsrcs = get_modsrcs b ~srcs in
   set_modsrcs modsrcs;
@@ -354,7 +354,7 @@ let html_page_proc ~html_file ~js_file set_modsrcs srcs b =
   if Fpath.Set.mem html_file assets then Fut.return () else
   let css = Fpath.Set.filter (Fpath.has_ext ".css") assets in
   let styles =
-    let build_dir = B0_build.current_build_dir b in
+    let build_dir = B0_build.current_dir b in
     let base f =
       Fpath.to_string (Option.get (Fpath.strip_prefix build_dir f))
     in

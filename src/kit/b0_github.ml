@@ -345,8 +345,8 @@ module Pages = struct
       src : Fpath.t option;
       follow_symlinks : bool }
 
-  let update ?(follow_symlinks = true) ~src dst = { dst; src; follow_symlinks }
-  let nojekyll = update ~src:(Some Fpath.null) (Fpath.v ".nojekyll")
+  let update ?(follow_symlinks = true) src ~dst = { dst; src; follow_symlinks }
+  let nojekyll = update (Some Fpath.null) ~dst:(Fpath.v ".nojekyll")
 
   let fetch_branch r ~log ~remote ~branch =
     let* exists = B0_vcs_repo.Git.remote_branch_exists r ~remote ~branch in
@@ -385,7 +385,7 @@ module Pages = struct
     in
     let cp r ~follow_symlinks src dst =
       let dst = Fpath.(B0_vcs_repo.(work_dir r) // dst) in
-      Os.Path.copy ~follow_symlinks ~make_path:true ~recurse:true ~src dst
+      Os.Path.copy ~follow_symlinks ~make_path:true ~recurse:true src ~dst
     in
     let rec loop r = function
     | [] -> do_commit r ~log ~amend ~msg

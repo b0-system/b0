@@ -35,6 +35,11 @@ let crunch_file m file ~in_dir =
 - [Bzero.Op.post_exec] we may want to error. See for example
   {!B0_ocaml.script}.
 
+- To sequence spawns [k] is a bit annoying to use. Synchronizing
+  through writes could also be nice. We'd need an easy way to
+  add a written file that is not written by the spawn but by the
+  memo machinery.
+
 {1:design_b0_file [b0.file] library}
 
 - [B0.ml] file finding. Should we stop at the last (vs the first now)
@@ -123,6 +128,13 @@ the [wrap] parameter to units.
   in a [B0.ml] file and used as a root but no longer when it is
   included. Not good.
 
+- Differences between actions and build procedures should
+  be lessened. Case in point, you may start with an action
+  and decide to memoize it. This entails needless churn,
+  for example we access the same directories but through
+  a different API, should B0_build disapear in favour of B0_env
+  (with some API entry points failing in b0_action ?).
+
 {2:b0_meta [B0_meta]}
 
 - Move {!B0_meta.Key} to [B0_key] ?
@@ -145,6 +157,7 @@ the [wrap] parameter to units.
 
   Dynamics. For now we used ['a Fut B0_meta.key] or functional
   keys (see {!B0_unit.Exec}. See how it goes fares for sync. Push/pull.
+  In the optic of direct style I think we rather want ivars.
 
 {2:b0_store [B0_store]}
 

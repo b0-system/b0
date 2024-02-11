@@ -286,8 +286,8 @@ module Theme = struct
        that in the API somewhere  *)
     let copy_file m ~src_root ~dst_root src =
       let dst = Fpath.reroot ~src_root ~dst_root src in
-      B0_memo.file_ready m src;
-      B0_memo.copy m ~src dst
+      B0_memo.ready_file m src;
+      B0_memo.copy m src ~dst
     in
     let src_root = path theme in
     let files = Os.Dir.fold_files ~recurse:true Os.Dir.path_list src_root [] in

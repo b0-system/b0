@@ -8,7 +8,7 @@ open Result.Syntax
 
 let ready_and_copy_dir
     ?(rel = false) ?follow_symlinks ?(prune = fun _ _ _ -> false) m
-    ~recurse ~src:src_root dst_root
+    ~recurse src_root ~dst:dst_root
   =
   let copy_file st name src () =
     if prune st name src then () else
@@ -16,8 +16,8 @@ let ready_and_copy_dir
     | true -> Fpath.(dst_root // src)
     | false -> Fpath.reroot ~src_root ~dst_root src
     in
-    B0_memo.file_ready m src;
-    B0_memo.copy m ~mode:st.Unix.st_perm ~src dst
+    B0_memo.ready_file m src;
+    B0_memo.copy m ~mode:st.Unix.st_perm src ~dst
   in
   B0_memo.fail_if_error m @@
   let* () = Os.Dir.must_exist src_root in

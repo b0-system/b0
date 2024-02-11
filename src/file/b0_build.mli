@@ -26,9 +26,12 @@ val may_build : t -> B0_unit.Set.t
 (** [may_build b] are all the units in [b] that may build, i.e. that
     can be {!require}d. This includes the elements in [must_build b]. *)
 
-val require : t -> B0_unit.t -> unit
-(** [require b u] asks to build unit [u] in [b]. This fails the
+val require_unit : t -> B0_unit.t -> unit
+(** [require_unit b u] asks to build unit [u] in [b]. This fails the
     memo if [b] is [u] is not in {!may_build}. *)
+
+val require_units : t -> B0_unit.t list -> unit
+(** [require_units b us] is [List.iter (require_unit b) us]. *)
 
 val current : t -> B0_unit.t
 (** [current b] is [b]'s current unit. In the
@@ -43,34 +46,42 @@ val current_meta : t -> B0_meta.t
     {b FIXME} Unify the directory story with {!B0_action} and
     We likely want to get rid of a few of the functions below. *)
 
-val scope_dir : t -> B0_unit.t -> Fpath.t
-(** [scope_dir b u] is the directory of the B0 file in which [u] was
+val unit_dir : t -> B0_unit.t -> Fpath.t
+(** [unit_dir b u] is the unit build directory for unit [u].
+    This is where [u] should write is build artefacts. *)
+
+val unit_scope_dir : t -> B0_unit.t -> Fpath.t
+(** [unit_scope_dir b u] is the directory of the B0 file in which [u] was
     defined. This is were unit relative paths like source files
     should be resolved. *)
 
-val build_dir : t -> B0_unit.t -> Fpath.t
-(** [build_dir b u] is the build directory for the build unit [u].
-    This is where [u] should write is build artefacts. *)
+val current_dir : t -> Fpath.t
+(** [current_dir b] is [unit_dir b current]. *)
 
-val shared_build_dir : t -> Fpath.t
-(** [shared_build_dir] is a build directory shared by all units of the
+val scope_dir : t -> Fpath.t
+(** [scope_dir b] is [unit_scope_dir b current]. *)
+
+val shared_dir : t -> Fpath.t
+(** [shared_dir b] is a build directory shared by all units of the
      build. This is used by computations shared by units, most of the
-     time one should rather use {!current_build_dir}. *)
+     time one should rather use {!current_dir}. *)
 
-val current_scope_dir : t -> Fpath.t
-(** [current_scope_dir b] is [root_dir b current]. *)
+(** {1:rel Relative file resolution} *)
 
-val current_build_dir : t -> Fpath.t
-(** [current_unit_build_dir b] is [build_dir b current]. *)
+val in_unit_dir : t -> B0_unit.t -> Fpath.t -> Fpath.t
+(** [in_unit_dir b u p] is [Fpath.(unit_dir b u // p)]. *)
 
-val in_build_dir : t -> Fpath.t -> Fpath.t
-(** [in_build_dir b p] is [Fpath.(build_dir b current // p)]). *)
+val in_unit_scope_dir : t -> B0_unit.t -> Fpath.t -> Fpath.t
+(** [in_unit_scope_dir b u p] is [Fpath.(unit_scope_dir b u // p)]) *)
+
+val in_current_dir : t -> Fpath.t -> Fpath.t
+(** [in_current_dir b p] is [Fpath.(current_dir b // p)]). *)
 
 val in_scope_dir : t -> Fpath.t -> Fpath.t
-(** [in_scope_dir b p] is [Fpath.(scope_dir b current // p)]). *)
+(** [in_scope_dir b p] is [Fpath.(scope_dir b // p)]). *)
 
-val in_shared_build_dir : t -> Fpath.t -> Fpath.t
-(** [in_shared_build_dir b p] is [Fpath.(shared_build_dir b // p)]). *)
+val in_shared_dir : t -> Fpath.t -> Fpath.t
+(** [in_shared_dir b p] is [Fpath.(shared_dir b // p)]). *)
 
 (** {1:store Store} *)
 

@@ -210,8 +210,8 @@ module Pages : sig
   type update
   (** The type for updates. *)
 
-  val update : ?follow_symlinks:bool -> src:Fpath.t option -> Fpath.t -> update
-  (** [update ~follow_symlinks ~src dst] is an update that given a relative
+  val update : ?follow_symlinks:bool -> Fpath.t option -> dst:Fpath.t -> update
+  (** [update ~follow_symlinks src ~dst] is an update that given a relative
       path [dst] in the work tree that may not exist:
       {ul
       {- If [src] is [None], deletes [dst] in the work tree.}

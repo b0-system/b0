@@ -11,7 +11,7 @@ type t = Cmd.t
 let get ?search ?(cmd = Cmd.tool "rsync") () = Os.Cmd.get ?search cmd
 let copy
   rsyncc ?(opts = Cmd.arg "-azh") ?(stats = false) ?(progress = true) ~delete
-  ?(src_host = "") ~src ?(dst_host = "") dst =
+  ?(src_host = "") ?(dst_host = "") src ~dst =
   (* XXX force slashes ?  *)
   let src = src_host ^ Fpath.to_string src in
   let dst = dst_host ^ Fpath.to_string dst in

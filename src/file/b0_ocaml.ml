@@ -633,7 +633,7 @@ module Lib = struct
         Result.bind (Os.Dir.fold_files ~recurse:false Os.Dir.path_list dir [])
         @@ fun fs ->
         let js_stubs = List.map (fun f -> Fpath.(dir // f)) js_stubs in
-        let () = List.iter (B0_memo.file_ready m) js_stubs in
+        let () = B0_memo.ready_files m js_stubs in
         let rec loop cmis cmxs cma cmxa c_archive c_stubs = function
         | [] ->
             make ~libname ~requires ~represents ~dir ~cmis ~cmxs ~cma ~cmxa
@@ -645,25 +645,25 @@ module Lib = struct
             in
             match Fpath.get_ext f with
             | ".cmi" ->
-                B0_memo.file_ready m f;
+                B0_memo.ready_file m f;
                 loop (f :: cmis) cmxs cma cmxa c_archive c_stubs fs
             | ".cmx" ->
-                B0_memo.file_ready m f;
+                B0_memo.ready_file m f;
                 loop cmis (f :: cmxs) cma cmxa c_archive c_stubs fs
             | ".cma" ->
                 let cma = match is_lib_archive f with
-                | true -> B0_memo.file_ready m f; Some f
+                | true -> B0_memo.ready_file m f; Some f
                 | false -> cma
                 in
                 loop cmis cmxs cma cmxa c_archive c_stubs fs
             | ".cmxa" ->
                 let cmxa = match is_lib_archive f with
-                | true -> B0_memo.file_ready m f; Some f
+                | true -> B0_memo.ready_file m f; Some f
                 | false -> cmxa
                 in
                 loop cmis cmxs cma cmxa c_archive c_stubs fs
             | ext when String.equal ext clib_ext ->
-                B0_memo.file_ready m f;
+                B0_memo.ready_file m f;
                 let c_archive, c_stubs = match is_lib_archive f with
                 | true -> Some f, c_stubs
                 | false -> c_archive, (f :: c_stubs)
@@ -676,7 +676,7 @@ module Lib = struct
 
   let of_unit b ocaml_conf u =
     let get_or_fail m k u = B0_unit.get_meta k u |> B0_memo.fail_if_error m in
-    B0_build.require b u;
+    B0_build.require_unit b u;
     let m = B0_build.memo b in
     let* built = B0_build.get b Code.built in
     let* srcs = get_or_fail m modsrcs u in
@@ -687,7 +687,7 @@ module Lib = struct
     let has_cma = has_srcs && byte in
     let has_cmxa = has_srcs && native in
     let has_c_archive = has_cmxa in
-    let dir = B0_build.build_dir b u in
+    let dir = B0_build.unit_dir b u in
     let libname = get_or_fail m library u in
     let requires = get_or_fail m requires u in
     let represents = get_or_fail m represents u in
@@ -893,7 +893,7 @@ module Libresolver = struct
         let res, set_res = Fut.make () in
         let post_exec = query_result o set_res in
         let success_exits = [0; 2 (* not found *) ] in
-        let k = function (* Ideally we could do that in post_exec *)
+        let k _ = function (* Ideally we could do that in post_exec *)
         | 0 -> set_res (Some o)
         | 2 -> set_res None | _ -> assert false
         in
@@ -973,7 +973,7 @@ module Libresolver = struct
     let* b = B0_store.get store B0_build.self in
     let* ocaml_conf = B0_build.get b Conf.key in
     let build_scope = Scope.build b ocaml_conf in
-    let cache_dir = Fpath.(B0_build.shared_build_dir b / Scope.cache_dir_name)in
+    let cache_dir = Fpath.(B0_build.shared_dir b / Scope.cache_dir_name)in
     (*  let ocamlpath = Lib.Resolver.ocamlpath ~cache_dir in *)
     let ocamlfind = Scope.ocamlfind ~cache_dir in
     let scopes = [build_scope; (* ocamlpath; *) ocamlfind] in
@@ -1354,8 +1354,8 @@ let unit_code b m meta =
 
 let exe_proc set_exe_path set_modsrcs srcs b =
   let m = B0_build.memo b in
-  let build_dir = B0_build.current_build_dir b in
-  let src_root = B0_build.current_scope_dir b in
+  let build_dir = B0_build.current_dir b in
+  let src_root = B0_build.scope_dir b in
   let* srcs = B0_srcs.(Fut.map by_ext @@ select b srcs) in
   let* modsrcs = Modsrc.map_of_files m ~build_dir ~src_root ~srcs in
   let meta = B0_build.current_meta b in
@@ -1409,12 +1409,12 @@ let exe_proc set_exe_path set_modsrcs srcs b =
 
 let script_proc set_exe_path file b =
   let m = B0_build.memo b in
-  let scope_dir = B0_build.current_scope_dir b in
+  let scope_dir = B0_build.scope_dir b in
   let exe_file = Fpath.(scope_dir // file) in
-  B0_memo.file_ready m exe_file;
+  B0_memo.ready_file m exe_file;
   set_exe_path exe_file;
   let ocaml = B0_memo.tool m Tool.ocaml in
-  let stdout_file = Fpath.(B0_build.current_build_dir b / "ocaml.stdout") in
+  let stdout_file = Fpath.(B0_build.current_dir b / "ocaml.stdout") in
   let stdin = Fpath.null and stderr = `File Fpath.null in
   let stdout = `File stdout_file in
   let nocolor = "-color=never" (* If this changes [find_error] must too *) in
@@ -1435,8 +1435,8 @@ let script_proc set_exe_path file b =
 let lib_proc set_modsrcs srcs b =
   (* XXX we are still missing cmxs here *)
   let m = B0_build.memo b in
-  let build_dir = B0_build.current_build_dir b in
-  let src_root = B0_build.current_scope_dir b in
+  let build_dir = B0_build.current_dir b in
+  let src_root = B0_build.scope_dir b in
   let* srcs = B0_srcs.(Fut.map by_ext @@ select b srcs) in
   let* modsrcs = Modsrc.map_of_files m ~build_dir ~src_root ~srcs in
   set_modsrcs modsrcs;
@@ -1872,7 +1872,7 @@ let byte_code_build_load_args b units =
                 in
                 Modname.Map.fold add (Fut.sync srcs) mods
             in
-            let inc_mods = Fpath.Set.add (B0_build.build_dir b unit) inc_mods in
+            let inc_mods = Fpath.Set.add (B0_build.unit_dir b unit) inc_mods in
             libs_acc, inc_mods, mods
       in
       loop libs_acc inc_mods mods units

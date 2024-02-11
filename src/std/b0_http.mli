@@ -100,4 +100,11 @@ module Http_client : sig
     ?docs:string -> ?env:Cmdliner.Cmd.Env.info -> unit -> Cmd.t Cmdliner.Term.t
   (** [curl] is a cli interface for specifying the curl command
       line tool. *)
+
+  val curl_fetch_args :
+    ?args:Cmd.t -> ?progress:bool -> Url.t -> Fpath.t -> Cmd.t
+  (** [curl_fetch_args url file] are curl arguments to fetch the URL
+      [url] and write it to [file]. If progress is [true] it is reported.
+      [args] are added to the result before the URL. Redirections
+      are followed. *)
 end

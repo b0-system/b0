@@ -911,9 +911,9 @@ module Compile : sig
   (** {1:basic Basic} *)
 
   val c_to_o :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
-    comp:B0_memo.Tool.t -> opts:Cmd.t -> reads:Fpath.t list -> c:Fpath.t ->
-    o:Fpath.t -> unit
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
+    B0_memo.t -> comp:B0_memo.Tool.t -> opts:Cmd.t -> reads:Fpath.t list ->
+    c:Fpath.t -> o:Fpath.t -> unit
   (** [c_to_o m ~comp ~opts ~reads ~c ~o] compiles the C file [c] to
       the object file [o] with options [opts] and using compiler
       [comp].  It assumes the compilation depends on C include header
@@ -921,9 +921,9 @@ module Compile : sig
       options. *)
 
   val mli_to_cmi :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> and_cmti:bool ->
-    B0_memo.t -> comp:B0_memo.Tool.t -> opts:Cmd.t -> reads:Fpath.t list ->
-    mli:Fpath.t -> o:Fpath.t -> unit
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
+    and_cmti:bool -> B0_memo.t -> comp:B0_memo.Tool.t -> opts:Cmd.t ->
+    reads:Fpath.t list -> mli:Fpath.t -> o:Fpath.t -> unit
   (** [mli_to_cmi ~and_cmti m ~comp ~opts ~reads ~mli ~o] compiles the
       file [mli] to the cmi file [o] and, if [and_cmti] is [true], to
       the cmti file [Fpath.(o -+ ".cmti")] with options [opts] and
@@ -932,9 +932,9 @@ module Compile : sig
       options. *)
 
   val ml_to_cmo :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> and_cmt:bool ->
-    B0_memo.t -> opts:Cmd.t -> reads:Fpath.t list -> has_cmi:bool ->
-    ml:Fpath.t -> o:Fpath.t -> unit
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
+    and_cmt:bool -> B0_memo.t -> opts:Cmd.t -> reads:Fpath.t list ->
+    has_cmi:bool -> ml:Fpath.t -> o:Fpath.t -> unit
   (** [ml_to_cmo ~and_cmt m ~opts ~reads ~has_cmi ~ml ~o] compiles the
       file [ml] to cmo file [o] and, if [and_cmt] is [true], to the
       cmt file [Fpath.(o -+ ".cmt")] with options [opts]. It assumes
@@ -944,9 +944,9 @@ module Compile : sig
       case it should be in [reads] (FIXME specify path directly ?). *)
 
   val ml_to_cmx :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> and_cmt:bool ->
-    B0_memo.t -> opts:Cmd.t -> reads:Fpath.t list -> has_cmi:bool ->
-    ml:Fpath.t -> o:Fpath.t -> unit
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
+    and_cmt:bool -> B0_memo.t -> opts:Cmd.t -> reads:Fpath.t list ->
+    has_cmi:bool -> ml:Fpath.t -> o:Fpath.t -> unit
   (** [ml_to_cmx ~and_cmt m ~opts ~reads ~has_cmi ~ml ~o ~and_cmt]
       compiles the file [ml] to cmx file [o] and, if [and_cmt] is
       [true], to the cmt file [Fpath.(o -+ ".cmt")] with options
@@ -957,9 +957,9 @@ module Compile : sig
       (FIXME specify path directly ?). *)
 
   val ml_to_impl :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
-    code:Code.t -> opts:Cmd.t -> reads:Fpath.t list -> has_cmi:bool ->
-    ml:Fpath.t -> o:Fpath.t -> and_cmt:bool -> unit
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
+    B0_memo.t -> code:Code.t -> opts:Cmd.t -> reads:Fpath.t list ->
+    has_cmi:bool -> ml:Fpath.t -> o:Fpath.t -> and_cmt:bool -> unit
   (** [ml_to_impl] is {!ml_to_cmo} or {!ml_to_cmx} according to [code].
        Beware that the given arguments must be common to both *)
 
@@ -1002,9 +1002,9 @@ end
 module Archive : sig
 
   val cstubs :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
-    conf:Conf.t -> opts:Cmd.t -> c_objs:Fpath.t list -> odir:Fpath.t ->
-    oname:string -> unit
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
+    B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> c_objs:Fpath.t list ->
+    odir:Fpath.t -> oname:string -> unit
   (** [cstubs m ~conf ~opts ~c_objs ~odir ~oname] creates in directory
       [odir] C stubs archives for a library named [oname]. *)
 
@@ -1012,47 +1012,47 @@ module Archive : sig
      c stubs archive directly. *)
 
   val byte :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
-    conf:Conf.t -> opts:Cmd.t -> has_cstubs:bool -> cobjs:Fpath.t list ->
-    odir:Fpath.t -> oname:string -> unit
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
+    B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> has_cstubs:bool ->
+    cobjs:Fpath.t list -> odir:Fpath.t -> oname:string -> unit
   (** [byte_archive m ~opts ~has_cstubs ~cobjs ~obase] creates in directory
       [odir] a bytecode archive named [oname] with the OCaml bytecode
       compilation objects [cobjs]. *)
 
   val native :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
-    conf:Conf.t -> opts:Cmd.t -> has_cstubs:bool -> cobjs:Fpath.t list ->
-    odir:Fpath.t -> oname:string -> unit
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
+    B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> has_cstubs:bool ->
+    cobjs:Fpath.t list -> odir:Fpath.t -> oname:string -> unit
   (** [native m ~opts ~has_cstubs ~cobjs ~obase] creates in directory
       [odir] a native code archive named [oname] with the OCaml native
       code compilation objects [cobjs]. *)
 
   val code :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
-    conf:Conf.t -> opts:Cmd.t -> code:Code.t -> has_cstubs:bool ->
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
+    B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> code:Code.t -> has_cstubs:bool ->
     cobjs:Fpath.t list -> odir:Fpath.t -> oname:string -> unit
   (** [archive] is {!byte} or {!native} according to [code]. *)
 
   val native_dynlink :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
-    conf:Conf.t -> opts:Cmd.t -> has_cstubs:bool -> cmxa:Fpath.t ->
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
+    B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> has_cstubs:bool -> cmxa:Fpath.t ->
     o:Fpath.t -> unit
 end
 
 (** Linking. *)
 module Link : sig
   val byte :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
-    conf:Conf.t -> opts:Cmd.t -> c_objs:Fpath.t list -> cobjs:Fpath.t list ->
-    o:Fpath.t -> unit
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
+    B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> c_objs:Fpath.t list ->
+    cobjs:Fpath.t list -> o:Fpath.t -> unit
   (** [byte_exe m ~opts ~c_objs ~cmos ~o] links the C objects [c_objs]
       and the OCaml compilation object files [cobjs] into a byte code
       executable [o] compiled in [-custom] mode. *)
 
   val native :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
-    conf:Conf.t -> opts:Cmd.t -> c_objs:Fpath.t list -> cobjs:Fpath.t list ->
-    o:Fpath.t -> unit
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
+    B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> c_objs:Fpath.t list ->
+    cobjs:Fpath.t list -> o:Fpath.t -> unit
   (** [byte_exe m ~opts ~c_objs ~cobjs ~o] links the C objects
       [c_objs] and the OCaml compilation object files [cobjs] into a
       native code executable [o], in [cobjs] you need to add the C [lib_ext]
@@ -1061,9 +1061,9 @@ module Link : sig
       lookup potential C stubs. *)
 
   val code :
-    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(int -> unit) -> B0_memo.t ->
-    conf:Conf.t -> opts:Cmd.t -> code:Code.t -> c_objs:Fpath.t list ->
-    cobjs:Fpath.t list -> o:Fpath.t -> unit
+    ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
+    B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> code:Code.t ->
+    c_objs:Fpath.t list -> cobjs:Fpath.t list -> o:Fpath.t -> unit
   (** [code] is {!byte} or {!native} according to [code]. *)
 end
 

@@ -18,7 +18,7 @@ module Trash = struct
     if not exists then Ok () else
     let (* deal with races *) force = true and make_path = true in
     let* garbage = Os.Path.tmp ~make_path ~dir:t.dir ~name:"%s" () in
-    Os.Path.rename ~force ~make_path ~src:p garbage
+    Os.Path.rename ~force ~make_path p ~dst:garbage
 
   let err_delete t err = Fmt.str "delete trash %a: %s" Fpath.pp t.dir err
 
@@ -94,7 +94,7 @@ module File_cache = struct
           let fdo = Unix.openfile dst write_flags mode in
           try
             Os.Fd.apply ~close:Unix.close fdo @@ fun fdo ->
-            Os.Fd.copy ~src:fdi fdo;
+            Os.Fd.copy fdi ~dst:fdo;
           with
           | e -> unlink_noerr dst; raise e
 
@@ -594,7 +594,7 @@ module Op = struct
     let dst c = c.copy_dst
     let mode c = c.copy_mode
     let linenum c = c.copy_linenum
-    let make_op ~id ~mark ~created ?post_exec ?k ~mode ~linenum ~src dst
+    let make_op ~id ~mark ~created ?post_exec ?k ~mode ~linenum src ~dst
       =
       let c = { copy_src = src; copy_dst = dst; copy_mode = mode;
                 copy_linenum = linenum }
@@ -1255,7 +1255,7 @@ module Exec = struct
     let atomic = true and force = true and make_path = true in
     let mode = Op.Copy.mode c and src = Op.Copy.src c and dst = Op.Copy.dst c in
     match Op.Copy.linenum c with
-    | None -> Os.File.copy ~atomic ~force ~make_path ~mode ~src dst
+    | None -> Os.File.copy ~atomic ~force ~make_path ~mode src ~dst
     | Some line ->
         Result.bind (Os.File.read src) @@ fun c ->
         let data = Fmt.str "#line %d \"%a\"\n%s" line Fpath.pp_unquoted src c in

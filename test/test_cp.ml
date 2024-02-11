@@ -9,7 +9,7 @@ let cp_cmd follow_symlinks recurse src dst =
   let error e = Fmt.epr "%s: %s" (Filename.basename Sys.argv.(0)) e; 1 in
   let make_path = true in
   Result.fold ~ok:(fun () -> 0) ~error @@
-  Os.Path.copy ~follow_symlinks ~make_path ~recurse ~src dst
+  Os.Path.copy ~follow_symlinks ~make_path ~recurse src ~dst
 
 let main () =
   let open Cmdliner in

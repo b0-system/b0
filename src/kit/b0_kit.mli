@@ -27,6 +27,7 @@ module V000 : sig
   module Os = B0_std.Os
   module Log = B0_std.Log
   module Random_queue = B0_std.Random_queue
+  module Bval = B0_std.Bval
 
   val ( ~/ ) : string -> Fpath.t
   (** [~/path] is [Fpath.v path] *)

@@ -11,6 +11,7 @@ open B0_std
 
     See also {!B0_http}. *)
 
+
 val fetch_url :
   ?env:Os.Env.assignments -> ?stderr:Os.Cmd.stdo -> ?args:Cmd.t ->
   ?progress:bool -> B0_env.t -> Url.t -> Fpath.t ->

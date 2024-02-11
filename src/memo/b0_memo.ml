@@ -90,7 +90,7 @@ let with_feedback m feedback = { m with m = { m.m with feedback }}
 
 (* Tool lookup *)
 
-let file_ready m p =
+let ready_file m p =
   (* XXX Maybe we should really test for file existence here and notify
      a failure if it doesn't exist. But also maybe we should
      introduce a stat cache and propagate it everywhere in B0_zero.
@@ -101,6 +101,8 @@ let file_ready m p =
      to be added for correct "never became ready" error reports. *)
   Guard.set_file_ready m.m.guard p;
   m.m.ready_roots <- Fpath.Set.add p m.m.ready_roots
+
+let ready_files m ps = List.iter (ready_file m) ps
 
 let cache_lookup lookup =
   let cache = Hashtbl.create 91 in
@@ -122,7 +124,7 @@ let tool_lookup_of_os_env ?sep ?(var = "PATH") env =
         | Error _ as e -> Fut.return e
         | Ok cmd ->
             let file = Cmd.find_tool cmd |> Option.get in
-            file_ready m file; Fut.return (Ok file)
+            ready_file m file; Fut.return (Ok file)
 
 let make_zero
     ?clock ?cpu_clock:cc ~feedback ~cwd ?(win_exe = Sys.win32)
@@ -347,10 +349,17 @@ let write m ?(stamp = "") ?(reads = []) ?(mode = 0o644) write d =
   let o = Op.Write.make_op ~id ~mark ~created ~stamp ~reads ~mode ~write d in
   add_op_and_stir m o
 
-let copy m ?(mode = 0o644) ?linenum ~src dst =
+let copy m ?(mode = 0o644) ?linenum src ~dst =
   let id = new_op_id m and mark = m.c.mark and created = timestamp m in
-  let o = Op.Copy.make_op ~id ~mark ~created ~mode ~linenum ~src dst in
+  let o = Op.Copy.make_op ~id ~mark ~created ~mode ~linenum src ~dst in
   add_op_and_stir m o
+
+let copy_to_dir m ?mode ?linenum ?src_root src ~dir =
+  let dst = match src_root with
+  | None -> Fpath.(dir / Fpath.basename src)
+  | Some src_root -> Fpath.reroot ~src_root ~dst_root:dir src
+  in
+  copy m ?mode ?linenum src ~dst; dst
 
 let mkdir m ?(mode = 0o755) dir =
   let id = new_op_id m and mark = m.c.mark and created = timestamp m in
@@ -445,7 +454,7 @@ let _spawn
       | None -> fun o -> ()
       | Some k ->
           fun o -> match Op.Spawn.exit (Op.Spawn.get o) with
-          | Some (`Exited code) -> k code
+          | Some (`Exited code) -> k o code
           | _ -> assert false
       in
       let o =

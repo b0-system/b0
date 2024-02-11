@@ -169,7 +169,7 @@ val spawn :
   ?stdout:B0_zero.Op.Spawn.stdo -> ?stderr:B0_zero.Op.Spawn.stdo ->
   ?success_exits:B0_zero.Op.Spawn.success_exits ->
   ?post_exec:(B0_zero.Op.t -> unit) ->
-  ?k:(int -> unit) -> cmd -> unit
+  ?k:(B0_zero.Op.t -> int -> unit) -> cmd -> unit
 (** [spawn m ~reads ~writes ~env ~cwd ~stdin ~stdout ~stderr
     ~success_exits cmd] spawns [cmd] once [reads] files are ready
     and makes files [writes] ready if the spawn succeeds and the
@@ -202,7 +202,7 @@ val spawn :
        if they are difficult to find out before hand. {b Do not}
        access [m] in that function.}
     {- [k], if specified a function invoked once the spawn has succesfully
-       executed with the exit code.}
+       executed with the operation and the exit code.}
     {- [stamp] is used for caching if two spawns diff only in their
        stamp they will cache to different keys. This can be used to
        memoize tool whose outputs may not entirely depend on the environment,
@@ -219,7 +219,7 @@ val spawn' :
   ?stdin:Fpath.t -> ?stdout:B0_zero.Op.Spawn.stdo ->
   ?stderr:B0_zero.Op.Spawn.stdo ->
   ?success_exits:B0_zero.Op.Spawn.success_exits ->
-  ?k:(int -> unit) -> cmd -> unit
+  ?k:(B0_zero.Op.t -> int -> unit) -> cmd -> unit
 (** [spawn'] is like {!val-spawn} except the actual file paths written
     by the spawn need not be determined before the spawn. Only the
     root directory of writes need to be specified via
@@ -244,10 +244,13 @@ val fail_if_error : t -> ('a, string) result -> 'a
 
 (** {1:files Files and directories} *)
 
-val file_ready : t -> Fpath.t -> unit
-(** [ready m p] declares path [p] to be ready, that is exists and is
+val ready_file : t -> Fpath.t -> unit
+(** [read_file m p] declares path [p] to be ready, that is exists and is
     up-to-date in [b]. This is typically used with source files
-    and files external to the build (e.g. installed libraries). *)
+    and files external to the build like installed libraries. *)
+
+val ready_files : t -> Fpath.t list -> unit
+(** [ready_files m ps] is [List.iter (ready_files m) ps]. *)
 
 val read : t -> Fpath.t -> string Fut.t
 (** [read m file k] is a future that determines with the contents
@@ -262,14 +265,21 @@ val write :
     [""]) and should not perform other side effects on the file system. *)
 
 val copy :
-  t -> ?mode:int -> ?linenum:int -> src:Fpath.t -> Fpath.t -> unit
-(** [copy m ~mode ?linenum ~src dst] copies file [src] to [dst] with
+  t -> ?mode:int -> ?linenum:int -> Fpath.t -> dst:Fpath.t -> unit
+(** [copy m ~mode ?linenum src ~dst] copies file [src] to [dst] with
     mode [mode] (defaults to [0o644]) when [src] is ready. If [linenum]
     is specified, the following line number directive is prependend
     in [dst] to the contents of [src]:
 {[
 #line $(linenum) "$(src)"
 ]} *)
+
+val copy_to_dir :
+  t -> ?mode:int -> ?linenum:int ->
+  ?src_root:Fpath.t -> Fpath.t -> dir:Fpath.t -> Fpath.t
+(** [copy_to_dir src dir] is [copy src ~dst] with [dst] as
+    [Fpath.reroot ~src_root ~dst_root:dst src] and [src_root] defaulting
+    to [Fpath.parent src]. The function returns the destination file. *)
 
 val mkdir : t -> ?mode:int -> Fpath.t -> unit Fut.t
 (** [mkdir m dir p] is a future that determines with [()] when the

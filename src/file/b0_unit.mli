@@ -43,6 +43,9 @@ val tool_name : string B0_meta.key
 val exe_file : Fpath.t Fut.t B0_meta.key
 (** [exe_file] is an absolute file path to an executable build by the unit. *)
 
+val outcomes : Fpath.t list Bval.t B0_meta.key
+(** [outcomes] is the set of public file outcomes. *)
+
 val is_public : t -> bool
 (** [is_public u] is [true] iff [u]'s meta has {!B0_meta.public}
     set to [true]. *)
@@ -165,17 +168,20 @@ module Build : sig
   val must_build : t -> Set.t
   val may_build : t -> Set.t
   val did_build : t -> Set.t
-  val require : t -> build_unit -> unit
+  val require_unit : t -> build_unit -> unit
+  val require_units : t -> build_unit list -> unit
   val current : t -> build_unit
   val current_meta : t -> B0_meta.t
-  val current_scope_dir : t -> Fpath.t
-  val current_build_dir : t -> Fpath.t
-  val shared_build_dir : t -> Fpath.t
-  val scope_dir : t -> build_unit -> Fpath.t
-  val build_dir : t -> build_unit -> Fpath.t
-  val in_build_dir : t -> Fpath.t -> Fpath.t
+  val unit_dir : t -> build_unit -> Fpath.t
+  val unit_scope_dir : t -> build_unit -> Fpath.t
+  val current_dir : t -> Fpath.t
+  val scope_dir : t -> Fpath.t
+  val shared_dir : t -> Fpath.t
+  val in_unit_dir : t -> build_unit -> Fpath.t -> Fpath.t
+  val in_unit_scope_dir : t -> build_unit -> Fpath.t -> Fpath.t
+  val in_current_dir : t -> Fpath.t -> Fpath.t
   val in_scope_dir : t -> Fpath.t -> Fpath.t
-  val in_shared_build_dir : t -> Fpath.t -> Fpath.t
+  val in_shared_dir : t -> Fpath.t -> Fpath.t
   val make :
     root_dir:Fpath.t -> b0_dir:Fpath.t -> variant:string ->
     store:B0_store.binding list -> B0_memo.t ->

@@ -210,8 +210,8 @@ module Op : sig
 
     val make_op :
       id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
-      ?k:(op -> unit) -> mode:int -> linenum:int option -> src:Fpath.t ->
-      Fpath.t -> op
+      ?k:(op -> unit) -> mode:int -> linenum:int option -> Fpath.t ->
+      dst:Fpath.t -> op
     (** [make_op] declares a file copy operation, see the corresponding
         accessors for the semantics of various arguments. *)
 

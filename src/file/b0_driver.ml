@@ -233,7 +233,7 @@ module Compile = struct
   let write_src m c expanded_src ~file_api_stamp ~src_file =
     let src_reads = B0_file.expanded_file_manifest expanded_src in
     let reads = List.rev_append file_api_stamp src_reads in
-    List.iter (B0_memo.file_ready m) src_reads;
+    B0_memo.ready_files m src_reads;
     B0_memo.write m ~reads src_file @@ fun () ->
     Ok (B0_file.expanded_src expanded_src)
 
@@ -346,7 +346,7 @@ module Compile = struct
     let c_archives = List.filter_map B0_ocaml.Lib.c_archive all_libs in
     let ars = List.rev_append archives c_archives in
     (* FIXME this should be done b the resolver *)
-    List.iter (B0_memo.file_ready m) ars;
+    B0_memo.ready_files m ars;
     let reads = src_file :: ars in
     B0_memo.spawn m ~reads ~writes @@
     comp Cmd.(arg "-linkall" % "-g" % "-o" %% unstamp (path exe) % "-opaque" %%

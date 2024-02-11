@@ -17,7 +17,7 @@ let cannot_read build_dir m =
   let f file = Fpath.(build_dir / file) in
   let r = f "nosuchfile" in
   let w = f "out" in
-  B0_memo.file_ready m r;
+  B0_memo.ready_file m r;
   B0_memo.spawn m ~reads:[r] ~writes:[w] ~stdout:(`File w) @@
   cat Cmd.(path r)
 

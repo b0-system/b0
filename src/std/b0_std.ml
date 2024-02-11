@@ -2746,7 +2746,7 @@ module Os = struct
       let close fd = try close fd with Unix.Unix_error _ -> () in
       match f fd with v -> close fd; v | exception e -> close fd; raise e
 
-    let copy ?buf ~src dst =
+    let copy ?buf src ~dst =
       let rec unix_read fd b = try Unix.read fd b 0 (Bytes.length b) with
       | Unix.Unix_error (Unix.EINTR, _, _) -> unix_read fd b
       in
@@ -3164,7 +3164,7 @@ module Os = struct
           dir_delete ~recurse p
       | Unix.Unix_error (e, _, _) -> ferr p (err_doing "Deleting" (uerror e))
 
-    let rec path_rename ~force ~make_path ~src p =
+    let rec path_rename ~force ~make_path src ~dst:p =
       let err e = Fmt.error "rename %a to %a: %s" Fpath.pp src Fpath.pp p e in
       match handle_force ~force p with
       | Error e -> err e
@@ -3174,10 +3174,11 @@ module Os = struct
               begin match dir_create ~make_path (Fpath.parent p) with
               | Error e -> err e
               | Ok false (* existed *) -> err (uerror e)
-              | Ok true (* created *) -> path_rename ~force ~make_path ~src p
+              | Ok true (* created *) ->
+                  path_rename ~force ~make_path src ~dst:p
               end
           | Unix.Unix_error (Unix.EINTR, _, _) ->
-              path_rename ~force ~make_path ~src p
+              path_rename ~force ~make_path src ~dst:p
           | Unix.Unix_error (e, _, _) -> err (uerror e)
 
     let rec path_stat p = try Ok (Unix.stat (Fpath.to_string p)) with
@@ -3221,7 +3222,7 @@ module Os = struct
     | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ferr p err_seg_not_dir
     | Unix.Unix_error (e, _, _) -> ferr p (err_doing "lstat" (uerror e))
 
-    let copy_symlink ~force ~make_path ~src dst =
+    let copy_symlink ~force ~make_path src ~dst =
       Result.bind (symlink_link src) @@ fun src ->
       symlink ~force ~make_path ~src dst
   end
@@ -3538,12 +3539,12 @@ module Os = struct
       with
       | Sys_error e -> ferr file e
 
-    let copy ?atomic ?mode ~force ~make_path ~src file =
+    let copy ?atomic ?mode ~force ~make_path src ~dst:file =
       let err e = Fmt.str "copy %a to %a: %s" Fpath.pp src Fpath.pp file e in
       Result.map_error err @@ Result.join @@
       read_with_fd src @@ fun fdi ->
       try match is_dash file with
-      | true -> Ok (Fd.copy ~src:fdi Unix.stdout)
+      | true -> Ok (Fd.copy fdi ~dst:Unix.stdout)
       | false ->
           let mode = match mode with
           | None -> Fs_base.path_get_mode src
@@ -3551,9 +3552,16 @@ module Os = struct
           in
           Result.join @@ Result.bind mode @@ fun mode ->
           write_with_fd ?atomic ~mode ~force ~make_path file @@ fun fdo ->
-          Ok (Fd.copy ~src:fdi fdo)
+          Ok (Fd.copy fdi ~dst:fdo)
       with
       | Unix.Unix_error (e, _, arg) -> Fmt.error "%s: %s" arg (uerror e)
+
+    let copy_to_dir ?atomic ?mode ~force ~make_path ?src_root src ~dir =
+        let dst = match src_root with
+        | None -> Fpath.(dir / Fpath.basename src)
+        | Some src_root -> Fpath.reroot ~src_root ~dst_root:dir src
+        in
+        copy ?atomic ?mode ~force ~make_path src ~dst
   end
 
   module Dir = struct
@@ -3716,7 +3724,7 @@ module Os = struct
 
     let copy
         ?(rel = true) ?(atomic = true) ?(follow_symlinks = true)
-        ?(prune = fun _ _ _ -> false) ~make_path ~recurse ~src dst
+        ?(prune = fun _ _ _ -> false) ~make_path ~recurse src ~dst
       =
       let err e = Fmt.str "copy %a to %a: %s" Fpath.pp src Fpath.pp dst e in
       let prune = match rel with (* we invoke [_fold] with [rel:true] *)
@@ -3745,7 +3753,7 @@ module Os = struct
             Result.join @@
             File.write_with_fd
               ~atomic:true ~mode ~force:false ~make_path:false dst @@
-            fun fdo -> Ok (Fd.copy ~src:fdi fdo)
+            fun fdo -> Ok (Fd.copy fdi ~dst:fdo)
           in
           if prune st name p () then acc else
           let mode = st.Unix.st_perm in
@@ -3757,7 +3765,7 @@ module Os = struct
           let dst = Fpath.(dst // p) in
           let src = Fpath.(src // p) in
           let force = false and make_path = false in
-          Fs_base.copy_symlink ~force ~make_path ~src dst
+          Fs_base.copy_symlink ~force ~make_path src ~dst
           |> Result.error_to_failure;
           acc
       | _ when prune st name p () (* why not *) -> acc
@@ -3794,7 +3802,7 @@ module Os = struct
             match atomic with
             | false -> Ok ()
             | true ->
-                Fs_base.path_rename ~force:false ~make_path:true ~src:tdst dst
+                Fs_base.path_rename ~force:false ~make_path:true tdst ~dst
           with Failure e ->
             if atomic then ignore (Fs_base.path_delete ~recurse:true tdst);
             Error e
@@ -3934,7 +3942,7 @@ module Os = struct
 
     let copy
         ?(rel = true) ?(atomic = true) ?(follow_symlinks = true)
-        ?(prune = fun _ _ _ -> false) ~make_path ~recurse ~src dst
+        ?(prune = fun _ _ _ -> false) ~make_path ~recurse src ~dst
       =
       let err e = Fmt.str "copy %a to %a: %s" Fpath.pp src Fpath.pp dst e in
       let stat = match follow_symlinks with
@@ -3947,12 +3955,12 @@ module Os = struct
           match stat.Unix.st_kind with
           | Unix.S_DIR ->
               Dir.copy ~rel ~atomic ~follow_symlinks ~prune ~make_path
-                ~recurse ~src dst
+                ~recurse src ~dst
           | Unix.S_LNK ->
               Result.map_error err @@
-              Fs_base.copy_symlink ~force:false ~make_path ~src dst
+              Fs_base.copy_symlink ~force:false ~make_path src ~dst
           | _  ->
-              File.copy ~atomic ~force:false ~make_path ~src dst
+              File.copy ~atomic ~force:false ~make_path src ~dst
 
     (* File modes and stat *)
 
@@ -4623,4 +4631,59 @@ module Random_queue = struct
       v
 
   let length q = q.length
+end
+
+module Bval = struct
+  let already_set () = invalid_arg "already set"
+
+  type 'a t =
+  | V of 'a
+  | Lazy of 'a Fut.t * (unit -> unit)
+  | Fut of ('a Fut.t * ('a -> unit))
+
+  type 'a setter = 'a t
+  let make () = let bv = Fut (Fut.make ()) in bv, bv
+  let of_val v = V v
+  let of_lazy_fun f =
+    (* XXX stir should spawn a fiber. *)
+    let value, set = Fut.make () in
+    let run = ref true in
+    let stir () = if !run then (run := true; set (f ())) else () in
+    Lazy (value, stir)
+
+  let of_setter = Fun.id
+  let is_lazy = function Lazy _ -> true | _ -> false
+
+  (* Setting *)
+
+  let set s v = match s with
+  | Fut (fut, set) -> set v
+  | _ -> assert false
+
+  let try_set s v = match s with
+  | Fut (fut, set) ->
+      (match Fut.value fut with None -> set v; true | Some _ -> false)
+  | _ -> assert false
+
+  (* Getting *)
+
+  let get = function
+  | V v -> Fut.return v
+  | Lazy (fut, stir) -> stir (); fut
+  | Fut (fut, _) -> fut
+
+  let poll = function
+  | V v -> Some v
+  | Lazy (fut, stir) -> stir (); Fut.value fut
+  | Fut (fut, _) -> Fut.value fut
+
+  let stir = function Lazy (_, stir) -> stir () | _ -> ()
+
+  (* Formatting *)
+
+  let pp pp_v ppf = function
+  | V v -> pp_v ppf v
+  | Lazy (fut, _) | Fut (fut, _) ->
+      match Fut.value fut with
+      | None -> Fmt.string ppf "<pending>" | Some v -> pp_v ppf v
 end

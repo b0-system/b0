@@ -87,8 +87,7 @@ let select b sels =
   let open B0_std.Fut.Syntax in
   let m = B0_build.memo b in
   let u = B0_build.current b in
-  let scope = B0_build.current_scope_dir b in
-  let abs d = Fpath.(scope // d) in
+  let abs d = B0_build.in_scope_dir b d in
   let fs, ds, xs, futs =
     let rec loop fs ds xs futs = function
     | [] -> fs, ds, xs, futs
@@ -105,7 +104,7 @@ let select b sels =
   let acc = Fpath.Set.empty, String.Map.empty in
   let acc = select_files m u acc fs in
   let (seen, _ as acc) = select_files_in_dirs m u xs acc ds in
-  Fpath.Set.iter (B0_memo.file_ready m) seen;
+  Fpath.Set.iter (B0_memo.ready_file m) seen;
   let* futs = Fut.of_list futs in
   let add_files acc files =
     let add_file file (seen, by_ext as acc) =

@@ -16,7 +16,7 @@ module rec Build_def : sig
     { root_dir : Fpath.t;
       b0_dir : Fpath.t;
       build_dir : Fpath.t;
-      shared_build_dir : Fpath.t;
+      shared_dir : Fpath.t;
       store : B0_store.t;
       must_build : Unit.Set.t;
       may_build : Unit.Set.t;
@@ -29,7 +29,7 @@ end = struct
     { root_dir : Fpath.t;
       b0_dir : Fpath.t;
       build_dir : Fpath.t;
-      shared_build_dir : Fpath.t;
+      shared_dir : Fpath.t;
       store : B0_store.t;
       must_build : Unit.Set.t;
       may_build : Unit.Set.t;
@@ -115,7 +115,7 @@ module Build = struct
   let current b = match b.u.current with
   | None -> invalid_arg "Build not running" | Some u -> u
 
-  let require b u =
+  let require_unit b u =
     if String.Map.mem (name u) b.b.requested then () else
     match Unit.Set.mem u b.b.may_build with
     | true ->
@@ -128,24 +128,27 @@ module Build = struct
           pp_name (current b) pp_name u Fmt.(code string) "--unlock"
           pp_name u
 
+  let require_units b us = List.iter (require_unit b) us
   let current_meta b = meta (current b)
 
   (* Directories *)
 
-  let scope_dir b u = match B0_def.scope_dir (def u) with
+  let unit_dir b u =
+    B0_dir.unit_build_dir ~build_dir:b.b.build_dir ~name:(name u)
+
+  let unit_scope_dir b u = match B0_def.scope_dir (def u) with
   | None -> b.b.root_dir
   | Some dir -> dir
 
-  let current_scope_dir b = scope_dir b (current b)
-  let build_dir b u =
-    B0_dir.unit_build_dir ~build_dir:b.b.build_dir ~name:(name u)
+  let current_dir b = unit_dir b (current b)
+  let scope_dir b = unit_scope_dir b (current b)
+  let shared_dir b = b.b.shared_dir
 
-  let current_build_dir b = build_dir b (current b)
-  let shared_build_dir b = b.b.shared_build_dir
-
-  let in_build_dir b p = Fpath.(build_dir b (current b) // p)
-  let in_shared_build_dir b p = Fpath.(b.b.shared_build_dir // p)
-  let in_scope_dir b p = Fpath.(scope_dir b (current b) // p)
+  let in_unit_dir b u p = Fpath.(unit_dir b u // p)
+  let in_unit_scope_dir b u p = Fpath.(unit_scope_dir b u // p)
+  let in_current_dir b p = Fpath.(current_dir b // p)
+  let in_scope_dir b p = Fpath.(scope_dir b // p)
+  let in_shared_dir b p = Fpath.(b.b.shared_dir // p)
 
   (* Store *)
 
@@ -161,7 +164,7 @@ module Build = struct
   let make ~root_dir ~b0_dir ~variant ~store m ~may_build ~must_build =
     let u = { current = None; m } in
     let build_dir = B0_dir.build_dir ~b0_dir ~variant in
-    let shared_build_dir = B0_dir.shared_build_dir ~build_dir in
+    let shared_dir = B0_dir.shared_build_dir ~build_dir in
     let store = B0_store.make m ~dir:(B0_dir.store_dir ~build_dir) store in
     let may_build = Set.union may_build must_build in
     let add_requested u acc = String.Map.add (name u) u acc in
@@ -171,7 +174,7 @@ module Build = struct
       Unit.Set.iter (Random_queue.add q) must_build; q
     in
     let b =
-      { root_dir; b0_dir; build_dir; shared_build_dir; store; must_build;
+      { root_dir; b0_dir; build_dir; shared_dir; store; must_build;
         may_build; requested; waiting; }
     in
     let b = { u; b } in
@@ -185,7 +188,7 @@ module Build = struct
     let u = { current = Some unit; m } in
     let b = { b with u } in
     B0_memo.run_proc m begin fun () ->
-      let* () = B0_memo.mkdir b.u.m (build_dir b unit) in
+      let* () = B0_memo.mkdir b.u.m (unit_dir b unit) in
       (build_proc unit) b
     end
 
@@ -252,6 +255,11 @@ let exe_file =
   let doc = "Absolute file path to a built executable." in
   let pp_value = Fmt.any "<built value>" in
   B0_meta.Key.make "exe-file" ~doc ~pp_value
+
+let outcomes =
+  let doc = "Unit build outcomes." in
+  let pp_value = Bval.pp (Fmt.vbox (Fmt.list Fpath.pp)) in
+  B0_meta.Key.make "outcomes" ~doc ~pp_value
 
 let is_public u = match find_meta B0_meta.public u with
 | None -> false | Some b -> b
@@ -320,7 +328,7 @@ module Env = struct
   let root_dir env = env.root_dir
   let scope_dir env = env.scope_dir
   let scratch_dir env = B0_dir.scratch_dir ~b0_dir:env.b0_dir
-  let unit_dir env u = Build.build_dir env.build u
+  let unit_dir env u = Build.unit_dir env.build u
 
   let in_root_dir env p = Fpath.(root_dir env // p)
   let in_scope_dir env p = Fpath.(scope_dir env // p)

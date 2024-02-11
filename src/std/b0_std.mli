@@ -2203,9 +2203,9 @@ module Os : sig
         See also {!File.delete}. *)
 
     val rename :
-      force:bool -> make_path:bool -> src:Fpath.t -> Fpath.t ->
+      force:bool -> make_path:bool -> Fpath.t -> dst:Fpath.t ->
       (unit, string) result
-    (** [rename ~force ~make_path ~src dst] renames [src] to [dst].
+    (** [rename ~force ~make_path src ~dst] renames [src] to [dst].
         {ul
         {- If [force] is [true] and [dst] exists it tries to delete it
            using {!File.delete}[ dst]. If [force] is [false]
@@ -2227,8 +2227,8 @@ module Os : sig
     val copy :
       ?rel:bool -> ?atomic:bool -> ?follow_symlinks:bool ->
       ?prune:(Unix.stats -> string -> Fpath.t -> bool) -> make_path:bool ->
-      recurse:bool -> src:Fpath.t -> Fpath.t -> (unit, string) result
-    (** [copy ~make_path ~recurse ~src dst] copies the file or file
+      recurse:bool -> Fpath.t -> dst:Fpath.t -> (unit, string) result
+    (** [copy ~make_path ~recurse src ~dst] copies the file or file
         hierarchy rooted at [src] to [dst]. The function errors if
         [dst] exists. The semantics and arguments correspond to those
         of {!Os.Dir.val-copy}, except this function also works if [src] is
@@ -2430,12 +2430,20 @@ module Os : sig
 
     val copy :
       ?atomic:bool -> ?mode:int -> force:bool -> make_path:bool ->
-      src:Fpath.t -> Fpath.t -> (unit, string) result
-    (** [copy ~atomic ~mode ~force ~path ~make_path ~src file]
+      Fpath.t -> dst:Fpath.t -> (unit, string) result
+    (** [copy ~atomic ~mode ~force ~path ~make_path src ~dst:file]
         operates like {!write_with_fd} but directly writes the content
         of [src] (or {!stdin} if [src] is {!Fpath.dash}) to [file].
         [mode] defaults to the permissions of [src] if available and
         [0o644] otherwise. *)
+
+    val copy_to_dir :
+      ?atomic:bool -> ?mode:int -> force:bool -> make_path:bool ->
+      ?src_root:Fpath.t -> Fpath.t -> dir:Fpath.t -> (unit, string) result
+   (** [copy ~force ~make_path src ~dir] is
+       [copy ~force ~make_path src ~dst] with [dst] equal to
+       {!Fpath.reroot}[ ~src_root ~dst_root:dir src] and [src_root]
+       defaulting to {!Fpath.parent}[ src]. *)
 
     (** {1:tmpfiles Temporary files}
 
@@ -2587,7 +2595,7 @@ module Os : sig
     val copy :
       ?rel:bool -> ?atomic:bool -> ?follow_symlinks:bool ->
       ?prune:(Unix.stats -> string -> Fpath.t -> bool) -> make_path:bool ->
-      recurse:bool -> src:Fpath.t -> Fpath.t -> (unit, string) result
+      recurse:bool -> Fpath.t -> dst:Fpath.t -> (unit, string) result
     (** [copy ~rel ~atomic ~prune ~follow_symlinks ~make_path ~recurse
         ~src dst] copies the directory [src] to [dst]. File modes of
         [src] and its contents are preserved in [dst]. The function
@@ -2743,8 +2751,8 @@ module Os : sig
         is called whenever the function returns. Any {!Unix.Unix_error}
         raised by [close fd] is ignored. *)
 
-    val copy : ?buf:Bytes.t -> src:Unix.file_descr -> Unix.file_descr -> unit
-    (** [copy ~buf ~src dst] reads [src] and writes it to [dst] using
+    val copy : ?buf:Bytes.t -> Unix.file_descr -> dst:Unix.file_descr -> unit
+    (** [copy ~buf src ~dst] reads [src] and writes it to [dst] using
         [buf] as a buffer; if unspecified a buffer of length
         {!unix_buffer_size} is created for the call. Raise {!Unix.Unix_error}
         if that happens *)
@@ -3488,4 +3496,68 @@ module Random_queue : sig
 
   val length : 'a t -> int
   (** [length q] is the number of elements in [q]. *)
+end
+
+
+(** Blocking values.
+
+    {b Note.} In direct style the {!Fut.t} values would go away.
+    For now be bundled lazy blocking values in the same structure. *)
+module Bval : sig
+
+  type 'a setter
+  (** The type for setting blocking value. *)
+
+  type 'a t
+  (** The type for immutable blocking values. *)
+
+  val make : unit -> 'a t * 'a setter
+  (** [make ()] is a blocking value and a setter to set it. *)
+
+  val of_val : 'a -> 'a t
+  (** [of_val v] is a (non-)blocking value holding [v]. *)
+
+  val of_lazy_fun : (unit -> 'a) -> 'a t
+  (** [of_lazy_fun f] is a blocking value that runs [f]
+      iff {!get} or {!poll} is called on the value.
+
+      {b XXX.} Something should be said about the context in
+      which f runs.  *)
+
+  val of_setter : 'a setter -> 'a t
+  (** [of_setter s] is the blocking value of [s]. *)
+
+  val is_lazy : 'a t -> bool
+  (** [is_lazy bv] is [true] iff [bv] is a lazily triggered value. *)
+
+  (** {1:setting Setting} *)
+
+  val set : 'a setter -> 'a -> unit
+  (** [set s v] sets the blocking value [of_setter s] to value [v].
+      Raises [Invalid_argument] if [set] is already set. *)
+
+  val try_set : 'a setter -> 'a -> bool
+  (** [try_set s v] is [true] if [iv] was set to [v] and [false]
+      if [iv] was already set. *)
+
+  (** {1:getting Getting} *)
+
+  val get : 'a t -> 'a Fut.t
+  (** [get bv] is the value of [bv]. In direct style,
+      this should be a blocking call. *)
+
+  val poll : 'a t -> 'a option
+  (** [poll bv] is [None] if [get bv] would block
+      and [Some _] if it does not block. If [bv] was created
+      with {!of_lazy_fun}, this ensure the computation gets triggered. *)
+
+  val stir : 'a t -> unit
+  (** [stir bv] is [ignore (poll v)]. Useful if you know [bv] will
+      be needed later and may be a {!of_lazy_fun}. *)
+
+  (** {1:formatting Formatting} *)
+
+  val pp : 'a Fmt.t -> 'a t Fmt.t
+  (** [pp] formats blocking values. Does not block if the value is not
+      set in which case "<pending>" formatted. *)
 end

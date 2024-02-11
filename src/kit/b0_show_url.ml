@@ -163,9 +163,9 @@ let unit_mode env args =
   let make_url (unit, (arg, p)) =
     Result.error_to_failure @@
     Result.map_error (fun e -> Fmt.str "%a: %s" Fmt.code' arg e) @@
-    let build_dir = B0_build.build_dir (B0_env.build env) unit in
+    let unit_dir = B0_build.unit_dir (B0_env.build env) unit in
     match p with
-    | Some p -> url_of_path env Fpath.(build_dir // v p)
+    | Some p -> url_of_path env Fpath.(unit_dir // v p)
     | None -> get_url env unit
   in
   try Ok (`Show_unit_urls (List.map make_url specs)) with Failure e -> Error e

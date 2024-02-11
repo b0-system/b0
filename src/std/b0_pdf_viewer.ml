@@ -4,6 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
+open Result.Syntax
 
 (* Show PDFs *)
 
@@ -16,9 +17,15 @@ end
 
 type t = Cmd.t
 
-let find ?search ?cmd () = match cmd with
-| Some cmd -> Os.Cmd.get ?search cmd
-| None ->
+let env_fallback cmd = match cmd with
+| Some _ as v -> Ok v
+| None -> Os.Env.find' ~empty_is_none:true Cmd.of_string Env.pdfviewer
+
+let find ?search ?cmd () =
+  let* cmd = env_fallback cmd in
+  match cmd with
+  | Some cmd -> Os.Cmd.get ?search cmd
+  | None ->
     let cmds = [Cmd.tool "xdg-open"; Cmd.tool "open"] in
     match Os.Cmd.find_first ?search cmds with
     | Some v -> Ok v

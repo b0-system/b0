@@ -54,7 +54,7 @@ let os_release =
     match find_first_existing_file files with
     | None -> Fut.return String.Map.empty
     | Some file ->
-        B0_memo.file_ready m file;
+        B0_memo.ready_file m file;
         let* s = B0_memo.read m file in
         let map =
           try
