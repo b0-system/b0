@@ -671,7 +671,7 @@ module String = struct
     in
     loop 0
 
-  (* Finding substrings. *)
+  (* Finding substrings.  *)
 
   let find_sub ?(start = 0) ~sub s =
     (* naive algorithm, worst case O(length sub * length s) *)
@@ -710,6 +710,31 @@ module String = struct
       then loop i 1 else loop (i - 1) 0
     in
     loop (start - max_sub) 0
+
+  let replace_all ~sub ~by s =
+    (* Uses the naive search algo. Implement
+       https://www-igm.univ-mlv.fr/~lecroq/string/node26.html at some point *)
+    let rec loop sub s start chunks = match find_sub ~start ~sub s with
+    | None ->
+        if start = 0 then s else
+        let chunks = String.sub s start (String.length s - start) :: chunks in
+        String.concat by (List.rev chunks)
+    | Some i ->
+        let chunks = String.sub s start (i - start) :: chunks in
+        let start = i + String.length sub in
+        loop sub s start chunks
+    in
+    if sub <> "" then loop sub s 0 [] else
+    if by = "" then s else
+    let slen = String.length s and bylen = String.length by in
+    let dst = Bytes.create (slen + (slen + 1) * bylen) in
+    for i = 0 to slen - 1 do
+      let start = i * (1 + bylen) in
+      Bytes.blit_string by 0 dst start bylen;
+      Bytes.set dst (start + bylen) s.[i];
+    done;
+    Bytes.blit_string by 0 dst (slen + slen * bylen) bylen;
+    Bytes.unsafe_to_string dst
 
   (* Extracting substrings *)
 

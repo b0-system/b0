@@ -599,7 +599,7 @@ module String : sig
   (** [exists p s] is [true] iff there exists an index [i] of [s] with
       [p s.[i] = true]. *)
 
-  (** {1:find Finding substrings} *)
+  (** {1:find Finding and replacing substrings} *)
 
   val find_sub : ?start:int -> sub:string -> string -> int option
   (** [find_sub ~start ~sub s] is the start index (if any) of the
@@ -609,6 +609,10 @@ module String : sig
   (** [rfind_sub ~start ~sub s] is the start index (if any) of the
       first occurence of [sub] in [s] before or at [start] (defaults to
       [String.length s - 1]). *)
+
+  val replace_all : sub:string -> by:string -> string -> string
+  (** [replace_all ~sub ~by s] replaces all non-overlapping occurences of
+      [sub] in [s] by [by]. *)
 
   (** {1:subs Extracting substrings} *)
 
