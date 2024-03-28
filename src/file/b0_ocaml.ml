@@ -1887,8 +1887,9 @@ let byte_code_build_load_args b units =
     in
     let resolver = Fut.sync (B0_build.get b Libresolver.key) in
     let m = B0_build.memo b in
-    let libs = Fut.sync (Libresolver.get_list_and_deps m resolver libs) in
-    let lib_opts = List.fold_left add_lib_opts Cmd.empty libs in
+    let libs = Libresolver.get_list_and_deps m resolver libs in
+    B0_memo.stir ~block:true m;
+    let lib_opts = List.fold_left add_lib_opts Cmd.empty (Fut.sync libs) in
     let inc_mods = Cmd.paths ~slip:"-I" (Fpath.Set.elements inc_mods) in
     Ok Cmd.(lib_opts %% inc_mods %% paths mods)
   with
