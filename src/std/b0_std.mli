@@ -914,15 +914,15 @@ let escape_dquotes s =
     (** [to_hex s] is the sequence of bytes of [s] as US-ASCII lowercase
         hexadecimal digits. *)
 
-    val of_hex : string -> (string, int) result
-    (** [of_hex h] parses a sequence of US-ASCII (lower or upper
+    val of_hex' : string -> (string, int) result
+    (** [of_hex' h] parses a sequence of US-ASCII (lower or upper
         cased) hexadecimal digits from [h] into its corresponding byte
         sequence.  [Error n] is returned either with [n] an index in
         the string which is not a hexadecimal digit or the length of
         [h] if it there is a missing digit at the end. *)
 
-    val of_hex' : string -> (string, string) result
-    (** [of_hex'] is {!of_hex} but errors with an english error message. *)
+    val of_hex : string -> (string, string) result
+    (** [of_hex] is {!of_hex'} but errors with an english error message. *)
 
     (** {1:escunesc Converting to printable US-ASCII characters} *)
 
@@ -1671,8 +1671,13 @@ module Hash : sig
   val to_hex : t -> string
   (** [to_hex h] is {!String.Ascii.to_hex}[ (to_bytes h)]. *)
 
-  val of_hex : string -> (t, int) result
-  (** [of_hex s] is [Result.map of_bytes (]{!String.Ascii.of_hex}[ s)]. *)
+  val of_hex : string -> (t, string) result
+  (** [of_hex s] is
+      [Result.map of_binary_string (]{!String.Ascii.of_hex}[ s)]. *)
+
+  val of_hex' : string -> (t, int) result
+  (** [of_hex s] is
+      [Result.map of_binary_string (]{!String.Ascii.of_hex'}[ s)]. *)
 
   val pp : t Fmt.t
   (** [pp] formats using {!to_hex} or, if the hash is {!nil},

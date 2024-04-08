@@ -1100,7 +1100,7 @@ module String = struct
       let h = Bytes.create (2 * len) in
       loop (len - 1) s 0 h 0
 
-    let of_hex h =
+    let of_hex' h =
       let hex_value s i = match s.[i] with
       | '0' .. '9' as c -> Char.code c - 0x30
       | 'A' .. 'F' as c -> 10 + (Char.code c - 0x41)
@@ -1121,7 +1121,7 @@ module String = struct
           let s = Bytes.create s_len in
           try loop (s_len - 1) s 0 h 0 with Illegal_escape i -> Error i
 
-    let of_hex' h = match of_hex h with
+    let of_hex h = match of_hex' h with
     | Ok _ as v -> v
     | Error i ->
         match i = String.length h with
@@ -2245,6 +2245,7 @@ module Hash = struct
   let to_binary_string h = h
   let of_binary_string h = h
   let to_hex = String.Ascii.to_hex
+  let of_hex' = String.Ascii.of_hex'
   let of_hex = String.Ascii.of_hex
   let pp ppf h = Fmt.string ppf (if is_nil h then "nil" else to_hex h)
 
