@@ -1511,6 +1511,16 @@ module List = struct
     let classes = List.fold_left add_classes M.empty els in
     List.rev (M.fold (fun c els acc -> (c, S.elements els) :: acc) classes [])
 
+  let distinct (type a) (compare : a -> a -> int) vs =
+    let module S = Set.Make (struct type t = a let compare = compare end) in
+    let rec loop seen acc = function
+    | [] -> List.rev acc
+    | v :: vs ->
+        if S.mem v seen then loop seen acc vs else
+        loop (S.add v seen) (v :: acc) vs
+    in
+    loop S.empty [] vs
+
   let rec fold_stop_on_error f l acc = match l with
   | [] -> Ok acc
   | v :: vs ->

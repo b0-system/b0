@@ -1160,6 +1160,11 @@ module List : sig
       compare elements and [cmp_classes] to compare classes, both
       default to {!compare}. *)
 
+  val distinct : ('a -> 'a -> int) -> 'a list -> 'a list
+  (** [distinct cmp l] are the distinct elements of [l] according to
+      [cmp]. The first occurence of an element in [l] is kept and
+      their order in [l] is preserved. *)
+
   (** {1:result Interaction with result} *)
 
   val fold_stop_on_error :
