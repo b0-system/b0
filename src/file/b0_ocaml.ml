@@ -46,6 +46,12 @@ module Tool = struct
 
   let ocaml = B0_memo.Tool.by_name ~vars:top_env_vars "ocaml"
   let ocamlnat = B0_memo.Tool.by_name ~vars:top_env_vars "ocamlnat"
+
+  (* Utilities *)
+
+  let ocamlyacc = B0_memo.Tool.by_name "ocamlyacc"
+  let ocamllex = B0_memo.Tool.by_name "ocamllex"
+  let menhir = B0_memo.Tool.by_name "menhir"
 end
 
 module Code = struct
@@ -1318,6 +1324,80 @@ module Link = struct
     let linker = match code with `Byte -> byte | `Native -> native in
     linker ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~o
 end
+
+(* Source transformations *)
+
+let ocamllex srcs =
+  let f srcs b =
+    let m = B0_build.memo b in
+    let build_dir = B0_build.current_dir b in
+    let* srcs = B0_srcs.(Fut.map by_ext @@ select b srcs) in
+    let mlls = B0_file_exts.(find_files (ext ".mll") srcs) in
+    let files = 
+      List.fold_left 
+        (fun outs mll ->
+          let name = Fpath.basename ~strip_ext:true mll in
+          let out = Fpath.(build_dir / name |> add_ext ".ml") in
+          let outs = Fpath.Set.add out outs in
+          B0_memo.spawn m ~reads:[mll] ~writes:[out] @@
+            B0_memo.tool m Tool.ocamllex
+              Cmd.(arg "-q" % "-o" %% (path out) %% (path mll));
+          Fpath.Set.add out outs)
+        Fpath.Set.empty
+        mlls
+    in
+    Fut.return files
+  in
+  `Fut (f srcs)
+
+let ocamlyacc srcs =
+  let f srcs b =
+    let m = B0_build.memo b in
+    let build_dir = B0_build.current_dir b in
+    let* srcs = B0_srcs.(Fut.map by_ext @@ select b srcs) in
+    let mlys = B0_file_exts.(find_files (ext ".mly") srcs) in
+    let files = 
+      List.fold_left 
+        (fun outs mly ->
+          let name = Fpath.basename ~strip_ext:true mly in
+          let prefix = Fpath.(build_dir / name) in
+          let writes = Fpath.[ add_ext ".ml" prefix;
+                               add_ext ".mli" prefix; ] in
+          B0_memo.spawn m ~reads:[mly] ~writes @@
+            B0_memo.tool m Tool.ocamlyacc 
+              Cmd.(unstamp @@ arg "-b" %% (path prefix) %% (path mly));
+          Fpath.Set.union outs (Fpath.Set.of_list writes))
+        Fpath.Set.empty
+        mlys
+    in
+    Fut.return files
+  in
+  `Fut (f srcs)
+
+let menhir srcs =
+  let f srcs b = 
+    let m = B0_build.memo b in
+    let build_dir = B0_build.current_dir b in
+    let* srcs = B0_srcs.(Fut.map by_ext @@ select b srcs) in
+    let mlys = B0_file_exts.(find_files (ext ".mly") srcs) in
+    let files = 
+      List.fold_left 
+        (fun outs mly ->
+          let name = Fpath.basename ~strip_ext:true mly in
+          let prefix = Fpath.(build_dir / name) in
+          let writes = Fpath.[ add_ext ".ml" prefix; add_ext ".mli" prefix ] in
+          (* use table mode as it doesnt require extensive type declarations
+             in the grammar and it doesnt require the compiler infrastructure
+             that code mode + infer does *)
+          B0_memo.spawn m ~reads:[mly] ~writes @@
+            B0_memo.tool m Tool.menhir
+              Cmd.(unstamp @@ arg "--table" % "-b" %% (path prefix) %% (path mly));
+          Fpath.Set.union outs (Fpath.Set.of_list writes))
+        Fpath.Set.empty
+        mlys in
+    Fut.return files
+  in
+  `Fut (f srcs)
 
 (* Build units. *)
 
