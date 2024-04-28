@@ -611,6 +611,11 @@ module Lib = struct
       js_stubs : Fpath.t list;
       warning : string option }
 
+  let key : t Fut.t B0_meta.key =
+    let pp_value = Fmt.any "<dynamic>" in
+    B0_meta.Key.make "lib-def" ~doc:"Compiled Ocaml library" ~pp_value
+
+  
   let make
       ~libname ~requires ~represents ~dir ~cmis ~cmxs ~cma ~cmxa ~c_archive
       ~c_stubs ~js_stubs ~warning
@@ -675,53 +680,10 @@ module Lib = struct
         Ok (loop [] [] None None None [] fs)
 
   let of_unit b ocaml_conf u =
-    let get_or_fail m k u = B0_unit.get_meta k u |> B0_memo.fail_if_error m in
     B0_build.require_unit b u;
     let m = B0_build.memo b in
-    let* built = B0_build.get b Code.built in
-    let* srcs = get_or_fail m modsrcs u in
-    let byte, native = match built with
-    | `Byte -> true, false | `Native -> false, true | `All -> true, true
-    in
-    let has_srcs = not (Modname.Map.is_empty srcs) in
-    let has_cma = has_srcs && byte in
-    let has_cmxa = has_srcs && native in
-    let has_c_archive = has_cmxa in
-    let dir = B0_build.unit_dir b u in
-    let libname = get_or_fail m library u in
-    let requires = get_or_fail m requires u in
-    let represents = get_or_fail m represents u in
-    let archive = Libname.to_archive_name libname in
-    let base = Fpath.(dir / archive) in
-    let cma = if has_cma then Some Fpath.(base + ".cma") else None in
-    let cmxa = if has_cmxa then Some Fpath.(base + ".cmxa") else None in
-    let c_archive =
-      if has_c_archive then Some Fpath.(base + (Conf.lib_ext ocaml_conf)) else
-      None
-    in
-    let cmis, cmxs =
-      let rec loop cmis cmxs = function
-      | [] -> cmis, cmxs
-      | s :: ss ->
-          let cmis = Modsrc.cmi_file s :: cmis in
-          let cmxs = match native with
-          | false -> cmxs
-          | true ->
-              match Modsrc.cmx_file s with
-              | None -> cmxs | Some cmx -> cmx :: cmxs
-          in
-          loop cmis cmxs ss
-      in
-      loop [] [] (Modname.Map.fold (fun _ v acc -> v :: acc) srcs [])
-    in
-    let c_stubs = [] (* FIXME *) in
-    let js_stubs = [] (* FIXME *) in
-    let warning = B0_unit.find_meta B0_meta.warning u in
-    let lib =
-      make ~libname ~requires ~represents ~dir ~cmis ~cmxs ~cma ~cmxa
-        ~c_archive ~c_stubs ~js_stubs ~warning
-    in
-    Fut.return (Some lib)
+    let lib = B0_unit.get_meta key u |> B0_memo.fail_if_error m in
+    Fut.map Option.some lib
 
   let libname l = l.libname
   let requires l = l.requires
@@ -1201,7 +1163,8 @@ module Archive = struct
     in
     B0_memo.spawn ?post_exec ?k m ~reads:c_objs ~writes @@
     ocamlmklib
-      Cmd.(arg "-o" %% unstamp (path o) %% opts %% unstamp (paths c_objs))
+      Cmd.(arg "-o" %% unstamp (path o) %% opts %% unstamp (paths c_objs));
+    writes
 
   let byte ?post_exec ?k m ~conf ~opts ~has_cstubs ~cobjs ~odir ~oname =
     let ocamlc = B0_memo.tool m Tool.ocamlc in
@@ -1275,16 +1238,16 @@ module Link = struct
        package mess) so we might have the same archive twice. *)
     Fpath.distinct cobjs
 
-  let byte ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~o =
+  let byte ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~c_stubs ~o =
     let ocamlc = B0_memo.tool m Tool.ocamlc in
     let cobjs = distinct_cobjs cobjs in
-    let reads = List.rev_append cobjs c_objs in
+    let reads = List.concat [ cobjs; c_objs; c_stubs ] in
     let incs = cstubs_incs cobjs in
     B0_memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
     ocamlc Cmd.(arg "-o" %% unstamp (path o) %% opts %%
                 unstamp (incs %% paths c_objs %% paths cobjs))
 
-  let native ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~o =
+  let native ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~c_stubs ~o =
     let ocamlopt = B0_memo.tool m Tool.ocamlopt in
     let obj_ext = Conf.obj_ext conf in
     let cobjs = distinct_cobjs cobjs in
@@ -1310,13 +1273,14 @@ module Link = struct
       in
       loop [] [] cobjs
     in
+    let reads = List.rev_append reads c_stubs in
     B0_memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
     ocamlopt Cmd.(arg "-o" %% unstamp (path o) %% opts %%
                   unstamp (incs %% paths c_objs %% paths cobjs))
 
-  let code ?post_exec ?k m ~conf ~opts ~code ~c_objs ~cobjs ~o =
+  let code ?post_exec ?k m ~conf ~opts ~code ~c_objs ~cobjs ~c_stubs ~o =
     let linker = match code with `Byte -> byte | `Native -> native in
-    linker ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~o
+    linker ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~c_stubs ~o
 end
 
 (* Build units. *)
@@ -1365,6 +1329,7 @@ let exe_proc set_exe_path set_modsrcs srcs b =
   let* conf = B0_build.get b Conf.key in
   let* resolver = B0_build.get b Libresolver.key in
   let* comp_requires = Libresolver.get_list_and_reprs m resolver requires in
+  let c_stubs = List.concat_map Lib.c_stubs comp_requires in
   let tool_name = B0_meta.get B0_unit.tool_name meta in
   let exe_ext = Conf.exe_ext conf in
   let opts = Cmd.(arg "-g") (* TODO *) in
@@ -1398,12 +1363,12 @@ let exe_proc set_exe_path set_modsrcs srcs b =
     let c_requires = B0_meta.get c_requires meta in
     Cmd.(opts %% (Cmd.list ~slip:"-ccopt" (Cmd.to_list c_requires)))
   in
-  Link.code m ~conf ~code ~opts ~c_objs ~cobjs:(lib_objs @ cobjs) ~o;
+  Link.code m ~conf ~code ~opts ~c_objs ~cobjs:(lib_objs @ cobjs) ~c_stubs ~o;
   if all_code then begin
     let o = Fpath.(build_dir / (tool_name ^ ".byte" ^ exe_ext)) in
     let lib_objs = List.concat_map (archive ~code:`Byte) link_requires in
     let cobjs = List.filter_map (Modsrc.impl_file ~code:`Byte) modsrcs in
-    Link.code m ~conf ~code:`Byte ~opts ~c_objs ~cobjs:(lib_objs @ cobjs) ~o
+    Link.code m ~conf ~code:`Byte ~opts ~c_objs ~cobjs:(lib_objs @ cobjs) ~c_stubs ~o
   end;
   Fut.return ()
 
@@ -1432,23 +1397,23 @@ let script_proc set_exe_path file b =
   ocaml Cmd.(arg nocolor % "-init" %% path exe_file);
   Fut.return ()
 
-let lib_proc set_modsrcs srcs b =
+let lib_proc set_lib srcs b =
   (* XXX we are still missing cmxs here *)
   let m = B0_build.memo b in
   let build_dir = B0_build.current_dir b in
   let src_root = B0_build.scope_dir b in
   let* srcs = B0_srcs.(Fut.map by_ext @@ select b srcs) in
   let* modsrcs = Modsrc.map_of_files m ~build_dir ~src_root ~srcs in
-  set_modsrcs modsrcs;
   let meta = B0_build.current_meta b in
-  let requires = B0_meta.get requires meta in
+  let requires_libnames = B0_meta.get requires meta in
+  let represents = B0_meta.get represents meta in
   let library = B0_meta.get library meta in
   let archive_name = Libname.to_archive_name library in
   let opts = Cmd.(arg "-g") (* TODO *) in
   let* built_code = B0_build.get b Code.built in
   let* conf = B0_build.get b Conf.key in
   let* resolver = B0_build.get b Libresolver.key in
-  let* requires = Libresolver.get_list_and_reprs m resolver requires in
+  let* requires = Libresolver.get_list_and_reprs m resolver requires_libnames in
   let code = match built_code with `All | `Native -> `Native |`Byte -> `Byte in
   let all_code = match built_code with `All -> true | _ -> false in
   let comp = match built_code with
@@ -1463,7 +1428,7 @@ let lib_proc set_modsrcs srcs b =
   let cobjs = List.filter_map (Modsrc.impl_file ~code) modsrcs  in
   let odir = build_dir and oname = archive_name in
   let has_cstubs = c_objs <> [] in
-  if has_cstubs then Archive.cstubs m ~conf ~opts ~c_objs ~odir ~oname;
+  let c_stubs = if has_cstubs then Archive.cstubs m ~conf ~opts ~c_objs ~odir ~oname else [] in
   let opts =
     let c_requires = B0_meta.get c_requires meta in
     Cmd.(opts %% (Cmd.list ~slip:"-ccopt" (Cmd.to_list c_requires)))
@@ -1472,7 +1437,20 @@ let lib_proc set_modsrcs srcs b =
   if all_code then begin
     let cobjs = List.filter_map (Modsrc.impl_file ~code:`Byte) modsrcs in
     Archive.code m ~conf ~code:`Byte ~opts ~has_cstubs ~cobjs ~odir ~oname
-  end;
+    end;
+  let cmis = List.filter (fun x -> Fpath.has_ext "cmi" x) cobjs in
+  let cmxs = List.filter (fun x -> Fpath.has_ext "cmx" x) cobjs in
+  let cma = match cmis with [] -> None | _ -> Some Fpath.(build_dir / oname + ".cma") in
+  let cmxa = match cmxs with [] -> None | _ -> Some Fpath.(build_dir / oname + ".cmxa") in
+  let c_archive = if Option.is_some cmxa
+                  then Some Fpath.(build_dir / oname + (Conf.lib_ext conf))
+                  else None in
+  let warning = B0_meta.find B0_meta.warning meta in
+  let lib = Lib.make ~libname:library ~requires:requires_libnames ~represents
+                  ~dir:build_dir ~cmis ~cmxs ~cma ~cmxa ~c_archive ~c_stubs ~js_stubs:[]
+                  ~warning
+  in
+  set_lib lib;
   Fut.return ()
 
 let exe
@@ -1557,7 +1535,7 @@ let lib
   =
   let name = unit_name_for_lib ~libname ~name in
   let doc = unit_doc_for_lib ~deprecated:false ~libname ~doc in
-  let fut_modsrcs, set_modsrcs = Fut.make () in
+  let fut_lib, set_lib = Fut.make () in
   let base =
     B0_meta.empty
     |> B0_meta.tag tag
@@ -1567,10 +1545,10 @@ let lib
     |> B0_meta.add_some_or_default c_requires c_reqs
     |> B0_meta.add_some_or_default requires reqs
     |> B0_meta.add_some_or_default represents reps
-    |> B0_meta.add modsrcs fut_modsrcs
+    |> B0_meta.add Lib.key fut_lib
   in
   let meta = B0_meta.override base ~by:meta in
-  let proc = wrap (lib_proc set_modsrcs srcs) in
+  let proc = wrap (lib_proc set_lib srcs) in
   B0_unit.make ~doc ~meta name proc
 
 let deprecated_lib

@@ -569,6 +569,8 @@ module Lib : sig
   type t
   (** The type for libraries. *)
 
+  val key : t Fut.t B0_meta.key
+  
   val make :
     libname:Libname.t -> requires:Libname.t list ->
     represents:Libname.t list -> dir:Fpath.t ->
@@ -1004,7 +1006,7 @@ module Archive : sig
   val cstubs :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
     B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> c_objs:Fpath.t list ->
-    odir:Fpath.t -> oname:string -> unit
+    odir:Fpath.t -> oname:string -> Fpath.t list
   (** [cstubs m ~conf ~opts ~c_objs ~odir ~oname] creates in directory
       [odir] C stubs archives for a library named [oname]. *)
 
@@ -1044,7 +1046,7 @@ module Link : sig
   val byte :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
     B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> c_objs:Fpath.t list ->
-    cobjs:Fpath.t list -> o:Fpath.t -> unit
+    cobjs:Fpath.t list -> c_stubs:Fpath.t list -> o:Fpath.t -> unit
   (** [byte_exe m ~opts ~c_objs ~cmos ~o] links the C objects [c_objs]
       and the OCaml compilation object files [cobjs] into a byte code
       executable [o] compiled in [-custom] mode. *)
@@ -1052,7 +1054,7 @@ module Link : sig
   val native :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
     B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> c_objs:Fpath.t list ->
-    cobjs:Fpath.t list -> o:Fpath.t -> unit
+    cobjs:Fpath.t list -> c_stubs:Fpath.t list -> o:Fpath.t -> unit
   (** [byte_exe m ~opts ~c_objs ~cobjs ~o] links the C objects
       [c_objs] and the OCaml compilation object files [cobjs] into a
       native code executable [o], in [cobjs] you need to add the C [lib_ext]
@@ -1063,7 +1065,7 @@ module Link : sig
   val code :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
     B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> code:Code.t ->
-    c_objs:Fpath.t list -> cobjs:Fpath.t list -> o:Fpath.t -> unit
+    c_objs:Fpath.t list -> cobjs:Fpath.t list -> c_stubs:Fpath.t list -> o:Fpath.t -> unit
   (** [code] is {!byte} or {!native} according to [code]. *)
 end
 
