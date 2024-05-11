@@ -397,6 +397,12 @@ there, consider rewriting them in a decent programming language as cmdlets.
 
 Read the {{!page-action}action manual}.
 
+{2:testing Testing}
+
+Tests are build units with the {!B0_meta.test} tag. The [b0 test] command
+builds like [b0 build] does but eventually runs all tests that must build
+and that have the {!B0_meta.run} tag.
+
 {1:editor_support Editor support}
 
 {2:emacs Emacs}

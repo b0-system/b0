@@ -13,6 +13,7 @@ let assert_eq' eq pp fnd exp =
 let assert_fpath = assert_eq' Fpath.equal Fpath.pp_unquoted
 
 let test_double_sep () =
+  B0_testing.Test.test "Fpath double seps" @@ fun () ->
   let test p q = assert (String.equal (Fpath.to_string (Fpath.v p)) q) in
   test "/////////" "//";
   test "//a///" "//a/";
@@ -23,6 +24,7 @@ let test_double_sep () =
   ()
 
 let test_is_prefix_strip_prefix () =
+  B0_testing.Test.test "Fpath.{is,strip}_prefix" @@ fun () ->
   let test p q r =
     let p = Fpath.v p and q = Fpath.v q in
     match r with
@@ -63,6 +65,7 @@ let test_is_prefix_strip_prefix () =
   ()
 
 let test_basename () =
+  B0_testing.Test.test "Fpath.basename" @@ fun () ->
   let test p b ~strip_ext:b' =
     let p = Fpath.v p in
     assert (Fpath.basename p = b);
@@ -101,6 +104,7 @@ let test_basename () =
   ()
 
 let test_parent () =
+  B0_testing.Test.test "Fpath.parent" @@ fun () ->
   let test p pp =
     assert (Fpath.equal (Fpath.parent (Fpath.v p)) (Fpath.v pp))
   in
@@ -129,6 +133,7 @@ let test_parent () =
   ()
 
 let test_relative () =
+  B0_testing.Test.test "Fpath.relative" @@ fun () ->
   let test p ~to_dir  q =
     let to_dir = Fpath.v to_dir and p = Fpath.v p and q = Fpath.v q in
     assert_fpath (Fpath.relative ~to_dir p) q
@@ -140,6 +145,7 @@ let test_relative () =
   ()
 
 let test () =
+  B0_testing.Test.log "Fpath";
   test_double_sep ();
   test_is_prefix_strip_prefix ();
   test_parent ();

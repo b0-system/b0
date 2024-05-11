@@ -46,6 +46,7 @@ let cmds =
     B0_cmd_scope.cmd;
     B0_cmd_show.cmd;
     B0_cmd_tool.cmd;
+    B0_cmd_test.cmd;
     B0_cmd_unit.cmd;
     B0_cmd_unlock.cmd;
     B0_cmd_vcs.cmd; ]

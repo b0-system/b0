@@ -11,6 +11,7 @@ let test_trip d e =
   assert (String.equal e e'); assert (String.equal d' d)
 
 let test_trips () =
+  B0_testing.Test.test "B0_base64 round trips" @@ fun () ->
   test_trip "" "";
   test_trip "f" "Zg==";
   test_trip "fo" "Zm8=";
@@ -21,5 +22,6 @@ let test_trips () =
   ()
 
 let test () =
+  B0_testing.Test.log "B0_base64";
   test_trips ();
   ()

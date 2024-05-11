@@ -21,6 +21,7 @@ let ocamlopt ?(profile = false) ?(debug = false) incs file =
   Cmd.(arg "ocamlopt" % "-c" %% debug %% profile %% incs %% (path file))
 
 let test_stamp () =
+  B0_testing.Test.test "Cmd stamps" @@ fun () ->
   let test cl cmd wit =
     assert ((cmd, wit) = Cmd.to_list_and_stamp cl)
   in
@@ -43,5 +44,6 @@ let test_stamp () =
   ()
 
 let test () =
+  B0_testing.Test.log "Cmd";
   test_stamp ();
   ()

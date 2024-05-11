@@ -74,7 +74,8 @@ let get_excluded_units ~x_units ~x_packs =
   let* packs = B0_pack.get_list_or_hint ~all_if_empty:false x_packs in
   Ok (unit_set_of ~units ~packs)
 
-let get_must_units_and_locked_packs ~exec ~exec_units ~exec_packs ~units ~packs
+let get_must_units_and_locked_packs
+    ~exec ~exec_units ~exec_packs ~units ~packs ()
   =
   let* units, packs = match exec, units, packs with
   | None, [], [] -> (* argumentless b0 invocation *)
@@ -103,6 +104,15 @@ let get_may_must ~is_locked ~units ~x_units =
     B0_unit.Set.diff all x_units
   in
   may, must
+
+let select_units ~units ~x_units ~packs ~x_packs ~lock =
+  let* x_units = get_excluded_units ~x_units ~x_packs in
+  let* units, locked_packs =
+    get_must_units_and_locked_packs
+      ~exec:None ~exec_units:[] ~exec_packs:[] ~units ~packs ()
+  in
+  let is_locked = is_locked ~lock ~locked_packs in
+  Ok (get_may_must ~is_locked ~units ~x_units, is_locked, locked_packs)
 
 let check_tool_ambiguities tool_name us =
   let warn_multi_defs tool_name u us =
@@ -218,6 +228,17 @@ let memo c ~may_build ~must_build =
   B0_memo.make
     ~hash_fun ~cwd ~tool_lookup ~env ~cache_dir ~trash_dir ~jobs ~feedback ()
 
+let make_build c ~store ~may_build ~must_build =
+  let* m = memo c ~may_build ~must_build in
+  let build =
+    let variant = "user" in
+    let b0_file = Option.get (B0_driver.Conf.b0_file c) in
+    let root_dir = Fpath.parent b0_file in
+    let b0_dir = B0_driver.Conf.b0_dir c in
+    B0_build.make ~root_dir ~b0_dir ~variant ~store m ~may_build ~must_build
+  in
+  Ok build
+
 (* Executing the action or the unit *)
 
 let executor_env build def c =
@@ -284,20 +305,14 @@ let build units x_units packs x_packs what lock show_path action args c =
   let* x_units = get_excluded_units ~x_units ~x_packs in
   let* units, locked_packs =
     get_must_units_and_locked_packs ~exec ~exec_units ~exec_packs ~units ~packs
+      ()
   in
   let is_locked = is_locked ~lock ~locked_packs in
   let may_build, must_build = get_may_must ~is_locked ~units ~x_units in
   if what
   then show_what ~lock ~is_locked ~locked_packs ~must_build ~may_build c else
   Log.if_error' ~use:B0_driver.Exit.build_error @@
-  let* m = memo c ~may_build ~must_build in
-  let build =
-    let variant = "user" in
-    let b0_file = Option.get (B0_driver.Conf.b0_file c) in
-    let root_dir = Fpath.parent b0_file in
-    let b0_dir = B0_driver.Conf.b0_dir c in
-    B0_build.make ~root_dir ~b0_dir ~variant ~store m ~may_build ~must_build
-  in
+  let* build = make_build c ~store ~may_build ~must_build in
   let exec_needs = unit_set_of ~units:exec_units ~packs:exec_packs in
   let* executor = match exec with
   | Some exec when not (B0_unit.Set.subset exec_needs must_build) ->

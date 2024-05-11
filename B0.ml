@@ -81,26 +81,34 @@ let show_url_tool =
 (* Tests *)
 
 let test_src f = `File Fpath.(~/"test" // f)
-let test_exe ?(requires = []) ?(more_srcs = []) file ~doc =
+let test ?(run = false) ?(requires = []) ?(more_srcs = []) file ~doc =
   let file = Fpath.v file in
   let more_srcs = List.map (fun v -> test_src (Fpath.v v)) more_srcs in
   let srcs = (test_src file) :: more_srcs in
   let requires =
     b0_std :: b0_memo :: b0_file :: b0_kit :: cmdliner :: requires
   in
-  B0_ocaml.exe (Fpath.basename ~strip_ext:true file) ~doc ~srcs ~requires
+  let meta =
+    B0_meta.empty
+    |> B0_meta.tag B0_meta.test
+    |> B0_meta.add B0_meta.run run
+  in
+  B0_ocaml.exe (Fpath.basename ~strip_ext:true file) ~meta ~doc ~srcs ~requires
 
 let test_memo ?requires ?(more_srcs = []) file ~doc =
   let more_srcs = "test_memo_setup.ml" :: more_srcs in
-  test_exe ?requires ~more_srcs file ~doc
+  test ?requires ~more_srcs file ~doc
 
-let test =
-  test_exe "test.ml" ~doc:"Some tests for basic modules (B0_std, etc.)"
-    ~more_srcs:["test_fmt.ml"; "test_fpath.ml"; "test_cmd.ml"; "test_base64.ml"]
+let test_base =
+  let doc = "Some tests for basic modules (B0_std, etc.)" in
+  let more_srcs =
+    ["test_fmt.ml"; "test_fpath.ml"; "test_cmd.ml"; "test_base64.ml"]
+  in
+  test "test.ml" ~run:true ~doc ~more_srcs
 
-let test_cp = test_exe "test_cp.ml" ~doc:"Test for Os.Path.copy"
-let test_rm = test_exe "test_rm.ml" ~doc:"Test for Os.Path.delete"
-let test_findex = test_exe "test_findex.ml" ~doc:"Test for B0_findex"
+let test_cp = test "test_cp.ml" ~doc:"Test for Os.Path.copy"
+let test_rm = test "test_rm.ml" ~doc:"Test for Os.Path.delete"
+let test_findex = test "test_findex.ml" ~doc:"Test for B0_findex"
 let test_memo_failure =
   test_memo "test_memo_failures.ml" ~doc:"Tests some failures of B0_memo.Memo."
 
@@ -114,11 +122,11 @@ let test_memo_redir =
   test_memo "test_memo_redir.ml" ~doc:"Test memo spawn stdio redirection"
 
 let test_ocaml_cobj_defs =
-  test_exe "test_ocaml_cobj_defs.ml" ~doc:"Test B0_ocaml.Cobj.of_string"
+  test "test_ocaml_cobj_defs.ml" ~doc:"Test B0_ocaml.Cobj.of_string"
 
 let test_b0_file =
   let requires = [b0_memo] in
-  test_exe "test_b0_file.ml" ~requires ~doc:"Test B0_file module"
+  test "test_b0_file.ml" ~requires ~doc:"Test B0_file module"
 
 (* Packs *)
 

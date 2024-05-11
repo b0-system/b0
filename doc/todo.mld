@@ -284,12 +284,9 @@ v}
 
 {2:test Test}
 
-- b0 test list
-- Add [b0 test] that run tests mark as such (or
-  rather skips those unmarked).
-- Testing executables, convention [test/$(unit)/suite.ini]
-  b0 test -u test -t
-  b0 bench -u bench -t
+- `b0 test`. Problem actions can't be part of packs. Why aren't actions
+  units ? List the differences (notably actions can statically
+  require units).
 
 {1:doc Documentation overhaul}
 

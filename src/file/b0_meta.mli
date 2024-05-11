@@ -299,5 +299,9 @@ val public : bool key
     [false]. The semantics depends on the context but it usually means
     that it exports the entity in an underlying global namespace. *)
 
+val run : bool key
+(** [run] tags entities that should be run in a particular context.
+    Defaults to [false]. *)
+
 val warning : string key
 (** [warning] is a warning shown on entity usage. *)

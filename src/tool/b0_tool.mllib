@@ -12,6 +12,7 @@ B0_cmd_log
 B0_cmd_pack
 B0_cmd_root
 B0_cmd_show
+B0_cmd_test
 B0_cmd_init
 B0_cmd_scope
 B0_cmd_tool
