@@ -1831,9 +1831,18 @@ let list format pager_don't =
   Log.app (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp_lib) us);
   B0_cli.Exit.ok
 
+let don't_load =
+  Libname.Set.of_list [
+    libname "compiler-libs.common";
+    libname "compiler-libs.bytecomp";
+    libname "compiler-libs.optcomp";
+    libname "compiler-libs.toplevel";
+    libname "compiler-libs.native-toplevel"; ]
+
+let don't_load lib = Libname.Set.mem (Lib.libname lib) don't_load
+
 let byte_code_build_load_args b units =
-  (* TODO this will likely need to be more sutble w.r.t. C stubs.
-     But its a good first step. Also we don't have a notion of stable
+  (* This is first good step. Also we don't have a notion of stable
      order for sort_mods, but we don't have one in the first place in b0
      OCaml exe specification yet I think. *)
   let sort_mods mods =
@@ -1889,7 +1898,9 @@ let byte_code_build_load_args b units =
     let m = B0_build.memo b in
     let libs = Libresolver.get_list_and_deps m resolver libs in
     B0_memo.stir ~block:true m;
-    let lib_opts = List.fold_left add_lib_opts Cmd.empty (Fut.sync libs) in
+    let libs = Fut.sync libs in
+    let libs = List.filter (Fun.negate don't_load) libs in
+    let lib_opts = List.fold_left add_lib_opts Cmd.empty libs in
     let inc_mods = Cmd.paths ~slip:"-I" (Fpath.Set.elements inc_mods) in
     Ok Cmd.(lib_opts %% inc_mods %% paths mods)
   with
