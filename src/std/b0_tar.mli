@@ -82,7 +82,7 @@ val unarchive :
   in_dir:Fpath.t -> unit -> (unit, string) result
 (** [unarchive ~make_path ~src ~in_dir] unarchives [src] in directory
     [in_dir] which is created if it doesn't exist. For [make_path]
-    see {!Os.Dir.create}. If [verbose] is [true] [-v] is passed to [tar].
+    see {!B0_std.Os.Dir.create}. If [verbose] is [true] [-v] is passed to [tar].
 
     The compression algorithm and tool is to use is looked up with [search]
     like in {!compress}. *)

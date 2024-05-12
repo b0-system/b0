@@ -19,7 +19,7 @@ type t
    the path given to [Tool.t] is not made of a single path segment it
    is not search in the environmet and it is the duty of the client to
    ensure it gets ready at some point. Either by a direct call to
-   {!file_ready} or by another file write. *)
+   {!ready_file} or by another file write. *)
 
 (** Command line tools.
 

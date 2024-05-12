@@ -24,7 +24,7 @@ val url : url B0_meta.key
     [.show-url] is used on a unit without specifying a path.*)
 
 val get_url : B0_env.t -> B0_unit.t -> (Url.t, string) result
-(** [get_url env u] performs the logic to get the {!url} for unit [u]
+(** [get_url env u] performs the logic to get the {!val-url} for unit [u]
     in environment [env]. *)
 
 (** {1:keys Server keys} *)
@@ -50,4 +50,4 @@ val action : B0_action.t
 
 val unit_exec : B0_unit.Exec.t
 (** [unit_exec] is a unit execution that invokes the [show-url]
-    tool on the unit's {!url}. *)
+    tool on the unit's {!val-url}. *)

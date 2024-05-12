@@ -727,7 +727,8 @@ module Op : sig
     ready_roots:Fpath.Set.t -> t list -> (unit, aggregate_error) result
   (** [find_aggregate_error ~ready_roots os] finds an aggregate error among
       the list of operation [os], assuming files [ready_roots] were made
-      ready. This is [Ok ()] if all operations [os] {!B0_zero.Op.Done}. *)
+      ready. This is [Ok ()] if all operations [os] are
+      {!Success}. *)
 end
 
 (** Build operation revivers.

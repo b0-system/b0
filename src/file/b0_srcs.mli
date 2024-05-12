@@ -93,7 +93,7 @@ val select : B0_build.t -> sels -> t Fut.t
 
     {b Important.} All files in the map that were selected via
     [`File], [`D] and [`D_rec] are automatically
-    {{!B0_memo.file_ready}made ready} in [b]. For those selected via
+    {{!B0_memo.ready_file}made ready} in [b]. For those selected via
     [`Fut] readyness determination is left to the invoked funtion.
 
     {b FIXME.} Provide ordering guarantes and avoid non-det from the

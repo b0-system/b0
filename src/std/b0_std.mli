@@ -1991,7 +1991,7 @@ module Cmd : sig
 
       {b Note.} For portability one should not use the [.exe] suffix on
       Windows on tools. This should be handled transparently by
-      {!tool_search} procedures. *)
+      {!type-tool_search} procedures. *)
 
   val tool : string -> t
   (** [tool t] is [arg t], used for reading clarity. *)
@@ -2015,7 +2015,7 @@ module Cmd : sig
   (** The type for tool search functions.
 
       These are functions that resolve and {{!set_tool}set} the
-      {!tool} argument of commands to a concrete program executable.
+      {!get_tool} argument of commands to a concrete program executable.
       Or return an error message if the tool cannot be resolved.
       See {!B0_std.Os.Cmd.section-tool_search}
       for implementations. *)
@@ -2941,7 +2941,7 @@ module Os : sig
 
     val get : ?search:Cmd.tool_search -> Cmd.t ->
       (Cmd.t, string) result
-    (** [get] is like {!tool} except but return an error message if [Ok None]
+    (** [get] is like {!find} except but return an error message if [Ok None]
         is returned. *)
 
     val get_first :
@@ -3142,7 +3142,7 @@ module Os : sig
       ?env:Env.assignments -> ?cwd:Fpath.t ->
       ?argv0:string -> Cmd.t -> ('a, string) result
     (** [execv ~env ~cwd cmd] executes the realpath pointed by
-        {!Cmd.tool cmd} as a new process in environment with [cmd] as
+        {!Cmd.tool}[ cmd] as a new process in environment with [cmd] as
         the {!Sys.argv} of this process. The function only returns in
         case of error. [env] defaults to
         {!B0_std.Os.Env.current_assignments}[ ()], [cwd] to
@@ -3507,7 +3507,6 @@ module Random_queue : sig
   val length : 'a t -> int
   (** [length q] is the number of elements in [q]. *)
 end
-
 
 (** Blocking values.
 

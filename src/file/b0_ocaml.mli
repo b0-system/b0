@@ -596,9 +596,9 @@ module Lib : sig
 
   val of_unit : B0_build.t -> Conf.t -> B0_unit.t -> t option Fut.t
   (** [lib_of_unit b ocaml_conf u] defines a library from unit [u] by
-      consulting {!requires}, {!respresents}, {!library}, {!modsrcs}
+      consulting {!requires}, {!represents}, {!library}, {!modsrcs}
       and {!B0_meta.warning}.  As a side effect this
-      {!B0_build.require}s [u]. *)
+      {!B0_build.requires}s [u]. *)
 
   (** {1:props Properties} *)
 
@@ -744,7 +744,7 @@ module Libresolver : sig
       {!key}.  It uses the {!Conf.key} in [store] and uses a
       {!Scope.build} with the build found in the store via
       {!B0_build.self} followed by an {!Scope.ocamlfind} in memo and a
-      cache in the {{!B0_build.shared_build_dir}directory} of the
+      cache in the {{!B0_build.shared_dir}directory} of the
       build. *)
 
   val key : t B0_store.key

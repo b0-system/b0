@@ -46,7 +46,7 @@ val scratch_dir : t -> Fpath.t
 
 val unit_dir : t -> B0_unit.t -> Fpath.t
 (** [unit_dir env u] is the build directory if [u] in the
-    build [build env]. That is {!B0_build.build_dir} [(build env) u]. *)
+    build [build env]. That is {!B0_build.unit_dir}[ (build env) u]. *)
 
 type dir = [`Cwd | `Root_dir | `Scope_dir | `Unit_dir ]
 (** The type for speciying directories. *)
@@ -70,7 +70,7 @@ val in_scratch_dir : t -> Fpath.t -> Fpath.t
 (** [in_scope_dir env p] is [Fpath.(scratch_dir env // p)]. *)
 
 val in_unit_dir : t -> B0_unit.t -> Fpath.t -> Fpath.t
-(** [in_unit_dir env u p] is [Fpath.(unit_build_dir env // p)]. *)
+(** [in_unit_dir env u p] is [Fpath.(unit_unit_dir env u // p)]. *)
 
 val in_dir : t -> dir -> Fpath.t -> Fpath.t
 (** [in_dir env d p] is [Fpath.(in_dir env d // p)]. *)
@@ -102,7 +102,7 @@ val build : t -> B0_build.t
 (** {1:tool Tool lookup} *)
 
 val get_cmd : ?skip_build:bool -> t -> Cmd.tool_search
-(** [get_cmd env cmd] is [cmd] with its {!B0_std.Cmd.tool} resolved in
+(** [get_cmd env cmd] is [cmd] with its {!B0_std.Cmd.get_tool} resolved in
     the environment. If [cmd]'s tool is defined by a unit in the build
     and is {!B0_unit.tool_is_user_accessible}, it comes first in the
     search, unless [skip_build] is [true] (defaults to [false]. *)
