@@ -261,7 +261,7 @@ module Compile = struct
           let archive = Some (B0_ocaml.Libname.to_archive_name libname) in
           let lib =
             B0_ocaml.Lib.of_dir m ~clib_ext ~libname ~requires:[]
-              ~represents:[] ~archive ~dir ~js_stubs:[] ~warning:None
+              ~exports:[] ~archive ~dir ~js_stubs:[] ~warning:None
           in
           match lib with
           | Error _ as e -> B0_memo.fail_if_error m e

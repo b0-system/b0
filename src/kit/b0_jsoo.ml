@@ -118,7 +118,9 @@ let get_link_objs m ~code ~resolver ~requires ~modsrcs =
 let compile_byte m ~opts ~resolver ~requires ~modsrcs =
   let code = `Byte in
   let comp = B0_ocaml.Tool.ocamlc in
-  let* requires = B0_ocaml.Libresolver.get_list_and_reprs m resolver requires in
+  let* requires =
+    B0_ocaml.Libresolver.get_list_and_exports m resolver requires
+  in
   B0_ocaml.Compile.intfs ~and_cmti:true m ~comp ~opts ~requires ~modsrcs;
   B0_ocaml.Compile.impls ~and_cmt:true m ~code ~opts ~requires ~modsrcs;
   Fut.return ()

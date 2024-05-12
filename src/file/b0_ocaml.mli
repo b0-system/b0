@@ -571,7 +571,7 @@ module Lib : sig
 
   val make :
     libname:Libname.t -> requires:Libname.t list ->
-    represents:Libname.t list -> dir:Fpath.t ->
+    exports:Libname.t list -> dir:Fpath.t ->
     cmis:Fpath.t list -> cmxs:Fpath.t list -> cma:Fpath.t option ->
     cmxa:Fpath.t option -> c_archive:Fpath.t option ->
     c_stubs:Fpath.t list -> js_stubs:Fpath.t list -> warning:string option -> t
@@ -580,7 +580,7 @@ module Lib : sig
 
   val of_dir :
     B0_memo.t -> clib_ext:Fpath.ext -> libname:Libname.t ->
-    requires:Libname.t list -> represents:Libname.t list -> dir:Fpath.t ->
+    requires:Libname.t list -> exports:Libname.t list -> dir:Fpath.t ->
     archive:string option -> js_stubs:Fpath.t list -> warning:string option ->
     (t, string) result
   (** [of_dir] is a library with given properties, looked up in [dir]
@@ -596,7 +596,7 @@ module Lib : sig
 
   val of_unit : B0_build.t -> Conf.t -> B0_unit.t -> t option Fut.t
   (** [lib_of_unit b ocaml_conf u] defines a library from unit [u] by
-      consulting {!requires}, {!represents}, {!library}, {!modsrcs}
+      consulting {!requires}, {!exports}, {!library}, {!modsrcs}
       and {!B0_meta.warning}.  As a side effect this
       {!B0_build.requires}s [u]. *)
 
@@ -608,8 +608,8 @@ module Lib : sig
   val requires : t -> Libname.t list
   (** [requires l] are the libraries that are required by [l]. *)
 
-  val represents : t -> Libname.t list
-  (** [represents l] are the libraries that are represented by [l]. *)
+  val exports : t -> Libname.t list
+  (** [exports l] are the libraries that are represented by [l]. *)
 
   val dir : t -> Fpath.t
   (** [dir l] is the library directory of [l]. *)
@@ -776,9 +776,10 @@ module Libresolver : sig
       fails if the library cannot be found. [m] is used to report
       notication or failure. *)
 
-  val get_list_and_reprs :  B0_memo.t -> t -> Libname.t list -> Lib.t list Fut.t
+  val get_list_and_exports :
+    B0_memo.t -> t -> Libname.t list -> Lib.t list Fut.t
   (** [get_list r libnames] looks up libraries [libnames] in [r] and
-      the libraries they {!B0_ocaml.represents}. Libraries are returned in
+      the libraries they {!B0_ocaml.exports}. Libraries are returned in
       the given order and the memo of [r] fails if a library cannot be found. *)
 
   val get_list_and_deps : B0_memo.t -> t -> Libname.t list -> Lib.t list Fut.t
@@ -837,7 +838,7 @@ let () = if !Sys.interactive then () else main ()
 val lib :
   ?wrap:(B0_unit.build_proc -> B0_unit.build_proc) -> ?doc:string ->
   ?meta:B0_meta.t -> ?c_requires:Cmd.t -> ?requires:Libname.t list ->
-  ?represents:Libname.t list -> ?public:bool -> ?name:string -> Libname.t ->
+  ?exports:Libname.t list -> ?public:bool -> ?name:string -> Libname.t ->
   srcs:B0_srcs.sels -> B0_unit.t
 (** [lib n ~srcs] is a built unit for a library named [n] made of
     sources [srcs].
@@ -850,7 +851,7 @@ val lib :
     {- [c_requires] FIXME hack, something more sensitive should be done.
        This each of these options are passed as [-cclib] options.}
     {- [requires] are the OCaml libraries required to compile the library.}
-    {- [represents] are the OCaml libraries represented by this library.}
+    {- [exports] are the OCaml libraries represented by this library.}
     {- [name] is the name of the build unit (default to [n] with [.]
         substituted by [-])}
     {- [srcs] are the library sources. extension [.ml],
@@ -861,14 +862,14 @@ val lib :
 
 val deprecated_lib :
   ?wrap:(B0_unit.build_proc -> B0_unit.build_proc) -> ?doc:string ->
-  ?meta:B0_meta.t -> ?represents:Libname.t list -> ?warning:string ->
+  ?meta:B0_meta.t -> ?exports:Libname.t list -> ?warning:string ->
   ?public:bool -> ?name:string -> Libname.t -> B0_unit.t
 (** [deprecated_lib n] is an empty build unit for a deprecated library
     named [n]. Most arguments are like in {!lib}.
     {ul
-    {- [rerpesents] is used {!represents}}
+    {- [rerpesents] is used {!exports}}
     {- [warning] is used for {!B0_meta.warning}, if unspecified
-       a warning message is derived from [represents].}
+       a warning message is derived from [exports].}
     {- The unit is tagged with {!B0_meta.deprecated}}} *)
 
 (** {2:metadata Metadata}
@@ -895,9 +896,9 @@ val requires : Libname.t list B0_meta.key
 (** [requires] on a unit specifies the OCaml libraries needed to
     compile a unit. *)
 
-val represents : Libname.t list B0_meta.key
-(** [represents] on a library build unit specifies that the library
-    represents these libraries. *)
+val exports : Libname.t list B0_meta.key
+(** [exports] on a library build unit specifies that the library
+    exports these libraries. *)
 
 (** {1:frag Build fragments}
 

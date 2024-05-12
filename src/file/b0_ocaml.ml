@@ -591,16 +591,16 @@ let requires =
   let pp_value = pp_libname_list in
   B0_meta.Key.make "requires" ~default:[] ~doc ~pp_value
 
-let represents =
-  let doc = "Represented OCaml libraries" in
+let exports =
+  let doc = "(Re-)exported OCaml libraries" in
   let pp_value = pp_libname_list in
-  B0_meta.Key.make "represents" ~default:[] ~doc ~pp_value
+  B0_meta.Key.make "exports" ~default:[] ~doc ~pp_value
 
 module Lib = struct
   type t =
     { libname : Libname.t;
       requires : Libname.t list;
-      represents : Libname.t list;
+      exports : Libname.t list;
       dir : Fpath.t;
       cmis : Fpath.t list;
       cmxs : Fpath.t list;
@@ -612,21 +612,21 @@ module Lib = struct
       warning : string option }
 
   let make
-      ~libname ~requires ~represents ~dir ~cmis ~cmxs ~cma ~cmxa ~c_archive
+      ~libname ~requires ~exports ~dir ~cmis ~cmxs ~cma ~cmxa ~c_archive
       ~c_stubs ~js_stubs ~warning
     =
-    { libname; requires; represents; dir; cmis; cmxs; cma; cmxa; c_archive;
+    { libname; requires; exports; dir; cmis; cmxs; cma; cmxa; c_archive;
       c_stubs; js_stubs; warning }
 
   let of_dir m
-      ~clib_ext ~libname ~requires ~represents ~dir ~archive ~js_stubs ~warning
+      ~clib_ext ~libname ~requires ~exports ~dir ~archive ~js_stubs ~warning
     =
     Result.map_error (fun e -> Fmt.str "Library %a: %s" Libname.pp libname e) @@
     Result.bind (Os.Dir.exists dir) @@ function
     | false ->
         B0_memo.notify m `Warn "Library %a: %a: no such directory"
           Libname.pp libname Fpath.pp dir;
-        Ok (make ~libname ~requires ~represents ~dir ~cmis:[] ~cmxs:[]
+        Ok (make ~libname ~requires ~exports ~dir ~cmis:[] ~cmxs:[]
               ~cma:None ~cmxa:None ~c_archive:None ~c_stubs:[] ~js_stubs:[]
               ~warning)
     | true ->
@@ -636,7 +636,7 @@ module Lib = struct
         let () = B0_memo.ready_files m js_stubs in
         let rec loop cmis cmxs cma cmxa c_archive c_stubs = function
         | [] ->
-            make ~libname ~requires ~represents ~dir ~cmis ~cmxs ~cma ~cmxa
+            make ~libname ~requires ~exports ~dir ~cmis ~cmxs ~cma ~cmxa
               ~c_archive ~c_stubs ~js_stubs ~warning
         | f :: fs ->
             let is_lib_archive f = match archive with
@@ -690,7 +690,7 @@ module Lib = struct
     let dir = B0_build.unit_dir b u in
     let libname = get_or_fail m library u in
     let requires = get_or_fail m requires u in
-    let represents = get_or_fail m represents u in
+    let exports = get_or_fail m exports u in
     let archive = Libname.to_archive_name libname in
     let base = Fpath.(dir / archive) in
     let cma = if has_cma then Some Fpath.(base + ".cma") else None in
@@ -718,14 +718,14 @@ module Lib = struct
     let js_stubs = [] (* FIXME *) in
     let warning = B0_unit.find_meta B0_meta.warning u in
     let lib =
-      make ~libname ~requires ~represents ~dir ~cmis ~cmxs ~cma ~cmxa
+      make ~libname ~requires ~exports ~dir ~cmis ~cmxs ~cma ~cmxa
         ~c_archive ~c_stubs ~js_stubs ~warning
     in
     Fut.return (Some lib)
 
   let libname l = l.libname
   let requires l = l.requires
-  let represents l = l.represents
+  let exports l = l.exports
   let dir l = l.dir
   let cmis l = l.cmis
   let cmxs l = l.cmxs
@@ -786,7 +786,7 @@ module Libresolver = struct
         (* We use %A otherwise whith %a we get a blank line if there's
            no archive. Technically though we only support single library
            archives *)
-        "%m:%d:%A:%(requires):%(represents):%(jsoo_runtime):%(warning)"
+        "%m:%d:%A:%(requires):%(exports):%(jsoo_runtime):%(warning)"
 
       let parse_field field parse s = match parse s with
       | Error e -> Fmt.failwith "%s: %s" field e
@@ -807,7 +807,7 @@ module Libresolver = struct
           in
           List.rev_map to_libname (rev_toks [] requires)
 
-      let parse_represents = parse_requires
+      let parse_exports = parse_requires
       let parse_archive = function
       | "" -> None
       | a ->
@@ -829,15 +829,15 @@ module Libresolver = struct
       let lib_of_info m ~conf ~libname ~file info =
         let clib_ext = Conf.lib_ext conf in
         try match String.split_on_char ':' (String.trim info) with
-        | [_meta_file; dir; archive; requires; represents; js_stubs; warning] ->
+        | [_meta_file; dir; archive; requires; exports; js_stubs; warning] ->
             let requires = parse_requires requires in
-            let represents = parse_represents represents in
+            let exports = parse_exports exports in
             let archive = parse_archive archive in
             let dir = parse_dir dir in
             let js_stubs = parse_js_stubs js_stubs in
             let warning = parse_warning warning in
             Lib.of_dir m
-              ~clib_ext ~libname ~requires ~represents
+              ~clib_ext ~libname ~requires ~exports
               ~dir ~archive ~js_stubs ~warning
         | _ -> Fmt.failwith "could not parse %S" info
         with
@@ -1015,7 +1015,7 @@ module Libresolver = struct
     | None -> B0_memo.fail m "@[Library %a: Not found@]" Libname.pp name
     | Some lib -> Fut.return lib
 
-  let get_list_and_reprs m r ns =
+  let get_list_and_exports m r ns =
     (* In the future we want to get `requires` aswell to
        get them into -H options (OCaml >= 5.2) *)
     let rec loop seen acc = function
@@ -1026,8 +1026,8 @@ module Libresolver = struct
         let* lib = get m r l in
         let () = Lib.handle_warning m lib in
         let not_seen n = not (Libname.Set.mem n seen) in
-        let reprs = List.filter not_seen (Lib.represents lib) in
-        let* seen, acc = loop seen acc reprs in
+        let exports = List.filter not_seen (Lib.exports lib) in
+        let* seen, acc = loop seen acc exports in
         loop seen (lib :: acc) ls
     in
     let* _, libs = loop Libname.Set.empty [] ns in
@@ -1040,7 +1040,7 @@ module Libresolver = struct
         if Libname.Set.mem l seen then loop seen acc ls else
         let seen = Libname.Set.add l seen in
         let* lib = get m r l in
-        let deps = Lib.represents lib in
+        let deps = Lib.exports lib in
         let* seen, acc = loop seen acc deps in
         let deps = Lib.requires lib in
         let* seen, acc = loop seen acc deps in
@@ -1364,7 +1364,7 @@ let exe_proc set_exe_path set_modsrcs srcs b =
   let* unit_code = unit_code b m meta in
   let* conf = B0_build.get b Conf.key in
   let* resolver = B0_build.get b Libresolver.key in
-  let* comp_requires = Libresolver.get_list_and_reprs m resolver requires in
+  let* comp_requires = Libresolver.get_list_and_exports m resolver requires in
   let tool_name = B0_meta.get B0_unit.tool_name meta in
   let exe_ext = Conf.exe_ext conf in
   let opts = Cmd.(arg "-g") (* TODO *) in
@@ -1448,7 +1448,7 @@ let lib_proc set_modsrcs srcs b =
   let* built_code = B0_build.get b Code.built in
   let* conf = B0_build.get b Conf.key in
   let* resolver = B0_build.get b Libresolver.key in
-  let* requires = Libresolver.get_list_and_reprs m resolver requires in
+  let* requires = Libresolver.get_list_and_exports m resolver requires in
   let code = match built_code with `All | `Native -> `Native |`Byte -> `Byte in
   let all_code = match built_code with `All -> true | _ -> false in
   let comp = match built_code with
@@ -1537,10 +1537,10 @@ let unit_doc_for_lib ~deprecated ~libname ~doc = match doc with
     let pp_depr ppf d = if d then Fmt.string ppf " (deprecated)" else () in
     Fmt.str "The %s library%a" (Libname.to_string libname) pp_depr deprecated
 
-let unit_warning_for_deprecated_lib ~represents ~warning = match warning with
+let unit_warning_for_deprecated_lib ~exports ~warning = match warning with
 | Some warning -> warning
 | None ->
-    let pp_use_represents ppf = function
+    let pp_use_exports ppf = function
     | None | Some [] -> ()
     | Some [l] -> Fmt.pf ppf ", use the %s library." (Libname.to_string l)
     | Some ls ->
@@ -1548,11 +1548,11 @@ let unit_warning_for_deprecated_lib ~represents ~warning = match warning with
         let ls = List.map Libname.to_string ls in
         Fmt.pf ppf ", use the %a libraries." pp_libs ls
     in
-    Fmt.str "Deprecated%a" pp_use_represents represents
+    Fmt.str "Deprecated%a" pp_use_exports exports
 
 let lib
     ?(wrap = fun proc b -> proc b) ?doc ?(meta = B0_meta.empty)
-    ?c_requires:c_reqs ?requires:reqs ?represents:reps ?(public = true)
+    ?c_requires:c_reqs ?requires:reqs ?exports:exps ?(public = true)
     ?name libname ~srcs
   =
   let name = unit_name_for_lib ~libname ~name in
@@ -1566,7 +1566,7 @@ let lib
     |> B0_meta.add B0_meta.public public
     |> B0_meta.add_some_or_default c_requires c_reqs
     |> B0_meta.add_some_or_default requires reqs
-    |> B0_meta.add_some_or_default represents reps
+    |> B0_meta.add_some_or_default exports exps
     |> B0_meta.add modsrcs fut_modsrcs
   in
   let meta = B0_meta.override base ~by:meta in
@@ -1575,11 +1575,11 @@ let lib
 
 let deprecated_lib
     ?(wrap = fun proc b -> proc b) ?doc ?(meta = B0_meta.empty)
-    ?represents:reprs ?warning ?(public = true) ?name libname
+    ?exports:exps ?warning ?(public = true) ?name libname
   =
   let name = unit_name_for_lib ~libname ~name in
   let doc = unit_doc_for_lib ~deprecated:true ~libname ~doc in
-  let warning = unit_warning_for_deprecated_lib ~represents:reprs ~warning in
+  let warning = unit_warning_for_deprecated_lib ~exports:exps ~warning in
   let base =
     B0_meta.empty
     |> B0_meta.tag tag
@@ -1589,7 +1589,7 @@ let deprecated_lib
     |> B0_meta.add B0_meta.public public
     |> B0_meta.add B0_meta.warning warning
     |> B0_meta.add_some_or_default requires None
-    |> B0_meta.add_some_or_default represents reprs
+    |> B0_meta.add_some_or_default exports exps
     |> B0_meta.add modsrcs (Fut.return Modname.Map.empty)
   in
   let meta = B0_meta.override base ~by:meta in
@@ -1926,7 +1926,7 @@ module Meta = struct
       description : string;
       libname : Libname.t;
       requires : string list;
-      represents : string list;
+      exports : string list;
       unit : B0_unit.t;
       warning : string option; }
 
@@ -1947,14 +1947,14 @@ module Meta = struct
     let requires = B0_unit.find_or_default_meta requires unit in
     let requires = List.map Libname.to_string requires in
     let warning = B0_unit.find_meta B0_meta.warning unit in
-    let requires, represents = match B0_unit.find_meta represents unit with
+    let requires, exports = match B0_unit.find_meta exports unit with
     | None -> requires, []
-    | Some reprs ->
-        let represents = List.map Libname.to_string reprs in
-        let requires = requires @ represents (* for compat *) in
-        requires, represents
+    | Some exps ->
+        let exports = List.map Libname.to_string exps in
+        let requires = requires @ exports (* for compat *) in
+        requires, exports
     in
-    { archive_name; description; libname; requires; represents; unit; warning }
+    { archive_name; description; libname; requires; exports; unit; warning }
 
   let empty_node basename =
     { basename; children = String.Map.empty; lib_info = None }
@@ -2019,8 +2019,8 @@ module Meta = struct
       let requires = match lib.lib_info with
       | None -> "" | Some i -> (String.concat " " i.requires)
       in
-      let represents = match lib.lib_info with
-      | None -> "" | Some i -> (String.concat " " i.represents)
+      let exports = match lib.lib_info with
+      | None -> "" | Some i -> (String.concat " " i.exports)
       in
       let ls =
         if is_top || is_deprecated
@@ -2031,8 +2031,8 @@ module Meta = struct
       let ls = field ls ~indent "version" meta.version in
       let ls = field ls ~indent "requires" requires in
       let ls =
-        if represents = "" then ls else
-        field ls ~indent "represents" represents
+        if exports = "" then ls else
+        field ls ~indent "exports" exports
       in
       let ls = match lib.lib_info with
       | None -> ls
