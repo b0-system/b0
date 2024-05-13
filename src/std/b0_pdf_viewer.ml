@@ -33,7 +33,7 @@ let find ?search ?cmd () =
         if Sys.win32
         then Ok Cmd.(arg "start" % "") (* XXX really ? *) else
         Fmt.error "No PDF viewer found. Set the %a environment variable."
-          Fmt.code' Env.pdfviewer
+          Fmt.code Env.pdfviewer
 
 let show pdf_viewer file = Os.Cmd.run Cmd.(pdf_viewer %% path file)
 

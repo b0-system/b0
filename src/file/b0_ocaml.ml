@@ -125,7 +125,7 @@ module Conf = struct
   let to_string_map c = c.fields
   let of_string_map fields = try
     let err = Fmt.failwith in
-    let err_key k = err "key %a not found." Fmt.(code string) k in
+    let err_key k = err "key %a not found." Fmt.code k in
     let find k fs = match String.Map.find_opt k fs with
     | None -> err_key k | Some v -> v
     in
@@ -146,7 +146,7 @@ module Conf = struct
       let k = "supports_shared_libraries" in
       let s = find k fields in
       match bool_of_string_opt s with
-      | None -> err "key %a cound not parse bool from %S" Fmt.(code string) k s
+      | None -> err "key %a cound not parse bool from %S" Fmt.code k s
       | Some b -> b
     in
     Ok { fields; version; where; asm_ext; dll_ext; exe_ext; lib_ext; obj_ext;
@@ -206,7 +206,7 @@ module Modname = struct
   let v n = String.Ascii.capitalize n
   let equal = String.equal
   let compare = String.compare
-  let pp = Fmt.tty' [`Bold]
+  let pp = Fmt.tty [`Bold]
   module Set = String.Set
   module Map = String.Map
 
@@ -557,7 +557,7 @@ module Libname = struct
   let v s = match of_string s with Ok n -> n | Error e -> invalid_arg e
   let equal n0 n1 = Fpath.equal n0.name n1.name
   let compare n0 n1 = Fpath.compare n0.name n1.name
-  let pp = Fmt.using to_string Fmt.code'
+  let pp = Fmt.using to_string Fmt.code
 
   module T = struct type nonrec t = t let compare = compare end
   module Set = Set.Make (T)
@@ -1992,7 +1992,7 @@ module Meta = struct
     if root = lib.basename then loop unit lib names else
     Fmt.failwith "@[<v>Library %a defined by unit %a not rooted in %a@,\
                   All libraries must belong to the same root.@]"
-      Libname.pp libname B0_unit.pp_name unit Fmt.code' root
+      Libname.pp libname B0_unit.pp_name unit Fmt.code root
 
   let of_units ~root_doc ~version units =
     try

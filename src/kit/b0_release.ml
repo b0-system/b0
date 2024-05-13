@@ -246,9 +246,9 @@ module Archive = struct
     let force = true and make_path = true in
     let* () = B0_tar.compress ~search ~force ~make_path archive_file ~archive in
     let archive_dir = Fpath.strip_ext archive_file in
-    Log.app (fun m -> m "Wrote %a" (Fmt.code Fpath.pp) archive_file);
+    Log.app (fun m -> m "Wrote %a" (Fmt.code' Fpath.pp) archive_file);
     Log.app (fun m ->
-        m "TODO Checking release in %a" (Fmt.code Fpath.pp) archive_dir);
+        m "TODO Checking release in %a" (Fmt.code' Fpath.pp) archive_dir);
     let make_path = true and verbose = false in
     let* _exists = Os.Path.delete ~recurse:true archive_dir in
     let in_dir = B0_env.scratch_dir env in
@@ -260,14 +260,14 @@ module Archive = struct
     let* _exists = Os.Path.delete ~recurse:true archive_dir in
     (Log.app @@ fun m ->
     m "@[<v>Release: %a %a@,Commit:  %a@,Archive: %a@]@."
-      Fmt.code' name String.pp_version_str version
+      Fmt.code name String.pp_version_str version
       B0_vcs_repo.pp_commit commit_id
-      (Fmt.code Fpath.pp) archive_file);
+      (Fmt.code' Fpath.pp) archive_file);
     if is_dirty then
       (Log.warn @@ fun m ->
        m "@[<v>%a repo in scope directory %a@,\
           Did you forget to commit some changes ?@]@."
-         B0_vcs_repo.pp_dirty () (Fmt.code Fpath.pp) scope_dir);
+         B0_vcs_repo.pp_dirty () (Fmt.code' Fpath.pp) scope_dir);
     Ok ()
 
   let cmd env commit_ish packs x_packs =
@@ -355,7 +355,7 @@ module Tag = struct
       if packs <> [] then Ok () else
       Fmt.error
         "@[<v>No pack found. Specify one with option %a or define@,\
-         a pack named %a.@]" Fmt.code' "-p" Fmt.code' "default"
+         a pack named %a.@]" Fmt.code "-p" Fmt.code "default"
     in
     let* repos_tags = gather_repos_and_tags version packs in
     let rec loop = function

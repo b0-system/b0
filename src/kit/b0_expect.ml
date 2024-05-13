@@ -8,13 +8,13 @@ open Result.Syntax
 
 (* FIXME potentially add these things to Fmt/fpath *)
 
-let pp_cli_arg fmt = Fmt.tty [`Underline] fmt
+let pp_cli_arg fmt = Fmt.tty' [`Underline] fmt
 let fpath_pp_high_suffix pre ppf p = match Fpath.strip_prefix pre p with
-| None -> (Fmt.code Fpath.pp) ppf p
+| None -> (Fmt.code' Fpath.pp) ppf p
 | Some p ->
     Fpath.pp ppf pre;
     (if not (Fpath.is_dir_path pre) then Fmt.char ppf Fpath.dir_sep_char);
-    (Fmt.code Fpath.pp) ppf p
+    (Fmt.code' Fpath.pp) ppf p
 
 (* Aborting *)
 
@@ -78,7 +78,7 @@ let cwd_rel_path ctx p = Fpath.relative ~to_dir:(B0_env.cwd ctx.env) p
 let path_for_user ctx p = if ctx.log_absolute then p else cwd_rel_path ctx p
 let pp_path_for_user ctx ppf p = match ctx.log_absolute with
 | true -> fpath_pp_high_suffix (B0_env.scope_dir ctx.env) ppf p
-| false -> (Fmt.code Fpath.pp) ppf (cwd_rel_path ctx p)
+| false -> (Fmt.code' Fpath.pp) ppf (cwd_rel_path ctx p)
 
 (* Showing results *)
 
@@ -93,7 +93,7 @@ let log_diff ctx file =  match B0_vcs_repo.kind ctx.vcs_repo with
     failwith "Hg support is TODO"
 
 let log_outcome ctx o =
-  let label ppf st l = Fmt.tty' st ppf (String.concat " " ["";l;""]) in
+  let label ppf st l = Fmt.tty st ppf (String.concat " " ["";l;""]) in
   let pp_label ppf = function
   | `Unexpected -> label ppf [`Bg `Red; `Fg `White] "M"
   | `New -> label ppf [`Bg `Yellow; `Fg `Black] "?"
@@ -111,7 +111,7 @@ let log_outcome ctx o =
 let pp_vcs_cmd vcs ?(file = false) ppf cmd =
   let pp_file_arg ppf () = Fmt.(pp_cli_arg string) ppf "file" in
   let file = if file then pp_file_arg else Fmt.nop in
-  Fmt.pf ppf "%a %a" Fmt.(code string) (String.concat " " [vcs; cmd]) file ()
+  Fmt.pf ppf "%a %a" Fmt.code (String.concat " " [vcs; cmd]) file ()
 
 let pp_git = pp_vcs_cmd "git"
 let pp_hg = pp_vcs_cmd "hg"
@@ -137,7 +137,7 @@ let pp_diff_cmd ppf (vcs, dir) = match B0_vcs_repo.kind vcs with
 | Hg -> pp_hg ppf "TODO"
 
 let pp_status st status =
-  Fmt.tty st (fun ppf c -> Fmt.pf ppf "%d %s" c status)
+  Fmt.tty' st (fun ppf c -> Fmt.pf ppf "%d %s" c status)
 
 let pp_corrected ppf n = if n = 0 then () else Fmt.pf ppf " (%d corrected)" n
 let pp_expected = pp_status [`Fg `Green] "expected"
@@ -163,7 +163,7 @@ let pp_all_pass ppf (count, corr, dur) =
   let test = if count > 1 then "tests expected" else "test expected" in
   let green = [`Fg `Green] in
   Fmt.pf ppf "%a %a%a in %a"
-    (Fmt.tty' green) "All" (pp_status green test) count
+    (Fmt.tty green) "All" (pp_status green test) count
     pp_corrected corr Mtime.Span.pp dur
 
 let pp_total ppf (count, dur) =

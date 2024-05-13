@@ -11,7 +11,7 @@ module T = struct
   type nonrec t = t
   let def_kind = "pack"
   let def p = p.def
-  let pp_name_str = Fmt.(code string)
+  let pp_name_str = Fmt.code
 end
 
 include (B0_def.Make (T) : B0_def.S with type t := t)
@@ -66,20 +66,20 @@ let find_default () = find "default"
 (* Formatting *)
 
 let pp_locked ppf p =
-  if locked p then Fmt.tty' [`Fg `Red] ppf "locked " else Fmt.nop ppf ()
+  if locked p then Fmt.tty [`Fg `Red] ppf "locked " else Fmt.nop ppf ()
 
 let pp_units ppf p =
   if units p = [] then () else
-  let label = Fmt.tty' [`Fg `Green ] in
+  let label = Fmt.tty [`Fg `Green ] in
   let pp = Fmt.(pp_locked ++ using units (list ~sep:sp B0_unit.pp_name)) in
   Fmt.field ~label "units" Fmt.id pp ppf p
 
 let pp_synopsis ppf v =
   let pp_tag ppf u =
     let style = [`Bold] in
-    Fmt.tty' style ppf "[";
+    Fmt.tty style ppf "[";
     Fmt.string ppf "p";
-    Fmt.tty' style ppf "]";
+    Fmt.tty style ppf "]";
   in
   Fmt.pf ppf "@[%a %a@]" pp_tag v pp_synopsis v
 

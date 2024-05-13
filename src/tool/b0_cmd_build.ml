@@ -10,18 +10,18 @@ let err_nothing () = match B0_unit.list () with
 | _ :: _ -> "Nothing to build with this invocation."
 | [] ->
     Fmt.str "No units are defined in the %a file"
-      Fmt.code' B0_driver.Conf.b0_file_name
+      Fmt.code B0_driver.Conf.b0_file_name
 
 (* XXX more needs to go the library here *)
 
 (* Explaining what gets into the build *)
 
-let green = Fmt.tty' [`Fg `Green]
-let red = Fmt.tty' [`Fg `Red]
+let green = Fmt.tty [`Fg `Green]
+let red = Fmt.tty [`Fg `Red]
 
 let log_explain_lock ~is_locked ~lock ~locked_packs =
   let option_reason pre opt ppf = function
-  | None -> () | Some _ -> Fmt.pf ppf "%s option %a" pre Fmt.(code string) opt
+  | None -> () | Some _ -> Fmt.pf ppf "%s option %a" pre Fmt.code opt
   in
   let packs_reason lock ppf = function
   | [] -> ()
@@ -118,22 +118,22 @@ let check_tool_ambiguities tool_name us =
   let warn_multi_defs tool_name u us =
     Log.warn @@ fun m ->
     m "@[<v>Tool %a defined in multiple units: %a.@,Using unit %a.@]"
-      Fmt.code' tool_name Fmt.(list ~sep:comma B0_unit.pp_name) (u :: us)
+      Fmt.code tool_name Fmt.(list ~sep:comma B0_unit.pp_name) (u :: us)
       B0_unit.pp_name u
   in
   let warn_has_unit_name tool_name u u' =
     Log.warn @@ fun m ->
     m "@[<v>Tool %a of unit %a also matches unit name %a@,\
        Running the tool, use %a %a to execute the unit.@]"
-      Fmt.code' tool_name B0_unit.pp_name u B0_unit.pp_name u'
-      Fmt.code' "b0 unit exec" B0_unit.pp_name u'
+      Fmt.code tool_name B0_unit.pp_name u B0_unit.pp_name u'
+      Fmt.code "b0 unit exec" B0_unit.pp_name u'
   in
   let warn_has_action_name tool_name u a =
     Log.warn @@ fun m ->
     m "@[<v>Tool %a of unit %a also matches action name %a@,\
        Running the tool, use %a %a to execute the action.@]"
-      Fmt.code' tool_name B0_unit.pp_name u B0_action.pp_name a
-      Fmt.code' "b0 action exec" B0_action.pp_name a
+      Fmt.code tool_name B0_unit.pp_name u B0_action.pp_name a
+      Fmt.code "b0 action exec" B0_action.pp_name a
   in
   let u = match us with
   | [u] -> u | u :: us -> warn_multi_defs tool_name u us; u
@@ -168,8 +168,7 @@ let find_store_and_execution args = function
         | Ok u, Ok action ->
             (* XXX we should maybe disallow declaring an action with the same
                name as a tool or unit in a given scope. *)
-            Fmt.error "Both a tool and action are called %a"
-              (Fmt.code Fmt.string) name
+            Fmt.error "Both a tool and action are called %a" Fmt.code name
         | Ok u, Error _ ->
             Ok ([], Some (`Unit u), [u], [])
         | Error _, Ok a ->
@@ -187,11 +186,11 @@ let find_store_and_execution args = function
             let suggs = String.Set.elements set in
             let hint = Fmt.did_you_mean in
             let nothing_to ppf v =
-              Fmt.pf ppf "Nothing to execute for %a." Fmt.code' v
+              Fmt.pf ppf "Nothing to execute for %a." Fmt.code v
             in
             let pp ppf (v, hints) = match hints with
             | [] -> nothing_to ppf v
-            | hints -> Fmt.pf ppf "%a@ %a" nothing_to v (hint Fmt.code') hints
+            | hints -> Fmt.pf ppf "%a@ %a" nothing_to v (hint Fmt.code) hints
             in
             (* XXX show how to list available actions if there's no typo *)
             Fmt.error "@[%a@]" pp (name, suggs)
@@ -293,7 +292,7 @@ let error_executor_needs ~exec_needs ~must_build exec =
   Fmt.error "@[Cannot execute %a: %a will not build, see %a@]"
     pp_exec exec
     (Fmt.iter B0_unit.Set.iter ~sep:Fmt.comma B0_unit.pp_name) diff
-    Fmt.code' "--what"
+    Fmt.code "--what"
 
 (* Build command *)
 

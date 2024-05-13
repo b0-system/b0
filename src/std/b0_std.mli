@@ -405,19 +405,19 @@ module Fmt : sig
   val tty_cap : unit -> Tty.cap
   (** [tty_cap ()] is the global styling capability. *)
 
-  val tty : Tty.style list -> 'a t -> 'a t
-  (** [tty styles pp_v ppf v] prints [v] with [pp_v] on [ppf]
+  val tty' : Tty.style list -> 'a t -> 'a t
+  (** [tty' styles pp_v ppf v] prints [v] with [pp_v] on [ppf]
       according to [styles] and the value of {!tty_cap}. *)
 
-  val tty' : Tty.style list -> string t
-  (** [tty' styles ppf s] prints [s] on [ppf] according to [styles]
+  val tty : Tty.style list -> string t
+  (** [tty styles ppf s] prints [s] on [ppf] according to [styles]
       and the value of {!tty_cap}. *)
 
-  val code : 'a t -> 'a t
-  (** [code] is [tty [`Bold]]. *)
-
-  val code' : string t
+  val code' : 'a t -> 'a t
   (** [code'] is [tty' [`Bold]]. *)
+
+  val code : string t
+  (** [code] is [tty [`Bold]]. *)
 end
 
 (** Result values *)

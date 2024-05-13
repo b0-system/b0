@@ -88,13 +88,12 @@ module Conf = struct
   let get_b0_file c = match c.b0_file with
   | Some file -> Ok file
   | None ->
-      let path = Fmt.(code Fpath.pp_unquoted) in
-      let code = Fmt.(code string) in
+      let path = Fmt.(code' Fpath.pp_unquoted) in
       Fmt.error
         "@[<v>No %a file found in %a@,\
                  or upwards. Use option %a to specify one or %a for help.@]"
-        code "B0.ml" path c.cwd Fmt.(code string) "--b0-file"
-        Fmt.(code string) "--help"
+        Fmt.code "B0.ml" path c.cwd Fmt.code "--b0-file"
+        Fmt.code "--help"
 
   (* Setup *)
 
@@ -384,7 +383,7 @@ module Compile = struct
           B0_zero_conv.Op.pp_aggregate_error
             ~read_howto ~write_howto () Fmt.stderr e;
         Fmt.error "Could not compile B0 file %a"
-          Fmt.(code Fpath.pp) (B0_file.file src)
+          Fmt.(code' Fpath.pp) (B0_file.file src)
 end
 
 let compile_b0_file conf ~driver ~feedback b0_file =
@@ -418,7 +417,7 @@ let with_b0_file_if_any ~driver cmd =
     | Some b0_file ->
         match compile_b0_file conf ~driver ~feedback:false b0_file with
         | Error e ->
-            (Log.warn @@ fun m -> m "%s. See %a." e Fmt.code' "b0 file log -e");
+            (Log.warn @@ fun m -> m "%s. See %a." e Fmt.code "b0 file log -e");
             has_failed_b0_file := true;
             cmd conf
         | Ok exe ->

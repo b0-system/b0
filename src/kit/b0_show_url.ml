@@ -75,7 +75,7 @@ let endpoint_of_url_and_authority url authority =
   | Some "https" -> Os.Socket.Endpoint.of_string ~default_port:443 authority
   | Some scheme ->
       (Log.warn @@ fun m ->
-       m "Unknown scheme %a using 80 as the default port" Fmt.code' scheme);
+       m "Unknown scheme %a using 80 as the default port" Fmt.code scheme);
       Os.Socket.Endpoint.of_string ~default_port:80 authority
 
 let find_server_mode_unit = function
@@ -98,11 +98,11 @@ let find_server_mode_unit = function
             let suggs = String.Set.elements set in
             let hint = Fmt.did_you_mean in
             let nothing_to ppf v =
-              Fmt.pf ppf "Nothing to execute for %a." Fmt.code' v
+              Fmt.pf ppf "Nothing to execute for %a." Fmt.code v
             in
             let pp ppf (v, hints) = match hints with
             | [] -> nothing_to ppf v
-            | hints -> Fmt.pf ppf "%a@ %a" nothing_to v (hint Fmt.code') hints
+            | hints -> Fmt.pf ppf "%a@ %a" nothing_to v (hint Fmt.code) hints
             in
             Fmt.error "@[%a@]" pp (entity, suggs)
 
@@ -117,7 +117,7 @@ let server_mode env timeout_cli no_exec ~url args = match Url.authority url with
           (Log.warn @@ fun m ->
            m "@[<v>No tool specified but trying to connect to %s@,\
               Use option %a to suppress this warning.@]"
-             authority Fmt.code' "--no-exec");
+             authority Fmt.code "--no-exec");
         let timeout = match timeout_cli with
         | Some timeout -> timeout
         | None -> B0_meta.Key.get_default timeout_s
@@ -162,7 +162,7 @@ let unit_mode env args =
   let specs = List.combine units paths in
   let make_url (unit, (arg, p)) =
     Result.error_to_failure @@
-    Result.map_error (fun e -> Fmt.str "%a: %s" Fmt.code' arg e) @@
+    Result.map_error (fun e -> Fmt.str "%a: %s" Fmt.code arg e) @@
     let unit_dir = B0_build.unit_dir (B0_env.build env) unit in
     match p with
     | Some p -> url_of_path env Fpath.(unit_dir // v p)

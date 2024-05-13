@@ -93,7 +93,7 @@ module B0_std = struct
   | "always" -> Ok (Some `Ansi)
   | "never" -> Ok (Some `None)
   | e ->
-      let pp_cap = Fmt.(code string) in
+      let pp_cap = Fmt.code in
       let kind = Fmt.any "color behaviour" in
       let dom = ["auto"; "always"; "never"] in
       Fmt.error "%a" Fmt.(unknown' ~kind pp_cap ~hint:must_be) (e, dom)
@@ -158,11 +158,11 @@ module File_cache = struct
 
   let pp_key_stats ppf s =
     Fmt.pf ppf " %5d  %5d  %a"
-      s.keys_count s.keys_file_count (Fmt.code Fmt.byte_size) s.keys_byte_size
+      s.keys_count s.keys_file_count (Fmt.code' Fmt.byte_size) s.keys_byte_size
 
   let pp_stats ppf (total, used) =
-    let row = Fmt.tty' [`Fg `Yellow] in
-    let col = Fmt.tty' [`Italic] in
+    let row = Fmt.tty [`Fg `Yellow] in
+    let col = Fmt.tty [`Italic] in
     let pp_cols ppf () = Fmt.pf ppf "       %a  %a" col "keys" col "files" in
     Fmt.pf ppf "@[<v>%a%a@,%a%a@,%a@]"
       row "total" pp_key_stats total
@@ -170,8 +170,8 @@ module File_cache = struct
       pp_cols ()
 
   let pp_stats ppf (total, used) =
-    let row = Fmt.tty' [`Fg `Yellow] in
-    let col = Fmt.tty' [`Italic] in
+    let row = Fmt.tty [`Fg `Yellow] in
+    let col = Fmt.tty [`Italic] in
     let pp_size ppf s = Fmt.pf ppf "%6s" (Fmt.str "%a" Fmt.byte_size s) in
     let pp_cols ppf () = Fmt.pf ppf "       %a    %a" col "total" col "used" in
     Fmt.pf ppf "@[<v>%a@,%a %6d  %6d@,%a %6d  %6d@,%a %a  %a@]"
@@ -179,8 +179,8 @@ module File_cache = struct
       row "keys " total.keys_count used.keys_count
       row "files" total.keys_file_count used.keys_file_count
       row "size "
-      (Fmt.code pp_size) total.keys_byte_size
-      (Fmt.code pp_size) used.keys_byte_size
+      (Fmt.code' pp_size) total.keys_byte_size
+      (Fmt.code' pp_size) used.keys_byte_size
 
   let stats_of_cache c ~used =
     let rec loop tk tf tb uk uf ub = function
@@ -229,7 +229,7 @@ module File_cache = struct
             | true -> Ok ()
             | false ->
                 Log.warn begin fun m ->
-                  m "No key %a in cache, ignored." Fmt.(code string) k
+                  m "No key %a in cache, ignored." Fmt.code k
                 end;
                 Ok ()
           in
@@ -710,7 +710,7 @@ module Memo = struct
     | None ->
         let ids = List.map (fun (module H : Hash.T) -> H.id) (Hash.funs ()) in
         Fmt.str "Hash function to use for caching. %a"
-          Fmt.(must_be (Fmt.code string)) ids
+          Fmt.(must_be Fmt.code) ids
     in
     Arg.(value & opt (some ~none:doc_none hash_fun) None &
          info opts ~env ~doc ?docs ~docv:"HASHFUN")
@@ -861,7 +861,7 @@ module Memo = struct
         let hs = if not hashed_size then 0 else hashed_byte_size l.file_hashes
         in
         let pp_hashed_size ppf s =
-          let label = Fmt.tty' [`Italic] in
+          let label = Fmt.tty [`Italic] in
           match hashed_size with
           | true -> Fmt.field ~label "size" (fun c -> c) Fmt.byte_size ppf s
           | false -> ()
@@ -869,7 +869,7 @@ module Memo = struct
         Fmt.pf ppf "%a %a" pp_totals (hc, hd) pp_hashed_size hs
       in
       let pp_xtime ppf (self, children) =
-        let label = Fmt.tty' [`Italic] in
+        let label = Fmt.tty [`Italic] in
         Fmt.pf ppf "%a %a" Mtime.Span.pp self
           (Fmt.field ~label "children" (fun c -> c) Mtime.Span.pp)
           children
@@ -888,7 +888,7 @@ module Memo = struct
       let pp_op_no_cache ppf (ot, od) =
         Fmt.pf ppf "%a %d" Mtime.Span.pp od ot
       in
-      let pp_sec s ppf _ = Fmt.tty' [`Bold] ppf s in
+      let pp_sec s ppf _ = Fmt.tty [`Bold] ppf s in
       (Fmt.record @@
        [ pp_sec "selected operations";
          Fmt.field "spawns" (fun _ -> (sc, st, sd)) pp_op;

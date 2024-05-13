@@ -34,7 +34,7 @@ let select_files m u (seen, by_ext) fs =
   | f :: fs ->
       match Os.File.exists f |> fail_if_error m u with
       | false ->
-          let pp_file = Fmt.(code Fpath.pp) in
+          let pp_file = Fmt.(code' Fpath.pp) in
           B0_memo.fail m "Source file@ %a@ does not exist." pp_file f
       | true ->
           if Fpath.Set.mem f seen then loop m u seen by_ext fs else
@@ -73,7 +73,7 @@ let select_files_in_dirs m u xs (seen, by_ext as acc) ds =
       if Fpath.Set.mem d xs then loop m u xs acc ds else
       match Os.Dir.exists d |> fail_if_error m u with
       | false ->
-          let pp_dir = Fmt.(code Fpath.pp) in
+          let pp_dir = Fmt.(code' Fpath.pp) in
           B0_memo.fail m "Source directory@ %a@ does not exist." pp_dir d
       | true ->
           let prune_dir _ dname dir _ = exclude dname dir  in

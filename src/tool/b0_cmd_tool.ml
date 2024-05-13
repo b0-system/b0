@@ -6,11 +6,11 @@
 open B0_std
 open Result.Syntax
 
-let pp_tool ppf n = Fmt.tty' [`Fg `Green] ppf n
+let pp_tool ppf n = Fmt.tty [`Fg `Green] ppf n
 let list format c =
   let pp, sep = match format with
   | `Short ->
-      let pp_tool ppf (n, _) = Fmt.code' ppf n in
+      let pp_tool ppf (n, _) = Fmt.code ppf n in
       pp_tool, Fmt.cut
   | `Normal ->
       let pp_tool ppf (n, u) =

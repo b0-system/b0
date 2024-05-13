@@ -9,7 +9,7 @@ open Result.Syntax
 let lock c =
   let warn () = Log.warn @@ fun m ->
     m "@[<v>Some variables unchanged. You may need to first issue:@,%a@]"
-      Fmt.code' "eval $(b0 root unlock)"
+      Fmt.code "eval $(b0 root unlock)"
   in
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
   let* b0_file = B0_driver.Conf.get_b0_file c in

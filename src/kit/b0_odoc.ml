@@ -244,7 +244,7 @@ module Theme = struct
   let name (n, _) = n
   let path (_, p) = p
   let pp ppf (n, p) =
-    Fmt.pf ppf "@[<h>%a %a@]" (Fmt.tty' [`Bold]) n Fpath.pp_unquoted p
+    Fmt.pf ppf "@[<h>%a %a@]" (Fmt.tty [`Bold]) n Fpath.pp_unquoted p
 
   let pp_name ppf (n, _) = Fmt.string ppf n
   let of_dir dir =
@@ -270,7 +270,7 @@ module Theme = struct
   let find ~fallback n ts = match List.find (fun t -> name t = n) ts with
   | t -> Ok t
   | exception Not_found ->
-      let pp_name = Fmt.(code string) in
+      let pp_name = Fmt.code in
       let ss = String.suggest (List.rev_map name ts) n in
       let pp_fallback ppf = function
       | None -> ()

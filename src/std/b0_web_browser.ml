@@ -87,7 +87,7 @@ let find ?search ?cmd () =
   | Some b -> Ok b
   | None ->
       Fmt.error "No browser found. Set the %a environment variable."
-        Fmt.code' Env.browser
+        Fmt.code Env.browser
 
 (* Show *)
 

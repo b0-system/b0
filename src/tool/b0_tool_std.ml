@@ -33,7 +33,7 @@ let def_list_get_or_hint def_list name =
       else
       let kind ppf () = Fmt.string ppf "definition"  in
       let hint = Fmt.did_you_mean in
-      let pp = Fmt.unknown' ~kind Fmt.(code string) ~hint in
+      let pp = Fmt.unknown' ~kind Fmt.code ~hint in
       Fmt.error "@[%a@]" pp (name, String.Set.elements suggs)
   | (module Def : B0_def.S) :: defs ->
       let vs, suggs = match Def.get_or_suggest name with

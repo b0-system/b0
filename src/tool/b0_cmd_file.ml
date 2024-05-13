@@ -108,7 +108,7 @@ let gather dest dirs force keep_symlinks keep_going relative symlink_scopes c =
   Log.if_error ~use:B0_cli.Exit.some_error @@
   let* dest, dest_b0_file = match dest with
   | None when symlink_scopes ->
-      Fmt.error "Will not symlink scopes without option %a" Fmt.code' "--dest"
+      Fmt.error "Will not symlink scopes without option %a" Fmt.code "--dest"
   | None -> Ok (B0_driver.Conf.cwd c, None)
   | Some dest ->
       let* _exists = Os.Dir.create ~make_path:true dest in
@@ -116,7 +116,7 @@ let gather dest dirs force keep_symlinks keep_going relative symlink_scopes c =
       let* exists = Os.File.exists dest_b0_file in
       if exists && not force then
         Fmt.error "%a: file exists, use option %a to overwrite."
-          Fpath.pp dest_b0_file Fmt.code' "--force"
+          Fpath.pp dest_b0_file Fmt.code "--force"
       else
       Ok (dest, Some dest_b0_file)
   in
@@ -134,7 +134,7 @@ let includes root format c =
   | `Short -> fun ppf (_, (p, _)) -> Fpath.pp_unquoted ppf p
   | `Normal | `Long ->
       fun ppf ((n, _), (p, _)) ->
-        Fmt.pf ppf "@[%a %a@]" Fmt.(code string) n Fpath.pp_unquoted p
+        Fmt.pf ppf "@[%a %a@]" Fmt.code n Fpath.pp_unquoted p
   in
   get_b0_file_src c @@ fun src ->
   let* incs = match root with

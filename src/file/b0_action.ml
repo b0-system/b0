@@ -28,7 +28,7 @@ module T = struct
   type nonrec t = t
   let def_kind = "action"
   let def p = p.def
-  let pp_name_str = Fmt.(code string)
+  let pp_name_str = Fmt.code
 end
 
 include (B0_def.Make (T) : B0_def.S with type t := t)
@@ -54,9 +54,9 @@ let store action = action.store
 let pp_synopsis ppf v =
   let pp_tag ppf v =
     let style = [`Fg `Green] in
-    Fmt.tty' style ppf "[";
+    Fmt.tty style ppf "[";
     Fmt.string ppf "a";
-    Fmt.tty' style ppf "]";
+    Fmt.tty style ppf "]";
   in
   Fmt.pf ppf "@[%a %a@]" pp_tag v pp_synopsis v
 

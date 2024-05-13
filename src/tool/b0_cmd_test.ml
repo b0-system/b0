@@ -10,21 +10,21 @@ open B0_testing
 let exit_test_error = Os.Exit.Code 1
 
 let pp_test_tags ppf () =
-  Fmt.pf ppf "%a and %a" Fmt.code' "test" Fmt.code' "run"
+  Fmt.pf ppf "%a and %a" Fmt.code "test" Fmt.code "run"
 
 let pp_no_tests ppf () =
   Fmt.pf ppf "%a found in the build (no unit with tags %a)"
-    Fmt.(tty' [`Fg `Red]) "No test" pp_test_tags ()
+    Fmt.(tty [`Fg `Red]) "No test" pp_test_tags ()
 
 let pp_run_tests ppf tests =
   if B0_unit.Set.is_empty tests then pp_no_tests ppf () else
   Fmt.pf ppf "@[<v>These %a will run:@,%a@]"
-    Fmt.(tty' [`Fg `Green]) "tests"
+    Fmt.(tty [`Fg `Green]) "tests"
     Fmt.(list B0_unit.pp_synopsis) (B0_unit.Set.elements tests)
 
 let pp_fail ppf (u, st) =
   Fmt.pf ppf "@[%a %a %a@]"
-    Fmt.code' "b0 test -u" B0_unit.pp_name u (Fmt.option Os.Cmd.pp_status) st
+    Fmt.code "b0 test -u" B0_unit.pp_name u (Fmt.option Os.Cmd.pp_status) st
 
 let pp_report ppf (dur, fails) = match fails with
 | [] ->
@@ -74,7 +74,7 @@ let run_test c build u =
       begin match B0_unit.find_meta B0_unit.exe_file u with
       | None ->
           Fmt.error "No exectuable file found (no %a key)"
-            Fmt.code' "B0_unit.exe_file"
+            Fmt.code "B0_unit.exe_file"
       | Some exe_file ->
           let exe_file = Fut.sync exe_file in
           let cmd = Cmd.(path exe_file %% args) in

@@ -11,7 +11,7 @@ let exit_b0_file_error = 121 (* See B0_driver.Exit.b0_file_error *)
 
 type name = string
 type qualified_name = string
-let pp_name = Fmt.code'
+let pp_name = Fmt.code
 
 let sep = "." (* Note this has to be one byte. *)
 let lib_root = sep
@@ -188,7 +188,7 @@ let pp_uncaught_exn ppf (exn, bt) =
         in
         Fmt.str "File %S, %s:" (Fpath.to_string file.file) loc
   in
-  let pp_error_label ppf () = Fmt.tty' [`Fg `Red; `Bold] ppf "Error" in
+  let pp_error_label ppf () = Fmt.tty [`Fg `Red; `Bold] ppf "Error" in
   let pp_error ppf (err, bt) =
     Fmt.pf ppf "@[<v>%s@,%a: %s@]"
       (current_location (Some bt)) pp_error_label () err

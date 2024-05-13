@@ -18,7 +18,7 @@ let find_copyright_holder ~cwd _meta = function
         Fmt.error
           "@[<v>Could not find a project name to assign copyright.@,\
            Use option %a to specify a copyright holder.@]"
-          Fmt.code' "--holder"
+          Fmt.code "--holder"
 
 (* B0.ml file init *)
 
@@ -79,7 +79,7 @@ let get_readme_project_name ~cwd = function
     | None ->
         Fmt.error
           "@[<v>Could not find a project name to use.@,\
-           Use option %a to specify a project name.@]" Fmt.code' "--name"
+           Use option %a to specify a project name.@]" Fmt.code "--name"
 
 let readme name synopsis file force conf =
   Log.if_error ~use:B0_cli.Exit.some_error @@
@@ -103,7 +103,7 @@ let get_lang ~file ~lang = match lang with
     | None ->
         Fmt.error
           "@[<v>Could not find a language for extension %a@,\
-           Use option %a to specify one.@]" Fmt.code' ext Fmt.code' "--lang"
+           Use option %a to specify one.@]" Fmt.code ext Fmt.code "--lang"
 
 let src years holder license lang files example force conf =
   Log.if_error ~use:B0_cli.Exit.some_error @@

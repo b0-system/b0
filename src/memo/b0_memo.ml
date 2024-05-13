@@ -214,7 +214,7 @@ module Env = struct
   | Some v ->
       match parse v with
       | Ok v -> Some v
-      | Error e -> fail m "parsing %a: %s" Fmt.(code string) var e
+      | Error e -> fail m "parsing %a: %s" Fmt.code var e
 
   let mem var m = String.Map.mem var m.m.env
 end

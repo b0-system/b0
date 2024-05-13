@@ -49,7 +49,7 @@ module Key = struct
   let equal (V k0) (V k1) = Int.equal (uid k0) (uid k1)
   let compare (V k0) (V k1) = Int.compare (uid k0) (uid k1)
   let compare_by_name (V k0) (V k1) = String.compare (name k0) (name k1)
-  let pp_name_str = Fmt.tty' [`Fg `Yellow]
+  let pp_name_str = Fmt.tty [`Fg `Yellow]
   let pp_name ppf k = pp_name_str ppf k.name
   let pp ppf (V k) = pp_name_str ppf k.name
 

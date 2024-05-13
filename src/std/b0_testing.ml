@@ -12,20 +12,20 @@ module Test_ui = struct
   let fail_color = [`Bg (`Hi `Red); `Fg `Black]
   let pass_color = [`Bg (`Hi `Green); `Fg `Black]
   let padding = "      "
-  let pp_test ppf () = (Fmt.tty' test_color) ppf " TEST "
-  let pp_fail ppf () = (Fmt.tty' fail_color) ppf " FAIL "
-  let pp_pass ppf () = (Fmt.tty' pass_color) ppf " PASS "
-  let pp_passed ppf () = (Fmt.tty' [`Fg (`Hi `Green)]) ppf "passed"
-  let pp_failed ppf () = (Fmt.tty' [`Fg (`Hi `Red)]) ppf "failed"
-  let pp_dur = Fmt.tty [`Bold] Mtime.Span.pp
-  let pp_count = Fmt.tty [`Bold] Fmt.int
+  let pp_test ppf () = (Fmt.tty test_color) ppf " TEST "
+  let pp_fail ppf () = (Fmt.tty fail_color) ppf " FAIL "
+  let pp_pass ppf () = (Fmt.tty pass_color) ppf " PASS "
+  let pp_passed ppf () = (Fmt.tty [`Fg (`Hi `Green)]) ppf "passed"
+  let pp_failed ppf () = (Fmt.tty [`Fg (`Hi `Red)]) ppf "failed"
+  let pp_dur = Fmt.tty' [`Bold] Mtime.Span.pp
+  let pp_count = Fmt.tty' [`Bold] Fmt.int
   let pp_slot_loc ppf l =
     Fmt.pf ppf "File \"%s\", line %d, characters %d-%d"
       l.Printexc.filename l.Printexc.line_number
       l.Printexc.start_char l.Printexc.end_char
 
   let munge_bt bt = match Printexc.backtrace_slots bt with
-  | None -> [Fmt.str "No backtrace. Did you compile with %a ?" Fmt.code' "-g"]
+  | None -> [Fmt.str "No backtrace. Did you compile with %a ?" Fmt.code "-g"]
   | Some slots ->
       let rec loop acc = function
       | [] -> List.rev acc
@@ -46,10 +46,10 @@ module Test = struct
 
   let log' fmt = Fmt.epr (fmt ^^ "@.")
   let log fmt =
-    Fmt.epr ("%a " ^^ fmt ^^ "@.") (Fmt.tty' Test_ui.test_color) Test_ui.padding
+    Fmt.epr ("%a " ^^ fmt ^^ "@.") (Fmt.tty Test_ui.test_color) Test_ui.padding
 
   let log_fail fmt =
-    Fmt.epr ("%a " ^^ fmt ^^ "@.") (Fmt.tty' Test_ui.fail_color) Test_ui.padding
+    Fmt.epr ("%a " ^^ fmt ^^ "@.") (Fmt.tty Test_ui.fail_color) Test_ui.padding
 
   let log_bt_msg bt msg =
     log_fail "%s" msg; List.iter (log_fail "%s") (Test_ui.munge_bt bt)
@@ -115,11 +115,11 @@ module Test = struct
 
   let invalid_arg f = match f () with
   | exception Invalid_argument _ -> ()
-  | _ -> failf "Expression did not raise %a" Fmt.code' "Invalid_argument"
+  | _ -> failf "Expression did not raise %a" Fmt.code "Invalid_argument"
 
   let failure f = match f () with
   | exception Failure _ -> ()
-  | _ -> failf "Expression did not raise %a" Fmt.code' "Failure"
+  | _ -> failf "Expression did not raise %a" Fmt.code "Failure"
 
   let raises exn f = match f () with
   | exception e when exn e -> ()

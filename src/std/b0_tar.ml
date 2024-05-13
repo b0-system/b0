@@ -135,7 +135,7 @@ let compress_tool_for_file_ext ?(de = "") file = match Fpath.get_ext file with
 | ".xz" -> Ok (Some (Cmd.tool "lzma"))
 | ".zst" -> Ok (Some (Cmd.tool "zstd"))
 | ext ->
-    Fpath.error file "Unknown extension %a, cannot %scompress" Fmt.code' ext de
+    Fpath.error file "Unknown extension %a, cannot %scompress" Fmt.code ext de
 
 let compress ?search ~force ~make_path file ~archive =
   let* compress = compress_tool_for_file_ext file in

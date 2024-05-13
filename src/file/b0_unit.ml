@@ -46,7 +46,7 @@ end = struct
   and t = { def : B0_def.t; build_proc : build_proc; }
   let def_kind = "unit"
   let def u = u.def
-  let pp_name_str = Fmt.(code string)
+  let pp_name_str = Fmt.code
 end
 
 and Unit : sig include B0_def.S with type t = Unit_def.t end
@@ -88,9 +88,9 @@ let pp_synopsis ppf v =
        if has_tag B0_meta.doc u then "u", [`Fg `Yellow] else
        "u", [])
     in
-    Fmt.tty' style ppf "[";
+    Fmt.tty style ppf "[";
     Fmt.string ppf tag;
-    Fmt.tty' style ppf "]";
+    Fmt.tty style ppf "]";
   in
   Fmt.pf ppf "@[%a %a@]" pp_tag v pp_synopsis v
 
@@ -125,7 +125,7 @@ module Build = struct
         B0_memo.fail b.u.m
           "@[<v>Unit %a requested %a which is not part of the build.@,\
            Try with %a or add the unit %a to the build."
-          pp_name (current b) pp_name u Fmt.(code string) "--unlock"
+          pp_name (current b) pp_name u Fmt.code "--unlock"
           pp_name u
 
   let require_units b us = List.iter (require_unit b) us
@@ -286,13 +286,13 @@ let tool_name_map units =
     Log.warn @@ fun m ->
     m "@[<v>Tool %a defined both by unit %a and %a.@,\
        Ignoring definition in unit %a.@]"
-      Fmt.code' n pp_name use pp_name ign pp_name ign
+      Fmt.code n pp_name use pp_name ign pp_name ign
   in
   let warn_no_exe_file u n =
     Log.warn @@ fun m ->
     m "@[<v>Tool %a defined by unit %a does not specify a@,\
        B0_meta.exe_file key. It will not be used in the build (if needed).@]"
-      Fmt.code' n pp_name u
+      Fmt.code n pp_name u
   in
   let add_unit u acc =
     if not (tool_is_user_accessible u) then acc else

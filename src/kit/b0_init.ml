@@ -191,7 +191,7 @@ let lang_to_id = function
 | `Html -> "html" | `Javascript -> "javascript" | `Java -> "java"
 | `Ocaml -> "ocaml" | `Racket -> "racket" | `Rust -> "rust" | `Sh -> "sh"
 
-let pp_lang_id = Fmt.(using lang_to_id code')
+let pp_lang_id = Fmt.(using lang_to_id code)
 
 let lang_of_id lid = match String.Ascii.lowercase lid with
 | "c" -> Ok `C | "css" -> Ok `Css | "haskell" -> Ok `Haskell
@@ -211,7 +211,7 @@ let lang_of_id lid = match String.Ascii.lowercase lid with
     | [] -> Fmt.must_be, dom
     | suggs -> Fmt.did_you_mean, suggs
     in
-    let pp = Fmt.unknown' ~kind:(Fmt.any "language") Fmt.code' ~hint in
+    let pp = Fmt.unknown' ~kind:(Fmt.any "language") Fmt.code ~hint in
     Fmt.error "@[%a@]" pp (lang, suggs)
 
 let lang_of_file_ext = function

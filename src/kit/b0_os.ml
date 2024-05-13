@@ -45,7 +45,7 @@ let os_release =
       match String.cut_left ~sep:"=" line with
       | None ->
           Fmt.failwith_line
-            i " Cannot find %a char in %S" Fmt.(code char) '=' line
+            i " Cannot find %a char in %S" Fmt.(code' char) '=' line
       | Some (k, v) ->
           String.Map.add (String.trim k) (unquote (String.trim v)) acc
   in
@@ -81,7 +81,7 @@ let uname = (* gets system name, release version, machine arch *)
         | [sys; rel; mach] -> Fut.return (Some (sys, rel, mach))
         | _ ->
             B0_memo.notify m
-              `Warn "Could not parse %a output %S." Fmt.(code string) "uname" s;
+              `Warn "Could not parse %a output %S." Fmt.code "uname" s;
             Fut.return None
   in
   B0_store.key ~mark det
@@ -141,7 +141,7 @@ let windows_version s m file =
   (* Format is 'Product [Version XXXX]', we parse the XXX *)
   let err m s =
     B0_memo.notify m `Warn
-      "@[<v>Could not parse %a output %S." Fmt.(code string) "ver" s;
+      "@[<v>Could not parse %a output %S." Fmt.code "ver" s;
     Fut.return "unknown"
   in
   let last = String.length s - 2 in
@@ -263,7 +263,7 @@ let arch_bits =
     | a ->
         B0_memo.notify m
           `Warn "Unknown word size for arch %a. Using %d bits."
-          Fmt.(code string) a default;
+          Fmt.code a default;
         Fut.return default
   in
   B0_store.key ~mark:"b0_os.arch_bits" det

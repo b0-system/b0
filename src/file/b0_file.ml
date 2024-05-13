@@ -16,7 +16,7 @@ let loc m = m
 let pp_loc = Tloc.pp_ocaml
 let loc_err_fmt ffmt m fmt =
   ffmt ("@[<v>%a:@,@[%a: " ^^ fmt ^^ "@]@]")
-    pp_loc (loc m) (Fmt.tty' [`Fg `Red; `Bold ]) "Error"
+    pp_loc (loc m) (Fmt.tty [`Fg `Red; `Bold ]) "Error"
 
 let loc_errf m fmt = loc_err_fmt Fmt.str m fmt
 let loc_error m fmt = loc_err_fmt Fmt.error m fmt
@@ -81,7 +81,7 @@ let pp_locs ppf s =
 (* Parsing *)
 
 let directives = ["@@@B0.boot"; "@@@B0.include"; "#requires"; "#mod_use"]
-let pp_directive = Fmt.code Fmt.string
+let pp_directive = Fmt.code
 
 let is_dir_letter c =
   (0x61 <= c && c <= 0x7A) || c = 0x5F || (0x41 <= c && c <= 0x5A) ||
@@ -171,7 +171,7 @@ let parse_include_directive d ~sbyte ~sline =
     if s = "" then Tdec.err (loc smeta) "Scope name cannot be empty." else
     if not (String.exists (Char.equal '.') s) then scope else
     Tdec.err (loc smeta)
-      (Fmt.str "Scope name %a contains a dot." Fmt.(code string) s)
+      (Fmt.str "Scope name %a contains a dot." Fmt.code s)
   in
   let arg = parse_string d in
   match skip_ws d; dec_byte d with
@@ -352,7 +352,7 @@ and w_includes b b0_file id npre manif boots incs reqs =
   | smeta' ->
       loc_err_fmt Fmt.failwith
         smeta "@[<v>Scope name %a already defined.@,\
-               Previous definition:@,%a:@]" Fmt.(code string) n pp_loc smeta'
+               Previous definition:@,%a:@]" Fmt.code n pp_loc smeta'
   in
   let rec loop b0_file id nmap npre b files boots incs reqs = function
   | (name, _ as i) :: todo ->

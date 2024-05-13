@@ -417,7 +417,7 @@ let work_dir (r, _) = r.work_dir
 let repo_cmd (r, (module Vcs : VCS)) = Vcs.repo_cmd r
 
 let pp ppf (r, _) =
-  Fmt.pf ppf "%a" (Fmt.tty [`Bold] Fpath.pp) r.repo_dir
+  Fmt.pf ppf "%a" (Fmt.tty' [`Bold] Fpath.pp) r.repo_dir
 
 let pp_long ppf (r, _ as vcs) =
   Fmt.pf ppf "%a %a" pp_kind r.kind pp vcs
@@ -460,7 +460,7 @@ let tracked_files (r, (module Vcs : VCS)) = Vcs.tracked_files r
 let commit_files ?stdout ?stderr ?msg (r, (module Vcs : VCS)) =
   Vcs.commit_files ?stdout ?stderr ?msg r
 
-let pp_commit = Fmt.tty' [`Fg `Yellow]
+let pp_commit = Fmt.tty [`Fg `Yellow]
 
 (* Working directory *)
 
@@ -474,7 +474,7 @@ let checkout ?and_branch (r, (module Vcs : VCS)) = Vcs.checkout ?and_branch r
 let local_clone (r, (module Vcs : VCS)) ~dir =
   Result.bind (Vcs.local_clone r ~dir) @@ fun r -> Ok (r, (module Vcs : VCS))
 
-let pp_dirty ppf () = Fmt.tty' [`Fg `Red] ppf "dirty"
+let pp_dirty ppf () = Fmt.tty [`Fg `Red] ppf "dirty"
 
 (* Tags *)
 
@@ -511,9 +511,9 @@ module Git = struct
   type remote = string
   type branch = string
 
-  let pp_branch = Fmt.tty' [`Fg `Green; `Bold;]
+  let pp_branch = Fmt.tty [`Fg `Green; `Bold;]
   let pp_remote_branch =
-    Fmt.tty [`Fg `Red; `Bold] (fun ppf (r, b) -> Fmt.pf ppf "%s/%s" r b)
+    Fmt.tty' [`Fg `Red; `Bold] (fun ppf (r, b) -> Fmt.pf ppf "%s/%s" r b)
 
   let remote_branch_exists ?env (r, _) ~remote ~branch =
     let ui = Cmd.(arg "--exit-code" % "--quiet") in

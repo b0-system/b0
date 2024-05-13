@@ -490,7 +490,7 @@ module Fmt = struct
 
   let tty_cap () = !_tty_cap
 
-  let tty styles pp_v ppf v = match !_tty_cap with
+  let tty' styles pp_v ppf v = match !_tty_cap with
   | `None -> pp_v ppf v
   | `Ansi ->
       (* XXX This doesn't compose well, we should get the current state
@@ -499,20 +499,20 @@ module Fmt = struct
       Format.kfprintf reset ppf "@<0>%s%a"
         (Printf.sprintf "\027[%sm" @@ Tty.sgrs_of_styles styles) pp_v v
 
-  let tty' styles ppf s = match !_tty_cap with
+  let tty styles ppf s = match !_tty_cap with
   | `None -> Format.pp_print_string ppf s
   | `Ansi ->
       Format.fprintf ppf "@<0>%s%s@<0>%s"
         (Printf.sprintf "\027[%sm" @@ Tty.sgrs_of_styles styles) s "\027[m"
 
-  let code pp_v ppf v = tty [`Bold] pp_v ppf v
-  let code' ppf v = tty' [`Bold] ppf v
+  let code' pp_v ppf v = tty' [`Bold] pp_v ppf v
+  let code ppf v = tty [`Bold] ppf v
 
   (* Records *)
 
   external id : 'a -> 'a = "%identity"
   let field
-      ?(label = tty' [`Fg `Yellow]) ?(sep = any ":@ ") l prj pp_v ppf v
+      ?(label = tty [`Fg `Yellow]) ?(sep = any ":@ ") l prj pp_v ppf v
     =
     pf ppf "@[<1>%a%a%a@]" label l sep () pp_v (prj v)
 
@@ -1312,8 +1312,8 @@ module String = struct
     Fmt.str "%d.%d.%d%a" major minor patchlevel Fmt.(option string) info
 
   let version_tty = [`Bold; `Fg `Magenta]
-  let pp_version ppf v = Fmt.tty' version_tty ppf (of_version v)
-  let pp_version_str ppf v = Fmt.tty' version_tty ppf v
+  let pp_version ppf v = Fmt.tty version_tty ppf (of_version v)
+  let pp_version_str ppf v = Fmt.tty version_tty ppf v
 
   (* CommonMark toy stuff *)
 
@@ -1399,7 +1399,7 @@ module String = struct
         in
         Error (List.rev (fold add_sugg m []))
 
-    let get_or_hint ?(pp_key = Fmt.code') ~kind k m =
+    let get_or_hint ?(pp_key = Fmt.code) ~kind k m =
       match get_or_suggest k m with
       | Ok _ as v -> v
       | Error suggs ->
@@ -2323,7 +2323,7 @@ module Hash = struct
     | m -> Ok m
     | exception Not_found ->
         let kind = Fmt.any "hash" in
-        let pp_id = Fmt.(code string) in
+        let pp_id = Fmt.code in
         let ids = List.map (fun (module H : T) -> H.id) funs in
         let hint, ids = match String.suggest ids id with
         | [] -> Fmt.must_be, ids
@@ -4464,7 +4464,7 @@ module Log = struct
   | "info" ->  Ok Info
   | "debug" ->  Ok Debug
   | e ->
-      let pp_level = Fmt.(code string) in
+      let pp_level = Fmt.code in
       let kind = Fmt.any "log level" in
       let dom = ["quiet"; "app"; "error"; "warning"; "info"; "debug"] in
       Fmt.error "%a" Fmt.(unknown' ~kind pp_level ~hint:must_be) (e, dom)
@@ -4478,19 +4478,19 @@ module Log = struct
   let debug_style = [`Faint; `Fg `Magenta]
 
   let pp_level_str level ppf v = match level with
-  | App -> Fmt.tty' app_style ppf v
-  | Error -> Fmt.tty' err_style ppf v
-  | Warning -> Fmt.tty' warn_style ppf v
-  | Info -> Fmt.tty' info_style ppf v
-  | Debug -> Fmt.tty' debug_style ppf v
+  | App -> Fmt.tty app_style ppf v
+  | Error -> Fmt.tty err_style ppf v
+  | Warning -> Fmt.tty warn_style ppf v
+  | Info -> Fmt.tty info_style ppf v
+  | Debug -> Fmt.tty debug_style ppf v
   | Quiet -> assert false
 
   let pp_level ppf level = match level with
   | App -> ()
-  | Error -> Fmt.tty' (`Bold :: err_style) ppf "Error"
-  | Warning -> Fmt.tty' (`Bold :: warn_style) ppf "Warning"
-  | Info -> Fmt.tty' (`Bold :: info_style) ppf "Info"
-  | Debug -> Fmt.tty' (`Bold :: debug_style) ppf "Debug"
+  | Error -> Fmt.tty (`Bold :: err_style) ppf "Error"
+  | Warning -> Fmt.tty (`Bold :: warn_style) ppf "Warning"
+  | Info -> Fmt.tty (`Bold :: info_style) ppf "Info"
+  | Debug -> Fmt.tty (`Bold :: debug_style) ppf "Debug"
   | Quiet -> assert false
 
   let pp_header =
