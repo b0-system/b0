@@ -1398,7 +1398,7 @@ let exe_proc set_exe_path set_modsrcs srcs b =
   let cobjs = List.filter_map (Modsrc.impl_file ~code) modsrcs in
   let opts =
     let c_requires = B0_meta.get c_requires meta in
-    Cmd.(opts %% (Cmd.list ~slip:"-ccopt" (Cmd.to_list c_requires)))
+    Cmd.(opts %% (Cmd.list ~slip:"-cclib" (Cmd.to_list c_requires)))
   in
   Link.code m ~conf ~code ~opts ~c_objs ~cobjs:(lib_objs @ cobjs) ~o;
   if all_code then begin
@@ -1477,7 +1477,7 @@ let lib_proc set_modsrcs set_lib srcs b =
   in
   let opts =
     let c_requires = B0_meta.get c_requires meta in
-    Cmd.(opts %% (Cmd.list ~slip:"-ccopt" (Cmd.to_list c_requires)))
+    Cmd.(opts %% (Cmd.list ~slip:"-cclib" (Cmd.to_list c_requires)))
   in
   let ars = Archive.code m ~conf ~code ~opts ~has_cstubs ~cobjs ~odir ~oname in
   let ars =
