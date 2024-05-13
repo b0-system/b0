@@ -121,7 +121,9 @@ let compile_byte m ~opts ~resolver ~requires ~modsrcs =
   let* requires =
     B0_ocaml.Libresolver.get_list_and_exports m resolver requires
   in
+  ignore @@
   B0_ocaml.Compile.intfs ~and_cmti:true m ~comp ~opts ~requires ~modsrcs;
+  ignore @@
   B0_ocaml.Compile.impls ~and_cmt:true m ~code ~opts ~requires ~modsrcs;
   Fut.return ()
 
