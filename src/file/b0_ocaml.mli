@@ -1052,7 +1052,9 @@ module Link : sig
     cobjs:Fpath.t list -> o:Fpath.t -> unit
   (** [byte_exe m ~opts ~c_objs ~cmos ~o] links the C objects [c_objs]
       and the OCaml compilation object files [cobjs] into a byte code
-      executable [o] compiled in [-custom] mode. *)
+      executable [o] compiled in [-custom] mode. In [cobjs] you need
+      to add the dll of [cma] files that have stubs (they are not added
+      to the invocation but the compiler reads them). *)
 
   val native :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
@@ -1061,7 +1063,9 @@ module Link : sig
   (** [byte_exe m ~opts ~c_objs ~cobjs ~o] links the C objects
       [c_objs] and the OCaml compilation object files [cobjs] into a
       native code executable [o], in [cobjs] you need to add the C [lib_ext]
-      file of `cmxa` files if they exist (since 4.12 they may not exist).
+      file of [cmxa] files if they exist (since 4.12 they may not exist)
+      and their C stubs if they have some (they are not added to the
+      invocation but the compiler reads them).
       An include is added to each element of [cobjs] in order to
       lookup potential C stubs. *)
 

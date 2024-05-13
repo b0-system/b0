@@ -663,6 +663,8 @@ module Lib = struct
                 in
                 loop cmis cmxs cma cmxa c_archive c_stubs fs
             | ext when String.equal ext clib_ext ->
+                (* XXX note that this won't get us the stub dlls which
+                   are not in the library directory. *)
                 B0_memo.ready_file m f;
                 let c_archive, c_stubs = match is_lib_archive f with
                 | true -> Some f, c_stubs
@@ -1234,10 +1236,6 @@ module Archive = struct
 end
 
 module Link = struct
-
-  (* FIXME Add cstubs archives of cm[x]a to [reads] ? Do we need it ?
-     that would entail an ocamlobjinfo + C library lookup *)
-
   let cstubs_incs objs =
     let add_inc acc obj = Fpath.Set.add (Fpath.parent obj) acc in
     let incs = List.fold_left add_inc Fpath.Set.empty objs in
@@ -1252,6 +1250,23 @@ module Link = struct
   let byte ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~o =
     let ocamlc = B0_memo.tool m Tool.ocamlc in
     let cobjs = distinct_cobjs cobjs in
+    let reads, cobjs =
+      let rec loop rsides rcobjs = function
+      | [] ->
+          List.rev_append rcobjs (List.rev_append rsides c_objs),
+          List.rev rcobjs
+      | cobj :: cobjs ->
+          match Fpath.has_ext ".cmo" cobj with
+          | true -> loop rsides (cobj :: rcobjs) cobjs
+          | false ->
+              match Fpath.has_ext ".cma" cobj with
+              | true -> loop rsides (cobj :: rcobjs) cobjs
+              | false ->
+                  (* This should be the cma's dll archive *)
+                  loop (cobj :: rsides) rcobjs cobjs
+      in
+      loop [] [] cobjs
+    in
     let reads = List.rev_append cobjs c_objs in
     let incs = cstubs_incs cobjs in
     B0_memo.spawn m ?post_exec ?k ~reads ~writes:[o] @@
@@ -1279,7 +1294,8 @@ module Link = struct
               | true ->
                   loop rsides (cobj :: rcobjs) cobjs
               | false ->
-                  (* This should be the `cmxa`s C library archives *)
+                  (* This should be the `cmxa`s C library archives or
+                     C stubs archives *)
                   loop (cobj :: rsides) rcobjs cobjs
       in
       loop [] [] cobjs
@@ -1363,10 +1379,20 @@ let exe_proc set_exe_path set_modsrcs srcs b =
   in
   let* link_requires = Libresolver.get_list_and_deps m resolver requires in
   let archive ~code lib = match code with
-  | `Byte -> (match Lib.cma lib with None -> [] | Some cma -> [cma])
+  | `Byte ->
+      let c_stubs =
+        (* Note we only get something with Libraries from
+           the build, the ocamlfind resolver doesn't give us the dlls here
+           for now *)
+        List.find_all (Fpath.has_ext (Conf.dll_ext conf)) (Lib.c_stubs lib)
+      in
+      (match Lib.cma lib with None -> c_stubs | Some cma -> cma :: c_stubs)
   | `Native ->
       let add v l = match v with None -> l | Some v -> v :: l in
-      add (Lib.cmxa lib) (add (Lib.c_archive lib) [])
+      let c_stubs =
+        List.find_all (Fpath.has_ext (Conf.lib_ext conf)) (Lib.c_stubs lib)
+      in
+      add (Lib.cmxa lib) (add (Lib.c_archive lib) c_stubs)
   in
   let lib_objs = List.concat_map (archive ~code) link_requires in
   let cobjs = List.filter_map (Modsrc.impl_file ~code) modsrcs in
