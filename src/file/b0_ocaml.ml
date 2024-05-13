@@ -1185,7 +1185,7 @@ module Archive = struct
     let cma = Fpath.(odir / Fmt.str "%s.cma" oname) in
     let writes = [cma] in
     B0_memo.spawn m ~reads:cobjs ~writes @@
-    ocamlc Cmd.(arg "-a" % "-o" %% unstamp (path cma) %% opts %% cstubs_opts %%
+    ocamlc Cmd.(arg "-a" % "-o" %% unstamp (path cma) %% cstubs_opts %% opts %%
                 unstamp (paths cobjs));
     writes
 
@@ -1207,8 +1207,8 @@ module Archive = struct
     let c_objs = List.rev_map (Fpath.set_ext obj_ext) cobjs in
     let reads = List.rev_append c_objs cobjs in
     B0_memo.spawn m ?post_exec ?k ~reads ~writes @@
-    ocamlopt Cmd.(arg "-a" % "-o" %% unstamp (path cmxa) %% opts %%
-                  cstubs_opts %% unstamp (paths cobjs));
+    ocamlopt Cmd.(arg "-a" % "-o" %% unstamp (path cmxa) %% cstubs_opts %%
+                  opts %% unstamp (paths cobjs));
     writes
 
   let code ?post_exec ?k m ~conf ~opts ~code ~has_cstubs ~cobjs ~odir ~oname =
