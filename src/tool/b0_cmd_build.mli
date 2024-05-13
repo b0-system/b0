@@ -27,11 +27,6 @@ val show_what :
 val executor_env :
   B0_build.t -> B0_def.t -> B0_driver.Conf.t -> B0_env.t
 
-val memo :
-  B0_driver.Conf.t ->
-  may_build:B0_unit.Set.t -> must_build:B0_unit.Set.t ->
-  (B0_memo.t, string) result
-
 val units : string list Cmdliner.Term.t
 val x_units : string list Cmdliner.Term.t
 val packs : string list Cmdliner.Term.t
