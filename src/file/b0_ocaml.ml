@@ -678,7 +678,7 @@ module Lib = struct
     let pp_value = Fmt.any "<dynamic>" in
     B0_meta.Key.make "lib-def" ~doc:"OCaml library definition" ~pp_value
 
-  let of_unit b ocaml_conf u =
+  let of_unit b u =
     B0_build.require_unit b u;
     let m = B0_build.memo b in
     let lib = B0_unit.get_meta key u |> B0_memo.fail_if_error m in
@@ -891,7 +891,7 @@ module Libresolver = struct
         | Some lib_name ->
             match Libname.Map.find_opt lib_name acc with
             | None ->
-                let lib = lazy (Lib.of_unit b conf u) in
+                let lib = lazy (Lib.of_unit b u) in
                 Libname.Map.add lib_name (u, lib) acc
             | Some (lib_u, _) ->
                 B0_memo.notify (B0_build.memo b)

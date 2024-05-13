@@ -597,7 +597,7 @@ module Lib : sig
   val key : t Fut.t B0_meta.key
   (** [key] stores the library definition of a unit. *)
 
-  val of_unit : B0_build.t -> Conf.t -> B0_unit.t -> t option Fut.t
+  val of_unit : B0_build.t -> B0_unit.t -> t option Fut.t
   (** [lib_of_unit b ocaml_conf u] defines a library from unit [u] by
       consulting {!key}. As a side effect this {!B0_build.requires}s
       [u]. *)
