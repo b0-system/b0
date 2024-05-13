@@ -1495,10 +1495,11 @@ let lib_proc set_modsrcs set_lib srcs b =
     let cmxa = List.find_opt (Fpath.has_ext ".cmxa") ars in
     let cmis = List.find_all (Fpath.has_ext ".cmi") intfs in
     let cmxs = List.find_all (Fpath.has_ext ".cmx") impls in
+    let js_stubs = B0_file_exts.(find_files js) srcs in
     let c_archive = List.find_opt (Fpath.has_ext (Conf.lib_ext conf)) ars in
     Lib.make ~libname ~requires:librequires
       ~exports ~dir:build_dir ~cmis ~cmxs ~cma ~cmxa
-      ~c_archive ~c_stubs ~js_stubs:[] ~warning
+      ~c_archive ~c_stubs ~js_stubs ~warning
   in
   set_lib lib;
   Fut.return ()
