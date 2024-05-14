@@ -294,6 +294,10 @@ val test : bool key
 val lib : bool key
 (** [lib] tags library entities. Defaults to [false]. *)
 
+val long : bool key
+(** [long] tags entities associated with a lengthy process.
+    Defaults to [false]. *)
+
 val public : bool key
 (** [public] indicates if an entity is public. Defaults to
     [false]. The semantics depends on the context but it usually means

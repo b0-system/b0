@@ -86,7 +86,9 @@ let pp_synopsis ppf v =
     let tag, style =
       (if has_tag B0_meta.exe u then
          (if has_tag B0_meta.test u && has_tag B0_meta.run u
-          then " T ", [`Bg `Green; `Fg `Black; `Bold]
+          then " T ",
+               [ (if has_tag B0_meta.long u then `Bg `White else `Bg `Green);
+                 `Fg `Black; `Bold]
           else " E ", base)
        else
        if has_tag B0_meta.lib u

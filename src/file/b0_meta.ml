@@ -245,6 +245,7 @@ let doc = Key.make_tag "doc" ~doc:"Documentation entity"
 let exe = Key.make_tag "exe" ~doc:"Executable entity"
 let test = Key.make_tag "test" ~doc:"Testing entity"
 let lib = Key.make_tag "lib" ~doc:"Library entity"
+let long = Key.make_tag "long" ~doc:"Entity is associated to a lengthy process"
 let public = Key.make_tag "public" ~doc:"Public entity"
 let run =
   Key.make_tag "run" ~doc:"Entity should be part of a run in a given context."

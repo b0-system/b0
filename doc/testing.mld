@@ -2,49 +2,57 @@
 
 The [b0] tool provides a simple test runner via the [b0 test] command.
 
-The principle of this command is simple, it makes a build like a [b0]
-or [b0 build] invocation does and any unit that {e must} build and
-that is tagged with {!B0_meta.test} and {!B0_meta.run}, is executed
-once built. Units that sport these two tags can be spotted by a green
-T in [b0 list].
+A test is an {{!B0_unit.Exec}executable} B0 unit tagged with
+{!B0_meta.test} and {!B0_meta.run}. Lengthy tests have, additionally,
+the {!B0_meta.long} tag, they are not run by default unless the
+[--long] option is specified.
 
-So doing a:
+Tests can be spotted by a [T] in [b0 list], non-long tests are in
+green.
+
+TODO image
+
+The principle of [b0 test] is simple, it makes a build like a [b0]
+invocation does and any test that {e must} build is executed once
+built. So the following invocations build the default pack and execute
+the runnable tests therein.
 
 {@sh[
 b0 test
+b0 test --long   # Also run the long tests
 ]}
 
-Builds the default pack and excutes the runnable tests therein. If any
-test exits with a non-zero error code, the build fails the test and
-the invocation exits with [1]. If a test executable runs multiple
-tests it is advised to report the number of failing tests as the exit
-code.
+If any test exits with a non-zero error code, the invocation
+eventually exits with [1]. If a test executable runs multiple tests it
+is advised to report the number of failing tests as the exit code.
 
-The granularity of tests is the executable unit. But you can easily
-devise your own test subsets via packs and the usual build selection
-options [-u], [-p], [-x] and [-X]. For example:
+Similar to [b0 --what], invoking [b0 test] with the [--what] option
+tells you what the invocation builds and which tests are run:
 
 {@sh[
-b0 test -p special_tests -x that_long_test
+b0 test --what
 ]}
 
-The [--what] option tells you which tests will effectively be run
-and what will build (like [b0 --what] does).
+The granularity of tests is the executable unit. Above this you can
+easily devise your own test sets via packs and the usual build
+selection options [-u], [-p], [-x] and [-X]. For example:
 
 {@sh[
-b0 test -p special_tests -x that_long_test --what
+b0 test -p special_tests -x known_to_fail
 ]}
 
-{1:long_tests Long tests}
+Also note that tests are just executable units so you can also run
+them individually with [b0]:
 
-TODO add [B0_meta.long] and only invoke these test when
-[b0 test --long] is provided.
+{@sh[
+b0 -- mytest
+]}
 
 {1:testing_ocaml_code Testing OCaml code}
 
 The infrastructure described above allows to hook the testing
-framework of your wish by simply tagging your test executables built
-with it with {!B0_meta.test} and {!B0_meta.run}.
+framework of your wish by simply tagging your test executables with
+{!B0_meta.test} and {!B0_meta.run}.
 
 B0 itself provides a few testing tools to make such executables. A
 simplistic {!B0_testing} module is available in the [b0.std] package.
