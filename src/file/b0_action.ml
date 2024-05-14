@@ -53,10 +53,8 @@ let store action = action.store
 
 let pp_synopsis ppf v =
   let pp_tag ppf v =
-    let style = [`Fg `Green] in
-    Fmt.tty style ppf "[";
-    Fmt.string ppf "a";
-    Fmt.tty style ppf "]";
+    let style = [`Bg `White; `Fg `Black; `Bold] in
+    Fmt.tty style ppf " A ";
   in
   Fmt.pf ppf "@[%a %a@]" pp_tag v pp_synopsis v
 

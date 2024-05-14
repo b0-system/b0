@@ -82,15 +82,20 @@ let build_proc u = u.Unit_def.build_proc
 
 let pp_synopsis ppf v =
   let pp_tag ppf u =
+    let base = [`Bg `White; `Fg `Black; `Bold] in
     let tag, style =
-      (if has_tag B0_meta.exe u then "u", [`Fg `Green] else
-       if has_tag B0_meta.lib u then "u", [`Fg `Magenta] else
-       if has_tag B0_meta.doc u then "u", [`Fg `Yellow] else
-       "u", [])
+      (if has_tag B0_meta.exe u then
+         (if has_tag B0_meta.test u && has_tag B0_meta.run u
+          then " T ", [`Bg `Green; `Fg `Black; `Bold]
+          else " E ", base)
+       else
+       if has_tag B0_meta.lib u
+       then " L ", [`Bg `Yellow; `Fg `Black; `Bold] else
+       if has_tag B0_meta.doc u
+       then " D ", [`Bg `Cyan; `Fg `Black; `Bold] else
+       " U ", base)
     in
-    Fmt.tty style ppf "[";
-    Fmt.string ppf tag;
-    Fmt.tty style ppf "]";
+    Fmt.tty style ppf tag;
   in
   Fmt.pf ppf "@[%a %a@]" pp_tag v pp_synopsis v
 

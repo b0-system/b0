@@ -76,10 +76,8 @@ let pp_units ppf p =
 
 let pp_synopsis ppf v =
   let pp_tag ppf u =
-    let style = [`Bold] in
-    Fmt.tty style ppf "[";
-    Fmt.string ppf "p";
-    Fmt.tty style ppf "]";
+    let style = [`Fg `White; `Bg `Black; `Bold] in
+    Fmt.tty style ppf " P ";
   in
   Fmt.pf ppf "@[%a %a@]" pp_tag v pp_synopsis v
 
