@@ -403,7 +403,7 @@ let with_b0_file ~driver cmd =
     | [] -> Cmd.arg exe
     | _ :: args -> Cmd.list (exe :: args)
     in
-    Ok (Os.Exit.exec cmd)
+    Ok (Os.Exit.exec ~argv0:"b0" cmd)
   in
   Cmdliner.Term.(const run $ Cli.conf $ cmd)
 
@@ -426,7 +426,7 @@ let with_b0_file_if_any ~driver cmd =
             | [] -> Cmd.arg exe
             | _ :: args -> Cmd.list (exe :: args)
             in
-            Os.Exit.exec cmd
+            Os.Exit.exec ~argv0:"b0" cmd
   in
   Cmdliner.Term.(const run $ Cli.conf $ cmd)
 
