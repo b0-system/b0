@@ -16,14 +16,16 @@ arbitrary build abstraction with reliable, efficient incremental rebuilds.
 
 - The {{!page-manual}B0 manual} is a conceptual overview of the
    B0 system and B0 files. It is recommended reading.
+- The {{!page-testing}testing manual} describes support to
+  test your software with [b0 test].
+- The {{!page-release}release manual} describes B0 support
+   for releasing source software.
 - The {{!page-action}action manual} describes how to define
    your own actions.
 - The {{!page-unit}build unit manual} describes how to
    create your own build units.
 - The {{!page-memo}memo manual} describes the [b0.memo] build
    library.
-- The {{!page-release}release manual} describes B0 support
-   for releasing source software.
 
 {2:manuals_ocaml For OCaml users}
 

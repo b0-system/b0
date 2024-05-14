@@ -288,6 +288,9 @@ v}
   units ? List the differences (notably actions can statically
   require units).
 
+- `b0 test`, perhaps not a good idea to pass when there is
+   not test. Only 0 if --allow-empty is specified ?
+
 {1:doc Documentation overhaul}
 
 - How to on action/unit execution

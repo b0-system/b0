@@ -7,7 +7,7 @@ open B0_std
 
 let () = Printexc.record_backtrace true
 
-module Test_ui = struct
+module Test_fmt = struct
   let test_color = [`Bg `White; `Fg `Black]
   let fail_color = [`Bg (`Hi `Red); `Fg `Black]
   let pass_color = [`Bg (`Hi `Green); `Fg `Black]
@@ -41,25 +41,23 @@ module Test_ui = struct
 end
 
 module Test = struct
+  open Test_fmt
+
   exception Fail of string
   let failf fmt = Fmt.kstr (fun msg -> raise (Fail msg)) fmt
 
   let log' fmt = Fmt.epr (fmt ^^ "@.")
-  let log fmt =
-    Fmt.epr ("%a " ^^ fmt ^^ "@.") (Fmt.tty Test_ui.test_color) Test_ui.padding
-
-  let log_fail fmt =
-    Fmt.epr ("%a " ^^ fmt ^^ "@.") (Fmt.tty Test_ui.fail_color) Test_ui.padding
-
+  let log fmt = Fmt.epr ("%a " ^^ fmt ^^ "@.") (Fmt.tty test_color) padding
+  let log_fail fmt = Fmt.epr ("%a " ^^ fmt ^^ "@.") (Fmt.tty fail_color) padding
   let log_bt_msg bt msg =
-    log_fail "%s" msg; List.iter (log_fail "%s") (Test_ui.munge_bt bt)
+    log_fail "%s" msg; List.iter (log_fail "%s") (munge_bt bt)
 
   let log_fail_loc bt = function
   | Fail msg -> log_bt_msg bt msg
   | Assert_failure _ -> log_bt_msg bt "Assertion failed"
   | exn ->
       log_fail "%a" Fmt.exn exn;
-      List.iter (log_fail "%s") (Test_ui.munge_bt bt)
+      List.iter (log_fail "%s") (munge_bt bt)
 
   let test_count = ref 0
   let fail_count = ref 0
@@ -75,20 +73,19 @@ module Test = struct
 
   let report_pass ~dur = match !test_count with
   | 0 ->
-      log' "@[%a Test %a in %a@]" Test_ui.pp_pass () Test_ui.pp_passed ()
-        Test_ui.pp_dur (Os.Mtime.count dur); 0
+      log' "@[%a Test %a in %a@]" pp_pass () pp_passed ()
+        pp_dur (Os.Mtime.count dur); 0
   | n ->
-      log' "@[%a %a %s %a in %a@]" Test_ui.pp_pass ()
-        Test_ui.pp_count !test_count
+      log' "@[%a %a %s %a in %a@]" pp_pass ()
+        pp_count !test_count
         (if !test_count <= 1 then "test" else "tests")
-        Test_ui.pp_passed () Test_ui.pp_dur (Os.Mtime.count dur); 0
+        pp_passed () pp_dur (Os.Mtime.count dur); 0
 
   let report_fail ~dur =
     log' "@[%a %a/%a %s %a in %a@]"
-      Test_ui.pp_fail ()
-      Test_ui.pp_count !fail_count Test_ui.pp_count !test_count
+      pp_fail () pp_count !fail_count pp_count !test_count
       (if !test_count <= 1 then "test" else "tests")
-      Test_ui.pp_failed () Test_ui.pp_dur (Os.Mtime.count dur);
+      pp_failed () pp_dur (Os.Mtime.count dur);
     !fail_count
 
   let main f =
@@ -100,8 +97,7 @@ module Test = struct
         let bt = Printexc.get_raw_backtrace () in
         log_fail_loc bt exn;
         log' "@[%a A test %a unexpectedly in %a@]"
-          Test_ui.pp_fail () Test_ui.pp_failed ()
-          Test_ui.pp_dur (Os.Mtime.count dur); 1
+          pp_fail () pp_failed () pp_dur (Os.Mtime.count dur); 1
 
   (* Testing Combinators *)
 
@@ -111,7 +107,6 @@ module Test = struct
         let bt = Printexc.get_raw_backtrace () in
         log_fail (fail ^^ ":") n; Printexc.raise_with_backtrace e bt
     | _ -> repeat ~fail (n - 1) f
-
 
   let invalid_arg f = match f () with
   | exception Invalid_argument _ -> ()

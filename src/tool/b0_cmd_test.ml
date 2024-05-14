@@ -13,8 +13,7 @@ let pp_test_tags ppf () =
   Fmt.pf ppf "%a and %a" Fmt.code "test" Fmt.code "run"
 
 let pp_no_tests ppf () =
-  Fmt.pf ppf "%a found in the build (no unit with tags %a)"
-    Fmt.(tty [`Fg `Red]) "No test" pp_test_tags ()
+  Fmt.pf ppf "No test found in the build (no unit with tags %a)" pp_test_tags ()
 
 let pp_run_tests ppf tests =
   if B0_unit.Set.is_empty tests then pp_no_tests ppf () else
@@ -28,15 +27,15 @@ let pp_fail ppf (u, st) =
 
 let pp_report ppf (dur, fails) = match fails with
 | [] ->
-    Fmt.pf ppf "@[%a The build %a all tests in %a@]" Test_ui.pp_pass ()
-      Test_ui.pp_passed () Test_ui.pp_dur dur
+    Fmt.pf ppf "@[%a The build %a all tests in %a@]" Test_fmt.pp_pass ()
+      Test_fmt.pp_passed () Test_fmt.pp_dur dur
 | fails ->
     let count = List.length fails in
     Fmt.pf ppf "%a @[<v>The build %a %a %s in %a:@,%a@]"
-      Test_ui.pp_fail () Test_ui.pp_failed ()
-      Test_ui.pp_count count
+      Test_fmt.pp_fail () Test_fmt.pp_failed ()
+      Test_fmt.pp_count count
       (if count <= 1 then "test unit" else "test units")
-      Test_ui.pp_dur dur (Fmt.list pp_fail) fails
+      Test_fmt.pp_dur dur (Fmt.list pp_fail) fails
 
 let get_tests ~warn_empty us =
   let is_test u = B0_unit.(has_tag B0_meta.run u && has_tag B0_meta.test u) in
@@ -57,7 +56,7 @@ let show_what ~lock ~may_build ~must_build ~is_locked ~locked_packs c =
 (* Test command *)
 
 let run_test c build u =
-  Log.app (fun m -> m "%a %a" Test_ui.pp_test () B0_unit.pp_name u);
+  Log.app (fun m -> m "%a %a" Test_fmt.pp_test () B0_unit.pp_name u);
   let exec = B0_unit.find_or_default_meta B0_unit.Exec.key u in
   let b0_env = B0_cmd_build.executor_env build (B0_unit.def u) c in
   let* env = B0_unit.Exec.get_env b0_env u in
