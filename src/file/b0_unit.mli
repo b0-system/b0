@@ -5,8 +5,10 @@
 
 (** Build units.
 
-    A build unit is a named build procedure with metadata associated
-    to it. Build units are the smallest unit of build in B0 files. *)
+    A unit is a named build procedure and an optional action to perform
+    once the unit has built. Units are the smallest unit of build in B0 files.
+
+    Either of the build procedure or the action can be a nop. *)
 
 open B0_std
 
@@ -58,16 +60,16 @@ val tool_is_user_accessible : t -> bool
 (** [tool_is_user_accessible u] assumes [u] has a tool name. This then
     returns [true] iff [u] {!is_public} or {!in_root_scope}. *)
 
-(** {1:meta Unit executions}  *)
+(** {1:meta Unit actions}  *)
 
 type b0_env
 (** The type for execution environments, see {!B0_env}. *)
 
-(** Unit executions.
+(** Unit actions.
 
     These properties pertain to the interface that allows to execute
-    units after they have been built as is done for example by the
-    [b0] command.
+    an action after a unit has build as is done for example by the
+    [b0] or [b0 test] commands.
 
     The execution procedure, will likely be refined when we get proper
     build environments and cross but basically:
@@ -76,9 +78,9 @@ type b0_env
     {- The environment and the cwd are respectively defined
        by {!Exec.get_env} and {!Exec.get_cwd}. Additional
        cli arguments may be provided by the driver.}
-    {- The actual entity to execute is either defined by {!Exec.key} if present
-       or by {!B0_unit.exe_file}}} *)
-module Exec : sig
+    {- The actual entity to execute is either defined by {!Action.key} if
+       present or by {!B0_unit.exe_file}}} *)
+module Action : sig
 
   type b0_unit := t
 
@@ -125,23 +127,26 @@ module Exec : sig
   (** {1:execution Execution} *)
 
   type t =
-    [ `Unit_exe (** The unit's {!exe_file} *)
-    | `Cmd of string *
-              (b0_env -> b0_unit -> args:Cmd.t -> (Cmd.t, string) result)
+  [ `Unit_exe (** The unit's {!exe_file} *)
+  | `Cmd of string *
+            (b0_env -> b0_unit -> args:Cmd.t -> (Cmd.t, string) result)
     (** Doc string and a function that returns a command to
         execute with {!B0_std.Os.Cmd.execv}. *)
-    | `Fun of
-        string *
-        (b0_env -> ?env:Os.Env.assignments -> ?cwd:Fpath.t ->
-         b0_unit -> args:Cmd.t -> (Os.Exit.t, string) result)
-        (** Doc string and a function. The function is given the result
+  | `Fun of
+      string *
+      (b0_env -> b0_unit -> args:Cmd.t -> (Os.Exit.t, string) result)
+      (** Doc string and a function. The function is given the result
             of {!get_cwd} and {!get_env}. *)
-   ]
+  ]
   (** The type for specifying unit executions. *)
 
   val key : t B0_meta.key
   (** [key] specifies the execution for a unit. If unspecified this is
       [`Unit_exe]. *)
+
+  val units : b0_unit list B0_meta.key
+  val dyn_units : (args:Cmd.t -> b0_unit list) B0_meta.key
+  val store : B0_store.binding list B0_meta.key
 
   val find :
     b0_unit ->

@@ -75,9 +75,9 @@ let get_excluded_units ~x_units ~x_packs =
   Ok (unit_set_of ~units ~packs)
 
 let get_must_units_and_locked_packs
-    ~exec ~exec_units ~exec_packs ~units ~packs ()
+    ~action ~action_units ~action_packs ~units ~packs ()
   =
-  let* units, packs = match exec, units, packs with
+  let* units, packs = match action, units, packs with
   | None, [], [] -> (* argumentless b0 invocation *)
       begin match B0_pack.find "default" with
       | None -> Ok (B0_unit.list (), [])
@@ -86,7 +86,8 @@ let get_must_units_and_locked_packs
   | _ ->
       let* units = B0_unit.get_list_or_hint ~all_if_empty:false units in
       let* packs = B0_pack.get_list_or_hint ~all_if_empty:false packs in
-      Ok (List.rev_append exec_units units, List.rev_append exec_packs packs)
+      Ok (List.rev_append action_units units,
+          List.rev_append action_packs packs)
   in
   let locked_packs = List.filter B0_pack.locked packs in
   Ok (unit_set_of ~units ~packs, locked_packs)
@@ -106,10 +107,11 @@ let get_may_must ~is_locked ~units ~x_units =
   may, must
 
 let select_units ~units ~x_units ~packs ~x_packs ~lock =
+  (* FIXME add a ~for_exection *)
   let* x_units = get_excluded_units ~x_units ~x_packs in
   let* units, locked_packs =
     get_must_units_and_locked_packs
-      ~exec:None ~exec_units:[] ~exec_packs:[] ~units ~packs ()
+      ~action:None ~action_units:[] ~action_packs:[] ~units ~packs ()
   in
   let is_locked = is_locked ~lock ~locked_packs in
   Ok (get_may_must ~is_locked ~units ~x_units, is_locked, locked_packs)
@@ -126,14 +128,7 @@ let check_tool_ambiguities tool_name us =
     m "@[<v>Tool %a of unit %a also matches unit name %a@,\
        Running the tool, use %a %a to execute the unit.@]"
       Fmt.code tool_name B0_unit.pp_name u B0_unit.pp_name u'
-      Fmt.code "b0 unit exec" B0_unit.pp_name u'
-  in
-  let warn_has_action_name tool_name u a =
-    Log.warn @@ fun m ->
-    m "@[<v>Tool %a of unit %a also matches action name %a@,\
-       Running the tool, use %a %a to execute the action.@]"
-      Fmt.code tool_name B0_unit.pp_name u B0_action.pp_name a
-      Fmt.code "b0 action exec" B0_action.pp_name a
+      Fmt.code "b0 unit action" B0_unit.pp_name u'
   in
   let u = match us with
   | [u] -> u | u :: us -> warn_multi_defs tool_name u us; u
@@ -148,30 +143,27 @@ let check_tool_ambiguities tool_name us =
          and B0_unit.exe_file or warn again ? *) ()
   | Some u' -> warn_has_unit_name tool_name u u'
   in
-  let () = match B0_action.find tool_name with
-  | None -> () | Some a -> warn_has_action_name tool_name u a
-  in
   u
 
-let find_store_and_execution args = function
+let find_store_and_action args = function
 | None -> Ok ([], None, [], [])
 | Some name ->
     let keep = B0_unit.tool_is_user_accessible in
     match B0_unit.get_or_suggest_tool ~keep name with
     | Ok us ->
         let u = check_tool_ambiguities name us in
-        Ok ([], Some (`Unit u), [u], [])
+        Ok ([], Some u, [u], [])
     | Error tool_suggs ->
-        let u = B0_unit.get_or_suggest name in
-        match u with
-        | Ok u when not (B0_action.is_action u) ->
-            Ok ([], Some (`Unit u), [u], [])
+        match B0_unit.get_or_suggest name with
         | Ok u ->
-            let store = B0_action.store u in
-            let units = B0_action.units u in
-            let dyn_units = B0_action.dyn_units u ~args:(Cmd.list args) in
-            let units = dyn_units @ units in
-            Ok (store, Some (`Action u), units, B0_action.packs u)
+            let store = B0_unit.find_or_default_meta B0_unit.Action.store u in
+            let units = B0_unit.find_or_default_meta B0_unit.Action.units u in
+            let dyn_units =
+              (B0_unit.find_or_default_meta
+                B0_unit.Action.dyn_units u) ~args:(Cmd.list args)
+            in
+            let units = u :: (dyn_units @ units) in
+            Ok (store, Some u, units, B0_action.packs u)
         | Error us ->
             let tname u = Option.get (B0_unit.find_meta B0_unit.tool_name u) in
             let ts = List.rev_map tname tool_suggs in
@@ -180,7 +172,7 @@ let find_store_and_execution args = function
             let suggs = String.Set.elements set in
             let hint = Fmt.did_you_mean in
             let nothing_to ppf v =
-              Fmt.pf ppf "Nothing to execute for %a." Fmt.code v
+              Fmt.pf ppf "Nothing to run for %a." Fmt.code v
             in
             let pp ppf (v, hints) = match hints with
             | [] -> nothing_to ppf v
@@ -234,7 +226,7 @@ let make_build c ~store ~may_build ~must_build =
 
 (* Executing the action or the unit *)
 
-let executor_env build def c =
+let action_env build def c =
   let cwd = B0_driver.Conf.cwd c in
   let root_dir = Fpath.parent @@ Option.get @@ B0_driver.Conf.b0_file c in
   let scope_dir = Option.value (B0_def.scope_dir def) ~default:root_dir in
@@ -242,17 +234,7 @@ let executor_env build def c =
   let driver_env = B0_driver.Conf.env c in
   B0_env.make ~cwd ~scope_dir ~root_dir ~b0_dir ~build ~driver_env
 
-let action_executor show_path build action c = match show_path with
-| false ->
-    let func = B0_action.func action in
-    let env = executor_env build (B0_action.def action) c in
-    let exec ~args = Ok (func action env ~args) in
-    Ok (Some exec)
-| true -> (* We could show the path to the b0 driver, bof. *)
-    Fmt.error "%a has no path, it is an action not an executable unit"
-      B0_action.pp_name action
-
-let unit_executor show_path build u c =
+let action_runner show_path build u c =
   let warn_noexec u =
     Log.warn @@ fun m ->
     m "Unit %a not executable: ignoring execution." B0_unit.pp_name u
@@ -263,28 +245,26 @@ let unit_executor show_path build u c =
     Log.app (fun m -> m "%a" Cmd.pp Cmd.(path p %% args));
     Ok B0_cli.Exit.ok
   in
-  match B0_unit.Exec.find u with
+  match B0_unit.Action.find u with
   | None -> warn_noexec u; Ok None
   | Some exec ->
       match show_path with
       | false ->
-          let env = executor_env build (B0_unit.def u) c in
+          let env = action_env build (B0_unit.def u) c in
           Ok (Some (fun ~args -> exec env u ~args))
       | true ->
           match B0_unit.find_meta B0_unit.exe_file u with
           | Some path -> Ok (Some (fun ~args -> show (Fut.sync path) ~args))
           | None ->
+              (* We could show the path to the b0 driver, bof. *)
               Fmt.error "No executable outcome path found in executable unit %a"
                 B0_unit.pp_name u
 
-let error_executor_needs ~exec_needs ~must_build exec =
-  let diff = B0_unit.Set.diff exec_needs must_build in
-  let pp_exec ppf = function
-  | `Action a -> Fmt.pf ppf "action %a" B0_action.pp_name a
-  | `Unit u -> Fmt.pf ppf "unit %a" B0_unit.pp_name u
-  in
-  Fmt.error "@[Cannot execute %a: %a will not build, see %a@]"
-    pp_exec exec
+let error_action_needs ~action_needs ~must_build action =
+  let diff = B0_unit.Set.diff action_needs must_build in
+  let pp_action ppf u = Fmt.pf ppf "action of %a" B0_unit.pp_name u in
+  Fmt.error "@[Cannot run %a: %a will not build, see %a@]"
+    pp_action action
     (Fmt.iter B0_unit.Set.iter ~sep:Fmt.comma B0_unit.pp_name) diff
     Fmt.code "--what"
 
@@ -292,13 +272,13 @@ let error_executor_needs ~exec_needs ~must_build exec =
 
 let build units x_units packs x_packs what lock show_path action args c =
   Log.if_error ~use:B0_cli.Exit.no_such_name @@
-  let* store, exec, exec_units, exec_packs =
-    find_store_and_execution args action
+  let* store, action, action_units, action_packs =
+    find_store_and_action args action
   in
   let* x_units = get_excluded_units ~x_units ~x_packs in
   let* units, locked_packs =
-    get_must_units_and_locked_packs ~exec ~exec_units ~exec_packs ~units ~packs
-      ()
+    get_must_units_and_locked_packs
+      ~action ~action_units ~action_packs ~units ~packs ()
   in
   let is_locked = is_locked ~lock ~locked_packs in
   let may_build, must_build = get_may_must ~is_locked ~units ~x_units in
@@ -306,21 +286,23 @@ let build units x_units packs x_packs what lock show_path action args c =
   then show_what ~lock ~is_locked ~locked_packs ~must_build ~may_build c else
   Log.if_error' ~use:B0_driver.Exit.build_error @@
   let* build = make_build c ~store ~may_build ~must_build in
-  let exec_needs = unit_set_of ~units:exec_units ~packs:exec_packs in
-  let* executor = match exec with
-  | Some exec when not (B0_unit.Set.subset exec_needs must_build) ->
-      error_executor_needs ~exec_needs ~must_build exec
-  | Some (`Action a) -> action_executor show_path build a c
-  | Some (`Unit u) -> unit_executor show_path build u c
+  let action_needs = unit_set_of ~units:action_units ~packs:action_packs in
+  let* action_runner = match action with
+  | Some action when not (B0_unit.Set.subset action_needs must_build) ->
+      error_action_needs ~action_needs ~must_build action
+  | Some action -> action_runner show_path build action c
   | None when B0_unit.Set.is_empty must_build -> Fmt.error "%s" (err_nothing ())
   | None -> Ok None
   in
   match B0_build.run build with
   | Error () -> Ok B0_driver.Exit.build_error
   | Ok () ->
-      match executor with
+      (* XXX eventually we should run the action as soon as it can.
+         OCaml actions should be run by a work queue which we can bake
+         by Domains on >= 5, this will be useful for `b0 test` *)
+      match action_runner with
       | None -> Ok B0_cli.Exit.ok
-      | Some executor -> executor ~args:(Cmd.list args)
+      | Some run -> run ~args:(Cmd.list args)
 
 (* Command line interface *)
 

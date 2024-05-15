@@ -56,8 +56,8 @@ let b0 =
   let srcs = [`File ~/"src/tool/b0_main_run.ml"] in
   let requires = [b0_file; b0_tool] in
   let exec_env = `Fun ("Bootstrap env on the b0 build", bootstrap_env) in
-  let meta = B0_meta.empty |> ~~ B0_unit.Exec.env exec_env in
-  B0_ocaml.exe "b0" ~doc:"The b0 tool" ~srcs ~requires ~meta
+  let meta = B0_meta.empty |> ~~ B0_unit.Action.env exec_env in
+  B0_ocaml.exe "b0" ~public:true ~doc:"The b0 tool" ~srcs ~requires ~meta
 
 (* Low-level B0 tools *)
 
@@ -67,7 +67,7 @@ let tool_exe ?requires n ~doc file =
   | Some requires -> requires
   in
   let srcs = [`File Fpath.(~/"src/lowtools" / file)] in
-  B0_ocaml.exe n ~doc ~srcs ~requires
+  B0_ocaml.exe n ~public:true ~doc ~srcs ~requires
 
 let b0_cache_tool =
   tool_exe "b0-cache" ~doc:"Operate on b0 caches" "b0_cache.ml"
@@ -88,7 +88,7 @@ let show_url_tool =
 (* Tests *)
 
 let test_src f = `File Fpath.(~/"test" // f)
-let test ?(run = false) ?(requires = []) ?(more_srcs = []) file ~doc =
+let test ?(run = false) ?(requires = []) ?(more_srcs = []) ?doc file =
   let file = Fpath.v file in
   let more_srcs = List.map (fun v -> test_src (Fpath.v v)) more_srcs in
   let srcs = (test_src file) :: more_srcs in
@@ -100,14 +100,14 @@ let test ?(run = false) ?(requires = []) ?(more_srcs = []) file ~doc =
     |> B0_meta.tag B0_meta.test
     |> B0_meta.add B0_meta.run run
   in
-  B0_ocaml.exe (Fpath.basename ~strip_ext:true file) ~meta ~doc ~srcs ~requires
+  B0_ocaml.exe (Fpath.basename ~strip_ext:true file) ~meta ?doc ~srcs ~requires
 
-let test_memo ?requires ?(more_srcs = []) file ~doc =
+let test_memo ?requires ?(more_srcs = []) ?doc file =
   let more_srcs = "test_memo_setup.ml" :: more_srcs in
-  test ?requires ~more_srcs file ~doc
+  test ?requires ~more_srcs ?doc file
 
 let test_base =
-  let doc = "Some tests for basic modules (B0_std, etc.)" in
+  let doc = "Basic module tests (B0_std, etc.)" in
   let more_srcs =
     ["test_fmt.ml"; "test_fpath.ml"; "test_cmd.ml"; "test_base64.ml"]
   in
@@ -120,10 +120,10 @@ let test_memo_failure =
   test_memo "test_memo_failures.ml" ~doc:"Tests some failures of B0_memo.Memo."
 
 let test_memo_no_write =
-  test_memo "test_memo_no_write.ml" ~doc:"???"
+  test_memo "test_memo_no_write.ml"
 
 let test_memo_store =
-  test_memo "test_memo_store.ml" ~doc:"???"
+  test_memo "test_memo_store.ml"
 
 let test_memo_redir =
   test_memo "test_memo_redir.ml" ~doc:"Test memo spawn stdio redirection"
@@ -183,7 +183,7 @@ let strap =
 let bowl =
   let doc = "Run built b0 in the bowl directory" in
   B0_action.make "bowl" ~units:[b0] ~doc @@
-  fun _ env ~args ->
+  fun env _ ~args ->
   match B0_env.unit_exe_file_cmd env b0 with (* TODO b0: error struct *)
   | Error e -> Log.err (fun m -> m "%s" e); B0_cli.Exit.some_error
   | Ok b0_exe ->

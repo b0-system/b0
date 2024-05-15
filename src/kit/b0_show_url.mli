@@ -41,13 +41,13 @@ val timeout_s : int B0_meta.key
 
 (** {1:action [.show-url] action} *)
 
-val action : B0_action.t
-(** [action] is the [.show-url] action.
+val unit : B0_action.t
+(** [unit] is the [.show-url] unit.
 
     See [b0 -- .show-url --help] for more information. *)
 
 (** {1:unit_exec Unit execution} *)
 
-val unit_exec : B0_unit.Exec.t
-(** [unit_exec] is a unit execution that invokes the [show-url]
-    tool on the unit's {!val-url}. *)
+val action : B0_unit.Action.t
+(** [action] is a unit action that invokes the [show-url] tool on
+    the unit's {!val-url}. *)

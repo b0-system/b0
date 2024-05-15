@@ -146,7 +146,7 @@ the [wrap] parameter to units.
 
   In the context of a merge with [B0_store] it should be possible to
   determine keys in various ways without needing to be explicit about
-  it like for example the datatype of {!B0_unit.Exec.type-env} is. But
+  it like for example the datatype of {!B0_unit.Action.type-env} is. But
   If we build dynamics directly into keys, we should keep the option to
   keep keys static only.
 
@@ -156,7 +156,7 @@ the [wrap] parameter to units.
   return type.
 
   Dynamics. For now we used ['a Fut B0_meta.key] or functional
-  keys (see {!B0_unit.Exec}. See how it goes fares for sync. Push/pull.
+  keys (see {!B0_unit.Action}. See how it goes fares for sync. Push/pull.
   In the optic of direct style I think we rather want ivars.
 
 {2:b0_store [B0_store]}

@@ -24,8 +24,7 @@ val show_what :
   must_build:B0_unit.Set.t ->
   may_build:B0_unit.Set.t -> B0_driver.Conf.t -> (B0_std.Os.Exit.t, 'a) result
 
-val executor_env :
-  B0_build.t -> B0_def.t -> B0_driver.Conf.t -> B0_env.t
+val action_env : B0_build.t -> B0_def.t -> B0_driver.Conf.t -> B0_env.t
 
 val units : string list Cmdliner.Term.t
 val x_units : string list Cmdliner.Term.t

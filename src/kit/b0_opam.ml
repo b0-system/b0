@@ -901,7 +901,7 @@ let opam_cmd action env =
                   information.";
               `Blocks man]
   in
-  let name = B0_action.name action and doc = B0_action.doc action in
+  let name = B0_unit.name action and doc = B0_unit.doc action in
   Cmd.group (Cmd.info name ~doc ~man) @@
   [file_cmd; list_cmd; publish_cmd]
 

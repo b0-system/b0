@@ -3,7 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** B0 builds.
+(** Builds.
 
     Centralizes the information to run and orchestrate a B0 build. *)
 

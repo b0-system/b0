@@ -141,8 +141,8 @@ let server_mode env timeout_cli no_exec ~url args = match Url.authority url with
           (B0_unit.find_or_default_meta listen_args unit) ~authority
         in
         let cmd = make_server_cmd cmd args ~listen_args in
-        let* cwd = B0_unit.Exec.get_cwd env unit in
-        let* env' = B0_unit.Exec.get_env env unit in
+        let* cwd = B0_unit.Action.get_cwd env unit in
+        let* env' = B0_unit.Action.get_env env unit in
         let env' = Os.Env.to_assignments env' in
         Ok (`Show_url_server (endpoint, timeout, url, cmd, cwd, env'))
 
@@ -309,14 +309,18 @@ let show_url_cmd action env =
         B0_web_browser.prefix ~default:true () $
         timeout $ dry_run $ no_exec $ args)
 
-let action =
+let unit =
   let doc = "Show URLs of files or server runs" in
   B0_action.of_cmdliner_cmd "" ~dyn_units show_url_cmd ~doc
 
-(* Unit exec *)
+(* Unit action *)
 
-let unit_exec =
-  let exec b0_env ?env ?cwd u ~args =
+let action =
+  let exec b0_env u ~args =
+    let* env =
+      Result.map Os.Env.to_assignments (B0_unit.Action.get_env b0_env u)
+    in
+    let* cwd = B0_unit.Action.get_cwd b0_env u in
     let err e = Log.err (fun m -> m "%s" e); Ok B0_cli.Exit.some_error in
     match B0_unit.get_meta (* or default ? *) url u with
     | Error e -> err e
@@ -326,7 +330,7 @@ let unit_exec =
         | Error e -> err e
         | Ok show_url ->
             let cmd = Cmd.(show_url % url %% args) in
-            Ok (Os.Exit.exec ?env ?cwd cmd)
+            Ok (Os.Exit.exec ?env:(Some env) ?cwd:(Some cwd) cmd)
   in
   `Fun ("show-url", exec)
 

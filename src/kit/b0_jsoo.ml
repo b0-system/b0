@@ -389,7 +389,7 @@ let html_page
     |> B0_meta.add B0_ocaml.Code.supported `Byte
     |> B0_meta.add B0_ocaml.Code.needs `Byte
     |> B0_meta.add B0_show_url.url (`In (`Unit_dir, html_file))
-    |> B0_meta.add B0_unit.Exec.key B0_show_url.unit_exec
+    |> B0_meta.add B0_unit.Action.key B0_show_url.action
   in
   let meta = B0_meta.override base ~by:meta in
   let proc = wrap (html_page_proc ~html_file ~js_file set_modsrcs srcs) in

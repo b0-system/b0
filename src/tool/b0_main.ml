@@ -30,8 +30,7 @@ let man = [
   `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information."; ]
 
 let cmds =
-  [ B0_cmd_action.cmd;
-    B0_cmd_browse.cmd;
+  [ B0_cmd_browse.cmd;
     B0_cmd_build.cmd;
     B0_cmd_delete.cmd;
     B0_cmd_edit.cmd;

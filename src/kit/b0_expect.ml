@@ -267,7 +267,7 @@ let run f env base short log_absolute no_pager =
   let ctx = make env ~log_absolute ~log_diffs:(not short) ~base in
   f ctx; finish ctx
 
-let action_func ~base f action env ~args =
+let action_func ~base f env action ~args =
   let run = run f env base in
   let no_pager = B0_pager.don't () in
   let run = Cmdliner.Term.(const run $ short $ log_absolute_arg $ no_pager) in

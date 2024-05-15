@@ -52,6 +52,7 @@ end
 and Unit : sig include B0_def.S with type t = Unit_def.t end
   = B0_def.Make (Unit_def)
 
+
 (* Build procedures *)
 
 type b0_build = Build_def.t
@@ -61,6 +62,18 @@ let build_nop b = Fut.return ()
 (* Build units *)
 
 include Unit
+
+type b0_unit = t
+type b0_env =
+  { b0_dir : Fpath.t;
+    build : b0_build;
+    built_tools : b0_unit String.Map.t Lazy.t;
+    cwd : Fpath.t;
+    root_dir : Fpath.t;
+    scope_dir : Fpath.t;
+    build_env : Os.Env.t;
+    driver_env : Os.Env.t; }
+
 
 (* We also maintain a tool name index for built tools. *)
 
@@ -80,26 +93,114 @@ let make ?doc ?meta n build_proc =
 
 let build_proc u = u.Unit_def.build_proc
 
-let pp_synopsis ppf v =
-  let pp_tag ppf u =
-    let base = [`Bg `White; `Fg `Black; `Bold] in
-    let tag, style =
-      (if has_tag B0_meta.exe u then
-         (if has_tag B0_meta.test u && has_tag B0_meta.run u
-          then " T ",
-               [ (if has_tag B0_meta.long u then `Bg `White else `Bg `Green);
-                 `Fg `Black; `Bold]
-          else " E ", base)
-       else
-       if has_tag B0_meta.lib u
-       then " L ", [`Bg `Yellow; `Fg `Black; `Bold] else
-       if has_tag B0_meta.doc u
-       then " D ", [`Bg `Cyan; `Fg `Black; `Bold] else
-       " U ", base)
-    in
-    Fmt.tty style ppf tag;
+(* Executing *)
+
+let exe_file =
+  let doc = "Absolute file path to a built executable." in
+  let pp_value = Fmt.any "<built value>" in
+  B0_meta.Key.make "exe-file" ~doc ~pp_value
+
+let outcomes =
+  let doc = "Unit build outcomes." in
+  let pp_value = Bval.pp (Fmt.vbox (Fmt.list Fpath.pp)) in
+  B0_meta.Key.make "outcomes" ~doc ~pp_value
+
+let is_public u = match find_meta B0_meta.public u with
+| None -> false | Some b -> b
+
+let get_or_suggest_tool ~keep n =
+  (* XXX I don't 'understand how this current_is_root () can work. *)
+  let is_root = B0_scope.current_is_root () in
+  let keep = if is_root then keep else fun u -> in_current_scope u && keep u in
+  let us = Option.value ~default:[] (String.Map.find_opt n !tool_name_index) in
+  match List.filter keep us with
+  | _ :: _ as us -> Ok us
+  | [] ->
+      let add_sugg acc u = if keep u then u :: acc else acc in
+      let add_suggs k us acc =
+        if String.edit_distance k n > 2 then acc else
+        List.fold_left add_sugg acc us
+      in
+      Error (List.rev (String.Map.fold add_suggs !tool_name_index []))
+
+let tool_is_user_accessible u = is_public u || in_root_scope u
+
+let tool_name_map units =
+  let warn_dup_tool use ign n =
+    Log.warn @@ fun m ->
+    m "@[<v>Tool %a defined both by unit %a and %a.@,\
+       Ignoring definition in unit %a.@]"
+      Fmt.code n pp_name use pp_name ign pp_name ign
   in
-  Fmt.pf ppf "@[%a %a@]" pp_tag v pp_synopsis v
+  let warn_no_exe_file u n =
+    Log.warn @@ fun m ->
+    m "@[<v>Tool %a defined by unit %a does not specify a@,\
+       B0_meta.exe_file key. It will not be used in the build (if needed).@]"
+      Fmt.code n pp_name u
+  in
+  let add_unit u acc =
+    if not (tool_is_user_accessible u) then acc else
+    match B0_meta.find tool_name (meta u) with
+    | None -> acc
+    | Some t ->
+        match String.Map.find_opt t acc with
+        | Some u' -> warn_dup_tool u u' t; acc
+        | None ->
+            if B0_meta.mem exe_file (meta u)
+            then String.Map.add t u acc
+            else (warn_no_exe_file u t; acc)
+  in
+  Set.fold add_unit units String.Map.empty
+
+(* We need this here because of formatting *)
+
+type action =
+  [ `Unit_exe
+  | `Cmd of string * (b0_env -> b0_unit -> args:Cmd.t -> (Cmd.t, string) result)
+  | `Fun of
+      string *
+      (b0_env -> b0_unit -> args:Cmd.t -> (Os.Exit.t, string) result) ]
+
+let pp ppf = function
+| `Unit_exe -> Fmt.pf ppf "file in %a" B0_meta.Key.pp_name exe_file
+| `Cmd (doc, _) -> Fmt.pf ppf "<fun> %s" doc
+| `Fun (doc, _) -> Fmt.pf ppf "<fun> %s" doc
+
+let action_key : action B0_meta.key =
+  (* We need this here because of formatting *)
+  let doc = "Unit execution." in
+  let default = `Unit_exe in
+  B0_meta.Key.make "action" ~default ~doc ~pp_value:pp
+
+(* Formatting build units *)
+
+let pp_tag ppf u =
+  let base = [`Fg `Black; `Bold] in
+  let wbg = `Bg `White in
+  let is_test u = has_tag B0_meta.test u in
+  let is_run_test u = has_tag B0_meta.test u && has_tag B0_meta.run u in
+  let is_long u = has_tag B0_meta.long u in
+  let is_public u = has_tag B0_meta.public u in
+  let is_exe u = has_tag B0_meta.exe u in
+  let is_lib u = has_tag B0_meta.lib u in
+  let is_doc u = has_tag B0_meta.doc u in
+  let is_action u = mem_meta action_key u in
+  let tag, style =
+    if is_run_test u
+    then " T ", (if is_long u then wbg else `Bg `Green) :: base else
+    if is_exe u
+    then
+      (if is_test u then " T " else " E "),
+      (if is_public u then `Fg `Red else `Fg `Black) :: [`Bold; wbg] else
+    if is_lib u
+    then " L ", (if is_public u then `Bg `Yellow else wbg) :: base else
+    if is_doc u
+    then " D ", (`Bg `Cyan :: base) else
+    ((if is_action u then " A " else " U "), (wbg :: base))
+  in
+  Fmt.tty style ppf tag
+
+let pp_synopsis ppf v = Fmt.pf ppf "@[%a %a@]" pp_tag v pp_synopsis v
 
 let pp ppf v =
   let pp_non_empty ppf m = match B0_meta.is_empty m with
@@ -245,76 +346,6 @@ module Build = struct
     String.Map.fold (fun _ u acc -> Set.add u acc) b.b.requested Set.empty
 end
 
-type b0_unit = t
-type b0_env =
-  { b0_dir : Fpath.t;
-    build : Build.t;
-    built_tools : b0_unit String.Map.t Lazy.t;
-    cwd : Fpath.t;
-    root_dir : Fpath.t;
-    scope_dir : Fpath.t;
-    build_env : Os.Env.t;
-    driver_env : Os.Env.t; }
-
-(* Executing *)
-
-let exe_file =
-  let doc = "Absolute file path to a built executable." in
-  let pp_value = Fmt.any "<built value>" in
-  B0_meta.Key.make "exe-file" ~doc ~pp_value
-
-let outcomes =
-  let doc = "Unit build outcomes." in
-  let pp_value = Bval.pp (Fmt.vbox (Fmt.list Fpath.pp)) in
-  B0_meta.Key.make "outcomes" ~doc ~pp_value
-
-let is_public u = match find_meta B0_meta.public u with
-| None -> false | Some b -> b
-
-let get_or_suggest_tool ~keep n =
-  (* XXX I don't 'understand how this current_is_root () can work. *)
-  let is_root = B0_scope.current_is_root () in
-  let keep = if is_root then keep else fun u -> in_current_scope u && keep u in
-  let us = Option.value ~default:[] (String.Map.find_opt n !tool_name_index) in
-  match List.filter keep us with
-  | _ :: _ as us -> Ok us
-  | [] ->
-      let add_sugg acc u = if keep u then u :: acc else acc in
-      let add_suggs k us acc =
-        if String.edit_distance k n > 2 then acc else
-        List.fold_left add_sugg acc us
-      in
-      Error (List.rev (String.Map.fold add_suggs !tool_name_index []))
-
-let tool_is_user_accessible u = is_public u || in_root_scope u
-
-let tool_name_map units =
-  let warn_dup_tool use ign n =
-    Log.warn @@ fun m ->
-    m "@[<v>Tool %a defined both by unit %a and %a.@,\
-       Ignoring definition in unit %a.@]"
-      Fmt.code n pp_name use pp_name ign pp_name ign
-  in
-  let warn_no_exe_file u n =
-    Log.warn @@ fun m ->
-    m "@[<v>Tool %a defined by unit %a does not specify a@,\
-       B0_meta.exe_file key. It will not be used in the build (if needed).@]"
-      Fmt.code n pp_name u
-  in
-  let add_unit u acc =
-    if not (tool_is_user_accessible u) then acc else
-    match B0_meta.find tool_name (meta u) with
-    | None -> acc
-    | Some t ->
-        match String.Map.find_opt t acc with
-        | Some u' -> warn_dup_tool u u' t; acc
-        | None ->
-            if B0_meta.mem exe_file (meta u)
-            then String.Map.add t u acc
-            else (warn_no_exe_file u t; acc)
-  in
-  Set.fold add_unit units String.Map.empty
-
 module Env = struct
   type t = b0_env
   let make ~b0_dir ~build ~cwd ~root_dir ~scope_dir ~driver_env =
@@ -393,7 +424,10 @@ module Env = struct
   let unit_exe_file_cmd env u = Result.map Cmd.path (unit_exe_file env u)
 end
 
-module Exec = struct
+module Action = struct
+
+  type b0_unit = t
+
   type env =
   [ Env.env
   | `Override of Env.env * Os.Env.t
@@ -438,23 +472,29 @@ module Exec = struct
   | `In (#Env.dir as dir, p) -> Ok (Env.in_dir b0_env dir p)
   | `Fun (_doc, f) -> f b0_env u
 
-  type t =
-  [ `Unit_exe
-  | `Cmd of string * (b0_env -> b0_unit -> args:Cmd.t -> (Cmd.t, string) result)
-  | `Fun of
-      string *
-      (b0_env -> ?env:Os.Env.assignments -> ?cwd:Fpath.t ->
-       b0_unit -> args:Cmd.t -> (Os.Exit.t, string) result) ]
+  type t = action
 
-  let pp ppf = function
-  | `Unit_exe -> Fmt.pf ppf "file in %a" B0_meta.Key.pp_name exe_file
-  | `Cmd (doc, _) -> Fmt.pf ppf "<fun> %s" doc
-  | `Fun (doc, _) -> Fmt.pf ppf "<fun> %s" doc
+  let key = action_key
 
-  let key : t B0_meta.key =
-    let doc = "Unit execution." in
-    let default = `Unit_exe in
-    B0_meta.Key.make "exec" ~default ~doc ~pp_value:pp
+  let units : b0_unit list B0_meta.key =
+    (* XXX Initially the idea was not to have a notion of explicit
+       dependency between units. But now that we have this for action
+       perhaps this should be moved to B0_unit. Or not, we could keep
+       that notion only for executions and not builds but why ? *)
+    let doc = "Units needed for action" in
+    let pp_value = Fmt.list ~sep:Fmt.sp pp_name in
+    B0_meta.Key.make "action-units" ~default:[] ~pp_value ~doc
+
+  let dyn_units : (args:Cmd.t -> b0_unit list) B0_meta.key =
+    let doc = "Dyn units needed for action (hack)" in
+    let pp_value = Fmt.any "<func>" in
+    let default ~args:_ = [] in
+    B0_meta.Key.make "action-dyn-units" ~default ~pp_value ~doc
+
+  let store : B0_store.binding list B0_meta.key =
+    let doc = "Store imposed by the action." in
+    let pp_value = Fmt.any "<store bindings>" in
+    B0_meta.Key.make "action-store" ~default:[] ~pp_value ~doc
 
   open Result.Syntax
 
@@ -465,10 +505,7 @@ module Exec = struct
     let cmd = Cmd.(path exe_file %% args) in
     Ok (Os.Exit.exec ~env ~cwd cmd)
 
-  let run_fun f b0_env u ~args =
-    let* env = Result.map Os.Env.to_assignments (get_env b0_env u) in
-    let* cwd = get_cwd b0_env u in
-    f b0_env ?env:(Some env) ?cwd:(Some cwd) u ~args
+  let run_fun f b0_env u ~args = f b0_env u ~args
 
   let run_cmd cmd b0_env u ~args =
     let* env = Result.map Os.Env.to_assignments (get_env b0_env u) in

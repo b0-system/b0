@@ -18,9 +18,8 @@ open B0_std
 type t = B0_unit.t
 (** The type for actions. *)
 
-val is_action : t -> bool
 
-type func = t -> B0_env.t -> args:Cmd.t -> Os.Exit.t
+type func = B0_env.t -> t -> args:Cmd.t -> Os.Exit.t
 (** The type for action implementations.
 
     A function that given the action, execution environment and command line
@@ -36,32 +35,15 @@ val make :
     be enforced in the build. *)
 
 val make' :
-  ?store:B0_store.binding list -> ?packs:B0_pack.t list ->
+  ?store:B0_store.binding list ->
   ?units:B0_unit.t list -> ?dyn_units:(args:Cmd.t -> B0_unit.t list) ->
   ?doc:string -> ?meta:B0_meta.t -> string ->
-  (t -> B0_env.t -> args:Cmd.t -> (unit, string) result) -> t
+  (B0_env.t -> t -> args:Cmd.t -> (unit, string) result) -> t
 (** [make'] is like {!make} but with a function whose result
     is turned into an error code via {!exit_of_result}. *)
 
-val func : t -> func
-(** [func a] is the action function. *)
-
-val func' : t -> func option
-(** [func' u] is the action function of unit [u] (if any). *)
-
-val units : t -> B0_unit.t list
-(** [units a] are the units that must build for running the action. *)
-
-val dyn_units : t -> args:Cmd.t -> B0_unit.t list
-(** [dyn_units a args] are the dynamic units of the action.
-
-    {b FIXME.} This is a temporary hack. *)
-
 val packs : t -> B0_pack.t list
 (** [packs a] are the packs that must build for running the action. *)
-
-val store : t -> B0_store.binding list
-(** [store a] are the store bindings to enforce on the build. *)
 
 (** {1:shortcuts Shortcuts} *)
 
@@ -104,6 +86,7 @@ val exec_cmd :
 
     {b TODO} Add a quick getopt interface. *)
 
+
 val of_cmdliner_cmd :
   ?store:B0_store.binding list -> ?packs:B0_pack.t list ->
   ?units:B0_unit.t list -> ?dyn_units:(args:Cmd.t -> B0_unit.t list) ->
@@ -124,10 +107,5 @@ val eval_cmdliner_term :
 (** [eval act env cmd t] defines a action command by evaluating the cmdliner
     term [t] with arguments [cmd]. The menagerie of optional
     parameters define a {!Cmdliner.Term.info} value for the term, see
-    the docs there. By default [doc] is derived from the action's doc string
+    the docs there. By default [doc] is derived from the unit's doc string
     and [exits] is {!B0_cli.Exit.infos}. *)
-
-
-(** {1:b0_def B0 definition API} *)
-
-include B0_def.S with type t := t

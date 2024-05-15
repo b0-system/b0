@@ -23,7 +23,6 @@ let make ?doc ?meta n ~locked units  =
 let units p = p.units
 let locked p = p.locked
 
-
 let synopsis_and_description_of_cmark file =
   let syn_of_title t = (* Get $SYN in "$NAME $SEP $SYN" *)
     let ws = Char.Ascii.is_white and tok c = not @@ Char.Ascii.is_white c in
@@ -75,9 +74,9 @@ let pp_units ppf p =
   Fmt.field ~label "units" Fmt.id pp ppf p
 
 let pp_synopsis ppf v =
-  let pp_tag ppf u =
-    let style = [`Fg `White; `Bg `Black; `Bold] in
-    Fmt.tty style ppf " P ";
+  let pp_tag ppf p =
+    let style = (if p.locked then [`Bg `Red] else [`Bg `Black]) in
+    Fmt.tty (`Fg `White :: `Bold :: style) ppf " P ";
   in
   Fmt.pf ppf "@[%a %a@]" pp_tag v pp_synopsis v
 

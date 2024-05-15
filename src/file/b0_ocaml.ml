@@ -2122,7 +2122,7 @@ let meta env pack =
 
 open Cmdliner
 
-let ocaml_cmd action env =
+let ocaml_cmd u env =
   let man =
     [ `S Manpage.s_see_also;
       `P "Consult $(b,odig doc b0) for the B0 release manual." ]
@@ -2178,7 +2178,7 @@ let ocaml_cmd action env =
       `P "$(iname) has a few tools for OCaml";
       `Blocks man ]
   in
-  let name = B0_action.name action and doc = B0_action.doc action in
+  let name = B0_unit.name u and doc = B0_unit.doc u in
   Cmd.group (Cmd.info name ~doc ~man) @@
   [ crunch; list; meta ]
 

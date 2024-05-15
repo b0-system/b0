@@ -3,38 +3,53 @@
 This manual shows how to deal with B0 actions and how to create your
 own.
 
+{b TODO.} Not super clear yet.
+
 {1:basics Basics}
 
-Basic operations on actions are provided by the [b0 action] command.
-{[
-b0 action list  # List action
+In B0, building is merely a side effect. Most of the time one is
+interested in doing something with build artefacts. This can be
+running them, displaying them, testing them, benchmarking them,
+deploying them etc.
+
+For these reasons a build unit [UNIT] has (most of the time) an action
+associated to it. This action can simply be run with:
+
+{@shell[
+b0 -- UNIT ARG…
 ]}
 
-Running an action is
+This builds the unit named [UNIT] like [b0 -u UNIT] would do
+and execute [UNIT]'s action with arguments [ARG…].
 
-{1:action Action, tool or executable unit ?}
+Note that a unit action:
 
-XXX clarify terminology and formally define executable unit (or eschew
-the concept and only keep tool).
+{ul
+{- Can be associated with an empty build procedure and not
+   build anything. For example it can simply run a script or
+   an OCaml function to download and refresh conformance
+   tests or data from the web.}
+{- May explicitely require other units or packs to be build
+   in order to be run.}
+{- May simply be the executable built by the unit.}
+{- May simply be the public tool.}
+{- Has access to what was part of the build. For example
+   the [.ocaml] library unit is an action that has a few
+   subcommand whose outcomes.}
+{- Can influence how the build is done ({!B0_unit.Action.store}).}}
 
-From the point of user interface there's not much difference between you
-all call them the same way which is:
+Note that a lot of domain specific build unit will define
+a default action for you.
 
 {[
-b0 -- NAME ARG…
+b0 list        # Lists the units (and thus actions).
+b0 list --all  # Also include library defined units
+b0 tool list   # List public tools and private tools in the root scope
 ]}
 
-Actions may involve a build or not, invoking a tool described by a
-unit automatically builds it and runs the tool. The [b0 list] command
-lists both tools an actions (except the library actions for which you
-need [--all]. If you want to see specific listings
 
-{[
-b0 list        # Actions, build units, build packs
-b0 list --all  # Also include library actions
-b0 action list # List only actions
-b0 tool list   # List public tools and private tools in the root scopexs
-]}
+Unique outcome, multiple action. Make empty units that need a base
+unit.
 
 {1:tutorial Making your own action}
 
