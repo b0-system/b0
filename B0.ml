@@ -128,6 +128,10 @@ let test_b0_file =
   let requires = [b0_memo] in
   test "test_b0_file.ml" ~requires ~doc:"Test B0_file module"
 
+let sttyles =
+  let requires = [b0_std] in
+  test "sttyles.ml" ~requires ~doc:"Show ANSI escape styles"
+
 (* Packs *)
 
 let b0_pack =
