@@ -61,7 +61,7 @@ let show_what
 
 let run_test c build u =
   Log.app (fun m -> m "%a %a" Test_fmt.pp_test () B0_unit.pp_name u);
-  let exec = B0_unit.find_or_default_meta B0_unit.Exec.key u in
+  let exec = B0_meta.find_or_default B0_unit.Exec.key (B0_unit.meta u) in
   let b0_env = B0_cmd_build.executor_env build (B0_unit.def u) c in
   let* env = B0_unit.Exec.get_env b0_env u in
   let env = Os.Env.to_assignments env in
@@ -74,14 +74,22 @@ let run_test c build u =
   in
   match exec with
   | `Unit_exe ->
-      begin match B0_unit.find_meta B0_unit.exe_file u with
+      begin match B0_action.func' u with
       | None ->
-          Fmt.error "No exectuable file found (no %a key)"
-            Fmt.code "B0_unit.exe_file"
-      | Some exe_file ->
-          let exe_file = Fut.sync exe_file in
-          let cmd = Cmd.(path exe_file %% args) in
-          run_cmd ~env ~cwd cmd
+          begin match B0_unit.find_meta B0_unit.exe_file u with
+          | None ->
+              Fmt.error "No executable file found (no %a key)"
+                Fmt.code "B0_unit.exe_file"
+          | Some exe_file ->
+              let exe_file = Fut.sync exe_file in
+              let cmd = Cmd.(path exe_file %% args) in
+              run_cmd ~env ~cwd cmd
+          end
+      | Some func ->
+          let dur = Os.Mtime.counter () in
+          match func u b0_env ~args with
+          | Code rc -> Ok (Os.Mtime.count dur, `Exited rc)
+          | Exec _ -> Fmt.error "Action Exec not supported yet"
       end
   | `Cmd (_, cmd) ->
       let* cmd = cmd b0_env u ~args in
@@ -89,7 +97,12 @@ let run_test c build u =
   | `Fun (_, cmd) ->
       (* FIXME we should clarify what `Fun is in B0_unit.Exec,
          in particular `Fun should not execv. In fact no Exec should. *)
-      Fmt.error "`Fun execution not supported yet"
+      let dur = Os.Mtime.counter () in
+      let* exit = cmd b0_env ~env ~cwd u ~args in
+      begin match exit with
+      | Code rc -> Ok (Os.Mtime.count dur, `Exited rc)
+      | Exec _ -> Fmt.error "Unit Exec not supported in tests"
+      end
 
 let rec run_tests c build dur fails = function
 | [] -> dur, fails

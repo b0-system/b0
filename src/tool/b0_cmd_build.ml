@@ -163,26 +163,20 @@ let find_store_and_execution args = function
         Ok ([], Some (`Unit u), [u], [])
     | Error tool_suggs ->
         let u = B0_unit.get_or_suggest name in
-        let action = B0_action.get_or_suggest name in
-        match u, action with
-        | Ok u, Ok action ->
-            (* XXX we should maybe disallow declaring an action with the same
-               name as a tool or unit in a given scope. *)
-            Fmt.error "Both a tool and action are called %a" Fmt.code name
-        | Ok u, Error _ ->
+        match u with
+        | Ok u when not (B0_action.is_action u) ->
             Ok ([], Some (`Unit u), [u], [])
-        | Error _, Ok a ->
-            let store = B0_action.store a in
-            let units = B0_action.units a in
-            let dyn_units = B0_action.dyn_units a ~args:(Cmd.list args) in
+        | Ok u ->
+            let store = B0_action.store u in
+            let units = B0_action.units u in
+            let dyn_units = B0_action.dyn_units u ~args:(Cmd.list args) in
             let units = dyn_units @ units in
-            Ok (store, Some (`Action a), units, B0_action.packs a)
-        | Error us, Error cs ->
+            Ok (store, Some (`Action u), units, B0_action.packs u)
+        | Error us ->
             let tname u = Option.get (B0_unit.find_meta B0_unit.tool_name u) in
             let ts = List.rev_map tname tool_suggs in
             let us = List.rev_map B0_unit.name us in
-            let cs = List.rev_map B0_action.name cs in
-            let set = String.Set.of_list (List.concat [ts; us; cs]) in
+            let set = String.Set.of_list (List.concat [ts; us]) in
             let suggs = String.Set.elements set in
             let hint = Fmt.did_you_mean in
             let nothing_to ppf v =

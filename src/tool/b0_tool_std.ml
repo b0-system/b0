@@ -11,7 +11,7 @@ let driver =
   B0_driver.make ~name:"b0" ~version:"%%VERSION%%" ~libs
 
 let def_list : (module B0_def.S) list =
-  [(module B0_action); (module B0_pack); (module B0_unit)]
+  [(module B0_pack); (module B0_unit)]
 
 let def_list_list def_list =
   let add_values (type a) acc (module Def : B0_def.S) =

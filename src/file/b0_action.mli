@@ -15,8 +15,10 @@
 
 open B0_std
 
-type t
+type t = B0_unit.t
 (** The type for actions. *)
+
+val is_action : t -> bool
 
 type func = t -> B0_env.t -> args:Cmd.t -> Os.Exit.t
 (** The type for action implementations.
@@ -43,6 +45,9 @@ val make' :
 
 val func : t -> func
 (** [func a] is the action function. *)
+
+val func' : t -> func option
+(** [func' u] is the action function of unit [u] (if any). *)
 
 val units : t -> B0_unit.t list
 (** [units a] are the units that must build for running the action. *)
