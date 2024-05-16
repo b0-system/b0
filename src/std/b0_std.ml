@@ -4366,7 +4366,9 @@ module Os = struct
   end
 
   module Exit = struct
-    type t = Code : int -> t | Exec : (unit -> ('a, string) result) -> t
+    type code = int
+
+    type t = Code : code -> t | Exec : (unit -> ('a, string) result) -> t
 
     let code c = Code c
     let exec ?env ?cwd ?argv0 cmd =

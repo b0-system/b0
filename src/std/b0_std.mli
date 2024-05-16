@@ -3158,13 +3158,16 @@ module Os : sig
 
     (** {1:exitspec Specifying exits} *)
 
+    type code = int
+    (** The type for exit codes. *)
+
     type t =
-    | Code : int -> t (** [exit] with code. *)
+    | Code : code -> t (** [exit] with code. *)
     | Exec : (unit -> ('a, string) result) -> t (** exit with [execv] *)
     (** The type for specifying program exits. Either an exit code or a
         function (that should be) calling {!B0_std.Os.Cmd.execv}. *)
 
-    val code : int -> t
+    val code : code -> t
     (** [code c] is [Code c]. *)
 
     val exec :
@@ -3172,7 +3175,7 @@ module Os : sig
     (** [exec ?env ?cwd ?argv0 cmd] is an [Exec _]. That has a call to
         {!Os.Cmd.execv} with the corresponding arguments. *)
 
-    val get_code : t -> int
+    val get_code : t -> code
     (** [get_code e] is the exit code of [e]. Raises [Invalid_argument] if
         [e] is {!Exec}. *)
 
