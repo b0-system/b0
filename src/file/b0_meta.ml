@@ -253,4 +253,14 @@ let run =
 let warning =
   string_key "warning" ~doc:"A warning shown when the entity is used"
 
+
+let exe_file =
+  let doc = "Absolute file path to a built executable." in
+  let pp_value = Fmt.any "<built value>" in
+  Key.make "exe-file" ~doc ~pp_value
+
+let tool_name =
+  let doc = "Executable tool name without platform specific extension" in
+  Key.make "tool-name" ~doc ~pp_value:Fmt.string
+
 let () = B0_scope.close ()

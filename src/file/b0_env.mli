@@ -11,7 +11,7 @@
 
 open B0_std
 
-type t = B0_unit.b0_env
+type t = B0_defs.b0_env
 (** The type for execution environments. *)
 
 val make :
@@ -44,7 +44,7 @@ val scratch_dir : t -> Fpath.t
     content may be destroyed at any time and actions are in charge of
     inventing a naming scheme to avoid collisions. *)
 
-val unit_dir : t -> B0_unit.t -> Fpath.t
+val unit_dir : t -> B0_defs.b0_unit -> Fpath.t
 (** [unit_dir env u] is the build directory if [u] in the
     build [build env]. That is {!B0_build.unit_dir}[ (build env) u]. *)
 
@@ -69,7 +69,7 @@ val in_scope_dir : t -> Fpath.t -> Fpath.t
 val in_scratch_dir : t -> Fpath.t -> Fpath.t
 (** [in_scope_dir env p] is [Fpath.(scratch_dir env // p)]. *)
 
-val in_unit_dir : t -> B0_unit.t -> Fpath.t -> Fpath.t
+val in_unit_dir : t -> B0_defs.b0_unit -> Fpath.t -> Fpath.t
 (** [in_unit_dir env u p] is [Fpath.(unit_unit_dir env u // p)]. *)
 
 val in_dir : t -> dir -> Fpath.t -> Fpath.t
@@ -107,10 +107,10 @@ val get_cmd : ?skip_build:bool -> t -> Cmd.tool_search
     and is {!B0_unit.tool_is_user_accessible}, it comes first in the
     search, unless [skip_build] is [true] (defaults to [false]. *)
 
-val unit_exe_file : t -> B0_unit.t -> (Fpath.t, string) result
+val unit_exe_file : t -> B0_defs.b0_unit -> (Fpath.t, string) result
 (** [unit_exe_file env u] looks up the {!B0_unit.exe_file}
     of [u] in [env]. This errors if [u] can't be found in the build
     of if [u] has no such key. *)
 
-val unit_exe_file_cmd : t -> B0_unit.t -> (Cmd.t, string) result
+val unit_exe_file_cmd : t -> B0_defs.b0_unit -> (Cmd.t, string) result
 (** [unit_exe_file env u] is [Result.map Cmd.path (unit_exe_file env u)]. *)

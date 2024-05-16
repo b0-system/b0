@@ -14,10 +14,7 @@ open B0_std
 
 (** {1:proc Build procedures} *)
 
-type b0_build
-(** The type for builds, see {!B0_build}. *)
-
-type build_proc = b0_build -> unit Fut.t
+type build_proc = B0_build.t -> unit Fut.t
 (** The type for unit build procedures. Note that when the future
     determines the build may not be finished. *)
 
@@ -26,7 +23,7 @@ val build_nop : build_proc
 
 (** {1:units Units} *)
 
-type t
+type t = B0_defs.b0_unit
 (** The type for build units. *)
 
 val make : ?doc:string -> ?meta:B0_meta.t -> string -> build_proc -> t
@@ -62,9 +59,6 @@ val tool_is_user_accessible : t -> bool
 
 (** {1:meta Unit actions}  *)
 
-type b0_env
-(** The type for execution environments, see {!B0_env}. *)
-
 (** Unit actions.
 
     These properties pertain to the interface that allows to execute
@@ -92,7 +86,7 @@ module Action : sig
   | `Override of [`Build_env | `Driver_env] * Os.Env.t
   (** Environment overriden by given values. *)
   | `Env of Os.Env.t (** This exact environment. *)
-  | `Fun of string * (b0_env -> b0_unit -> (Os.Env.t, string) result)
+  | `Fun of string * (B0_env.t -> b0_unit -> (Os.Env.t, string) result)
     (** Doc string and function. *) ]
   (** The type for execution environments. *)
 
@@ -100,7 +94,7 @@ module Action : sig
   (** [env] specifies the environement for executing a unit. If unspecified
       this is [`Build_env].  *)
 
-  val get_env : b0_env -> b0_unit -> (Os.Env.t, string) result
+  val get_env : B0_env.t -> b0_unit -> (Os.Env.t, string) result
   (** [get_env env u] performs the logic to get the execution
       environment {!val-env} for unit [u] in environment [env]. *)
 
@@ -112,7 +106,7 @@ module Action : sig
   | `Scope_dir (** The directory of the scope where the entity is defined. *)
   | `Unit_dir (** The unit's build directory. *)
   | `In of [ `Cwd | `Unit_dir | `Root_dir | `Scope_dir ] * Fpath.t
-  | `Fun of string * (b0_env -> b0_unit -> (Fpath.t, string) Result.t)
+  | `Fun of string * (B0_env.t -> b0_unit -> (Fpath.t, string) Result.t)
     (** Doc string and function. *) ]
   (** The type for execution working directories. *)
 
@@ -120,7 +114,7 @@ module Action : sig
   (** [cwd] specifies the current working directory for executing a unit.
       If unspecified this is [`Cwd]. *)
 
-  val get_cwd : b0_env -> b0_unit -> (Fpath.t, string) result
+  val get_cwd : B0_env.t -> b0_unit -> (Fpath.t, string) result
   (** [get_cwd env u] performs the logic to get the cwd {!val-cwd}
       for unit [u] in environment [env]. *)
 
@@ -129,12 +123,12 @@ module Action : sig
   type t =
   [ `Unit_exe (** The unit's {!exe_file} *)
   | `Cmd of string *
-            (b0_env -> b0_unit -> args:Cmd.t -> (Cmd.t, string) result)
+            (B0_env.t -> b0_unit -> args:Cmd.t -> (Cmd.t, string) result)
     (** Doc string and a function that returns a command to
         execute with {!B0_std.Os.Cmd.execv}. *)
   | `Fun of
       string *
-      (b0_env -> b0_unit -> args:Cmd.t -> (Os.Exit.t, string) result)
+      (B0_env.t -> b0_unit -> args:Cmd.t -> (Os.Exit.t, string) result)
       (** Doc string and a function. The function is given the result
             of {!get_cwd} and {!get_env}. *)
   ]
@@ -150,7 +144,7 @@ module Action : sig
 
   val find :
     b0_unit ->
-    (b0_env -> b0_unit -> args:Cmd.t -> (Os.Exit.t, string) result) option
+    (B0_env.t -> b0_unit -> args:Cmd.t -> (Os.Exit.t, string) result) option
     (** [find u] is a function, if any, for executing unit [u]
         according to {!val-key}.  Given the environment, the unit and
         additional arguments potentially provided by the driver it
@@ -160,77 +154,8 @@ end
 (** {1:b0_def B0 definition API} *)
 
 include B0_def.S with type t := t (** @inline *)
+  with type Set.t = B0_defs.Unit.Set.t
 
 val tool_name_map : Set.t -> t String.Map.t
 (** [tool_name_map units] are the user accessible tools defined by the
     set of units [units]. *)
-
-(**/**)
-module Build : sig
-  type build_unit := t
-  type t = b0_build
-  val memo : t -> B0_memo.t
-  val must_build : t -> Set.t
-  val may_build : t -> Set.t
-  val did_build : t -> Set.t
-  val require_unit : t -> build_unit -> unit
-  val require_units : t -> build_unit list -> unit
-  val current : t -> build_unit
-  val current_meta : t -> B0_meta.t
-  val unit_dir : t -> build_unit -> Fpath.t
-  val unit_scope_dir : t -> build_unit -> Fpath.t
-  val current_dir : t -> Fpath.t
-  val scope_dir : t -> Fpath.t
-  val shared_dir : t -> Fpath.t
-  val in_unit_dir : t -> build_unit -> Fpath.t -> Fpath.t
-  val in_unit_scope_dir : t -> build_unit -> Fpath.t -> Fpath.t
-  val in_current_dir : t -> Fpath.t -> Fpath.t
-  val in_scope_dir : t -> Fpath.t -> Fpath.t
-  val in_shared_dir : t -> Fpath.t -> Fpath.t
-  val make :
-    root_dir:Fpath.t -> b0_dir:Fpath.t -> variant:string ->
-    store:B0_store.binding list -> B0_memo.t ->
-    may_build:Set.t -> must_build:Set.t -> t
-
-  val store : t -> B0_store.t
-  val get : t -> 'a B0_store.key -> 'a Fut.t
-  val self : t B0_store.key
-  val run : t -> (unit, unit) result
-  val did_build : t -> Set.t
-end
-
-module Env : sig
-  type build_unit := t
-  type t = b0_env
-  val make :
-    b0_dir:Fpath.t -> build:Build.t -> cwd:Fpath.t -> root_dir:Fpath.t ->
-    scope_dir:Fpath.t -> driver_env:Os.Env.t -> t
-
-  val b0_dir : t -> Fpath.t
-  val build : t -> Build.t
-  val cwd : t -> Fpath.t
-  val root_dir : t -> Fpath.t
-  val scope_dir : t -> Fpath.t
-  val scratch_dir : t -> Fpath.t
-  val unit_dir : t -> build_unit -> Fpath.t
-  val in_root_dir : t -> Fpath.t -> Fpath.t
-  val in_scope_dir : t -> Fpath.t -> Fpath.t
-  val in_scratch_dir : t -> Fpath.t -> Fpath.t
-  val in_unit_dir : t -> build_unit -> Fpath.t -> Fpath.t
-
-  type dir = [`Cwd | `Root_dir | `Scope_dir | `Unit_dir ]
-  val pp_dir : dir Fmt.t
-  val dir : t -> dir -> Fpath.t
-  val in_dir : t -> dir -> Fpath.t -> Fpath.t
-
-  type env = [`Build_env | `Driver_env]
-  val pp_env : env Fmt.t
-  val build_env : t -> Os.Env.t
-  val driver_env : t -> Os.Env.t
-  val env : t -> env -> Os.Env.t
-
-  val get_cmd : ?skip_build:bool -> t -> Cmd.t -> (Cmd.t, string) result
-  val unit_exe_file : t -> build_unit -> (Fpath.t, string) result
-  val unit_exe_file_cmd : t -> build_unit -> (Cmd.t, string) result
-end
-(**/**)
