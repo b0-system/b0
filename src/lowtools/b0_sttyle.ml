@@ -55,26 +55,36 @@ let make_base ~bold ~faint ~italic ~underline ~reverse =
   add_if italic `Italic @@ add_if underline `Underline @@
   add_if reverse `Reverse @@ []
 
-let main () =
-  let usage = "sttyles [--bold]" in
-  let bold = ref false in
-  let faint = ref false in
-  let italic = ref false in
-  let underline = ref false in
-  let reverse = ref false in
-  let spec = ["--bold", (Arg.Set bold), "Use bold";
-              "--faint", (Arg.Set faint), "Use faint";
-              "--italic", (Arg.Set italic), "Use italic";
-              "--underline", (Arg.Set underline), "Use underline";
-              "--reverse", (Arg.Set reverse), "Use reverse"]
-  in
-  let () =
-    Arg.parse spec (fun _ -> raise (Arg.Bad "No positional argument")) usage
-  in
-  let base =
-    make_base ~bold:!bold ~faint:!faint ~italic:!italic ~underline:!underline
-      ~reverse:!reverse
-  in
-  Fmt.set_tty_cap (); matrix ~base (); 0
+let sttyle bold faint italic underline reverse =
+  let base = make_base ~bold ~faint ~italic ~underline ~reverse in
+  Fmt.set_tty_cap (); matrix ~base ()
 
-let () = if !Sys.interactive then () else exit (main ())
+open Cmdliner
+
+let cmd =
+  let doc = "Show ANSI styles" in
+  let man =
+    [ `S Manpage.s_description;
+      `P "The $(iname) tool outputs the various ANSI styles that \
+          can be devised using $(b,B0_std.Tty.style) specifications. \
+          It shows a basic color matrix (which does not fit on 80 columns) \
+          and options can add more styling.";
+      `Pre "$(iname)"; `Noblank;
+      `Pre "$(iname) $(b,--bold)"; `Noblank;
+      `Pre "$(iname) $(b,--italic --bold)";
+      `P "See more options below.";
+      `S Manpage.s_bugs;
+      `P "This program is distributed with the B0 system. \
+          See https://erratique.ch/software/b0 for contact information."; ]
+  in
+  let bold = Arg.(value & flag & info ["b"; "bold"] ~doc:"Use bold.") in
+  let faint = Arg.(value & flag & info ["f"; "faint"] ~doc:"Use faint.") in
+  let italic = Arg.(value & flag & info ["i"; "italic"] ~doc:"Use italic.") in
+  let underline =
+    Arg.(value & flag & info ["u"; "underline"] ~doc:"Use underline.")
+  in
+  let reverse = Arg.(value & flag & info ["r"; "reverse"] ~doc:"Use reverse.")in
+  Cmd.v (Cmd.info "b0-sttyle" ~version:"%%VERSION%%" ~doc ~man) @@
+  Term.(const sttyle $ bold $ faint $ italic $ underline $ reverse)
+
+let () = if !Sys.interactive then () else exit (Cmd.eval cmd)

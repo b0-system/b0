@@ -61,8 +61,11 @@ let b0 =
 
 (* Low-level B0 tools *)
 
-let tool_exe n ~doc file =
-  let requires = [cmdliner; b0_std; b0_memo; b0_file; b0_kit] in
+let tool_exe ?requires n ~doc file =
+  let requires = match requires with
+  | None -> [cmdliner; b0_std; b0_memo; b0_file; b0_kit]
+  | Some requires -> requires
+  in
   let srcs = [`File Fpath.(~/"src/lowtools" / file)] in
   B0_ocaml.exe n ~doc ~srcs ~requires
 
@@ -74,6 +77,10 @@ let b0_hash_tool =
 
 let b0_log_tool =
   tool_exe "b0-log" ~doc:"Operate on b0 logs" "b0_log.ml"
+
+let b0_sttyle =
+  let requires = [cmdliner; b0_std;] in
+  tool_exe "b0-sttyle" ~requires ~doc:"Show ANSI escape styles" "b0_sttyle.ml"
 
 let show_url_tool =
   tool_exe "show-url" ~doc:"Show URLs in web browsers" "show_url.ml"
@@ -127,10 +134,6 @@ let test_ocaml_cobj_defs =
 let test_b0_file =
   let requires = [b0_memo] in
   test "test_b0_file.ml" ~requires ~doc:"Test B0_file module"
-
-let sttyles =
-  let requires = [b0_std] in
-  test "sttyles.ml" ~requires ~doc:"Show ANSI escape styles"
 
 (* Packs *)
 
