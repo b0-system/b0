@@ -5,7 +5,9 @@
 
 open B0_std
 
-type t = { def : B0_def.t; units : B0_unit.t list; locked : bool; }
+type b0_unit = B0_defs.b0_unit
+
+type t = { def : B0_def.t; units : b0_unit list; locked : bool; }
 
 module T = struct
   type nonrec t = t
@@ -70,7 +72,7 @@ let pp_locked ppf p =
 let pp_units ppf p =
   if units p = [] then () else
   let label = Fmt.tty [`Fg `Green ] in
-  let pp = Fmt.(pp_locked ++ using units (list ~sep:sp B0_unit.pp_name)) in
+  let pp = Fmt.(pp_locked ++ using units (list ~sep:sp B0_defs.Unit.pp_name)) in
   Fmt.field ~label "units" Fmt.id pp ppf p
 
 let pp_synopsis ppf v =

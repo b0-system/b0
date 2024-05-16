@@ -5,9 +5,9 @@
 
 (** {{:https://dune.build/}[dune]} support. *)
 
-(** {1:action [.dune] action} *)
+(** {1:unit [.dune] unit} *)
 
-val action : B0_action.t
-(** [action] is the [.dune] action.
+val unit : B0_unit.t
+(** [unit] is the [.dune] unit.
 
     See [b0 -- .dune --help]. *)

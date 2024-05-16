@@ -11,11 +11,14 @@ open B0_std
 
 (** {1:packs Packs} *)
 
+type b0_unit = B0_defs.b0_unit
+(** The type for B0 units. See {!B0_unit.t}. *)
+
 type t
 (** The type for build units. *)
 
 val make :
-  ?doc:string -> ?meta:B0_meta.t -> string -> locked:bool -> B0_unit.t list -> t
+  ?doc:string -> ?meta:B0_meta.t -> string -> locked:bool -> b0_unit list -> t
 (** [make n us] is a build pack named [n] made of build units [us] and
     described by [doc]. [locked] defaults to [false], see {!locked} for
     the semantics. *)
@@ -24,7 +27,7 @@ val locked : t -> bool
 (** [locked] is [true] if the pack when used in a build mandates a
     locked build. *)
 
-val units : t -> B0_unit.t list
+val units : t -> b0_unit list
 (** [units p] are the units of [p]. *)
 
 (** {1:meta_derivation Metadata derivation} *)

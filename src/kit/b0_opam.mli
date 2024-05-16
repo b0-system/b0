@@ -188,10 +188,10 @@ val pkg_meta_of_pack : B0_pack.t -> B0_meta.t
        not workable for now we don't have enough metadata in library
        names.}} *)
 
-(** {1:action [.opam] action} *)
+(** {1:unit [.opam] unit} *)
 
-val action : B0_action.t
-(** [action] is the [.opam] action.
+val unit : B0_unit.t
+(** [unit] is the unit of the [.opam] action.
 
     See [b0 -- .opam --help] and the {{!page-opam}B0 [opam] manual}
     for more information. *)

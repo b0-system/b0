@@ -41,7 +41,7 @@ val require_units : t -> b0_unit list -> unit
 
 val current : t -> b0_unit
 (** [current b] is [b]'s current unit. In the
-    {{!b0_unitype-build_proc}build procedure} of a unit this is the
+    {{!b0_unit.type-build_proc}build procedure} of a unit this is the
     unit itself. *)
 
 val current_meta : t -> B0_meta.t

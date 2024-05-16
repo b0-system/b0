@@ -311,7 +311,7 @@ let show_url_cmd action env =
 
 let unit =
   let doc = "Show URLs of files or server runs" in
-  B0_action.of_cmdliner_cmd "" ~dyn_units show_url_cmd ~doc
+  B0_unit.of_cmdliner_cmd "" ~dyn_units show_url_cmd ~doc
 
 (* Unit action *)
 

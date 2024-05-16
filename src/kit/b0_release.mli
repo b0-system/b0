@@ -126,7 +126,8 @@ val changes_latest_version_of_title : string -> string option
     (typically extracted with {!changes_latest_of_file}) as a version
     tag. *)
 
-(** {1:action Action} *)
+(** {1:unit Unit} *)
 
-val action : B0_action.t
-(** [.release] action *)
+val unit : B0_unit.t
+(** [unit] is the [.release] unit. See [b0 -- .release --help] for more
+    information. *)

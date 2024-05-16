@@ -163,7 +163,8 @@ let find_store_and_action args = function
                 B0_unit.Action.dyn_units u) ~args:(Cmd.list args)
             in
             let units = u :: (dyn_units @ units) in
-            Ok (store, Some u, units, B0_action.packs u)
+            let packs = B0_unit.find_or_default_meta B0_unit.Action.packs u in
+            Ok (store, Some u, units, packs)
         | Error us ->
             let tname u = Option.get (B0_unit.find_meta B0_unit.tool_name u) in
             let ts = List.rev_map tname tool_suggs in

@@ -2182,9 +2182,9 @@ let ocaml_cmd u env =
   Cmd.group (Cmd.info name ~doc ~man) @@
   [ crunch; list; meta ]
 
-let action =
+let unit =
   let doc = "OCaml support" in
-  B0_action.of_cmdliner_cmd "" ocaml_cmd ~doc
+  B0_unit.of_cmdliner_cmd "" ocaml_cmd ~doc
 
 let ocaml_ocaml_cmd action env =
   (* N.B. We have that separately for now because we can't
@@ -2219,9 +2219,9 @@ let ocaml_ocaml_cmd action env =
   Cmd.v (Cmd.info "ocaml" ~doc ~man) @@
   Term.(const ocaml $ const env $ use_utop $ dry_run $ args)
 
-let action_ocaml =
+let unit_ocaml =
   let doc = "Load your build in the ocaml repl" in
   let store = B0_store.[B (Code.built, Fut.return `Byte)] in
-  B0_action.of_cmdliner_cmd ~store "ocaml" ocaml_ocaml_cmd ~doc
+  B0_unit.of_cmdliner_cmd ~store "ocaml" ocaml_ocaml_cmd ~doc
 
 let () = B0_scope.close ()

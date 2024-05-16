@@ -115,8 +115,8 @@ let dune_cmd action env =
   Cmd.group (Cmd.info name ~doc ~man) @@
   [export]
 
-let action =
+let unit =
   let doc = "dune support" in
-  B0_action.of_cmdliner_cmd "" dune_cmd ~doc
+  B0_unit.of_cmdliner_cmd "" dune_cmd ~doc
 
 let () = B0_scope.close ()

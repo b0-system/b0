@@ -583,8 +583,8 @@ let release_cmd action env =
   Cmd.group (Cmd.info name ~doc ~man) @@
   [ archive; tag; status ]
 
-let action =
+let unit =
   let doc = "Source software release support" in
-  B0_action.of_cmdliner_cmd "" release_cmd ~doc
+  B0_unit.of_cmdliner_cmd "" release_cmd ~doc
 
 let () = B0_scope.close ()

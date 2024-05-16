@@ -260,7 +260,7 @@ let exits =
   Cmdliner.Cmd.Exit.defaults
 
 let run f env base short log_absolute no_pager =
-  B0_action.exit_of_result' @@
+  B0_unit.Action.exit_of_result' @@
   let* pager = B0_pager.find ~don't:no_pager () in
   let* () = B0_pager.page_stdout pager in
   abort_to_result @@ fun () ->
@@ -271,4 +271,4 @@ let action_func ~base f env action ~args =
   let run = run f env base in
   let no_pager = B0_pager.don't () in
   let run = Cmdliner.Term.(const run $ short $ log_absolute_arg $ no_pager) in
-  B0_action.eval_cmdliner_term ~exits action env run ~args
+  B0_unit.eval_cmdliner_term ~exits action env run ~args

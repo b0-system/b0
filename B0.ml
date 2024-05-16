@@ -177,12 +177,12 @@ let default =
 (* Actions *)
 
 let strap =
-  B0_action.make "strap" ~doc:"Run boot/strap" @@
-  B0_action.exec_file (Cmd.tool "boot/strap")
+  B0_unit.of_action "strap" ~doc:"Run boot/strap" @@
+  B0_unit.Action.exec_file (Cmd.tool "boot/strap")
 
 let bowl =
   let doc = "Run built b0 in the bowl directory" in
-  B0_action.make "bowl" ~units:[b0] ~doc @@
+  B0_unit.of_action "bowl" ~units:[b0] ~doc @@
   fun env _ ~args ->
   match B0_env.unit_exe_file_cmd env b0 with (* TODO b0: error struct *)
   | Error e -> Log.err (fun m -> m "%s" e); B0_cli.Exit.some_error
@@ -194,7 +194,7 @@ let bowl =
 
 let vendor_htmlit =
   let doc = "Vendor Htmlit and expose it as B0_html" in
-  B0_action.make' "vendor-htmlit" ~doc @@
+  B0_unit.of_action' "vendor-htmlit" ~doc @@
   fun _ env ~args ->
   Log.app (fun m -> m "TODO");
   Os.Exit.exit (Code 0)

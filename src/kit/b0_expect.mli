@@ -19,7 +19,7 @@ type t
 (** The type for expectation contexts. An expectation context
     orchestrates and gathers the result of expectation tests. *)
 
-val action_func : base:Fpath.t -> (t -> unit) -> B0_action.func
+val action_func : base:Fpath.t -> (t -> unit) -> B0_unit.Action.func
 (** [action_func ~base f] is an action function calling [f ctx] and
     handling test reporting and aborting. [f] should simply perform
     computations, add {{!expectations}expectations} to [ctx] and,

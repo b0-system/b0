@@ -39,14 +39,14 @@ val timeout_s : int B0_meta.key
 (** [timeout_s] defines the maximal number of seconds to wait for the
     server to be connectable before reloading the URL. Defaults to 1s. *)
 
-(** {1:action [.show-url] action} *)
+(** {1:unit [.show-url] unit} *)
 
-val unit : B0_action.t
+val unit : B0_unit.t
 (** [unit] is the [.show-url] unit.
 
     See [b0 -- .show-url --help] for more information. *)
 
-(** {1:unit_exec Unit execution} *)
+(** {1:unit_action Unit action} *)
 
 val action : B0_unit.Action.t
 (** [action] is a unit action that invokes the [show-url] tool on

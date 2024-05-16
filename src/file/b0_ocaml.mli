@@ -1165,16 +1165,16 @@ module Crunch : sig
       a string. *)
 end
 
-(** {1:action Actions} *)
+(** {1:unit Units} *)
 
-val action : B0_action.t
-(** [action] is the [.ocaml] action.
+val unit : B0_unit.t
+(** [unit] is the [.ocaml] unit.
 
     See [b0 -- .ocaml --help] for more information. *)
 
-val action_ocaml : B0_action.t
-(** [action_ocaml] is the [.ocaml.ocaml] action. This action forces
-    a byte code build and loads the resulting build in the [ocaml]
-    toplevel.
+val unit_ocaml : B0_unit.t
+(** [unit_ocaml] is the [.ocaml.ocaml] action. The action of this unit
+    forces a byte code build and loads the resulting build in the
+    [ocaml] toplevel.
 
     See [b0 -- .ocaml.ocaml --help] for more information. *)
