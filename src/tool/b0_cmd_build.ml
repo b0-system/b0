@@ -12,8 +12,6 @@ let err_nothing () = match B0_unit.list () with
     Fmt.str "No units are defined in the %a file"
       Fmt.code B0_driver.Conf.b0_file_name
 
-(* XXX more needs to go the library here *)
-
 (* Explaining what gets into the build *)
 
 let green = Fmt.tty [`Fg `Green]
@@ -31,6 +29,7 @@ let log_explain_lock ~is_locked ~lock ~locked_packs =
         (if rest = [] then "" else "s")
         (Fmt.and_enum B0_pack.pp_name) ps
   in
+  let locked_packs = B0_pack.Set.elements locked_packs in
   match is_locked with
   | true ->
       Log.app @@ fun m ->
@@ -66,36 +65,45 @@ let show_what ~lock ~is_locked ~locked_packs ~must_build ~may_build c =
 (* Finding what to build *)
 
 let unit_set_of ~units ~packs =
-  let pack_units = List.concat_map B0_pack.units packs in
+  let add_pack p acc = List.rev_append (B0_pack.units p) acc in
+  let pack_units = B0_pack.Set.fold add_pack packs [] in
   B0_unit.Set.of_list (List.rev_append units pack_units)
 
 let get_excluded_units ~x_units ~x_packs =
   let* units = B0_unit.get_list_or_hint ~all_if_empty:false x_units in
   let* packs = B0_pack.get_list_or_hint ~all_if_empty:false x_packs in
+  let packs = B0_pack.Set.of_list packs in
   Ok (unit_set_of ~units ~packs)
 
-let get_must_units_and_locked_packs
-    ~action ~action_units ~action_packs ~units ~packs ()
-  =
-  let* units, packs = match action, units, packs with
-  | None, [], [] -> (* argumentless b0 invocation *)
-      begin match B0_pack.find "default" with
-      | None -> Ok (B0_unit.list (), [])
-      | Some t -> Ok ([], [t])
-      end
-  | _ ->
-      let* units = B0_unit.get_list_or_hint ~all_if_empty:false units in
-      let* packs = B0_pack.get_list_or_hint ~all_if_empty:false packs in
-      Ok (List.rev_append action_units units,
-          List.rev_append action_packs packs)
-  in
-  let locked_packs = List.filter B0_pack.locked packs in
-  Ok (unit_set_of ~units ~packs, locked_packs)
+let get_default_build () = match B0_pack.find "default" with
+| None -> B0_unit.list (), []
+| Some t -> [], [t]
 
-let is_locked ~lock ~locked_packs = match lock, locked_packs with
-| Some false, _ -> false
-| None, [] -> false
-| _, _ -> true
+let get_must_units_and_locked_packs ~is_action ~units ~packs ~args () =
+  let store, units, packs =
+    let store, units, action_packs =
+      let add_unit (store, us, ps) u =
+        if not (is_action u) then (store, u :: us, ps) else
+        let st = B0_unit.find_or_default_meta B0_unit.Action.store u in
+        let units = B0_unit.find_or_default_meta B0_unit.Action.units u in
+        let dyn_units =
+          (B0_unit.find_or_default_meta
+             B0_unit.Action.dyn_units u) ~args:(Cmd.list args)
+        in
+        let us = u :: List.rev_append ( List.rev_append dyn_units units) us in
+        let packs = B0_unit.find_or_default_meta B0_unit.Action.packs u in
+          List.rev_append st store, us, List.rev_append packs ps
+      in
+      List.fold_left add_unit ([], [], []) units
+    in
+    store, units, List.rev_append action_packs packs
+  in
+  let packs = B0_pack.Set.of_list packs in
+  let locked_packs = B0_pack.Set.filter B0_pack.locked packs in
+  store, unit_set_of ~units ~packs, locked_packs
+
+let is_locked ~lock ~locked_packs = match lock with
+| Some lock -> lock | None -> not (B0_pack.Set.is_empty locked_packs)
 
 let get_may_must ~is_locked ~units ~x_units =
   let must = B0_unit.Set.diff units x_units in
@@ -105,16 +113,6 @@ let get_may_must ~is_locked ~units ~x_units =
     B0_unit.Set.diff all x_units
   in
   may, must
-
-let select_units ~units ~x_units ~packs ~x_packs ~lock =
-  (* FIXME add a ~for_exection *)
-  let* x_units = get_excluded_units ~x_units ~x_packs in
-  let* units, locked_packs =
-    get_must_units_and_locked_packs
-      ~action:None ~action_units:[] ~action_packs:[] ~units ~packs ()
-  in
-  let is_locked = is_locked ~lock ~locked_packs in
-  Ok (get_may_must ~is_locked ~units ~x_units, is_locked, locked_packs)
 
 let check_tool_ambiguities tool_name us =
   let warn_multi_defs tool_name u us =
@@ -145,42 +143,33 @@ let check_tool_ambiguities tool_name us =
   in
   u
 
-let find_store_and_action args = function
-| None -> Ok ([], None, [], [])
+let find_action_unit = function
+| None -> Ok None
 | Some name ->
-    let keep = B0_unit.tool_is_user_accessible in
-    match B0_unit.get_or_suggest_tool ~keep name with
-    | Ok us ->
-        let u = check_tool_ambiguities name us in
-        Ok ([], Some u, [u], [])
-    | Error tool_suggs ->
-        match B0_unit.get_or_suggest name with
-        | Ok u ->
-            let store = B0_unit.find_or_default_meta B0_unit.Action.store u in
-            let units = B0_unit.find_or_default_meta B0_unit.Action.units u in
-            let dyn_units =
-              (B0_unit.find_or_default_meta
-                B0_unit.Action.dyn_units u) ~args:(Cmd.list args)
-            in
-            let units = u :: (dyn_units @ units) in
-            let packs = B0_unit.find_or_default_meta B0_unit.Action.packs u in
-            Ok (store, Some u, units, packs)
-        | Error us ->
-            let tname u = Option.get (B0_unit.find_meta B0_unit.tool_name u) in
-            let ts = List.rev_map tname tool_suggs in
-            let us = List.rev_map B0_unit.name us in
-            let set = String.Set.of_list (List.concat [ts; us]) in
-            let suggs = String.Set.elements set in
-            let hint = Fmt.did_you_mean in
-            let nothing_to ppf v =
-              Fmt.pf ppf "Nothing to run for %a." Fmt.code v
-            in
-            let pp ppf (v, hints) = match hints with
-            | [] -> nothing_to ppf v
-            | hints -> Fmt.pf ppf "%a@ %a" nothing_to v (hint Fmt.code) hints
-            in
-            (* XXX show how to list available actions if there's no typo *)
-            Fmt.error "@[%a@]" pp (name, suggs)
+  let keep = B0_unit.tool_is_user_accessible in
+  match B0_unit.get_or_suggest_tool ~keep name with
+  | Ok us ->
+      let u = check_tool_ambiguities name us in
+      Ok (Some u)
+  | Error tool_suggs ->
+      match B0_unit.get_or_suggest name with
+      | Ok u -> Ok (Some u)
+      | Error us ->
+          let tname u = Option.get (B0_unit.find_meta B0_unit.tool_name u) in
+          let ts = List.rev_map tname tool_suggs in
+          let us = List.rev_map B0_unit.name us in
+          let set = String.Set.of_list (List.concat [ts; us]) in
+          let suggs = String.Set.elements set in
+          let hint = Fmt.did_you_mean in
+          let nothing_to ppf v =
+            Fmt.pf ppf "Nothing to run for %a." Fmt.code v
+          in
+          let pp ppf (v, hints) = match hints with
+          | [] -> nothing_to ppf v
+          | hints -> Fmt.pf ppf "%a@ %a" nothing_to v (hint Fmt.code) hints
+          in
+          (* XXX show how to list available actions if there's no typo *)
+          Fmt.error "@[%a@]" pp (name, suggs)
 
 let memo c ~may_build ~must_build =
   (* Look for tools in the build first. XXX cross *)
@@ -206,8 +195,8 @@ let memo c ~may_build ~must_build =
   let feedback =
     let op_howto ppf o = Fmt.pf ppf "b0 log --id %d" (B0_zero.Op.id o) in
     let show_op = Log.Info and show_ui = Log.Error and level = Log.level () in
-    B0_cli.Memo.pp_leveled_feedback ~op_howto ~show_op ~show_ui ~level
-      Fmt.stderr
+    B0_cli.Memo.pp_leveled_feedback
+      ~op_howto ~show_op ~show_ui ~level Fmt.stderr
   in
   let* env = Os.Env.current () in
   let tool_lookup = tool_lookup ~may_build ~must_build ~env in
@@ -227,83 +216,81 @@ let make_build c ~store ~may_build ~must_build =
 
 (* Executing the action or the unit *)
 
-let action_env build def c =
+let warn_noexec u =
+  Log.warn @@ fun m ->
+  m "@[Unit %a not actionable, execution ignored@ (no@ %a@ or@ %a@ key).@]"
+    B0_unit.pp_name u B0_meta.Key.pp_name B0_unit.Action.key B0_meta.Key.pp_name
+    B0_unit.exe_file
+
+let error_no_path action_unit =
+  Fmt.error "%a: No path to executable file found (no %a key)"
+    B0_unit.pp_name action_unit B0_meta.Key.pp_name B0_unit.exe_file
+
+let do_show_path action_unit ~args =
+  let* path = B0_unit.get_meta B0_unit.exe_file action_unit in
+  let p = Fut.sync path in
+  (* Is there a way of quoting to make the shell notation $() work if args
+     or p have spaces ? *)
+  Log.app (fun m -> m "%a" Cmd.pp Cmd.(path p %% args));
+  Ok Os.Exit.ok
+
+let env_for_unit c build u =
   let cwd = B0_driver.Conf.cwd c in
   let root_dir = Fpath.parent @@ Option.get @@ B0_driver.Conf.b0_file c in
-  let scope_dir = Option.value (B0_def.scope_dir def) ~default:root_dir in
+  let scope_dir = Option.value (B0_unit.scope_dir u) ~default:root_dir in
   let b0_dir = B0_driver.Conf.b0_dir c in
   let driver_env = B0_driver.Conf.env c in
   B0_env.make ~cwd ~scope_dir ~root_dir ~b0_dir ~build ~driver_env
 
-let action_runner show_path build u c =
-  let warn_noexec u =
-    Log.warn @@ fun m ->
-    m "Unit %a not executable: ignoring execution." B0_unit.pp_name u
-  in
-  let show p ~args =
-    (* N.B. it seems there's no way of quoting to make the shell notation $()
-       work if args or p have spaces !? *)
-    Log.app (fun m -> m "%a" Cmd.pp Cmd.(path p %% args));
-    Ok Os.Exit.ok
-  in
-  match B0_unit.Action.find u with
-  | None -> warn_noexec u; Ok None
-  | Some exec ->
-      match show_path with
-      | false ->
-          let env = action_env build (B0_unit.def u) c in
-          Ok (Some (fun ~args -> exec env u ~args))
-      | true ->
-          match B0_unit.find_meta B0_unit.exe_file u with
-          | Some path -> Ok (Some (fun ~args -> show (Fut.sync path) ~args))
-          | None ->
-              (* We could show the path to the b0 driver, bof. *)
-              Fmt.error "No executable outcome path found in executable unit %a"
-                B0_unit.pp_name u
-
-let error_action_needs ~action_needs ~must_build action =
-  let diff = B0_unit.Set.diff action_needs must_build in
-  let pp_action ppf u = Fmt.pf ppf "action of %a" B0_unit.pp_name u in
-  Fmt.error "@[Cannot run %a: %a will not build, see %a@]"
-    pp_action action
-    (Fmt.iter B0_unit.Set.iter ~sep:Fmt.comma B0_unit.pp_name) diff
-    Fmt.code "--what"
+let do_action_exit c build action_unit ~args =
+  (* Note if we want to run the action asap we should not exit, but
+     B0_unit.Action.run *)
+  let env = env_for_unit c build action_unit in
+  let a = B0_unit.(find_or_default_meta Action.key action_unit) in
+  B0_unit.Action.exit env action_unit ~args a
 
 (* Build command *)
 
 let build units x_units packs x_packs what lock show_path action args c =
   Log.if_error ~use:Os.Exit.no_such_name @@
-  let* store, action, action_units, action_packs =
-    find_store_and_action args action
+  let* action_unit = find_action_unit action in
+  let is_action = match action_unit with
+  | None -> Fun.const false
+  | Some u -> B0_unit.equal u
   in
   let* x_units = get_excluded_units ~x_units ~x_packs in
-  let* units, locked_packs =
-    get_must_units_and_locked_packs
-      ~action ~action_units ~action_packs ~units ~packs ()
+  let* units = B0_unit.get_list_or_hint ~all_if_empty:false units in
+  let* packs = B0_pack.get_list_or_hint ~all_if_empty:false packs in
+  let units, packs = match action_unit with
+  | None when units = [] && packs = [] -> get_default_build ()
+  | None -> units, packs
+  | Some u -> u :: units, packs
   in
+  let store, units, locked_packs =
+    get_must_units_and_locked_packs ~is_action ~units ~packs ~args ()
+  in
+  Log.if_error' ~use:B0_driver.Exit.build_error @@
   let is_locked = is_locked ~lock ~locked_packs in
   let may_build, must_build = get_may_must ~is_locked ~units ~x_units in
   if what
   then show_what ~lock ~is_locked ~locked_packs ~must_build ~may_build c else
-  Log.if_error' ~use:B0_driver.Exit.build_error @@
-  let* build = make_build c ~store ~may_build ~must_build in
-  let action_needs = unit_set_of ~units:action_units ~packs:action_packs in
-  let* action_runner = match action with
-  | Some action when not (B0_unit.Set.subset action_needs must_build) ->
-      error_action_needs ~action_needs ~must_build action
-  | Some action -> action_runner show_path build action c
+  (* Assert or warn a few things before starting the build. *)
+  let* action_unit = match action_unit with
   | None when B0_unit.Set.is_empty must_build -> Fmt.error "%s" (err_nothing ())
-  | None -> Ok None
+  | Some u when not (B0_unit.mem_meta B0_unit.exe_file u) && show_path ->
+      error_no_path u
+  | Some u when not (B0_unit.is_actionable u) -> warn_noexec u; Ok None
+  | o -> Ok o
   in
+  let* build = make_build c ~store ~may_build ~must_build in
+  let args = Cmd.of_list Fun.id args in
   match B0_build.run build with
   | Error () -> Ok B0_driver.Exit.build_error
   | Ok () ->
-      (* XXX eventually we should run the action as soon as it can.
-         OCaml actions should be run by a work queue which we can bake
-         by Domains on >= 5, this will be useful for `b0 test` *)
-      match action_runner with
+      match action_unit with
       | None -> Ok Os.Exit.ok
-      | Some run -> run ~args:(Cmd.list args)
+      | Some action_unit when show_path -> do_show_path action_unit ~args
+      | Some action_unit -> do_action_exit c build action_unit ~args
 
 (* Command line interface *)
 
@@ -342,7 +329,7 @@ let show_path =
   Arg.(value & flag & info ["path"] ~doc)
 
 let action =
-  let doc = "Action to run. Specify it after a $(b,--) otherwise \
+  let doc = "Action or tool to run. Specify it after a $(b,--) otherwise \
              it gets taken for a $(mname) command when $(b,b0) is used \
              without a command."
   in
@@ -364,17 +351,17 @@ let cmd =
         $(b,--) [$(i,ACTION)] [$(i,ARG)]…";
   in
   let descr =
-    [ `P "The $(iname) command builds and runs actions, executable units \
-          or the tool they define.";
+    [ `P "The $(iname) command builds units and runs actions, or \
+          the tools they define.";
       `P "To build a unit use the $(b,-u) option. To build all the units of \
           a pack use the $(b,-p) option.";
-      `P "If an action is specified, its required units and packs are \
-          added to the build like $(b,-u) and $(b,-p) options do. If an \
-          executable unit is specified, it is added like $(b,-u) does.";
+      `P "If an action or tool is specified, its required units and packs are \
+          added to the build like $(b,-u) and $(b,-p) options do and the unit \
+          which defines it is added like $(b,-u) does.";
       `P "If no unit or pack is specified on the command line and no \
-          action or executable unit is specified all units build unless \
-          a pack named $(b,default) exists in the root scope in which \
-          case $(b,-p default) is implied.";
+          action or tool is specified all units build unless a pack \
+          named $(b,default) exists in the root scope in which case \
+          $(b,-p default) is implied.";
       `P "Build procedures may dynamically require the build of units \
           unspecified on the command line. To prevent a unit from building \
           use the $(b,-x) and $(b,-X) options. These options take over \

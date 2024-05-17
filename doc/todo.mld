@@ -85,7 +85,12 @@ the [wrap] parameter to units.
 
 - Also see we what to do with {!B0_dir}.
 
-{2:b0_action [B0_action]}
+{2:b0_unit [B0_unit]}
+
+- Should we perhaps move [build_proc] to a meta key ? This would
+  allow to name the build procedures like we do with actions.
+
+{2:b0_action [B0_unit.Action]}
 
 - Maybe we could specify an option that allows an action to always
   requires a build and defaults to the default build if none is
@@ -104,12 +109,10 @@ the [wrap] parameter to units.
   of worms (or not) we could try to enforce more access control via
   the definition scope of the action (lib vs. file).
 
-- Execution logic. Unit name and action name conflicting should be
-  resolved locally. If a tool conflicts with action warn but use tool,
-  [b0 action exec] can be used for the action. If a tool conflicts
+- Execution logic. If a tool conflicts with action warn but use tool,
+  [b0 unit action] can be used for the action. If a tool conflicts
   with a unit warn if it's not the same unit. We should have all of
-  [b0 unit exec], [b0 tool exec] and [b0 action exec] to resolve
-  conflicts.
+  [b0 unit action], [b0 tool exec] to resolve conflicts.
 
 - The current scheme is not yet what we want.  One reason is that it's
   not a good idea to first build and then parse the cli args, we
@@ -117,8 +120,6 @@ the [wrap] parameter to units.
   actions to be able to define what to build dynamically; but it's
   likely a good thing to forbid new builds then the action runs. This
   is unconvenient to do right now (there is a hack).
-
-- Action vs Unit exection. Look for signature unifications.
 
 {2:b0_build [B0_build]}
 
@@ -195,12 +196,8 @@ On hold until we get the {!B0_srcs} thing right.
 
 {2:b0_test Testing and [B0_testing] and [B0_expect]}
 
-- `b0 test`. Problem actions can't be part of packs. Why aren't actions
-  units ? List the differences (notably actions can statically
-  require units).
 - `b0 test`, run as soon as build.
-- Default cli driver, needs a new design round now that we
-  have actions.
+- Default cli driver, needs a new design round now that we have actions.
 - Parallel execution
 - Progress
 - VCS agnostic, i.e. fill-in the hg support
@@ -241,7 +238,6 @@ On hold until we get the {!B0_srcs} thing right.
 - The topkg delegate had a way to list issues on the cli. Maybe
   integrate something like (along with open PRs) in `.release status`.
 
-
 {2:b0_show_url [B0_show_url]}
 
 {ul
@@ -273,7 +269,7 @@ maybe it shouldn't. Unit ideas:
 
 {2:deploy Deploy}
 
-For now let's see where the new actions bring us. But the idea. Is
+For now let's see where the new actions bring us. But the idea is
 that a deploy is a way to selectively "save" the build.
 
 Units should have a function that list what they want to save

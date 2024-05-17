@@ -39,21 +39,18 @@ let pp_report ppf (total, dur, fails) = match fails with
       (if count <= 1 then "test unit" else "test units")
       Test_fmt.pp_dur dur (Fmt.list pp_fail) fails
 
-let get_tests ~allow_long us =
-  let is_test u =
-    B0_unit.(has_tag B0_meta.run u && has_tag B0_meta.test u &&
-             (allow_long || not (has_tag B0_meta.long u)))
-  in
-  B0_unit.Set.filter is_test us
+
+let is_test ~allow_long u =
+  B0_unit.(has_tag B0_meta.run u && has_tag B0_meta.test u &&
+           (allow_long || not (has_tag B0_meta.long u)))
 
 let show_what
-    ~allow_long ~lock ~may_build ~must_build ~is_locked ~locked_packs c
+    ~allow_long ~tests ~lock ~may_build ~must_build ~is_locked ~locked_packs c
   =
   Log.if_error' ~use:Os.Exit.some_error @@
   let don't = B0_driver.Conf.no_pager c in
   let* pager = B0_pager.find ~don't () in
   let* () = B0_pager.page_stdout pager in
-  let tests = get_tests ~allow_long must_build in
   Log.app (fun m -> m "%a" pp_run_tests tests);
   B0_cmd_build.show_what ~lock ~may_build ~must_build ~is_locked ~locked_packs c
 
@@ -61,40 +58,11 @@ let show_what
 
 let run_test c build u =
   Log.app (fun m -> m "%a %a" Test_fmt.pp_test () B0_unit.pp_name u);
-  let exec = B0_meta.find_or_default B0_unit.Action.key (B0_unit.meta u) in
-  let b0_env = B0_cmd_build.action_env build (B0_unit.def u) c in
-  let* env = B0_unit.Action.get_env b0_env u in
-  let env = Os.Env.to_assignments env in
-  let* cwd = B0_unit.Action.get_cwd b0_env u in
-  let args = Cmd.empty (* We could have a run_args key here *) in
-  let run_cmd ~env ~cwd cmd =
-    let dur = Os.Mtime.counter () in
-    let* st = Os.Cmd.run_status ~env ~cwd cmd in
-    Ok (Os.Mtime.count dur, st)
-  in
-  match exec with
-  | `Unit_exe ->
-      begin match B0_unit.find_meta B0_unit.exe_file u with
-      | None ->
-          Fmt.error "No executable file found (no %a key)"
-            Fmt.code "B0_unit.exe_file"
-      | Some exe_file ->
-          let exe_file = Fut.sync exe_file in
-          let cmd = Cmd.(path exe_file %% args) in
-          run_cmd ~env ~cwd cmd
-      end
-  | `Cmd (_, cmd) ->
-      let* cmd = cmd b0_env u ~args in
-      run_cmd ~env ~cwd cmd
-  | `Fun (_, cmd) ->
-      (* FIXME we should clarify what `Fun is in B0_unit.Exec,
-         in particular `Fun should not execv. In fact no Exec should. *)
-      let dur = Os.Mtime.counter () in
-      let* exit = cmd b0_env u ~args in
-      begin match exit with
-      | Code rc -> Ok (Os.Mtime.count dur, `Exited rc)
-      | Execv _ -> Fmt.error "Unit Exec not supported in tests"
-      end
+  let action = B0_meta.find_or_default B0_unit.Action.key (B0_unit.meta u) in
+  let b0_env = B0_cmd_build.env_for_unit c build u in
+  let dur = Os.Mtime.counter () in
+  let* st = B0_unit.Action.run b0_env u ~args:Cmd.empty action in
+  Ok (Os.Mtime.count dur, st)
 
 let rec run_tests c build dur fails = function
 | [] -> dur, fails
@@ -116,18 +84,34 @@ let rec run_tests c build dur fails = function
 let test allow_long allow_empty units x_units packs x_packs what lock c =
   let total = Os.Mtime.counter () in
   Log.if_error ~use:Os.Exit.no_such_name @@
-  (* FIXME select_units here must return units and packs needed by
-     every action of [tests] unit and a common store. *)
-  let* (may_build, must_build), is_locked, locked_packs  =
-    B0_cmd_build.select_units ~units ~x_units ~packs ~x_packs ~lock
+  let* units = B0_unit.get_list_or_hint ~all_if_empty:false units in
+  let* packs = B0_pack.get_list_or_hint ~all_if_empty:false packs in
+  let units, packs =
+    if units = [] && packs = [] then B0_cmd_build.get_default_build () else
+    units, packs
+  in
+  let* x_units = B0_cmd_build.get_excluded_units ~x_units ~x_packs in
+  let tests =
+    let packs = B0_pack.Set.of_list packs in
+    let us = B0_cmd_build.unit_set_of ~units ~packs in
+    let us = B0_unit.Set.diff us x_units in
+    (B0_unit.Set.filter (is_test ~allow_long) us)
+  in
+  let is_action u = B0_unit.Set.mem u tests in
+  let store, units, locked_packs =
+    B0_cmd_build.get_must_units_and_locked_packs
+      ~is_action ~units ~packs ~args:[] ()
+  in
+  let is_locked = B0_cmd_build.is_locked ~lock ~locked_packs in
+  let may_build, must_build =
+    B0_cmd_build.get_may_must ~is_locked ~units ~x_units
   in
   if what
   then
     show_what ~allow_long ~lock ~may_build ~must_build ~is_locked
-      ~locked_packs c
+      ~locked_packs ~tests c
   else
   Log.if_error' ~use:B0_driver.Exit.build_error @@
-  let tests = get_tests ~allow_long must_build in
   if B0_unit.Set.is_empty tests && not allow_empty
   then (Log.err (fun m ->
       m "@[<v>%a.@,Use option %a to succeed anyways.@]" pp_no_tests ()

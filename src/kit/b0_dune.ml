@@ -78,7 +78,7 @@ let units ~right:r =
   let doc = "The $(docv) to act on. All of them if unspecified." in
   Arg.(value & pos_right r string [] & info [] ~doc ~docv:"UNIT")
 
-let dune_cmd action env =
+let dune_cmd env u =
   let man =
     [ `S Manpage.s_see_also;
       `P "Consult $(b,odig doc b0) for the B0 dune manual."]
@@ -111,7 +111,7 @@ let dune_cmd action env =
           information.";
       `Blocks man]
   in
-  let name = B0_unit.name action and doc = B0_unit.doc action in
+  let name = B0_unit.name u and doc = B0_unit.doc u in
   Cmd.group (Cmd.info name ~doc ~man) @@
   [export]
 

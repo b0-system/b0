@@ -26,17 +26,14 @@ module Build_def : sig
       mutable waiting : b0_unit Random_queue.t; }
 end
 
-
 type b0_build = Build_def.t
 type build_proc = b0_build -> unit Fut.t
-
 
 module Unit : B0_def.S
   with type t = b0_unit
    and type Set.t = b0_unit_set
 
 val unit_build_proc : b0_unit -> build_proc
-
 
 type b0_env =
   { b0_dir : Fpath.t;
@@ -47,7 +44,6 @@ type b0_env =
     scope_dir : Fpath.t;
     build_env : Os.Env.t;
     driver_env : Os.Env.t; }
-
 
 val exe_file : Fpath.t Fut.t B0_meta.key
 val tool_name : string B0_meta.key

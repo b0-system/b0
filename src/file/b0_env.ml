@@ -76,7 +76,7 @@ let get_cmd ?(skip_build = false) env cmd =
       match String.Map.find_opt (Fpath.to_string tool) tool_map with
       | None -> Os.Cmd.get cmd
       | Some u ->
-          Result.map (fun v -> Cmd.path (Fut.sync v))
+          Result.map (fun v -> Cmd.set_tool (Fut.sync v) cmd)
             (B0_defs.Unit.get_meta B0_defs.exe_file u)
 
 let unit_exe_file env u =

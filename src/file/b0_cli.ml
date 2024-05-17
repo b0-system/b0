@@ -15,6 +15,9 @@ module Exit = struct
     e Os.Exit.no_such_name "if a specified name does not exist." ::
     Cmd.Exit.defaults
 
+  (* FIXME remove this once we release Cmdliner with
+     Cmd.eval_value' *)
+
   let of_eval_result ?(term_error = Os.Exit.cli_error) = function
   | Ok (`Ok e) -> e
   | Ok _ -> Os.Exit.ok

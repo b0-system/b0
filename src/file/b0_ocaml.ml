@@ -2122,10 +2122,12 @@ let meta env pack =
 
 open Cmdliner
 
-let ocaml_cmd u env =
+let unit =
+  let doc = "OCaml support" in
+  B0_unit.of_cmdliner_cmd "" ~doc @@ fun env u ->
   let man =
     [ `S Manpage.s_see_also;
-      `P "Consult $(b,odig doc b0) for the B0 release manual." ]
+      `P "Consult $(b,odig doc b0) for the B0 OCaml manual." ]
   in
   let crunch =
     let doc = "Crunch bytes into an OCaml string" in
@@ -2178,18 +2180,12 @@ let ocaml_cmd u env =
       `P "$(iname) has a few tools for OCaml";
       `Blocks man ]
   in
-  let name = B0_unit.name u and doc = B0_unit.doc u in
-  Cmd.group (Cmd.info name ~doc ~man) @@
-  [ crunch; list; meta ]
+  let name = B0_unit.name u in
+  Cmd.group (Cmd.info name ~doc ~man) @@ [ crunch; list; meta ]
 
-let unit =
-  let doc = "OCaml support" in
-  B0_unit.of_cmdliner_cmd "" ocaml_cmd ~doc
-
-let ocaml_ocaml_cmd action env =
+let ocaml_ocaml_cmd env u =
   (* N.B. We have that separately for now because we can't
      specify separate store arguments for cmdliner subcommands *)
-  let doc = "Load your build in the $(b,ocaml) repl" in
   let man =
     [ `S Cmdliner.Manpage.s_synopsis;
       `P "$(b,b0) [$(b,-p) $(i,PACK)]… [$(b,-u) $(i,UNIT)]… \
@@ -2216,11 +2212,12 @@ let ocaml_ocaml_cmd action env =
     in
     Arg.(value & pos_all string [] & info [] ~doc ~docv:"ARG")
   in
-  Cmd.v (Cmd.info "ocaml" ~doc ~man) @@
+  let name = B0_unit.name u and doc = B0_unit.doc u in
+  Cmd.v (Cmd.info name ~doc ~man) @@
   Term.(const ocaml $ const env $ use_utop $ dry_run $ args)
 
 let unit_ocaml =
-  let doc = "Load your build in the ocaml repl" in
+  let doc = "Load your build in the ocaml REPL" in
   let store = B0_store.[B (Code.built, Fut.return `Byte)] in
   B0_unit.of_cmdliner_cmd ~store "ocaml" ocaml_ocaml_cmd ~doc
 

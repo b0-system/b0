@@ -772,11 +772,12 @@ module Publish = struct
         Ok Os.Exit.ok
 end
 
-(* .opam action command line interface  *)
+(* .opam unit  command line interface  *)
 
-open Cmdliner
-
-let opam_cmd action env =
+let unit =
+  let doc = "opam support" in
+  B0_unit.of_cmdliner_cmd "" ~doc @@ fun env u ->
+  let open Cmdliner in
   let man =
     [ `S Manpage.s_see_also;
       `P "Consult $(b,odig doc b0) for the B0 opam manual."]
@@ -901,12 +902,7 @@ let opam_cmd action env =
                   information.";
               `Blocks man]
   in
-  let name = B0_unit.name action and doc = B0_unit.doc action in
-  Cmd.group (Cmd.info name ~doc ~man) @@
-  [file_cmd; list_cmd; publish_cmd]
-
-let unit =
-  let doc = "opam support" in
-  B0_unit.of_cmdliner_cmd "" opam_cmd ~doc
+  let name = B0_unit.name u in
+  Cmd.group (Cmd.info name ~doc ~man) [file_cmd; list_cmd; publish_cmd]
 
 let () = B0_scope.close ()

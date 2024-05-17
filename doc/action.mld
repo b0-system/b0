@@ -53,24 +53,23 @@ unit.
 
 {1:tutorial Making your own action}
 
+{b XXX} Needs to be rewritten.
+
 Let's make a simple action a script at the root of your project:
 
 Yaddada root vs scope
 
 {[
-let run_script script _ env ~args =
+let mycmd =
+  B0_unit.make_action "mycmd" ~doc:"Run mycmd" @@ fun env _ ~args ->
   let cwd = B0_env.scope_dir env in
   let script = B0_env.in_scope_dir env script in
-  Os.Exit.exec ~cwd script Cmd.(path script %% args)
-
-let mycmd =
-  B0_action.make "mycmd" ~doc:"Run mycmd" @@
-  run_script ~/"scripts/mycmd"
+  Os.Exit.execv ~cwd script Cmd.(path script %% args)
 ]}
 
 Even though you should rewrite all these scripts as OCaml actions a
 direct short cut for the above boilerplate is provided.  Use
-{!B0_action.exec_file}:
+{!B0_unit.Action.exec_file}:
 
 {[
 let mycmd =
@@ -86,7 +85,7 @@ let mycmd =
 let myunit = …
 let action
   let doc = "That's particular" in
-  B0_action.make' "my-exec" ~units:[myunit] ~doc @@ fun _ env ~args ->
+  B0_action.make' "my-exec" ~units:[myunit] ~doc @@ fun env _ ~args ->
   let* cmd = B0_env.unit_cmd myunit in
   Os.Cmd.run cmd
 ]}

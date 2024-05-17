@@ -267,8 +267,8 @@ let run f env base short log_absolute no_pager =
   let ctx = make env ~log_absolute ~log_diffs:(not short) ~base in
   f ctx; finish ctx
 
-let action_func ~base f env action ~args =
+let action_func ~base f =
+  B0_unit.Action.of_cmdliner_term ~exits @@ fun env u ->
   let run = run f env base in
   let no_pager = B0_pager.don't () in
-  let run = Cmdliner.Term.(const run $ short $ log_absolute_arg $ no_pager) in
-  B0_unit.eval_cmdliner_term ~exits action env run ~args
+  Cmdliner.Term.(const run $ short $ log_absolute_arg $ no_pager)

@@ -68,15 +68,14 @@ let make_server_cmd cmd args ~listen_args =
   let args = List.rev_append prev (Cmd.to_list listen_args) @ rest in
   Cmd.(cmd %% of_list Fun.id args)
 
-let endpoint_of_url_and_authority url authority =
-  match Url.scheme url with
-  | None -> Fmt.error "URL %s: no scheme found" url
-  | Some "http" -> Os.Socket.Endpoint.of_string ~default_port:80 authority
-  | Some "https" -> Os.Socket.Endpoint.of_string ~default_port:443 authority
-  | Some scheme ->
-      (Log.warn @@ fun m ->
-       m "Unknown scheme %a using 80 as the default port" Fmt.code scheme);
-      Os.Socket.Endpoint.of_string ~default_port:80 authority
+let endpoint_of_url_and_authority url authority = match Url.scheme url with
+| None -> Fmt.error "URL %s: no scheme found" url
+| Some "http" -> Os.Socket.Endpoint.of_string ~default_port:80 authority
+| Some "https" -> Os.Socket.Endpoint.of_string ~default_port:443 authority
+| Some scheme ->
+    (Log.warn @@ fun m ->
+     m "Unknown scheme %a using 80 as the default port" Fmt.code scheme);
+    Os.Socket.Endpoint.of_string ~default_port:80 authority
 
 let find_server_mode_unit = function
 | [] -> Ok None
@@ -235,14 +234,14 @@ let show_url env browser background prefix timeout dry_run no_exec args =
       in
       Ok Os.Exit.ok
 
-(* .show-url action command line interface  *)
+(* .show-url unit  *)
 
-let show_url_cmd action env =
-  let open Cmdliner in
+let unit =
   let doc = "Show URLs of files or servers in browsers" in
+  B0_unit.of_cmdliner_cmd "" ~dyn_units ~doc @@ fun env u ->
+  let open Cmdliner in
   let man =
-    [
-      `S Manpage.s_synopsis;
+    [ `S Manpage.s_synopsis;
       `P "$(iname) [$(i,OPTION)]… $(i,UNIT[:PATH])…";
       `Noblank;
       `P "$(iname) [$(i,OPTION)]… $(i,URL) $(b,--) $(i,ENTITY) [$(i,ARG)]…";
@@ -302,32 +301,16 @@ let show_url_cmd action env =
     let doc = "Show URL but do not invoke a tool." in
     Arg.(value & flag & info ["n"; "no-exec"] ~doc)
   in
-  Cmd.v (Cmd.info ".show-url" ~doc ~man) @@
-  Term.(const show_url $ const env $
-        B0_web_browser.browser () $
-        B0_web_browser.background () $
-        B0_web_browser.prefix ~default:true () $
+  Cmd.v (Cmd.info (B0_unit.name u) ~doc ~man) @@
+  Term.(const show_url $ const env $ B0_web_browser.browser () $
+        B0_web_browser.background () $ B0_web_browser.prefix ~default:true () $
         timeout $ dry_run $ no_exec $ args)
-
-let unit =
-  let doc = "Show URLs of files or server runs" in
-  B0_unit.of_cmdliner_cmd "" ~dyn_units show_url_cmd ~doc
 
 (* Unit action *)
 
 let action =
-  let exec b0_env u ~args =
-    let* url = B0_unit.get_meta url u in
-    let* url = get_url b0_env u in
-    let* show_url = B0_env.get_cmd b0_env (Cmd.tool "show-url") in
-    let* env =
-      Result.map Os.Env.to_assignments (B0_unit.Action.get_env b0_env u)
-    in
-    let* cwd = B0_unit.Action.get_cwd b0_env u in
-    let cmd = Cmd.(show_url % url %% args) in
-    Ok (Os.Exit.execv ?env:(Some env) ?cwd:(Some cwd) cmd)
-  in
-  `Fun ("show-url", exec)
-
+  B0_unit.Action.func ~doc:"show-url" @@ fun env u ~args ->
+  let* url = get_url env u in
+  Ok (Os.Exit.execv Cmd.(tool "show-url" % url %% args))
 
 let () = B0_scope.close ()

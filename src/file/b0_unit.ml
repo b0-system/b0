@@ -12,19 +12,17 @@ open B0_std
 type build_proc = B0_defs.build_proc
 let build_nop b = Fut.return ()
 
-(* Build units *)
+(* Units *)
 
 include B0_defs.Unit
-
-type b0_unit = t
-
-let exe_file = B0_defs.exe_file
-let tool_name = B0_defs.tool_name
 
 let make = B0_defs.unit_make
 let build_proc = B0_defs.unit_build_proc
 
-(* Executing *)
+(* Built executable *)
+
+let exe_file = B0_defs.exe_file
+let tool_name = B0_defs.tool_name
 
 let outcomes =
   let doc = "Unit build outcomes." in
@@ -32,7 +30,6 @@ let outcomes =
   B0_meta.Key.make "outcomes" ~doc ~pp_value
 
 let is_public = B0_defs.unit_is_public
-
 let get_or_suggest_tool ~keep n =
   (* XXX I don't 'understand how this current_is_root () can work. *)
   let is_root = B0_scope.current_is_root () in
@@ -52,24 +49,17 @@ let get_or_suggest_tool ~keep n =
 
 let tool_is_user_accessible = B0_defs.tool_is_user_accessible
 
-(* We need this here because of formatting *)
+(* We need this here because of pp_tag *)
 
-type action =
-  [ `Unit_exe
-  | `Cmd of
-      string * (B0_env.t -> b0_unit -> args:Cmd.t -> (Cmd.t, string) result)
-  | `Fun of
-      string *
-      (B0_env.t -> b0_unit -> args:Cmd.t -> (Os.Exit.t, string) result) ]
+type action_func = B0_env.t -> t -> args:Cmd.t -> (Os.Exit.t, string) result
+type action = [ `Unit_exe | `Fun of string * action_func ]
 
 let pp ppf = function
 | `Unit_exe -> Fmt.pf ppf "file in %a" B0_meta.Key.pp_name exe_file
-| `Cmd (doc, _) -> Fmt.pf ppf "<fun> %s" doc
 | `Fun (doc, _) -> Fmt.pf ppf "<fun> %s" doc
 
 let action_key : action B0_meta.key =
-  (* We need this here because of formatting *)
-  let doc = "Unit execution." in
+  let doc = "Unit action." in
   let default = `Unit_exe in
   B0_meta.Key.make "action" ~default ~doc ~pp_value:pp
 
@@ -109,8 +99,9 @@ let pp ppf v =
   Fmt.pf ppf "@[<v>%a%a@]" pp_synopsis v pp_non_empty (meta v)
 
 module Action = struct
-
   type b0_unit = t
+
+  (* Environment *)
 
   type env =
   [ B0_env.env
@@ -136,6 +127,8 @@ module Action = struct
   | `Env env -> Ok env
   | `Fun (_doc, f) -> f b0_env u
 
+  (* Cwd *)
+
   type cwd =
   [ B0_env.dir
   | `In of B0_env.dir * Fpath.t
@@ -156,7 +149,37 @@ module Action = struct
   | `In (#B0_env.dir as dir, p) -> Ok (B0_env.in_dir b0_env dir p)
   | `Fun (_doc, f) -> f b0_env u
 
+  (* Action *)
+
+  type func = action_func
   type t = action
+
+  let func ?(doc = "undocumented") func = `Fun (doc, func)
+  let scope_exec ?env:e ?cwd cmd env _ ~args =
+    let open Result.Syntax in
+    let scope_dir = B0_env.scope_dir env in
+    let cwd = Option.value ~default:scope_dir cwd in
+    let* file = Cmd.get_tool cmd in
+    let file = Fpath.(scope_dir // file) in
+    Ok (Os.Exit.execv ?env:e ~cwd Cmd.(set_tool file cmd %% args))
+
+  let of_cmdliner_term
+      ?man_xrefs ?man ?envs ?exits ?sdocs ?docs ?doc:d ?version
+      termf env u ~args
+    =
+    let open Cmdliner in
+    let name = name u in
+    let doc = Option.value ~default:(doc u) d in
+    let exits = Option.value ~default:B0_cli.Exit.infos exits in
+    let info =
+      Cmd.info ?man_xrefs ?man ?envs ~exits ?sdocs ?docs ?version name ~doc
+    in
+    let argv = Array.of_list (name :: B0_std.Cmd.to_list args) in
+    let cmd = Cmdliner.Cmd.v info (termf env u) in
+    (* FIXME use Cmd.eval_value' *)
+    Ok (B0_cli.Exit.of_eval_result (Cmd.eval_value ~argv cmd))
+
+  (* Metadata *)
 
   let key = action_key
 
@@ -185,68 +208,69 @@ module Action = struct
     let pp_value = Fmt.list ~sep:Fmt.sp B0_pack.pp_name in
     B0_meta.Key.make "action-packs" ~default:[] ~pp_value ~doc
 
-  open Result.Syntax
-
   let run_exe_file exe_file b0_env u ~args =
+    let open Result.Syntax in
     let* env = Result.map Os.Env.to_assignments (get_env b0_env u) in
     let* cwd = get_cwd b0_env u in
     let exe_file = Fut.sync exe_file in
     let cmd = Cmd.(path exe_file %% args) in
     Ok (Os.Exit.execv ~env ~cwd cmd)
 
-  let run_fun f b0_env u ~args = f b0_env u ~args
+  (* Running *)
 
-  let run_cmd cmd b0_env u ~args =
-    let* env = Result.map Os.Env.to_assignments (get_env b0_env u) in
+  let err_miss_exe_file u =
+    Fmt.error "Unit %a not actionable, no executable file found (no %a key)"
+      pp_name u B0_meta.Key.pp_name exe_file
+
+  let run' exit_rc run b0_env u ~args action =
+    let open Result.Syntax in
+    let* env = get_env b0_env u in
+    let env = Os.Env.to_assignments env in
     let* cwd = get_cwd b0_env u in
-    let* cmd = cmd b0_env u ~args in
-    Ok (Os.Exit.execv ~env ~cwd cmd)
+    match action with
+    | `Unit_exe ->
+        begin match find_meta exe_file u with
+        | None -> err_miss_exe_file u
+        | Some exe_file ->
+            let exe_file = Fut.sync exe_file in
+            run ~env ~cwd ~argv0:None Cmd.(path exe_file %% args)
+        end
+    | `Fun (_, cmd) ->
+        let* exit = cmd b0_env u ~args in
+        begin match exit with
+        | Os.Exit.Code rc -> Ok (exit_rc rc)
+        | Os.Exit.Execv execv ->
+            let env = Option.value ~default:env (Os.Exit.execv_env execv) in
+            let cwd = Option.value ~default:cwd (Os.Exit.execv_cwd execv) in
+            let argv0 = Os.Exit.execv_argv0 execv in
+            let cmd = Os.Exit.execv_cmd execv in
+            let* cmd = B0_env.get_cmd b0_env cmd in
+            run ~env ~cwd ~argv0 cmd
+        end
 
-  let find u = match find_or_default_meta key u with
-  | `Cmd (_, cmd) -> Some (run_cmd cmd)
-  | `Fun (_, f) -> Some (run_fun f)
-  | `Unit_exe ->
-      match find_meta exe_file u with
-      | None -> None
-      | Some exe_file -> Some (run_exe_file exe_file)
+  let run b0_env u ~args action =
+    let exit_rc rc = `Exited rc in
+    let run ~env ~cwd ~argv0:_ cmd = Os.Cmd.run_status ~env ~cwd cmd in
+    run' exit_rc run b0_env u ~args action
 
-  let exit_some_error e =
-  Log.err (fun m -> m "@[%a@]" Fmt.lines e); Os.Exit.some_error
-
-  type func = B0_env.t -> b0_unit -> args:Cmd.t -> Os.Exit.t
-
-  (* Script and tool execution *)
-
-  let exec_file ?env:e ?cwd cmd env t ~args =
-    let scope_dir = B0_env.scope_dir env in
-    let cwd = Option.value ~default:scope_dir cwd in
-    match Cmd.get_tool cmd with
-    | Error e -> exit_some_error e
-    | Ok file ->
-        let file = Fpath.(scope_dir // file) in
-        Os.Exit.execv ?env:e ~cwd Cmd.(set_tool file cmd %% args)
-
-  let exec_cmd ?env:e ?cwd env cmd = match B0_env.get_cmd env cmd with
-  | Error e -> exit_some_error e
-  | Ok cmd ->
-      let scope_dir = B0_env.scope_dir env in
-      let cwd = Option.value ~default:scope_dir cwd in
-      Os.Exit.execv ?env:e ~cwd cmd
+  let exit b0_env u ~args action =
+    let exit_rc rc = Os.Exit.code rc in
+    let run ~env ~cwd ~argv0 cmd = Ok (Os.Exit.execv ~env ~cwd ?argv0 cmd) in
+    run' exit_rc run b0_env u ~args action
 end
 
+let is_actionable u = match find_or_default_meta Action.key u with
+| `Unit_exe -> mem_meta exe_file u | `Fun _ -> true
 
 (* Actions *)
 
-
-
-let of_action
+let of_action'
     ?store:st ?packs:ps ?units:us ?dyn_units:dus ?doc
     ?(meta = B0_meta.empty) name (f : Action.func)
   =
-  let f e u ~args = Ok (f e u ~args) in
   let meta =
     meta
-    |> B0_meta.add Action.key (`Fun ("action", f))
+    |> B0_meta.add Action.key (Action.func ?doc f)
     |> B0_meta.add_some Action.units us
     |> B0_meta.add_some Action.dyn_units dus
     |> B0_meta.add_some Action.packs ps
@@ -254,34 +278,21 @@ let of_action
   in
   make ?doc ~meta name build_nop
 
-let of_action' ?store (* ?packs *) ?units ?dyn_units ?doc ?meta name func =
-  let func action env ~args = Os.Exit.of_result (func action env ~args) in
-  of_action ?store (* ?packs *) ?units ?dyn_units ?doc ?meta name func
+let of_action ?store ?packs ?units ?dyn_units ?doc ?meta name func =
+  let func action env ~args =
+    Result.map (Fun.const Os.Exit.ok) (func action env ~args)
+  in
+  of_action' ?store ?packs ?units ?dyn_units ?doc ?meta name func
 
 (* Command line interaction. *)
 
 let of_cmdliner_cmd ?store ?packs ?units ?dyn_units ?doc ?meta name cmd =
-  let func env action ~args =
+  let func env u ~args =
     let argv = Array.of_list (name :: Cmd.to_list args) in
-    let cmd = cmd action env in
-    B0_cli.Exit.of_eval_result (Cmdliner.Cmd.eval_value ~argv cmd)
+    let cmd = cmd env u in
+    Ok (B0_cli.Exit.of_eval_result (Cmdliner.Cmd.eval_value ~argv cmd))
   in
-  of_action ?store ?packs ?units ?dyn_units ?doc ?meta name func
-
-let eval_cmdliner_term
-    ?man_xrefs ?man ?envs ?exits ?sdocs ?docs ?doc:d ?version
-    action env term ~args
-  =
-  let name = name action in
-  let doc = Option.value ~default:(doc action) d in
-  let exits = Option.value ~default:B0_cli.Exit.infos exits in
-  let info =
-    Cmdliner.Cmd.info
-      ?man_xrefs ?man ?envs ~exits ?sdocs ?docs ?version name ~doc
-  in
-  let argv = Array.of_list (name :: Cmd.to_list args) in
-  let cmd = Cmdliner.Cmd.v info term in
-  B0_cli.Exit.of_eval_result (Cmdliner.Cmd.eval_value ~argv cmd)
+  of_action' ?store ?packs ?units ?dyn_units ?doc ?meta name func
 
 let tool_name_map = B0_defs.tool_name_map
 

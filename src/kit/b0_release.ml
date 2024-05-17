@@ -437,7 +437,9 @@ end
 
 open Cmdliner
 
-let release_cmd action env =
+let unit =
+  let doc = "Source software release support" in
+  B0_unit.of_cmdliner_cmd "" ~doc @@ fun env u ->
   let man =
     [ `S Manpage.s_see_also;
       `P "Consult $(b,odig doc b0) for the B0 release manual."]
@@ -579,12 +581,7 @@ let release_cmd action env =
           mostly useful for releasing software as sources.";
       `Blocks man ]
   in
-  let name = B0_unit.name action and doc = B0_unit.doc action in
-  Cmd.group (Cmd.info name ~doc ~man) @@
-  [ archive; tag; status ]
-
-let unit =
-  let doc = "Source software release support" in
-  B0_unit.of_cmdliner_cmd "" release_cmd ~doc
+  let name = B0_unit.name u in
+  Cmd.group (Cmd.info name ~doc ~man) @@ [ archive; tag; status ]
 
 let () = B0_scope.close ()

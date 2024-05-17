@@ -5,11 +5,23 @@
 
 (** B0 [build] command. *)
 
-val select_units :
-  units:string list -> x_units:string list ->
-  packs:string list -> x_packs:string list ->
-  lock:bool option ->
-  ((B0_unit.Set.t * B0_unit.Set.t) * bool * B0_pack.t list, string) result
+val get_default_build : unit -> B0_unit.t list * B0_pack.t list
+val unit_set_of :
+  units:B0_pack.b0_unit list -> packs:B0_pack.Set.t -> B0_unit.Set.t
+
+val get_excluded_units :
+  x_units:string list -> x_packs:string list -> (B0_unit.Set.t, string) result
+
+val get_must_units_and_locked_packs :
+  is_action:(B0_unit.t -> bool) -> units:B0_unit.t list ->
+  packs:B0_pack.Set.elt list -> args:string list ->
+  unit -> B0_store.binding list * B0_unit.Set.t * B0_pack.Set.t
+
+val is_locked : lock:bool option -> locked_packs:B0_pack.Set.t -> bool
+
+val get_may_must :
+  is_locked:bool -> units:B0_unit.Set.t -> x_units:B0_unit.Set.t ->
+  B0_unit.Set.t * B0_unit.Set.t
 
 val make_build :
   B0_driver.Conf.t ->
@@ -18,13 +30,11 @@ val make_build :
   must_build:B0_unit.Set.t -> (B0_build.t, string) result
 
 val show_what :
-  lock:bool option ->
-  is_locked:bool ->
-  locked_packs:B0_pack.t list ->
-  must_build:B0_unit.Set.t ->
-  may_build:B0_unit.Set.t -> B0_driver.Conf.t -> (B0_std.Os.Exit.t, 'a) result
+  lock:bool option -> is_locked:bool -> locked_packs:B0_pack.Set.t ->
+  must_build:B0_unit.Set.t -> may_build:B0_unit.Set.t -> B0_driver.Conf.t ->
+  (B0_std.Os.Exit.t, 'a) result
 
-val action_env : B0_build.t -> B0_def.t -> B0_driver.Conf.t -> B0_env.t
+val env_for_unit : B0_driver.Conf.t -> B0_build.t -> B0_unit.t -> B0_env.t
 
 val units : string list Cmdliner.Term.t
 val x_units : string list Cmdliner.Term.t
