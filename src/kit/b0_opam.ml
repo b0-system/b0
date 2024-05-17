@@ -342,10 +342,10 @@ end
 (* .opam list command *)
 
 let list_cmd env pkgs format =
-  Log.if_error ~use:B0_cli.Exit.no_such_name @@
+  Log.if_error ~use:Os.Exit.no_such_name @@
   let* pkg_packs = Pkg.get_list_or_hints pkgs in
   match pkg_packs with
-  | [] -> Ok B0_cli.Exit.ok
+  | [] -> Ok Os.Exit.ok
   | ps ->
       let pp_normal ppf pkg =
         Fmt.pf ppf "@[<h>%a %s@]" Pkg.pp_name pkg (B0_pack.name (Pkg.pack pkg))
@@ -354,7 +354,7 @@ let list_cmd env pkgs format =
       | `Short -> Pkg.pp_name | `Normal | `Long -> pp_normal
       in
       Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_pkg) ps);
-      Ok B0_cli.Exit.ok
+      Ok Os.Exit.ok
 
 (* .opam file command *)
 
@@ -366,7 +366,7 @@ let lint_files ~normalize pkgs =
   in
   let* _ = collect_results (List.map lint pkgs) in
   Log.app (fun m -> m "%a" (Fmt.tty [`Fg `Green]) "Passed.");
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 let gen_files pkgs ~normalize ~with_name ~dst =
   let* opam = get () in
@@ -392,10 +392,10 @@ let gen_files pkgs ~normalize ~with_name ~dst =
   in
   let gen = gen_file ~normalize ~with_name ~dst in
   let* () = list_iter_stop_on_error gen pkgs in
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 let file_cmd env constraints pkgs lint raw dst in_scope no_name =
-  Log.if_error ~use:B0_cli.Exit.no_such_name @@
+  Log.if_error ~use:Os.Exit.no_such_name @@
   let action =
     if lint then `Lint else
     if in_scope then `Gen `In_scope else
@@ -408,9 +408,9 @@ let file_cmd env constraints pkgs lint raw dst in_scope no_name =
   match pkgs with
   | [] ->
       Log.warn (fun m -> m "No opam packages found in B0 root.");
-      Ok B0_cli.Exit.ok
+      Ok Os.Exit.ok
   | ps ->
-      Log.if_error' ~use:B0_cli.Exit.some_error @@
+      Log.if_error' ~use:Os.Exit.some_error @@
       let normalize = not raw in
       match action with
       | `Lint -> lint_files ~normalize pkgs
@@ -741,17 +741,17 @@ module Publish = struct
       env pkgs_dir pkgs_repo fork_repo local_repo github_auth
       constraints pkgs incompats check_only no_pr
     =
-    Log.if_error ~use:B0_cli.Exit.no_such_name @@
+    Log.if_error ~use:Os.Exit.no_such_name @@
     let pkgs = List.map split_version pkgs in
     let* ps = Pkg.get_unique_list_or_hints ~constraints (List.map fst pkgs) in
     match ps with
     | [] ->
         Log.app (fun m -> m "No opam package to publish in B0 root.");
-        Ok B0_cli.Exit.ok
+        Ok Os.Exit.ok
     | ps ->
         let add_version p = p, Option.join (List.assoc_opt (Pkg.name p) pkgs) in
         let pkgs = List.map add_version (List.sort compare ps) in
-        Log.if_error' ~use:B0_cli.Exit.some_error @@
+        Log.if_error' ~use:Os.Exit.some_error @@
         let* local_repo = match local_repo with
         | Some d -> Ok d
         | None ->
@@ -769,7 +769,7 @@ module Publish = struct
           publish_pkgs ~pkgs_dir ~pkgs_repo ~fork_repo ~local_repo ~github_auth
             pkgs incompats check_only no_pr
         in
-        Ok B0_cli.Exit.ok
+        Ok Os.Exit.ok
 end
 
 (* .opam action command line interface  *)

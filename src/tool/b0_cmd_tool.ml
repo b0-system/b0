@@ -23,19 +23,19 @@ let list format c =
       let pp_tool ppf (n, u) = B0_unit.pp ppf u in
       pp_tool, Fmt.(cut ++ cut)
   in
-  Log.if_error ~use:B0_cli.Exit.no_such_name @@
+  Log.if_error ~use:Os.Exit.no_such_name @@
   let* us = B0_unit.get_list_or_hint ~all_if_empty:true [] in
   let keep_tool u = match B0_unit.find_meta B0_unit.tool_name u with
   | Some n when B0_unit.tool_is_user_accessible u -> Some (n, u)
   | None | Some _ -> None
   in
   let tools = List.sort compare (List.filter_map keep_tool us) in
-  Log.if_error' ~use:B0_cli.Exit.some_error @@
+  Log.if_error' ~use:Os.Exit.some_error @@
   let don't = B0_driver.Conf.no_pager c in
   let* pager = B0_pager.find ~don't () in
   let* () = B0_pager.page_stdout pager in
   if tools <> [] then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp) tools);
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 (* Command line interface *)
 

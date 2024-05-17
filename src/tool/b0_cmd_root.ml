@@ -11,7 +11,7 @@ let path c =
   let* b0_file = B0_driver.Conf.get_b0_file c in
   let root = Fpath.parent b0_file in
   Log.app (fun m -> m "%a" Fpath.pp root);
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 (* Command line interface *)
 

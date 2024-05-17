@@ -18,14 +18,14 @@ let list format c =
       let pp_key ppf k = B0_meta.Key.pp ppf k in
       pp_key, Fmt.(cut ++ cut)
   in
-  Log.if_error ~use:B0_cli.Exit.no_such_name @@
+  Log.if_error ~use:Os.Exit.no_such_name @@
   let* keys = B0_meta.Key.get_list_or_hint ~all_if_empty:true [] in
-  Log.if_error' ~use:B0_cli.Exit.some_error @@
+  Log.if_error' ~use:Os.Exit.some_error @@
   let don't = B0_driver.Conf.no_pager c in
   let* pager = B0_pager.find ~don't () in
   let* () = B0_pager.page_stdout pager in
   if keys <> [] then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp) keys);
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 
 

@@ -271,15 +271,15 @@ module Archive = struct
     Ok ()
 
   let cmd env commit_ish packs x_packs =
-    Log.if_error ~use:B0_cli.Exit.no_such_name @@
+    Log.if_error ~use:Os.Exit.no_such_name @@
     let* packs = select_packs packs x_packs in
-    Log.if_error' ~use:B0_cli.Exit.some_error @@
+    Log.if_error' ~use:Os.Exit.some_error @@
     (* XXX we likely need to do/say something if there's a pack
        with the same repo, or not. Also maybe we should rather
        use the [B0_release.tag] to select them, but then it's one
        more thing to add. *)
     let* () = List.iter_stop_on_error (for_pack env ~commit_ish) packs in
-    Ok B0_cli.Exit.some_error
+    Ok Os.Exit.some_error
 end
 
 (* Release tagging *)
@@ -348,9 +348,9 @@ module Tag = struct
     | Failure e -> Error e
 
   let cmd version commit_ish msg sign force delete dry_run packs x_packs =
-    Log.if_error ~use:B0_cli.Exit.no_such_name @@
+    Log.if_error ~use:Os.Exit.no_such_name @@
     let* packs = select_packs packs x_packs in
-    Log.if_error' ~use:B0_cli.Exit.some_error @@
+    Log.if_error' ~use:Os.Exit.some_error @@
     let* () =
       if packs <> [] then Ok () else
       Fmt.error
@@ -359,7 +359,7 @@ module Tag = struct
     in
     let* repos_tags = gather_repos_and_tags version packs in
     let rec loop = function
-    | [] -> Ok B0_cli.Exit.ok
+    | [] -> Ok Os.Exit.ok
     | (repo, tag) :: repos ->
         match tag_repo repo tag ~commit_ish ~msg ~sign ~force ~delete ~dry_run
         with
@@ -414,9 +414,9 @@ module Status = struct
     Fmt.pf ppf "%a %s" B0_vcs_repo.pp_commit id log
 
   let cmd after last packs x_packs pager_don't =
-    Log.if_error ~use:B0_cli.Exit.no_such_name @@
+    Log.if_error ~use:Os.Exit.no_such_name @@
     let* packs = select_packs packs x_packs in
-    Log.if_error' ~use:B0_cli.Exit.some_error @@
+    Log.if_error' ~use:Os.Exit.some_error @@
     let* pager = B0_pager.find ~don't:pager_don't () in
     let* () = B0_pager.page_stdout pager in
     let* repos = gather_repos packs in
@@ -432,7 +432,7 @@ module Status = struct
         loop ~has_changes repos
     in
     let* has_changes = loop ~has_changes:false repos in
-    Ok (if has_changes then B0_cli.Exit.ok else Os.Exit.code 1)
+    Ok (if has_changes then Os.Exit.ok else Os.Exit.code 1)
 end
 
 open Cmdliner

@@ -90,7 +90,7 @@ module Action : sig
   | `Env of Os.Env.t (** This exact environment. *)
   | `Fun of string * (B0_env.t -> b0_unit -> (Os.Env.t, string) result)
     (** Doc string and function. *) ]
-  (** The type for execution environments. *)
+  (** The type for action execution environments. *)
 
   val env : env B0_meta.key
   (** [env] specifies the environement for executing a unit. If unspecified
@@ -110,7 +110,7 @@ module Action : sig
   | `In of [ `Cwd | `Unit_dir | `Root_dir | `Scope_dir ] * Fpath.t
   | `Fun of string * (B0_env.t -> b0_unit -> (Fpath.t, string) Result.t)
     (** Doc string and function. *) ]
-  (** The type for execution working directories. *)
+  (** The type for action execution working directories. *)
 
   val cwd : cwd B0_meta.key
   (** [cwd] specifies the current working directory for executing a unit.
@@ -120,7 +120,11 @@ module Action : sig
   (** [get_cwd env u] performs the logic to get the cwd {!val-cwd}
       for unit [u] in environment [env]. *)
 
-  (** {1:action Action} *)
+  (** {1:action Action}
+
+      {b Warning.} Actions may be executed in parallel, either at the
+      OS or OCaml level. Keep that in mind if you make funny
+      things. *)
 
   type func = B0_env.t -> b0_unit -> args:Cmd.t -> Os.Exit.t
 
@@ -168,17 +172,6 @@ module Action : sig
         according to {!val-key}.  Given the environment, the unit and
         additional arguments potentially provided by the driver it
         performs the full execution logic. *)
-
-  (** {1:shortcuts Shortcuts} *)
-
-  val exit_of_result : (unit, string) result -> Os.Exit.t
-  (** [exit_of_result v] exits with {!B0_cli.Exit.ok} if [v] is [Ok ()]
-      and logs the Error and exits with {!B0_cli.Exit.some_error} if [v]
-      is [Error _]. *)
-
-  val exit_of_result' : (Os.Exit.t, string) result -> Os.Exit.t
-  (** [exit_of_result' v] exits with [e] if [v] is [Ok e] and logs the
-      Error and exits with {!B0_cli.Exit.some_error} if [v] is [Error _]. *)
 
   (** {2:script Action functions for script execution} *)
 

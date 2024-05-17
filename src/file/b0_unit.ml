@@ -192,7 +192,7 @@ module Action = struct
     let* cwd = get_cwd b0_env u in
     let exe_file = Fut.sync exe_file in
     let cmd = Cmd.(path exe_file %% args) in
-    Ok (Os.Exit.exec ~env ~cwd cmd)
+    Ok (Os.Exit.execv ~env ~cwd cmd)
 
   let run_fun f b0_env u ~args = f b0_env u ~args
 
@@ -200,7 +200,7 @@ module Action = struct
     let* env = Result.map Os.Env.to_assignments (get_env b0_env u) in
     let* cwd = get_cwd b0_env u in
     let* cmd = cmd b0_env u ~args in
-    Ok (Os.Exit.exec ~env ~cwd cmd)
+    Ok (Os.Exit.execv ~env ~cwd cmd)
 
   let find u = match find_or_default_meta key u with
   | `Cmd (_, cmd) -> Some (run_cmd cmd)
@@ -210,16 +210,8 @@ module Action = struct
       | None -> None
       | Some exe_file -> Some (run_exe_file exe_file)
 
-
-
   let exit_some_error e =
-  Log.err (fun m -> m "@[%a@]" Fmt.lines e); B0_cli.Exit.some_error
-
-  let exit_of_result = function
-  | Ok _ -> B0_cli.Exit.ok | Error e -> exit_some_error e
-
-  let exit_of_result' = function Ok e -> e | Error e -> exit_some_error e
-
+  Log.err (fun m -> m "@[%a@]" Fmt.lines e); Os.Exit.some_error
 
   type func = B0_env.t -> b0_unit -> args:Cmd.t -> Os.Exit.t
 
@@ -232,14 +224,14 @@ module Action = struct
     | Error e -> exit_some_error e
     | Ok file ->
         let file = Fpath.(scope_dir // file) in
-        Os.Exit.exec ?env:e ~cwd Cmd.(set_tool file cmd %% args)
+        Os.Exit.execv ?env:e ~cwd Cmd.(set_tool file cmd %% args)
 
   let exec_cmd ?env:e ?cwd env cmd = match B0_env.get_cmd env cmd with
   | Error e -> exit_some_error e
   | Ok cmd ->
       let scope_dir = B0_env.scope_dir env in
       let cwd = Option.value ~default:scope_dir cwd in
-      Os.Exit.exec ?env:e ~cwd cmd
+      Os.Exit.execv ?env:e ~cwd cmd
 end
 
 
@@ -263,7 +255,7 @@ let of_action
   make ?doc ~meta name build_nop
 
 let of_action' ?store (* ?packs *) ?units ?dyn_units ?doc ?meta name func =
-  let func action env ~args = Action.exit_of_result (func action env ~args) in
+  let func action env ~args = Os.Exit.of_result (func action env ~args) in
   of_action ?store (* ?packs *) ?units ?dyn_units ?doc ?meta name func
 
 (* Command line interaction. *)

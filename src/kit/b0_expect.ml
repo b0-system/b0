@@ -183,7 +183,7 @@ let log_summary ctx =
   match !expected = count with
   | true ->
       Log.app (fun m -> m "%a" pp_all_pass (count, !corrected, dur ctx));
-      B0_cli.Exit.ok
+      Os.Exit.ok
   | false ->
       Log.app (fun m ->
           m "@[<v> @[<v>%a%a%a%a%a@]@,@,\
@@ -260,7 +260,7 @@ let exits =
   Cmdliner.Cmd.Exit.defaults
 
 let run f env base short log_absolute no_pager =
-  B0_unit.Action.exit_of_result' @@
+  Os.Exit.of_result' @@
   let* pager = B0_pager.find ~don't:no_pager () in
   let* () = B0_pager.page_stdout pager in
   abort_to_result @@ fun () ->

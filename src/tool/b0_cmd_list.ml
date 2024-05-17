@@ -22,12 +22,12 @@ let edit names conf =
      | None -> find_files (v :: not_found) fs vs
      | Some f -> find_files not_found (f :: fs) vs
   in
-  Log.if_error ~use:B0_cli.Exit.no_such_name @@
+  Log.if_error ~use:Os.Exit.no_such_name @@
   let* vs = get_defs names ~with_lib_defs:false in
   let defs = B0_tool_std.def_list and all_if_empty = true in
   let* vs = B0_tool_std.def_list_get_list_or_hint defs ~all_if_empty names in
   let not_found, files = find_files [] [] vs in
-  Log.if_error' ~use:B0_cli.Exit.some_error @@
+  Log.if_error' ~use:Os.Exit.some_error @@
   let edit_all = names = [] in
   match not edit_all && not_found <> [] with
   | true ->
@@ -38,8 +38,8 @@ let edit names conf =
   | false ->
       let* editor = B0_editor.find () in
       Result.bind (B0_editor.edit_files editor files) @@ function
-      | `Exited 0 -> Ok B0_cli.Exit.ok
-      | _ -> Ok B0_cli.Exit.some_error
+      | `Exited 0 -> Ok Os.Exit.ok
+      | _ -> Ok Os.Exit.some_error
 
 let list format names all conf =
   let pp_v ppf (B0_def.V ((module Def), v)) = match format with
@@ -58,10 +58,10 @@ let list format names all conf =
     then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp_v) vs);
     Ok ()
   in
-  Log.if_error ~use:B0_cli.Exit.no_such_name @@
+  Log.if_error ~use:Os.Exit.no_such_name @@
   let* vs = get_defs names ~with_lib_defs:all in
   let* () = list conf vs in
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 let show format names all conf =
   let format = if format = `Normal then `Long else format in

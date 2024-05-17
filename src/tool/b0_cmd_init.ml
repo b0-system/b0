@@ -24,7 +24,7 @@ let find_copyright_holder ~cwd _meta = function
 
 let b0_ml file force _conf =
   (* TODO this needs to be made much better. *)
-  Log.if_error ~use:B0_cli.Exit.some_error @@
+  Log.if_error ~use:Os.Exit.some_error @@
   let b0_file =
     "open B0_kit.V000\n\n\
     (* Library names *)\n\n\
@@ -42,21 +42,21 @@ let b0_ml file force _conf =
     "
   in
   let* () = Os.File.write ~force ~make_path:true file b0_file in
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 (* Changes file init *)
 
 let changes file force _conf =
-  Log.if_error ~use:B0_cli.Exit.some_error @@
+  Log.if_error ~use:Os.Exit.some_error @@
   let* changes = B0_init.find_changes_generator file in
   let changes = changes () in
   let* () = Os.File.write ~force ~make_path:true file changes in
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 (* License file init *)
 
 let license years holder license file force conf =
-  Log.if_error ~use:B0_cli.Exit.some_error @@
+  Log.if_error ~use:Os.Exit.some_error @@
   let cwd = B0_driver.Conf.cwd conf in
   let meta = B0_init.get_project_meta () in
   let years = B0_init.get_copyright_years years in
@@ -66,7 +66,7 @@ let license years holder license file force conf =
   let license, warns = B0_init.license text ~years ~holder in
   List.iter (fun warn -> Log.warn (fun m -> m "%s" warn)) warns;
   let* () = Os.File.write ~force ~make_path:true file license in
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 (* Readme file init *)
 
@@ -82,14 +82,14 @@ let get_readme_project_name ~cwd = function
            Use option %a to specify a project name.@]" Fmt.code "--name"
 
 let readme name synopsis file force conf =
-  Log.if_error ~use:B0_cli.Exit.some_error @@
+  Log.if_error ~use:Os.Exit.some_error @@
   let cwd = B0_driver.Conf.cwd conf in
   let meta = B0_init.get_project_meta () in
   let* project_name = get_readme_project_name ~cwd name in
   let* readme = B0_init.find_readme_generator file in
   let readme = readme ~project_name ~synopsis meta in
   let* () = Os.File.write ~force ~make_path:true file readme in
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 (* Source file init *)
 
@@ -106,7 +106,7 @@ let get_lang ~file ~lang = match lang with
            Use option %a to specify one.@]" Fmt.code ext Fmt.code "--lang"
 
 let src years holder license lang files example force conf =
-  Log.if_error ~use:B0_cli.Exit.some_error @@
+  Log.if_error ~use:Os.Exit.some_error @@
   let files = match files with [] -> [Fpath.dash] | files -> files in
   let cwd = B0_driver.Conf.cwd conf in
   let meta = B0_init.get_project_meta () in
@@ -120,7 +120,7 @@ let src years holder license lang files example force conf =
     Os.File.write ~force ~make_path:true file src
   in
   let* () = List.iter_stop_on_error write_file files in
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 open Cmdliner
 

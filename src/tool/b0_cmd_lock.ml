@@ -29,7 +29,7 @@ let lock c =
     Fmt.pf ppf "@[<h>%s=%a; export %s;@]" var Fpath.pp_quoted path var
   in
   Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_binding) bindings);
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 (* Command line interface *)
 

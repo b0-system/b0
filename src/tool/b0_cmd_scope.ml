@@ -34,10 +34,10 @@ let get_scopes c ~topmost ~includes ~excludes =
 
 let exec_when cond c topmost includes excludes keep_going cmd =
   let err (_, dir) e =
-    Log.err (fun m -> m "@[%a: %s@]" pp_dir dir e); B0_cli.Exit.some_error
+    Log.err (fun m -> m "@[%a: %s@]" pp_dir dir e); Os.Exit.some_error
   in
   let rec loop = function
-  | [] -> B0_cli.Exit.ok
+  | [] -> Os.Exit.ok
   | (name, dir as s) :: ss ->
       match cond s with
       | Error e -> err s e
@@ -64,10 +64,10 @@ let list topmost includes excludes format path c =
   let pp_scopes = Fmt.(list pp_scope) in
   let scopes = get_scopes c ~topmost ~includes ~excludes in
   if scopes <> [] then Log.app (fun m -> m "@[<v>%a@]" pp_scopes scopes);
-  B0_cli.Exit.ok
+  Os.Exit.ok
 
 let symlink topmost includes excludes dir rm c =
-  Log.if_error ~use:B0_cli.Exit.some_error @@
+  Log.if_error ~use:Os.Exit.some_error @@
   let scopes = get_scopes c ~topmost ~includes ~excludes in
   let symlink_scope (scope, path) =
     if scope = "" (* root scope *) then Ok () else
@@ -101,7 +101,7 @@ let symlink topmost includes excludes dir rm c =
   in
   let op = if rm then remove_scope_symlink else symlink_scope in
   let* () = List.iter_stop_on_error op scopes in
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 let vcs root includes excludes all keep_going vcs_kind vcs_args c =
   let vcs_cmd = match vcs_kind with

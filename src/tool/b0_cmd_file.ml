@@ -24,19 +24,19 @@ let boot root c =
   in
   Log.app (fun m -> m "Boot is TODO.");
   if boots <> [] then Log.app (fun m -> m "@[<v>%a@]" pp_boots boots);
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 let compile c =
   get_b0_file_src c @@ fun f ->
   let* _ =
     B0_driver.Compile.compile c ~driver:B0_tool_std.driver ~feedback:true f
   in
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 let edit all c =
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
   let* b0_file = B0_driver.Conf.get_b0_file c in
-  Log.if_error' ~use:B0_cli.Exit.some_error @@
+  Log.if_error' ~use:Os.Exit.some_error @@
   let* editor = B0_editor.find () in
   Log.if_error' ~header:"" ~use:B0_driver.Exit.b0_file_error @@
   let* files = match all with
@@ -50,8 +50,8 @@ let edit all c =
       Ok (List.rev @@ List.fold_left add_inc [b0_file] incs)
   in
   Result.bind (B0_editor.edit_files editor files) @@ function
-  | `Exited 0 -> Ok B0_cli.Exit.ok
-  | _ -> Ok B0_cli.Exit.some_error
+  | `Exited 0 -> Ok Os.Exit.ok
+  | _ -> Ok Os.Exit.some_error
 
 let gather dest dirs force keep_symlinks keep_going relative symlink_scopes c =
   let pp_inc_directive ppf (s, f) =
@@ -105,7 +105,7 @@ let gather dest dirs force keep_symlinks keep_going relative symlink_scopes c =
       end
   | [] -> Ok (List.sort compare acc)
   in
-  Log.if_error ~use:B0_cli.Exit.some_error @@
+  Log.if_error ~use:Os.Exit.some_error @@
   let* dest, dest_b0_file = match dest with
   | None when symlink_scopes ->
       Fmt.error "Will not symlink scopes without option %a" Fmt.code "--dest"
@@ -127,7 +127,7 @@ let gather dest dirs force keep_symlinks keep_going relative symlink_scopes c =
   in
   let force = true (* The force logic was handled above *) in
   let* () = Os.File.write ~force ~make_path:false b0_file incs in
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 let includes root format c =
   let pp_inc = match format with
@@ -144,23 +144,23 @@ let includes root format c =
       Ok (B0_file.expanded_b0_includes exp)
   in
   if incs <> [] then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_inc) incs);
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 let log format log_format op_selector c =
-  Log.if_error ~use:B0_cli.Exit.some_error @@
+  Log.if_error ~use:Os.Exit.some_error @@
   let don't = B0_driver.Conf.no_pager c || log_format = `Trace_event in
   let log_file = B0_driver.Compile.build_log c ~driver:B0_tool_std.driver in
   let* pager = B0_pager.find ~don't () in
   let* () = B0_pager.page_stdout pager in
   let* l = B0_cli.Memo.Log.read log_file in
   B0_cli.Memo.Log.out Fmt.stdout log_format format op_selector ~path:log_file l;
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 let path c =
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
   let* b0_file = B0_driver.Conf.get_b0_file c in
   Log.app (fun m -> m "%a" Fpath.pp_unquoted b0_file);
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 let requires root c =
   let pp_require = Fmt.using fst B0_ocaml.Libname.pp in
@@ -173,7 +173,7 @@ let requires root c =
   in
   if reqs <> []
   then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_require) reqs);
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 let source root c =
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
@@ -183,14 +183,14 @@ let source root c =
   | true ->
       let* s = Os.File.read b0_file in
       Log.app (fun m -> m "%s" s);
-      Ok B0_cli.Exit.ok
+      Ok Os.Exit.ok
   | false ->
       let* s = Os.File.read b0_file in
       let* src = B0_file.of_string ~file:b0_file s in
       let* exp = B0_file.expand src in
       let esrc = B0_file.expanded_src exp in
       Log.app (fun m -> m "%s" esrc);
-      Ok B0_cli.Exit.ok
+      Ok Os.Exit.ok
 
 (* Command line interface *)
 

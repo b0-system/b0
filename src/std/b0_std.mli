@@ -3153,43 +3153,97 @@ module Os : sig
     (** {!Exit} needs that alias to refer to {!B0_std.Cmd.t}. *)
   end
 
-  (** Program exit. *)
+  (** Program exit.
+
+      There are two ways for a program to exit: either by returning an
+      exit code or by calling {!B0_std.Os.Cmd.execv}. The type here
+      allows to represent these two ways of exiting. *)
   module Exit : sig
 
-    (** {1:exitspec Specifying exits} *)
+    (** {1:program_exits Program exits} *)
 
     type code = int
     (** The type for exit codes. *)
 
+    type execv
+    (** The type for execv calls. *)
+
     type t =
     | Code : code -> t (** [exit] with code. *)
-    | Exec : (unit -> ('a, string) result) -> t (** exit with [execv] *)
-    (** The type for specifying program exits. Either an exit code or a
-        function (that should be) calling {!B0_std.Os.Cmd.execv}. *)
-
-    val code : code -> t
-    (** [code c] is [Code c]. *)
-
-    val exec :
-      ?env:Env.assignments -> ?cwd:Fpath.t -> ?argv0:string -> Cmd.t -> t
-    (** [exec ?env ?cwd ?argv0 cmd] is an [Exec _]. That has a call to
-        {!Os.Cmd.execv} with the corresponding arguments. *)
+    | Execv : execv -> t (** exit with [execv] *)
+    (** The type for specifying program exits.  *)
 
     val get_code : t -> code
     (** [get_code e] is the exit code of [e]. Raises [Invalid_argument] if
         [e] is {!Exec}. *)
 
-    (** {1:exitexit Exiting exits} *)
-
-    val exit : t -> ('a, string) result
-    (** [exit e] exits according to [e]:
+    val exit : ?on_error:t -> t -> 'a
+    (** [exit ~on_error e] exits according to [e]:
         {ul
         {- If [e] is [Code c], {!Stdlib.exit}[ c] is called and the
            function never returns.}
-        {- If [e] is [Exec execv], [execv] is called. This can
-           only return with an [Error _]. In that case log it
-           and call the function again with an error code -
-           this guarantees termination.}} *)
+        {- If [e] is [Execv execv], [execv] is called. This can only
+           return with an [Error _]. In that case the error
+           is logged and [exit] is called again with [on_error]
+           (and the default [on_error])}}
+        [on_error] defaults to {!some_error}. Except if an asynchronous
+        exception is raised this function never returns. *)
+
+    (** {1:exit_with_codes Exiting with codes}
+
+        {b Note.} The constants here match those established by
+        [Cmdliner] with another one useful in cli tools. But we don't
+        want a [Cmdliner] dependency on it here. *)
+
+    val code : code -> t
+    (** [code c] is [Code c]. *)
+
+    val ok : t
+    (** [ok] is [Code 0]. *)
+
+    val no_such_name : t
+    (** [no_such_name] is [Code 122], it indicates a named entity was
+        not found. *)
+
+    val some_error : t
+    (** [some_error] is [Code 123], it indicates an indiscriminate
+        error reported on stdout. *)
+
+    val cli_error : t
+    (** [cli_error] is [Code 124], it indicates a command line parsing error. *)
+
+    val internal_error : t
+    (** [internal_error] is [Code 125], it indicates an unexpected internal
+        error (bug). *)
+
+    (** {1:exit_results Exit with [results]} *)
+
+    val of_result : (unit, string) result -> t
+    (** [of_result v] exits with {!ok} if [v] is [Ok ()] and logs the
+        Error and exits with {!some_error} if [v] is [Error _]. *)
+
+    val of_result' : (t, string) result -> t
+    (** [of_result v] exits with [e] if [v] is [Ok e] and logs the
+        error and exits with {!some_error} if [v] is [Error _]. *)
+
+    (** {1:exit_with_execv Exit by [execv]} *)
+
+    val execv :
+      ?env:Env.assignments -> ?cwd:Fpath.t -> ?argv0:string -> Cmd.t -> t
+    (** [exec ?env ?cwd ?argv0 cmd] is an [Exec _]. That has a call to
+        {!Os.Cmd.execv} with the corresponding arguments. *)
+
+    val execv_env : execv -> Env.assignments option
+    (** [execv_env exec] is the environment of [exec]. *)
+
+    val execv_cwd : execv -> Fpath.t option
+    (** [execv_env exec] is the environment of [exec]. *)
+
+    val execv_argv0 : execv -> string option
+    (** [execv_env exec] is the environment of [exec]. *)
+
+    val execv_cmd : execv -> Cmd.t
+    (** [execv_env exec] is the command of [exec]. *)
 
     (** {1:sigexit Signal exit hooks} *)
 
@@ -3209,7 +3263,7 @@ module Os : sig
   end
 
 
-    (** {1:sleeping_and_timing Sleeping and timing} *)
+  (** {1:sleeping_and_timing Sleeping and timing} *)
 
   val sleep : Mtime.Span.t -> Mtime.Span.t
   (** [sleep dur] sleeps for duration [dur] and returns the duration

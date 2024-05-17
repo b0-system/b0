@@ -7,7 +7,7 @@ open B0_std
 open Result.Syntax
 
 let log details format op_selector c =
-  Log.if_error ~use:B0_cli.Exit.some_error @@
+  Log.if_error ~use:Os.Exit.some_error @@
   let don't = B0_driver.Conf.no_pager c || format = `Trace_event in
   let b0_dir = B0_driver.Conf.b0_dir c in
   (* FIXME
@@ -17,7 +17,7 @@ let log details format op_selector c =
   let* () = B0_pager.page_stdout pager in
   let* l = B0_cli.Memo.Log.read log_file in
   B0_cli.Memo.Log.out Fmt.stdout format details op_selector ~path:log_file l;
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 (* Command line interface *)
 

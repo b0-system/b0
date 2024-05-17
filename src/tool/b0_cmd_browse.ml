@@ -29,18 +29,18 @@ let process_url browser background prefix show_url no_pager =
       Ok (fun u -> Ok (Log.app (fun m -> m "%s" u)))
 
 let browse key packs browser background prefix show_url no_pager c =
-  Log.if_error ~use:B0_cli.Exit.no_such_name @@
+  Log.if_error ~use:Os.Exit.no_such_name @@
   let* (V key) = B0_meta.Key.get_or_hint key in
   let no_lookup_error = packs = [] in
   let* packs = B0_pack.get_list_or_hint ~all_if_empty:true packs in
-  Log.if_error' ~use:B0_cli.Exit.some_error @@
+  Log.if_error' ~use:Os.Exit.some_error @@
   let* process_url = process_url browser background prefix show_url no_pager in
   let rec loop = function
-  | [] -> Ok B0_cli.Exit.ok
+  | [] -> Ok Os.Exit.ok
   | p :: ps ->
       match B0_pack.get_meta key p with
       | Error _ when no_lookup_error -> loop ps
-      | Error _ as e -> Log.if_error' ~use:B0_cli.Exit.no_such_name e
+      | Error _ as e -> Log.if_error' ~use:Os.Exit.no_such_name e
       | Ok v ->
           let url = Fmt.str "%a" (B0_meta.Key.pp_value key) v in
           let* () = process_url url in
@@ -49,10 +49,10 @@ let browse key packs browser background prefix show_url no_pager c =
   loop packs
 
 let browse_url urls browser background prefix show_url no_pager () =
-  Log.if_error ~use:B0_cli.Exit.some_error @@
+  Log.if_error ~use:Os.Exit.some_error @@
   let* process_url = process_url browser background prefix show_url no_pager in
   let rec loop = function
-  | [] -> Ok B0_cli.Exit.ok
+  | [] -> Ok Os.Exit.ok
   | url :: urls -> let* () = process_url url in loop urls
   in
   loop urls

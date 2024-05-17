@@ -4366,19 +4366,43 @@ module Os = struct
   end
 
   module Exit = struct
+    (* Very ugly, but Log depends on a bunch of stuff in Os *)
+    let log_error : (string -> unit) ref = ref (fun _ -> assert false)
+
     type code = int
+    type execv =
+      { env : Env.assignments option;
+        cwd : Fpath.t option;
+        argv0 : string option;
+        cmd : Cmd.t }
 
-    type t = Code : code -> t | Exec : (unit -> ('a, string) result) -> t
-
+    type t = Code : code -> t | Execv : execv -> t
     let code c = Code c
-    let exec ?env ?cwd ?argv0 cmd =
-      Exec (fun () -> Cmd.execv ?env ?cwd ?argv0 cmd)
+    let execv ?env ?cwd ?argv0 cmd = Execv { env; cwd; argv0; cmd }
 
     let get_code = function Code c -> c | _ -> invalid_arg "not an Exit.Code"
 
-    let exit = function
+    let ok = Code 0
+    let no_such_name = Code 122
+    let some_error = Code 123
+    let cli_error = Code 124
+    let internal_error = Code 125
+
+    let exit_some_error e = !log_error e; some_error
+    let of_result = function Ok () -> ok | Error e -> exit_some_error e
+    let of_result' = function Ok e -> e | Error e -> exit_some_error e
+
+    let execv_env e = e.env
+    let execv_cwd e = e.cwd
+    let execv_argv0 e = e.argv0
+    let execv_cmd e = e.cmd
+
+    let rec exit ?(on_error = some_error) = function
     | Code c -> Stdlib.exit c
-    | Exec execv -> Result.bind (execv ()) @@ fun _ -> assert false
+    | Execv { env; cwd; argv0; cmd } ->
+        match Cmd.execv ?env ?cwd ?argv0 cmd with
+        | Ok _ -> assert false
+        | Error e -> !log_error e; exit on_error
 
     let on_sigint ~hook f =
       let hook _ = hook (); Stdlib.exit 130 (* as if SIGINT signaled *) in
@@ -4610,6 +4634,11 @@ module Log = struct
     fun pid env ~cwd cmd ->
       msg level (fun m ->
           m ~header:(header pid) "@[<v>%a%a@]" pp_env env Cmd.pp_dump cmd)
+
+  (* Exit logging *)
+
+  let () =
+    Os.Exit.log_error := (fun e -> err (fun m -> m "@[%a@]" Fmt.lines e))
 end
 
 module Random_queue = struct

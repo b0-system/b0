@@ -7,16 +7,16 @@ open B0_std
 open Result.Syntax
 
 let delete clean c =
-  Log.if_error ~use:B0_cli.Exit.some_error @@
+  Log.if_error ~use:Os.Exit.some_error @@
   let del_dir = match clean with
   | true -> Some (B0_driver.Conf.b0_dir c)
   | false -> None (* For now *)
   in
   match del_dir with
-  | None -> Log.app (fun m -> m "Nothing deleted for now!"); Ok B0_cli.Exit.ok
+  | None -> Log.app (fun m -> m "Nothing deleted for now!"); Ok Os.Exit.ok
   | Some del_dir ->
       let* _existed = Os.Path.delete ~recurse:true del_dir in
-      Ok B0_cli.Exit.ok
+      Ok Os.Exit.ok
 
 (* Command line interface *)
 

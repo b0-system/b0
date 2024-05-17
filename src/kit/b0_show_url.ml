@@ -202,7 +202,7 @@ let dyn_units ~args =
 
 let show_url env browser background prefix timeout dry_run no_exec args =
   let secs timeout = Mtime.Span.(timeout * s) in
-  Log.if_error ~use:B0_cli.Exit.some_error @@
+  Log.if_error ~use:Os.Exit.some_error @@
   let search = B0_env.get_cmd env in
   let* browser = B0_web_browser.find ~search ?cmd:browser () in
   let show url = B0_web_browser.show ~background ~prefix browser url in
@@ -210,14 +210,14 @@ let show_url env browser background prefix timeout dry_run no_exec args =
   match mode with
   | `Show_url_no_exec (endpoint, timeout, url) ->
       if dry_run
-      then (Log.app (fun m -> m "%s" url); Ok B0_cli.Exit.ok) else
+      then (Log.app (fun m -> m "%s" url); Ok Os.Exit.ok) else
       let timeout = secs timeout in
       let* () = Os.Socket.Endpoint.wait_connectable' ~timeout endpoint in
       let* () = show url in
-      Ok B0_cli.Exit.ok
+      Ok Os.Exit.ok
   | `Show_url_server (endpoint, timeout, url, cmd, cwd, env) ->
       if dry_run
-      then (Log.app (fun m -> m "%a" Cmd.pp cmd); Ok B0_cli.Exit.ok) else
+      then (Log.app (fun m -> m "%a" Cmd.pp cmd); Ok Os.Exit.ok) else
       let* server = Os.Cmd.spawn ~cwd ~env cmd in
       let* () =
         let timeout = secs timeout in
@@ -233,7 +233,7 @@ let show_url env browser background prefix timeout dry_run no_exec args =
         then (Log.app (fun m -> m "@[<v>%a@]" Fmt.(list string) urls); Ok ())
         else List.iter_stop_on_error show urls
       in
-      Ok B0_cli.Exit.ok
+      Ok Os.Exit.ok
 
 (* .show-url action command line interface  *)
 
@@ -317,20 +317,15 @@ let unit =
 
 let action =
   let exec b0_env u ~args =
+    let* url = B0_unit.get_meta url u in
+    let* url = get_url b0_env u in
+    let* show_url = B0_env.get_cmd b0_env (Cmd.tool "show-url") in
     let* env =
       Result.map Os.Env.to_assignments (B0_unit.Action.get_env b0_env u)
     in
     let* cwd = B0_unit.Action.get_cwd b0_env u in
-    let err e = Log.err (fun m -> m "%s" e); Ok B0_cli.Exit.some_error in
-    match B0_unit.get_meta (* or default ? *) url u with
-    | Error e -> err e
-    | Ok url ->
-        let* url = get_url b0_env u in
-        match B0_env.get_cmd b0_env (Cmd.tool "show-url") with
-        | Error e -> err e
-        | Ok show_url ->
-            let cmd = Cmd.(show_url % url %% args) in
-            Ok (Os.Exit.exec ?env:(Some env) ?cwd:(Some cwd) cmd)
+    let cmd = Cmd.(show_url % url %% args) in
+    Ok (Os.Exit.execv ?env:(Some env) ?cwd:(Some cwd) cmd)
   in
   `Fun ("show-url", exec)
 

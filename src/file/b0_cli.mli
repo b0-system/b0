@@ -17,16 +17,6 @@ module Exit : sig
 
   (** {1:codes Common exit codes} *)
 
-  val ok : Os.Exit.t
-  (** [ok] is the zero exit code. *)
-
-  val no_such_name : Os.Exit.t
-  (** [no_such_name] (122) indicates a named entity was not found. *)
-
-  val some_error : Os.Exit.t
-  (** [some_error] (123) indicates an indiscriminate error reported on
-      stdout. *)
-
   val infos : Cmdliner.Cmd.Exit.info list
   (** [infos] has the infos of {!Cmdliner.Term.default_exits},
       {!no_such_name}, {!some_error} and those above.  *)
@@ -45,11 +35,6 @@ module Exit : sig
       {- [Os.Exit.Code Cmdliner.Exit.internal_error] if [r] is [Error `Exn].}
       {- [Os.Exit.code term_error] if [r] is [Error `Term]. [term_error]
          (defaults to [Os.Exit.Code Cmdliner.Exit.cli_error]).}} *)
-
-  val exit : exec_error:Os.Exit.t -> Os.Exit.t -> 'a
-  (** [exit e] exits with [e]. This uses {!B0_std.Os.Exit.exit} and
-      in case of [Error _] logs it and exits with [exec_error] which
-      {b if given an exit code} is then guaranteed to exit. *)
 end
 
 (** {1:conv Argument converters} *)
@@ -210,7 +195,8 @@ module Op : sig
       given filters. *)
 
   val order :
-    by:[`Create | `Dur | `Wait | `Start] -> B0_zero.Op.t list -> B0_zero.Op.t list
+    by:[`Create | `Dur | `Wait | `Start] ->
+    B0_zero.Op.t list -> B0_zero.Op.t list
   (** [order ~by ops] orders [ops] by [by] time. *)
 
   val query :

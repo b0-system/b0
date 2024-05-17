@@ -197,7 +197,7 @@ let timing b0_file d _ m =
   m "total time %s %s %s" d.name d.version b0_file
 
 let run ~has_b0_file:b0_file =
-  B0_cli.Exit.exit ~exec_error:B0_cli.Exit.some_error @@
+  Os.Exit.exit @@
   match !driver with
   | None -> invalid_arg "No driver set via B0_driver.set"
   | Some (d, main) ->
@@ -403,7 +403,7 @@ let with_b0_file ~driver cmd =
     | [] -> Cmd.arg exe
     | _ :: args -> Cmd.list (exe :: args)
     in
-    Ok (Os.Exit.exec ~argv0:"b0" cmd)
+    Ok (Os.Exit.execv ~argv0:"b0" cmd)
   in
   Cmdliner.Term.(const run $ Cli.conf $ cmd)
 
@@ -426,7 +426,7 @@ let with_b0_file_if_any ~driver cmd =
             | [] -> Cmd.arg exe
             | _ :: args -> Cmd.list (exe :: args)
             in
-            Os.Exit.exec ~argv0:"b0" cmd
+            Os.Exit.execv ~argv0:"b0" cmd
   in
   Cmdliner.Term.(const run $ Cli.conf $ cmd)
 

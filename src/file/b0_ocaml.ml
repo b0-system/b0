@@ -1821,7 +1821,7 @@ end
 open Result.Syntax
 
 let crunch id file =
-  Log.if_error ~use:B0_cli.Exit.some_error @@
+  Log.if_error ~use:Os.Exit.some_error @@
   let* data = Os.File.read file in
   let id = match id with
   | Some id -> id
@@ -1830,7 +1830,7 @@ let crunch id file =
   in
   let crunch = Crunch.string_to_string ~id ~data in
   let* () = Os.File.write ~force:false ~make_path:false Fpath.dash crunch in
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 let list format pager_don't =
   let keep u =
@@ -1860,7 +1860,7 @@ let list format pager_don't =
   | `Long -> pp_long, Fmt.(cut ++ cut)
   in
   Log.app (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp_lib) us);
-  B0_cli.Exit.ok
+  Os.Exit.ok
 
 let don't_load =
   Libname.Set.of_list [
@@ -1938,7 +1938,7 @@ let byte_code_build_load_args b units =
   | Failure e -> Error e
 
 let ocaml env use_utop dry_run args =
-  Log.if_error ~use:B0_cli.Exit.some_error @@
+  Log.if_error ~use:Os.Exit.some_error @@
   let b = B0_env.build env in
   let units = B0_build.did_build b in
   let units = B0_unit.Set.filter (B0_unit.has_tag tag) units in
@@ -1955,10 +1955,10 @@ let ocaml env use_utop dry_run args =
   let args = Cmd.of_list Fun.id args in
   let top = Cmd.(exe %% load_args %% args) in
   match dry_run with
-  | false -> Ok (Os.Exit.exec top)
+  | false -> Ok (Os.Exit.execv top)
   | true ->
       Log.app (fun m -> m "%s" (Cmd.to_string top));
-      Ok B0_cli.Exit.ok
+      Ok Os.Exit.ok
 
 (* OCamlfind META files (for generation) *)
 
@@ -2113,12 +2113,12 @@ let meta_file_of_pack pack =
       Ok (Meta.to_string meta)
 
 let meta env pack =
-  Log.if_error ~use:B0_cli.Exit.no_such_name @@
+  Log.if_error ~use:Os.Exit.no_such_name @@
   let* pack = B0_pack.get_or_hint pack in
-  Log.if_error' ~use:B0_cli.Exit.some_error @@
+  Log.if_error' ~use:Os.Exit.some_error @@
   let* meta = meta_file_of_pack pack in
   Log.app (fun m -> m "%s" meta);
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 open Cmdliner
 

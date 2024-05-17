@@ -49,7 +49,7 @@ let get_tests ~allow_long us =
 let show_what
     ~allow_long ~lock ~may_build ~must_build ~is_locked ~locked_packs c
   =
-  Log.if_error' ~use:B0_cli.Exit.some_error @@
+  Log.if_error' ~use:Os.Exit.some_error @@
   let don't = B0_driver.Conf.no_pager c in
   let* pager = B0_pager.find ~don't () in
   let* () = B0_pager.page_stdout pager in
@@ -93,7 +93,7 @@ let run_test c build u =
       let* exit = cmd b0_env u ~args in
       begin match exit with
       | Code rc -> Ok (Os.Mtime.count dur, `Exited rc)
-      | Exec _ -> Fmt.error "Unit Exec not supported in tests"
+      | Execv _ -> Fmt.error "Unit Exec not supported in tests"
       end
 
 let rec run_tests c build dur fails = function
@@ -115,7 +115,7 @@ let rec run_tests c build dur fails = function
 
 let test allow_long allow_empty units x_units packs x_packs what lock c =
   let total = Os.Mtime.counter () in
-  Log.if_error ~use:B0_cli.Exit.no_such_name @@
+  Log.if_error ~use:Os.Exit.no_such_name @@
   (* FIXME select_units here must return units and packs needed by
      every action of [tests] unit and a common store. *)
   let* (may_build, must_build), is_locked, locked_packs  =
@@ -141,7 +141,7 @@ let test allow_long allow_empty units x_units packs x_packs what lock c =
       let tests = B0_unit.Set.elements tests in
       let dur, fails = run_tests c build Mtime.Span.zero [] tests in
       Log.app (fun m -> m "%a" pp_report (Os.Mtime.count total, dur, fails));
-      Ok (if fails <> [] then exit_test_error else B0_cli.Exit.ok)
+      Ok (if fails <> [] then exit_test_error else Os.Exit.ok)
 
 (* Command line interface *)
 

@@ -61,14 +61,14 @@ let ocaml_libs_by_scope us =
 
 let file env us dry_run =
   let dry_run = true in
-  Log.if_error ~use:B0_cli.Exit.no_such_name @@
+  Log.if_error ~use:Os.Exit.no_such_name @@
   let* us = B0_unit.get_list_or_hint ~all_if_empty:true us in
   let ocaml_libs = Fpath.Map.bindings (ocaml_libs_by_scope us) in
   let root_dir = B0_env.root_dir env (* Do one dune file per scope dirs ? *) in
   let root_project = Fpath.(root_dir / "dune-project") in
   let* () = write_file ~dry_run root_project (dune_project ()) in
   let* () = List.iter_stop_on_error (write_dune_file ~dry_run) ocaml_libs in
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 (* .dune action command line interface  *)
 

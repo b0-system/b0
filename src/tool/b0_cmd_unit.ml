@@ -7,7 +7,7 @@ open B0_std
 open Result.Syntax
 
 let dir us c =
-  Log.if_error ~use:B0_cli.Exit.no_such_name @@
+  Log.if_error ~use:Os.Exit.no_such_name @@
   (* XXX Eventually we should use B0_env here. *)
   let* us = B0_unit.get_list_or_hint ~all_if_empty:true us in
   let b0_dir = B0_driver.Conf.b0_dir c in
@@ -15,7 +15,7 @@ let dir us c =
   let unit_dir u = B0_dir.unit_build_dir ~build_dir ~name:(B0_unit.name u) in
   let dirs = List.map unit_dir us in
   Log.app (fun m -> m "@[<v>%a@]" (Fmt.list Fpath.pp) dirs);
-  Ok B0_cli.Exit.ok
+  Ok Os.Exit.ok
 
 let edit us c =
   B0_tool_std.Def.edit (module B0_unit) c us

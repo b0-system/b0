@@ -46,12 +46,12 @@ let log_units color ~kind us =
     color kind Fmt.(list B0_unit.pp_synopsis) (B0_unit.Set.elements us)
 
 let show_what ~lock ~is_locked ~locked_packs ~must_build ~may_build c =
-  Log.if_error' ~use:B0_cli.Exit.some_error @@
+  Log.if_error' ~use:Os.Exit.some_error @@
   let don't = B0_driver.Conf.no_pager c in
   let* pager = B0_pager.find ~don't () in
   let* () = B0_pager.page_stdout pager in
   if B0_unit.Set.is_empty must_build
-  then (Log.app (fun m -> m "%s" (err_nothing ())); Ok B0_cli.Exit.ok)
+  then (Log.app (fun m -> m "%s" (err_nothing ())); Ok Os.Exit.ok)
   else begin
     log_explain_lock ~is_locked ~lock ~locked_packs;
     log_units red ~kind:"Must" must_build;
@@ -60,7 +60,7 @@ let show_what ~lock ~is_locked ~locked_packs ~must_build ~may_build c =
       if not (B0_unit.Set.is_empty may_build)
       then log_units green ~kind:"May" may_build
     end;
-    Ok B0_cli.Exit.ok
+    Ok Os.Exit.ok
   end
 
 (* Finding what to build *)
@@ -244,7 +244,7 @@ let action_runner show_path build u c =
     (* N.B. it seems there's no way of quoting to make the shell notation $()
        work if args or p have spaces !? *)
     Log.app (fun m -> m "%a" Cmd.pp Cmd.(path p %% args));
-    Ok B0_cli.Exit.ok
+    Ok Os.Exit.ok
   in
   match B0_unit.Action.find u with
   | None -> warn_noexec u; Ok None
@@ -272,7 +272,7 @@ let error_action_needs ~action_needs ~must_build action =
 (* Build command *)
 
 let build units x_units packs x_packs what lock show_path action args c =
-  Log.if_error ~use:B0_cli.Exit.no_such_name @@
+  Log.if_error ~use:Os.Exit.no_such_name @@
   let* store, action, action_units, action_packs =
     find_store_and_action args action
   in
@@ -302,7 +302,7 @@ let build units x_units packs x_packs what lock show_path action args c =
          OCaml actions should be run by a work queue which we can bake
          by Domains on >= 5, this will be useful for `b0 test` *)
       match action_runner with
-      | None -> Ok B0_cli.Exit.ok
+      | None -> Ok Os.Exit.ok
       | Some run -> run ~args:(Cmd.list args)
 
 (* Command line interface *)

@@ -10,26 +10,17 @@ open Cmdliner
 (* Exit *)
 
 module Exit = struct
-  let ok = Os.Exit.Code 0
-  let no_such_name = Os.Exit.Code 122
-  let some_error = Os.Exit.Code Cmd.Exit.some_error
-  let cli_error = Os.Exit.Code Cmd.Exit.cli_error
-  let internal_error = Os.Exit.Code Cmd.Exit.internal_error
-
   let e c doc = Cmd.Exit.info (Os.Exit.get_code c) ~doc
   let infos =
-    e no_such_name "if a specified name does not exist." ::
+    e Os.Exit.no_such_name "if a specified name does not exist." ::
     Cmd.Exit.defaults
 
-  let of_eval_result ?(term_error = cli_error) = function
+  let of_eval_result ?(term_error = Os.Exit.cli_error) = function
   | Ok (`Ok e) -> e
-  | Ok _ -> ok
+  | Ok _ -> Os.Exit.ok
   | Error `Term -> term_error
-  | Error `Parse -> cli_error
-  | Error `Exn -> internal_error
-
-  let rec exit ~exec_error e =
-    exit ~exec_error (Log.if_error ~use:exec_error (Os.Exit.exit e))
+  | Error `Parse -> Os.Exit.cli_error
+  | Error `Exn -> Os.Exit.internal_error
 end
 
 (* Argument converters *)
