@@ -83,7 +83,7 @@ the [wrap] parameter to units.
   but a bit cold feet on replicating all the {!B0_std.Os} module
   in {!B0_env} to allow that.
 
-- Also see we what to do with {!B0_dir}.
+- Also see we what to do with {!B0_build.B0_dir}.
 
 {2:b0_unit [B0_unit]}
 

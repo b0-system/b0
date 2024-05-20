@@ -11,8 +11,12 @@ let dir us c =
   (* XXX Eventually we should use B0_env here. *)
   let* us = B0_unit.get_list_or_hint ~all_if_empty:true us in
   let b0_dir = B0_driver.Conf.b0_dir c in
-  let build_dir = B0_dir.build_dir ~b0_dir ~variant:"user" (* FIXME *) in
-  let unit_dir u = B0_dir.unit_build_dir ~build_dir ~name:(B0_unit.name u) in
+  let build_dir =
+    B0_build.B0_dir.build_dir ~b0_dir ~variant:"user" (* FIXME *)
+  in
+  let unit_dir u =
+    B0_build.B0_dir.unit_build_dir ~build_dir ~name:(B0_unit.name u)
+  in
   let dirs = List.map unit_dir us in
   Log.app (fun m -> m "@[<v>%a@]" (Fmt.list Fpath.pp) dirs);
   Ok Os.Exit.ok

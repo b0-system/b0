@@ -4,6 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 
+
 open B0_std
 open B0_std.Fut.Syntax
 
@@ -39,6 +40,14 @@ let require_units b us = List.iter (require_unit b) us
 let current_meta b = B0_defs.Unit.meta (current b)
 
 (* Directories *)
+
+module B0_dir = struct
+  let build_dir ~b0_dir ~variant = Fpath.(b0_dir / "b" / variant)
+  let shared_build_dir ~build_dir = Fpath.(build_dir / "_shared")
+  let store_dir ~build_dir = Fpath.(build_dir / "_store")
+  let unit_build_dir ~build_dir ~name = Fpath.(build_dir / name)
+  let scratch_dir ~b0_dir = Fpath.(b0_dir / "_scratch")
+end
 
 let unit_dir b u =
   B0_dir.unit_build_dir ~build_dir:b.b.build_dir ~name:(B0_defs.Unit.name u)

@@ -27,7 +27,7 @@ let b0_dir env = env.B0_defs.b0_dir
 let cwd env = env.B0_defs.cwd
 let root_dir env = env.B0_defs.root_dir
 let scope_dir env = env.B0_defs.scope_dir
-let scratch_dir env = B0_dir.scratch_dir ~b0_dir:env.B0_defs.b0_dir
+let scratch_dir env = B0_build.B0_dir.scratch_dir ~b0_dir:env.B0_defs.b0_dir
 let unit_dir env u = B0_build.unit_dir env.B0_defs.build u
 
 let in_root_dir env p = Fpath.(root_dir env // p)
