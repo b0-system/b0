@@ -1582,6 +1582,121 @@ let unit_warning_for_deprecated_lib ~exports ~warning = match warning with
     in
     Fmt.str "Deprecated%a" pp_use_exports exports
 
+let don't_load =
+  Libname.Set.of_list [
+    libname "compiler-libs.common";
+    libname "compiler-libs.bytecomp";
+    libname "compiler-libs.optcomp";
+    libname "compiler-libs.toplevel";
+    libname "compiler-libs.native-toplevel"; ]
+
+let don't_load lib = Libname.Set.mem (Lib.libname lib) don't_load
+
+let byte_code_build_load_args b units =
+  (* This is first good step. Also we don't have a notion of stable
+     order for sort_mods, but we don't have one in the first place in b0
+     OCaml exe specification yet I think. *)
+  let sort_mods mods =
+    let mods = Modname.Map.map snd mods in
+    let mods = Modsrc.sort ~deps:Modsrc.ml_deps mods in
+    List.filter_map Modsrc.cmo_file mods
+  in
+  let rec loop libs_acc inc_mods mods = function
+  | [] -> List.rev (snd libs_acc), inc_mods, sort_mods mods
+  | unit :: units ->
+      let add_lib (seen, libs as acc) name =
+        if Libname.Set.mem name seen then acc else
+        (Libname.Set.add name seen, name :: libs)
+      in
+      let libs_acc, inc_mods, mods =
+        match B0_unit.find_meta library unit with
+        | Some name -> (* N.B. libs' requires will be added by lib resolution *)
+            add_lib libs_acc name, inc_mods, mods
+        | None ->
+            let libs_acc = match B0_unit.find_meta requires unit with
+            | None -> libs_acc
+            | Some requires -> List.fold_left add_lib libs_acc requires
+            in
+            let mods = match B0_unit.find_meta modsrcs unit with
+            | None -> mods | Some srcs ->
+                let add n src acc =
+                  let update = function
+                  | None -> Some (unit, src)
+                  | Some (u, src) ->
+                      Fmt.failwith
+                      "@[<v>Cannot load build: module %a defined by@,\
+                       units %a and %a@]"
+                      Modname.pp n B0_unit.pp_name u B0_unit.pp_name unit
+                  in
+                  Modname.Map.update n update acc
+                in
+                Modname.Map.fold add (Fut.sync srcs) mods
+            in
+            let inc_mods = Fpath.Set.add (B0_build.unit_dir b unit) inc_mods in
+            libs_acc, inc_mods, mods
+      in
+      loop libs_acc inc_mods mods units
+  in
+  try
+    let add_lib_opts cmd lib =
+      let cma = Option.map Cmd.path (Lib.cma lib) in
+      Cmd.(cmd % "-I" %% path (Lib.dir lib) %% if_some cma)
+    in
+    let libs, inc_mods, mods =
+      loop (Libname.Set.empty, []) Fpath.Set.empty Modname.Map.empty units
+    in
+    let resolver = Fut.sync (B0_build.get b Libresolver.key) in
+    let m = B0_build.memo b in
+    let libs = Libresolver.get_list_and_deps m resolver libs in
+    B0_memo.stir ~block:true m;
+    let libs = Fut.sync libs in
+    let libs = List.filter (Fun.negate don't_load) libs in
+    let lib_opts = List.fold_left add_lib_opts Cmd.empty libs in
+    let inc_mods = Cmd.paths ~slip:"-I" (Fpath.Set.elements inc_mods) in
+    Ok Cmd.(lib_opts %% inc_mods %% paths mods)
+  with
+  | Failure e -> Error e
+
+let run_ocaml env ~use_utop ~dry_run ~args units =
+  let open Result.Syntax in
+  let b = B0_env.build env in
+  let top = Cmd.tool (if use_utop then "utop" else "ocaml") in
+  let* exe = B0_env.get_cmd env top in
+  let* load_args = byte_code_build_load_args b (B0_unit.Set.elements units) in
+  let args = Cmd.of_list Fun.id args in
+  let top = Cmd.(exe %% load_args %% args) in
+  match dry_run with
+  | false -> Ok (Os.Exit.execv top)
+  | true ->
+      Log.app (fun m -> m "%s" (Cmd.to_string top));
+      Ok Os.Exit.ok
+
+let run_ocaml_term func env =
+  let open Cmdliner in
+  let dry_run =
+    let doc = "Show $(b,ocaml) invocation rather than executing it." in
+    Arg.(value & flag & info ["dry-run"] ~doc)
+  in
+  let use_utop =
+    let doc = "Use $(b,utop) rather than $(b,ocaml)." in
+    Arg.(value & flag & info ["utop"] ~doc)
+  in
+  let args =
+    let doc =
+      "Arguments for the $(b,ocaml) executable. Specify them after $(b,--)."
+    in
+    Arg.(value & pos_all string [] & info [] ~doc ~docv:"ARG")
+  in
+  Term.(const func $ const env $ use_utop $ dry_run $ args)
+
+let load_lib =
+  B0_unit.Action.of_cmdliner_term @@ fun env u ->
+  let run env use_utop dry_run args =
+    Log.if_error ~use:Os.Exit.some_error @@
+    run_ocaml env ~use_utop ~dry_run ~args (B0_unit.Set.singleton u)
+  in
+  run_ocaml_term run env
+
 let lib
     ?(wrap = fun proc b -> proc b) ?doc ?(meta = B0_meta.empty)
     ?c_requires:c_reqs ?requires:reqs ?exports:exps ?(public = true)
@@ -1602,6 +1717,11 @@ let lib
     |> B0_meta.add_some_or_default exports exps
     |> B0_meta.add modsrcs fut_modsrcs
     |> B0_meta.add Lib.key fut_lib
+    |> B0_meta.add B0_unit.Action.key (`Fun ("ocaml", load_lib))
+    |> B0_meta.add B0_unit.Action.store
+       (* XXX the store should be able to depend on the action's
+          args so that we can add a `--nat` option. *)
+      B0_store.[B (Code.built, Fut.return `Byte)]
   in
   let meta = B0_meta.override base ~by:meta in
   let proc = wrap (lib_proc set_modsrcs set_lib srcs) in
@@ -1865,104 +1985,6 @@ let list format pager_don't =
   Log.app (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp_lib) us);
   Os.Exit.ok
 
-let don't_load =
-  Libname.Set.of_list [
-    libname "compiler-libs.common";
-    libname "compiler-libs.bytecomp";
-    libname "compiler-libs.optcomp";
-    libname "compiler-libs.toplevel";
-    libname "compiler-libs.native-toplevel"; ]
-
-let don't_load lib = Libname.Set.mem (Lib.libname lib) don't_load
-
-let byte_code_build_load_args b units =
-  (* This is first good step. Also we don't have a notion of stable
-     order for sort_mods, but we don't have one in the first place in b0
-     OCaml exe specification yet I think. *)
-  let sort_mods mods =
-    let mods = Modname.Map.map snd mods in
-    let mods = Modsrc.sort ~deps:Modsrc.ml_deps mods in
-    List.filter_map Modsrc.cmo_file mods
-  in
-  let rec loop libs_acc inc_mods mods = function
-  | [] -> List.rev (snd libs_acc), inc_mods, sort_mods mods
-  | unit :: units ->
-      let add_lib (seen, libs as acc) name =
-        if Libname.Set.mem name seen then acc else
-        (Libname.Set.add name seen, name :: libs)
-      in
-      let libs_acc, inc_mods, mods =
-        match B0_unit.find_meta library unit with
-        | Some name -> (* N.B. libs' requires will be added by lib resolution *)
-            add_lib libs_acc name, inc_mods, mods
-        | None ->
-            let libs_acc = match B0_unit.find_meta requires unit with
-            | None -> libs_acc
-            | Some requires -> List.fold_left add_lib libs_acc requires
-            in
-            let mods = match B0_unit.find_meta modsrcs unit with
-            | None -> mods | Some srcs ->
-                let add n src acc =
-                  let update = function
-                  | None -> Some (unit, src)
-                  | Some (u, src) ->
-                      Fmt.failwith
-                      "@[<v>Cannot load build: module %a defined by@,\
-                       units %a and %a@]"
-                      Modname.pp n B0_unit.pp_name u B0_unit.pp_name unit
-                  in
-                  Modname.Map.update n update acc
-                in
-                Modname.Map.fold add (Fut.sync srcs) mods
-            in
-            let inc_mods = Fpath.Set.add (B0_build.unit_dir b unit) inc_mods in
-            libs_acc, inc_mods, mods
-      in
-      loop libs_acc inc_mods mods units
-  in
-  try
-    let add_lib_opts cmd lib =
-      let cma = Option.map Cmd.path (Lib.cma lib) in
-      Cmd.(cmd % "-I" %% path (Lib.dir lib) %% if_some cma)
-    in
-    let libs, inc_mods, mods =
-      loop (Libname.Set.empty, []) Fpath.Set.empty Modname.Map.empty units
-    in
-    let resolver = Fut.sync (B0_build.get b Libresolver.key) in
-    let m = B0_build.memo b in
-    let libs = Libresolver.get_list_and_deps m resolver libs in
-    B0_memo.stir ~block:true m;
-    let libs = Fut.sync libs in
-    let libs = List.filter (Fun.negate don't_load) libs in
-    let lib_opts = List.fold_left add_lib_opts Cmd.empty libs in
-    let inc_mods = Cmd.paths ~slip:"-I" (Fpath.Set.elements inc_mods) in
-    Ok Cmd.(lib_opts %% inc_mods %% paths mods)
-  with
-  | Failure e -> Error e
-
-let ocaml env use_utop dry_run args =
-  Log.if_error ~use:Os.Exit.some_error @@
-  let b = B0_env.build env in
-  let units = B0_build.did_build b in
-  let units = B0_unit.Set.filter (B0_unit.has_tag tag) units in
-  begin match B0_unit.Set.is_empty units with
-  | true -> Log.warn (fun m -> m "The build has no OCaml entities to load.")
-  | false ->
-      Log.info @@ fun m ->
-      m "Did build: @[%a@]"
-        Fmt.(iter B0_unit.Set.iter ~sep:sp B0_unit.pp_name) units;
-  end;
-  let top = Cmd.tool (if use_utop then "utop" else "ocaml") in
-  let* exe = B0_env.get_cmd env top in
-  let* load_args = byte_code_build_load_args b (B0_unit.Set.elements units) in
-  let args = Cmd.of_list Fun.id args in
-  let top = Cmd.(exe %% load_args %% args) in
-  match dry_run with
-  | false -> Ok (Os.Exit.execv top)
-  | true ->
-      Log.app (fun m -> m "%s" (Cmd.to_string top));
-      Ok Os.Exit.ok
-
 (* OCamlfind META files (for generation) *)
 
 module Meta = struct
@@ -2186,6 +2208,20 @@ let unit =
   let name = B0_unit.name u in
   Cmd.group (Cmd.info name ~doc ~man) @@ [ crunch; list; meta ]
 
+let ocaml env use_utop dry_run args =
+  Log.if_error ~use:Os.Exit.some_error @@
+  let b = B0_env.build env in
+  let units = B0_build.did_build b in
+  let units = B0_unit.Set.filter (B0_unit.has_tag tag) units in
+  begin match B0_unit.Set.is_empty units with
+  | true -> Log.warn (fun m -> m "The build has no OCaml entities to load.")
+  | false ->
+      Log.info @@ fun m ->
+      m "Did build: @[%a@]"
+        Fmt.(iter B0_unit.Set.iter ~sep:sp B0_unit.pp_name) units;
+  end;
+  run_ocaml env ~use_utop ~dry_run ~args units
+
 let ocaml_ocaml_cmd env u =
   (* N.B. We have that separately for now because we can't
      specify separate store arguments for cmdliner subcommands *)
@@ -2201,23 +2237,9 @@ let ocaml_ocaml_cmd env u =
       `S Cmdliner.Manpage.s_arguments;
     ]
   in
-  let dry_run =
-    let doc = "Show $(b,ocaml) invocation rather than executing it." in
-    Arg.(value & flag & info ["dry-run"] ~doc)
-  in
-  let use_utop =
-    let doc = "Use $(b,utop) rather than $(b,ocaml)." in
-    Arg.(value & flag & info ["utop"] ~doc)
-  in
-  let args =
-    let doc =
-      "Arguments for the $(b,ocaml) executable. Specify them after $(b,--)."
-    in
-    Arg.(value & pos_all string [] & info [] ~doc ~docv:"ARG")
-  in
   let name = B0_unit.name u and doc = B0_unit.doc u in
   Cmd.v (Cmd.info name ~doc ~man) @@
-  Term.(const ocaml $ const env $ use_utop $ dry_run $ args)
+  run_ocaml_term ocaml env
 
 let unit_ocaml =
   let doc = "Load your build in the ocaml REPL" in
