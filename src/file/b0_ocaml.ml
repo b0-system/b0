@@ -1472,11 +1472,14 @@ let lib_proc set_modsrcs set_lib srcs b =
   let cobjs = List.filter_map (Modsrc.impl_file ~code) modsrcs  in
   let odir = build_dir and oname = archive_name in
   let has_cstubs = c_objs <> [] in
-  let c_stubs =
-    if has_cstubs then Archive.cstubs m ~conf ~opts ~c_objs ~odir ~oname else []
+  let c_requires = B0_meta.get c_requires meta in
+  let c_stubs = match has_cstubs with
+  | false -> []
+  | true ->
+      let opts = Cmd.(opts %% c_requires) in
+      Archive.cstubs m ~conf ~opts ~c_objs ~odir ~oname
   in
   let opts =
-    let c_requires = B0_meta.get c_requires meta in
     Cmd.(opts %% (Cmd.list ~slip:"-cclib" (Cmd.to_list c_requires)))
   in
   let ars = Archive.code m ~conf ~code ~opts ~has_cstubs ~cobjs ~odir ~oname in
@@ -2189,7 +2192,7 @@ let ocaml_ocaml_cmd env u =
   let man =
     [ `S Cmdliner.Manpage.s_synopsis;
       `P "$(b,b0) [$(b,-p) $(i,PACK)]… [$(b,-u) $(i,UNIT)]… \
-          -- .ocaml ocaml -- $(i,ARG)…";
+          -- .ocaml.ocaml -- $(i,ARG)…";
       `S Cmdliner.Manpage.s_description;
       `P "$(iname) loads the build you specify for the action \
           in the $(b,ocaml) interactive toplevel. This also \
