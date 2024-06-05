@@ -47,6 +47,7 @@ package "std" (
   archive(native) = "b0_std.cmxa"
   plugin(byte) = "b0_std.cma"
   plugin(native) = "b0_std.cmxs"
+  jsoo_runtime = "runtime.js"
   exists_if = "b0_std.cma b0_std.cmxa"
 )
 

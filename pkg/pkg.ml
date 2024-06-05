@@ -9,8 +9,8 @@ let () =
     (* Libraries *)
     Pkg.mllib "src/std/b0_std.mllib" ~dst_dir:"std";
     Pkg.clib "src/std/libb0_stubs.clib" ~lib_dst_dir:"std";
-    Pkg.lib "src/std/b0_std_top_init.ml"
-      ~dst:"std/b0_std_top_init.ml";
+    Pkg.lib "src/std/runtime.js" ~dst:"std/";
+    Pkg.lib "src/std/b0_std_top_init.ml" ~dst:"std/";
     Pkg.mllib "src/memo/b0_memo.mllib" ~dst_dir:"memo";
     Pkg.mllib "src/file/b0_file.mllib" ~dst_dir:"file";
     Pkg.mllib "src/kit/b0_kit.mllib" ~dst_dir:"kit";
