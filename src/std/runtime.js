@@ -55,3 +55,10 @@ function ocaml_b0_monotonic_now_ns () {
                                caml_int64_of_float (1000));
   return now_ns;
 }
+
+//Provides: unix_error_message
+//Requires: caml_raise_sys_error
+function unix_error_message (err)
+{
+  caml_raise_sys_error ("Unix.error_message is not available");
+}

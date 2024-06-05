@@ -61,6 +61,13 @@ let () = if !Sys.interactive then exit (main ())
   (** [raises is_exn f] tests that [f ()] raises an exception [exn]
       that satisfies [is_exn exn]. *)
 
+  val is_error : ('a, 'b) result -> unit
+  (** [is_error r] tests that [r] is [Error _]. *)
+
+  val is_error' : ?msg:string -> ('a, string) result -> unit
+  (** [is_error' ~msg r] tests that [r] is [Error msg] or [Error _]
+      if [msg] is unspecified. *)
+
   (** {1:testing_log Testing logging} *)
 
   val log : ('a, Format.formatter, unit, unit) format4 -> 'a
@@ -68,7 +75,6 @@ let () = if !Sys.interactive then exit (main ())
 
   val log_fail : ('a, Format.formatter, unit, unit) format4 -> 'a
   (** [log_fail fmt …] is like {!log} but for failures. *)
-
 end
 
 
@@ -103,6 +109,6 @@ let main () =
   test_string_append ();
   ()
 
-let () = if !Sys.interactive then exit (main ())
+let () = if !Sys.interactive then () else exit (main ())
 ]}
 *)

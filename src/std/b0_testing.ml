@@ -6,6 +6,7 @@
 open B0_std
 
 let () = Printexc.record_backtrace true
+let out = ref Format.err_formatter
 
 module Test_fmt = struct
   let test_color = [`Bg `White; `Fg `Black]
@@ -46,9 +47,11 @@ module Test = struct
   exception Fail of string
   let failf fmt = Fmt.kstr (fun msg -> raise (Fail msg)) fmt
 
-  let log' fmt = Fmt.epr (fmt ^^ "@.")
-  let log fmt = Fmt.epr ("%a " ^^ fmt ^^ "@.") (Fmt.tty test_color) padding
-  let log_fail fmt = Fmt.epr ("%a " ^^ fmt ^^ "@.") (Fmt.tty fail_color) padding
+  let log' fmt = Fmt.pf !out (fmt ^^ "@.")
+  let log fmt = Fmt.pf !out ("%a " ^^ fmt ^^ "@.") (Fmt.tty test_color) padding
+  let log_fail fmt =
+    Fmt.pf !out ("%a " ^^ fmt ^^ "@.") (Fmt.tty fail_color) padding
+
   let log_bt_msg bt msg =
     log_fail "%s" msg; List.iter (log_fail "%s") (munge_bt bt)
 
@@ -88,8 +91,13 @@ module Test = struct
       pp_failed () pp_dur (Os.Mtime.count dur);
     !fail_count
 
+  let setup () = match Sys.backend_type with
+  | Other "js_of_ocaml" ->
+      out := Format.std_formatter; Fmt.set_tty_cap ~cap:`Ansi ()
+  | _ -> Fmt.set_tty_cap ()
+
   let main f =
-    let () = Fmt.set_tty_cap () in
+    let () = setup () in
     let dur = Os.Mtime.counter () in
     match f () with
     | () -> if !fail_count = 0 then report_pass ~dur else report_fail ~dur
@@ -120,4 +128,15 @@ module Test = struct
   | exception e when exn e -> ()
   | exception e -> raise (Fail "Expression did not raise expected exception")
   | _ -> raise (Fail "Expression did not raise")
+
+  let is_error = function
+  | Ok _ -> failf "@[<v>Fnd: Ok _@,Exp: Error _@]" | Error _ -> ()
+
+  let is_error' ?msg r = match msg with
+  | None -> is_error r
+  | Some msg ->
+      match r with
+      | Error m when String.equal msg m -> ()
+      | Error m -> failf "@[<v>Fnd: Error %S@,Exp: Error %S@]" m msg
+      | Ok _ -> failf "Fnd: Ok _@,Exp: Error %S@]" msg
 end
