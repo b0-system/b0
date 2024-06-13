@@ -808,8 +808,8 @@ val exe :
     {- [requires] are the OCaml libraries required to compile the executable.}
     {- [name] is the name of the unit (defaults to [n]).}
     {- [srcs] are the executable sources. All files with extension [.ml],
-       [.mli], [.c] and [.h] are considered for compiling and linking the
-       executable.}
+       [.mli], [.c], [.h], [.o] ([.obj]), and [.a] ([.lib]) are considered
+       for compiling and linking the executable.}
     {- [wrap] allows to extend the build procedure you must call the given
        build procedure. TODO maybe remove once we have good {!frag}.}} *)
 
@@ -853,9 +853,9 @@ val lib :
     {- [represents] are the OCaml libraries represented by this library.}
     {- [name] is the name of the build unit (default to [n] with [.]
         substituted by [-])}
-    {- [srcs] are the library sources. extension [.ml],
-       [.mli], [.c] and [.h] are considered for compiling and linking the
-       executable.}
+    {- [srcs] are the library sources. All files with extension [.ml],
+       [.mli], [.c], [.h], [.o] ([.obj]), and [.a] ([.lib]) are considered
+       for compiling and linking the library.}
     {- [wrap] allows to extend the build procedure you must call the given
        build procedure. TODO maybe remove once we have good {!frag}.}} *)
 
