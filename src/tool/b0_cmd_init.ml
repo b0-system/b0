@@ -44,6 +44,28 @@ let b0_ml file force _conf =
   let* () = Os.File.write ~force ~make_path:true file b0_file in
   Ok Os.Exit.ok
 
+(* Cmdliner file init *)
+
+let cmdliner file force name _conf =
+  Log.if_error ~use:Os.Exit.some_error @@
+  let* name = match name with
+  | None -> Fmt.error "No tool name found specify one with %a" Fmt.code "-t"
+  | Some n -> Ok n
+  in
+  let cmdliner = Fmt.str
+      "let cmd ~flag = 0\n\n\
+       open Cmdliner\n\
+       open Cmdliner.Term.Syntax\n\n\
+       let %s =\n\
+      \ Cmd.v (Cmd.info \"%s\") @@@@\n\
+      \ let+ flag = Arg.(value & flag & info [\"flag\"]) in\n\
+      \ cmd ~flag\n\n\
+      let main () = Cmd.eval' %s\n\
+      let () = if !Sys.interactive then () else exit (main ())" name name name
+  in
+  let* () = Os.File.write ~force ~make_path:true file cmdliner in
+  Ok Os.Exit.ok
+
 (* Changes file init *)
 
 let changes file force _conf =
@@ -166,10 +188,27 @@ let b0_ml =
           for a software project. For example:";
       `Pre "$(iname) $(b,> B0.ml)"; `Noblank;
       `Pre "$(iname) $(b,B0.ml)";
-      `P "TODO unastisfactory for now."]
+      `P "TODO unsatisfactory for now."]
   in
   B0_tool_std.Cli.subcmd_with_b0_file_if_any "B0.ml" ~doc ~descr @@
   Term.(const b0_ml $ file $ force)
+
+let cmdliner =
+  let doc = "Generate a cmdliner tool blueprint" in
+  let descr =
+    `Blocks [
+      `P "The $(iname) command generates a cmdliner blueprint.
+          For example:";
+      `P "TODO unsatifactory. How to compose with the license stuff. \
+          What about a $(b,b0 snippet) command"; ]
+  in
+  let toolname =
+    let absent = "TODO derive from filename if specified" and docv = "NAME" in
+    Arg.(value & opt (some string) None & info ["t"; "tool"] ~doc ~docv ~absent)
+  in
+  B0_tool_std.Cli.subcmd_with_b0_file_if_any "cmdliner" ~doc ~descr @@
+  Term.(const cmdliner $ file $ force $ toolname)
+
 
 let changes =
   let doc = "Generate a $(b,CHANGES) file" in
@@ -276,4 +315,4 @@ let cmd =
   let doc = "Generate files from templates" in
   let descr = `P "The $(iname) command generates files from templates." in
   B0_tool_std.Cli.cmd_group "init" ~doc ~descr @@
-  [b0_ml; changes; license; readme; src]
+  [b0_ml; cmdliner; changes; license; readme; src]
