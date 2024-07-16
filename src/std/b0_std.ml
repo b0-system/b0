@@ -2834,6 +2834,11 @@ module Os = struct
   module Socket = struct
     let close_noerr fd = try Unix.close fd with Unix.Unix_error _ -> ()
 
+    let pp_name_port ppf (n, p) = Fmt.pf ppf "%s:%d" n p
+    let pp_sockaddr ppf = function
+    | Unix.ADDR_UNIX s -> Fmt.string ppf s
+    | Unix.ADDR_INET (a, p) -> pp_name_port ppf (Unix.string_of_inet_addr a, p)
+
     let rec of_endpoint ep stype = match ep with
     | `Fd fd -> Ok (None, fd, false)
     | `Host (name, port) ->
@@ -2874,13 +2879,10 @@ module Os = struct
                 | None -> Fmt.error "port %S not an integer" p
                 | Some p -> Ok (`Host (h, p))
 
-      let pp_name_port ppf (n, p) = Fmt.pf ppf "%s:%d" n p
       let pp ppf = function
       | `Host (n, p) -> pp_name_port ppf (n, p)
       | `Fd _fd -> Fmt.pf ppf "<fd>"
-      | `Sockaddr (Unix.ADDR_UNIX s) -> Fmt.string ppf s
-      | `Sockaddr (Unix.ADDR_INET (a, p)) ->
-          pp_name_port ppf (Unix.string_of_inet_addr a, p)
+      | `Sockaddr addr -> pp_sockaddr ppf addr
 
       let err_wait ep e = Fmt.str "Wait on %a: %s" pp ep e
 

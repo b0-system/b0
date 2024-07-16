@@ -2827,6 +2827,9 @@ module Os : sig
            {{!Unix.set_close_on_exec}close on exec} set to [true].}
         {- [close] is [true] if the caller is in charge of closing it. This
            is [false] iff [c] is [`Fd _].}} *)
+
+    val pp_sockaddr : Format.formatter -> Unix.sockaddr -> unit
+    (** [pp_sockaddr] formats a socket address. *)
   end
 
   (** {1:process Processes} *)
