@@ -75,6 +75,14 @@ let changes file force _conf =
   let* () = Os.File.write ~force ~make_path:true file changes in
   Ok Os.Exit.ok
 
+(* [.gitignore] file init. *)
+
+let gitignore file force _conf =
+  Log.if_error ~use:Os.Exit.some_error @@
+  let gitignore = "_b0\n_build\ntmp\n*.install\n" in
+  let* () = Os.File.write ~force ~make_path:true file gitignore in
+  Ok Os.Exit.ok
+
 (* License file init *)
 
 let license years holder license file force conf =
@@ -209,7 +217,6 @@ let cmdliner =
   B0_tool_std.Cli.subcmd_with_b0_file_if_any "cmdliner" ~doc ~descr @@
   Term.(const cmdliner $ file $ force $ toolname)
 
-
 let changes =
   let doc = "Generate a $(b,CHANGES) file" in
   let descr =
@@ -221,6 +228,18 @@ let changes =
   in
   B0_tool_std.Cli.subcmd_with_b0_file_if_any "changes" ~doc ~descr @@
   Term.(const changes $ file $ force)
+
+let gitignore =
+  let doc = "Generate a [.gitignore] file" in
+  let descr =
+    `Blocks [
+      `P "The $(iname) command generates [.gitignore] file.
+          For example:";
+      `Pre "$(iname) $(b,> .gitignore)";
+      `Pre "$(iname) $(b,.gitignore)"; ]
+  in
+  B0_tool_std.Cli.subcmd_with_b0_file_if_any "gitignore" ~doc ~descr @@
+  Term.(const gitignore $ file $ force)
 
 let license =
   let doc = "Generate a $(b,LICENSE) file" in
@@ -315,4 +334,4 @@ let cmd =
   let doc = "Generate files from templates" in
   let descr = `P "The $(iname) command generates files from templates." in
   B0_tool_std.Cli.cmd_group "init" ~doc ~descr @@
-  [b0_ml; cmdliner; changes; license; readme; src]
+  [b0_ml; cmdliner; changes; gitignore; license; readme; src]
