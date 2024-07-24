@@ -89,7 +89,7 @@ let pp_tag ppf u =
     then " D ", (`Bg `Cyan :: base) else
     ((if is_action u then " A " else " U "), (wbg :: base))
   in
-  Fmt.tty style ppf tag
+  Fmt.st style ppf tag
 
 let pp_synopsis ppf v = Fmt.pf ppf "@[%a %a@]" pp_tag v pp_synopsis v
 

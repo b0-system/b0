@@ -518,7 +518,7 @@ module B0_std : sig
       {{!B0_std.Log.set_level}log verbosity} and the
       {!B0_std.Os.Cmd.spawn_tracer}. *)
 
-  val get_tty_cap : Tty.cap option option -> Tty.cap
+  val get_tty_cap : Fmt.styler option option -> Fmt.styler
   (** [get_tty_cap cap] determines [cap] with {!B0_std.Tty.cap} and
       {!B0_std.Tty.of_fd} on {!Unix.stdout} if [cap] is [None] or [Some
       None]. *)
@@ -527,7 +527,7 @@ module B0_std : sig
   (** [get_log_level level] determines [level] with {!B0_std.Log.Warning} if
       [level] is [None]. *)
 
-  val setup : Tty.cap -> Log.level -> log_spawns:Log.level -> unit
+  val setup : Fmt.styler -> Log.level -> log_spawns:Log.level -> unit
   (** [setup tty_cap log_level ~log_spawns] sets:
       {ul
       {- {!B0_std.Fmt.set_tty_styling_cap} with [tty_cap].}
@@ -542,7 +542,7 @@ module B0_std : sig
 
   (** {1:cli Cli arguments} *)
 
-  val tty_cap_of_string : string -> (Tty.cap option, string) result
+  val tty_cap_of_string : string -> (Fmt.styler option, string) result
   (** [tty_cap_of_string v] parses:
       {ul
       {- [""], ["auto"] into [None]}
@@ -551,7 +551,7 @@ module B0_std : sig
 
   val tty_cap :
     ?docs:string -> ?env:Cmdliner.Cmd.Env.info -> unit ->
-    Tty.cap option option Cmdliner.Term.t
+    Fmt.styler option option Cmdliner.Term.t
   (** [tty_cap ~docs ~env ()] is a cli interface for specifiying a TTY
       capability with a [--color] option. [docs] is where
       the options are documented (defaults to

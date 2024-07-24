@@ -206,7 +206,7 @@ module Modname = struct
   let v n = String.Ascii.capitalize n
   let equal = String.equal
   let compare = String.compare
-  let pp = Fmt.tty [`Bold]
+  let pp = Fmt.st [`Bold]
   module Set = String.Set
   module Map = String.Map
 

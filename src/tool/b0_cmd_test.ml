@@ -19,7 +19,7 @@ let pp_no_tests ppf () =
 let pp_run_tests ppf tests =
   if B0_unit.Set.is_empty tests then pp_no_tests ppf () else
   Fmt.pf ppf "@[<v>These %a will run:@,%a@]"
-    Fmt.(tty [`Fg `Green]) "tests"
+    Fmt.(st [`Fg `Green]) "tests"
     Fmt.(list B0_unit.pp_synopsis) (B0_unit.Set.elements tests)
 
 let pp_fail ppf (u, st) =
@@ -38,7 +38,6 @@ let pp_report ppf (total, dur, fails) = match fails with
       Test_fmt.pp_count count
       (if count <= 1 then "test unit" else "test units")
       Test_fmt.pp_dur dur (Fmt.list pp_fail) fails
-
 
 let is_test ~allow_long u =
   B0_unit.(has_tag B0_meta.run u && has_tag B0_meta.test u &&

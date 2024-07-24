@@ -13,13 +13,13 @@ module Test_fmt = struct
   let fail_color = [`Bg (`Hi `Red); `Fg `Black]
   let pass_color = [`Bg (`Hi `Green); `Fg `Black]
   let padding = "      "
-  let pp_test ppf () = (Fmt.tty test_color) ppf " TEST "
-  let pp_fail ppf () = (Fmt.tty fail_color) ppf " FAIL "
-  let pp_pass ppf () = (Fmt.tty pass_color) ppf " PASS "
-  let pp_passed ppf () = (Fmt.tty [`Fg (`Hi `Green)]) ppf "passed"
-  let pp_failed ppf () = (Fmt.tty [`Fg (`Hi `Red)]) ppf "failed"
-  let pp_dur = Fmt.tty' [`Bold] Mtime.Span.pp
-  let pp_count = Fmt.tty' [`Bold] Fmt.int
+  let pp_test ppf () = (Fmt.st test_color) ppf " TEST "
+  let pp_fail ppf () = (Fmt.st fail_color) ppf " FAIL "
+  let pp_pass ppf () = (Fmt.st pass_color) ppf " PASS "
+  let pp_passed ppf () = (Fmt.st [`Fg (`Hi `Green)]) ppf "passed"
+  let pp_failed ppf () = (Fmt.st [`Fg (`Hi `Red)]) ppf "failed"
+  let pp_dur = Fmt.st' [`Bold] Mtime.Span.pp
+  let pp_count = Fmt.st' [`Bold] Fmt.int
   let pp_slot_loc ppf l =
     Fmt.pf ppf "File \"%s\", line %d, characters %d-%d"
       l.Printexc.filename l.Printexc.line_number
@@ -48,9 +48,9 @@ module Test = struct
   let failf fmt = Fmt.kstr (fun msg -> raise (Fail msg)) fmt
 
   let log' fmt = Fmt.pf !out (fmt ^^ "@.")
-  let log fmt = Fmt.pf !out ("%a " ^^ fmt ^^ "@.") (Fmt.tty test_color) padding
+  let log fmt = Fmt.pf !out ("%a " ^^ fmt ^^ "@.") (Fmt.st test_color) padding
   let log_fail fmt =
-    Fmt.pf !out ("%a " ^^ fmt ^^ "@.") (Fmt.tty fail_color) padding
+    Fmt.pf !out ("%a " ^^ fmt ^^ "@.") (Fmt.st fail_color) padding
 
   let log_bt_msg bt msg =
     log_fail "%s" msg; List.iter (log_fail "%s") (munge_bt bt)

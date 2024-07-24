@@ -16,7 +16,7 @@ let loc m = m
 let pp_loc = Tloc.pp_ocaml
 let loc_err_fmt ffmt m fmt =
   ffmt ("@[<v>%a:@,@[%a: " ^^ fmt ^^ "@]@]")
-    pp_loc (loc m) (Fmt.tty [`Fg `Red; `Bold ]) "Error"
+    pp_loc (loc m) (Fmt.st [`Fg `Red; `Bold ]) "Error"
 
 let loc_errf m fmt = loc_err_fmt Fmt.str m fmt
 let loc_error m fmt = loc_err_fmt Fmt.error m fmt

@@ -8,7 +8,7 @@ open Result.Syntax
 
 (* FIXME potentially add these things to Fmt/fpath *)
 
-let pp_cli_arg fmt = Fmt.tty' [`Underline] fmt
+let pp_cli_arg fmt = Fmt.st' [`Underline] fmt
 let fpath_pp_high_suffix pre ppf p = match Fpath.strip_prefix pre p with
 | None -> (Fmt.code' Fpath.pp) ppf p
 | Some p ->
@@ -85,7 +85,7 @@ let pp_path_for_user ctx ppf p = match ctx.log_absolute with
 let log_diff ctx file =  match B0_vcs_repo.kind ctx.vcs_repo with
 | Git ->
     let git = B0_vcs_repo.repo_cmd ctx.vcs_repo in
-    let color = match Fmt.tty_cap () with `Ansi -> true | _ -> false in
+    let color = match Fmt.styler () with `Ansi -> true | _ -> false in
     let color = Cmd.(if' color (arg "--color=always")) in
     let cmd = Cmd.(git % "--no-pager" % "diff" %% color %% path file) in
     Log.if_error ~use:() (Os.Cmd.run cmd)
@@ -93,7 +93,7 @@ let log_diff ctx file =  match B0_vcs_repo.kind ctx.vcs_repo with
     failwith "Hg support is TODO"
 
 let log_outcome ctx o =
-  let label ppf st l = Fmt.tty st ppf (String.concat " " ["";l;""]) in
+  let label ppf st l = Fmt.st st ppf (String.concat " " ["";l;""]) in
   let pp_label ppf = function
   | `Unexpected -> label ppf [`Bg `Red; `Fg `White] "M"
   | `New -> label ppf [`Bg `Yellow; `Fg `Black] "?"
@@ -137,7 +137,7 @@ let pp_diff_cmd ppf (vcs, dir) = match B0_vcs_repo.kind vcs with
 | Hg -> pp_hg ppf "TODO"
 
 let pp_status st status =
-  Fmt.tty' st (fun ppf c -> Fmt.pf ppf "%d %s" c status)
+  Fmt.st' st (fun ppf c -> Fmt.pf ppf "%d %s" c status)
 
 let pp_corrected ppf n = if n = 0 then () else Fmt.pf ppf " (%d corrected)" n
 let pp_expected = pp_status [`Fg `Green] "expected"
@@ -163,7 +163,7 @@ let pp_all_pass ppf (count, corr, dur) =
   let test = if count > 1 then "tests expected" else "test expected" in
   let green = [`Fg `Green] in
   Fmt.pf ppf "%a %a%a in %a"
-    (Fmt.tty green) "All" (pp_status green test) count
+    (Fmt.st green) "All" (pp_status green test) count
     pp_corrected corr Mtime.Span.pp dur
 
 let pp_total ppf (count, dur) =

@@ -51,33 +51,8 @@ module Tty : sig
       using {!Unix.isatty}[ fd] and consulting the [TERM] environment
       variable. *)
 
-  (** {1:caps Capabilities} *)
-
-  type cap = [ `None (** No capability. *) | `Ansi (** ANSI terminal. *)  ]
-  (** The type for terminal capabilities. Either no capability or
-      ANSI capability. *)
-
-  val cap : t -> cap
+  val cap : t -> [ `None | `Ansi]
   (** [cap tty] determines [tty]'s capabilities. *)
-
-  (** {1:style ANSI escapes and styling} *)
-
-  type color =
-  [ `Default | `Black | `Red | `Green | `Yellow | `Blue | `Magenta | `Cyan
-  | `White ]
-  (** The type for ANSI colors. *)
-
-  type style =
-  [ `Bold | `Faint | `Italic | `Underline | `Blink of [ `Slow | `Rapid ]
-  | `Reverse | `Fg of [ color | `Hi of color ]
-  | `Bg of [ color | `Hi of color ] ]
-  (** The type for ANSI styles. *)
-
-  val styled_str : cap -> style list -> string -> string
-  (** [styled_str cap styles s] styles [s] according to [styles] and [cap]. *)
-
-  val strip_escapes : string -> string
-  (** [strip_escapes s] removes ANSI escapes from [s]. *)
 end
 
 (** Textual formatters.
@@ -298,12 +273,16 @@ module Fmt : sig
       projection are formatted using [pp_fst] and [pp_snd] and are
       separated by [sep] (defaults to {!cut}). *)
 
+  val none : unit t
+  (** [none] is [any "<none>"]. *)
+
   val option : ?none:unit t -> 'a t -> 'a option t
   (** [option ~none pp_v] formats an option. The [Some] case uses
       [pp_v] and [None] uses [none] (defaults to {!nop}). *)
 
-  val none : unit t
-  (** [none] is [any "<none>"]. *)
+  val result : ok:'a t -> error:'b t -> ('a, 'b) result t
+  (** [result ~ok ~error] formats a result value. The [Ok _] case uses
+      [ok] and the [Error _] case uses [error]. *)
 
   val list : ?empty:unit t -> ?sep:unit t -> 'a t -> 'a list t
   (** [list ~sep pp_v] formats list elements. Each element of the list is
@@ -317,7 +296,7 @@ module Fmt : sig
       seperated by [sep] (defaults to {!cut}). If the array is empty
       this is [empty] (defauls to {!nop}). *)
 
-    (** {1:mag Magnitudes} *)
+  (** {1:mag Magnitudes} *)
 
   val si_size : scale:int -> string -> int t
   (** [si_size ~scale unit] formats a non negative integer
@@ -395,29 +374,53 @@ module Fmt : sig
   (** [unknown ~kind pp_v ~hint (v, hints)] formats {!unknown} followed
       by a space and [hint pp_v hints] if [hints] is non-empty. *)
 
-  (** {1:tty ANSI TTY styling} *)
+  (** {1:styling Text styling} *)
 
-  val set_tty_cap : ?cap:Tty.cap -> unit -> unit
+  type styler =
+  [ `Ansi (** ANSI escapes. *)
+  | `None (** Styles are ignored. *) ]
+  (** The styler backend. *)
+
+  val set_styler : styler -> unit
+  (** [set_styler st] sets the stylers to [st]. See {!styler}. *)
+
+  val styler : unit -> styler
+  (** [styler st] sets the stylers to [st]. The initial styler is set
+      to [`Ansi] unless the value of the [TERM] environment variable
+      is set to [dumb]. *)
+
+  val set_tty_cap : ?cap:styler -> unit -> unit
   (** [set_tty_cap ?cap ()] sets the global TTY formatting capabilities to
       [cap] if specified and to [Tty.(cap (of_fd Unix.stdout))] otherwise.
       Affects the output of {!val-tty} and {!val-tty'}. *)
 
-  val tty_cap : unit -> Tty.cap
-  (** [tty_cap ()] is the global styling capability. *)
+  type color =
+  [ `Default | `Black | `Red | `Green | `Yellow | `Blue | `Magenta | `Cyan
+  | `White ]
+  (** The type for colors. *)
 
-  val tty' : Tty.style list -> 'a t -> 'a t
-  (** [tty' styles pp_v ppf v] prints [v] with [pp_v] on [ppf]
+  type style =
+  [ `Bold | `Faint | `Italic | `Underline | `Blink of [ `Slow | `Rapid ]
+  | `Reverse | `Fg of [ color | `Hi of color ]
+  | `Bg of [ color | `Hi of color ] ]
+  (** The type for text styles. *)
+
+  val st' : style list -> 'a t -> 'a t
+  (** [st' styles pp_v ppf v] prints [v] with [pp_v] on [ppf]
       according to [styles] and the value of {!tty_cap}. *)
 
-  val tty : Tty.style list -> string t
-  (** [tty styles ppf s] prints [s] on [ppf] according to [styles]
+  val st : style list -> string t
+  (** [st styles ppf s] prints [s] on [ppf] according to [styles]
       and the value of {!tty_cap}. *)
 
   val code' : 'a t -> 'a t
-  (** [code'] is [tty' [`Bold]]. *)
+  (** [code'] is [st' [`Bold]]. *)
 
   val code : string t
-  (** [code] is [tty [`Bold]]. *)
+  (** [code] is [st [`Bold]]. *)
+
+  val hey : string t
+  (** [hey] is [st [`Bold; `Fg `Red]]. *)
 end
 
 (** Result values *)
@@ -1036,6 +1039,9 @@ let escape_dquotes s =
 
       {b Warning.} This function may break on valid CommonMark inputs in
       all sorts of fashion. *)
+
+  val strip_ansi_escapes : string -> string
+  (** [strip_ansi_escapes s] removes ANSI escapes from [s]. *)
 
   (** {1:setmap Sets and maps} *)
 

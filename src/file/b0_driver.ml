@@ -52,7 +52,7 @@ module Conf = struct
       log_level : Log.level;
       no_pager : bool;
       memo : (B0_memo.t, string) result Lazy.t;
-      tty_cap : Tty.cap; }
+      tty_cap : Fmt.styler; }
 
   let memo ~hash_fun ~cwd ~env ~cache_dir ~trash_dir ~jobs =
     let feedback =

@@ -14,8 +14,8 @@ let err_nothing () = match B0_unit.list () with
 
 (* Explaining what gets into the build *)
 
-let green = Fmt.tty [`Fg `Green]
-let red = Fmt.tty [`Fg `Red]
+let green = Fmt.st [`Fg `Green]
+let red = Fmt.st [`Fg `Red]
 
 let log_explain_lock ~is_locked ~lock ~locked_packs =
   let option_reason pre opt ppf = function

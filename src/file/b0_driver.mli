@@ -86,7 +86,7 @@ module Conf : sig
     b0_dir:Fpath.t -> b0_file:Fpath.t option -> cache_dir:Fpath.t ->
     cwd:Fpath.t -> code:B0_ocaml.Code.t option -> env:Os.Env.t ->
     hash_fun:(module Hash.T) -> jobs:int -> log_level:Log.level ->
-    no_pager:bool -> tty_cap:Tty.cap -> unit -> t
+    no_pager:bool -> tty_cap:Fmt.styler -> unit -> t
   (** [make] constructs a configuration with given attributes. See the
       accessors for semantics. *)
 
@@ -123,7 +123,7 @@ module Conf : sig
   val no_pager : t -> bool
   (** [no_pager] indicates no paging is desired on stdout. *)
 
-  val tty_cap : t -> Tty.cap
+  val tty_cap : t -> Fmt.styler
   (** [tty_cap] is the terminal capability to assume for outputs. *)
 
   (** {1:derived Derived data} *)
@@ -138,7 +138,7 @@ module Conf : sig
     cache_dir:Fpath.t option -> code:B0_ocaml.Code.t option ->
     hash_fun:(module Hash.T) option -> jobs:int option ->
     log_level:Log.level option -> no_pager:bool ->
-    tty_cap:Tty.cap option option -> unit -> (t, string) result
+    tty_cap:Fmt.styler option option -> unit -> (t, string) result
   (** [setup_with_cli] determines and setups a configuration with the
       given values. These are expected to have been determined by
       environment variables and command line arugments. *)
@@ -147,7 +147,7 @@ end
 (** Cli interaction. *)
 module Cli : sig
   val log_level : B0_std.Log.level option Cmdliner.Term.t
-  val tty_cap : B0_std.Tty.cap option option Cmdliner.Term.t
+  val tty_cap : B0_std.Fmt.styler option option Cmdliner.Term.t
   val no_pager : bool Cmdliner.Term.t
   val conf : Conf.t Cmdliner.Term.t
 end

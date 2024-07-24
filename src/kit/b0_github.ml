@@ -496,7 +496,7 @@ module Pull_request = struct
         in
         Ok ("Opened", url)
     in
-    let pp_action ppf a = Fmt.tty [`Fg `Green] ppf a in
+    let pp_action ppf a = Fmt.st [`Fg `Green] ppf a in
     (* TODO we sould return this rather than log *)
     Log.app begin fun m ->
       m "%a pull request %a" pp_action action Fmt.code url

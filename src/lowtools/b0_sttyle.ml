@@ -5,7 +5,7 @@
 
 open B0_std
 
-type color = [ Tty.color | `Hi of Tty.color ]
+type color = [ Fmt.color | `Hi of Fmt.color ]
 
 let colors =
   [ `Default; `Black; `Red; `Green; `Yellow; `Blue; `Magenta; `Cyan; `White; ]
@@ -30,8 +30,8 @@ let sp = "  "
 
 let row ~base =
   let cells f =
-    [Fmt.str "%a" (Fmt.tty ((`Fg (f :> color)) :: base)) txt;
-     Fmt.str "%a" (Fmt.tty ((`Fg (`Hi f)) :: base)) txt; ]
+    [Fmt.str "%a" (Fmt.st ((`Fg (f :> color)) :: base)) txt;
+     Fmt.str "%a" (Fmt.st ((`Fg (`Hi f)) :: base)) txt; ]
   in
   String.concat sp (List.concat_map cells colors)
 

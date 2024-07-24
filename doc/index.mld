@@ -13,7 +13,6 @@ arbitrary build abstraction with reliable, efficient incremental rebuilds.
 
 {2:manuals_all For all users}
 
-
 - The {{!page-manual}B0 manual} is a conceptual overview of the
    B0 system and B0 files. It is recommended reading.
 - The {{!page-testing}testing manual} describes support to

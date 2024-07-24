@@ -46,10 +46,10 @@ module Op = struct
 
   let pp_file = Fpath.pp_quoted
   let pp_file_read = pp_file
-  let pp_file_write = Fmt.tty' style_file_write pp_file
-  let pp_file_delete = Fmt.tty' style_file_delete pp_file
-  let pp_hash = Fmt.tty' style_hash Hash.pp
-  let pp_subfield_label = Fmt.tty style_subfield
+  let pp_file_write = Fmt.st' style_file_write pp_file
+  let pp_file_delete = Fmt.st' style_file_delete pp_file
+  let pp_hash = Fmt.st' style_hash Hash.pp
+  let pp_subfield_label = Fmt.st style_subfield
   let pp_subfield s f pp = Fmt.field ~label:pp_subfield_label ~sep:Fmt.sp s f pp
   let pp_did_not_write ppf fs =
     Fmt.pf ppf "@[<v>Did not write:@,%a@]" (Fmt.list pp_file_write) fs
@@ -66,10 +66,10 @@ module Op = struct
     let args = Cmd.to_list (Op.Spawn.args s) in
     let quote = Filename.quote in
     let pquote p = Filename.quote (Fpath.to_string p) in
-    let pp_brack = Fmt.tty style_cmd_brackets in
-    let pp_tool ppf t = Fmt.tty style_cmd_tool ppf (pquote t) in
+    let pp_brack = Fmt.st style_cmd_brackets in
+    let pp_tool ppf t = Fmt.st style_cmd_tool ppf (pquote t) in
     let pp_arg ppf a = Fmt.pf ppf "%s" (quote a) in
-    let pp_o_arg ppf a = Fmt.tty style_file_write ppf (quote a) in
+    let pp_o_arg ppf a = Fmt.st style_file_write ppf (quote a) in
     let pp_sep ppf ~last = match last with
     | "-I" | "-L" | "-o" | "-f" | "-d" -> Fmt.char ppf ' '
     | _ -> Fmt.sp ppf ()
@@ -117,25 +117,25 @@ module Op = struct
     | "" -> () | m -> Fmt.sp ppf (); Fmt.pf ppf "[%a]" Fmt.code m
     in
     Fmt.pf ppf "@[@[<h>[%a]%a@]:@ @[%a@]@]"
-      (Fmt.tty s) label pp_mark o Fmt.lines (Op.Notify.msg n)
+      (Fmt.st s) label pp_mark o Fmt.lines (Op.Notify.msg n)
 
   let pp_header ppf o =
     let pp_status ppf o = match Op.status o with
     | Op.Success -> ()
-    | Op.Failed _ -> Fmt.tty style_status_failed ppf "FAILED "
-    | Op.Aborted -> Fmt.tty style_status_aborted ppf "ABORTED "
-    | Op.Waiting -> Fmt.tty style_status_waiting ppf "WAITING "
+    | Op.Failed _ -> Fmt.st style_status_failed ppf "FAILED "
+    | Op.Aborted -> Fmt.st style_status_aborted ppf "ABORTED "
+    | Op.Waiting -> Fmt.st style_status_waiting ppf "WAITING "
     in
     let pp_id ppf o =
       let pp_id ppf id = Fmt.pf ppf "%03d" id in
-      Fmt.tty' style_op_id pp_id ppf (Op.id o)
+      Fmt.st' style_op_id pp_id ppf (Op.id o)
     in
     let pp_kind_name ppf o =
-      (Fmt.tty style_kind_name) ppf (Op.kind_name (Op.kind o))
+      (Fmt.st style_kind_name) ppf (Op.kind_name (Op.kind o))
     in
     let pp_revived ppf o = match Op.revived o with
-    | false -> Fmt.tty style_status_exec ppf "e"
-    | true -> Fmt.tty style_status_exec_revived ppf "r"
+    | false -> Fmt.st style_status_exec ppf "e"
+    | true -> Fmt.st style_status_exec_revived ppf "r"
     in
     let pp_op_hash ppf o =
       let h = Op.hash o in if Hash.is_nil h then () else
@@ -158,7 +158,7 @@ module Op = struct
     | Some (Ok d) -> Fmt.lines ppf (String.trim d)
     | Some (Error e) ->
         Fmt.pf ppf "@[%a: @[%a@]@]"
-          (Fmt.tty style_err) "error" Fmt.lines e
+          (Fmt.st style_err) "error" Fmt.lines e
     in
     begin match Op.kind o with
     | Op.Spawn s ->
@@ -212,7 +212,7 @@ module Op = struct
       let pp_ui_kind ppf o = match Op.kind o with
       | Op.Spawn s ->
           let name = Fpath.basename (Op.Spawn.tool s) in
-          (Fmt.tty style_cmd_tool) ppf name
+          (Fmt.st style_cmd_tool) ppf name
       | k -> pp_kind_line ppf o
       in
       let pp_mark ppf o = match Op.mark o with
@@ -220,7 +220,7 @@ module Op = struct
       in
       let pp_status ppf o = match Op.status o with
       | Op.Failed _ ->
-          Fmt.pf ppf "[%a] " (Fmt.tty style_status_failed) "FAIL"
+          Fmt.pf ppf "[%a] " (Fmt.st style_status_failed) "FAIL"
       | _ -> ()
       in
       let if_spawn_pp_spawn_exit ppf o = match Op.kind o with
@@ -229,7 +229,7 @@ module Op = struct
       in
       Fmt.pf ppf "@[%a[%a%a]%a: %a@]"
         pp_status o pp_mark o pp_ui_kind o if_spawn_pp_spawn_exit o
-        (Fmt.tty' [`Faint] (Fmt.parens op_howto)) o
+        (Fmt.st' [`Faint] (Fmt.parens op_howto)) o
     in
     match Op.kind o with
     | Op.Notify _ -> pp_notify ppf o; sep ppf ()
@@ -268,7 +268,7 @@ module Op = struct
       | Op.Exec None -> ()
       | Op.Exec (Some e) ->
           Fmt.pf ppf "@[%a: @[%a@]@]@,"
-            (Fmt.tty style_err) "error" Fmt.lines e;
+            (Fmt.st style_err) "error" Fmt.lines e;
       | Op.Missing_writes fs -> pp_did_not_write ppf fs; Fmt.cut ppf ()
       | Op.Missing_reads fs -> pp_cannot_read ppf fs; Fmt.cut ppf ()
       end;
@@ -650,7 +650,7 @@ module Op = struct
 
   (* Aggregate errors *)
 
-  let howto_file howto = Fmt.(tty' style_op_howto howto ++ pp_file_write)
+  let howto_file howto = Fmt.(st' style_op_howto howto ++ pp_file_write)
   let writes_cycle os =
     let deps prev next =
       let prev_writes = Fpath.Set.of_list (B0_zero.Op.writes prev) in
@@ -668,7 +668,7 @@ module Op = struct
         in
         loop first [] os
 
-  let pp_failed ppf () = Fmt.(tty style_err) ppf "FAILED"
+  let pp_failed ppf () = Fmt.(st style_err) ppf "FAILED"
   let pp_ops_cycle ?(write_howto = Fmt.any "") ppf os =
     let pp_self_cycle ~write_howto ppf writes =
       let these_file, them = match Fpath.Set.cardinal writes with

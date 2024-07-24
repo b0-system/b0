@@ -7,7 +7,7 @@ open B0_std
 open Result.Syntax
 
 let pp_name = B0_scope.pp_name
-let pp_dir = Fmt.tty' [`Fg `Blue] Fpath.pp
+let pp_dir = Fmt.st' [`Fg `Blue] Fpath.pp
 let pp_scope_dir ppf (_, dir) = pp_dir ppf dir
 let pp_scope_name ppf (name, _) = B0_scope.pp_name ppf name
 let pp_scope_all ppf (name, dir) =

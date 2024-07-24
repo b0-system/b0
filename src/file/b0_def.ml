@@ -109,7 +109,7 @@ module Make (V : VALUE) = struct
 
   let pp_name_str = V.pp_name_str
   let pp_name = Fmt.using name pp_name_str
-  let pp_doc = Fmt.using doc (Fmt.tty [])
+  let pp_doc = Fmt.using doc (Fmt.st [])
   let pp_synopsis ppf v = Fmt.pf ppf "%a  %a" pp_name v pp_doc v
   let pp ppf v =
     let pp_non_empty ppf m = match B0_meta.is_empty m with

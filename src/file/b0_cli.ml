@@ -155,8 +155,8 @@ module File_cache = struct
       s.keys_count s.keys_file_count (Fmt.code' Fmt.byte_size) s.keys_byte_size
 
   let pp_stats ppf (total, used) =
-    let row = Fmt.tty [`Fg `Yellow] in
-    let col = Fmt.tty [`Italic] in
+    let row = Fmt.st [`Fg `Yellow] in
+    let col = Fmt.st [`Italic] in
     let pp_cols ppf () = Fmt.pf ppf "       %a  %a" col "keys" col "files" in
     Fmt.pf ppf "@[<v>%a%a@,%a%a@,%a@]"
       row "total" pp_key_stats total
@@ -164,8 +164,8 @@ module File_cache = struct
       pp_cols ()
 
   let pp_stats ppf (total, used) =
-    let row = Fmt.tty [`Fg `Yellow] in
-    let col = Fmt.tty [`Italic] in
+    let row = Fmt.st [`Fg `Yellow] in
+    let col = Fmt.st [`Italic] in
     let pp_size ppf s = Fmt.pf ppf "%6s" (Fmt.str "%a" Fmt.byte_size s) in
     let pp_cols ppf () = Fmt.pf ppf "       %a    %a" col "total" col "used" in
     Fmt.pf ppf "@[<v>%a@,%a %6d  %6d@,%a %6d  %6d@,%a %a  %a@]"
@@ -855,7 +855,7 @@ module Memo = struct
         let hs = if not hashed_size then 0 else hashed_byte_size l.file_hashes
         in
         let pp_hashed_size ppf s =
-          let label = Fmt.tty [`Italic] in
+          let label = Fmt.st [`Italic] in
           match hashed_size with
           | true -> Fmt.field ~label "size" (fun c -> c) Fmt.byte_size ppf s
           | false -> ()
@@ -863,7 +863,7 @@ module Memo = struct
         Fmt.pf ppf "%a %a" pp_totals (hc, hd) pp_hashed_size hs
       in
       let pp_xtime ppf (self, children) =
-        let label = Fmt.tty [`Italic] in
+        let label = Fmt.st [`Italic] in
         Fmt.pf ppf "%a %a" Mtime.Span.pp self
           (Fmt.field ~label "children" (fun c -> c) Mtime.Span.pp)
           children
@@ -882,7 +882,7 @@ module Memo = struct
       let pp_op_no_cache ppf (ot, od) =
         Fmt.pf ppf "%a %d" Mtime.Span.pp od ot
       in
-      let pp_sec s ppf _ = Fmt.tty [`Bold] ppf s in
+      let pp_sec s ppf _ = Fmt.st [`Bold] ppf s in
       (Fmt.record @@
        [ pp_sec "selected operations";
          Fmt.field "spawns" (fun _ -> (sc, st, sd)) pp_op;

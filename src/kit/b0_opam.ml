@@ -365,7 +365,7 @@ let lint_files ~normalize pkgs =
     Pkg.lint_opam_file opam ~normalize pkg (snd (Pkg.file ~with_name:false pkg))
   in
   let* _ = collect_results (List.map lint pkgs) in
-  Log.app (fun m -> m "%a" (Fmt.tty [`Fg `Green]) "Passed.");
+  Log.app (fun m -> m "%a" (Fmt.st [`Fg `Green]) "Passed.");
   Ok Os.Exit.ok
 
 let gen_files pkgs ~normalize ~with_name ~dst =
@@ -599,7 +599,7 @@ module Publish = struct
           let* response = Http_client.fetch http request in
           match Http.Response.status response with
           | 200 -> checksum shasum (Http.Response.body response)
-          | c -> Fmt.error "[%a] %s" Fmt.(tty' [`Fg `Red] int) c i.url
+          | c -> Fmt.error "[%a] %s" Fmt.(st' [`Fg `Red] int) c i.url
         in
         String.Map.add i.url csum acc, add csum i :: is
     in
@@ -608,8 +608,8 @@ module Publish = struct
     | _, is -> Ok (List.rev is)
 
   let log_start is incs check_only =
-    let pp_add ppf () = Fmt.tty [`Fg `Green] ppf "Add:" in
-    let pp_inc ppf () = Fmt.tty [`Fg `Yellow] ppf "Incompatible:" in
+    let pp_add ppf () = Fmt.st [`Fg `Green] ppf "Add:" in
+    let pp_inc ppf () = Fmt.st [`Fg `Yellow] ppf "Incompatible:" in
     let pp_info ppf i =
       Fmt.pf ppf "@[<v>%a %a@,     %s@]"
         pp_add () Fmt.code (versioned_name i) i.url
@@ -626,7 +626,7 @@ module Publish = struct
     m "@[<v>%a%a%a@]" Fmt.(list pp_info) is pp_incs incs pp_download check_only
 
   let log_check_success () = Log.app @@ fun m ->
-    m "%a" (Fmt.tty [`Fg `Green]) "All checks succeeded"
+    m "%a" (Fmt.st [`Fg `Green]) "All checks succeeded"
 
   let stdout_logging () =
     (* Bof bof, maybe we should rather have something in B0_vcs_repo.t *)

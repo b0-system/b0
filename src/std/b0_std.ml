@@ -58,62 +58,6 @@ module Tty = struct
   let cap tty = match tty with None | (Some `Dumb) -> `None | _ -> `Ansi
 
   (* ANSI escapes and styling *)
-
-  type color =
-  [ `Default | `Black | `Red | `Green | `Yellow | `Blue | `Magenta | `Cyan
-  | `White ]
-
-  let rec sgr_base_int_of_color = function
-  | `Black -> 0 | `Red -> 1 | `Green -> 2 | `Yellow -> 3  | `Blue -> 4
-  | `Magenta -> 5 | `Cyan -> 6 | `White -> 7 | `Default -> 9
-  | `Hi (#color as c) -> 60 + sgr_base_int_of_color c
-
-  let sgr_of_fg_color c = Printf.sprintf "%d" (30 + sgr_base_int_of_color c)
-  let sgr_of_bg_color c = Printf.sprintf "%d" (40 + sgr_base_int_of_color c)
-
-  type style =
-  [ `Bold | `Faint | `Italic | `Underline | `Blink of [ `Rapid | `Slow ]
-  | `Reverse | `Fg of [ color | `Hi of color ]
-  | `Bg of [ color | `Hi of color ] ]
-
-  let sgr_of_style = function
-  | `Bold -> "01"
-  | `Faint -> "02"
-  | `Italic -> "03"
-  | `Underline -> "04"
-  | `Blink `Slow -> "05"
-  | `Blink `Rapid -> "06"
-  | `Reverse -> "07"
-  | `Fg c -> sgr_of_fg_color c
-  | `Bg c -> sgr_of_bg_color c
-
-  let sgrs_of_styles styles = String.concat ";" (List.map sgr_of_style styles)
-
-  let styled_str cap styles s = match cap with
-  | `None -> s
-  | `Ansi -> Printf.sprintf "\027[%sm%s\027[m" (sgrs_of_styles styles) s
-
-  let strip_escapes s =
-    let len = String.length s in
-    let b = Buffer.create len in
-    let max = len - 1 in
-    let flush start stop = match start < 0 || start > max with
-    | true -> ()
-    | false -> Buffer.add_substring b s start (stop - start + 1)
-    in
-    let rec skip_esc i = match i > max with
-    | true -> loop i i
-    | false -> let k = i + 1 in if s.[i] = 'm' then loop k k else skip_esc k
-    and loop start i = match i > max with
-    | true ->
-        if Buffer.length b = len then s else
-        (flush start max; Buffer.contents b)
-    | false ->
-        match s.[i] with
-        | '\027' -> flush start (i - 1); skip_esc (i + 1)
-        | _ -> loop start (i + 1)
-    in
-    loop 0 0
 end
 
 (* Formatters *)
@@ -264,11 +208,12 @@ module Fmt = struct
   let pair ?sep:(pp_sep = cut) pp_fst pp_snd ppf (fst, snd) =
     pp_fst ppf fst; pp_sep ppf (); pp_snd ppf snd
 
+  let none ppf () = string ppf "<none>"
   let option ?none:(pp_none = nop) pp_v ppf = function
   | None -> pp_none ppf ()
   | Some v -> pp_v ppf v
 
-  let none ppf () = string ppf "<none>"
+  let result ~ok ~error ppf = function Ok v -> ok ppf v | Error e -> error ppf e
 
   let list ?(empty = nop) ?sep:pp_sep pp_elt ppf = function
   | [] -> empty ppf ()
@@ -474,45 +419,83 @@ module Fmt = struct
   | [] -> unknown ~kind pp_v ppf v
   | hints -> unknown ~kind pp_v ppf v; sp ppf (); (hint pp_v) ppf hints
 
-  (* ANSI TTY styling
+  (* Text styling.
 
      XXX What we are doing here is less subtle than what we did in Fmt
      where capability was associated to formatters and hence could
      distinguish between stdout/stderr, maybe we should do that again. *)
 
-  let _tty_cap = ref `None
+   type styler = [ `Ansi | `None ]
+  type color =
+  [ `Default | `Black | `Red | `Green | `Yellow | `Blue | `Magenta | `Cyan
+  | `White ]
+
+  let rec sgr_base_int_of_color = function
+  | `Black -> 0 | `Red -> 1 | `Green -> 2 | `Yellow -> 3  | `Blue -> 4
+  | `Magenta -> 5 | `Cyan -> 6 | `White -> 7 | `Default -> 9
+  | `Hi (#color as c) -> 60 + sgr_base_int_of_color c
+
+  let sgr_of_fg_color c = string_of_int (30 + sgr_base_int_of_color c)
+  let sgr_of_bg_color c = string_of_int (40 + sgr_base_int_of_color c)
+
+  type style =
+  [ `Bold
+  | `Faint
+  | `Italic
+  | `Underline
+  | `Blink of [ `Slow | `Rapid ]
+  | `Reverse
+  | `Fg of [ color | `Hi of color ]
+  | `Bg of [ color | `Hi of color ] ]
+
+  let sgr_of_style = function
+  | `Bold -> "01"
+  | `Faint -> "02"
+  | `Italic -> "03"
+  | `Underline -> "04"
+  | `Blink `Slow -> "05"
+  | `Blink `Rapid -> "06"
+  | `Reverse -> "07"
+  | `Fg c -> sgr_of_fg_color c
+  | `Bg c -> sgr_of_bg_color c
+
+  let sgrs_of_styles styles = String.concat ";" (List.map sgr_of_style styles)
+
+  let styler' = ref `None
+  let set_styler styler = styler' := styler
+  let styler () = !styler'
+
   let set_tty_cap ?cap () =
     let cap = match cap with
     | None -> Tty.(cap (of_fd Unix.stdout))
     | Some cap -> cap
     in
-    _tty_cap := cap
+    styler' := cap
 
-  let tty_cap () = !_tty_cap
-
-  let tty' styles pp_v ppf v = match !_tty_cap with
+  let st' styles pp_v ppf v = match !styler' with
   | `None -> pp_v ppf v
   | `Ansi ->
       (* XXX This doesn't compose well, we should get the current state
          and restore it afterwards rather than resetting. *)
       let reset ppf = Format.fprintf ppf "@<0>%s" "\027[m" in
       Format.kfprintf reset ppf "@<0>%s%a"
-        (Printf.sprintf "\027[%sm" @@ Tty.sgrs_of_styles styles) pp_v v
+        (String.concat "" ["\027["; sgrs_of_styles styles; "m"]) pp_v v
 
-  let tty styles ppf s = match !_tty_cap with
-  | `None -> Format.pp_print_string ppf s
+  let st styles ppf s = match !styler' with
+  | `None -> string ppf s
   | `Ansi ->
-      Format.fprintf ppf "@<0>%s%s@<0>%s"
-        (Printf.sprintf "\027[%sm" @@ Tty.sgrs_of_styles styles) s "\027[m"
+      pf ppf "@<0>%s%s@<0>%s"
+        (String.concat "" ["\027["; sgrs_of_styles styles; "m"]) s "\027[m"
 
-  let code' pp_v ppf v = tty' [`Bold] pp_v ppf v
-  let code ppf v = tty [`Bold] ppf v
+  let code' pp_v ppf v = st' [`Bold] pp_v ppf v
+  let code ppf v = st [`Bold] ppf v
+  let hey ppf v = st [`Bold; `Fg `Red] ppf v
 
   (* Records *)
 
   external id : 'a -> 'a = "%identity"
   let field
-      ?(label = tty [`Fg `Yellow]) ?(sep = any ":@ ") l prj pp_v ppf v
+      ?(label = st [`Fg `Yellow]) ?(sep = any ":@ ") l prj pp_v ppf v
     =
     pf ppf "@[<1>%a%a%a@]" label l sep () pp_v (prj v)
 
@@ -1312,8 +1295,8 @@ module String = struct
     Fmt.str "%d.%d.%d%a" major minor patchlevel Fmt.(option string) info
 
   let version_tty = [`Bold; `Fg `Magenta]
-  let pp_version ppf v = Fmt.tty version_tty ppf (of_version v)
-  let pp_version_str ppf v = Fmt.tty version_tty ppf v
+  let pp_version ppf v = Fmt.st version_tty ppf (of_version v)
+  let pp_version_str ppf v = Fmt.st version_tty ppf v
 
   (* CommonMark toy stuff *)
 
@@ -1366,6 +1349,30 @@ module String = struct
     let rev_lines = fold_ascii_lines ~strip_newlines:true add_line [] md
     in
     find_heading [] (List.rev rev_lines)
+
+  (* ANSI escape stripping *)
+
+  let strip_ansi_escapes s =
+    let len = String.length s in
+    let b = Buffer.create len in
+    let max = len - 1 in
+    let flush start stop = match start < 0 || start > max with
+    | true -> ()
+    | false -> Buffer.add_substring b s start (stop - start + 1)
+    in
+    let rec skip_esc i = match i > max with
+    | true -> loop i i
+    | false -> let k = i + 1 in if s.[i] = 'm' then loop k k else skip_esc k
+    and loop start i = match i > max with
+    | true ->
+        if Buffer.length b = len then s else
+        (flush start max; Buffer.contents b)
+    | false ->
+        match s.[i] with
+        | '\027' -> flush start (i - 1); skip_esc (i + 1)
+        | _ -> loop start (i + 1)
+    in
+    loop 0 0
 
   (* String map and sets *)
 
@@ -4506,19 +4513,19 @@ module Log = struct
   let debug_style = [`Faint; `Fg `Magenta]
 
   let pp_level_str level ppf v = match level with
-  | App -> Fmt.tty app_style ppf v
-  | Error -> Fmt.tty err_style ppf v
-  | Warning -> Fmt.tty warn_style ppf v
-  | Info -> Fmt.tty info_style ppf v
-  | Debug -> Fmt.tty debug_style ppf v
+  | App -> Fmt.st app_style ppf v
+  | Error -> Fmt.st err_style ppf v
+  | Warning -> Fmt.st warn_style ppf v
+  | Info -> Fmt.st info_style ppf v
+  | Debug -> Fmt.st debug_style ppf v
   | Quiet -> assert false
 
   let pp_level ppf level = match level with
   | App -> ()
-  | Error -> Fmt.tty (`Bold :: err_style) ppf "Error"
-  | Warning -> Fmt.tty (`Bold :: warn_style) ppf "Warning"
-  | Info -> Fmt.tty (`Bold :: info_style) ppf "Info"
-  | Debug -> Fmt.tty (`Bold :: debug_style) ppf "Debug"
+  | Error -> Fmt.st (`Bold :: err_style) ppf "Error"
+  | Warning -> Fmt.st (`Bold :: warn_style) ppf "Warning"
+  | Info -> Fmt.st (`Bold :: info_style) ppf "Info"
+  | Debug -> Fmt.st (`Bold :: debug_style) ppf "Debug"
   | Quiet -> assert false
 
   let pp_header =

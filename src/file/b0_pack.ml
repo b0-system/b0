@@ -67,18 +67,18 @@ let find_default () = find "default"
 (* Formatting *)
 
 let pp_locked ppf p =
-  if locked p then Fmt.tty [`Fg `Red] ppf "locked " else Fmt.nop ppf ()
+  if locked p then Fmt.st [`Fg `Red] ppf "locked " else Fmt.nop ppf ()
 
 let pp_units ppf p =
   if units p = [] then () else
-  let label = Fmt.tty [`Fg `Green ] in
+  let label = Fmt.st [`Fg `Green ] in
   let pp = Fmt.(pp_locked ++ using units (list ~sep:sp B0_defs.Unit.pp_name)) in
   Fmt.field ~label "units" Fmt.id pp ppf p
 
 let pp_synopsis ppf v =
   let pp_tag ppf p =
     let style = (if p.locked then [`Bg `Red] else [`Bg `Black]) in
-    Fmt.tty (`Fg `White :: `Bold :: style) ppf " P ";
+    Fmt.st (`Fg `White :: `Bold :: style) ppf " P ";
   in
   Fmt.pf ppf "@[%a %a@]" pp_tag v pp_synopsis v
 
