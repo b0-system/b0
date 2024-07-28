@@ -27,7 +27,7 @@ module Compile : sig
 
       As determined by the [odoc compile-deps] command. These dependencies
       need to be resolved to concrete [.odoc] files by some external
-      mean. *)
+     mean. *)
   module Dep : sig
 
     (** {1:dep Dependencies} *)

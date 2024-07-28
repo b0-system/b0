@@ -892,9 +892,9 @@ module Memo = struct
          Fmt.field "all" (fun _ -> (ot, od)) pp_totals;
          pp_sec "global timings";
          Fmt.field "jobs" jobs Fmt.int;
-         Fmt.field "hashes" Fmt.id pp_hashes;
-         Fmt.field "utime" Fmt.id pp_utime;
-         Fmt.field "stime" Fmt.id pp_stime;
+         Fmt.field "hashes" Fun.id pp_hashes;
+         Fmt.field "utime" Fun.id pp_utime;
+         Fmt.field "stime" Fun.id pp_stime;
          Fmt.field "real" (fun _ -> l.total_dur) Mtime.Span.pp ]) ppf l
 
     type out_format =

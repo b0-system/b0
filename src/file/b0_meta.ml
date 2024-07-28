@@ -194,7 +194,7 @@ let get_binding_by_name n m = match find_binding_by_name n m with
 | None -> err_no_such_key_name n | Some v -> v
 
 let pp_binding ppf (B (k, v)) =
-  Fmt.field k.Key.name Fmt.id k.Key.pp_value ppf v
+  Fmt.field k.Key.name Fun.id k.Key.pp_value ppf v
 
 (* Traversing *)
 

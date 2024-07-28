@@ -281,6 +281,21 @@ possibly depending on build logics.
   b0 deploy -u unit install
 v}
 
+{2:init Init}
+
+Lots of ad-hoc stuff is growing. Go back to carcass' `etc` per package
+lookup (note we want `init` to work when there's no b0 file yet but we
+also want it to lookup in the build env where packages are
+installed). We can likely do something generic that other tools can
+use.  Focus on {e files} and {e fragments} that output on stdout
+rather than file hierarchies.
+
+```
+b0 init template list
+b0 init src -t mylib file.ml
+b0 init src -t mylib.alt > hop.ml
+```
+
 {1:doc Documentation overhaul}
 
 - How to on action/unit execution

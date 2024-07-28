@@ -37,7 +37,9 @@ module Type : sig
 end
 
 (** {{:http://www.ecma-international.org/publications/standards/Ecma-048.htm}
-      ANSI terminal} interaction. *)
+      ANSI terminal} interaction.
+
+    {b TODO get rid of this}. *)
 module Tty : sig
 
   (** {1:terminals Terminals} *)
@@ -206,9 +208,6 @@ module Fmt : sig
       column (this allows for UTF-8 encoded marks). *)
 
   (** {1:records Records} *)
-
-  val id : 'a -> 'a
-  (** [id] is {!Fun.id}. *)
 
   val field :
     ?label:string t -> ?sep:unit t -> string -> ('b -> 'a) -> 'a t -> 'b t
@@ -397,12 +396,18 @@ module Fmt : sig
   val styler : unit -> styler
   (** [styler st] sets the stylers to [st]. The initial styler is set
       to [`Ansi] unless the value of the [TERM] environment variable
-      is set to [dumb]. *)
+      is set to [dumb] or if {!Unix.stdout} is not a tty. *)
+
+  val with_styler : styler -> (unit -> unit) -> unit
+  (** [with_styler styler f] runs [f] with styler set to [styler].
+      Not thread-safe. *)
 
   val set_tty_cap : ?cap:styler -> unit -> unit
   (** [set_tty_cap ?cap ()] sets the global TTY formatting capabilities to
       [cap] if specified and to [Tty.(cap (of_fd Unix.stdout))] otherwise.
-      Affects the output of {!val-tty} and {!val-tty'}. *)
+      Affects the output of {!val-tty} and {!val-tty'}.
+
+      {b TODO.} Get rid of this. *)
 
   type color =
   [ `Default | `Black | `Red | `Green | `Yellow | `Blue | `Magenta | `Cyan
@@ -431,12 +436,25 @@ module Fmt : sig
 
   val hey : string t
   (** [hey] is [st [`Bold; `Fg `Red]]. *)
+
+  val puterr : unit t
+  (** [putmsg] formats [Error:] in red. *)
+
+  val putwarn : unit t
+  (** [putwarn] formats [Warning:] in yellow. *)
+
+  val putnote : unit t
+  (** [putnote] formats [Note:] in blue. *)
 end
 
 (** Result values *)
 module Result : sig
 
   include module type of Stdlib.Result (** @closed *)
+
+  val get_ok' : ('a, string) result -> 'a
+  (** [get_ok' r] is like {!get_ok} but the message of [Invalid_argument]
+      is the error meesage. *)
 
   val retract : ('a, 'a) result -> 'a
   (** [retract r] is [v] if [r] is [Ok v] or [Error v]. *)

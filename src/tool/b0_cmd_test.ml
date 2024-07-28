@@ -14,7 +14,7 @@ let pp_test_tags ppf () =
   Fmt.pf ppf "%a and %a" Fmt.code "test" Fmt.code "run"
 
 let pp_no_tests ppf () =
-  Fmt.pf ppf "No test found in the build (no unit with tags %a)" pp_test_tags ()
+  Fmt.pf ppf "No unit with tags %a found in the build" pp_test_tags ()
 
 let pp_run_tests ppf tests =
   if B0_unit.Set.is_empty tests then pp_no_tests ppf () else

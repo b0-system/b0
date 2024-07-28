@@ -18,13 +18,13 @@ let lookup_b0_os build_dir m =
   let* bits = B0_store.get store B0_os.arch_bits in
   Log.app (fun m ->
       m "@[<v>%a@,%a@,%a@,%a@,%a@,%a@,%a@]"
-        Fmt.(field "name" id string) n
-        Fmt.(field "version" id string) v
-        Fmt.(field "distribution" id string) d
-        Fmt.(field "family" id string) f
-        Fmt.(field "arch" id string) a
-        Fmt.(field "arch-normalized" id string) an
-        Fmt.(field "arch-bits" id int) bits);
+        Fmt.(field "name" Fun.id string) n
+        Fmt.(field "version" Fun.id string) v
+        Fmt.(field "distribution" Fun.id string) d
+        Fmt.(field "family" Fun.id string) f
+        Fmt.(field "arch" Fun.id string) a
+        Fmt.(field "arch-normalized" Fun.id string) an
+        Fmt.(field "arch-bits" Fun.id int) bits);
   Fut.return ()
 
 let test_memo_store () =

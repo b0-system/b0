@@ -106,6 +106,7 @@ let test_string_append () =
 
 let main () =
   Test.main @@ fun () ->
+  test_string_get ();
   test_string_append ();
   ()
 

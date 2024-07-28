@@ -246,7 +246,7 @@ module Op = struct
   let pp_timings =
     let pp_span = Mtime.Span.pp in
     let wait o = Mtime.Span.abs_diff (Op.time_created o) (Op.time_started o) in
-    Fmt.field "timings" Fmt.id @@
+    Fmt.field "timings" Fun.id @@
     Fmt.box @@ Fmt.concat ~sep:Fmt.sp @@
     [ pp_subfield "duration" Op.duration pp_span;
       pp_subfield "created" Op.time_created pp_span;
@@ -254,7 +254,7 @@ module Op = struct
       pp_subfield "waited" wait pp_span; ]
 
   let pp_timing_created =
-    Fmt.field "timings" Fmt.id @@
+    Fmt.field "timings" Fun.id @@
     Fmt.box @@ pp_subfield "created" Op.time_created Mtime.Span.pp
 
   let pp_timings ppf o =
@@ -356,8 +356,8 @@ module Op = struct
           pp_subfield_label "manifest root" pp_file root pp_writes (Op.writes o)
     in
     Fmt.record [
-      Fmt.using Fmt.id pp_spawn_base;
-      Fmt.field "writes" Fmt.id pp_writes;
+      Fmt.using Fun.id pp_spawn_base;
+      Fmt.field "writes" Fun.id pp_writes;
       Fmt.field "reads" Op.reads pp_reads;
       Fmt.field "success-exits" Op.Spawn.get pp_success_exits;
       Fmt.field "stdio" Op.Spawn.get pp_spawn_stdio;

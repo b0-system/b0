@@ -2197,7 +2197,7 @@ let unit =
       in
       Arg.(value & pos 0 string "default" & info [] ~doc ~docv:"PACK")
     in
-    Cmd.v (Cmd.info "meta" ~doc ~man) @@
+    Cmd.v (Cmd.info "META" ~doc ~man) @@
     Term.(const meta $ const env $ pack)
   in
   let man =

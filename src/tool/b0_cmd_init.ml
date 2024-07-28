@@ -49,7 +49,9 @@ let b0_ml file force _conf =
 let cmdliner file force name _conf =
   Log.if_error ~use:Os.Exit.some_error @@
   let* name = match name with
-  | None -> Fmt.error "No tool name found specify one with %a" Fmt.code "-t"
+  | None ->
+      Fmt.error "No tool name found for cmdliner template. \
+                 Specify one with %a" Fmt.code "-t"
   | Some n -> Ok n
   in
   let cmdliner = Fmt.str
@@ -61,7 +63,8 @@ let cmdliner file force name _conf =
       \ let+ flag = Arg.(value & flag & info [\"flag\"]) in\n\
       \ cmd ~flag\n\n\
       let main () = Cmd.eval' %s\n\
-      let () = if !Sys.interactive then () else exit (main ())" name name name
+      let () = if !Sys.interactive then () else exit (main ())\n\
+      " name name name
   in
   let* () = Os.File.write ~force ~make_path:true file cmdliner in
   Ok Os.Exit.ok
@@ -226,19 +229,19 @@ let changes =
       `Pre "$(iname) $(b,> CHANGES.md)"; `Noblank;
       `Pre "$(iname) $(b,CHANGES.md)"; ]
   in
-  B0_tool_std.Cli.subcmd_with_b0_file_if_any "changes" ~doc ~descr @@
+  B0_tool_std.Cli.subcmd_with_b0_file_if_any "CHANGES" ~doc ~descr @@
   Term.(const changes $ file $ force)
 
 let gitignore =
-  let doc = "Generate a [.gitignore] file" in
+  let doc = "Generate a $(b,.gitignore) file" in
   let descr =
     `Blocks [
-      `P "The $(iname) command generates [.gitignore] file.
+      `P "The $(iname) command generates $(b,.gitignore) file.
           For example:";
       `Pre "$(iname) $(b,> .gitignore)";
       `Pre "$(iname) $(b,.gitignore)"; ]
   in
-  B0_tool_std.Cli.subcmd_with_b0_file_if_any "gitignore" ~doc ~descr @@
+  B0_tool_std.Cli.subcmd_with_b0_file_if_any ".gitignore" ~doc ~descr @@
   Term.(const gitignore $ file $ force)
 
 let license =
@@ -257,7 +260,7 @@ let license =
           for the first license of the $(b,.meta.licenses) key is generated \
           if $(b,--license) is unspecified." ]
   in
-  B0_tool_std.Cli.subcmd_with_b0_file_if_any "license" ~doc ~descr @@
+  B0_tool_std.Cli.subcmd_with_b0_file_if_any "LICENSE" ~doc ~descr @@
   Term.(const license $ years $ holder $ license_opt $ file $ force)
 
 let readme =
@@ -287,7 +290,7 @@ let readme =
     Arg.(value & opt (some string) None &
          info ["s"; "synopsis"] ~doc ~docv:"SYNOPSIS")
   in
-  B0_tool_std.Cli.subcmd_with_b0_file_if_any "readme" ~doc ~descr @@
+  B0_tool_std.Cli.subcmd_with_b0_file_if_any "README" ~doc ~descr @@
   Term.(const readme $ name' $ synopsis $ file $ force)
 
 let src =

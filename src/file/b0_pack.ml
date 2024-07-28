@@ -73,7 +73,7 @@ let pp_units ppf p =
   if units p = [] then () else
   let label = Fmt.st [`Fg `Green ] in
   let pp = Fmt.(pp_locked ++ using units (list ~sep:sp B0_defs.Unit.pp_name)) in
-  Fmt.field ~label "units" Fmt.id pp ppf p
+  Fmt.field ~label "units" Fun.id pp ppf p
 
 let pp_synopsis ppf v =
   let pp_tag ppf p =

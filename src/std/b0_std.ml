@@ -523,9 +523,23 @@ module Fmt = struct
 
   let sgrs_of_styles styles = String.concat ";" (List.map sgr_of_style styles)
 
-  let styler' = ref `None
+  let guess_styler () =
+    let rec isatty fd = try Unix.isatty fd with
+    | Unix.Unix_error (Unix.EINTR, _, _) -> isatty fd
+    | Unix.Unix_error (e, _, _) -> false
+    in
+    if not (isatty Unix.stdout) then `None else
+    match Sys.getenv "TERM" with
+    | "dumb" -> `None
+    | exception Not_found -> `Ansi | _ -> `Ansi
+
+  let styler' = ref (guess_styler ())
   let set_styler styler = styler' := styler
   let styler () = !styler'
+
+  let with_styler s f =
+    let old = styler () in
+    set_styler s; Fun.protect ~finally:(fun () -> set_styler old) f
 
   let set_tty_cap ?cap () =
     let cap = match cap with
@@ -552,13 +566,11 @@ module Fmt = struct
   let code' pp_v ppf v = st' [`Bold] pp_v ppf v
   let code ppf v = st [`Bold] ppf v
   let hey ppf v = st [`Bold; `Fg `Red] ppf v
+  let puterr ppf () = st [`Bold; `Fg `Red] ppf "Error"; char ppf ':'
+  let putwarn ppf () = st [`Bold; `Fg `Yellow] ppf "Warning"; char ppf ':'
+  let putnote ppf () = st [`Bold; `Fg `Blue] ppf "Note"; char ppf ':'
 
-  (* Records *)
-
-  external id : 'a -> 'a = "%identity"
-  let field
-      ?(label = st [`Fg `Yellow]) ?(sep = any ":@ ") l prj pp_v ppf v
-    =
+  let field ?(label = st [`Fg `Yellow]) ?(sep = any ":@ ") l prj pp_v ppf v =
     pf ppf "@[<1>%a%a%a@]" label l sep () pp_v (prj v)
 
   let record ?(sep = cut) pps = vbox (concat ~sep pps)
@@ -580,6 +592,7 @@ module Result = struct
 
   let error_to_failure = function Ok v -> v | Error e -> failwith e
   let error_to_invalid_argument = function Ok v -> v | Error e -> invalid_arg e
+  let get_ok' = error_to_invalid_argument
 
   (* Syntax *)
 
