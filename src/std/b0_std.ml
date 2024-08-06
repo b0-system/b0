@@ -60,6 +60,56 @@ module Tty = struct
   (* ANSI escapes and styling *)
 end
 
+(* Characters *)
+
+module Char = struct
+  include Char
+  module Ascii = struct
+    let max = '\x7F'
+
+    (* Decimal and hexadecimal digits *)
+
+    let is_digit = function '0' .. '9' -> true | _ -> false
+    let is_hex_digit = function
+    | '0' .. '9' | 'A' .. 'F' | 'a' .. 'f' -> true
+    | _ -> false
+
+    let hex_digit_value = function
+    | '0' .. '9' as c -> Char.code c - 0x30
+    | 'A' .. 'F' as c -> 10 + (Char.code c - 0x41)
+    | 'a' .. 'f' as c -> 10 + (Char.code c - 0x61)
+    | c -> invalid_arg (Printf.sprintf "%C: not a hex digit" c)
+
+    let lower_hex_digit n =
+      let n = n land 0xF in
+      Char.unsafe_chr (if n < 10 then 0x30 + n else 0x57 + n)
+
+    let upper_hex_digit n =
+      let n = n land 0xF in
+      Char.unsafe_chr (if n < 10 then 0x30 + n else 0x37 + n)
+
+    (* Predicates *)
+
+    let is_valid : t -> bool = fun c -> c <= max
+    let is_upper = function 'A' .. 'Z' -> true | _ -> false
+    let is_lower = function 'a' .. 'z' -> true | _ -> false
+    let is_letter = function 'A' .. 'Z' | 'a' .. 'z' -> true | _ -> false
+    let is_alphanum = function
+    | '0' .. '9' | 'A' .. 'Z' | 'a' .. 'z' -> true | _ -> false
+
+    let is_white = function ' ' | '\t' .. '\r'  -> true | _ -> false
+    let is_blank = function ' ' | '\t' -> true | _ -> false
+    let is_graphic = function '!' .. '~' -> true | _ -> false
+    let is_print = function ' ' .. '~' -> true | _ -> false
+    let is_control = function '\x00' .. '\x1F' | '\x7F' -> true | _ -> false
+
+    (* Casing transforms *)
+
+    let uppercase = function 'a' .. 'z' as c -> chr (code c - 0x20) | c -> c
+    let lowercase = function 'A' .. 'Z' as c -> chr (code c + 0x20) | c -> c
+  end
+end
+
 (* Formatters *)
 
 module Fmt = struct
@@ -80,7 +130,6 @@ module Fmt = struct
   let failwith_line n fmt = kstr failwith ("%d:" ^^ fmt) n
   let failwith fmt = kstr failwith fmt
   let failwith_notrace fmt = kstr (fun s -> raise_notrace (Failure s)) fmt
-
 
   let invalid_arg fmt = kstr invalid_arg fmt
   let error fmt = kstr (fun s -> Error s) fmt
@@ -393,6 +442,19 @@ module Fmt = struct
       for i = 0 to max - 2 do Format.pp_print_char ppf s.[i] done;
       Format.fprintf ppf "@<1>%s" "…"
 
+  (* ASCII text *)
+
+  let ascii_char ppf c =
+    if Char.Ascii.is_print c then char ppf c else
+    pf ppf "\\x%02x" (Char.code c)
+
+  let ascii_string ppf s =
+    for i = 0 to String.length s - 1 do
+      let c = s.[i] in
+      if Char.Ascii.is_print c || c = ' ' then char ppf c else
+      pf ppf "\\x%02x" (Char.code c)
+    done
+
   (* HCI fragments *)
 
   let op_enum op ?(empty = nop) pp_v ppf = function
@@ -425,7 +487,7 @@ module Fmt = struct
      where capability was associated to formatters and hence could
      distinguish between stdout/stderr, maybe we should do that again. *)
 
-   type styler = [ `Ansi | `None ]
+  type styler = [ `Ansi | `None ]
   type color =
   [ `Default | `Black | `Red | `Green | `Yellow | `Blue | `Magenta | `Cyan
   | `White ]
@@ -529,55 +591,6 @@ module Result = struct
   end
 end
 
-(* Characters *)
-
-module Char = struct
-  include Char
-  module Ascii = struct
-    let max = '\x7F'
-
-    (* Decimal and hexadecimal digits *)
-
-    let is_digit = function '0' .. '9' -> true | _ -> false
-    let is_hex_digit = function
-    | '0' .. '9' | 'A' .. 'F' | 'a' .. 'f' -> true
-    | _ -> false
-
-    let hex_digit_value = function
-    | '0' .. '9' as c -> Char.code c - 0x30
-    | 'A' .. 'F' as c -> 10 + (Char.code c - 0x41)
-    | 'a' .. 'f' as c -> 10 + (Char.code c - 0x61)
-    | c -> Fmt.invalid_arg "%C: not a hex digit" c
-
-    let lower_hex_digit n =
-      let n = n land 0xF in
-      Char.unsafe_chr (if n < 10 then 0x30 + n else 0x57 + n)
-
-    let upper_hex_digit n =
-      let n = n land 0xF in
-      Char.unsafe_chr (if n < 10 then 0x30 + n else 0x37 + n)
-
-    (* Predicates *)
-
-    let is_valid : t -> bool = fun c -> c <= max
-    let is_upper = function 'A' .. 'Z' -> true | _ -> false
-    let is_lower = function 'a' .. 'z' -> true | _ -> false
-    let is_letter = function 'A' .. 'Z' | 'a' .. 'z' -> true | _ -> false
-    let is_alphanum = function
-    | '0' .. '9' | 'A' .. 'Z' | 'a' .. 'z' -> true | _ -> false
-
-    let is_white = function ' ' | '\t' .. '\r'  -> true | _ -> false
-    let is_blank = function ' ' | '\t' -> true | _ -> false
-    let is_graphic = function '!' .. '~' -> true | _ -> false
-    let is_print = function ' ' .. '~' -> true | _ -> false
-    let is_control = function '\x00' .. '\x1F' | '\x7F' -> true | _ -> false
-
-    (* Casing transforms *)
-
-    let uppercase = function 'a' .. 'z' as c -> chr (code c - 0x20) | c -> c
-    let lowercase = function 'A' .. 'Z' as c -> chr (code c + 0x20) | c -> c
-  end
-end
 
 (* Strings *)
 

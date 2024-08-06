@@ -374,6 +374,16 @@ module Fmt : sig
   (** [unknown ~kind pp_v ~hint (v, hints)] formats {!unknown} followed
       by a space and [hint pp_v hints] if [hints] is non-empty. *)
 
+  (** {1:ascii ASCII text} *)
+
+  val ascii_char : char t
+  (** [ascii_char] prints {!Char.Ascii.is_print} characters
+      and hex escapes for other characters. *)
+
+  val ascii_string : string t
+  (** [ascii_string] prints {!Char.Ascii.is_print} characters and [' ']
+      and hex escapes for other characters. *)
+
   (** {1:styling Text styling} *)
 
   type styler =
