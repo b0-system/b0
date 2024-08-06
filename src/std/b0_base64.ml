@@ -28,8 +28,8 @@ let encode s =
   let len = String.length s in
   if len = 0 then "" else loop len (Bytes.create (((len + 2) / 3) * 4)) 0 s 0
 
-exception Alpha_error of int (* after 4.04 can be moved as a let below *)
-let decode s =
+let decode' s =
+  let exception Alpha_error of int in
   let decode_alpha len s i = match s.[i] with
   | 'A' .. 'Z' as c -> Char.code c - 0x41
   | 'a' .. 'z' as c -> Char.code c - 0x61 + 26
@@ -66,3 +66,11 @@ let decode s =
   let dlen = if s.[len - 1] = '=' then dlen - 1 else dlen in
   let dlen = if s.[len - 2] = '=' then dlen - 1 else dlen in
   try Ok (loop len (Bytes.create dlen) 0 s 0) with Alpha_error i -> Error i
+
+let decode s = match decode' s with
+| Ok _ as v -> v
+| Error i when i = String.length s ->
+    Error "Base64 error: truncated data"
+| Error i ->
+    B0_std.Fmt.error "Base64 error: illegal alphabet character '%a'"
+      B0_std.Fmt.ascii_char s.[i]

@@ -11,8 +11,12 @@
 val encode : string -> string
 (** [encode s] is the Base64 encoding of [s]. *)
 
-val decode : string -> (string, int) result
-(** [decode s] is the Base64 decode of [s]. In case of error the
+val decode : string -> (string, string) result
+(** [decode s] is the Base64 decode of [s] or an error message of the
+    form ["Base64 error: <reason>"]. *)
+
+val decode' : string -> (string, int) result
+(** [decode' s] is the Base64 decode of [s]. In case of error the
     integer indicates the byte index of the error for an invalid
     alphabet character error or the length of the string if the string
     length is not a multiple of [4]. *)
