@@ -26,7 +26,7 @@ module Http = struct
         headers : headers;
         body : string; }
 
-    let make ?(headers = []) ?(body = "") ~url method' =
+    let make ?(headers = []) ?(body = "") method' ~url =
       { url; method'; headers; body }
 
     let url r = r.url
@@ -78,23 +78,34 @@ end
 module Http_client = struct
   type t = Cmd.t
   let default = Cmd.tool "curl"
-  let get ?search ?(cmd = default) () = Os.Cmd.get ?search cmd
+  let make ?(insecure = false) ?search ?(cmd = default) () =
+    let* curl = Os.Cmd.get ?search cmd in
+    Ok (Cmd.(curl %% if' insecure (arg "--insecure")))
 
   let find_location request response =
     match List.assoc_opt "location" (Http.Response.headers response) with
     | None -> Error "No 'location' header found in 3XX response"
     | Some loc ->
-        if String.length loc > 0 && loc.[0] <> '/' then Ok loc else
         let url = Http.Request.url request in
-        try
-          match Url.scheme url with
-          | None -> raise Exit
-          | Some s ->
-              match Url.authority url with
-              | None -> raise Exit
-              | Some a -> Ok (String.concat "" [s; "://"; a; loc])
+        try match Url.kind loc with
+        | `Abs -> Ok loc
+        | `Rel `Rel_path ->
+            begin match String.rindex_opt url '/' with
+            | None -> Ok (String.concat "/" [url; loc])
+            | Some i -> Ok (String.concat "/" [String.sub url 0 i; loc])
+            end
+        | `Rel `Abs_path ->
+            begin match Url.scheme url with
+            | None -> raise Exit
+            | Some s ->
+                match Url.authority url with
+                | None -> raise Exit
+                | Some a -> Ok (String.concat "" [s; "://"; a; loc])
+            end
+        | `Rel _ -> raise Exit
         with
-        | Exit -> Fmt.error "Could not construct redirect from %s to %s" url loc
+        | Exit ->
+            Fmt.error "Could not construct redirect from %s to %s" url loc
 
   let redirect_response visited request response =
     match Http.Response.status response with
@@ -104,12 +115,11 @@ module Http_client = struct
         Ok (Some { request with url })
     | _ -> Ok None
 
-  let fetch ?(insecure = false) ?(follow = true) curl request =
+  let request curl ~follow request =
     let rec loop follow visited request =
       let method' = Http.Request.method' request in
       let is_head = method' = `HEAD in
-      let do_follow = match method' with `GET | `HEAD -> true | _ -> false in
-      let follow = follow && do_follow in
+      let follow = match method' with `GET | `HEAD -> follow | _ -> false in
       let method' = Http.method_to_string method' in
       let method' = Cmd.(arg "-X" % method' %% if' is_head (arg "--head")) in
       let headers = Http.Request.headers request in
@@ -118,10 +128,9 @@ module Http_client = struct
       let body = Http.Request.body request in
       let stdin = if has_body then Os.Cmd.in_string body else Os.Cmd.in_stdin in
       let body = Cmd.(if' has_body (arg "--data-binary" % "@-")) in
-      let insecure = Cmd.(if' insecure (arg "--insecure")) in
       let url = Http.Request.url request in
       let base = Cmd.(arg "-s" (* silent *) % "-i" (* resp. headers *)) in
-      let args = Cmd.(base %% insecure %% method' %% headers %% body % url) in
+      let args = Cmd.(base %% method' %% headers %% body % url) in
       let* out = Os.Cmd.run_out ~trim:false ~stdin Cmd.(curl %% args) in
       let* response = Http.Response.of_string out in
       if not follow then Ok response else

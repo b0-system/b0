@@ -2,4 +2,4 @@ PKG unix cmdliner
 S src/**
 S test/**
 S examples/**
-B _b0/**
+B _b0/b/**

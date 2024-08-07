@@ -30,8 +30,8 @@ module Http : sig
     type t
     (** The type for HTTP requests. *)
 
-    val make : ?headers:headers -> ?body:string -> url:Url.t -> method' -> t
-    (** [make uri m ~headers ~body] is a request on [url] with method [m],
+    val make : ?headers:headers -> ?body:string -> method' -> url:Url.t -> t
+    (** [make m ~url ~headers ~body] is a request on [url] with method [m],
         headers [headers] (defaults to [[]]) and body [body] (defaults to
         [""]). *)
 
@@ -79,18 +79,18 @@ module Http_client : sig
   type t
   (** The type for HTTP clients. *)
 
-  val get : ?search:Cmd.tool_search -> ?cmd:Cmd.t -> unit -> (t, string) result
-  (** [get ~search ~cmd ()] looks for [cmd] (defaults to [Cmd.tool "curl"])
-      in [search] (defaults to [Os.Cmd.get ~search]). *)
+  val make :
+    ?insecure:bool -> ?search:Cmd.tool_search -> ?cmd:Cmd.t -> unit ->
+    (t, string) result
+  (** [make ~search ~cmd ()] looks for [cmd] (defaults to [Cmd.tool "curl"])
+      in [search] (defaults to [Os.Cmd.get ~search]). If [insecure] is
+      [true] (defaults to [false]) TLS server certificates are not checked. *)
 
-  val fetch :
-    ?insecure:bool -> ?follow:bool -> t -> Http.Request.t ->
-    (Http.Response.t, string) result
-  (** [fetch httpr r] performs request [r] via [httpr].  If [follow]
-      is [true] (default) HTTP redirects for GET and HEAD requests
-      that return 301, 302, 303, 305 or 307 are automatically
-      followed. If [insecure] is [true] (defaults to [false]) TLS
-      server certificates are not checked.
+  val request :
+    t -> follow:bool -> Http.Request.t -> (Http.Response.t, string) result
+  (** [request httpc ~follow r] performs request [r] via [httpr].  If [follow]
+      is [true] HTTP redirects for GET and HEAD requests that return
+      301, 302, 303, 305 or 307 are automatically followed.
 
       The response's {!Http.Response.headers} are lowercased. *)
 

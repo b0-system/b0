@@ -596,7 +596,7 @@ module Publish = struct
         let csum =
           Result.error_to_failure @@
           Result.map_error (Fmt.str "%a: %s" Pkg.pp_err i.pkg) @@
-          let* response = Http_client.fetch http request in
+          let* response = Http_client.request ~follow:true http request in
           match Http.Response.status response with
           | 200 -> checksum shasum (Http.Response.body response)
           | c -> Fmt.error "[%a] %s" Fmt.(st' [`Fg `Red] int) c i.url
@@ -715,7 +715,7 @@ module Publish = struct
           See https://github.com/ocaml/opam/issues/3077@]"
     end;
     let* opam = get () in
-    let* httpc = B0_http.Http_client.get () in
+    let* httpc = B0_http.Http_client.make () in
     let* shasum = Os.Cmd.get (Cmd.tool "shasum") in
     let* git = B0_vcs_repo.Git.get_cmd () in
     let* is = collect_results (List.map (info_of_pkg opam) pkgs) in

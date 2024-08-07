@@ -2159,19 +2159,37 @@ end
 (* URLs *)
 
 module Url = struct
-  type t = string
   let alpha = Char.Ascii.is_letter
   let digit = Char.Ascii.is_digit
-  let scheme u =
-    let scheme_char c =
-      alpha c || digit c || Char.equal c '+' || Char.equal c '-' ||
-      Char.equal '.' c
-    in
-    match String.keep_left scheme_char u with
-    | "" -> None
-    | s ->
-        let ulen = String.length u and slen = String.length s in
-        if alpha s.[0] && slen < ulen && u.[slen] = ':' then Some s else None
+
+  type relative_kind = [ `Scheme | `Abs_path | `Rel_path | `Empty ]
+  type kind = [ `Abs | `Rel of relative_kind ]
+  type t = string
+
+  let scheme_char c =
+    alpha c || digit c || Char.equal c '+' || Char.equal c '-' ||
+    Char.equal '.' c
+
+  let find_scheme_colon u =
+    if u = "" || not (alpha u.[0]) then None else
+    let max = String.length u - 1 in
+    let i = ref 1 in
+    while !i <= max && scheme_char u.[!i] do incr i done;
+    if !i > max || u.[!i] <> ':' then None else Some !i
+
+  let relative_kind s =
+    let len = String.length s in
+    if len = 0 then `Empty else
+    if s.[0] = '/'
+    then (if len > 1 && s.[1] = '/' then `Scheme else `Abs_path)
+    else `Rel_path
+
+  let kind s = match find_scheme_colon s with
+  | Some _ -> `Abs
+  | None -> `Rel (relative_kind s)
+
+  let scheme u = match find_scheme_colon u with
+  | None -> None | Some i -> Some (String.sub u 0 i)
 
   let authority u = match String.index u ':' with
   | exception Not_found -> None

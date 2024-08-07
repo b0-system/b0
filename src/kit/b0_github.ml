@@ -180,7 +180,7 @@ let req_json_v3 ?(headers = []) http auth ~path m body =
   in
   let url = v3_api_url ^ path in
   let request = Http.Request.make ~url m ~headers ~body in
-  let* response = Http_client.fetch http request in
+  let* response = Http_client.request ~follow:true http request in
   response_success auth request response
 
 let query_v4 http auth q =
@@ -190,7 +190,7 @@ let query_v4 http auth q =
   let headers = req_v4_headers auth in
   let body = Jsong.to_string query in
   let request = Http.Request.make ~url:v4_api_url `POST ~headers ~body in
-  let* response = Http_client.fetch http request in
+  let* response = Http_client.request ~follow:true http request in
   response_success auth request response
 
 (* Higher-level interfaces *)
