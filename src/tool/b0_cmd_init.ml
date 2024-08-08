@@ -44,31 +44,6 @@ let b0_ml file force _conf =
   let* () = Os.File.write ~force ~make_path:true file b0_file in
   Ok Os.Exit.ok
 
-(* Cmdliner file init *)
-
-let cmdliner file force name _conf =
-  Log.if_error ~use:Os.Exit.some_error @@
-  let* name = match name with
-  | None ->
-      Fmt.error "No tool name found for cmdliner template. \
-                 Specify one with %a" Fmt.code "-t"
-  | Some n -> Ok n
-  in
-  let cmdliner = Fmt.str
-      "let cmd ~flag = 0\n\n\
-       open Cmdliner\n\
-       open Cmdliner.Term.Syntax\n\n\
-       let %s =\n\
-      \ Cmd.v (Cmd.info \"%s\") @@@@\n\
-      \ let+ flag = Arg.(value & flag & info [\"flag\"]) in\n\
-      \ cmd ~flag\n\n\
-      let main () = Cmd.eval' %s\n\
-      let () = if !Sys.interactive then () else exit (main ())\n\
-      " name name name
-  in
-  let* () = Os.File.write ~force ~make_path:true file cmdliner in
-  Ok Os.Exit.ok
-
 (* Changes file init *)
 
 let changes file force _conf =
@@ -124,6 +99,26 @@ let readme name synopsis file force conf =
   let* () = Os.File.write ~force ~make_path:true file readme in
   Ok Os.Exit.ok
 
+(* Source file templates. TODO a scheme like we had in caracass. *)
+
+(* set at the end of this file to avoid cluttering *)
+
+let templates = ref []
+
+let src_template t = match List.assoc_opt t !templates with
+| Some t -> Ok t
+| None ->
+    let names = List.map fst !templates in
+    let suggestions = String.suggest names t in
+    Fmt.error "@[%s: @[<v>No such template. %a@]"
+      t Fmt.(did_you_mean string) suggestions
+
+let template_list () conf =
+  Log.if_error ~use:Os.Exit.some_error @@
+  let names = List.map fst !templates in
+  Log.app (fun m -> m "@[<v>%a@]" Fmt.(code' (list string)) names);
+  Ok Os.Exit.ok
+
 (* Source file init *)
 
 let get_lang ~file ~lang = match lang with
@@ -138,7 +133,7 @@ let get_lang ~file ~lang = match lang with
           "@[<v>Could not find a language for extension %a@,\
            Use option %a to specify one.@]" Fmt.code ext Fmt.code "--lang"
 
-let src years holder license lang files example force conf =
+let src ~years ~holder ~license ~lang ~files ~example ~force ~template conf =
   Log.if_error ~use:Os.Exit.some_error @@
   let files = match files with [] -> [Fpath.dash] | files -> files in
   let cwd = B0_driver.Conf.cwd conf in
@@ -150,20 +145,37 @@ let src years holder license lang files example force conf =
     let* lang = get_lang ~file ~lang in
     let src = B0_init.src_generator lang in
     let src = src ~years ~holder ~license in
+    let* content = match template with
+    | None -> Ok "" | Some t -> src_template t
+    in
+    let src = String.concat "\n" [src; content] in
     Os.File.write ~force ~make_path:true file src
   in
   let* () = List.iter_stop_on_error write_file files in
   Ok Os.Exit.ok
 
+let snip ~files ~force ~template conf =
+  Log.if_error ~use:Os.Exit.some_error @@
+  let files = match files with [] -> [Fpath.dash] | files -> files in
+  let write_file file =
+    let* content = src_template template in
+    Os.File.write ~force ~make_path:true file content
+  in
+  let* () = List.iter_stop_on_error write_file files in
+  Ok Os.Exit.ok
+
 open Cmdliner
+open Cmdliner.Term.Syntax
 
 let force =
   let doc = "Overwrite any existing file rather than error." in
   Arg.(value & flag & info ["f"; "force"] ~doc)
 
 let file =
-  let doc = "Generate to file $(docv). Standard output if unspecified." in
-  Arg.(value & pos 0 B0_cli.fpath Fpath.dash & info [] ~doc ~docv:"PATH")
+  let doc = "Generate to file $(docv)." in
+  let absent = "$(b,stdout)" in
+  Arg.(value & pos 0 B0_cli.fpath Fpath.dash &
+       info [] ~doc ~docv:"PATH" ~absent)
 
 let license_opt =
   let doc =
@@ -191,7 +203,23 @@ let years =
   let absent = "current year" in
   Arg.(value & opt (some string) None & info ["y"; "years"] ~doc ~docv ~absent)
 
-let b0_ml =
+let template =
+  let doc =
+    "$(docv) is the template to use for the file content. \
+     See $(b,b0 init template list) for a list";
+  in
+  let absent = "no content" in
+  Arg.(value & opt (some string) None &
+       info ["t"; "template"] ~doc ~docv:"NAME" ~absent)
+
+let lang =
+  let lang_conv = Arg.conv' (B0_init.(lang_of_id, pp_lang_id)) in
+  let doc = "$(docv) is the source language." in
+  let absent = "derived from file extension or $(b,ocaml) on stdout" in
+  Arg.(value & opt (some lang_conv) None &
+       info ["l"; "lang"] ~doc ~docv:"LANG" ~absent)
+
+let b0_ml_cmd =
   let doc = "Generate a $(b,B0.ml) file" in
   let descr =
     `Blocks [
@@ -204,23 +232,7 @@ let b0_ml =
   B0_tool.Cli.subcmd_with_b0_file_if_any "B0.ml" ~doc ~descr @@
   Term.(const b0_ml $ file $ force)
 
-let cmdliner =
-  let doc = "Generate a cmdliner tool blueprint" in
-  let descr =
-    `Blocks [
-      `P "The $(iname) command generates a cmdliner blueprint.
-          For example:";
-      `P "TODO unsatifactory. How to compose with the license stuff. \
-          What about a $(b,b0 snippet) command"; ]
-  in
-  let toolname =
-    let absent = "TODO derive from filename if specified" and docv = "NAME" in
-    Arg.(value & opt (some string) None & info ["t"; "tool"] ~doc ~docv ~absent)
-  in
-  B0_tool.Cli.subcmd_with_b0_file_if_any "cmdliner" ~doc ~descr @@
-  Term.(const cmdliner $ file $ force $ toolname)
-
-let changes =
+let changes_cmd =
   let doc = "Generate a $(b,CHANGES) file" in
   let descr =
     `Blocks [
@@ -232,7 +244,7 @@ let changes =
   B0_tool.Cli.subcmd_with_b0_file_if_any "CHANGES" ~doc ~descr @@
   Term.(const changes $ file $ force)
 
-let gitignore =
+let gitignore_cmd =
   let doc = "Generate a $(b,.gitignore) file" in
   let descr =
     `Blocks [
@@ -244,7 +256,7 @@ let gitignore =
   B0_tool.Cli.subcmd_with_b0_file_if_any ".gitignore" ~doc ~descr @@
   Term.(const gitignore $ file $ force)
 
-let license =
+let license_cmd =
   let doc = "Generate a $(b,LICENSE) file" in
   let descr =
     `Blocks [
@@ -263,7 +275,7 @@ let license =
   B0_tool.Cli.subcmd_with_b0_file_if_any "LICENSE" ~doc ~descr @@
   Term.(const license $ years $ holder $ license_opt $ file $ force)
 
-let readme =
+let readme_cmd =
   let doc = "Generate a $(b,README) file" in
   let descr =
     `Blocks [
@@ -293,48 +305,113 @@ let readme =
   B0_tool.Cli.subcmd_with_b0_file_if_any "README" ~doc ~descr @@
   Term.(const readme $ name' $ synopsis $ file $ force)
 
-let src =
-  let files =
-    let doc =
-      "Generate to file $(docv). Repeatable. Standard output if unspecified."
-    in
-    Arg.(value & pos_all B0_cli.fpath [] & info [] ~doc ~docv:"PATH")
+let src_cmd =
+  let doc = "Generate a copyrighted source file" in
+  let descr =
+    `Blocks [
+      `P "The $(iname) command generates copyrighted source file. The content \
+          is empty unless the option $(b,-t) is specified. If you want \
+          content without the copyright use $(b,b0 init snip). For example:";
+      `Pre "$(iname) $(b,> mysrc.ml)  # Defaults has OCaml syntax"; `Noblank;
+      `Pre "$(iname) $(b,-l c > mysrc.h)";`Noblank;
+      `Pre "$(iname) $(b,mysrc.h) $(b,mysrc.c)"; `Noblank;
+      `Pre "$(iname) $(b,-x) $(b,example.c)"; `Noblank;
+      `Pre "$(iname) $(b,-y 2038 mysrc.mli mysrc.ml) "; `Noblank;
+      `Pre "$(iname) $(b,-h Unknown > mysrc.ml)"; `Noblank;
+      `Pre "$(iname) $(b,-t cmdliner > tool.ml)";
+      `P "The command makes best-effort guesses to derive the file's language,
+           the copyright year, the copyright holder and the SPDX license. \
+          See the corresponding options for more details.";
+      `P "The copyright header format is fixed, it cannot be tweaked." ]
   in
-  let lang =
-    let lang_conv = Arg.conv' (B0_init.(lang_of_id, pp_lang_id)) in
-    let doc = "$(docv) is the source language." in
-    let absent = "derived from file extension or $(b,ocaml) on stdout" in
-    Arg.(value & opt (some lang_conv) None &
-         info ["l"; "lang"] ~doc ~docv:"LANG" ~absent )
-  in
-  let example =
+  B0_tool.Cli.subcmd_with_b0_file_if_any "src" ~doc ~descr @@
+  let+ years and+ holder and+ license = license_opt and+ force and+ template
+  and+ lang
+  and+ files =
+    let doc = "Generate to file $(docv). Repeatable." in
+    let absent = "$(b,stdout)" in
+    Arg.(value & pos_all B0_cli.fpath [] & info [] ~doc ~docv:"PATH" ~absent)
+  and+ example =
     let doc =
       "Example source code. If $(b,--license) is unspecified, uses \
        $(b,CC0-1.0) for the license."
     in
     Arg.(value & flag & info ["x"; "example"] ~doc)
   in
-  let doc = "Generate a copyrighted source file" in
+  src ~years ~holder ~license ~lang ~files ~example ~force ~template
+
+let snip_cmd =
+  let doc = "Generate a snip of code" in
   let descr =
     `Blocks [
-      `P "The $(iname) command generates an empty copyrighted source file. \
-          For example:";
-      `P "$(iname) $(b,mysrc.c)"; `Noblank;
-      `P "$(iname) $(b,-x) $(b,example.c)"; `Noblank;
-      `P "$(iname) $(b,-y 2038 mysrc.mli mysrc.ml) "; `Noblank;
-      `P "$(iname) $(b,-h Unknown > mysrc.ml)"; `Noblank;
-      `P "$(iname) $(b,-l c > mysrc.h)";
-      `P "The command makes best-effort guesses to derive the file's language,
-           the copyright year, the copyright holder and the SPDX license. \
-          See the corresponding options for more details.";
-      `P "The output format is fixed, it cannot be tweaked." ]
+      `P "The $(iname) command generates an snip of code. It's exactly like
+          the $(b,src) command but without the copyright headers."; ]
   in
-  B0_tool.Cli.subcmd_with_b0_file_if_any "src" ~doc ~descr @@
-  Term.(const src $ years $ holder $ license_opt $ lang $ files $ example $
-        force)
+  B0_tool.Cli.subcmd_with_b0_file_if_any "snip" ~doc ~descr @@
+  let+ force
+  and+ files =
+    let doc = "Generate to file $(docv). Repeatable." in
+    let absent = "$(b,stdout)" in
+    Arg.(value & pos_right 0 B0_cli.fpath [] &
+         info [] ~doc ~docv:"PATH" ~absent)
+  and+ template =
+    let doc =
+      "$(docv) is the content template. \
+       See $(b,b0 init template list) for a list";
+    in
+    Arg.(required & pos 0 (some string) None & info [] ~doc ~docv:"NAME")
+  in
+  snip ~files ~force ~template
+
+let templates_cmd =
+  let doc = "Operate on content templates" in
+  let descr = `Blocks [
+      `P "The $(iname) command operates on content templates.";
+      `P "Note that for now templates are hard-coded."; ]
+  in
+  let template_list_cmd =
+    let doc = "List templates" in
+    let descr = `P "The $(iname) command lists available templates." in
+    B0_tool.Cli.subcmd_with_b0_file_if_any "list" ~doc ~descr @@
+    let+ () = Term.const () in
+    template_list ()
+  in
+  B0_tool.Cli.cmd_group "template" ~doc ~descr @@
+  [template_list_cmd]
 
 let cmd =
   let doc = "Generate files from templates" in
   let descr = `P "The $(iname) command generates files from templates." in
   B0_tool.Cli.cmd_group "init" ~doc ~descr @@
-  [b0_ml; cmdliner; changes; gitignore; license; readme; src]
+  [b0_ml_cmd; changes_cmd; gitignore_cmd; license_cmd; readme_cmd;
+   snip_cmd; src_cmd; templates_cmd;]
+
+
+(* Templates, TODO eventually get rid of this with a file system based
+   lookup mechanism. *)
+
+let templates' = [
+"cmdliner",
+"let cmd ~flag = 0\n\n\
+ open Cmdliner\n\
+ open Cmdliner.Term.Syntax\n\n\
+ let cmd =\n\
+\  Cmd.v (Cmd.info \"TODO\" ~version:\"\x25%VERSION%%\") @@\n\
+\  let+ flag = Arg.(value & flag & info [\"flag\"]) in\n\
+\  cmd ~flag\n\n\
+ let main () = Cmd.eval' cmd\n\
+ let () = if !Sys.interactive then () else exit (main ())\n";
+
+"b0.testing",
+"open B0_testing\n\n\
+ let test () =\n\
+\  Test.test \"that\" @@ fun () ->\n\
+\  assert true;\n\
+\  ()\n\n\
+ let main () =\n\
+\  Test.main @@ fun () ->
+\  test ();
+\  ()\n\n\
+let () = if !Sys.interactive then () else exit (main ())\n";]
+
+let () = templates := templates'
