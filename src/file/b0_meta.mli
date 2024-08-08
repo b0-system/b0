@@ -307,5 +307,8 @@ val run : bool key
 (** [run] tags entities that should be run in a particular context.
     Defaults to [false]. *)
 
+val sample : bool key
+(** [sample] tags entities that exist for demonstration purposes. *)
+
 val warning : string key
 (** [warning] is a warning shown on entity usage. *)

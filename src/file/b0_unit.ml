@@ -75,13 +75,14 @@ let pp_tag ppf u =
   let is_exe u = has_tag B0_meta.exe u in
   let is_lib u = has_tag B0_meta.lib u in
   let is_doc u = has_tag B0_meta.doc u in
+  let is_sample u = has_tag B0_meta.sample u in
   let is_action u = mem_meta action_key u in
   let tag, style =
     if is_run_test u
     then " T ", (if is_long u then wbg else `Bg `Green) :: base else
     if is_exe u
     then
-      (if is_test u then " T " else " E "),
+      (if is_test u then " T " else (if is_sample u then " S " else " E ")),
       (if is_public u then `Fg `Red else `Fg `Black) :: [`Bold; wbg] else
     if is_lib u
     then " L ", (if is_public u then `Bg `Yellow else wbg) :: base else
