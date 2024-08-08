@@ -78,7 +78,7 @@ let show_url =
   let doc = "Output URLs rather than opening them." in
   Arg.(value & flag & info ["s"; "show-urls"] ~doc)
 
-let no_pager = B0_tool_std.Cli.no_pager
+let no_pager = B0_tool.Cli.no_pager
 
 let browse_conf term =
   Term.(term $ browser $ background $ prefix $ show_url $ no_pager)
@@ -86,25 +86,25 @@ let browse_conf term =
 let homepage =
   let doc = "Browse homepage" in
   let descr = `P "$(iname) opens the $(b,B0_meta.homepage) URL." in
-  B0_tool_std.Cli.subcmd_with_b0_file "homepage" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_b0_file "homepage" ~doc ~descr @@
   browse_conf Term.(const browse $ const ".meta.homepage" $ packs_all)
 
 let issues =
   let doc = "Browse issues" in
   let descr = `P "$(iname) opens the $(b,B0_meta.issues) URL." in
-  B0_tool_std.Cli.subcmd_with_b0_file "issues" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_b0_file "issues" ~doc ~descr @@
   browse_conf Term.(const browse $ const ".meta.issues" $ packs_all)
 
 let key =
   let doc = "Browse a metadata key value" in
   let descr = `P "$(iname) opens the URL found in $(i,KEY)." in
-  B0_tool_std.Cli.subcmd_with_b0_file "key" ~doc ~descr @@
-  browse_conf Term.(const browse $ B0_tool_std.Cli.pos_key $ packs_tail)
+  B0_tool.Cli.subcmd_with_b0_file "key" ~doc ~descr @@
+  browse_conf Term.(const browse $ B0_tool.Cli.pos_key $ packs_tail)
 
 let online_doc =
   let doc = "Browse online documentation" in
   let descr = `P "$(iname) opens the $(b,B0_meta.online_doc) URL." in
-  B0_tool_std.Cli.subcmd_with_b0_file "online-doc" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_b0_file "online-doc" ~doc ~descr @@
   browse_conf Term.(const browse $ const ".meta.online-doc" $ packs_all)
 
 let url =
@@ -118,7 +118,7 @@ let url =
     let doc = "The $(docv) to open." in
     Arg.(non_empty & pos_all string [] & info [] ~doc ~docv:"URL")
   in
-  B0_tool_std.Cli.subcmd "url" ~doc ~descr @@
+  B0_tool.Cli.subcmd "url" ~doc ~descr @@
   browse_conf Term.(const browse_url $ urls)
 
 let cmd =
@@ -127,5 +127,5 @@ let cmd =
     `P "$(iname) browses the URLs found in the metadata of packs. \
         This gives quick access to package homepages, issues, online docs, etc."
   in
-  B0_tool_std.Cli.cmd_group "browse" ~doc ~descr @@
+  B0_tool.Cli.cmd_group "browse" ~doc ~descr @@
   [homepage; issues; key; online_doc; url]

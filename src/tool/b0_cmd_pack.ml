@@ -7,17 +7,17 @@ open B0_std
 open Result.Syntax
 
 let edit clets c =
-  B0_tool_std.Def.edit (module B0_pack) c clets
+  B0_tool.Def.edit (module B0_pack) c clets
 
 let get format k clets c =
-  B0_tool_std.Def.get_meta_key (module B0_pack) c format k clets
+  B0_tool.Def.get_meta_key (module B0_pack) c format k clets
 
 let list format clets c =
-  B0_tool_std.Def.list (module B0_pack) c format clets
+  B0_tool.Def.list (module B0_pack) c format clets
 
 let show format cs c =
   let format = if format = `Normal then `Long else format in
-  B0_tool_std.Def.list (module B0_pack) c format cs
+  B0_tool.Def.list (module B0_pack) c format cs
 
 (* Command line interface *)
 
@@ -36,8 +36,8 @@ let edit =
     `P "$(iname) opens in your editor the B0 files of given build packs \
         are defined."
   in
-  let envs = B0_tool_std.Cli.editor_envs in
-  B0_tool_std.Cli.subcmd_with_b0_file "edit" ~doc ~descr ~envs @@
+  let envs = B0_tool.Cli.editor_envs in
+  B0_tool.Cli.subcmd_with_b0_file "edit" ~doc ~descr ~envs @@
   Term.(const edit $ packs_all)
 
 let get =
@@ -45,26 +45,26 @@ let get =
   let descr =
     `P "$(iname) outputs the value of metadata $(i,KEY) of given build packs."
   in
-  B0_tool_std.Cli.subcmd_with_b0_file "get" ~doc ~descr @@
-  Term.(const get $ B0_tool_std.Cli.format $ B0_tool_std.Cli.pos_key $
+  B0_tool.Cli.subcmd_with_b0_file "get" ~doc ~descr @@
+  Term.(const get $ B0_tool.Cli.format $ B0_tool.Cli.pos_key $
         packs_tail)
 
 let list =
   let doc = "List build packs" in
   let descr = `P "$(iname) lists given build packs." in
-  B0_tool_std.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
-  Term.(const list $ B0_tool_std.Cli.format $ packs_all)
+  B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
+  Term.(const list $ B0_tool.Cli.format $ packs_all)
 
 let show =
   let doc = "Show build pack metadata" in
   let descr =
     `P "$(iname) is $(b,list -l), it outputs metadata of given build packs."
   in
-  B0_tool_std.Cli.subcmd_with_b0_file "show" ~doc ~descr @@
-  Term.(const show $ B0_tool_std.Cli.format $ packs_all)
+  B0_tool.Cli.subcmd_with_b0_file "show" ~doc ~descr @@
+  Term.(const show $ B0_tool.Cli.format $ packs_all)
 
 let cmd =
   let doc = "Operate on build packs" in
   let descr = `P "$(iname) operates on build packs." in
-  B0_tool_std.Cli.cmd_group "pack" ~doc ~descr @@
+  B0_tool.Cli.cmd_group "pack" ~doc ~descr @@
   [edit; get; list; show]

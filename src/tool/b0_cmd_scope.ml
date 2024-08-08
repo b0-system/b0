@@ -124,17 +124,17 @@ let topmost =
     "Only consider topmost scopes included by the root B0 file. Those \
      recursively included by these are excluded."
   in
-  let docs = B0_tool_std.Cli.s_scope_selection in
+  let docs = B0_tool.Cli.s_scope_selection in
   Arg.(value & flag & info ["topmost"] ~doc ~docs)
 
 let excludes =
   let doc = "Exclude scope $(docv) from the request. Repeatable." in
-  let docs = B0_tool_std.Cli.s_scope_selection and docv = "SCOPE" in
+  let docs = B0_tool.Cli.s_scope_selection and docv = "SCOPE" in
   Arg.(value & opt_all string [] & info ["x"; "exclude"] ~doc ~docv ~docs)
 
 let includes =
   let doc = "Include scope $(docv) in the request. Repeatable." in
-  let docs = B0_tool_std.Cli.s_scope_selection and docv = "SCOPE" in
+  let docs = B0_tool.Cli.s_scope_selection and docv = "SCOPE" in
   Arg.(value & opt_all string [] & info ["i"; "include"] ~doc ~docv ~docs)
 
 let keep_going =
@@ -187,7 +187,7 @@ let exec =
         use the option $(b,--fail-stop) to prevent that.";
     select_doc ]
   in
-  B0_tool_std.Cli.subcmd_with_b0_file "exec" ~doc ~synopsis ~descr @@
+  B0_tool.Cli.subcmd_with_b0_file "exec" ~doc ~synopsis ~descr @@
   Term.(const exec $ topmost $ includes $ excludes $ keep_going $ tool $
         tool_args)
 
@@ -202,8 +202,8 @@ let list =
     let doc = "Only print the scope paths." in
     Arg.(value & flag & info ["path"] ~doc)
   in
-  B0_tool_std.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
-  Term.(const list $ topmost $ includes $ excludes $ B0_tool_std.Cli.format $
+  B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
+  Term.(const list $ topmost $ includes $ excludes $ B0_tool.Cli.format $
         path)
 
 let symlink =
@@ -233,7 +233,7 @@ let symlink =
     in
     Arg.(value & flag & info ["rm"] ~doc)
   in
-  B0_tool_std.Cli.subcmd_with_b0_file "symlink" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_b0_file "symlink" ~doc ~descr @@
   Term.(const symlink $ topmost $ includes $ excludes $ dir $ rm)
 
 let vcs =
@@ -260,7 +260,7 @@ let vcs =
       select_doc;
     ]
   in
-  B0_tool_std.Cli.subcmd_with_b0_file "vcs" ~doc ~synopsis ~descr @@
+  B0_tool.Cli.subcmd_with_b0_file "vcs" ~doc ~synopsis ~descr @@
   Term.(const vcs $ topmost $ includes $ excludes $ all $ keep_going $
         vcs_kind $ tool_args)
 
@@ -272,5 +272,5 @@ let cmd =
         arbitary tool. Use the $(b,b0 vcs) command to invokes a vcs operation \
         on scope directories that are managed by it and dirty.";
   in
-  B0_tool_std.Cli.cmd_group "scope" ~doc ~descr @@
+  B0_tool.Cli.cmd_group "scope" ~doc ~descr @@
   [exec; list; symlink (* vcs *) ]

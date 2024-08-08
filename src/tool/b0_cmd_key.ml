@@ -38,11 +38,11 @@ let list =
   let descr =
     `P "$(iname) lists keys."
   in
-  B0_tool_std.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
-  Term.(const list $ B0_tool_std.Cli.format)
+  B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
+  Term.(const list $ B0_tool.Cli.format)
 
 let cmd =
   let doc = "Operate on keys" in
   let descr = `P "$(iname) operates on keys." in
-  B0_tool_std.Cli.cmd_group "key" ~doc ~descr @@
+  B0_tool.Cli.cmd_group "key" ~doc ~descr @@
   [list]

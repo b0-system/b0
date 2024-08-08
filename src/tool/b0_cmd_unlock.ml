@@ -23,5 +23,5 @@ let cmd =
             performed by $(b,lock). The indented usage is:";
         `Pre "$(b,eval \\$(b0 unlock\\))"; ]
   in
-  B0_tool_std.Cli.subcmd_with_driver_conf "unlock" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_driver_conf "unlock" ~doc ~descr @@
   Term.(const unlock)

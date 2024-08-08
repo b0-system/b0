@@ -201,7 +201,7 @@ let b0_ml =
       `Pre "$(iname) $(b,B0.ml)";
       `P "TODO unsatisfactory for now."]
   in
-  B0_tool_std.Cli.subcmd_with_b0_file_if_any "B0.ml" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_b0_file_if_any "B0.ml" ~doc ~descr @@
   Term.(const b0_ml $ file $ force)
 
 let cmdliner =
@@ -217,7 +217,7 @@ let cmdliner =
     let absent = "TODO derive from filename if specified" and docv = "NAME" in
     Arg.(value & opt (some string) None & info ["t"; "tool"] ~doc ~docv ~absent)
   in
-  B0_tool_std.Cli.subcmd_with_b0_file_if_any "cmdliner" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_b0_file_if_any "cmdliner" ~doc ~descr @@
   Term.(const cmdliner $ file $ force $ toolname)
 
 let changes =
@@ -229,7 +229,7 @@ let changes =
       `Pre "$(iname) $(b,> CHANGES.md)"; `Noblank;
       `Pre "$(iname) $(b,CHANGES.md)"; ]
   in
-  B0_tool_std.Cli.subcmd_with_b0_file_if_any "CHANGES" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_b0_file_if_any "CHANGES" ~doc ~descr @@
   Term.(const changes $ file $ force)
 
 let gitignore =
@@ -241,7 +241,7 @@ let gitignore =
       `Pre "$(iname) $(b,> .gitignore)";
       `Pre "$(iname) $(b,.gitignore)"; ]
   in
-  B0_tool_std.Cli.subcmd_with_b0_file_if_any ".gitignore" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_b0_file_if_any ".gitignore" ~doc ~descr @@
   Term.(const gitignore $ file $ force)
 
 let license =
@@ -260,7 +260,7 @@ let license =
           for the first license of the $(b,.meta.licenses) key is generated \
           if $(b,--license) is unspecified." ]
   in
-  B0_tool_std.Cli.subcmd_with_b0_file_if_any "LICENSE" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_b0_file_if_any "LICENSE" ~doc ~descr @@
   Term.(const license $ years $ holder $ license_opt $ file $ force)
 
 let readme =
@@ -290,7 +290,7 @@ let readme =
     Arg.(value & opt (some string) None &
          info ["s"; "synopsis"] ~doc ~docv:"SYNOPSIS")
   in
-  B0_tool_std.Cli.subcmd_with_b0_file_if_any "README" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_b0_file_if_any "README" ~doc ~descr @@
   Term.(const readme $ name' $ synopsis $ file $ force)
 
 let src =
@@ -329,12 +329,12 @@ let src =
           See the corresponding options for more details.";
       `P "The output format is fixed, it cannot be tweaked." ]
   in
-  B0_tool_std.Cli.subcmd_with_b0_file_if_any "src" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_b0_file_if_any "src" ~doc ~descr @@
   Term.(const src $ years $ holder $ license_opt $ lang $ files $ example $
         force)
 
 let cmd =
   let doc = "Generate files from templates" in
   let descr = `P "The $(iname) command generates files from templates." in
-  B0_tool_std.Cli.cmd_group "init" ~doc ~descr @@
+  B0_tool.Cli.cmd_group "init" ~doc ~descr @@
   [b0_ml; cmdliner; changes; gitignore; license; readme; src]

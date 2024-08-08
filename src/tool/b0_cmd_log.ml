@@ -33,6 +33,6 @@ let cmd =
     `Blocks B0_cli.Op.query_man ]
   in
   let descr = `Blocks descr in
-  B0_tool_std.Cli.subcmd_with_driver_conf "log" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_driver_conf "log" ~doc ~descr @@
   Term.(const log $ B0_cli.output_format () $
         B0_cli.Memo.Log.out_format_cli () $ B0_cli.Op.query_cli ())

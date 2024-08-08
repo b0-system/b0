@@ -47,5 +47,5 @@ let cmd =
       `Pre "…"; `Noblank;
       `Pre "$(b,eval \\$(b0 unlock\\))"; ]
   in
-  B0_tool_std.Cli.subcmd_with_driver_conf "lock" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_driver_conf "lock" ~doc ~descr @@
   Term.(const lock)

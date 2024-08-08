@@ -29,7 +29,7 @@ let boot root c =
 let compile c =
   get_b0_file_src c @@ fun f ->
   let* _ =
-    B0_driver.Compile.compile c ~driver:B0_tool_std.driver ~feedback:true f
+    B0_driver.Compile.compile c ~driver:B0_tool.driver ~feedback:true f
   in
   Ok Os.Exit.ok
 
@@ -149,7 +149,7 @@ let includes root format c =
 let log format log_format op_selector c =
   Log.if_error ~use:Os.Exit.some_error @@
   let don't = B0_driver.Conf.no_pager c || log_format = `Trace_event in
-  let log_file = B0_driver.Compile.build_log c ~driver:B0_tool_std.driver in
+  let log_file = B0_driver.Compile.build_log c ~driver:B0_tool.driver in
   let* pager = B0_pager.find ~don't () in
   let* () = B0_pager.page_stdout pager in
   let* l = B0_cli.Memo.Log.read log_file in
@@ -205,13 +205,13 @@ let root =
 let boot =
   let doc = "Install libraries needed for the B0 file" in
   let descr = `P "$(iname) install libraries needed to compile the B0 file." in
-  B0_tool_std.Cli.subcmd_with_driver_conf "boot" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_driver_conf "boot" ~doc ~descr @@
   Term.(const boot $ root)
 
 let compile =
   let doc = "Compile the driver for the B0 file" in
   let descr = `P "$(iname) compiles the driver for the B0 file." in
-  B0_tool_std.Cli.subcmd_with_driver_conf "compile" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_driver_conf "compile" ~doc ~descr @@
   Term.(const compile)
 
 let edit =
@@ -223,7 +223,7 @@ let edit =
     let doc = "Edit the B0 file and all its includes." in
     Arg.(value & flag & info ["all"] ~doc)
   in
-  B0_tool_std.Cli.subcmd_with_driver_conf "edit" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_driver_conf "edit" ~doc ~descr @@
   Term.(const edit $ all)
 
 let gather =
@@ -280,7 +280,7 @@ let gather =
     in
     Arg.(value & flag & info ["s"; "symlink-scopes"] ~doc)
   in
-  B0_tool_std.Cli.subcmd_with_driver_conf "gather" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_driver_conf "gather" ~doc ~descr @@
   Term.(const gather $ dest $ dirs $ force $ keep_symlinks $ keep_going $
         relative $ symlink_scopes)
 
@@ -290,8 +290,8 @@ let includes =
                   files. If $(b,--root) is specified only shows the includes \
                   of the root B0 file."
   in
-  B0_tool_std.Cli.subcmd_with_driver_conf "includes" ~doc ~descr @@
-  Term.(const includes $ root $ B0_tool_std.Cli.format)
+  B0_tool.Cli.subcmd_with_driver_conf "includes" ~doc ~descr @@
+  Term.(const includes $ root $ B0_tool.Cli.format)
 
 let log =
   let doc = "Show driver compilation log" in
@@ -304,14 +304,14 @@ let log =
       `S B0_cli.Op.s_selection_options;
       `Blocks B0_cli.Op.query_man; ]
   in
-  B0_tool_std.Cli.subcmd_with_driver_conf "log" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_driver_conf "log" ~doc ~descr @@
   Term.(const log $ B0_cli.output_format () $
         B0_cli.Memo.Log.out_format_cli () $ B0_cli.Op.query_cli ())
 
 let path =
   let doc = "Output the B0 file path (default command)" in
   let descr = `P "$(iname) outputs the B0 file path." in
-  B0_tool_std.Cli.subcmd_with_driver_conf "path" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_driver_conf "path" ~doc ~descr @@
   Term.(const path)
 
 let requires =
@@ -320,7 +320,7 @@ let requires =
                   the B0 file. If $(b,--root) is specified only shows the \
                   requires of the root B0 file."
   in
-  B0_tool_std.Cli.subcmd_with_driver_conf "requires" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_driver_conf "requires" ~doc ~descr @@
   Term.(const requires $ root)
 
 let source =
@@ -329,11 +329,11 @@ let source =
                   by the driver. If $(b,--root) is specified shows the \
                   non-expanded source of the root B0 file."
   in
-  B0_tool_std.Cli.subcmd_with_driver_conf "source" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_driver_conf "source" ~doc ~descr @@
   Term.(const source $ root)
 
 let cmd =
   let doc = "Operate on the B0 file" in
   let descr = `P "$(iname) operates on the B0 file." in
-  B0_tool_std.Cli.cmd_group "file" ~doc ~descr @@
+  B0_tool.Cli.cmd_group "file" ~doc ~descr @@
   [ boot; compile; edit; gather; includes; log; path; requires; source ]

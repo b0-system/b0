@@ -376,4 +376,4 @@ let cmd =
           see $(b,odig doc b0)."; ]
   in
   let descr = `Blocks descr in
-  B0_tool_std.Cli.subcmd_with_b0_file "build" ~doc ~descr ~synopsis term
+  B0_tool.Cli.subcmd_with_b0_file "build" ~doc ~descr ~synopsis term

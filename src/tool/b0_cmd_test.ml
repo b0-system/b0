@@ -161,7 +161,7 @@ let cmd =
     in
     Arg.(value & flag & info ["l";"long"] ~doc)
   in
-  B0_tool_std.Cli.subcmd_with_b0_file "test" ~exits ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_b0_file "test" ~exits ~doc ~descr @@
   Term.(const test $ long $ allow_empty $ B0_cmd_build.units $
         B0_cmd_build.x_units $ B0_cmd_build.packs $ B0_cmd_build.x_packs $
         B0_cmd_build.what $ B0_cmd_build.lock)

@@ -44,8 +44,8 @@ open Cmdliner
 let list =
   let doc = "List buildable tools" in
   let descr = `P "$(iname) lists given buildable tools"; in
-  B0_tool_std.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
-  Term.(const list $ B0_tool_std.Cli.format)
+  B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
+  Term.(const list $ B0_tool.Cli.format)
 
 let cmd =
   let doc = "Operate on buildable tools" in
@@ -54,5 +54,5 @@ let cmd =
     `P "These are the public tools in the build and the non-public tools \
         in the root scope."; ]
   in
-  B0_tool_std.Cli.cmd_group "tool" ~doc ~descr @@
+  B0_tool.Cli.cmd_group "tool" ~doc ~descr @@
   [list]

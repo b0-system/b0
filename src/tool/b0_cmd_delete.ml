@@ -37,5 +37,5 @@ let cmd =
         control over build cache deletions." ]
   in
   let descr = `Blocks descr in
-  B0_tool_std.Cli.subcmd_with_driver_conf "delete" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_driver_conf "delete" ~doc ~descr @@
   Term.(const delete $ clean)
