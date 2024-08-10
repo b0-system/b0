@@ -171,14 +171,14 @@ module Action = struct
     let open Cmdliner in
     let name = name u in
     let doc = Option.value ~default:(doc u) d in
-    let exits = Option.value ~default:B0_cli.Exit.infos exits in
+    let exits = Option.value ~default:B0_std_cli.Exit.infos exits in
     let info =
       Cmd.info ?man_xrefs ?man ?envs ~exits ?sdocs ?docs ?version name ~doc
     in
     let argv = Array.of_list (name :: B0_std.Cmd.to_list args) in
     let cmd = Cmdliner.Cmd.v info (termf env u) in
     (* FIXME use Cmd.eval_value' *)
-    Ok (B0_cli.Exit.of_eval_result (Cmd.eval_value ~argv cmd))
+    Ok (B0_std_cli.Exit.of_eval_result (Cmd.eval_value ~argv cmd))
 
   (* Metadata *)
 
@@ -291,7 +291,7 @@ let of_cmdliner_cmd ?store ?packs ?units ?dyn_units ?doc ?meta name cmd =
   let func env u ~args =
     let argv = Array.of_list (name :: Cmd.to_list args) in
     let cmd = cmd env u in
-    Ok (B0_cli.Exit.of_eval_result (Cmdliner.Cmd.eval_value ~argv cmd))
+    Ok (B0_std_cli.Exit.of_eval_result (Cmdliner.Cmd.eval_value ~argv cmd))
   in
   of_action' ?store ?packs ?units ?dyn_units ?doc ?meta name func
 

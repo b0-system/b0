@@ -15,9 +15,9 @@ let pp_hash = function
     fun ppf (f, h) -> Hash.pp ppf h; Fmt.char ppf ' '; Fpath.pp_unquoted ppf f
 
 let hash tty_cap log_level hash_fun format files =
-  let tty_cap = B0_cli.B0_std.get_tty_cap tty_cap in
-  let log_level = B0_cli.B0_std.get_log_level log_level in
-  B0_cli.B0_std.setup tty_cap log_level ~log_spawns:Log.Debug;
+  let tty_cap = B0_std_cli.get_tty_cap tty_cap in
+  let log_level = B0_std_cli.get_log_level log_level in
+  B0_std_cli.setup tty_cap log_level ~log_spawns:Log.Debug;
   let hash_fun = B0_cli.Memo.get_hash_fun ~hash_fun in
   let pp_hash = pp_hash format in
   Log.if_error ~use:Cmdliner.Cmd.Exit.some_error @@ match files with
@@ -38,7 +38,7 @@ open Cmdliner
 
 let files =
   let doc = "File to hash. Use $(b,-) for stdin." in
-  Arg.(value & pos_all B0_cli.fpath [] & info [] ~doc ~docv:"FILE")
+  Arg.(value & pos_all B0_std_cli.fpath [] & info [] ~doc ~docv:"FILE")
 
 let hash_fun =
   B0_cli.Memo.hash_fun ~opts:["H"; "hash-fun"] ~docs:Manpage.s_options ()
@@ -50,14 +50,14 @@ let tool =
     `S Manpage.s_description;
     `P "The $(tname) command hashes files like b0 does.";
     `S Manpage.s_options;
-    `S B0_cli.s_output_format_options;
+    `S B0_std_cli.s_output_format_options;
     `S Manpage.s_bugs;
     `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ]
   in
   Cmd.v (Cmd.info "b0-hash" ~version:"%%VERSION%%" ~doc ~man ~man_xrefs)
-    Term.(const hash $ B0_cli.B0_std.tty_cap () $
-          B0_cli.B0_std.log_level () $ hash_fun $
-          B0_cli.output_format () $ files)
+    Term.(const hash $ B0_std_cli.tty_cap () $
+          B0_std_cli.log_level () $ hash_fun $
+          B0_std_cli.output_format () $ files)
 
 let main () = exit (Cmd.eval' tool)
 let () = if !Sys.interactive then () else main ()

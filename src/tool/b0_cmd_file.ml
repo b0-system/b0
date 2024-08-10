@@ -152,7 +152,7 @@ let log format log_format op_selector c =
   let log_file = B0_driver.Compile.build_log c ~driver:B0_tool.driver in
   let* pager = B0_pager.find ~don't () in
   let* () = B0_pager.page_stdout pager in
-  let* l = B0_cli.Memo.Log.read log_file in
+  let* l = B0_memo_log.read log_file in
   B0_cli.Memo.Log.out Fmt.stdout log_format format op_selector ~path:log_file l;
   Ok Os.Exit.ok
 
@@ -244,11 +244,12 @@ let gather =
                the file is written on $(b,stdout)."
     in
     let docv = "DIR" in
-    Arg.(value & opt (some B0_cli.fpath) None & info ["d"; "dest"] ~doc ~docv)
+    Arg.(value & opt (some B0_std_cli.fpath) None &
+         info ["d"; "dest"] ~doc ~docv)
   in
   let dirs =
     let doc = "Gather the $(docv)$(b,/B0.ml) file." in
-    Arg.(non_empty & pos_all B0_cli.fpath [] & info [] ~doc ~docv:"DIR")
+    Arg.(non_empty & pos_all B0_std_cli.fpath [] & info [] ~doc ~docv:"DIR")
   in
   let force =
     let doc = "Write the $(b,B0.ml) file even if it exists in the \
@@ -300,12 +301,12 @@ let log =
           in various formats. If $(b,--path) \
           is specified, shows the path to the log.";
       `S Manpage.s_options;
-      `S B0_cli.s_output_format_options;
+      `S B0_std_cli.s_output_format_options;
       `S B0_cli.Op.s_selection_options;
       `Blocks B0_cli.Op.query_man; ]
   in
   B0_tool.Cli.subcmd_with_driver_conf "log" ~doc ~descr @@
-  Term.(const log $ B0_cli.output_format () $
+  Term.(const log $ B0_std_cli.output_format () $
         B0_cli.Memo.Log.out_format_cli () $ B0_cli.Op.query_cli ())
 
 let path =

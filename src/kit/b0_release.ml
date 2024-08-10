@@ -535,7 +535,7 @@ let unit =
       in
       Arg.(value & pos 0 (some string) None & info [] ~doc ~docv:"VERSION")
     in
-    let exits = B0_cli.Exit.infos in
+    let exits = B0_std_cli.Exit.infos in
     Cmd.v (Cmd.info "tag" ~doc ~exits ~man) @@
     Term.(const Tag.cmd $ version $ commit $ msg $ sign $ force $ delete $
           dry_run $ packs $ x_packs)
@@ -568,7 +568,7 @@ let unit =
     let exits =
       (Cmd.Exit.info 0 ~doc:"when changes have been detected.") ::
       (Cmd.Exit.info 1 ~doc:"when no changes have been detected.") ::
-      B0_cli.Exit.infos
+      B0_std_cli.Exit.infos
     in
     let pager_don't = B0_pager.don't () in
     let envs = B0_pager.Env.infos in

@@ -7,49 +7,6 @@ open B0_std
 open Result.Syntax
 open Cmdliner
 
-(* Exit *)
-
-module Exit = struct
-  let e c doc = Cmd.Exit.info (Os.Exit.get_code c) ~doc
-  let infos =
-    e Os.Exit.no_such_name "if a specified name does not exist." ::
-    Cmd.Exit.defaults
-
-  (* FIXME remove this once we release Cmdliner with
-     Cmd.eval_value' *)
-
-  let of_eval_result ?(term_error = Os.Exit.cli_error) = function
-  | Ok (`Ok e) -> e
-  | Ok _ -> Os.Exit.ok
-  | Error `Term -> term_error
-  | Error `Parse -> Os.Exit.cli_error
-  | Error `Exn -> Os.Exit.internal_error
-end
-
-(* Argument converters *)
-
-let cmd = Arg.conv' ~docv:"CMD" (B0_std.Cmd.of_string, B0_std.Cmd.pp_dump)
-let fpath = Arg.conv' ~docv:"PATH" (Fpath.of_string, Fpath.pp_unquoted)
-
-(* Specifying output detail *)
-
-let s_output_format_options = "OUTPUT FORMAT OPTIONS"
-
-type output_format = [ `Normal | `Short | `Long ]
-let output_format
-    ?(docs = s_output_format_options) ?(short_opts = ["s"; "short"])
-    ?(long_opts = ["l"; "long"]) ()
-  =
-  let short =
-    let doc = "Short output. Line based output with only relevant data." in
-    Arg.info short_opts ~doc ~docs
-  in
-  let long =
-    let doc = "Long output. Outputs as much information as possible." in
-    Arg.info long_opts ~doc ~docs
-  in
-  Arg.(value & vflag `Normal [`Short, short; `Long, long])
-
 (* Specifying B0 definitions. *)
 
 let units ?docs ?(doc = "Use unit $(docv).") () =
@@ -66,82 +23,13 @@ let x_packs ?docs ?(doc = "Exclude pack $(docv). Takes over inclusion.") () =
   let docv = "PACK" in
   Arg.(value & opt_all string [] & info ["X"; "x-pack"] ?docs ~doc ~docv)
 
-(* B0_std setup *)
-
-module B0_std = struct
-  let get_tty_cap c = match Option.join c with
-  | Some c -> c | None -> Tty.(cap (of_fd Unix.stdout))
-
-  let get_log_level level = Option.value ~default:Log.Warning level
-
-  let setup cap level ~log_spawns =
-    Fmt.set_tty_cap ~cap ();
-    Log.set_level level;
-    if level >= log_spawns
-    then Os.Cmd.set_spawn_tracer (Log.spawn_tracer log_spawns)
-
-  (* Cli argumements *)
-
-  let tty_cap_of_string s = match String.trim s with
-  | "" | "auto" -> Ok None
-  | "always" -> Ok (Some `Ansi)
-  | "never" -> Ok (Some `None)
-  | e ->
-      let pp_cap = Fmt.code in
-      let kind = Fmt.any "color behaviour" in
-      let dom = ["auto"; "always"; "never"] in
-      Fmt.error "%a" Fmt.(unknown' ~kind pp_cap ~hint:must_be) (e, dom)
-
-  let tty_cap ?(docs = Manpage.s_common_options) ?env () =
-    let parse s = Result.map_error (fun e -> `Msg e) (tty_cap_of_string s) in
-    let pp ppf c = Fmt.string ppf @@ match c with
-      | None -> "auto" | Some `Ansi -> "always" | Some `None -> "never"
-    in
-    let color = Arg.conv ~docv:"WHEN" (parse, pp) in
-    let doc =
-      "Colorize the output. $(docv) must be $(b,auto), $(b,always) \
-       or $(b,never)."
-    in
-    let docv = "WHEN" and none = None in
-    Arg.(value & opt (some' ~none color) None &
-         info ["color"] ?env ~doc ~docv ~docs)
-
-  let log_level
-      ?(none = Log.Warning) ?(docs = Manpage.s_common_options) ?env () =
-    let vopts =
-      let doc =
-        "Increase verbosity. Repeatable, but more than twice does not bring \
-         more. Takes over $(b,--verbosity)."
-        (* The reason for taking over verbosity is due to cmdliner
-           limitation: we cannot distinguish in choose below if verbosity
-           was set via an env var. And cli args should always take over env
-           var. So verbosity set through the env var would take over -v
-           otherwise. *)
-      in
-      Arg.(value & flag_all & info ["v"; "verbose"] ~doc ~docs)
-    in
-    let verbosity =
-      let parse s = Result.map_error (fun e -> `Msg e) (Log.level_of_string s)in
-      let level = Arg.conv ~docv:"LEVEL" (parse, Log.pp_level) in
-      let doc =
-        "Be more or less verbose. $(docv) must be $(b,quiet), $(b,app), \
-         $(b,error), $(b,warning), $(b,info) or $(b,debug)."
-      in
-      Arg.(value & opt (some ~none:"warning" level) None &
-           info ["verbosity"] ?env ~docv:"LEVEL" ~doc ~docs)
-    in
-    let quiet =
-      let doc = "Be quiet. Takes over $(b,-v) and $(b,--verbosity)." in
-      Arg.(value & flag & info ["q"; "quiet"] ~doc ~docs)
-    in
-    let choose quiet verbosity vopts =
-      if quiet then Some Log.Quiet else match vopts with
-      | (_ :: []) -> Some Log.Info
-      | ( _:: _ :: _) -> Some Log.Debug
-      | [] -> verbosity
-    in
-    Term.(const choose $ quiet $ verbosity $ vopts)
-end
+let get_excluded_units ~x_units ~x_packs =
+  let* units = B0_unit.get_list_or_hint ~all_if_empty:false x_units in
+  let* packs = B0_pack.get_list_or_hint ~all_if_empty:false x_packs in
+  let add_unit acc u = B0_unit.Set.add u acc in
+  let add_pack_units p acc = List.fold_left add_unit acc (B0_pack.units p) in
+  let packs = B0_pack.Set.of_list packs in
+  Ok (B0_pack.Set.fold add_pack_units packs (B0_unit.Set.of_list units))
 
 module File_cache = struct
 
@@ -437,12 +325,12 @@ module Op = struct
   let select_cli ?docs ?(marks = marks () ?docs) () =
     let reads =
       let doc = "Select operations that read file $(docv). Repeatable." in
-      Arg.(value & opt_all fpath [] &
+      Arg.(value & opt_all B0_std_cli.fpath [] &
            info ["r"; "read"] ~doc ?docs ~docv:"FILE")
     in
     let writes =
       let doc = "Select operations that wrote file $(docv). Repeatable." in
-      Arg.(value & opt_all fpath [] &
+      Arg.(value & opt_all B0_std_cli.fpath [] &
            info ["w"; "write"] ~doc ?docs ~docv:"FILE")
     in
     let ids =
@@ -612,7 +500,7 @@ module Memo = struct
       ?doc_none:(absent = "$(b,_b0) in root directory")
       ?(env = Cmd.Env.info b0_dir_env) ()
     =
-    Arg.(value & opt (some fpath) None &
+    Arg.(value & opt (some B0_std_cli.fpath) None &
          info opts ~env ~absent ~doc ~docs ~docv:"DIR")
 
   let get_b0_dir ~cwd ~root ~b0_dir = match b0_dir with
@@ -644,7 +532,7 @@ module Memo = struct
       ?doc_none:(absent = "$(b,.cache) in b0 directory")
       ?(env = Cmd.Env.info cache_dir_env) ()
     =
-    Arg.(value & opt (some fpath) None &
+    Arg.(value & opt (some B0_std_cli.fpath) None &
          info opts ~env ~absent ~doc ~docs ~docv:"DIR")
 
   let get_cache_dir ~cwd ~b0_dir ~cache_dir =
@@ -666,7 +554,7 @@ module Memo = struct
       ?doc_none:(absent = "$(b,.log) in b0 directory")
       ?(env = Cmd.Env.info log_file_env) ()
     =
-    Arg.(value & opt (some fpath) None &
+    Arg.(value & opt (some B0_std_cli.fpath) None &
          info opts ~absent ~env ~doc ?docs ~docv:"LOG_FILE")
 
   let get_log_file ~cwd ~b0_dir ~log_file =
@@ -717,102 +605,6 @@ module Memo = struct
 
   module Log = struct
 
-    (* XXX at the moment we are not serializing Memo.t.ready_roots.
-       This means we can't use the log with [B0_zero.Op.find_aggregate_error]
-       we might want to change this but it seems log writing is already
-       not so fast. *)
-
-    (* Logs *)
-
-    type t =
-      { hash_fun : string;
-        file_hashes : Hash.t Fpath.Map.t;
-        hash_dur : Mtime.Span.t;
-        total_dur : Mtime.Span.t;
-        cpu_dur : Os.Cpu.Time.Span.t;
-        jobs : int;
-        ops : B0_zero.Op.t list; }
-
-    let of_memo m =
-      let r = B0_memo.reviver m in
-      let module H = (val (B0_zero.Reviver.hash_fun r)) in
-      let file_hashes = B0_zero.Reviver.file_hashes r in
-      let hash_dur = B0_zero.Reviver.file_hash_dur r in
-      let total_dur = Os.Mtime.count (B0_memo.clock m) in
-      let cpu_dur = Os.Cpu.Time.count (B0_memo.cpu_clock m) in
-      let jobs = B0_zero.Exec.jobs (B0_memo.exec m) in
-      let ops = B0_memo.ops m in
-      { hash_fun = H.id; hash_dur; file_hashes; total_dur; cpu_dur; jobs; ops }
-
-    let hash_fun l = l.hash_fun
-    let file_hashes l = l.file_hashes
-    let hash_dur l = l.hash_dur
-    let total_dur l = l.total_dur
-    let cpu_dur l = l.cpu_dur
-    let jobs l = l.jobs
-    let ops l = l.ops
-
-    (* IO *)
-
-    let enc_file_hashes b hs =
-      let enc_file_hash b f h =
-        B0_bincode.enc_fpath b f; B0_bincode.enc_hash b h
-      in
-      let count = Fpath.Map.cardinal hs in
-      B0_bincode.enc_int b count;
-      Fpath.Map.iter (enc_file_hash b) hs
-
-    let dec_file_hashes s i =
-      let rec loop acc count s i =
-        if count = 0 then i, acc else
-        let i, file = B0_bincode.dec_fpath s i in
-        let i, hash = B0_bincode.dec_hash s i in
-        loop (Fpath.Map.add file hash acc) (count - 1) s i
-      in
-      let i, count = B0_bincode.dec_int s i in
-      loop Fpath.Map.empty count s i
-
-    let magic = "b\x00\x00\x00log"
-
-    let enc b l =
-      B0_bincode.enc_magic magic b ();
-      B0_bincode.enc_string b l.hash_fun;
-      enc_file_hashes b l.file_hashes;
-      B0_bincode.enc_mtime_span b l.hash_dur;
-      B0_bincode.enc_mtime_span b l.total_dur;
-      B0_bincode.enc_cpu_time_span b l.cpu_dur;
-      B0_bincode.enc_int b l.jobs;
-      B0_bincode.enc_list (B0_bincode.enc B0_zero_conv.Op.bincode) b l.ops
-
-    let dec s i =
-      let i, () = B0_bincode.dec_magic magic s i in
-      let i, hash_fun = B0_bincode.dec_string s i in
-      let i, file_hashes = i, Fpath.Map.empty in
-      let i, file_hashes = dec_file_hashes s i in
-      let i, hash_dur = B0_bincode.dec_mtime_span s i in
-      let i, total_dur = B0_bincode.dec_mtime_span s i in
-      let i, cpu_dur = B0_bincode.dec_cpu_time_span s i in
-      let i, jobs = B0_bincode.dec_int s i in
-      let i, ops =
-        B0_bincode.dec_list (B0_bincode.dec (B0_zero_conv.Op.bincode)) s i
-      in
-      i, { hash_fun; file_hashes; hash_dur; total_dur; cpu_dur; jobs; ops; }
-
-    let bincode = B0_bincode.make enc dec
-
-    let write file l =
-      let data =
-        Log.time (fun _ msg -> msg "generating log") @@ fun () ->
-        let buf = Buffer.create (1024 * 1024) in
-        B0_bincode.to_string ~buf bincode l
-      in
-      Log.time (fun _ msg -> msg "writing log") @@ fun () ->
-      Os.File.write ~force:true ~make_path:true file data
-
-    let read file =
-      Result.bind (Os.File.read file) @@ fun data ->
-      B0_bincode.of_string ~file bincode data
-
     (* Log formatters *)
 
     let hashed_byte_size file_hashes =
@@ -847,12 +639,14 @@ module Memo = struct
         in
         loop
           0 0 Mtime.Span.zero 0 0 Mtime.Span.zero 0 0 Mtime.Span.zero
-          0 Mtime.Span.zero 0 Mtime.Span.zero (sel l.ops)
+          0 Mtime.Span.zero 0 Mtime.Span.zero (sel (B0_memo_log.ops l))
       in
       let pp_totals ppf (ot, od) = Fmt.pf ppf "%a %d" Mtime.Span.pp od ot in
       let pp_hashes ppf l =
-        let hc, hd = Fpath.Map.cardinal l.file_hashes, l.hash_dur in
-        let hs = if not hashed_size then 0 else hashed_byte_size l.file_hashes
+        let file_hashes = B0_memo_log.file_hashes l in
+        let hash_dur = B0_memo_log.hash_dur l in
+        let hc, hd = Fpath.Map.cardinal file_hashes, hash_dur in
+        let hs = if not hashed_size then 0 else hashed_byte_size file_hashes
         in
         let pp_hashed_size ppf s =
           let label = Fmt.st [`Italic] in
@@ -869,11 +663,13 @@ module Memo = struct
           children
       in
       let pp_stime ppf l =
-        let t = Os.Cpu.Time.Span.(stime l.cpu_dur, children_stime l.cpu_dur) in
+        let cpu_dur = B0_memo_log.cpu_dur l in
+        let t = Os.Cpu.Time.Span.(stime cpu_dur, children_stime cpu_dur) in
         pp_xtime ppf t
       in
       let pp_utime ppf l =
-        let t = Os.Cpu.Time.Span.(utime l.cpu_dur, children_utime l.cpu_dur) in
+        let cpu_dur = B0_memo_log.cpu_dur l in
+        let t = Os.Cpu.Time.Span.(utime cpu_dur, children_utime cpu_dur) in
         pp_xtime ppf t
       in
       let pp_op ppf (oc, ot, od) =
@@ -883,6 +679,7 @@ module Memo = struct
         Fmt.pf ppf "%a %d" Mtime.Span.pp od ot
       in
       let pp_sec s ppf _ = Fmt.st [`Bold] ppf s in
+      let total_dur = B0_memo_log.total_dur l in
       (Fmt.record @@
        [ pp_sec "selected operations";
          Fmt.field "spawns" (fun _ -> (sc, st, sd)) pp_op;
@@ -891,11 +688,11 @@ module Memo = struct
          Fmt.field "reads" (fun _ -> (rt, rd)) pp_op_no_cache;
          Fmt.field "all" (fun _ -> (ot, od)) pp_totals;
          pp_sec "global timings";
-         Fmt.field "jobs" jobs Fmt.int;
+         Fmt.field "jobs" B0_memo_log.jobs Fmt.int;
          Fmt.field "hashes" Fun.id pp_hashes;
          Fmt.field "utime" Fun.id pp_utime;
          Fmt.field "stime" Fun.id pp_stime;
-         Fmt.field "real" (fun _ -> l.total_dur) Mtime.Span.pp ]) ppf l
+         Fmt.field "real" (fun _ -> total_dur) Mtime.Span.pp ]) ppf l
 
     type out_format =
     [ `Hashed_files | `Op_hashes | `Ops | `Path | `Stats | `Root_hashed_files
@@ -923,20 +720,20 @@ module Memo = struct
     | `Path ->
         Fmt.pf ppf "@[%a@]@." Fpath.pp_unquoted path
     | `Ops ->
-        let ops = query l.ops in
+        let ops = query (B0_memo_log.ops l) in
         if ops = [] then () else
         Fmt.pf ppf "@[<v>%a@]@." (Fmt.list (pp_op details)) ops
     | `Stats ->
         let hashed_size = details <> `Short (* do it by default for now *) in
         Fmt.pf ppf "@[%a@]@." (pp_stats ~hashed_size query) l
     | `Trace_event ->
-        let ops = query l.ops in
+        let ops = query (B0_memo_log.ops l) in
         if ops = [] then () else
         let t = B0_build_trace.Trace_event.of_ops ops in
         Fmt.pf ppf "@[%s@]@." (B0_json.Jsong.to_string t)
     | `Op_hashes ->
         let has_hash o = not (Hash.is_nil (B0_zero.Op.hash o)) in
-        let ops = List.filter has_hash (query l.ops) in
+        let ops = List.filter has_hash (query (B0_memo_log.ops l)) in
         if ops = [] then () else
         Fmt.pf ppf "@[<v>%a@]@." (Fmt.list (pp_op_hash details)) ops
     | `Root_hashed_files ->
@@ -945,22 +742,24 @@ module Memo = struct
           let add_op acc o =
             List.fold_left add_write acc (B0_zero.Op.writes o)
           in
-          List.fold_left add_op Fpath.Set.empty l.ops
+          List.fold_left add_op Fpath.Set.empty (B0_memo_log.ops l)
         in
         let add_file writes f h acc =
           if Fpath.Set.mem f writes then acc else (f, h) :: acc
         in
-        let roots = Fpath.Map.fold (add_file writes) l.file_hashes [] in
+        let file_hashes = B0_memo_log.file_hashes l in
+        let roots = Fpath.Map.fold (add_file writes) file_hashes [] in
         if roots = [] then () else
         Fmt.pf ppf "@[<v>%a@]@." (Fmt.list (pp_hashed_file details)) roots
     | `Hashed_files ->
         let pp_hashed_files =
           Fmt.iter_bindings Fpath.Map.iter (pp_hashed_file details)
         in
-        if Fpath.Map.is_empty l.file_hashes then () else
-        Fmt.pf ppf "@[<v>%a@]@." pp_hashed_files l.file_hashes
+        let file_hashes = B0_memo_log.file_hashes l in
+        if Fpath.Map.is_empty file_hashes then () else
+        Fmt.pf ppf "@[<v>%a@]@." pp_hashed_files file_hashes
 
-    let out_format_cli ?(docs = s_output_format_options) () =
+    let out_format_cli ?(docs = B0_std_cli.s_output_format_options) () =
       let a opt doc = Arg.info [opt] ~doc ~docs in
       let fmts =
         [ `Hashed_files, a "hashed-files"

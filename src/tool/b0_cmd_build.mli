@@ -9,9 +9,6 @@ val get_default_build : unit -> B0_unit.t list * B0_pack.t list
 val unit_set_of :
   units:B0_pack.b0_unit list -> packs:B0_pack.Set.t -> B0_unit.Set.t
 
-val get_excluded_units :
-  x_units:string list -> x_packs:string list -> (B0_unit.Set.t, string) result
-
 val get_must_units_and_locked_packs :
   is_action:(B0_unit.t -> bool) -> units:B0_unit.t list ->
   packs:B0_pack.Set.elt list -> args:string list ->

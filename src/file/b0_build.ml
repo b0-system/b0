@@ -118,7 +118,7 @@ let rec run_units b = match Random_queue.take b.b.waiting with
 
 let log_file b = Fpath.(b.b.build_dir / "_log")
 let write_log_file ~log_file m =
-  Log.if_error ~use:() @@ B0_cli.Memo.Log.(write log_file (of_memo m))
+  Log.if_error ~use:() @@ B0_memo_log.(write log_file (of_memo m))
 
 let report_memo_errors ppf m = match B0_memo.status m with
 | Ok _ as v -> v

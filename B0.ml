@@ -61,29 +61,28 @@ let b0 =
 
 (* Low-level B0 tools *)
 
-let tool_exe ?requires n ~doc file =
-  let requires = match requires with
-  | None -> [cmdliner; b0_std; b0_memo; b0_file; b0_kit]
-  | Some requires -> requires
-  in
+let tool_exe ?(requires = []) n ~doc file =
+  let requires = (cmdliner :: b0_std :: requires) in
   let srcs = [`File Fpath.(~/"src/lowtools" / file)] in
   B0_ocaml.exe n ~public:true ~doc ~srcs ~requires
 
 let b0_cache_tool =
-  tool_exe "b0-cache" ~doc:"Operate on b0 caches" "b0_cache.ml"
+  let requires = [b0_memo; b0_file] in
+  tool_exe "b0-cache" "b0_cache.ml" ~doc:"Operate on b0 caches" ~requires
 
 let b0_hash_tool =
-  tool_exe "b0-hash" ~doc:"Hash like b0" "b0_hash.ml"
+  let requires = [b0_file] (* for B0_cli *)  in
+  tool_exe "b0-hash" "b0_hash.ml" ~doc:"Hash like b0" ~requires
 
 let b0_log_tool =
-  tool_exe "b0-log" ~doc:"Operate on b0 logs" "b0_log.ml"
+  let requires = [b0_memo; b0_file] in
+  tool_exe "b0-log" "b0_log.ml" ~doc:"Operate on b0 logs" ~requires
 
 let b0_sttyle =
-  let requires = [cmdliner; b0_std;] in
-  tool_exe "b0-sttyle" ~requires ~doc:"Show ANSI escape styles" "b0_sttyle.ml"
+  tool_exe "b0-sttyle" "b0_sttyle.ml" ~doc:"Show ANSI escape styles"
 
 let show_url_tool =
-  tool_exe "show-url" ~doc:"Show URLs in web browsers" "show_url.ml"
+  tool_exe "show-url" "show_url.ml" ~doc:"Show URLs in web browsers"
 
 (* Tests *)
 

@@ -2156,10 +2156,11 @@ let unit =
   in
   let crunch =
     let doc = "Crunch bytes into an OCaml string" in
-    let exits = B0_cli.Exit.infos in
+    let exits = B0_std_cli.Exit.infos in
     let infile =
       let doc = "Input bytes from file $(docv). Use $(b,-) for $(b,stdin)." in
-      Arg.(value & pos 0 B0_cli.fpath Fpath.dash & info [] ~doc ~docv:"INPUT")
+      Arg.(value & pos 0 B0_std_cli.fpath Fpath.dash &
+           info [] ~doc ~docv:"INPUT")
     in
     let id =
       let doc = "OCaml identifier to use for the crunch." in
@@ -2177,8 +2178,8 @@ let unit =
     in
     let pager_don't = B0_pager.don't () in
     let envs = B0_pager.Env.infos in
-    let exits = B0_cli.Exit.infos in
-    let format = B0_cli.output_format () in
+    let exits = B0_std_cli.Exit.infos in
+    let format = B0_std_cli.output_format () in
     Cmd.v (Cmd.info "libs" ~doc ~man ~exits ~envs) @@
     Term.(const list $ format $ pager_don't)
   in

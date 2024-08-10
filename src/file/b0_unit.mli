@@ -148,7 +148,7 @@ module Action : sig
       term [t] with arguments [cmd]. The menagerie of optional
       parameters define a {!Cmdliner.Term.info} value for the term, see
       the docs there. By default [doc] is derived from the unit's doc string
-      and [exits] is {!B0_cli.Exit.infos}. *)
+      and [exits] is {!B0_std_cli.Exit.infos}. *)
 
   (** {1:meta Metadata}
 
@@ -233,9 +233,9 @@ val of_action :
 
 (** {2:cli Command line interaction}
 
-    Use {!B0_cli} to parse actions arguments and {!B0_cli.Exit} for
-    exit codes. Given a suitable {!Cmdliner} term this function can be
-    used to implement the action's command.
+    Use {!B0_std_cli} to parse actions arguments and {!Os.Exit}
+    for exit codes. Given a suitable {!Cmdliner} term this function
+    can be used to implement the action's command.
 
     {b TODO} Add a quick getopt interface. *)
 

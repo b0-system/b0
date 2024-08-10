@@ -174,7 +174,7 @@ let force =
 let file =
   let doc = "Generate to file $(docv)." in
   let absent = "$(b,stdout)" in
-  Arg.(value & pos 0 B0_cli.fpath Fpath.dash &
+  Arg.(value & pos 0 B0_std_cli.fpath Fpath.dash &
        info [] ~doc ~docv:"PATH" ~absent)
 
 let license_opt =
@@ -330,7 +330,7 @@ let src_cmd =
   and+ files =
     let doc = "Generate to file $(docv). Repeatable." in
     let absent = "$(b,stdout)" in
-    Arg.(value & pos_all B0_cli.fpath [] & info [] ~doc ~docv:"PATH" ~absent)
+    Arg.(value & pos_all B0_std_cli.fpath [] & info [] ~doc ~docv:"PATH" ~absent)
   and+ example =
     let doc =
       "Example source code. If $(b,--license) is unspecified, uses \
@@ -352,7 +352,7 @@ let snip_cmd =
   and+ files =
     let doc = "Generate to file $(docv). Repeatable." in
     let absent = "$(b,stdout)" in
-    Arg.(value & pos_right 0 B0_cli.fpath [] &
+    Arg.(value & pos_right 0 B0_std_cli.fpath [] &
          info [] ~doc ~docv:"PATH" ~absent)
   and+ template =
     let doc =

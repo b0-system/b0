@@ -15,7 +15,7 @@ let log details format op_selector c =
   let log_file = Fpath.(b0_dir / "b" / "user" / "_log") in
   let* pager = B0_pager.find ~don't () in
   let* () = B0_pager.page_stdout pager in
-  let* l = B0_cli.Memo.Log.read log_file in
+  let* l = B0_memo_log.read log_file in
   B0_cli.Memo.Log.out Fmt.stdout format details op_selector ~path:log_file l;
   Ok Os.Exit.ok
 
@@ -28,11 +28,11 @@ let cmd =
   let descr = [
     `P "The $(iname) command shows build information and operations in \
         various formats.";
-    `S B0_cli.s_output_format_options;
+    `S B0_std_cli.s_output_format_options;
     `S B0_cli.Op.s_selection_options;
     `Blocks B0_cli.Op.query_man ]
   in
   let descr = `Blocks descr in
   B0_tool.Cli.subcmd_with_driver_conf "log" ~doc ~descr @@
-  Term.(const log $ B0_cli.output_format () $
+  Term.(const log $ B0_std_cli.output_format () $
         B0_cli.Memo.Log.out_format_cli () $ B0_cli.Op.query_cli ())

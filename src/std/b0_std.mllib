@@ -9,6 +9,7 @@ B0_pdf_viewer
 B0_rsync
 B0_sexp
 B0_std
+B0_std_cli
 B0_tar
 B0_text
 B0_testing

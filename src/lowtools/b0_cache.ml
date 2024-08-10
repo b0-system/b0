@@ -37,8 +37,8 @@ let find_used_keys ~err ~cwd ~b0_dir ~log_file k =
   | _ ->
       Log.if_error' ~use:err_no_log_file @@
       Result.map_error (Fmt.str "Cannot determine used keys: %s") @@
-      let* l = B0_cli.Memo.Log.read file in
-      k (B0_cli.File_cache.keys_of_success_ops (B0_cli.Memo.Log.ops l))
+      let* l = B0_memo_log.read file in
+      k (B0_cli.File_cache.keys_of_success_ops (B0_memo_log.ops l))
 
 let find_dirs ~b0_dir ~cache_dir =
   let* cwd = Os.Dir.cwd () in
@@ -94,13 +94,13 @@ let sdocs = Manpage.s_common_options
 
 let setup =
   let setup tty_cap log_level =
-    let tty_cap = B0_cli.B0_std.get_tty_cap tty_cap in
-    let log_level = B0_cli.B0_std.get_log_level log_level in
-    B0_cli.B0_std.setup tty_cap log_level ~log_spawns:Log.Debug
+    let tty_cap = B0_std_cli.get_tty_cap tty_cap in
+    let log_level = B0_std_cli.get_log_level log_level in
+    B0_std_cli.setup tty_cap log_level ~log_spawns:Log.Debug
   in
   Term.(const setup $
-        B0_cli.B0_std.tty_cap ~docs:sdocs () $
-        B0_cli.B0_std.log_level ~docs:sdocs ())
+        B0_std_cli.tty_cap ~docs:sdocs () $
+        B0_std_cli.log_level ~docs:sdocs ())
 
 let b0_dir = B0_cli.Memo.b0_dir ~docs:sdocs ()
 let cache_dir = B0_cli.Memo.cache_dir ~docs:sdocs ()
@@ -112,7 +112,7 @@ let log_file =
     Cmdliner.Cmd.Env.info ~doc B0_cli.Memo.log_file_env
   in
   let absent = "Default $(b,_log) in b0 directory" in
-  Arg.(value & pos 0 (some B0_cli.fpath) None &
+  Arg.(value & pos 0 (some B0_std_cli.fpath) None &
        info [] ~absent ~env ~doc ~docv)
 
 let exits =

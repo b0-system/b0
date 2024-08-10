@@ -27,12 +27,12 @@ let main () =
     in
     let src =
       let doc = "$(docv) is the source file or directory" in
-      Arg.(required & pos 0 (some B0_cli.fpath) None &
+      Arg.(required & pos 0 (some B0_std_cli.fpath) None &
            info [] ~doc ~docv:"SRC")
     in
     let dst =
       let doc = "$(docv) is the destination path; which must not exist." in
-      Arg.(required & pos 1 (some B0_cli.fpath) None &
+      Arg.(required & pos 1 (some B0_std_cli.fpath) None &
            info [] ~doc ~docv:"DST")
     in
     Cmd.v (Cmd.info "test-cp" ~sdocs:Manpage.s_common_options)

@@ -794,7 +794,7 @@ let unit =
   in
   let list_cmd =
     let pkgs = pkgs ~doc:"Only list opam package $(docv) (repeatable)." () in
-    let format = B0_cli.output_format () in
+    let format = B0_std_cli.output_format () in
     let doc = "List opam packages and their defining packs" in
     Cmd.v (Cmd.info "list" ~doc ~man) @@
     Term.(const list_cmd $ const env $ pkgs $ format)
@@ -806,7 +806,7 @@ let unit =
     in
     let dst =
       let doc = "Write files in directory $(docv)." in
-      Arg.(value & opt (some ~none:"stdout" B0_cli.fpath) None &
+      Arg.(value & opt (some ~none:"stdout" B0_std_cli.fpath) None &
            info ["d"; "dir"] ~doc ~docv:"DIR")
     in
     let in_scope =
@@ -854,7 +854,7 @@ let unit =
       let doc = "The directory to the local (shallow and bare) clone of \
                  the package repository." in
       let none = "XDG_CACHE_HOME/opam-repository.git" in
-      Arg.(value & opt (some ~none B0_cli.fpath) None &
+      Arg.(value & opt (some ~none B0_std_cli.fpath) None &
            info ["local-repo"] ~doc ~docv:"DIR")
     in
     let github_auth = B0_github.Auth.cli () in

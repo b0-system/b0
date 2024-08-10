@@ -23,7 +23,7 @@ module Exit = struct
   let infos =
     info_deploy_error :: info_build_error ::
     info_b0_file_error :: info_no_b0_file ::
-    B0_cli.Exit.infos
+    B0_std_cli.Exit.infos
 end
 
 module Env = struct
@@ -113,9 +113,9 @@ module Conf = struct
       ~b0_dir ~b0_file ~cache_dir ~code ~hash_fun ~jobs
       ~log_level ~no_pager ~tty_cap ()
     =
-    let tty_cap = B0_cli.B0_std.get_tty_cap tty_cap in
-    let log_level = B0_cli.B0_std.get_log_level log_level in
-    B0_cli.B0_std.setup tty_cap log_level ~log_spawns:Log.Debug;
+    let tty_cap = B0_std_cli.get_tty_cap tty_cap in
+    let log_level = B0_std_cli.get_log_level log_level in
+    B0_std_cli.setup tty_cap log_level ~log_spawns:Log.Debug;
     let* cwd = Os.Dir.cwd () in
     let* env = Os.Env.current () in
     let b0_file = find_b0_file ~cwd ~b0_file in
@@ -137,7 +137,7 @@ module Cli = struct
     let env = Cmd.Env.info Env.b0_file in
     let doc = "Use $(docv) as the B0 file." and docv = "PATH" in
     let absent = "$(b,B0.ml) file in cwd or first upwards" in
-    Arg.(value & opt (Arg.some B0_cli.fpath) None &
+    Arg.(value & opt (Arg.some B0_std_cli.fpath) None &
          info ["b0-file"] ~absent ~doc ~docv ~docs ~env)
 
   let cache_dir = B0_cli.Memo.cache_dir ~docs ()
@@ -155,9 +155,9 @@ module Cli = struct
   let hash_fun = B0_cli.Memo.hash_fun ~docs ()
   let jobs = B0_cli.Memo.jobs ~docs ()
   let log_level =
-    B0_cli.B0_std.log_level ~docs ~env:(Cmd.Env.info Env.verbosity) ()
+    B0_std_cli.log_level ~docs ~env:(Cmd.Env.info Env.verbosity) ()
 
-  let tty_cap = B0_cli.B0_std.tty_cap ~docs ~env:(Cmd.Env.info Env.color) ()
+  let tty_cap = B0_std_cli.tty_cap ~docs ~env:(Cmd.Env.info Env.color) ()
   let no_pager = B0_pager.don't ~docs ()
   let conf =
     let conf
@@ -206,7 +206,7 @@ let run ~has_b0_file:b0_file =
         let b0_file = if b0_file then "with B0.ml" else "no B0.ml" in
         m "total time %s %s %s" d.name d.version b0_file
       end @@ fun () ->
-      B0_cli.Exit.of_eval_result @@
+      B0_std_cli.Exit.of_eval_result @@
       try main ()
       with B0_scope.After_seal e ->
         (* FIXME I suspect we may never see this it will be catched
@@ -353,7 +353,7 @@ module Compile = struct
     Fut.return ()
 
   let write_log_file ~log_file m =
-    Log.if_error ~use:() @@ B0_cli.Memo.Log.(write log_file (of_memo m))
+    Log.if_error ~use:() @@ B0_memo_log.(write log_file (of_memo m))
 
   let compile c ~driver ~feedback src =
     Result.bind (Conf.memo c) @@ fun m ->

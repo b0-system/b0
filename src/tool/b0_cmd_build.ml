@@ -69,12 +69,6 @@ let unit_set_of ~units ~packs =
   let pack_units = B0_pack.Set.fold add_pack packs [] in
   B0_unit.Set.of_list (List.rev_append units pack_units)
 
-let get_excluded_units ~x_units ~x_packs =
-  let* units = B0_unit.get_list_or_hint ~all_if_empty:false x_units in
-  let* packs = B0_pack.get_list_or_hint ~all_if_empty:false x_packs in
-  let packs = B0_pack.Set.of_list packs in
-  Ok (unit_set_of ~units ~packs)
-
 let get_default_build () = match B0_pack.find "default" with
 | None -> B0_unit.list (), []
 | Some t -> [], [t]
@@ -258,7 +252,7 @@ let build units x_units packs x_packs what lock show_path action args c =
   | None -> Fun.const false
   | Some u -> B0_unit.equal u
   in
-  let* x_units = get_excluded_units ~x_units ~x_packs in
+  let* x_units = B0_cli.get_excluded_units ~x_units ~x_packs in
   let* units = B0_unit.get_list_or_hint ~all_if_empty:false units in
   let* packs = B0_pack.get_list_or_hint ~all_if_empty:false packs in
   let units, packs = match action_unit with

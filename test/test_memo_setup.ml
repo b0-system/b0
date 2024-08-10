@@ -28,5 +28,5 @@ let with_memo ?jobs f =
   | Ok () -> ()
   | Error e -> (B0_zero_conv.Op.pp_aggregate_error ()) Fmt.stderr e
   end;
-  Log.if_error ~use:() (B0_cli.Memo.Log.(write log_file (of_memo m)));
+  Log.if_error ~use:() (B0_memo_log.(write log_file (of_memo m)));
   Ok ()

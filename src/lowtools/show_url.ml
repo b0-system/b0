@@ -17,9 +17,9 @@ let urify u = (* Detects if u is simply a file path and urifies it *)
   Ok (file_url Fpath.(cwd // p))
 
 let show_urls tty_cap log_level background prefix browser urls =
-  let tty_cap = B0_cli.B0_std.get_tty_cap tty_cap in
-  let log_level = B0_cli.B0_std.get_log_level log_level in
-  B0_cli.B0_std.setup tty_cap log_level ~log_spawns:Log.Debug;
+  let tty_cap = B0_std_cli.get_tty_cap tty_cap in
+  let log_level = B0_std_cli.get_log_level log_level in
+  B0_std_cli.setup tty_cap log_level ~log_spawns:Log.Debug;
   Log.if_error ~use:1 @@
   let* browser = B0_web_browser.find ?cmd:browser () in
   let open_url u = B0_web_browser.show ~background ~prefix browser (urify u) in
@@ -54,8 +54,8 @@ let uris =
 let tool =
   Cmd.v (Cmd.info "show-url" ~version ~doc ~sdocs ~exits ~man)
     Term.(const show_urls $
-          B0_cli.B0_std.tty_cap ~docs:sdocs () $
-          B0_cli.B0_std.log_level ~docs:sdocs () $
+          B0_std_cli.tty_cap ~docs:sdocs () $
+          B0_std_cli.log_level ~docs:sdocs () $
           B0_web_browser.background () $
           B0_web_browser.prefix ~default:false () $
           B0_web_browser.browser () $ uris)

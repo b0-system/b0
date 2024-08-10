@@ -144,7 +144,7 @@ module Cli = struct
         `S Manpage.s_commands;
         `S Manpage.s_arguments;
         `S Manpage.s_options;
-        `S B0_cli.s_output_format_options;
+        `S B0_std_cli.s_output_format_options;
         `S s_scope_selection;
         `S Manpage.s_common_options;
        man_see_manual ]
@@ -155,7 +155,7 @@ module Cli = struct
 
   let editor_envs = B0_editor.Env.infos
   let pager_envs = B0_pager.Env.infos
-  let format = B0_cli.output_format ()
+  let format = B0_std_cli.output_format ()
   let no_pager = B0_driver.Cli.no_pager
   let pos_key =
     let doc = "The metadata key $(docv) to get." and docv = "KEY" in
@@ -163,9 +163,9 @@ module Cli = struct
 
   let minimal_setup =
     let minimal_setup_with_cli log_level tty_cap =
-      let tty_cap = B0_cli.B0_std.get_tty_cap tty_cap in
-      let log_level = B0_cli.B0_std.get_log_level log_level in
-      B0_cli.B0_std.setup tty_cap log_level ~log_spawns:Log.Debug;
+      let tty_cap = B0_std_cli.get_tty_cap tty_cap in
+      let log_level = B0_std_cli.get_log_level log_level in
+      B0_std_cli.setup tty_cap log_level ~log_spawns:Log.Debug;
     in
     Term.(const minimal_setup_with_cli $ B0_driver.Cli.log_level $
           B0_driver.Cli.tty_cap)

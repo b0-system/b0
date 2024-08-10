@@ -224,7 +224,7 @@ let symlink =
        created if it doesn't exist."
     in
     let docv = "DIR" in
-    Arg.(value & opt B0_cli.fpath (Fpath.v ".") &
+    Arg.(value & opt B0_std_cli.fpath (Fpath.v ".") &
          info ["d"; "in-dir"] ~doc ~docv)
   in
   let rm =

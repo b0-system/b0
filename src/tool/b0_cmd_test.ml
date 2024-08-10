@@ -89,7 +89,7 @@ let test allow_long allow_empty units x_units packs x_packs what lock c =
     if units = [] && packs = [] then B0_cmd_build.get_default_build () else
     units, packs
   in
-  let* x_units = B0_cmd_build.get_excluded_units ~x_units ~x_packs in
+  let* x_units = B0_cli.get_excluded_units ~x_units ~x_packs in
   let tests =
     let packs = B0_pack.Set.of_list packs in
     let us = B0_cmd_build.unit_set_of ~units ~packs in
