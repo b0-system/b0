@@ -1657,7 +1657,9 @@ let byte_code_build_load_args b units =
   with
   | Failure e -> Error e
 
-let run_ocaml env ~use_utop ~dry_run ~args units =
+let run_ocaml
+    env ~use_utop ~dry_run ~args ~x_units (* TODO in resolver *) units
+  =
   let open Result.Syntax in
   let b = B0_env.build env in
   let top = Cmd.tool (if use_utop then "utop" else "ocaml") in
@@ -1690,10 +1692,13 @@ let run_ocaml_term func env =
   Term.(const func $ const env $ use_utop $ dry_run $ args)
 
 let load_lib =
+  let open Result.Syntax in
   B0_unit.Action.of_cmdliner_term @@ fun env u ->
   let run env use_utop dry_run args =
     Log.if_error ~use:Os.Exit.some_error @@
-    run_ocaml env ~use_utop ~dry_run ~args (B0_unit.Set.singleton u)
+    let* x_units = B0_cli.get_excluded_units ~x_units ~x_packs in
+    let x_units = B0_unit.Set.filter (fun u -> B0_unit.has_tag tag u) x_units in
+    run_ocaml env ~use_utop ~dry_run ~args ~x_units (B0_unit.Set.singleton u)
   in
   run_ocaml_term run env
 
@@ -2213,7 +2218,10 @@ let ocaml env use_utop dry_run args =
   Log.if_error ~use:Os.Exit.some_error @@
   let b = B0_env.build env in
   let units = B0_build.did_build b in
+  let* x_units = B0_cli.get_excluded_units ~x_units ~x_packs in
+  let x_units = B0_unit.Set.filter (B0_unit.has_tag tag) x_units in
   let units = B0_unit.Set.filter (B0_unit.has_tag tag) units in
+  let units = B0_unit.Set.diff units x_units in
   begin match B0_unit.Set.is_empty units with
   | true -> Log.warn (fun m -> m "The build has no OCaml entities to load.")
   | false ->
@@ -2221,7 +2229,7 @@ let ocaml env use_utop dry_run args =
       m "Did build: @[%a@]"
         Fmt.(iter B0_unit.Set.iter ~sep:sp B0_unit.pp_name) units;
   end;
-  run_ocaml env ~use_utop ~dry_run ~args units
+  run_ocaml env ~use_utop ~dry_run ~args ~x_units units
 
 let ocaml_ocaml_cmd env u =
   (* N.B. We have that separately for now because we can't

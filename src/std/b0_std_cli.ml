@@ -21,7 +21,7 @@ module Exit = struct
   let of_eval_result ?(term_error = Os.Exit.cli_error) = function
   | Ok (`Ok e) -> e
   | Ok _ -> Os.Exit.ok
-  | Error `Term -> term_error
+  | Error `Term -> Os.Exit.cli_error
   | Error `Parse -> Os.Exit.cli_error
   | Error `Exn -> Os.Exit.internal_error
 end
