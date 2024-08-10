@@ -1590,9 +1590,8 @@ let don't_load =
     libname "compiler-libs.toplevel";
     libname "compiler-libs.native-toplevel"; ]
 
-let don't_load lib = Libname.Set.mem (Lib.libname lib) don't_load
 
-let byte_code_build_load_args b units =
+let byte_code_build_load_args b ~x_units units =
   (* This is first good step. Also we don't have a notion of stable
      order for sort_mods, but we don't have one in the first place in b0
      OCaml exe specification yet I think. *)
@@ -1638,6 +1637,17 @@ let byte_code_build_load_args b units =
       loop libs_acc inc_mods mods units
   in
   try
+    let units = B0_unit.Set.diff units x_units in
+    let don't_load =
+      (* Note perhaps this could be a bit more subtle and we should
+         exclude *build* lookups a the resolver level (i.e. let
+         the other resolvers quick in if needed *)
+      let add_unit_lib xu acc = match B0_unit.find_meta library xu with
+      | None -> acc | Some libname -> Libname.Set.add libname acc
+      in
+      B0_unit.Set.fold add_unit_lib x_units don't_load
+    in
+    let units = B0_unit.Set.elements units in
     let add_lib_opts cmd lib =
       let cma = Option.map Cmd.path (Lib.cma lib) in
       Cmd.(cmd % "-I" %% path (Lib.dir lib) %% if_some cma)
@@ -1650,6 +1660,7 @@ let byte_code_build_load_args b units =
     let libs = Libresolver.get_list_and_deps m resolver libs in
     B0_memo.stir ~block:true m;
     let libs = Fut.sync libs in
+    let don't_load lib = Libname.Set.mem (Lib.libname lib) don't_load in
     let libs = List.filter (Fun.negate don't_load) libs in
     let lib_opts = List.fold_left add_lib_opts Cmd.empty libs in
     let inc_mods = Cmd.paths ~slip:"-I" (Fpath.Set.elements inc_mods) in
@@ -1664,7 +1675,7 @@ let run_ocaml
   let b = B0_env.build env in
   let top = Cmd.tool (if use_utop then "utop" else "ocaml") in
   let* exe = B0_env.get_cmd env top in
-  let* load_args = byte_code_build_load_args b (B0_unit.Set.elements units) in
+  let* load_args = byte_code_build_load_args b ~x_units units in
   let args = Cmd.of_list Fun.id args in
   let top = Cmd.(exe %% load_args %% args) in
   match dry_run with
@@ -1675,26 +1686,31 @@ let run_ocaml
 
 let run_ocaml_term func env =
   let open Cmdliner in
-  let dry_run =
+  let open Cmdliner.Term.Syntax in
+  let+ dry_run =
     let doc = "Show $(b,ocaml) invocation rather than executing it." in
     Arg.(value & flag & info ["dry-run"] ~doc)
-  in
-  let use_utop =
+  and+ use_utop =
     let doc = "Use $(b,utop) rather than $(b,ocaml)." in
     Arg.(value & flag & info ["utop"] ~doc)
-  in
-  let args =
+  and+ x_units =
+    let doc = "Exclude objects of $(docv) from loading." in
+    B0_cli.x_units ~doc ()
+  and+ x_packs =
+    let doc = "Exclude objects of units of $(docv) from loading." in
+    B0_cli.x_packs ~doc ()
+  and+ args =
     let doc =
       "Arguments for the $(b,ocaml) executable. Specify them after $(b,--)."
     in
     Arg.(value & pos_all string [] & info [] ~doc ~docv:"ARG")
   in
-  Term.(const func $ const env $ use_utop $ dry_run $ args)
+  func env use_utop dry_run x_units x_packs args
 
 let load_lib =
   let open Result.Syntax in
   B0_unit.Action.of_cmdliner_term @@ fun env u ->
-  let run env use_utop dry_run args =
+  let run env use_utop dry_run x_units x_packs args =
     Log.if_error ~use:Os.Exit.some_error @@
     let* x_units = B0_cli.get_excluded_units ~x_units ~x_packs in
     let x_units = B0_unit.Set.filter (fun u -> B0_unit.has_tag tag u) x_units in
@@ -2214,14 +2230,13 @@ let unit =
   let name = B0_unit.name u in
   Cmd.group (Cmd.info name ~doc ~man) @@ [ crunch; list; meta ]
 
-let ocaml env use_utop dry_run args =
+let ocaml env use_utop dry_run x_units x_packs args =
   Log.if_error ~use:Os.Exit.some_error @@
   let b = B0_env.build env in
   let units = B0_build.did_build b in
   let* x_units = B0_cli.get_excluded_units ~x_units ~x_packs in
   let x_units = B0_unit.Set.filter (B0_unit.has_tag tag) x_units in
   let units = B0_unit.Set.filter (B0_unit.has_tag tag) units in
-  let units = B0_unit.Set.diff units x_units in
   begin match B0_unit.Set.is_empty units with
   | true -> Log.warn (fun m -> m "The build has no OCaml entities to load.")
   | false ->
@@ -2237,7 +2252,7 @@ let ocaml_ocaml_cmd env u =
   let man =
     [ `S Cmdliner.Manpage.s_synopsis;
       `P "$(b,b0) [$(b,-p) $(i,PACK)]… [$(b,-u) $(i,UNIT)]… \
-          -- .ocaml.ocaml -- $(i,ARG)…";
+          -- .ocaml.ocaml [$(i,OPTION)]… -- $(i,ARG)…";
       `S Cmdliner.Manpage.s_description;
       `P "$(iname) loads the build you specify for the action \
           in the $(b,ocaml) interactive toplevel. This also \
