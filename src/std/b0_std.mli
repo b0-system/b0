@@ -145,6 +145,20 @@ module Fmt : sig
   val semi : 'a t
   (** [semi] is {!Fmt.any}[ ";@ "]. *)
 
+  (*
+  val with_newline : nl:string -> 'a t -> 'a t
+  (** [with_newline ~nl pp] formats like [pp] but the string [~nl] is
+      used for issuing newlines. In 5.2.0 that doesn't work see
+      {{:https://github.com/ocaml/ocaml/issues/13371}This bug report} *)
+*)
+
+  val suffix_lines : suffix:string -> 'a t -> 'a t
+  (** [suffix_lines ~suffix pp] adds [suffix] to the lines
+      formatted by [pp]. {b Note.} Not very compositional: first
+      formats to a string, cuts the string and then formats the
+      lines. *)
+
+
   (** {1:sequencing Sequencing} *)
 
   val iter : ?sep:unit t -> (('a -> unit) -> 'b -> unit) -> 'a t -> 'b t
@@ -2131,8 +2145,13 @@ v}
   val pp : t Fmt.t
   (** [pp] is an unspecified formatter for commands. *)
 
+  val pp_shell : t Fmt.t
+  (** [pp_shell] formats a command as a multiline shell command
+      that can be cut and pasted. {b Note.} Currently this may
+      overflow your boxes. *)
+
   val pp_dump : t Fmt.t
-  (** [pp_dump] formats raw dadta for debugging. *)
+  (** [pp_dump] formats raw data for debugging. *)
 
   (** {1:stamp Stamps}
 

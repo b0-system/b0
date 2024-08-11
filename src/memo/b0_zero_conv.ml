@@ -70,14 +70,15 @@ module Op = struct
     let pp_tool ppf t = Fmt.st style_cmd_tool ppf (pquote t) in
     let pp_arg ppf a = Fmt.pf ppf "%s" (quote a) in
     let pp_o_arg ppf a = Fmt.st style_file_write ppf (quote a) in
-    let pp_sep ppf ~last = match last with
-    | "-I" | "-L" | "-o" | "-f" | "-d" -> Fmt.char ppf ' '
+    let is_opt s = String.length s > 1 && s.[0] = '-' in
+    let pp_sep ppf ~last a = match last with
+    | s when is_opt last && not (is_opt a) -> Fmt.char ppf ' '
     | _ -> Fmt.sp ppf ()
     in
     let rec pp_args ~last ppf = function
     | [] -> ()
     | a :: args ->
-        pp_sep ppf ~last;
+        pp_sep ppf ~last a;
         if String.equal last "-o" then pp_o_arg ppf a else pp_arg ppf a;
         pp_args ~last:a ppf args
     in
@@ -89,14 +90,18 @@ module Op = struct
     | `Tee f | `File f ->
         Fmt.pf ppf "@ %s %a" redir pp_o_arg (Fpath.to_string f)
     in
-    (if single_line then Fmt.pf ppf "@[<h>" else Fmt.pf ppf "@[<1>");
-    pp_brack ppf "[";
-    pp_tool ppf (Op.Spawn.tool s); pp_args ~last:"" ppf args;
-    pp_stdin ppf (Op.Spawn.stdin s);
-    pp_stdo ">" ppf (Op.Spawn.stdout s);
-    pp_stdo "2>" ppf (Op.Spawn.stderr s);
-    pp_brack ppf "]";
-    Fmt.pf ppf "@]"
+    let pp ppf s =
+      if single_line then Fmt.pf ppf "@[<h>" else Fmt.pf ppf "@[<1>";
+      pp_brack ppf "[";
+      pp_tool ppf (Op.Spawn.tool s); pp_args ~last:"" ppf args;
+      pp_stdin ppf (Op.Spawn.stdin s);
+      pp_stdo ">" ppf (Op.Spawn.stdout s);
+      pp_stdo "2>" ppf (Op.Spawn.stderr s);
+      pp_brack ppf "]";
+      Fmt.pf ppf "@]"
+    in
+    if single_line then pp ppf s else
+    Fmt.suffix_lines ~suffix:" \\" pp ppf s
 
   let pp_spawn_and_exit =
     Fmt.(pp_spawn_cmd ~single_line:true ++ using Op.Spawn.exit pp_spawn_exit)

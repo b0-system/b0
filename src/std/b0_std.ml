@@ -152,6 +152,17 @@ module Fmt = struct
   let comma ppf _ = Format.pp_print_string ppf ","; sp ppf ()
   let semi ppf _ = Format.pp_print_string ppf ";"; sp ppf ()
 
+  (*
+  (* Doesn't work https://github.com/ocaml/ocaml/issues/13371 *)
+  let with_newline ~nl pp = fun ppf v ->
+    let outf = Format.pp_get_formatter_out_functions ppf () in
+    let out_newline () = outf.out_string nl 0 (String.length nl) in
+    let outf_with_nl = { outf with out_newline } in
+    let finally () = Format.pp_set_formatter_out_functions ppf outf in
+    Format.pp_set_formatter_out_functions ppf outf_with_nl;
+    Fun.protect ~finally @@ fun () -> pp ppf v
+  *)
+
   (* Sequencing *)
 
   let iter ?sep:(pp_sep = cut) iter pp_elt ppf v =
@@ -441,6 +452,17 @@ module Fmt = struct
   | false ->
       for i = 0 to max - 2 do Format.pp_print_char ppf s.[i] done;
       Format.fprintf ppf "@<1>%s" "…"
+
+  let suffix_lines ~suffix pp ppf v =
+    let b = Buffer.create 255 in
+    let () = box pp (Format.formatter_of_buffer b) v in
+    let lines = Buffer.contents b in
+    let lines = String.split_on_char '\n' lines in
+    let last = List.length lines - 1 in
+    let add_newline_esc i l = if i = last then l else l ^ suffix in
+    let lines = List.mapi add_newline_esc lines in
+    vbox (list string) ppf lines
+
 
   (* ASCII text *)
 
@@ -2630,6 +2652,25 @@ module Cmd = struct
   let pp_dump ppf l =
     let pp_arg ppf a = Fmt.string ppf (Filename.quote a) in
     Fmt.pf ppf "@[<h>%a@]" Fmt.(list ~sep:sp pp_arg) (to_list l)
+
+  let pp_shell =
+    let pp_arg ppf a = Fmt.string ppf (Filename.quote a) in
+    let pp_cmd ppf l =
+      let is_opt s = String.length s > 1 && s.[0] = '-' in
+      match (to_list l) with
+      | [] -> ()
+      | s :: ss ->
+          let rec loop ~last_is_opt ppf = function
+          | [] -> ()
+          | s :: ss ->
+              let is_opt = is_opt s in
+              (if last_is_opt && not is_opt
+               then Fmt.char ppf ' ' else Fmt.sp ppf ());
+              pp_arg ppf s; loop ~last_is_opt:is_opt ppf ss
+          in
+          pp_arg ppf s; loop ~last_is_opt:(is_opt s) ppf ss
+    in
+    Fmt.suffix_lines ~suffix:" \\" pp_cmd
 
   let rec fold ~arg ~unstamp ~append ~empty = function
   | A a -> arg a

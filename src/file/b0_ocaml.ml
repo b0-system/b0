@@ -1670,7 +1670,7 @@ let run_ocaml
   match dry_run with
   | false -> Ok (Os.Exit.execv top)
   | true ->
-      Log.app (fun m -> m "%s" (Cmd.to_string top));
+      Log.app (fun m -> m "%a" Cmd.pp_shell top);
       Ok Os.Exit.ok
 
 let run_ocaml_term func env =
