@@ -702,6 +702,20 @@ module String = struct
     in
     loop 0
 
+  (* Finding indices *)
+
+  let find_index ?(start = 0) sat s =
+    let max = String.length s - 1 in
+    let i = ref start in
+    while (!i <= max && not (sat s.[!i])) do incr i done;
+    if !i > max then None else Some !i
+
+  let rfind_index ?start sat s =
+    let start = match start with None -> String.length s - 1 | Some s -> s in
+    let i = ref start in
+    while (0 <= !i && not (sat s.[!i])) do decr i done;
+    if !i < 0 then None else Some !i
+
   (* Finding substrings.  *)
 
   let find_sub ?(start = 0) ~sub s =

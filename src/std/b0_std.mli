@@ -145,19 +145,10 @@ module Fmt : sig
   val semi : 'a t
   (** [semi] is {!Fmt.any}[ ";@ "]. *)
 
-  (*
-  val with_newline : nl:string -> 'a t -> 'a t
-  (** [with_newline ~nl pp] formats like [pp] but the string [~nl] is
-      used for issuing newlines. In 5.2.0 that doesn't work see
-      {{:https://github.com/ocaml/ocaml/issues/13371}This bug report} *)
-*)
-
   val suffix_lines : suffix:string -> 'a t -> 'a t
-  (** [suffix_lines ~suffix pp] adds [suffix] to the lines
-      formatted by [pp]. {b Note.} Not very compositional: first
-      formats to a string, cuts the string and then formats the
-      lines. *)
-
+  (** [suffix_lines ~suffix pp] adds [suffix] to the lines formatted
+      by [pp]. {b Note.} Not very compositional: first formats to a
+      string, cuts the string and then formats the lines. *)
 
   (** {1:sequencing Sequencing} *)
 
@@ -638,17 +629,32 @@ module String : sig
 
   val for_all : (char -> bool) -> string -> bool
   (** [for_all p s] is [true] iff for all indices [i] of [s], [p s.[i]
-      = true]. *)
+      = true].
+
+      {b Note.} Available in 4.13 *)
 
   val exists : (char -> bool) -> string -> bool
   (** [exists p s] is [true] iff there exists an index [i] of [s] with
-      [p s.[i] = true]. *)
+      [p s.[i] = true].
+
+      {b Note.} Available in 4.13 *)
+
+  (** {1:find Finding indices} *)
+
+  val find_index : ?start:int -> (char -> bool) -> string -> int option
+  (** [find_index ~start sat] is the index of the first character of
+      [s] that satisfies [sat] before or at [start] (defaults to [0]). *)
+
+  val rfind_index : ?start:int -> (char -> bool) -> string -> int option
+  (** [rfind_index ~start sat] is the index of the first character of
+      [s] that satisfies [sat] before or at [start] (defaults to
+      [String.length s - 1]). *)
 
   (** {1:find Finding and replacing substrings} *)
 
   val find_sub : ?start:int -> sub:string -> string -> int option
   (** [find_sub ~start ~sub s] is the start index (if any) of the
-      first occurence of [sub] in [s] at or after [start]. *)
+      first occurence of [sub] in [s] at or after [start] (default to [0]). *)
 
   val rfind_sub : ?start:int -> sub:string -> string -> int option
   (** [rfind_sub ~start ~sub s] is the start index (if any) of the
