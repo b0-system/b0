@@ -245,7 +245,9 @@ let do_action_exit c build action_unit ~args =
 
 (* Build command *)
 
-let build units x_units packs x_packs what lock show_path action args c =
+let build
+    units x_units packs x_packs what lock show_path build_only action args c
+  =
   Log.if_error ~use:Os.Exit.no_such_name @@
   let* action_unit = find_action_unit action in
   let is_action = match action_unit with
@@ -284,6 +286,7 @@ let build units x_units packs x_packs what lock show_path action args c =
       match action_unit with
       | None -> Ok Os.Exit.ok
       | Some action_unit when show_path -> do_show_path action_unit ~args
+      | Some action_unit when build_only -> Ok Os.Exit.ok
       | Some action_unit -> do_action_exit c build action_unit ~args
 
 (* Command line interface *)
@@ -322,6 +325,10 @@ let show_path =
   in
   Arg.(value & flag & info ["path"] ~doc)
 
+let build_only =
+  let doc = "Build only. Do not execute the action." in
+  Arg.(value & flag & info ["b"; "build"] ~doc)
+
 let action =
   let doc = "Action or tool to run. Specify it after a $(b,--) otherwise \
              it gets taken for a $(mname) command when $(b,b0) is used \
@@ -335,7 +342,7 @@ let args =
 
 let term =
   Term.(const build $ units $ x_units $ packs $ x_packs $ what $ lock $
-        show_path $ action $ args)
+        show_path $ build_only $ action $ args)
 
 let cmd =
   let doc = "Build and run actions (default command)" in
