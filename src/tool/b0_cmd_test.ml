@@ -26,17 +26,22 @@ let pp_fail ppf (u, st) =
   Fmt.pf ppf "@[%a %a %a@]"
     Fmt.code "b0 test -u" B0_unit.pp_name u (Fmt.option Os.Cmd.pp_status) st
 
-let pp_report ppf (total, dur, fails) = match fails with
+
+let pp_report ppf (test_count, total, dur, fails) = match fails with
 | [] ->
-    Fmt.pf ppf "@[%a The build %a all tests in %a (%a with build)@]"
-      Test_fmt.pp_pass () Test_fmt.pp_passed () Test_fmt.pp_dur dur
+    Fmt.pf ppf "@[%a The build %a all %a %s in %a (%a with build)@]"
+      Test_fmt.pp_pass () Test_fmt.pp_passed ()
+      Test_fmt.pp_count test_count
+      (if test_count < 2 then "test unit" else "test units")
+      Test_fmt.pp_dur dur
       Mtime.Span.pp total
 | fails ->
     let count = List.length fails in
-    Fmt.pf ppf "%a @[<v>The build %a %a %s in %a:@,%a@]"
-      Test_fmt.pp_fail () Test_fmt.pp_failed ()
-      Test_fmt.pp_count count
-      (if count <= 1 then "test unit" else "test units")
+    Fmt.pf ppf "%a @[<v>The build %a %a/%a %s in %a:@,%a@]"
+      Test_fmt.pp_fail ()
+      Test_fmt.pp_failed ()
+      Test_fmt.pp_count count Test_fmt.pp_count test_count
+      (if test_count < 2 then "test unit" else "test units")
       Test_fmt.pp_dur dur (Fmt.list pp_fail) fails
 
 let is_test ~allow_long u =
@@ -121,9 +126,11 @@ let test allow_long allow_empty units x_units packs x_packs what lock c =
   match B0_build.run build with
   | Error () -> Ok B0_driver.Exit.build_error
   | Ok () ->
+      let test_count = B0_unit.Set.cardinal tests in
       let tests = B0_unit.Set.elements tests in
       let dur, fails = run_tests c build Mtime.Span.zero [] tests in
-      Log.app (fun m -> m "%a" pp_report (Os.Mtime.count total, dur, fails));
+      Log.app (fun m ->
+          m "%a" pp_report (test_count, Os.Mtime.count total, dur, fails));
       Ok (if fails <> [] then exit_test_error else Os.Exit.ok)
 
 (* Command line interface *)

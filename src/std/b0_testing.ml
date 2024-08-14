@@ -87,7 +87,7 @@ module Test = struct
   let report_fail ~dur =
     log' "@[%a %a/%a %s %a in %a@]"
       pp_fail () pp_count !fail_count pp_count !test_count
-      (if !test_count <= 1 then "test" else "tests")
+      (if !fail_count <= 1 then "test" else "tests")
       pp_failed () pp_dur (Os.Mtime.count dur);
     !fail_count
 
