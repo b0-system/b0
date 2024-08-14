@@ -1300,12 +1300,13 @@ module Fpath : sig
   val fmt : ('a, Format.formatter, unit, t) format4 -> 'a
   (** [fmt …] is [Fmt.kstr v …]. *)
 
-  val add_seg : t -> string -> t
+  val add_seg : t -> string -> (t, string) result
   (** [add_seg p seg] if [p]'s last segment is non-empty this is
       [p] with [seg] added. If [p]'s last segment is empty, this is
       [p] with the empty segment replaced by [seg].
 
-      Raises [Invalid_argument] if [is_seg seg] is [false]. *)
+      This errors if [is_seg seg] is [false]. *)
+
 
   val append : t -> t -> t
   (** [append p q] appends [q] to [p] as follows:
@@ -1315,7 +1316,9 @@ module Fpath : sig
       {- Otherwise appends [q]'s segments to [p] using {!add_seg}.}} *)
 
   val ( / ) : t -> string -> t
-  (** [p / seg] is [add_seg p seg]. Left associative. *)
+  (** [p / seg] is [add_seg p seg |> Result.get_ok'].
+      Left associative. {b Warning.} Use {!add_seg} to deal with
+      untrusted [seg] values. *)
 
   val ( // ) : t -> t -> t
   (** [p // p'] is [append p p']. Left associative. *)

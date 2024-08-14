@@ -1867,10 +1867,13 @@ module Fpath = struct
   let to_string p = p
   let v s = match of_string s with Ok p -> p | Error m -> invalid_arg m
   let fmt fmt = Fmt.kstr v fmt
-  let add_seg p seg =
+  let add_seg' p seg =
     if not (is_seg seg) then invalid_arg (err_invalid_seg seg) else
     let sep = if last_is_dir_sep p then "" else dir_sep in
     String.concat sep [p; seg]
+
+  let add_seg p seg = try Ok (add_seg' p seg) with
+  | Invalid_argument e -> Error e
 
   let append = if Sys.win32 then Windows.append else Posix.append
 
@@ -1898,7 +1901,7 @@ module Fpath = struct
         end
     | _ -> false
 
-  let add_dir_sep p = add_seg p ""
+  let add_dir_sep p = add_seg' p ""
 
   let strip_dir_sep p = match String.length p with
   | 1 -> p
@@ -2085,7 +2088,7 @@ module Fpath = struct
     | false -> plen - 1
     in
     let seg_len = seg_stop - seg_start + 1 in
-    let via_dotdot p = add_seg (add_seg p "..") "" in
+    let via_dotdot p = add_seg' (add_seg' p "..") "" in
     match seg_len with
     | 0 -> p
     | 1 when p.[seg_start] = '.' ->
@@ -2093,7 +2096,7 @@ module Fpath = struct
         parent (String.subrange ~last:(seg_start - 1) p)
     | 2 when p.[seg_start] = '.' && p.[seg_stop] = '.' -> via_dotdot p
     | _ when seg_start = 0 -> "./"
-    | _ -> add_seg (String.subrange ~last:(seg_start - 1) p) ""
+    | _ -> add_seg' (String.subrange ~last:(seg_start - 1) p) ""
 
   let equal_basename p0 p1 = (* XXX could avoid alloc *)
     String.equal (basename p0) (basename p1)
@@ -2118,7 +2121,7 @@ module Fpath = struct
           else
           match strip_prefix dir p with
           | Some q -> append loc q
-          | None -> loop (add_seg loc "..") (parent dir)
+          | None -> loop (add_seg' loc "..") (parent dir)
         in
         loop ".." (parent to_dir)
 
@@ -2186,7 +2189,7 @@ module Fpath = struct
 
   (* Operators *)
 
-  let ( / ) = add_seg
+  let ( / ) = add_seg'
   let ( // ) = append
   let ( + ) p e = add_ext e p
   let ( -+ ) p e = set_ext e p
