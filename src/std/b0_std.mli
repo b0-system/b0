@@ -1307,7 +1307,6 @@ module Fpath : sig
 
       This errors if [is_seg seg] is [false]. *)
 
-
   val append : t -> t -> t
   (** [append p q] appends [q] to [p] as follows:
       {ul
