@@ -22,31 +22,34 @@ let pp_run_tests ppf tests =
     Fmt.(st [`Fg `Green]) "tests"
     Fmt.(list B0_unit.pp_synopsis) (B0_unit.Set.elements tests)
 
-let pp_fail ppf (u, st) =
-  Fmt.pf ppf "@[%a %a %a@]"
-    Fmt.code "b0 test -u" B0_unit.pp_name u (Fmt.option Os.Cmd.pp_status) st
+let pp_fail ppf ~allow_long (u, st) =
+  Fmt.pf ppf "@[%a%a %a %a %a@]"
+    Fmt.code "b0 test"
+    Fmt.code (if allow_long then " -l" else "")
+    Fmt.code "-u" B0_unit.pp_name u (Fmt.option Os.Cmd.pp_status) st
 
+let test_unit_msg n = if n <= 1 then "test unit" else "test units"
 
-let pp_report ppf (test_count, total, dur, fails) = match fails with
-| [] ->
-    Fmt.pf ppf "@[%a The build %a all %a %s in %a (%a with build)@]"
-      Test_fmt.pp_pass () Test_fmt.pp_passed ()
-      Test_fmt.pp_count test_count
-      (if test_count < 2 then "test unit" else "test units")
-      Test_fmt.pp_dur dur
-      Mtime.Span.pp total
-| fails ->
-    let count = List.length fails in
-    Fmt.pf ppf "%a @[<v>The build %a %a/%a %s in %a:@,%a@]"
-      Test_fmt.pp_fail ()
-      Test_fmt.pp_failed ()
-      Test_fmt.pp_count count Test_fmt.pp_count test_count
-      (if test_count < 2 then "test unit" else "test units")
-      Test_fmt.pp_dur dur (Fmt.list pp_fail) fails
+let pp_report ppf (allow_long, test_count, total, dur, fails) =
+  match fails with
+  | [] ->
+      Fmt.pf ppf "@[<v>%a The build %a all %a %s in %a (%a with build)@]"
+        Test_fmt.pp_pass () Test_fmt.pp_passed ()
+        Test_fmt.pp_count test_count
+        (test_unit_msg test_count)
+        Test_fmt.pp_dur dur
+        Mtime.Span.pp total
+  | fails ->
+      let count = List.length fails in
+      Fmt.pf ppf "%a @[<v>The build %a %a/%a %s in %a:@,%a@]"
+        Test_fmt.pp_fail ()
+        Test_fmt.pp_failed ()
+        Test_fmt.pp_count count Test_fmt.pp_count test_count
+        (test_unit_msg test_count)
+        Test_fmt.pp_dur dur (Fmt.list (pp_fail ~allow_long)) fails
 
-let is_test ~allow_long u =
-  B0_unit.(has_tag B0_meta.run u && has_tag B0_meta.test u &&
-           (allow_long || not (has_tag B0_meta.long u)))
+let is_test u = B0_unit.(has_tag B0_meta.run u && has_tag B0_meta.test u)
+let is_long = B0_unit.has_tag B0_meta.long
 
 let show_what
     ~allow_long ~tests ~lock ~may_build ~must_build ~is_locked ~locked_packs c
@@ -85,6 +88,22 @@ let rec run_tests c build dur fails = function
         let dur = Mtime.Span.add dur tdur in
         log_sep (); run_tests c build dur ((u, Some st) :: fails) us
 
+let show_skip_tests us =
+  let pp_skipped ppf skipped =
+    if skipped = 0 then () else
+    Fmt.pf ppf "%s %a long %s %a, invoke with %a to run."
+      Test_fmt.padding
+      Test_fmt.pp_count skipped (test_unit_msg skipped)
+      Test_fmt.pp_skipped () Fmt.code "-l"
+  in
+  let pp_skip ppf u =
+    Fmt.pf ppf "%a Long %a" Test_fmt.pp_skip () B0_unit.pp_name u
+  in
+  if B0_unit.Set.is_empty us then () else
+  let count = B0_unit.Set.cardinal us in
+  Log.app @@ fun m ->
+  m "@[<v>%a@,%a@,@]" (Fmt.iter B0_unit.Set.iter pp_skip) us pp_skipped count
+
 let test allow_long allow_empty units x_units packs x_packs what lock c =
   let total = Os.Mtime.counter () in
   Log.if_error ~use:Os.Exit.no_such_name @@
@@ -95,11 +114,14 @@ let test allow_long allow_empty units x_units packs x_packs what lock c =
     units, packs
   in
   let* x_units = B0_cli.get_excluded_units ~x_units ~x_packs in
-  let tests =
+  let tests, skip_tests =
     let packs = B0_pack.Set.of_list packs in
     let us = B0_cmd_build.unit_set_of ~units ~packs in
     let us = B0_unit.Set.diff us x_units in
-    (B0_unit.Set.filter (is_test ~allow_long) us)
+    let tests = B0_unit.Set.filter is_test us in
+    if allow_long then tests, B0_unit.Set.empty else
+    let long_tests = B0_unit.Set.filter is_long tests in
+    B0_unit.Set.diff tests long_tests, long_tests
   in
   let is_action u = B0_unit.Set.mem u tests in
   let store, units, locked_packs =
@@ -117,10 +139,13 @@ let test allow_long allow_empty units x_units packs x_packs what lock c =
   else
   Log.if_error' ~use:B0_driver.Exit.build_error @@
   if B0_unit.Set.is_empty tests && not allow_empty
-  then (Log.err (fun m ->
-      m "@[<v>%a.@,Use option %a to succeed anyways.@]" pp_no_tests ()
-        Fmt.code "-e"); Ok exit_no_tests)
-  else
+  then begin
+    let () = show_skip_tests skip_tests in
+    Log.err (fun m ->
+        m "@[<v>%a.@,Use option %a to succeed anyways.@]" pp_no_tests ()
+          Fmt.code "-e");
+    Ok exit_no_tests
+  end else
   let store = [] in
   let* build = B0_cmd_build.make_build c ~store ~may_build ~must_build in
   match B0_build.run build with
@@ -129,8 +154,10 @@ let test allow_long allow_empty units x_units packs x_packs what lock c =
       let test_count = B0_unit.Set.cardinal tests in
       let tests = B0_unit.Set.elements tests in
       let dur, fails = run_tests c build Mtime.Span.zero [] tests in
+      let () = show_skip_tests skip_tests in
       Log.app (fun m ->
-          m "%a" pp_report (test_count, Os.Mtime.count total, dur, fails));
+          m "%a" pp_report (allow_long,
+                            test_count, Os.Mtime.count total, dur, fails));
       Ok (if fails <> [] then exit_test_error else Os.Exit.ok)
 
 (* Command line interface *)

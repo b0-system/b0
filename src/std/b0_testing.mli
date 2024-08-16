@@ -80,11 +80,14 @@ end
 
 (** Formatters for test runners. *)
 module Test_fmt : sig
+  val padding : string
   val pp_test : unit Fmt.t
   val pp_fail : unit Fmt.t
   val pp_pass : unit Fmt.t
+  val pp_skip : unit Fmt.t
   val pp_passed : unit Fmt.t
   val pp_failed : unit Fmt.t
+  val pp_skipped : unit Fmt.t
   val pp_dur : Mtime.Span.t Fmt.t
   val pp_count : int Fmt.t
 end
