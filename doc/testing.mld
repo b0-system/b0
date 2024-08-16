@@ -2,7 +2,7 @@
 
 The [b0] tool provides a simple test runner via the [b0 test] command.
 
-A test is an {{!B0_unit.Action}unit action} tagged with
+A test unit is an {{!B0_unit.Action}unit action} tagged with
 {!B0_meta.test} and {!B0_meta.run}. Lengthy tests have, additionally,
 the {!B0_meta.long} tag, they are not run by default unless the
 [--long] option is specified.
@@ -14,12 +14,12 @@ TODO image
 
 The principle of [b0 test] is simple, it makes a build like a [b0]
 invocation does and any test that {e must} build is executed once
-built. So the following invocations build the default pack and execute
+built. For example the following invocations build the default pack and execute
 the runnable tests therein.
 
 {@sh[
 b0 test
-b0 test --long   # Also run the long tests
+b0 test -l   # Also run the long tests
 ]}
 
 If any test exits with a non-zero error code, the invocation

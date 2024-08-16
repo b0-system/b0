@@ -19,15 +19,14 @@ module Test : sig
       {[
 let mytest () =
   Test.test "Something" @@ fun () ->
-  assert (1 = 1); …
+  assert (1 = 1); Test.int 1 1; …
   ()
 ]}
   *)
 
   val main : (unit -> unit) -> int
-  (** [main f] executes [f ()] and reports the testing status.
-      The returned integer is the number of failing tests which
-      should be given to [exit].
+  (** [main f] executes [f ()] and reports the testing status, [0] if
+      everything went right, [1] if a test failed.
 
       [f] typically calls function that call {!test}. Your typical main
       should look like this::
@@ -68,10 +67,43 @@ let () = if !Sys.interactive then exit (main ())
   (** [is_error' ~msg r] tests that [r] is [Error msg] or [Error _]
       if [msg] is unspecified. *)
 
+  (** {1:test_values Test values} *)
+
+  val bool : bool -> bool -> unit
+  (** [bool b0 b1] asserts that [b0] and [b1] are equal. *)
+
+  val int : int -> int -> unit
+  (** [int i0 i1] asserts that [i0] and [i1] are equal. *)
+
+  val float : float -> float -> unit
+  (** [int i0 i1] asserts that [i0] and [i1] are equal. This uses
+      {!Float.equal} so it can be used to assert [NaN] values, also
+      you should be aware of the limitations that are involved in
+      testing floats for equality. *)
+
+  val string : string -> string -> unit
+  (** [string s0 s1] asserts that [s0] and [s1] are equal. *)
+
+  val bytes : bytes -> bytes -> unit
+  (** [string s0 s1] asserts that [s0] and [s1] are equal. *)
+
+  (** Types with equality and formatters. *)
+  module type EQ = sig
+    type t
+    val equal : t -> t -> bool
+    val pp : Format.formatter -> t -> unit
+  end
+
+  val eq : (module EQ with type t = 'a) -> 'a -> 'a -> unit
+  (** [eq (module M) v0 v1] assert [v0] and [v1] are equal. *)
+
+  val neq : (module EQ with type t = 'a) -> 'a -> 'a -> unit
+  (** [neq (module M) v0 v1] assert [v0] and [v1] are not equal. *)
+
   (** {1:testing_log Testing logging} *)
 
   val log : ('a, Format.formatter, unit, unit) format4 -> 'a
-  (** [log fmt …] logs a message formatted by [fmt] *)
+  (** [log fmt …] logs a message formatted by [fmt]. *)
 
   val log_fail : ('a, Format.formatter, unit, unit) format4 -> 'a
   (** [log_fail fmt …] is like {!log} but for failures. *)

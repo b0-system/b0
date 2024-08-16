@@ -92,7 +92,7 @@ module Test = struct
       pp_fail () pp_count !fail_count pp_count !test_count
       (if !fail_count <= 1 then "test" else "tests")
       pp_failed () pp_dur (Os.Mtime.count dur);
-    !fail_count
+    1
 
   let setup () = match Sys.backend_type with
   | Other "js_of_ocaml" ->
@@ -142,4 +142,28 @@ module Test = struct
       | Error m when String.equal msg m -> ()
       | Error m -> failf "@[<v>Fnd: Error %S@,Exp: Error %S@]" m msg
       | Ok _ -> failf "Fnd: Ok _@,Exp: Error %S@]" msg
+
+  (* Testing values *)
+
+  let bool b0 b1 = if Bool.equal b0 b1 then () else failf "@[%b <> %b@]" b0 b1
+  let int i0 i1 = if Int.equal i0 i1 then () else failf "@[%d <> %d@]" i0 i1
+  let float f0 f1 = if Float.equal f0 f1 then () else failf "@[%g <> %g@]" f0 f1
+  let string s0 s1 =
+    if String.equal s0 s1 then () else failf "@[<hov>%S <>@ %S@]" s0 s1
+
+  let bytes b0 b1 =
+    string (Bytes.unsafe_to_string b0) (Bytes.unsafe_to_string b1)
+
+  module type EQ = sig
+    type t
+    val equal : t -> t -> bool
+    val pp : Format.formatter -> t -> unit
+  end
+
+  let eq (type a) (module M : EQ with type t = a) v0 v1 =
+    if M.equal v0 v1 then () else failf "@[<hov>%a <>@ %a@]" M.pp v0 M.pp v1
+
+  let neq (type a) (module M : EQ with type t = a) v0 v1 =
+    if not (M.equal v0 v1) then () else
+    failf "@[<hov>%a <>@ %a@]" M.pp v0 M.pp v1
 end
