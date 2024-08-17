@@ -11,7 +11,7 @@ arbitrary build abstraction with reliable, efficient incremental rebuilds.
 
 {1:manuals Manuals}
 
-Some {{:page-occasionally}quick hints} if you need to use the [b0] tool
+Some {{!page-occasionally}quick hints} if you need to use the [b0] tool
 occasionally.
 
 {2:manuals_all For all users}
@@ -20,8 +20,8 @@ occasionally.
    b0 system and b0 files. It is recommended reading.
 - The {{!page-testing}testing manual} describes support to
   test your software with [b0 test].
-- The {{!page-release}release manual} describes b0 support
-   for releasing source software.
+- The {{!page-release}release manual} describes support to
+   publish source software with the [.release] action.
 - The {{!page-action}action manual} describes how to define
    your own actions.
 - The {{!page-unit}build unit manual} describes how to
@@ -31,14 +31,14 @@ occasionally.
 
 {2:manuals_ocaml For OCaml users}
 
-- The {{!page-ocaml}b0 OCaml manual} describes the built-in support
+- The {{!page-ocaml}b0 OCaml manual} describes support
   for handling your OCaml projects.
-- The {{!page-opam}b0 opam manual} describes the [opam] support
-  to generate opam package files and publish them in repositories.
+- The {{!page-opam}b0 opam manual} describes support to generate
+  [opam] files and publish them in repositories with the [.opam] action.
 
 {2:manuals_dev For b0 developers}
 
-- The {{!page-driver}b0 driver manual} describes
+- The {{!page-driver}driver manual} describes
   how to make your own drivers to operate on b0 files.
 - The {{!page-todo}TODO} page
 - {{!page-old_manual}Old manual fragments} and TODO which will eventually
@@ -89,7 +89,7 @@ B0_vcs_repo
 
 The [b0.memo] library implements the build model used by b0. It can be
 used for its own good without resorting to the [b0.file] library to
-devise domain specific build system – see for example the [brzo] or
+devise domain specific build systems – see for example the [brzo] or
 [odig] tools.
 
 {!modules:

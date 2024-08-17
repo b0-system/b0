@@ -1,4 +1,4 @@
-{0 b0 actions manual}
+{0 The b0 action manual}
 
 This manual shows how to deal with b0 actions and how to create your
 own.
@@ -7,13 +7,10 @@ own.
 
 {1:basics Basics}
 
-In b0 building is merely a side effect. Most of the time one is
-interested in doing something with build artefacts. This can be
-running them, displaying them, testing them, benchmarking them,
-deploying them etc.
-
-For these reasons a build unit [UNIT] has (most of the time) an action
-associated to it. This action can simply be run with:
+Build artefacts are meant to be executed, displayed, tested,
+benchmarked, deployed etc. As such b0 treats building as a mere side
+effect and associates to each build unit an action. The action
+of a unit [u] can simply be run with:
 
 {@shell[
 b0 -- UNIT ARG…
@@ -22,10 +19,10 @@ b0 -- UNIT ARG…
 This builds the unit named [UNIT] like [b0 -u UNIT] would do
 and execute [UNIT]'s action with arguments [ARG…].
 
-Note that a unit action:
+Note that an action:
 
 {ul
-{- Can be associated with an empty build procedure and not
+{- Can be associated to an empty unit and not
    build anything. For example it can simply run a script or
    an OCaml function to download and refresh conformance
    tests or data from the web.}
@@ -38,54 +35,84 @@ Note that a unit action:
    subcommand whose outcomes.}
 {- Can influence how the build is done ({!B0_unit.Action.store}).}}
 
-Note that a lot of domain specific build unit will define
-a default action for you.
+A lot of domain specific build unit constructors will define a default action
+for you. Here are a few examples:
 
-{[
-b0 list        # Lists the units (and thus actions).
-b0 list --all  # Also include library defined units
-b0 tool list   # List public tools and private tools in the root scope
-]}
-
-
-Unique outcome, multiple action. Make empty units that need a base
-unit.
+{ul
+{- {!B0_ocaml.exe} units simply execute the built executable}
+{- {!B0_ocaml.lib} units load the build library in the [ocaml] REPL, etc.}
+{- {!B0_jsoo.val-html_page} units reload the webpage in your browser}}
 
 {1:tutorial Making your own action}
 
-{b XXX} Needs to be rewritten.
+{b XXX} Needs more words.
 
-Let's make a simple action a script at the root of your project:
+An action has to be part of a unit, that's the way you can operate
+on it. However that unit may be empty build-wise. The
+{!B0_unit.of_action} constructors do this.
 
-Yaddada root vs scope
+The following action takes a sript located in [scripts/hello.sh] in
+the [B0.ml] scope directory and runs it with the [cwd] set to the scope
+directory.
 
 {[
-let mycmd =
-  B0_unit.make_action "mycmd" ~doc:"Run mycmd" @@ fun env _ ~args ->
+let hello =
+  B0_unit.of_action' "hello" ~doc:"Run hello script" @@ fun env _ ~args ->
   let cwd = B0_env.scope_dir env in
-  let script = B0_env.in_scope_dir env script in
-  Os.Exit.execv ~cwd script Cmd.(path script %% args)
+  let hello = B0_env.in_scope_dir env ~/"scripts/hello.sh" in
+  Ok (Os.Exit.execv ~cwd Cmd.(path hello %% args))
 ]}
 
 Even though you should rewrite all these scripts as OCaml actions a
-direct short cut for the above boilerplate is provided.  Use
-{!B0_unit.Action.exec_file}:
+direct shortcut for the above boilerplate is provided by
+{!B0_unit.Action.scope_exec}:
 
 {[
-let mycmd =
-  B0_action.make "mycmd" ~doc:"Run mycmd" @@
-  B0_action.exec_file ~/"scripts/mycmd"
+let hello =
+  B0_unit.of_action' "hello" ~doc:"Run hello script" @@
+  B0_unit.Action.scope_exec (Cmd.path ~/"scripts/hello.sh")
+]}
+
+The two last examples actually perform {!Os.Exit.execv} so the b0
+invocation becomes these executables. You can also simply run cmds
+without becoming them, so rather than shell scripting around you
+can write OCaml scripts.
+
+{[
+let hello =
+  B0_unit.of_action "hello" @@ fun env _ ~args ->
+  let* () = Os.Cmd.run Cmd.(tool "echo" % "hey" ) in
+  let* () = Os.Cmd.run Cmd.(tool "echo" % "ho" ) in
+  Ok ()
 ]}
 
 {1:howto Howto}
 
-{2:run Run a unit executable in an action}
+{2:run Run a built executable in (another) action}
+
+For those units that build an executable and mention it in their
+metadata as {!B0_unit.exe_file} {e and are in your scope} the
+following shows how to run it in another unit. The key step is to look
+them up with {!B0_env.unit_exe_file_cmd} and make sure that unit is
+actually built by specifying it in [~units] of {!B0_unit.of_action}.
 
 {[
-let myunit = …
+let tool = … (* This unit should have the B0_unit.exe_file set. *)
 let action
-  let doc = "That's particular" in
-  B0_action.make' "my-exec" ~units:[myunit] ~doc @@ fun env _ ~args ->
-  let* cmd = B0_env.unit_cmd myunit in
-  Os.Cmd.run cmd
+  let doc = "Do stuff with tool" in
+  B0_unit.of_action "my-exec" ~units:[tool] ~doc @@ fun env _ ~args ->
+  let* cmd = B0_env.unit_exe_file_cmd env download_data in
+  Os.Cmd.run Cmd.(cmd % "--help")
+]}
+
+{2:fetch Fetch an URL and write it in the scope}
+
+{[
+let download_test_data =
+  let doc = "Download test data" in
+  B0_unit.of_action "download-test-data" ~doc @@ fun env _ ~args:_ ->
+  let file = "data.json" in
+  let url = Fmt.str "https://example.org/%s" file in
+  let dst = Fmt.str "test/%s" file in
+  B0_action_kit.fetch_url env url (B0_env.in_scope_dir env ~/dst)
 ]}

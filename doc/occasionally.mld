@@ -26,6 +26,8 @@ b0 list
 
 {@sh[
 b0 test
+b0 test -l      # Also run the long test
+b0 test --what  # Show what will run
 ]}
 
 {2:run How do I run build artefacts ?}

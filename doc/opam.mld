@@ -1,4 +1,4 @@
-{0 [opam] b0 manual}
+{0 The b0 [opam] manual}
 
 {!B0_opam} has support for {{:http://opam.ocaml.org/}[opam]}, the
 OCaml package manager. It provides:
@@ -29,16 +29,15 @@ Here's an example:
 let mypkg =
   let meta =
     B0_meta.empty
-    |> B0_meta.(add authors) ["The mylib programmers"]
-    |> B0_meta.(add maintainers) ["mylib@example.org"]
-    |> B0_meta.(add homepage) "https://example.org/software/mylib"
-    |> B0_meta.(add online_doc) "https://example.org/software/mylib/doc"
-    |> B0_meta.(add license) ["MIT"]
-    |> B0_meta.(add repo) "git+https://example.org/repos/mylib.git"
-    |> B0_meta.(add issues) "https://github.com/mylib/mylib/issues"
+    |> ~~ B0_meta.authors ["The mylib programmers"]
+    |> ~~ B0_meta.maintainers ["mylib@example.org"]
+    |> ~~ B0_meta.homepage "https://example.org/software/mylib"
+    |> ~~ B0_meta.online_doc "https://example.org/software/mylib/doc"
+    |> ~~ B0_meta.license ["MIT"]
+    |> ~~ B0_meta.repo "git+https://example.org/repos/mylib.git"
+    |> ~~ B0_meta.issues "https://github.com/mylib/mylib/issues"
     |> B0_meta.tag B0_opam.tag
-    |> B0_meta.add B0_opam.Meta.depends [
-       "ocaml", {|>= "4.14.0" |} ]
+    |> B0_meta.add B0_opam.Meta.depends [ "ocaml", {|>= "4.14.0" |} ]
   in
   B0_pack.v "mypkg" ~doc:"opam package mypkg" ~meta ~locked:true @@
   B0_unit.list () (* You likely want to be more refined than that *)
@@ -186,7 +185,7 @@ let mypkg_unix =
   let meta =
     B0_meta.empty
     ...
-    |> B0_meta.(add B0_release.src_archive_name) (B0_pack.basename mypkg)
+    |> ~~ B0_release.src_archive_name (B0_pack.basename mypkg)
   in
   B0_pack.v "mypkg-unix" ~meta @@ mypkg_unix_units
 ]}

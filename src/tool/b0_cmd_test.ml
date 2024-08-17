@@ -58,7 +58,7 @@ let show_what
   let don't = B0_driver.Conf.no_pager c in
   let* pager = B0_pager.find ~don't () in
   let* () = B0_pager.page_stdout pager in
-  Log.app (fun m -> m "%a" pp_run_tests tests);
+  Log.app (fun m -> m "%a@." pp_run_tests tests);
   B0_cmd_build.show_what ~lock ~may_build ~must_build ~is_locked ~locked_packs c
 
 (* Test command *)

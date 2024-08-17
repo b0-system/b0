@@ -5,22 +5,22 @@ definitions of a b0 file. This manual shows how to develop a custom
 driver for b0 files.
 
 Note that it is unlikely you will need to create your own custom
-driver, a lot can be achieved by simply devising {!B0_action}, read
+driver. A lot can be achieved by simply devising actions, read
 the {{!page-action}action manual}. But if you are interested in
 understanding the [b0] tool machinery in more details, read on.
 
 {1:overview Overview}
 
 The b0 file needs to be compiled and made accessible to the driver
-executable. At the moment the OCaml [Dynlink] API is not being
-used. Instead the driver executable relinks its objects with a
+executable. The deriver machinery does not use OCaml's [Dynlink]
+module. Instead the driver executable relinks its objects with a
 compilation of the b0 file to produce another executable that is
 executed to run the driver on the definitions.
 
 With the help of the {!B0_driver} module this all happens
 transparently in the [.drivers] directory of the [_b0] directory.
 
-{1:library The driver library}
+{1:library The driver's library}
 
 For your driver to access a b0 file you need to create an OCaml library
 which has all the objects of your driver and registers its [main]
@@ -33,7 +33,7 @@ src/mydriver_main.ml
 src/mydriver_main_run.ml
 ]}
 
-The [mydriver_main.ml] file implements and registers the driver. It's
+The [mydriver_main.ml] file implements and registers the driver. Its
 compiled object should be part of your driver library. Here's a
 minimal example :
 
@@ -41,22 +41,26 @@ minimal example :
 open B0_std
 open Cmdliner
 
+let my_driver conf = Fmt.pr "Running!@."; Os.Exit.ok
+
 let driver =
   let name = "mydriver" and version = "%%VERSION%%" in
-  let libs = ["mydriver" (* other needed libraries can be added here *) ] in
-  B0_driver.create ~name ~version ~libs
+  let self = B0_ocaml.libname name in
+  let libs = [self (* other needed libraries can be added here *) ] in
+  B0_driver.make ~name ~version ~libs
 
-let my_driver conf = Fmt.pr "Running %s!@."; B0_driver.Exit.ok
-let my_driver =
-  let doc = "My driver" in
-  let sdocs = Manpage.s_common_options in
-  let exits = B0_driver.Exit.Info.base_cmd in
-  let man = [ `S Manpage.s_description; "$(mname) does not much." ] in
-  B0_driver.with_b0_file ~driver (Term.const unit_cmd),
-  Term.info "mydriver" ~version:"%%VERSION%%" ~doc ~sdocs ~exits ~man
+let main () =
+  let cmd =
+    let doc = "My driver" in
+    let exits = B0_driver.Exit.infos in
+    let man = [ `S Manpage.s_description; `P "$(iname) does not much." ] in
+    let name = B0_driver.name driver and version = B0_driver.version driver in
+    Cmd.v (Cmd.info name ~version ~doc ~exits ~man) @@
+    B0_driver.with_b0_file ~driver (Term.const my_driver)
+  in
+  Cmd.eval_value cmd
 
-let main () = Term.eval mydriver
-let () = B0_driver.set driver ~main
+let () = B0_driver.set ~driver ~main
 ]}
 
 The [mydriver_main_run.ml] file defines your driver executable when it
@@ -82,14 +86,16 @@ A few things to note:
 
 {1:fixme FIXME}
 
+
 The driver dance seems to be a bit slow for now. Even for the
-up-to-date dance we get into the 43ms [b0 unit list]. But there's room
+up-to-date dance we get into the 18-30ms [b0 unit list]. But there's room
 for improvement. Here are different things to consider that could be
 done.
 
 {ul
 {- Cold driver compilation. I think we get hit a bit by the executable
-   link phase (globally 500ms, but the compilation spawn takes 480ms).
+   link phase (globally 500ms, but the compilation spawn takes 480ms,
+   XXX 2024 with 5.2 this no longer seems to be the case we rather have 5ms).
    Investigate what makes OCaml linking faster. Maybe a mono cmo ?
    Alternatively consider using [Dynlink] once it gets lib support, but
    then what about platforms that don't support it.}

@@ -1,9 +1,8 @@
 {0 b0 release manual}
 
-This manual describes the tools to publish source software releases.
-
-The release support is rather generic but the release script here
-specifically talks about submitting the software to the opam
+The [.release] unit provides tools to publish source software
+releases. The release support is rather generic but the release script
+here specifically talks about submitting the software to the opam
 repository. You can skip these steps if you are doing something
 different.
 
@@ -24,10 +23,10 @@ b0 -- .release publish    # Publish it on the WWW with its documentation
 b0 -- .opam submit
 v}
 
-Note the tools allow to handle the following cases:
+Note worflows is able to handle the following cases:
 
 - Your b0 file gathers the [B0.ml] file of multiple projects in
-   different VCSs.
+  different VCSs.
 - You need to publish multiple packages from a single release archive.
 
 We do not describe this advanced usage here but checkout the
@@ -42,12 +41,12 @@ checking the issue tracker with this command.
 b0 browse issues
 v}
 
-This open the URLs specified in the {!B0_meta.issues} field of the
-packs of the [B0.ml] file in your browser.
+This open in your browser the URLs specified in the {!B0_meta.issues}
+field of the packs of the [B0.ml] file in your browser.
 
 {2:release_notes Write the release notes}
 
-Carefully write the release notes in the package's change log, these
+Carefully write the release notes in the package's change log. These
 are essential time savers for users of the package. The list of
 changes that were comitted since the last VCS version tag can help:
 
@@ -59,7 +58,7 @@ You can then write the release notes and commit them to the VCS with:
 
 {v
 $EDITOR CHANGES.md
-git commit -m 'Prepare release."
+git commit -m 'Prepare for release."
 v}
 
 {2:tag_the_release VCS tag the release}
@@ -72,7 +71,7 @@ and that the package tests pass. FIXME we should have a
 
 {v
 b0 -- .opam file  # Regenerate opam file
-b0 -- .ocaml meta # Regenerate META file (TODO get rid of that)
+b0 -- .ocaml META # Regenerate META file (TODO get rid of that)
 b0                # Build the project
 b0 lint           # Lint the project
 b0 test           # Run the default test suite
@@ -91,14 +90,13 @@ This will only work if the change log follows a certain format, see
 the first token of the first heading of the
 {{!B0_release.changes_file}changes file}.
 
-You can check the extracted
-tag is the one you wish before with:
+You can check the extracted tag is the one you wish before with:
 
 {v
 b0 -- .release tag --dry-run
 v}
 
-If you do not want to rely on [B0_release] appromative extraction
+If you do not want to rely on [B0_release]'s appromative extraction
 algorithms just specify it on the command line:
 
 {v
@@ -149,7 +147,7 @@ will be needed in the first time. See the details in the
 
 Also this will download the software you just published back to your
 computer. It may seem wasteful but it makes sure everything is
-properly setup.
+properly setup to work for others.
 
 {1:troubleshooting Troubleshooting}
 

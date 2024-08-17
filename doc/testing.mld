@@ -1,52 +1,52 @@
 {0 Testing with [b0 test]}
 
-The [b0] tool provides a simple test runner via the [b0 test] command.
+{1:run Running tests}
 
-A test unit is an {{!B0_unit.Action}unit action} tagged with
-{!B0_meta.test} and {!B0_meta.run}. Lengthy tests have, additionally,
-the {!B0_meta.long} tag, they are not run by default unless the
-[--long] option is specified.
+The [b0 test] command is a simple test runner for your [B0.ml] file.
 
-Tests can be spotted by a [T] in [b0 list], non-long tests are in
-green.
+A test unit is a unit tagged with {!B0_meta.test} and {!B0_meta.run}
+and, for lengthy tests, the {!B0_meta.long} tag. Tests can be spotted by
+a [T] in [b0 list]; the non-lengthy ones are in green.
 
-TODO image
+The operating principle of [b0 test] is simple:
 
-The principle of [b0 test] is simple, it makes a build like a [b0]
-invocation does and any test that {e must} build is executed once
-built. For example the following invocations build the default pack and execute
-the runnable tests therein.
+{ol
+{- It makes a build exactly like a [b0] invocation does.}
+{- It executes the action of any test unit that {e must} build in that build.}}
+
+For example the following invocations build the default pack and
+execute the test units therein:
 
 {@sh[
 b0 test
-b0 test -l   # Also run the long tests
+b0 test -l      # Do not skip the long tests
 ]}
 
-If any test exits with a non-zero error code, the invocation
-eventually exits with [1]. If a test executable runs multiple tests it
-is advised to report the number of failing tests as the exit code.
+If any test exits with a non-zero error code, the [b0 test] invocation
+eventually exits with [1].
 
-Similar to [b0 --what], invoking [b0 test] with the [--what] option
-tells you what the invocation builds and which tests are run:
+Adding [--what] a [b0 test] invocation reports what is build and which
+tests are executed.
+{@sh[
+b0 test --what  # Show what builds and runs
+]}
+
+For [b0] the testing granularity is the executable unit. You can easily
+devise your own test sets via packs and the usual build selection
+options [-u], [-p], [-x] and [-X]. For example:
 
 {@sh[
-b0 test --what
+b0 test -p special-tests -x known_to_fail
 ]}
 
-The granularity of tests is the executable unit. Above this you can
-easily devise your own test sets via packs and the usual build
-selection options [-u], [-p], [-x] and [-X]. For example:
-
-{@sh[
-b0 test -p special_tests -x known_to_fail
-]}
-
-Also note that tests are just executable units so you can also run
-them individually with [b0]:
+Since tests are just executable units so you can also run them
+individually with usual [b0] invocations:
 
 {@sh[
 b0 -- mytest
 ]}
+
+That's all there is to know about b0 and testing.
 
 {1:testing_ocaml_code Testing OCaml code}
 
@@ -54,11 +54,13 @@ The infrastructure described above allows to hook the testing
 framework of your wish by simply tagging your test executables with
 {!B0_meta.test} and {!B0_meta.run}.
 
-b0 itself provides a few testing tools to make such executables. A
-simplistic {!B0_testing} module is available in the [b0.std] package.
-It simply runs tests as functions from [unit -> unit], provides a few
-asserting tools and integrates nicely with [b0 test]'s rendering. See
-an {!B0_testing.example}.
+b0 itself provides a few testing tools to make such executables for
+OCaml:
 
-The {!B0_expect} tool for testing expectations which is expected to
-change a little bit in order to integrate in [b0 test].
+{ul
+{- {!B0_testing} in the [b0.std] library simply runs tests
+   as functions from [unit -> unit], provides a few asserting tools
+   and integrates nicely with [b0 test]'s rendering.}
+{- {!B0_expect} in the [b0.kit] library provides expectation testing.
+   It is expected to change a little bit in order to integrate better
+   with [b0 test] and {!B0_testing}.}}

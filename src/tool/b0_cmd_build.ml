@@ -41,7 +41,7 @@ let log_explain_lock ~is_locked ~lock ~locked_packs =
 
 let log_units color ~kind us =
   Log.app @@ fun m ->
-  m "@[<v1>%a build:@,@[<v>%a@]@]"
+  m "@[<v>%a build:@,@[<v>%a@]@]"
     color kind Fmt.(list B0_unit.pp_synopsis) (B0_unit.Set.elements us)
 
 let show_what ~lock ~is_locked ~locked_packs ~must_build ~may_build c =

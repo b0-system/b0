@@ -134,6 +134,10 @@ let test_b0_file =
   let requires = [b0_memo] in
   test "test_b0_file.ml" ~requires ~doc:"Test B0_file module"
 
+let example_driver =
+  let requires = [b0_file] in
+  test "example_driver.ml" ~requires ~doc:"Example from the docs"
+
 (* Packs *)
 
 let b0_pack =
