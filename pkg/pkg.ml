@@ -35,6 +35,7 @@ let () =
     Pkg.doc "doc/ocaml.mld" ~dst:"odoc-pages/ocaml.mld";
     Pkg.doc "doc/old_manual.mld" ~dst:"odoc-pages/old_manual.mld";
     Pkg.doc "doc/opam.mld" ~dst:"odoc-pages/opam.mld";
+    Pkg.doc "doc/ocasionally.mld" ~dst:"odoc-pages/ocasionally.mld";
     Pkg.doc "doc/rationale.mld" ~dst:"odoc-pages/rationale.mld";
     Pkg.doc "doc/release.mld" ~dst:"odoc-pages/release.mld";
     Pkg.doc "doc/testing.mld" ~dst:"odoc-pages/testing.mld";

@@ -6,10 +6,13 @@ depend on it.
 B0 describes software construction and deployments using modular and
 customizable definitions written in OCaml.
 
-At the core of B0 is the {{!b0_memo}[b0.memo]} library wich provides
+At the core of b0 is the {{!b0_memo}[b0.memo]} library wich provides
 arbitrary build abstraction with reliable, efficient incremental rebuilds.
 
 {1:manuals Manuals}
+
+Some {{:page-occasionally}quick hints} if you need to use the [b0] tool
+occasionally.
 
 {2:manuals_all For all users}
 

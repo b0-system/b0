@@ -1,0 +1,104 @@
+{0 [b0], occasionally}
+
+The quick hints if you need to use the [b0] tool occasionally.
+
+{1:basic Basic}
+
+{2:build How do I build ?}
+
+{@sh[
+b0
+]}
+
+{2:what What gets build ?}
+
+{@sh[
+b0 --what
+]}
+
+{2:list What can I build ?}
+
+{@sh[
+b0 list
+]}
+
+{2:test How do I run tests ?}
+
+{@sh[
+b0 test
+]}
+
+{2:run How do I run build artefacts ?}
+
+{@sh[
+b0 list       # Spot the unit name u you are interested in
+b0 -- u …     # Build u and run with arguments.
+b0 -b -- u …  # Back to build only
+b0 -- lib     # If lib is a library gets you in a REPL
+]}
+
+{2:browser How do I open build artefacts in a browser ?}
+
+{@sh[
+b0 -- .show-url u
+b0 -- .show-url --help   # See the different modes of operation
+]}
+
+{2:show How do I get information about a unit ?}
+
+{@sh[
+b0 show u
+]}
+
+
+{2:lock How can I use the build anywhere ?}
+
+{@sh[
+eval $(b0 lock)
+cd /any/where
+b0 -- u …
+]}
+
+
+{1:build_more More on builds}
+
+{2:parts How do I build specific parts ?}
+
+{@sh[
+b0 list            # Spot units names or packs you are interested in
+b0 -u lib -p pack  # Build unit 'lib' and pack 'pack'
+]}
+
+{2:delete How do I clear the build ?}
+
+{@sh[
+b0 delete
+b0 delete -a   # Clean
+]}
+
+{2:log How do I see build steps ?}
+
+{@sh[
+b0 log
+b0 log -l
+]}
+
+{2:log_by_dur Which build steps take time ?}
+
+{@sh[
+b0 log -d
+]}
+
+{2:log_fail Which build steps failed ?}
+
+{b FIXME.} [-e] is likely more intuitive.
+
+{@sh[
+b0 log -f
+]}
+
+{2:log_unrevived Which build steps did really execute ?}
+
+{@sh[
+b0 log -e
+]}
