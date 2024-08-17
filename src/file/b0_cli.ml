@@ -380,11 +380,13 @@ module Op = struct
       in
       let unrevived =
         let doc = "Keep only revivable operations that were executed." in
-        Some `Unrevived, Arg.info ["e";"unrevived"] ~doc ?docs
+        Some `Unrevived, Arg.info ["u";"unrevived"] ~doc ?docs
       in
       let executed =
-        let doc = "Keep only operations that were executed." in
-        Some `Executed, Arg.info ["E"; "executed"] ~doc ?docs
+        let doc =
+          "Keep only operations that were executed. See also $(b,-u)."
+        in
+        Some `Executed, Arg.info ["executed"] ~doc ?docs
       in
       Arg.(value & vflag None [revived; unrevived; executed])
     in
@@ -407,7 +409,7 @@ module Op = struct
           "Keep only failed operations. Equivalent to add $(b,failed) to \
            the $(b,--status) option."
         in
-        Arg.(value & flag & info ["f"; "failed"] ~doc ?docs)
+        Arg.(value & flag & info ["e"; "failed"] ~doc ?docs)
       in
       let sts statuses errs = if errs then `Failed :: statuses else statuses in
       Term.(const sts $ statuses $ errors)

@@ -269,10 +269,6 @@ maybe it shouldn't. Unit ideas:
 
 {1:tool Tool}
 
-{2:log [b0 log]}
-
-Use [-x] for what is now [-e] and [-e] for what is not [-f].
-
 {2:deploy Deploy}
 
 For now let's see where the new actions bring us. But the idea is

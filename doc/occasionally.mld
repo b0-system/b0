@@ -55,7 +55,7 @@ b0 show u
 
 {@sh[
 eval $(b0 lock)
-cd /any/where
+cd /any/where/
 b0 -- u …
 ]}
 
@@ -91,14 +91,12 @@ b0 log -d
 
 {2:log_fail Which build steps failed ?}
 
-{b FIXME.} [-e] is likely more intuitive.
-
 {@sh[
-b0 log -f
+b0 log -e
 ]}
 
 {2:log_unrevived Which build steps did really execute ?}
 
 {@sh[
-b0 log -e
+b0 log -u
 ]}
