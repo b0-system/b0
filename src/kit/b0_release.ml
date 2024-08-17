@@ -442,7 +442,7 @@ let unit =
   B0_unit.of_cmdliner_cmd "" ~doc @@ fun env u ->
   let man =
     [ `S Manpage.s_see_also;
-      `P "Consult $(b,odig doc b0) for the B0 release manual."]
+      `P "Consult $(b,odig doc b0) for the b0 release manual."]
   in
   let packs =
     let doc =
@@ -464,7 +464,7 @@ let unit =
       [ `S Cmdliner.Manpage.s_description;
         `P "$(iname) creates an archive file for a release's pack. The \
             generated archive should be bit-wise reproducible. There \
-            are a few caveats, see B0 release manual in $(b,odig doc b0).";
+            are a few caveats, see b0 release manual in $(b,odig doc b0).";
         `P "Once the archive is created it is unpacked in the build \
             directory, linted and the package is built using the package \
             description contained in the archive. The build will use the \

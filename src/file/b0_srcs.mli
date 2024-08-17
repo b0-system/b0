@@ -15,7 +15,7 @@
     {- Support for watermaking should likely occur here.}}
 
     This module provides a type to select source files for build units
-    in B0 files. To support generated source files, selections can
+    in b0 files. To support generated source files, selections can
     depend on the build.
 
     In a nutshell the declaration:

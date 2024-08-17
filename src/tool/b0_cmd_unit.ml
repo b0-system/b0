@@ -55,7 +55,7 @@ let build_dir =
 
 let edit =
   let doc = "Edit build units" in
-  let descr = `P "$(iname) opens in your editor the B0 files in which given \
+  let descr = `P "$(iname) opens in your editor the b0 files in which given \
                   build units are defined." in
   B0_tool.Cli.subcmd_with_b0_file "edit" ~doc ~descr @@
   Term.(const edit $ units_all)

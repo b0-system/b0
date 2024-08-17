@@ -101,7 +101,7 @@ static inline void _ocaml_b0_munmap (b0_ctx c, void *b, size_t size)
 /* Unsupported */
 
 #else
-#warning OCaml B0 library: unsupported platform, hashing will fail.
+#warning OCaml b0 library: unsupported platform, hashing will fail.
 
 #define b0_ctx void *
 

@@ -7,7 +7,7 @@ open B0_std
 open Result.Syntax
 open Cmdliner
 
-(* Specifying B0 definitions. *)
+(* Specifying b0 definitions. *)
 
 let units ?docs ?(doc = "Use unit $(docv).") () =
   Arg.(value & opt_all string [] & info ["u"; "unit"] ?docs ~doc ~docv:"UNIT")
@@ -491,7 +491,7 @@ module Memo = struct
         then (B0_zero_conv.Op.pp_ui ~sep ~op_howto ppf o)
     | _ ->  ()
 
-  (* B0 directory *)
+  (* b0 directory *)
 
   let b0_dir_env = "B0_DIR"
   let b0_dir_name = "_b0"

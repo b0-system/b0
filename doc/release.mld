@@ -1,4 +1,4 @@
-{0 B0 release manual}
+{0 b0 release manual}
 
 This manual describes the tools to publish source software releases.
 
@@ -26,7 +26,7 @@ v}
 
 Note the tools allow to handle the following cases:
 
-- Your B0 file gathers the [B0.ml] file of multiple projects in
+- Your b0 file gathers the [B0.ml] file of multiple projects in
    different VCSs.
 - You need to publish multiple packages from a single release archive.
 
@@ -145,7 +145,7 @@ v}
 
 There are however details you need to be aware and some setup
 will be needed in the first time. See the details in the
-{{:page-opam}B0 opam manual}.
+{{:page-opam}b0 opam manual}.
 
 Also this will download the software you just published back to your
 computer. It may seem wasteful but it makes sure everything is

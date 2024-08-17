@@ -121,7 +121,7 @@ open Cmdliner
 
 let topmost =
   let doc =
-    "Only consider topmost scopes included by the root B0 file. Those \
+    "Only consider topmost scopes included by the root b0 file. Those \
      recursively included by these are excluded."
   in
   let docs = B0_tool.Cli.s_scope_selection in

@@ -5,7 +5,7 @@
 
 (** {{:https://opam.ocaml.org/}[opam]} support.
 
-    See the B0 {{!page-opam}B0 opam manual} for more details. *)
+    See the b0 {{!page-opam}b0 opam manual} for more details. *)
 
 open B0_std
 
@@ -106,7 +106,7 @@ type pkg_spec = string * string
 
 val tag : bool B0_meta.key
 (** [tag] indicates the entity is related to [opam]. Adding this tag
-    to a pack makes it represent an opam package for B0's opam tooling. *)
+    to a pack makes it represent an opam package for b0's opam tooling. *)
 
 val available : string B0_meta.key
 (** [available] is an opam
@@ -193,5 +193,5 @@ val pkg_meta_of_pack : B0_pack.t -> B0_meta.t
 val unit : B0_unit.t
 (** [unit] is the unit of the [.opam] action.
 
-    See [b0 -- .opam --help] and the {{!page-opam}B0 [opam] manual}
+    See [b0 -- .opam --help] and the {{!page-opam}b0 [opam] manual}
     for more information. *)

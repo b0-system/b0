@@ -21,7 +21,7 @@ let loc_err_fmt ffmt m fmt =
 let loc_errf m fmt = loc_err_fmt Fmt.str m fmt
 let loc_error m fmt = loc_err_fmt Fmt.error m fmt
 
-(* B0 files *)
+(* b0 files *)
 
 type b0_boot = (string * smeta) list
 type b0_include = (string * smeta) * (Fpath.t * smeta)

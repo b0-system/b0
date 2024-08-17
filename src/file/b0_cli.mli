@@ -7,7 +7,7 @@
 
 open B0_std
 
-(** {2:def_spec Specifying B0 definitions} *)
+(** {2:def_spec Specifying b0 definitions} *)
 
 val units :
   ?docs:string -> ?doc:string -> unit -> string list Cmdliner.Term.t
@@ -221,7 +221,7 @@ module Memo : sig
 
   (** {1:dirs_files Directories and files} *)
 
-  (** {2:b0_dir B0 directory} *)
+  (** {2:b0_dir b0 directory} *)
 
   val b0_dir_env : string
   (** [b0_dir_env] is ["B0_DIR"]. *)

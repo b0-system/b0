@@ -81,7 +81,7 @@ CAMLprim value ocaml_b0_realpath (value p)
 /* Unsupported */
 
 #else
-#warning OCaml B0 library: unsupported platform, realpath will fail.
+#warning OCaml b0 library: unsupported platform, realpath will fail.
 
 CAMLPrim value ocaml_b0_realpath (value p)
 {

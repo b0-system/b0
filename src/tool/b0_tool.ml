@@ -94,7 +94,7 @@ module Def = struct
     | true ->
         let plural = if (Def.Set.cardinal not_found > 1) then "s" else "" in
         let none = Def.Set.elements not_found in
-        Fmt.error "Could not find B0 file for %s%s: @[%a@]"
+        Fmt.error "Could not find b0 file for %s%s: @[%a@]"
           Def.def_kind plural Fmt.(list ~sep:sp Def.pp_name) none
     | false ->
         let* editor = B0_editor.find () in

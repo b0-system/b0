@@ -112,7 +112,7 @@ let raise_after_seal fmt = Fmt.kstr (fun s -> raise (After_seal s)) fmt
 
 let raise_create_after_seal ~kind ~name =
   raise_after_seal
-    "%s %a illegaly created after B0 file initialization."
+    "%s %a illegaly created after b0 file initialization."
     (String.Ascii.capitalize kind) pp_name name
 
 (* Scoping *)
@@ -195,7 +195,7 @@ let pp_uncaught_exn ppf (exn, bt) =
   in
   let pp_uncaught ppf (exn, bt) =
     Fmt.pf ppf
-      "@[<v>%s@,%a: B0 file raised an uncaught exception.@, @[<v>%a@]@]"
+      "@[<v>%s@,%a: b0 file raised an uncaught exception.@, @[<v>%a@]@]"
       (current_location None) pp_error_label () Fmt.exn_backtrace (exn, bt)
   in
   match exn with

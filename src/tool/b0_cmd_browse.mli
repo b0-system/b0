@@ -3,7 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** B0 [browse] command. *)
+(** b0 [browse] command. *)
 
 val cmd : B0_std.Os.Exit.t Cmdliner.Cmd.t
 (** [cmd] is the command line for [browse]. *)

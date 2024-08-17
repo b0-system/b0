@@ -32,14 +32,14 @@ end
     The format is a bit underpowered (see also the discusion in the
     merlin issue tracker
     {{:https://github.com/ocaml/merlin/issues/737}here}) and doesn't
-    exactly match B0's build model here are a few notes on the
+    exactly match b0's build model here are a few notes on the
     treatment:
     {ol
-    {- The [file] field. B0's operations do not identify a "main source"
+    {- The [file] field. b0's operations do not identify a "main source"
        processed by a step. For now we use the first element of
        {!B0_zero.Op.reads}
        TODO maybe we should spell out this convention in {!B0_memo}.}
-    {- The [output] field. B0's operations support multiple writes.
+    {- The [output] field. b0's operations support multiple writes.
        If multiple files are written we repeat the command for
        each write. We add an numbered [id] field to indicate that this is
        the same command.}

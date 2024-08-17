@@ -5,7 +5,7 @@
 
 (** Builds.
 
-    Centralizes the information to run and orchestrate a B0 build. *)
+    Centralizes the information to run and orchestrate a b0 build. *)
 
 open B0_std
 
@@ -57,7 +57,7 @@ val unit_dir : t -> b0_unit -> Fpath.t
     This is where [u] should write is build artefacts. *)
 
 val unit_scope_dir : t -> b0_unit -> Fpath.t
-(** [unit_scope_dir b u] is the directory of the B0 file in which [u] was
+(** [unit_scope_dir b u] is the directory of the b0 file in which [u] was
     defined. This is were unit relative paths like source files
     should be resolved. *)
 

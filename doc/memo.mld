@@ -10,7 +10,7 @@
 
 {1:design Design considerations}
 
-{2:kernel_extract Kernel extraction from B0}
+{2:kernel_extract Kernel extraction from b0}
 
 Concepts kept:
 
@@ -272,7 +272,7 @@ input before actually running it. We need to be able to force the
 re-execution of this command (e.g. via [force_exec] flag given to
 [Memo.spawn]).
 
-The conceptual model of [B0] relies on the fact that in most of the cases
+The conceptual model of b0 relies on the fact that in most of the cases
 it is possible to characterize the inputs and outputs of build operations,
 armed with this, incremental rebuilds is just a mattter of memoizing
 the function [inputs -> outputs].

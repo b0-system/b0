@@ -5,8 +5,8 @@
 
 (** Name scopes.
 
-    Scopes are used to track and scope the name of B0 definitions created
-    by libraries and B0 files.
+    Scopes are used to track and scope the name of b0 definitions created
+    by libraries and b0 files.
 
     {b TODO.}
     {ul
@@ -112,7 +112,7 @@ val open_lib : module':string -> name -> unit
 ]}
 *)
 
-(** {2:b0_file B0 file scopes}
+(** {2:b0_file b0 file scopes}
 
     {b Note.} This is used by the implementation of the driver API, if
     you are fiddling with this you are likely doing something
@@ -125,8 +125,8 @@ val name_list : unit -> (qualified_name * Fpath.t) list
     [Invalid_argument]. *)
 
 val open_root : Fpath.t -> unit
-(** [open_root file] initializes B0 file scoping and opens a root scope
-    for the root B0 file at the {e absolute} file path [file].
+(** [open_root file] initializes b0 file scoping and opens a root scope
+    for the root b0 file at the {e absolute} file path [file].
 
     Only file scope can be opened from now on.
 
@@ -156,7 +156,7 @@ exception Error of string
 *)
 
 val raise_error : ('b, Format.formatter, unit, 'a) format4 -> 'b
-(** [raise_error fmt …] can be used if an unrecoverable B0 file user
+(** [raise_error fmt …] can be used if an unrecoverable b0 file user
     error occurs in a scope (e.g. duplicate definition). The given
     error message is printed and the program exits with
     {!B0_driver.Exit.b0_file_error}. *)
@@ -190,7 +190,7 @@ exception After_seal of string
 
 val seal : unit -> unit
 (** [seal ()] prevents further scope definitions from being made. This
-    function is called at the end of the root B0 file. Since it comes
+    function is called at the end of the root b0 file. Since it comes
     last during linking the library scopes have already been established. *)
 
 val sealed : unit -> bool

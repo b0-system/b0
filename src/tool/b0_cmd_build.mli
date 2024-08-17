@@ -3,7 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** B0 [build] command. *)
+(** b0 [build] command. *)
 
 val get_default_build : unit -> B0_unit.t list * B0_pack.t list
 val unit_set_of :

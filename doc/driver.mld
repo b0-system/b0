@@ -1,8 +1,8 @@
-{0 B0 driver manual}
+{0 b0 driver manual}
 
-A B0 driver like [b0] is an executable that provides a service on the
-definitions of a B0 file. This manual shows how to develop a custom
-driver for B0 files.
+A b0 driver like [b0] is an executable that provides a service on the
+definitions of a b0 file. This manual shows how to develop a custom
+driver for b0 files.
 
 Note that it is unlikely you will need to create your own custom
 driver, a lot can be achieved by simply devising {!B0_action}, read
@@ -11,10 +11,10 @@ understanding the [b0] tool machinery in more details, read on.
 
 {1:overview Overview}
 
-The B0 file needs to be compiled and made accessible to the driver
+The b0 file needs to be compiled and made accessible to the driver
 executable. At the moment the OCaml [Dynlink] API is not being
 used. Instead the driver executable relinks its objects with a
-compilation of the B0 file to produce another executable that is
+compilation of the b0 file to produce another executable that is
 executed to run the driver on the definitions.
 
 With the help of the {!B0_driver} module this all happens
@@ -22,7 +22,7 @@ transparently in the [.drivers] directory of the [_b0] directory.
 
 {1:library The driver library}
 
-For your driver to access a B0 file you need to create an OCaml library
+For your driver to access a b0 file you need to create an OCaml library
 which has all the objects of your driver and registers its [main]
 function by calling {!B0_driver.set}.
 
@@ -60,8 +60,8 @@ let () = B0_driver.set driver ~main
 ]}
 
 The [mydriver_main_run.ml] file defines your driver executable when it
-has no B0 file linked in. It's the program that runs your driver
-without the B0 file linked in. It should simply be:
+has no b0 file linked in. It's the program that runs your driver
+without the b0 file linked in. It should simply be:
 
 {[
 let () =
@@ -75,10 +75,10 @@ A few things to note:
 {- Your driver library must be installed and available in the [OCAMLPATH]
    under the name you gave in to {!B0_driver}. FIXME lib resolution info.}
 {- The driver library's directory is not added to the includes for
-   compiling the B0 file. This prevents drivers from adding declarations
-   to the compilation environment since using them in a B0 file would
+   compiling the b0 file. This prevents drivers from adding declarations
+   to the compilation environment since using them in a b0 file would
    then break other drivers. New declarations must always be explicitely
-   imported in the B0 file by using the [#require] directive.}}
+   imported in the b0 file by using the [#require] directive.}}
 
 {1:fixme FIXME}
 

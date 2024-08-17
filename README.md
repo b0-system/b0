@@ -1,15 +1,15 @@
-B0 — Software construction and deployment kit
+b0 — Software construction and deployment kit
 -------------------------------------------------------------------------------
 
 WARNING this package is unstable and work in progress, do not depend on it. 
 
-B0 describes software construction and deployments using modular and
+b0 describes software construction and deployments using modular and
 customizable definitions written in OCaml.
 
-At the core of B0 is the `b0.memo` library which provides arbitrary 
+At the core of b0 is the `b0.memo` library which provides arbitrary 
 build abstraction with reliable, efficient incremental rebuilds.
 
-B0 is distributed under the ISC license. It depends on [cmdliner][cmdliner].
+b0 is distributed under the ISC license. It depends on [cmdliner][cmdliner].
 
 [cmdliner]: https://erratique.ch/software/cmdliner
 

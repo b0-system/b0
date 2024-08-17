@@ -81,7 +81,7 @@ let units ~right:r =
 let dune_cmd env u =
   let man =
     [ `S Manpage.s_see_also;
-      `P "Consult $(b,odig doc b0) for the B0 dune manual."]
+      `P "Consult $(b,odig doc b0) for the b0 dune manual."]
   in
   let export =
     let doc = "Best-effort dune file generation" in
@@ -106,7 +106,7 @@ let dune_cmd env u =
   let man =
     [ `S Cmdliner.Manpage.s_description;
       `P "$(iname) helps with $(b,dune) \
-          see the B0 dune manual in $(b,odig doc b0) and \
+          see the b0 dune manual in $(b,odig doc b0) and \
           invoke the subcommands with $(b,--help) for more \
           information.";
       `Blocks man]

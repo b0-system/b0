@@ -198,40 +198,40 @@ open Cmdliner
 
 let root =
   let doc =
-    "Apply operation on the root B0 file only rather than on its expansion."
+    "Apply operation on the root b0 file only rather than on its expansion."
   in
   Arg.(value & flag & info ["root"] ~doc)
 
 let boot =
-  let doc = "Install libraries needed for the B0 file" in
-  let descr = `P "$(iname) install libraries needed to compile the B0 file." in
+  let doc = "Install libraries needed for the b0 file" in
+  let descr = `P "$(iname) install libraries needed to compile the b0 file." in
   B0_tool.Cli.subcmd_with_driver_conf "boot" ~doc ~descr @@
   Term.(const boot $ root)
 
 let compile =
-  let doc = "Compile the driver for the B0 file" in
-  let descr = `P "$(iname) compiles the driver for the B0 file." in
+  let doc = "Compile the driver for the b0 file" in
+  let descr = `P "$(iname) compiles the driver for the b0 file." in
   B0_tool.Cli.subcmd_with_driver_conf "compile" ~doc ~descr @@
   Term.(const compile)
 
 let edit =
-  let doc = "Edit the B0 file" in
-  let descr = `P "$(iname) opens the B0 file in your editor. If $(b,--all) \
+  let doc = "Edit the b0 file" in
+  let descr = `P "$(iname) opens the b0 file in your editor. If $(b,--all) \
                   is specified also opens all includes."
   in
   let all =
-    let doc = "Edit the B0 file and all its includes." in
+    let doc = "Edit the b0 file and all its includes." in
     Arg.(value & flag & info ["all"] ~doc)
   in
   B0_tool.Cli.subcmd_with_driver_conf "edit" ~doc ~descr @@
   Term.(const edit $ all)
 
 let gather =
-  let doc = "Gathers and scope B0 files into a single B0.ml file" in
+  let doc = "Gathers and scope b0 files into a single B0.ml file" in
   let descr = `Blocks [
-      `P "$(iname) outputs on $(b,stdout) a B0 file that includes and scopes \
-          the B0 files existing in given $(i,DIR)… directories.";
-      `P "If the $(b,-d) $(i,DEST) option is specified, the B0 file is written \
+      `P "$(iname) outputs on $(b,stdout) a b0 file that includes and scopes \
+          the b0 files existing in given $(i,DIR)… directories.";
+      `P "If the $(b,-d) $(i,DEST) option is specified, the b0 file is written \
           in the $(i,DEST) destination directory and, if the $(b,-s) option \
           is specified it symlinks the scope names to their directory \
           in $(i,DEST).";
@@ -259,9 +259,9 @@ let gather =
     Arg.(value & flag & info ["force"] ~doc)
   in
   let keep_going =
-    let doc = "Skip input directories that have no B0 file (default)." in
+    let doc = "Skip input directories that have no b0 file (default)." in
     let keep_going = true, Arg.info ["k"; "keep-going"] ~doc in
-    let doc = "Stop if an input directory has no B0 file." in
+    let doc = "Stop if an input directory has no b0 file." in
     let fail_stop = false, Arg.info ["f"; "fail-stop"] ~doc in
     Arg.(value & vflag true [keep_going; fail_stop])
   in
@@ -286,10 +286,10 @@ let gather =
         relative $ symlink_scopes)
 
 let includes =
-  let doc = "Output scope name and paths of included B0 files" in
-  let descr = `P "$(iname) outputs the scope name and paths of included B0 \
+  let doc = "Output scope name and paths of included b0 files" in
+  let descr = `P "$(iname) outputs the scope name and paths of included b0 \
                   files. If $(b,--root) is specified only shows the includes \
-                  of the root B0 file."
+                  of the root b0 file."
   in
   B0_tool.Cli.subcmd_with_driver_conf "includes" ~doc ~descr @@
   Term.(const includes $ root $ B0_tool.Cli.format)
@@ -310,31 +310,31 @@ let log =
         B0_cli.Memo.Log.out_format_cli () $ B0_cli.Op.query_cli ())
 
 let path =
-  let doc = "Output the B0 file path (default command)" in
-  let descr = `P "$(iname) outputs the B0 file path." in
+  let doc = "Output the b0 file path (default command)" in
+  let descr = `P "$(iname) outputs the b0 file path." in
   B0_tool.Cli.subcmd_with_driver_conf "path" ~doc ~descr @@
   Term.(const path)
 
 let requires =
-  let doc = "Output the OCaml libraries required by the B0 file" in
+  let doc = "Output the OCaml libraries required by the b0 file" in
   let descr = `P "$(iname) outputs the OCaml libraries required to compile \
-                  the B0 file. If $(b,--root) is specified only shows the \
-                  requires of the root B0 file."
+                  the b0 file. If $(b,--root) is specified only shows the \
+                  requires of the root b0 file."
   in
   B0_tool.Cli.subcmd_with_driver_conf "requires" ~doc ~descr @@
   Term.(const requires $ root)
 
 let source =
-  let doc = "Output the expanded B0 source file" in
-  let descr = `P "$(iname) outputs the expanded B0 source file compiled
+  let doc = "Output the expanded b0 source file" in
+  let descr = `P "$(iname) outputs the expanded b0 source file compiled
                   by the driver. If $(b,--root) is specified shows the \
-                  non-expanded source of the root B0 file."
+                  non-expanded source of the root b0 file."
   in
   B0_tool.Cli.subcmd_with_driver_conf "source" ~doc ~descr @@
   Term.(const source $ root)
 
 let cmd =
-  let doc = "Operate on the B0 file" in
-  let descr = `P "$(iname) operates on the B0 file." in
+  let doc = "Operate on the b0 file" in
+  let descr = `P "$(iname) operates on the b0 file." in
   B0_tool.Cli.cmd_group "file" ~doc ~descr @@
   [ boot; compile; edit; gather; includes; log; path; requires; source ]

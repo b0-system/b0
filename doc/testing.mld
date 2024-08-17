@@ -54,7 +54,7 @@ The infrastructure described above allows to hook the testing
 framework of your wish by simply tagging your test executables with
 {!B0_meta.test} and {!B0_meta.run}.
 
-B0 itself provides a few testing tools to make such executables. A
+b0 itself provides a few testing tools to make such executables. A
 simplistic {!B0_testing} module is available in the [b0.std] package.
 It simply runs tests as functions from [unit -> unit], provides a few
 asserting tools and integrates nicely with [b0 test]'s rendering. See

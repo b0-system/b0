@@ -17,8 +17,8 @@ module Exit = struct
   let e c doc = Cmd.Exit.info (Os.Exit.get_code c) ~doc
   let info_deploy_error = e deploy_error "on deploy error."
   let info_build_error = e build_error "on build error."
-  let info_b0_file_error = e b0_file_error "on B0 file error."
-  let info_no_b0_file = e no_b0_file "no B0 file found."
+  let info_b0_file_error = e b0_file_error "on b0 file error."
+  let info_no_b0_file = e no_b0_file "no b0 file found."
 
   let infos =
     info_deploy_error :: info_build_error ::
@@ -135,7 +135,7 @@ module Cli = struct
   let b0_dir = B0_cli.Memo.b0_dir ~docs ()
   let b0_file =
     let env = Cmd.Env.info Env.b0_file in
-    let doc = "Use $(docv) as the B0 file." and docv = "PATH" in
+    let doc = "Use $(docv) as the b0 file." and docv = "PATH" in
     let absent = "$(b,B0.ml) file in cwd or first upwards" in
     Arg.(value & opt (Arg.some B0_std_cli.fpath) None &
          info ["b0-file"] ~absent ~doc ~docv ~docs ~env)
@@ -382,7 +382,7 @@ module Compile = struct
         if feedback then
           B0_zero_conv.Op.pp_aggregate_error
             ~read_howto ~write_howto () Fmt.stderr e;
-        Fmt.error "Could not compile B0 file %a"
+        Fmt.error "Could not compile b0 file %a"
           Fmt.(code' Fpath.pp) (B0_file.file src)
 end
 

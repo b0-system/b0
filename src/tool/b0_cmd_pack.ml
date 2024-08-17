@@ -33,7 +33,7 @@ let packs_all = packs ~right:(-1)
 let edit =
   let doc = "Edit build packs" in
   let descr =
-    `P "$(iname) opens in your editor the B0 files of given build packs \
+    `P "$(iname) opens in your editor the b0 files of given build packs \
         are defined."
   in
   let envs = B0_tool.Cli.editor_envs in

@@ -2173,7 +2173,7 @@ let unit =
   B0_unit.of_cmdliner_cmd "" ~doc @@ fun env u ->
   let man =
     [ `S Manpage.s_see_also;
-      `P "Consult $(b,odig doc b0) for the B0 OCaml manual." ]
+      `P "Consult $(b,odig doc b0) for the b0 OCaml manual." ]
   in
   let crunch =
     let doc = "Crunch bytes into an OCaml string" in

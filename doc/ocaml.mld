@@ -1,6 +1,6 @@
-{0 [ocaml] B0 manual}
+{0 [ocaml] b0 manual}
 
-B0 obviously supports compiling OCaml projects. The support is spread
+b0 obviously supports compiling OCaml projects. The support is spread
 in a set of modules aligned on the different tools of the eco-system:
 
 - {!B0_ocaml}, has support for the basic OCaml toolchain and libary

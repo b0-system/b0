@@ -1,6 +1,6 @@
-# B0 copyrights
+# b0 copyrights
 
-The B0 project is covered by the following copyrights.
+The b0 project is covered by the following copyrights.
 
 * The `src/std/vendor/MurmumHash3.{h,c}` files were written by 
   Austin Appleby who disclaims copyright and placed them in the public domain.

@@ -19,7 +19,7 @@ open B0_std
 val find_project_meta : unit -> B0_meta.t option
 (** [find_project_meta ()] finds default metadata for the project.
     For now this the meta of {!B0_pack.find_default} if there is
-    a B0 file linked (see {!B0_driver.has_b0_file}). *)
+    a b0 file linked (see {!B0_driver.has_b0_file}). *)
 
 val get_project_meta : unit -> B0_meta.t
 (** [get_project_meta ()] is like {!find_project_meta} but defaults to

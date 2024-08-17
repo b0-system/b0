@@ -3,7 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** APIs to use in B0 files. *)
+(** APIs to use in b0 files. *)
 
 (** Version 000. *)
 module V000 : sig

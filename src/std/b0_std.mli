@@ -3,7 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** Standard needs for B0 programs.
+(** Standard needs for b0 programs.
 
     Open this module to use it. It redefines a few standard
     modules and introduces a few new ones. *)

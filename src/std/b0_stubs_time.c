@@ -74,8 +74,8 @@ CAMLprim value ocaml_b0_monotonic_now_ns (value unit)
 /* Unsupported */
 
 #else
-
-#warning OCaml B0 library: unsupported platform, monotonic timings will be wrong
+y
+#warning OCaml b0 library: unsupported platform, monotonic timings will be wrong
 
 CAMLprim value ocaml_b0_monotonic_now_ns (value unit)
 {

@@ -3,7 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** B0 [test] command. *)
+(** [test] command. *)
 
 val cmd : B0_std.Os.Exit.t Cmdliner.Cmd.t
 (** [build] is the command line for [test]. *)

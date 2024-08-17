@@ -9,7 +9,7 @@
 #include <caml/fail.h>
 
 #define OCAML_B0_RAISE_SYS_ERROR(ERR)                               \
-  do { caml_raise_sys_error (caml_copy_string("B0 stubs: " ERR)); } \
+  do { caml_raise_sys_error (caml_copy_string("b0 stubs: " ERR)); } \
   while (0)
 
 /* Detect platform */

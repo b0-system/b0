@@ -34,7 +34,7 @@ val root_dir : t -> Fpath.t
 (** [root_dir env] is the {{!page-manual.root_dir}root directory}. *)
 
 val scope_dir : t -> Fpath.t
-(** [scope_dir env] is the absolute path to the directory of the B0 file
+(** [scope_dir env] is the absolute path to the directory of the b0 file
     in which the action is defined or the {{!root_dir}root
     directory} if the action is defined the global scope. *)
 

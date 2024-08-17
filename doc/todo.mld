@@ -61,7 +61,7 @@ let crunch_file m file ~in_dir =
 
 {2:fragments Build fragments}
 
-At the B0 level we need to expose build fragments. It seems the build
+At the b0 level we need to expose build fragments. It seems the build
 procedures of units is a good candidate but for now it's a bit
 unconvient to do that. We need to clarify the configuration store and
 dynamic metadata see {!b0_meta}. For now as a temporary hack we add

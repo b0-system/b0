@@ -36,7 +36,7 @@ let cmd =
     `P "$(mname) $(b,--) [$(i,ACTION)] [$(i,ARG)]…"; `Noblank;
     `P "$(mname) $(i,COMMAND) …";
     `S Manpage.s_description;
-    `P "B0 describes software construction and deployments using modular and \
+    `P "b0 describes software construction and deployments using modular and \
         customizable definitions written in OCaml.";
     `Pre "Use $(iname) $(b,unit --list) to see what can be built."; `Noblank;
     `Pre "Use $(iname) $(b,--what) to see what gets built."; `Noblank;

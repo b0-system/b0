@@ -3,7 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** B0 [scope] command. *)
+(** [scope] command. *)
 
 val vcs : B0_std.Os.Exit.t Cmdliner.Cmd.t
 (** [vcs] is the [b0 vcs] command. *)

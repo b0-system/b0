@@ -6,7 +6,7 @@
 (** Metadata.
 
     Typed key-value dictionaries. These dictionaries are attached to
-    various B0 definitions to specify metadata about them.
+    various b0 definitions to specify metadata about them.
 
     The module defines a few {{!std}standard keys}.
 

@@ -3,7 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** B0 file source and expansion. *)
+(** b0 file source and expansion. *)
 
 open B0_std
 open B0_text
@@ -20,7 +20,7 @@ val loc_errf : smeta -> ('a, Format.formatter, unit, string) format4 -> 'a
 (** [loc_errf smeta fmt] formats an error for the location in [smeta]. The
     result should be printed as is on the TTY. *)
 
-(** {1:srcs B0 files sources} *)
+(** {1:srcs b0 files sources} *)
 
 type b0_boot = (string * smeta) list
 (** The type for [@@@B0.boot] directive data. The list of strings. *)
@@ -36,14 +36,14 @@ type mod_use = Fpath.t * smeta
 (** The type for #mod_use directive data. The path to the module source. *)
 
 type t
-(** The type for B0 files sources. *)
+(** The type for b0 files sources. *)
 
 val of_string : file:Fpath.t -> string -> (t, string) result
-(** [of_string ~file s] parses a B0 file from [s]. [file] is the file
+(** [of_string ~file s] parses a b0 file from [s]. [file] is the file
     used for locations, it must be absolute. *)
 
 val file : t -> Fpath.t
-(** [file f] is the B0 file's file. *)
+(** [file f] is the b0 file's file. *)
 
 val b0_boots : t -> b0_boot list
 (** [b0_boots f] are the individual [@@@B0.boot] directives. *)
@@ -62,7 +62,7 @@ val ocaml_unit : t -> string * smeta
 (** [ocaml_unit s] is the script's OCaml implementation unit. *)
 
 val pp_dump : t Fmt.t
-(** [pp_dump] dumps the parsed B0 file. *)
+(** [pp_dump] dumps the parsed b0 file. *)
 
 val pp_locs : t Fmt.t
 (** [pp_locs] dumps the source text locations of [s]. *)

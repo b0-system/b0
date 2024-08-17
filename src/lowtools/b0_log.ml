@@ -26,7 +26,7 @@ let log_file =
   Arg.(required & pos 0 (some B0_std_cli.fpath) None & info [] ~doc ~docv)
 
 let tool =
-  let doc = "Operate on B0 log files" in
+  let doc = "Operate on b0 log files" in
   let envs = B0_pager.Env.infos in
   let man_xrefs = [`Tool "b0"; `Tool "b0-cache"; `Tool "b0-hash" ] in
   let man = [

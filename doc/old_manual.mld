@@ -1,4 +1,4 @@
-{0 B0 manual}
+{0 b0 manual}
 
 The old manual, kept for reference.
 
@@ -8,11 +8,11 @@ The old manual, kept for reference.
 
 {2:model Build model}
 
-Effectively a [B0] build system is an OCaml program that executes
+Effectively a b0 build system is an OCaml program that executes
 arbitrary external commands in parallel and whose effects on the file
 system are memoized across program runs with an on-disk cache.
 
-There is no notion of build rule in [B0]: you simply generate and
+There is no notion of build rule in b0: you simply generate and
 execute program commands using arbitrary OCaml functions. This allows
 to define modular and rich data structures for describing builds that
 are "compiled" down, on each build, to parallel invocations of
@@ -20,7 +20,7 @@ memoized commands.
 
 {2:concept_conf Configuration}
 
-Next to this simple build model [B0] adds a configuration mecanism
+Next to this simple build model b0 adds a configuration mecanism
 under the form of a typed, persisted, key-value store which builds can
 consult and depend on.
 
@@ -30,10 +30,10 @@ without loosing the earlier CPU cycles.
 
 The configuration layer is also cross-compilation ready: any
 configuration key value can differ for the build and host operating
-system and the build system of B0 keeps tracks of build tools that are
+system and the build system of b0 keeps tracks of build tools that are
 build and used by the build system to make sure they are built with
 the build OS toolchain. For programmers of the build system, cross
-compilation is oblivious in B0, it happens without the user having to
+compilation is oblivious in b0, it happens without the user having to
 perform anything special.  More on {{!configuration}configuration}.
 
 {2:concept_variants Build variants}
@@ -233,7 +233,7 @@ builds your project.
 
 {1:descr_values Description values}
 
-[B0] descriptions are made of a grab bag of OCaml values,
+b0 descriptions are made of a grab bag of OCaml values,
 configuration keys, build units, packages, variants, variant
 schemes, deployments, etc. In order to operate on these values
 from end-user interfaces (e.g. the [b0] and [d0] tools), the
@@ -242,12 +242,12 @@ following must be guaranteed:
 {ol
 {- Values and their names need to be defined during the toplevel
    initialization phase of the program without being conditioned
-   by external factors [B0] may not be aware of (FIXME implement
+   by external factors b0 may not be aware of (FIXME implement
    Def locking).}
 {- Values names need to be unique to ensure all the values are
    accessible and can be operated on.}}
 
-As far as 1. is concerned, [B0] relies on the discpline of [B0.ml]
+As far as 1. is concerned, b0 relies on the discpline of [B0.ml]
 file writers. They should define all their description values
 through toplevel [let] definitions and {b never} conditionalize
 their existence or the definition of their components.  For
@@ -260,10 +260,10 @@ let myprogram =
   Conf.(key "myprogram" ~default)
 ]}
 
-As far as 2. is concerned. [B0] handles this automatically. In two manners:
+As far as 2. is concerned. b0 handles this automatically. In two manners:
 {ul
 {- If a name used in a description clashes with a name defined by a library
-[B0] logs a warning and automatically rename the new definition.}
+b0 logs a warning and automatically rename the new definition.}
 {- When multiple [B0.ml] are composed toghether. The names defined
 by subdescriptions get automatically namespaced by their position
 in the file hierarchy. TODO Give example.}}
@@ -291,7 +291,7 @@ A description file is either:
 {ol
 {- A [B0.b0] file that {{!b0b0}describes} how to compile a description.}
 {- A [B0.ml] OCaml file in a directory without a [B0.b0] file.}}
-If your description is simple or uses only the default [B0]
+If your description is simple or uses only the default b0
 library then a simple [B0.ml] description will do. If not, a
 [B0.b0] file is an s-expression based {{!b0b0}configuration file}
 that describes how to compile a self-contained and isolated
@@ -427,7 +427,7 @@ have to be in the corresponding [libname] directory.
     {- [(libs (<libname>...))]. Libraries unconditionally used to compile
         and link.}
     {- [(drop-libs (<libname>...))]. Libraries dropped from compile and link
-       (e.g. to drop [B0] or [B0_care]).}
+       (e.g. to drop b0 or [B0_care]).}
     {- [(srcs ((<path> (<libname>...) <docstring>)...))]
        OCaml source files to use for the description. Each source is
        described by a path to an ml file, libraries whose existence
@@ -511,7 +511,7 @@ If you spend some time thinking about building software
 incrementally and correctly you quickly realize that our current
 file system and tool based approach is entirely hopless. The fact
 that you can't guarantee noone fiddles with the outputs of your
-build steps across build system runs. [B0] is not different and
+build steps across build system runs. b0 is not different and
 you can entirely trip it by fiddling with the contents of its
 [_b0] dir.
 
@@ -565,7 +565,7 @@ use the value.
 {- Provide a way to lock definitions so that any def afterwards raises.
   This ensures that description files do not generate definitions
   dynamically (e.g. conf keys, build units, variants schemes).}
-{- For B0 as a library. Provide a way to disable the retaining of
+{- For b0 as a library. Provide a way to disable the retaining of
   definitions (Unit.list, Variant.Scheme.list). Related to locking.}}
 
 {2 B0.Conf}

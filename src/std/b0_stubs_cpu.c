@@ -38,7 +38,7 @@ CAMLprim value ocaml_b0_cpu_logical_count (value unit)
 /* Unsupported */
 
 #else
-#warning OCaml B0 library: unsupported platform, cpu count will always be 1
+#warning OCaml b0 library: unsupported platform, cpu count will always be 1
 
 CAMLprim value ocaml_b0_cpu_logical_count (value unit)
 {

@@ -407,7 +407,7 @@ let file_cmd env constraints pkgs lint raw dst in_scope no_name =
   in
   match pkgs with
   | [] ->
-      Log.warn (fun m -> m "No opam packages found in B0 root.");
+      Log.warn (fun m -> m "No opam packages found in b0 root.");
       Ok Os.Exit.ok
   | ps ->
       Log.if_error' ~use:Os.Exit.some_error @@
@@ -746,7 +746,7 @@ module Publish = struct
     let* ps = Pkg.get_unique_list_or_hints ~constraints (List.map fst pkgs) in
     match ps with
     | [] ->
-        Log.app (fun m -> m "No opam package to publish in B0 root.");
+        Log.app (fun m -> m "No opam package to publish in b0 root.");
         Ok Os.Exit.ok
     | ps ->
         let add_version p = p, Option.join (List.assoc_opt (Pkg.name p) pkgs) in
@@ -780,7 +780,7 @@ let unit =
   let open Cmdliner in
   let man =
     [ `S Manpage.s_see_also;
-      `P "Consult $(b,odig doc b0) for the B0 opam manual."]
+      `P "Consult $(b,odig doc b0) for the b0 opam manual."]
   in
   let pkgs ?(docv = "PKG") ~doc () =
     Arg.(value & pos_all string [] & info [] ~doc ~docv)
@@ -897,7 +897,7 @@ let unit =
   in
   let man = [ `S Cmdliner.Manpage.s_description;
               `P "$(iname) helps with $(b,opam) \
-                  see the B0 opam manual in $(b,odig doc b0) and \
+                  see the b0 opam manual in $(b,odig doc b0) and \
                   invoke the subcommands with $(b,--help) for more \
                   information.";
               `Blocks man]

@@ -11,27 +11,27 @@ let b0_file = B0_ocaml.libname "b0.file"
 let b0_kit = B0_ocaml.libname "b0.kit"
 let b0_tool = B0_ocaml.libname "b0.tool"
 
-(* B0 libraries *)
+(* b0 libraries *)
 
 let b0_std_lib =
   let srcs = [ `Dir_rec ~/"src/std"; `X ~/"src/std/b0_std_top_init.ml" ] in
   let requires = [unix; cmdliner] in
-  B0_ocaml.lib b0_std ~doc:"B0 standard library" ~srcs ~requires
+  B0_ocaml.lib b0_std ~doc:"b0 standard library" ~srcs ~requires
 
 let b0_memo_lib =
   let srcs = [`Dir ~/"src/memo"] in
   let requires = [unix; cmdliner; b0_std] in
-  B0_ocaml.lib b0_memo ~doc:"B0 build library" ~srcs ~requires
+  B0_ocaml.lib b0_memo ~doc:"b0 build library" ~srcs ~requires
 
 let b0_file_lib =
   let srcs = [`Dir ~/"src/file"] in
   let requires = [unix; cmdliner; b0_std; b0_memo] in
-  B0_ocaml.lib b0_file ~doc:"B0 build file library" ~srcs ~requires
+  B0_ocaml.lib b0_file ~doc:"b0 build file library" ~srcs ~requires
 
 let b0_kit_lib =
   let srcs = [`Dir ~/"src/kit"] in
   let requires = [unix; cmdliner; b0_std; b0_memo; b0_file] in
-  B0_ocaml.lib b0_kit ~doc:"B0 toolkit library" ~srcs ~requires
+  B0_ocaml.lib b0_kit ~doc:"b0 toolkit library" ~srcs ~requires
 
 (* The b0 tool *)
 
@@ -59,7 +59,7 @@ let b0 =
   let meta = B0_meta.empty |> ~~ B0_unit.Action.env exec_env in
   B0_ocaml.exe "b0" ~public:true ~doc:"The b0 tool" ~srcs ~requires ~meta
 
-(* Low-level B0 tools *)
+(* Low-level b0 tools *)
 
 let tool_exe ?(requires = []) n ~doc file =
   let requires = (cmdliner :: b0_std :: requires) in
@@ -137,15 +137,15 @@ let test_b0_file =
 (* Packs *)
 
 let b0_pack =
-  B0_pack.make "b0" ~doc:"The B0 libraries" ~locked:true @@
+  B0_pack.make "b0" ~doc:"The b0 libraries" ~locked:true @@
   [b0_std_lib; b0_memo_lib; b0_file_lib; b0_kit_lib]
 
 let tool_pack =
-  B0_pack.make "b0-tools" ~doc:"The low-level B0 tools" ~locked:false @@
+  B0_pack.make "b0-tools" ~doc:"The low-level b0 tools" ~locked:false @@
   [b0_cache_tool; b0_hash_tool; b0_log_tool; show_url_tool]
 
 let driver_pack =
-  B0_pack.make "b0-drivers" ~doc:"The B0 drivers" ~locked:false @@ [b0]
+  B0_pack.make "b0-drivers" ~doc:"The b0 drivers" ~locked:false @@ [b0]
 
 let default =
   let meta =
@@ -170,7 +170,7 @@ let default =
     |> B0_meta.tag B0_opam.tag
     |> B0_meta.tag B0_release.tag
   in
-  B0_pack.make "default" ~doc:"The B0 system" ~meta ~locked:true @@
+  B0_pack.make "default" ~doc:"The b0 system" ~meta ~locked:true @@
   B0_unit.list ()
 
 (* Actions *)

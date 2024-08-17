@@ -3,9 +3,9 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** B0 file drivers.
+(** b0 file drivers.
 
-    B0 file drivers access the definitions of B0 files.
+    b0 file drivers access the definitions of b0 files.
     See {{!page-driver}this manual} for an
     overview and a minimal example. *)
 
@@ -22,13 +22,13 @@ module Exit : sig
   (** [build_error] indicates a build error. *)
 
   val b0_file_error : Os.Exit.t
-  (** [b0_file_error] indicates a B0 file error. *)
+  (** [b0_file_error] indicates a b0 file error. *)
 
   val deploy_error : Os.Exit.t
   (** [deploy_error] indicates a deploy error. *)
 
   val no_b0_file : Os.Exit.t
-  (** [no_b0_file] indicates no B0 file could be found. *)
+  (** [no_b0_file] indicates no b0 file could be found. *)
 
   val infos : Cmdliner.Cmd.Exit.info list
   (** [infos] has the infos of {!Cmdliner.Cmd.Exit.defaults},
@@ -71,7 +71,7 @@ module Conf : sig
   (** {1:filename Default file names} *)
 
   val b0_file_name : string
-  (** [b0_file_name] is ["B0.ml"] the default B0 file name. *)
+  (** [b0_file_name] is ["B0.ml"] the default b0 file name. *)
 
   val drivers_dir_name : string
   (** [driver_dir_name] is [".drivers"] the default directory
@@ -91,7 +91,7 @@ module Conf : sig
       accessors for semantics. *)
 
   val b0_file : t -> Fpath.t option
-  (** [b0_file] is the absolute path to the B0 file (if any). *)
+  (** [b0_file] is the absolute path to the b0 file (if any). *)
 
   val b0_dir : t -> Fpath.t
   (** [b0_dir] is the absolute path to the b0 directory. *)
@@ -160,7 +160,7 @@ type main =
     a Cmdliner evaluation result. This evaluation result is used
     by {!run} to handle program termination. Note that the driver
     may exit prematurely with {!Exit.b0_file_error} if there's
-    a fatal error in the B0 file. *)
+    a fatal error in the b0 file. *)
 
 type t
 (** The type for drivers. *)
@@ -168,7 +168,7 @@ type t
 val make :
   name:string -> version:string -> libs:B0_ocaml.Libname.t list -> t
 (** [make ~name ~version] is a new driver named [name] which has
-    version [version] and uses library [libs] to link the B0 file. Note
+    version [version] and uses library [libs] to link the b0 file. Note
     that these libraries are not added during the compilation phase.
 
     {b Note.} The b0 libraries are automatically added to [libs]
@@ -190,21 +190,21 @@ val set : driver:t -> main:main -> unit
 
 val run : has_b0_file:bool -> unit
 (** [run ~has_b0_file] runs the driver set by {!set}. [has_b0_file]
-    must be [true] if the B0 file is linked in, this is typically done
-    by the B0 file expanded source invocation. Raises
+    must be [true] if the b0 file is linked in, this is typically done
+    by the b0 file expanded source invocation. Raises
     [Invalid_argument] if no driver is set. *)
 
-(** {1:require Require the B0 file} *)
+(** {1:require Require the b0 file} *)
 
 val with_b0_file :
   driver:t -> (Conf.t -> Os.Exit.t) Cmdliner.Term.t -> Os.Exit.t Cmdliner.Term.t
 (** [with_b0_file ~driver cmd] wraps [cmd] to make sure it runs with
-    the B0 file compiled and linked in as specified by [driver]. *)
+    the b0 file compiled and linked in as specified by [driver]. *)
 
 val with_b0_file_if_any :
   driver:t -> (Conf.t -> Os.Exit.t) Cmdliner.Term.t -> Os.Exit.t Cmdliner.Term.t
 (** [with_b0_file_if_any ~driver cmd] is like {!with_b0_file} however
-    it doesn't error if the B0 file does not exist or if it fails to
+    it doesn't error if the b0 file does not exist or if it fails to
     compile (a warning is generated in this case). The driver code can
     use {!B0_driver.has_b0_file} to see if one is linked and
     {!B0_driver.has_failed_b0_file} to check if there was an error in linking
@@ -215,7 +215,7 @@ val has_b0_file : unit -> bool
 
 val has_failed_b0_file : unit -> bool
 (** [has_failed_b0_file ()] is [true] for {!with_b0_file_if_any} when
-    there is a B0 file but it file to compile. *)
+    there is a b0 file but it file to compile. *)
 
 (** {1:compile Compilation} *)
 

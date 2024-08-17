@@ -138,10 +138,10 @@ let unix_dir, unix_archive =
 let ext_lib_dirs = [cmdliner_dir; unix_dir]
 let ext_lib_archives = [cmdliner_archive; unix_archive]
 
-(* Ad-hoc compile of a b0 driver for the B0 file of b0.
+(* Ad-hoc compile of a b0 driver for the b0 file of b0.
 
-   We concatenate the sorted source files of all needed B0 libraries
-   with the B0 file to a single source. This source is compiled and
+   We concatenate the sorted source files of all needed b0 libraries
+   with the b0 file to a single source. This source is compiled and
    linked along with the C stub sources in a single step in the
    boot/_build directory to produce the boot/run executable. The build
    directory exists in the repo to avoid having to mkdir which Sys

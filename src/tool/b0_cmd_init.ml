@@ -268,7 +268,7 @@ let license_cmd =
       `Pre "$(iname) $(b,-l ISC > LICENSE.md)"; `Noblank;
       `Pre "$(iname) $(b,-h holder -l ISC > LICENSE.md)"; `Noblank;
       `Pre "$(iname) $(b,LICENSE.md)";
-      `P "If a B0 file with a default pack is available a license \
+      `P "If a b0 file with a default pack is available a license \
           for the first license of the $(b,.meta.licenses) key is generated \
           if $(b,--license) is unspecified." ]
   in
@@ -283,7 +283,7 @@ let readme_cmd =
           for a software project. For example:";
       `Pre "$(iname) $(b,-s \"My project synopsis\" > README.md) "; `Noblank;
       `Pre "$(iname) $(b,-n myproject README.md) ";
-      `P "If a B0 file with a default pack is available it may use some of \
+      `P "If a b0 file with a default pack is available it may use some of \
           its metadata to generate boilerplate. In particular if it \
           has the $(b,.opam.tag) key, OCaml specific instructions are \
           generated." ]

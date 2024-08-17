@@ -12,7 +12,7 @@ open B0_std
 (** {1:packs Packs} *)
 
 type b0_unit = B0_defs.b0_unit
-(** The type for B0 units. See {!B0_unit.t}. *)
+(** The type for b0 units. See {!B0_unit.t}. *)
 
 type t
 (** The type for build units. *)
@@ -51,6 +51,6 @@ val derive_synopsis_and_description : t -> B0_meta.t -> B0_meta.t
     {b XXX.} See if we couldn't define that as a default key value
     in the future. Though we'd need the def for getting the directory. *)
 
-(** {1:b0_def B0 definition API} *)
+(** {1:b0_def b0 definition API} *)
 
 include B0_def.S with type t := t

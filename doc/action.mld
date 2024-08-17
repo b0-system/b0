@@ -1,13 +1,13 @@
-{0 B0 actions manual}
+{0 b0 actions manual}
 
-This manual shows how to deal with B0 actions and how to create your
+This manual shows how to deal with b0 actions and how to create your
 own.
 
 {b TODO.} Not super clear yet.
 
 {1:basics Basics}
 
-In B0, building is merely a side effect. Most of the time one is
+In b0 building is merely a side effect. Most of the time one is
 interested in doing something with build artefacts. This can be
 running them, displaying them, testing them, benchmarking them,
 deploying them etc.

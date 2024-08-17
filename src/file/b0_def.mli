@@ -3,13 +3,13 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** B0 definitions.
+(** b0 definitions.
 
-    B0 definitions are uniquely named OCaml values of different types
+    b0 definitions are uniquely named OCaml values of different types
     used for describing software construction. The value names are
     used for end-user interaction.
 
-    B0 definitions occur in various B0 files and libraries during the
+    b0 definitions occur in various b0 files and libraries during the
     module initialisation phase of the program consuming the
     definitions. After the module initialisation phase no new
     definition is allowed.
@@ -152,7 +152,7 @@ module type S = sig
   (** [find name] is the value named [name] (if any). *)
 
   val get : string -> t
-  (** [get name] looks up the value named [name] and errors the B0 file
+  (** [get name] looks up the value named [name] and errors the b0 file
       if there no such [name]. *)
 
   val get_or_suggest : string -> (t, t list) result

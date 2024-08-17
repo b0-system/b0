@@ -6,7 +6,7 @@
 (** Build units.
 
     A unit is a named build procedure and an optional action to perform
-    once the unit has built. Units are the smallest unit of build in B0 files.
+    once the unit has built. Units are the smallest unit of build in b0 files.
 
     Either of the build procedure or the action can be a nop. Actions
     can also require a bit more than the unit itself from the build in
@@ -94,7 +94,7 @@ module Action : sig
 
   type cwd =
   [ `Cwd (** The user's current working directory. *)
-  | `Root_dir (** The root B0 file directory. *)
+  | `Root_dir (** The root b0 file directory. *)
   | `Scope_dir (** The directory of the scope where the entity is defined. *)
   | `Unit_dir (** The unit's build directory. *)
   | `In of [ `Cwd | `Unit_dir | `Root_dir | `Scope_dir ] * Fpath.t
@@ -251,7 +251,7 @@ val of_cmdliner_cmd :
     This entails a bit of repetition for name and doc but you can access
     those of the action in the thunk to define the cmdliner command. *)
 
-(** {1:b0_def B0 definition API} *)
+(** {1:b0_def b0 definition API} *)
 
 include B0_def.S with type t := t (** @inline *)
   with type Set.t = B0_defs.Unit.Set.t

@@ -33,7 +33,7 @@ let edit names conf =
   | true ->
       let pp_name ppf (B0_def.V ((module Def), def)) = Def.pp_name ppf def in
       let plural = if (List.length not_found > 1) then "s" else "" in
-      Fmt.error "Could not find B0 file for definition%s: @[%a@]"
+      Fmt.error "Could not find b0 file for definition%s: @[%a@]"
         plural Fmt.(list ~sep:sp pp_name) not_found
   | false ->
       let* editor = B0_editor.find () in
@@ -103,7 +103,7 @@ let cmd_show =
 
 let cmd_edit =
   let doc = "Edit definitions" in
-  let descr = `P "$(iname) opens in your editor the B0 files where given \
+  let descr = `P "$(iname) opens in your editor the b0 files where given \
                   definitions are defined." in
   let envs = B0_tool.Cli.editor_envs in
   B0_tool.Cli.subcmd_with_b0_file "edit" ~doc ~descr ~envs @@

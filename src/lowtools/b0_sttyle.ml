@@ -74,7 +74,7 @@ let cmd =
       `Pre "$(iname) $(b,--italic --bold)";
       `P "See more options below.";
       `S Manpage.s_bugs;
-      `P "This program is distributed with the B0 system. \
+      `P "This program is distributed with the b0 system. \
           See https://erratique.ch/software/b0 for contact information."; ]
   in
   let bold = Arg.(value & flag & info ["b"; "bold"] ~doc:"Use bold.") in

@@ -26,7 +26,7 @@ val def_list_get_list_or_hint :
 (** {!B0_def} generic support.
 
     Generic implementation of a few standard commands we need for
-    B0 defintions. *)
+    b0 defintions. *)
 module Def : sig
 
   val list :
@@ -39,8 +39,8 @@ module Def : sig
   val edit :
     (module B0_def.S) -> B0_driver.Conf.t -> string list ->
     B0_std.Os.Exit.t
-  (** [edit (module Def) c ns] edits the B0 files which define [Def]s
-      named [ns]. If [ns] is empty all the B0 files that have
+  (** [edit (module Def) c ns] edits the b0 files which define [Def]s
+      named [ns]. If [ns] is empty all the b0 files that have
       definitions of kind [Def] are edited. *)
 
   val get_meta_key :
@@ -69,7 +69,7 @@ module Cli : sig
     ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
     ?synopsis:Manpage.block -> string -> doc:string -> descr:Manpage.block ->
     (unit -> Os.Exit.t) Term.t -> Os.Exit.t Cmd.t
-  (** [subcmd] does not require driver configuration options or a B0 file
+  (** [subcmd] does not require driver configuration options or a b0 file
       it justs setups logging and the tty stuff. *)
 
   val subcmd_with_driver_conf :

@@ -16,7 +16,7 @@ more explanations):
     ocaml boot/strap --clean    # clean the bootstrap build
 
 The `boot/strap` invocation produces the `boot/run` executable which
-has B0's own B0 file linked with the `b0` tool driver. Running
+has b0's own b0 file linked with the `b0` tool driver. Running
 `boot/run` it is equivalent to run `b0` on the root `B0.ml`
 file. After this usable `b0` executables and libraries are in the
 `_b0` directory. These can be used by having the `B0_BOOTSTRAP` and

@@ -1,9 +1,9 @@
-{0 [opam] B0 manual}
+{0 [opam] b0 manual}
 
 {!B0_opam} has support for {{:http://opam.ocaml.org/}[opam]}, the
 OCaml package manager. It provides:
 
-- A convention to represent [opam] packages in the metadata of B0 packs.
+- A convention to represent [opam] packages in the metadata of b0 packs.
 - The [b0 -- .opam] action to generate opam package files and publish
   packages on the public OCaml [opam] repository.
 
@@ -44,11 +44,11 @@ let mypkg =
   B0_unit.list () (* You likely want to be more refined than that *)
 ]}
 
-The [opam] packages defined in a B0 root along with the pack in which
+The [opam] packages defined in a b0 root along with the pack in which
 they are defined can be listed with the [.opam list] command:
 
 {v
-b0 -- .opam list           # List opam packages in the B0 root
+b0 -- .opam list           # List opam packages in the b0 root
 b0 -- .opam list --help    # See more options
 v}
 
@@ -100,10 +100,10 @@ to:
 
 [opam] package publication happens after the software source archive
 has been released on the web. To get help for releasing your software
-with B0 see the {{!page-release}B0 release manual}.
+with b0 see the {{!page-release}b0 release manual}.
 
 The publication process depends on the current work tree of the VCSes
-that are in your B0 root as follows:
+that are in your b0 root as follows:
 
 {ul
 {- The current metadata of the packs defining [opam] packages is used

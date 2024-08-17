@@ -5,7 +5,7 @@
 
 (** File indexes.
 
-    {b TODO.} Maybe move that back to brzo. At the B0 level we are trying
+    {b TODO.} Maybe move that back to brzo. At the b0 level we are trying
     something with {!B0_srcs}. *)
 
 open B0_std
