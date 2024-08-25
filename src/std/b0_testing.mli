@@ -7,7 +7,9 @@
 
 open B0_std
 
-(** Testing structure and combinators. *)
+(** Testing structure and combinators.
+
+    {b TODO.} We should likely not stop on value testing combinators. *)
 module Test : sig
 
   (** {1:testing Testing structure} *)
@@ -18,8 +20,8 @@ module Test : sig
       [f] is executed. This is typically called this way:
       {[
 let mytest () =
-  Test.test "Something" @@ fun () ->
-  assert (1 = 1); Test.int 1 1; …
+  Test.test "something" @@ fun () ->
+  assert (1 = 1); Test.int 1 1 ~__POS__; …
   ()
 ]}
   *)
@@ -44,11 +46,34 @@ let () = if !Sys.interactive then exit (main ())
 
   (** {1:combinators Test combinators} *)
 
+  type pos = string * int * int * int
+  (** The type for test positions. This is the type of {!Stdlib.__POS__}.
+
+      It is an optional argument of most combinators to short-circuit
+      the best effort failure location tracking performed via backtraces
+      which may be unreliable in certain scenarios (e.g. closures). The idea
+      is that the argument is simply used with {!Stdlib.__POS__}. For
+      example:
+      {[
+        Test.string s0 s1 ~__POS__;
+      ]}
+  *)
+
   val repeat :
     fail:(int -> 'b, Format.formatter, unit, unit) format4 ->
     int -> (int -> 'a) -> unit
     (** [repeat ~fail n f] calls [f] with [n] to [1] stopping
         if it fails and logging [log fail n]. *)
+
+  (** {1:failing Failing tests} *)
+
+  val fail : ?__POS__:pos -> string -> 'a
+  (** [fail msg] fails the test with [msg] *)
+
+  val failf : ?__POS__:pos -> ('a, Format.formatter, unit, 'b) format4 -> 'a
+  (** [failf fmt…] fails the test with the given formatted message. *)
+
+  (** {1:test_errors Testing errors} *)
 
   val invalid_arg : (unit -> 'a) -> unit
   (** [invalid_arg f] tests that [f ()] raises [Invalid_argument].  *)
@@ -60,6 +85,9 @@ let () = if !Sys.interactive then exit (main ())
   (** [raises is_exn f] tests that [f ()] raises an exception [exn]
       that satisfies [is_exn exn]. *)
 
+  val is_ok : ?__POS__:pos -> ('a, string) result -> unit
+  (** [is_ok] tests that [r] is [Ok _]. *)
+
   val is_error : ('a, 'b) result -> unit
   (** [is_error r] tests that [r] is [Error _]. *)
 
@@ -69,22 +97,22 @@ let () = if !Sys.interactive then exit (main ())
 
   (** {1:test_values Test values} *)
 
-  val bool : bool -> bool -> unit
+  val bool : ?__POS__:pos ->  bool -> bool -> unit
   (** [bool b0 b1] asserts that [b0] and [b1] are equal. *)
 
-  val int : int -> int -> unit
+  val int : ?__POS__:pos -> int -> int -> unit
   (** [int i0 i1] asserts that [i0] and [i1] are equal. *)
 
-  val float : float -> float -> unit
+  val float : ?__POS__:pos -> float -> float -> unit
   (** [int i0 i1] asserts that [i0] and [i1] are equal. This uses
       {!Float.equal} so it can be used to assert [NaN] values, also
       you should be aware of the limitations that are involved in
       testing floats for equality. *)
 
-  val string : string -> string -> unit
+  val string : ?__POS__:pos -> string -> string -> unit
   (** [string s0 s1] asserts that [s0] and [s1] are equal. *)
 
-  val bytes : bytes -> bytes -> unit
+  val bytes : ?__POS__:pos -> bytes -> bytes -> unit
   (** [string s0 s1] asserts that [s0] and [s1] are equal. *)
 
   (** Types with equality and formatters. *)
@@ -94,10 +122,10 @@ let () = if !Sys.interactive then exit (main ())
     val pp : Format.formatter -> t -> unit
   end
 
-  val eq : (module EQ with type t = 'a) -> 'a -> 'a -> unit
+  val eq : ?__POS__:pos -> (module EQ with type t = 'a) -> 'a -> 'a -> unit
   (** [eq (module M) v0 v1] assert [v0] and [v1] are equal. *)
 
-  val neq : (module EQ with type t = 'a) -> 'a -> 'a -> unit
+  val neq : ?__POS__:pos -> (module EQ with type t = 'a) -> 'a -> 'a -> unit
   (** [neq (module M) v0 v1] assert [v0] and [v1] are not equal. *)
 
   (** {1:testing_log Testing logging} *)
@@ -122,6 +150,7 @@ module Test_fmt : sig
   val pp_skipped : unit Fmt.t
   val pp_dur : Mtime.Span.t Fmt.t
   val pp_count : int Fmt.t
+  val pp_pos : Test.pos Fmt.t
 end
 
 (** {1:example Example}

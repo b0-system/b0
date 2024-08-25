@@ -28,6 +28,9 @@ module Test_fmt = struct
       l.Printexc.filename l.Printexc.line_number
       l.Printexc.start_char l.Printexc.end_char
 
+  let pp_pos ppf (file, lnum, cnum, enum) =
+    Fmt.pf ppf "File %S, line %d, characters %d-%d:@," file lnum cnum enum
+
   let munge_bt bt = match Printexc.backtrace_slots bt with
   | None -> [Fmt.str "No backtrace. Did you compile with %a ?" Fmt.code "-g"]
   | Some slots ->
@@ -47,20 +50,25 @@ end
 module Test = struct
   open Test_fmt
 
-  exception Fail of string
-  let failf fmt = Fmt.kstr (fun msg -> raise (Fail msg)) fmt
+  type pos = string * int * int * int
+
+  exception Fail of pos option * string
+
+  let fail ?__POS__:pos msg = raise (Fail (pos, msg))
+  let failf ?__POS__:pos fmt = Fmt.kstr (fun msg -> raise (Fail (pos, msg))) fmt
 
   let log' fmt = Fmt.pf !out (fmt ^^ "@.")
   let log fmt = Fmt.pf !out ("%a " ^^ fmt ^^ "@.") (Fmt.st test_color) padding
   let log_fail fmt =
     Fmt.pf !out ("%a " ^^ fmt ^^ "@.") (Fmt.st fail_color) padding
 
-  let log_bt_msg bt msg =
-    log_fail "%s" msg; List.iter (log_fail "%s") (munge_bt bt)
+  let log_bt_msg bt pos msg = match pos with
+  | None -> log_fail "%s" msg; List.iter (log_fail "%s") (munge_bt bt)
+  | Some pos -> log_fail "%s" msg; log_fail "%a" pp_pos pos
 
   let log_fail_loc bt = function
-  | Fail msg -> log_bt_msg bt msg
-  | Assert_failure _ -> log_bt_msg bt "Assertion failed"
+  | Fail (pos, msg) -> log_bt_msg bt pos msg
+  | Assert_failure _ -> log_bt_msg bt None "Assertion failed"
   | exn ->
       log_fail "%a" Fmt.exn exn;
       List.iter (log_fail "%s") (munge_bt bt)
@@ -129,8 +137,13 @@ module Test = struct
 
   let raises exn f = match f () with
   | exception e when exn e -> ()
-  | exception e -> raise (Fail "Expression did not raise expected exception")
-  | _ -> raise (Fail "Expression did not raise")
+  | exception e ->
+      raise (Fail (None, "Expression did not raise expected exception"))
+  | _ -> raise (Fail (None, "Expression did not raise"))
+
+  let is_ok ?__POS__ = function
+  | Ok _ -> ()
+  | Error e -> failf ?__POS__ "@[<v>Exp: Ok _@,Fnd: Error %S@]" e
 
   let is_error = function
   | Ok _ -> failf "@[<v>Fnd: Ok _@,Exp: Error _@]" | Error _ -> ()
@@ -145,14 +158,20 @@ module Test = struct
 
   (* Testing values *)
 
-  let bool b0 b1 = if Bool.equal b0 b1 then () else failf "@[%b <> %b@]" b0 b1
-  let int i0 i1 = if Int.equal i0 i1 then () else failf "@[%d <> %d@]" i0 i1
-  let float f0 f1 = if Float.equal f0 f1 then () else failf "@[%g <> %g@]" f0 f1
-  let string s0 s1 =
-    if String.equal s0 s1 then () else failf "@[<hov>%S <>@ %S@]" s0 s1
+  let bool ?__POS__ b0 b1 =
+    if Bool.equal b0 b1 then () else failf ?__POS__ "@[%b <> %b@]" b0 b1
 
-  let bytes b0 b1 =
-    string (Bytes.unsafe_to_string b0) (Bytes.unsafe_to_string b1)
+  let int ?__POS__ i0 i1 =
+    if Int.equal i0 i1 then () else failf ?__POS__ "@[%d <> %d@]" i0 i1
+
+  let float ?__POS__ f0 f1 =
+    if Float.equal f0 f1 then () else failf ?__POS__ "@[%g <> %g@]" f0 f1
+
+  let string ?__POS__ s0 s1 =
+    if String.equal s0 s1 then () else failf ?__POS__ "@[<hov>%S <>@ %S@]" s0 s1
+
+  let bytes ?__POS__ b0 b1 =
+    string ?__POS__ (Bytes.unsafe_to_string b0) (Bytes.unsafe_to_string b1)
 
   module type EQ = sig
     type t
@@ -160,10 +179,11 @@ module Test = struct
     val pp : Format.formatter -> t -> unit
   end
 
-  let eq (type a) (module M : EQ with type t = a) v0 v1 =
-    if M.equal v0 v1 then () else failf "@[<hov>%a <>@ %a@]" M.pp v0 M.pp v1
+  let eq ?__POS__ (type a) (module M : EQ with type t = a) v0 v1 =
+    if M.equal v0 v1 then () else
+    failf ?__POS__ "@[<hov>%a <>@ %a@]" M.pp v0 M.pp v1
 
-  let neq (type a) (module M : EQ with type t = a) v0 v1 =
+  let neq ?__POS__ (type a) (module M : EQ with type t = a) v0 v1 =
     if not (M.equal v0 v1) then () else
-    failf "@[<hov>%a <>@ %a@]" M.pp v0 M.pp v1
+    failf ?__POS__ "@[<hov>%a <>@ %a@]" M.pp v0 M.pp v1
 end

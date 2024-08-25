@@ -17,6 +17,8 @@
 - {!B0_std.String}. Perhaps a few combinators should be dropped
   and a few renamed, e.g. use `first` and `last` instead of `left` and
   `right`.
+- Review the error reporting strategy in file system operations
+  and properly document it.
 
 {1:design_b0 [b0.memo] library}
 
