@@ -4,6 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
+open B0_testing
 
 let ls p = Cmd.(arg "ls" % "-a" %% path p)
 let tar file dir = Cmd.(arg "tar" % "-cvf" %% path file %% path dir)
@@ -21,7 +22,7 @@ let ocamlopt ?(profile = false) ?(debug = false) incs file =
   Cmd.(arg "ocamlopt" % "-c" %% debug %% profile %% incs %% (path file))
 
 let test_stamp () =
-  B0_testing.Test.test "Cmd stamps" @@ fun () ->
+  Test.test "stamps" @@ fun () ->
   let test cl cmd wit =
     assert ((cmd, wit) = Cmd.to_list_and_stamp cl)
   in
@@ -43,7 +44,9 @@ let test_stamp () =
     [ "ocamlopt"; "-c"; "-p"; "m.ml" ];
   ()
 
-let test () =
-  B0_testing.Test.log "Cmd";
+let main () =
+  Test.main @@ fun () ->
   test_stamp ();
   ()
+
+let () = if !Sys.interactive then () else exit (main ())

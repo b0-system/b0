@@ -90,10 +90,17 @@ let test ?(requires = []) =
   let reqs = b0_std :: b0_memo :: b0_file :: b0_kit :: cmdliner :: requires in
   B0_ocaml.test ~requires:reqs
 
-let test_fmt = test ~/"test/test_fmt.ml" ~doc:"Test B0_std.Fmt"
-let test_fpath = test ~/"test/test_fpath.ml" ~doc:"Test B0_std.Fpath"
-let test_cmd = test ~/"test/test_cmd.ml" ~doc:"Test B0_std.Cmd"
-let test_base64 = test ~/"test/test_base64.ml" ~doc:"Test B0_base64"
+let test_b0_std_fmt =
+  test ~/"test/test_b0_std_fmt.ml" ~doc:"Test B0_std.Fmt"
+
+let test_b0_std_fpath =
+  test ~/"test/test_b0_std_fpath.ml" ~doc:"Test B0_std.Fpath"
+
+let test_b0_std_cmd =
+  test ~/"test/test_b0_std_cmd.ml" ~doc:"Test B0_std.Cmd"
+
+let test_b0_base64 = test ~/"test/test_b0_base64.ml" ~doc:"Test B0_base64"
+let test_b0_testing = test ~/"test/test_b0_testing.ml" ~doc:"Test B0_testing"
 let test_cp = test ~/"test/test_cp.ml" ~run:false ~doc:"Test for Os.Path.copy"
 let test_rm = test ~/"test/test_rm.ml" ~run:false ~doc:"Test for Os.Path.delete"
 let test_findex =
@@ -103,16 +110,6 @@ let test_memo ?requires ?(srcs = []) =
   let srcs = `File (~/"test/test_memo_setup.ml") :: srcs in
   test ?requires ~srcs
 
-let test_base =
-  let doc = "Basic module tests (B0_std, etc.)" in
-  let more_srcs =
-    ["test_fmt.ml"; "test_fpath.ml"; "test_cmd.ml"; "test_base64.ml"]
-  in
-  test "test.ml" ~run:true ~doc ~more_srcs
-
-let test_cp = test "test_cp.ml" ~doc:"Test for Os.Path.copy"
-let test_rm = test "test_rm.ml" ~doc:"Test for Os.Path.delete"
-let test_findex = test "test_findex.ml" ~doc:"Test for B0_findex"
 let test_memo_failure =
   let doc = "Tests some failures of B0_memo.Memo." in
   test_memo ~/"test/test_memo_failures.ml" ~doc ~run:false
@@ -134,8 +131,13 @@ let test_b0_file =
   test ~/"test/test_b0_file.ml" ~requires ~doc:"Test B0_file module" ~run:false
 
 let example_driver =
+  let doc = "Example from the docs" in
   let requires = [b0_file] in
-  test ~/"test/example_driver.ml" ~requires ~doc:"Example from the docs"
+  test ~/"test/example_driver.ml" ~run:false ~requires ~doc
+
+let example_testing =
+  test ~/"test/example_testing.ml" ~run:false ~doc:"Example from the docs"
+
 
 (* Packs *)
 

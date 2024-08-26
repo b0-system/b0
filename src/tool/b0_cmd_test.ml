@@ -34,19 +34,18 @@ let pp_report ppf (allow_long, test_count, total, dur, fails) =
   match fails with
   | [] ->
       Fmt.pf ppf "@[<v>%a The build %a all %a %s in %a (%a with build)@]"
-        Test_fmt.pp_pass () Test_fmt.pp_passed ()
-        Test_fmt.pp_count test_count
+        Test.Fmt.pass () Test.Fmt.passed ()
+        Test.Fmt.count test_count
         (test_unit_msg test_count)
-        Test_fmt.pp_dur dur
+        Test.Fmt.dur dur
         Mtime.Span.pp total
   | fails ->
       let count = List.length fails in
-      Fmt.pf ppf "%a @[<v>The build %a %a/%a %s in %a:@,%a@]"
-        Test_fmt.pp_fail ()
-        Test_fmt.pp_failed ()
-        Test_fmt.pp_count count Test_fmt.pp_count test_count
+      Fmt.pf ppf "%a @[<v>The build %a %a %s in %a:@,%a@]"
+        Test.Fmt.fail () Test.Fmt.failed ()
+        Test.Fmt.count_ratio (count, test_count)
         (test_unit_msg test_count)
-        Test_fmt.pp_dur dur (Fmt.list (pp_fail ~allow_long)) fails
+        Test.Fmt.dur dur (Fmt.list (pp_fail ~allow_long)) fails
 
 let is_test u = B0_unit.(has_tag B0_meta.run u && has_tag B0_meta.test u)
 let is_long = B0_unit.has_tag B0_meta.long
@@ -64,7 +63,7 @@ let show_what
 (* Test command *)
 
 let run_test c build u =
-  Log.app (fun m -> m "%a %a" Test_fmt.pp_test () B0_unit.pp_name u);
+  Log.app (fun m -> m "%a %a" Test.Fmt.test () B0_unit.pp_name u);
   let action = B0_meta.find_or_default B0_unit.Action.key (B0_unit.meta u) in
   let b0_env = B0_cmd_build.env_for_unit c build u in
   let dur = Os.Mtime.counter () in
@@ -92,12 +91,12 @@ let show_skip_tests us =
   let pp_skipped ppf skipped =
     if skipped = 0 then () else
     Fmt.pf ppf "%s %a long %s %a, invoke with %a to run."
-      Test_fmt.padding
-      Test_fmt.pp_count skipped (test_unit_msg skipped)
-      Test_fmt.pp_skipped () Fmt.code "-l"
+      Test.Fmt.padding
+      Test.Fmt.count skipped (test_unit_msg skipped)
+      Test.Fmt.skipped () Fmt.code "-l"
   in
   let pp_skip ppf u =
-    Fmt.pf ppf "%a Long %a" Test_fmt.pp_skip () B0_unit.pp_name u
+    Fmt.pf ppf "%a Long %a" Test.Fmt.skip () B0_unit.pp_name u
   in
   if B0_unit.Set.is_empty us then () else
   let count = B0_unit.Set.cardinal us in

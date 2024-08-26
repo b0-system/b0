@@ -4,6 +4,7 @@ true : package(unix), package(cmdliner)
 <_b0> : -traverse
 <bowl> : -traverse
 <examples> : -traverse
+<test> : -traverse
 
 <src/std> : include
 <src/std/b0_std.{cma,cmxa}> : record_b0_stubs
@@ -17,6 +18,3 @@ true : package(unix), package(cmdliner)
 
 <src/lowtools> : include
 <src/lowtools/**> : use_b0_stubs
-
-<test> : include
-<test/**> : use_b0_stubs

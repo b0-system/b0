@@ -1775,7 +1775,9 @@ let deprecated_lib
   let name = unit_name_for_lib ~libname ~name in
   let doc = unit_doc_for_lib ~deprecated:true ~libname ~doc in
   let warning = unit_warning_for_deprecated_lib ~exports:exps ~warning in
-  let base =
+  let fut_lib, set_lib = Fut.make () in
+  let meta =
+    B0_meta.override ~by:meta @@
     B0_meta.empty
     |> B0_meta.tag tag
     |> B0_meta.tag B0_meta.lib
@@ -1786,9 +1788,22 @@ let deprecated_lib
     |> B0_meta.add_some_or_default requires None
     |> B0_meta.add_some_or_default exports exps
     |> B0_meta.add modsrcs (Fut.return Modname.Map.empty)
+    |> B0_meta.add Lib.key fut_lib
   in
-  let meta = B0_meta.override base ~by:meta in
-  let proc = wrap B0_unit.build_nop in
+  let proc =
+    wrap @@ fun b ->
+    let lib =
+      let meta = B0_build.current_meta b in
+      let exports = B0_meta.get exports meta in
+      let warning = B0_meta.find B0_meta.warning meta in
+      let build_dir = B0_build.current_dir b in
+      Lib.make ~libname ~requires:[]
+        ~exports ~dir:build_dir ~cmis:[] ~cmxs:[] ~cma:None ~cmxa:None
+        ~c_archive:None ~c_stubs:[] ~js_stubs:[] ~warning
+    in
+    set_lib lib;
+    Fut.return ()
+  in
   B0_unit.make ~meta ~doc name proc
 
 (* Compiled object information *)

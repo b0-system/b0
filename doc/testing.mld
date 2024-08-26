@@ -25,7 +25,7 @@ b0 test -l      # Do not skip the long tests
 If any test exits with a non-zero error code, the [b0 test] invocation
 eventually exits with [1].
 
-Adding [--what] a [b0 test] invocation reports what is build and which
+Adding option [--what] to a [b0 test] invocation reports what is build and which
 tests are executed.
 {@sh[
 b0 test --what  # Show what builds and runs
@@ -39,8 +39,8 @@ options [-u], [-p], [-x] and [-X]. For example:
 b0 test -p special-tests -x known_to_fail
 ]}
 
-Since tests are just executable units so you can also run them
-individually with usual [b0] invocations:
+Since tests are just executable units you can also run them
+individually with the usual [b0] invocation:
 
 {@sh[
 b0 -- mytest

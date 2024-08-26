@@ -242,6 +242,17 @@ let stdout ?diff ctx ?env ?cwd ?stdout cmd =
   let () = Os.Cmd.run ?env ?cwd ~stdout cmd |> result_to_abort in
   file ?diff ctx out
 
+let stderr ?diff ctx ?env ?cwd ?stderr cmd =
+  let out = match stderr with
+  | Some stderr -> stderr
+  | None ->
+      Fpath.v (Fpath.basename (Cmd.find_tool cmd |> Option.get) ^ ".stderr")
+  in
+  let out = Fpath.(ctx.base // out) in
+  let stderr = Os.Cmd.out_file ~force:true ~make_path:true out in
+  let _status = Os.Cmd.run_status ?env ?cwd ~stderr cmd |> result_to_abort in
+  file ?diff ctx out
+
 (* Cmdlet *)
 
 let short =

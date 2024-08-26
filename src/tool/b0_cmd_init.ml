@@ -404,13 +404,13 @@ let templates' = [
 
 "b0.testing",
 "open B0_testing\n\n\
- let test () =\n\
+ let test_that () =\n\
 \  Test.test \"that\" @@ fun () ->\n\
-\  assert true;\n\
+\  Test.int ~__POS__ 1 1;\n\
 \  ()\n\n\
  let main () =\n\
 \  Test.main @@ fun () ->
-\  test ();
+\  test_that ();
 \  ()\n\n\
 let () = if !Sys.interactive then () else exit (main ())\n";]
 

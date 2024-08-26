@@ -68,7 +68,7 @@ let cmd =
     `Pre "$(iname) $(b,index.html) $(b,doc.pdf)";
     `P "It can also directly read $(b,stdin) by writing it to a temporary \
         file. Certain browser do not recognize certain file types without \
-        an extension use $(b,-t) to specify a file name; it allows allows
+        an extension use $(b,-t) to specify a file name; it allows \
         reloads while keeping the file in a temporary directory.";
     `Pre "$(b,echo 'Hey' |) $(iname)"; `Noblank;
     `Pre "$(b,echo 'Hey' |) $(iname) $(b,-t hey.txt) "; `Noblank;

@@ -59,6 +59,12 @@ val stdout :
 
     For [diff] see corresponding argument of {!file}. *)
 
+val stderr :
+  ?diff:bool -> t -> ?env:Os.Env.assignments -> ?cwd:Fpath.t ->
+  ?stderr:Fpath.t -> Cmd.t -> unit
+(** [stderr] is like {!stdout} but for standard error and ignores
+    [Cmd.t]'s exit status. *)
+
 (** {1:aborting Aborting}
 
     This can be used to abort test runs when unexpected and

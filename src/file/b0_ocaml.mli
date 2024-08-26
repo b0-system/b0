@@ -845,7 +845,7 @@ val test :
     and a [name] derived from the basename of [file] if unspecified:
     {ul
     {- {!B0_meta.test} is [run], default to [true].}
-    {- {!B0_meta.long} is [long], defaults to [false]}}
+    {- {!B0_meta.long} is [long], defaults to [false]}
     {- {!B0_meta.Action.cwd} is set to `Scope_dir}} *)
 
 (** {2:libs Libraries} *)
@@ -882,7 +882,7 @@ val deprecated_lib :
 (** [deprecated_lib n] is an empty build unit for a deprecated library
     named [n]. Most arguments are like in {!lib}.
     {ul
-    {- [rerpesents] is used {!exports}}
+    {- [exports] is used {!exports}}
     {- [warning] is used for {!B0_meta.warning}, if unspecified
        a warning message is derived from [exports].}
     {- The unit is tagged with {!B0_meta.deprecated}}} *)

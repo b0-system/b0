@@ -54,7 +54,7 @@ and do not specifically depend on b0.
 
 {2:std Standard needs}
 
-{!modules: B0_std}
+{!modules: B0_std B0_std_cli}
 
 {2:codecs Codecs}
 
