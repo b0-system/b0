@@ -86,24 +86,22 @@ let show_url_tool =
 
 (* Tests *)
 
-let test_src f = `File Fpath.(~/"test" // f)
-let test ?(run = false) ?(requires = []) ?(more_srcs = []) ?doc file =
-  let file = Fpath.v file in
-  let more_srcs = List.map (fun v -> test_src (Fpath.v v)) more_srcs in
-  let srcs = (test_src file) :: more_srcs in
-  let requires =
-    b0_std :: b0_memo :: b0_file :: b0_kit :: cmdliner :: requires
-  in
-  let meta =
-    B0_meta.empty
-    |> B0_meta.tag B0_meta.test
-    |> B0_meta.add B0_meta.run run
-  in
-  B0_ocaml.exe (Fpath.basename ~strip_ext:true file) ~meta ?doc ~srcs ~requires
+let test ?(requires = []) =
+  let reqs = b0_std :: b0_memo :: b0_file :: b0_kit :: cmdliner :: requires in
+  B0_ocaml.test ~requires:reqs
 
-let test_memo ?requires ?(more_srcs = []) ?doc file =
-  let more_srcs = "test_memo_setup.ml" :: more_srcs in
-  test ?requires ~more_srcs ?doc file
+let test_fmt = test ~/"test/test_fmt.ml" ~doc:"Test B0_std.Fmt"
+let test_fpath = test ~/"test/test_fpath.ml" ~doc:"Test B0_std.Fpath"
+let test_cmd = test ~/"test/test_cmd.ml" ~doc:"Test B0_std.Cmd"
+let test_base64 = test ~/"test/test_base64.ml" ~doc:"Test B0_base64"
+let test_cp = test ~/"test/test_cp.ml" ~run:false ~doc:"Test for Os.Path.copy"
+let test_rm = test ~/"test/test_rm.ml" ~run:false ~doc:"Test for Os.Path.delete"
+let test_findex =
+  test ~/"test/test_findex.ml" ~run:false ~doc:"Test for B0_findex"
+
+let test_memo ?requires ?(srcs = []) =
+  let srcs = `File (~/"test/test_memo_setup.ml") :: srcs in
+  test ?requires ~srcs
 
 let test_base =
   let doc = "Basic module tests (B0_std, etc.)" in
@@ -116,27 +114,28 @@ let test_cp = test "test_cp.ml" ~doc:"Test for Os.Path.copy"
 let test_rm = test "test_rm.ml" ~doc:"Test for Os.Path.delete"
 let test_findex = test "test_findex.ml" ~doc:"Test for B0_findex"
 let test_memo_failure =
-  test_memo "test_memo_failures.ml" ~doc:"Tests some failures of B0_memo.Memo."
+  let doc = "Tests some failures of B0_memo.Memo." in
+  test_memo ~/"test/test_memo_failures.ml" ~doc ~run:false
 
 let test_memo_no_write =
-  test_memo "test_memo_no_write.ml"
+  test_memo ~/"test/test_memo_no_write.ml"
 
 let test_memo_store =
-  test_memo "test_memo_store.ml"
+  test_memo ~/"test/test_memo_store.ml"
 
 let test_memo_redir =
-  test_memo "test_memo_redir.ml" ~doc:"Test memo spawn stdio redirection"
+  test_memo ~/"test/test_memo_redir.ml" ~doc:"Test memo spawn stdio redirection"
 
 let test_ocaml_cobj_defs =
-  test "test_ocaml_cobj_defs.ml" ~doc:"Test B0_ocaml.Cobj.of_string"
+  test ~/"test/test_ocaml_cobj_defs.ml" ~doc:"Test B0_ocaml.Cobj.of_string"
 
 let test_b0_file =
   let requires = [b0_memo] in
-  test "test_b0_file.ml" ~requires ~doc:"Test B0_file module"
+  test ~/"test/test_b0_file.ml" ~requires ~doc:"Test B0_file module" ~run:false
 
 let example_driver =
   let requires = [b0_file] in
-  test "example_driver.ml" ~requires ~doc:"Example from the docs"
+  test ~/"test/example_driver.ml" ~requires ~doc:"Example from the docs"
 
 (* Packs *)
 

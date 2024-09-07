@@ -835,6 +835,19 @@ let () = if !Sys.interactive then () else main ()
 
     FIXME [file] should become a src so that it can be generated. *)
 
+val test :
+  ?wrap:(B0_unit.build_proc -> B0_unit.build_proc) -> ?doc:string ->
+  ?meta:B0_meta.t -> ?requires:Libname.t list -> ?name:string ->
+  ?run:bool -> ?long:bool -> ?srcs:B0_srcs.sel list -> Fpath.t ->
+  B0_unit.t
+(** [test file] is a test for an OCaml [.ml] [file] (and additional [srcs] if
+    specified). This is just {!exe} with added metadata predefined for a test
+    and a [name] derived from the basename of [file] if unspecified:
+    {ul
+    {- {!B0_meta.test} is [run], default to [true].}
+    {- {!B0_meta.long} is [long], defaults to [false]}}
+    {- {!B0_meta.Action.cwd} is set to `Scope_dir}} *)
+
 (** {2:libs Libraries} *)
 
 val lib :

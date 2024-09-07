@@ -1560,6 +1560,26 @@ let script
   let proc = wrap (script_proc set_exe_path file) in
   B0_unit.make ?doc ~meta name proc
 
+let test
+    ?wrap ?doc ?(meta = B0_meta.empty) ?requires ?name ?(run = true)
+    ?(long  = false) ?(srcs = []) src
+  =
+  let srcs = (`File src) :: srcs in
+  let meta =
+    B0_meta.override ~by:meta @@
+    B0_meta.empty
+    |> B0_meta.tag B0_meta.test
+    |> B0_meta.add B0_meta.run run
+    |> B0_meta.add B0_meta.long long
+    |> B0_meta.add B0_unit.Action.cwd `Scope_dir
+  in
+  let name = match name with
+  | None -> Fpath.basename ~strip_ext:true src
+  | Some name -> name
+  in
+  exe ?wrap ?doc name ~srcs ?requires ~meta
+
+
 let unit_name_for_lib ~libname ~name = match name with
 | Some name -> name | None -> Libname.undot ~rep:'-' libname
 

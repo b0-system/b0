@@ -201,7 +201,8 @@ On hold until we get the {!B0_srcs} thing right.
 {2:b0_test Testing and [B0_testing] and [B0_expect]}
 
 - `b0 test`, run as soon as build.
-- Default cli driver, needs a new design round now that we have actions.
+- Default b0_expect cli driver, needs a new design round now that we have
+  actions.
 - Parallel execution
 - Progress
 - VCS agnostic, i.e. fill-in the hg support
