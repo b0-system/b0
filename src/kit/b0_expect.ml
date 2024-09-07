@@ -259,10 +259,8 @@ let exits =
   Cmdliner.Cmd.Exit.info 1 ~doc:"on unexpected expectations." ::
   Cmdliner.Cmd.Exit.defaults
 
-let run f env base short log_absolute no_pager =
+let run f env base short log_absolute =
   Os.Exit.of_result' @@
-  let* pager = B0_pager.find ~don't:no_pager () in
-  let* () = B0_pager.page_stdout pager in
   abort_to_result @@ fun () ->
   let ctx = make env ~log_absolute ~log_diffs:(not short) ~base in
   f ctx; finish ctx
@@ -270,5 +268,4 @@ let run f env base short log_absolute no_pager =
 let action_func ~base f =
   B0_unit.Action.of_cmdliner_term ~exits @@ fun env u ->
   let run = run f env base in
-  let no_pager = B0_pager.don't () in
-  Cmdliner.Term.(const run $ short $ log_absolute_arg $ no_pager)
+  Cmdliner.Term.(const run $ short $ log_absolute_arg)
