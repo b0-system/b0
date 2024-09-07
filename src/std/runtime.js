@@ -56,9 +56,9 @@ function ocaml_b0_monotonic_now_ns () {
   return now_ns;
 }
 
-//Provides: unix_error_message
+//Provides: caml_unix_error_message
 //Requires: caml_raise_sys_error
-function unix_error_message (err)
+function caml_unix_error_message (err)
 {
   caml_raise_sys_error ("Unix.error_message is not available");
 }
