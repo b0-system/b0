@@ -2059,7 +2059,9 @@ module Meta = struct
     | None -> requires, []
     | Some exps ->
         let exports = List.map Libname.to_string exps in
-        let requires = requires @ exports (* for compat *) in
+        let requires =
+          List.distinct String.compare (requires @ exports) (* for compat *)
+        in
         requires, exports
     in
     { archive_name; description; libname; requires; exports; unit; warning }
