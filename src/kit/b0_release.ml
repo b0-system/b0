@@ -205,7 +205,7 @@ let changes_file_of_pack pack =
   let changes = B0_pack.find_or_default_meta changes_file pack in
   match B0_pack.in_scope_dir pack changes with
   | None -> Ok None
-  | Some dir ->
+  | Some changes ->
       let* exists = Os.File.exists changes in
       if not exists then Ok None else Ok (Some changes)
 
