@@ -1374,6 +1374,12 @@ let exe_proc set_exe_path set_modsrcs srcs b =
       ~and_cmt:false m ~code:`Byte ~opts ~requires:comp_requires ~modsrcs;
   end;
   let* c_objs = compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs in
+  let obj_ext = Conf.obj_ext conf in
+  let lib_ext = Conf.lib_ext conf in
+  let c_obj_exts = B0_file_exts.((ext obj_ext) + (ext lib_ext)) in
+  let c_objs =
+    List.append (B0_file_exts.find_files c_obj_exts srcs) c_objs
+  in
   let modsrcs =
     Modsrc.sort (* for link *) ~deps:Modsrc.ml_deps modsrcs
   in
@@ -1468,6 +1474,12 @@ let lib_proc set_modsrcs set_lib srcs b =
     List.rev_append bimpls impls
   in
   let* c_objs = compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs in
+  let obj_ext = Conf.obj_ext conf in
+  let lib_ext = Conf.lib_ext conf in
+  let c_obj_exts = B0_file_exts.((ext obj_ext) + (ext lib_ext)) in
+  let c_objs =
+    List.append (B0_file_exts.find_files c_obj_exts srcs) c_objs
+  in
   let modsrcs = Modsrc.sort (* for link *) ~deps:Modsrc.ml_deps modsrcs in
   let cobjs = List.filter_map (Modsrc.impl_file ~code) modsrcs  in
   let odir = build_dir and oname = archive_name in
