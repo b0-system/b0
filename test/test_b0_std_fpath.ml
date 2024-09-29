@@ -111,6 +111,9 @@ let test_parent () =
   test "a" "." ~__POS__;
   test "." ".." ~__POS__;
   test "./" ".." ~__POS__;
+  test "././" ".." ~__POS__;
+  test "././a" "." ~__POS__;
+  test "././a/" "." ~__POS__;
   test ".." "../.." ~__POS__;
   test "../.." "../../.." ~__POS__;
   test "a/b/." "a/" ~__POS__;
@@ -126,6 +129,9 @@ let test_parent () =
   test "/" "/" ~__POS__;
   test "/." "/" ~__POS__;
   test "/./" "/" ~__POS__;
+  test "/././" "/" ~__POS__;
+  test "/././a" "/" ~__POS__;
+  test "/././a/" "/" ~__POS__;
   test "/.." "/../.." ~__POS__;
   test "/../.." "/../../.." ~__POS__;
   test "/a/b/." "/a/" ~__POS__;

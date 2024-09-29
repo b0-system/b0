@@ -1800,7 +1800,7 @@ module Fpath = struct
             | exception Not_found -> 0
             | k -> k + 1
 
-    let path_start p = 0
+    let path_start p = if String.equal p "//" then 1 else 0
     let chop_volume p = p
     let append p0 p1 =
       if p1.[0] = dir_sep_char (* absolute *) then p1 else
@@ -2064,21 +2064,20 @@ module Fpath = struct
 
   let rec parent p =
     let plen = String.length p in
-    let seg_start = last_non_empty_seg_start p in
-    let seg_stop = match last_is_dir_sep p with
-    | true -> plen - 2
-    | false -> plen - 1
-    in
-    let seg_len = seg_stop - seg_start + 1 in
-    let via_dotdot p = add_seg' (add_seg' p "..") "" in
+    let path_start = path_start p in
+    let seg_first = last_non_empty_seg_start p in
+    let seg_last = if last_is_dir_sep p then plen - 2 else plen - 1 in
+    let seg_len = seg_last - seg_first + 1 in
     match seg_len with
     | 0 -> p
-    | 1 when p.[seg_start] = '.' ->
-        if seg_start = 0 then "../" else
-        parent (String.subrange ~last:(seg_start - 1) p)
-    | 2 when p.[seg_start] = '.' && p.[seg_stop] = '.' -> via_dotdot p
-    | _ when seg_start = 0 -> "./"
-    | _ -> add_seg' (String.subrange ~last:(seg_start - 1) p) ""
+    | 1 when p.[seg_first] = '.' ->
+        if seg_first = path_start then ".." else (* Chop '.' and try again *)
+        parent (String.subrange ~last:(seg_first - 1) p)
+    | 2 when p.[seg_first] = '.' && p.[seg_last] = '.' ->
+        let via_dotdot p = add_seg' p ".." in
+        via_dotdot p
+    | _ when seg_first = path_start -> "."
+    | _ -> add_seg' (String.subrange ~last:(seg_first - 1) p) ""
 
   let equal_basename p0 p1 = (* XXX could avoid alloc *)
     String.equal (basename p0) (basename p1)
