@@ -1678,23 +1678,21 @@ module Fpath = struct
     | i -> i + 1 (* exists by construction once injected *)
 
     let path_start p = (* once [p] is injected this does not raise *)
-      match is_unc_path p with
-      | false -> non_unc_path_start p
-      | true ->
-          let plen = String.length p in
-          if plen = 2 then raise Not_found else
-          let sep_from p from = String.index_from p from dir_sep_char in
-          let i = sep_from p 2 in
-          let j = sep_from p (i + 1) in
-          match p.[i - 1] with
-          | '.' when i = 3 -> j
-          | '?' when i = 3 ->
-              if p.[j - 1] = ':' then j else
-              if i + 3 < plen
-              && p.[i + 1] = 'U' && p.[i + 2] = 'N' && p.[i + 3] = 'C'
-              then sep_from p (sep_from p (j + 1) + 1)
-              else sep_from p (j + 1)
-          | _ -> sep_from p j
+      if not (is_unc_path p) then non_unc_path_start p else
+      let plen = String.length p in
+      if plen = 2 then raise Not_found else
+      let sep_from p from = String.index_from p from dir_sep_char in
+      let i = sep_from p 2 in
+      let j = sep_from p (i + 1) in
+      match p.[i - 1] with
+      | '.' when i = 3 -> j
+      | '?' when i = 3 ->
+          if p.[j - 1] = ':' then j else
+          if i + 3 < plen
+          && p.[i + 1] = 'U' && p.[i + 2] = 'N' && p.[i + 3] = 'C'
+          then sep_from p (sep_from p (j + 1) + 1)
+          else sep_from p (j + 1)
+      | _ -> sep_from p j
 
     let last_non_empty_seg_start p = match String.rindex p dir_sep_char with
     | exception Not_found -> path_start p
@@ -1719,21 +1717,20 @@ module Fpath = struct
       if s = "" then err_empty s else
       try
         let p =
-          let rec loop has_slash last_is_sep dbl_sep i max =
-            match i > max with
-            | true ->
-                let s = if has_slash then backslashify s else s in
-                if dbl_sep > 0 then undouble_sep dir_sep_char dbl_sep s else s
-            | false ->
-                let c = String.unsafe_get s i in
-                if Char.equal c '\x00' then raise Exit else
-                let is_slash = Char.equal c '/' in
-                let has_slash = has_slash || is_slash in
-                let c_is_sep = (is_slash || Char.equal c dir_sep_char) && i <> 0
-                in
-                let is_dbl = last_is_sep && c_is_sep in
-                let dbl_sep = if is_dbl then dbl_sep + 1 else dbl_sep in
-                loop has_slash c_is_sep dbl_sep (i + 1) max
+          let rec loop has_slash last_is_sep dbl_sep i max = match i > max with
+          | true ->
+              let s = if has_slash then backslashify s else s in
+              if dbl_sep > 0 then undouble_sep dir_sep_char dbl_sep s else s
+          | false ->
+              let c = String.unsafe_get s i in
+              if Char.equal c '\x00' then raise Exit else
+              let is_slash = Char.equal c '/' in
+              let has_slash = has_slash || is_slash in
+              let c_is_sep = (is_slash || Char.equal c dir_sep_char) && i <> 0
+              in
+              let is_dbl = last_is_sep && c_is_sep in
+              let dbl_sep = if is_dbl then dbl_sep + 1 else dbl_sep in
+              loop has_slash c_is_sep dbl_sep (i + 1) max
           in
           loop false false 0 0 (String.length s - 1)
         in
@@ -1748,16 +1745,14 @@ module Fpath = struct
       with Exit -> err_null s
 
     let append p0 p1 =
-      match is_unc_path p1 || has_drive p1 || p1.[0] = dir_sep_char with
-      | true (* with volume or absolute *) -> p1
-      | false ->
-          let p0_last_is_sep = p0.[String.length p0 - 1] = dir_sep_char in
-          let sep = if p0_last_is_sep then "" else dir_sep in
-          String.concat sep [p0; p1]
+      if is_unc_path p1 || has_drive p1 || p1.[0] = dir_sep_char
+      then (* with volume or absolute *) p1 else
+      let p0_last_is_sep = p0.[String.length p0 - 1] = dir_sep_char in
+      let sep = if p0_last_is_sep then "" else dir_sep in
+      String.concat sep [p0; p1]
 
-    let is_rel p = match is_unc_path p with
-    | true -> false
-    | false -> p.[non_unc_path_start p] <> dir_sep_char
+    let is_rel p =
+      not (is_unc_path p) && p.[non_unc_path_start p] <> dir_sep_char
 
     let is_root p = p.[path_start p] = dir_sep_char
 
@@ -1805,17 +1800,6 @@ module Fpath = struct
             | exception Not_found -> 0
             | k -> k + 1
 
-    let dir_sep_char = '/'
-    let last_non_empty_seg_start p = match String.rindex p dir_sep_char with
-    | exception Not_found -> 0
-    | k ->
-        match k = String.length p - 1 with
-        | false -> k + 1
-        | true ->
-            match String.rindex_from p (k - 1) dir_sep_char with
-            | exception Not_found -> 0
-            | k -> k + 1
-
     let path_start p = 0
     let chop_volume p = p
     let append p0 p1 =
@@ -1828,8 +1812,8 @@ module Fpath = struct
     let is_root p = String.equal p dir_sep || String.equal p "//"
 
     let to_url_path ?(escape_space = true) p =
-      String.byte_escaper (pct_esc_len ~escape_space)
-        (pct_esc_set_char ~escape_space) p
+      let esc_len = pct_esc_len ~escape_space in
+      String.byte_escaper esc_len (pct_esc_set_char ~escape_space) p
   end
 
   let path_start = if Sys.win32 then Windows.path_start else Posix.path_start
@@ -1856,9 +1840,9 @@ module Fpath = struct
   | exception Not_found -> String.length p
   | k -> String.length p - (k + 1)
 
-  let last_non_empty_seg_start = match Sys.win32 with
-  | true -> Windows.last_non_empty_seg_start
-  | false -> Posix.last_non_empty_seg_start
+  let last_non_empty_seg_start =
+    if Sys.win32 then Windows.last_non_empty_seg_start else
+    Posix.last_non_empty_seg_start
 
   (* Paths *)
 
@@ -1916,23 +1900,21 @@ module Fpath = struct
 
   (* Strict prefixes *)
 
-  let is_prefix pre p = match String.starts_with ~prefix:pre p with
-  | false -> false
-  | true ->
-      let suff_start = String.length pre in
-      let p_len = String.length p in
-      (* Check [prefix] and [p] are not equal modulo directoryness. *)
-      if suff_start = p_len then false else
-      if suff_start = p_len - 1 && p.[suff_start] = dir_sep_char then false else
-      (* Check the prefix is segment based *)
-      (pre.[suff_start - 1] = dir_sep_char || p.[suff_start] = dir_sep_char)
+  let is_prefix pre p =
+    String.starts_with ~prefix:pre p &&
+    let suff_start = String.length pre in
+    let p_len = String.length p in
+    (* Check [prefix] and [p] are not equal modulo directoryness. *)
+    if suff_start = p_len then false else
+    if suff_start = p_len - 1 && p.[suff_start] = dir_sep_char then false else
+    (* Check the prefix is segment based *)
+    (pre.[suff_start - 1] = dir_sep_char || p.[suff_start] = dir_sep_char)
 
-  let strip_prefix pre p = match is_prefix pre p with
-  | false -> None
-  | true ->
-      let len = String.length pre in
-      let first = if p.[len] = dir_sep_char then len + 1 else len in
-      Some (String.subrange p ~first)
+  let strip_prefix pre p =
+    if not (is_prefix pre p) then None else
+    let len = String.length pre in
+    let first = if p.[len] = dir_sep_char then len + 1 else len in
+    Some (String.subrange p ~first)
 
   let drop_prefixed dirs =
     let is_prefixed d by = is_prefix by d in
