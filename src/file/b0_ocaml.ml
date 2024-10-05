@@ -1675,9 +1675,12 @@ let byte_code_build_load_args b ~x_units units =
     let libs, inc_mods, mods =
       loop (Libname.Set.empty, []) Fpath.Set.empty Modname.Map.empty units
     in
-    let resolver = Fut.sync (B0_build.get b Libresolver.key) in
     let m = B0_build.memo b in
-    let libs = Libresolver.get_list_and_deps m resolver libs in
+    let libs =
+      let* resolver = B0_build.get b Libresolver.key in
+      let libs = Libresolver.get_list_and_deps m resolver libs in
+      libs
+    in
     B0_memo.stir ~block:true m;
     let libs = Fut.sync libs in
     let don't_load lib = Libname.Set.mem (Lib.libname lib) don't_load in
