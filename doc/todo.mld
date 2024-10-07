@@ -61,6 +61,10 @@ let crunch_file m file ~in_dir =
   support. Also if we use [@@@B0.version] rather than open we might get
   in trouble with merlin. If would rather say no.
 
+- Add a repeatable [b0-include=[scope,]path] option that simply
+  prepends a corresponding directive to the B0.ml file. This
+  allows for quick transient vendors.
+
 {2:fragments Build fragments}
 
 At the b0 level we need to expose build fragments. It seems the build

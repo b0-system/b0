@@ -2464,7 +2464,7 @@ module Os : sig
 
     val read_with_ic : Fpath.t -> (in_channel -> 'b) -> ('b, string) result
     (** [read_with_ic file f] is exactly like {!read_with_fd} but
-        opens an OCaml input channel. *)
+        opens an OCaml input channel in binary mode. *)
 
     val read : Fpath.t -> (string, string) result
     (** [read file] is [file]'s content as a string. If [file] is
@@ -2511,7 +2511,7 @@ module Os : sig
       ?atomic:bool -> ?mode:int -> force:bool -> make_path:bool -> Fpath.t ->
       (out_channel -> ('a, 'b) result) -> (('a, 'b) result, string) result
     (** [write_with_oc ~atomic ~mode ~force ~make_path file f] operates like
-        {!write_with_fd} but opens an OCaml channel. *)
+        {!write_with_fd} but opens an OCaml channel in binary mode. *)
 
     val write :
       ?atomic:bool -> ?mode:int -> force:bool -> make_path:bool -> Fpath.t ->
