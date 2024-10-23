@@ -399,14 +399,21 @@ module Fmt : sig
       raw [U+001B] characters. *)
 
   type color =
-  [ `Default | `Black | `Red | `Green | `Yellow | `Blue | `Magenta | `Cyan
-  | `White ]
+  [ `Default
+  | `Black   | `Black_bright
+  | `Red     | `Red_bright
+  | `Green   | `Green_bright
+  | `Yellow  | `Yellow_bright
+  | `Blue    | `Blue_bright
+  | `Magenta | `Magenta_bright
+  | `Cyan    | `Cyan_bright
+  | `White   | `White_bright ]
   (** The type for colors. *)
 
   type style =
   [ `Bold | `Faint | `Italic | `Underline | `Blink of [ `Slow | `Rapid ]
-  | `Reverse | `Fg of [ color | `Hi of color ]
-  | `Bg of [ color | `Hi of color ] ]
+  | `Reverse | `Fg of color
+  | `Bg of color ]
   (** The type for text styles.
 
       {b TODO} Fuse [`Hi] into {!color}. *)

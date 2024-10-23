@@ -489,27 +489,35 @@ module Fmt = struct
      the formatter functions. *)
 
   type styler = Ansi | Plain
+
   type color =
-  [ `Default | `Black | `Red | `Green | `Yellow | `Blue | `Magenta | `Cyan
-  | `White ]
+  [ `Default
+  | `Black   | `Black_bright
+  | `Red     | `Red_bright
+  | `Green   | `Green_bright
+  | `Yellow  | `Yellow_bright
+  | `Blue    | `Blue_bright
+  | `Magenta | `Magenta_bright
+  | `Cyan    | `Cyan_bright
+  | `White   | `White_bright ]
 
   let rec sgr_base_int_of_color = function
-  | `Black -> 0 | `Red -> 1 | `Green -> 2 | `Yellow -> 3  | `Blue -> 4
-  | `Magenta -> 5 | `Cyan -> 6 | `White -> 7 | `Default -> 9
-  | `Hi (#color as c) -> 60 + sgr_base_int_of_color c
+  | `Default -> 9
+  | `Black -> 0   | `Black_bright -> 60 + 0
+  | `Red -> 1     | `Red_bright -> 60 + 1
+  | `Green -> 2   | `Green_bright -> 60 + 2
+  | `Yellow -> 3  | `Yellow_bright -> 60 + 3
+  | `Blue -> 4    | `Blue_bright -> 60 + 4
+  | `Magenta -> 5 | `Magenta_bright -> 60 + 5
+  | `Cyan -> 6    | `Cyan_bright -> 60 + 6
+  | `White -> 7   | `White_bright -> 60 + 7
 
   let sgr_of_fg_color c = string_of_int (30 + sgr_base_int_of_color c)
   let sgr_of_bg_color c = string_of_int (40 + sgr_base_int_of_color c)
 
   type style =
-  [ `Bold
-  | `Faint
-  | `Italic
-  | `Underline
-  | `Blink of [ `Slow | `Rapid ]
-  | `Reverse
-  | `Fg of [ color | `Hi of color ]
-  | `Bg of [ color | `Hi of color ] ]
+  [ `Bold | `Faint | `Italic | `Underline | `Blink of [ `Slow | `Rapid ]
+  | `Reverse | `Fg of color | `Bg of color ]
 
   let sgr_of_style = function
   | `Bold -> "01"
@@ -561,8 +569,9 @@ module Fmt = struct
   let st' styles pp_v ppf v = match !styler' with
   | Plain -> pp_v ppf v
   | Ansi ->
-      (* XXX This doesn't compose well, we should get the current state
-         and restore it afterwards rather than resetting. *)
+      (* This doesn't compose well, we should get the current state
+         and restore it afterwards rather than resetting. But then we don't
+         have access to the current state. *)
       let reset ppf = Format.fprintf ppf "@<0>%s" "\x1B[m" in
       let sgrs = String.concat "" ["\x1B["; sgrs_of_styles styles; "m"] in
       Format.kfprintf reset ppf "@<0>%s%a" sgrs pp_v v

@@ -5,48 +5,49 @@
 
 open B0_std
 
-type color = [ Fmt.color | `Hi of Fmt.color ]
+type bright =
+  [ `Black_bright | `Red_bright | `Green_bright | `Yellow_bright
+  | `Blue_bright | `Magenta_bright | `Cyan_bright | `White_bright ]
 
 let colors =
-  [ `Default; `Black; `Red; `Green; `Yellow; `Blue; `Magenta; `Cyan; `White; ]
+  [ `Default;
+    `Black;   `Black_bright;
+    `Red;     `Red_bright;
+    `Green;   `Green_bright;
+    `Yellow;  `Yellow_bright;
+    `Blue;    `Blue_bright;
+    `Magenta; `Magenta_bright;
+    `Cyan;    `Cyan_bright;
+    `White;   `White_bright ]
 
-let color_to_string ~hi c =
-  let c = match c with
-  | `Default -> "dft"
-  | `Black   -> "blk"
-  | `Red     -> "red"
-  | `Green   -> "grn"
-  | `Yellow  -> "yel"
-  | `Blue    -> "blu"
-  | `Magenta -> "mag"
-  | `Cyan    -> "cya"
-  | `White   -> "whi"
-  | _ -> assert false
-  in
-  if hi then c ^ "H" else c ^ "L"
+let color_to_string = function
+| `Default -> "dft "
+| `Black -> "blk "  | `Black_bright  -> "blkB"
+| `Red -> "red "    | `Red_bright  -> "redB"
+| `Green -> "grn "  | `Green_bright  -> "grnB"
+| `Yellow -> "yel " | `Yellow_bright -> "yelB"
+| `Blue -> "blu "    | `Blue_bright -> "bluB"
+| `Magenta -> "mag " | `Magenta_bright -> "magB"
+| `Cyan    -> "cya " | `Cyan_bright    -> "cyaB"
+| `White   -> "whi " | `White_bright   -> "whiB"
 
 let txt = " TEXT "
 let sp = "  "
 
 let row ~base =
-  let cells f =
-    [Fmt.str "%a" (Fmt.st ((`Fg (f :> color)) :: base)) txt;
-     Fmt.str "%a" (Fmt.st ((`Fg (`Hi f)) :: base)) txt; ]
-  in
-  String.concat sp (List.concat_map cells colors)
+  let cell c = Fmt.str "%a" (Fmt.st ((`Fg c) :: base)) txt in
+  String.concat sp (List.map cell colors)
 
 let col_labels () =
-  let cols c = [color_to_string ~hi:false c; color_to_string ~hi:true c] in
-  let labels = List.concat_map cols colors in
+  let labels = List.map color_to_string colors in
   String.concat sp (List.map (Fmt.str " %s ") labels)
 
 let matrix ~base () =
   Fmt.pr "    %s%s@.@." sp (col_labels ());
-  let bg ~hi_bg b =
-    let base = (if hi_bg then `Bg (`Hi b) else `Bg (b :> color)) :: base in
-    Fmt.pr "%s%s%s@.@." (color_to_string ~hi:hi_bg b) sp (row ~base)
+  let bg b =
+    let base = `Bg b :: base in
+    Fmt.pr "%s%s%s@.@." (color_to_string b) sp (row ~base)
   in
-  let bg b = bg ~hi_bg:false b; bg ~hi_bg:true b; in
   List.iter bg colors
 
 let make_base ~bold ~faint ~italic ~underline ~reverse =
@@ -66,7 +67,7 @@ let cmd =
   let man =
     [ `S Manpage.s_description;
       `P "The $(iname) tool outputs the various ANSI styles that \
-          can be devised using $(b,B0_std.Tty.style) specifications. \
+          can be devised using $(b,B0_std.Fmt.style) specifications. \
           It shows a basic color matrix (which does not fit on 80 columns) \
           and options can add more styling.";
       `Pre "$(iname)"; `Noblank;
