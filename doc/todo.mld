@@ -211,7 +211,7 @@ On hold until we get the {!B0_srcs} thing right.
   to print arguments. It would be nice to recover that
   https://github.com/dbuenzli/ptime/blob/fd59e25cef4eceb2d13311ce2d42794fed3dc4de/test/testing.ml#L151-L248
   Somehow it overlaps with block which is more powerful. But it would be nice
-  to have something for Test.get_{some,ok} failures.
+  to have something for [Test.get_{some,ok}] failures.
 - Long requests, return exit code 2 if test pass but there
   were ungranted long requests ? Perhaps not, for now we decided not to
   integrate long tests in the framework but keep it at the b0 unit level.

@@ -208,10 +208,6 @@ let open_root file =
     Stdlib.exit exit_b0_file_error
   in
   current := Some (root_scope file);
-  (* XXX we want style ! But we didn't setup the driver config yet :-(
-     We should look Sys.argv for --color and the B0_COLOR env var. Forcing
-     for now, this will be set again later by B0_driver.Cli.conf. *)
-  Fmt.set_tty_cap ~cap:`Ansi ();
   Printexc.record_backtrace true;
   Printexc.set_uncaught_exception_handler catch_exn
 

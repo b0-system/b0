@@ -52,7 +52,7 @@ module Conf = struct
       log_level : Log.level;
       no_pager : bool;
       memo : (B0_memo.t, string) result Lazy.t;
-      tty_cap : Fmt.styler; }
+      fmt_styler : Fmt.styler; }
 
   let memo ~hash_fun ~cwd ~env ~cache_dir ~trash_dir ~jobs =
     let feedback =
@@ -65,12 +65,12 @@ module Conf = struct
 
   let make
       ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~env ~hash_fun ~jobs
-      ~log_level ~no_pager ~tty_cap ()
+      ~log_level ~no_pager ~fmt_styler ()
     =
     let trash_dir = Fpath.(b0_dir / B0_cli.Memo.trash_dir_name) in
     let memo = lazy (memo ~hash_fun ~cwd ~env ~cache_dir ~trash_dir ~jobs) in
     { b0_dir; b0_file; cache_dir; cwd; code; env; hash_fun; jobs;
-      memo; log_level; no_pager; tty_cap }
+      memo; log_level; no_pager; fmt_styler }
 
   let b0_dir c = c.b0_dir
   let b0_file c = c.b0_file
@@ -83,7 +83,7 @@ module Conf = struct
   let log_level c = c.log_level
   let memo c = Lazy.force c.memo
   let no_pager c = c.no_pager
-  let tty_cap c = c.tty_cap
+  let fmt_styler c = c.fmt_styler
 
   let get_b0_file c = match c.b0_file with
   | Some file -> Ok file
@@ -111,11 +111,11 @@ module Conf = struct
 
   let setup_with_cli
       ~b0_dir ~b0_file ~cache_dir ~code ~hash_fun ~jobs
-      ~log_level ~no_pager ~tty_cap ()
+      ~log_level ~no_pager ~color ()
     =
-    let tty_cap = B0_std_cli.get_tty_cap tty_cap in
+    let color = B0_std_cli.get_styler color in
     let log_level = B0_std_cli.get_log_level log_level in
-    B0_std_cli.setup tty_cap log_level ~log_spawns:Log.Debug;
+    B0_std_cli.setup color log_level ~log_spawns:Log.Debug;
     let* cwd = Os.Dir.cwd () in
     let* env = Os.Env.current () in
     let b0_file = find_b0_file ~cwd ~b0_file in
@@ -125,7 +125,7 @@ module Conf = struct
     let hash_fun = B0_cli.Memo.get_hash_fun ~hash_fun in
     let jobs = B0_cli.Memo.get_jobs ~jobs in
     Ok (make ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~env ~hash_fun
-          ~jobs ~log_level ~no_pager ~tty_cap ())
+          ~jobs ~log_level ~no_pager ~fmt_styler:color ())
 end
 
 module Cli = struct
@@ -157,20 +157,20 @@ module Cli = struct
   let log_level =
     B0_std_cli.log_level ~docs ~env:(Cmd.Env.info Env.verbosity) ()
 
-  let tty_cap = B0_std_cli.tty_cap ~docs ~env:(Cmd.Env.info Env.color) ()
+  let color = B0_std_cli.color ~docs ~env:(Cmd.Env.info Env.color) ()
   let no_pager = B0_pager.don't ~docs ()
   let conf =
     let conf
-        b0_dir b0_file cache_dir code hash_fun jobs log_level no_pager tty_cap
+        b0_dir b0_file cache_dir code hash_fun jobs log_level no_pager color
       =
       Result.map_error (fun s -> `Msg s) @@
       Conf.setup_with_cli
         ~b0_dir ~b0_file ~cache_dir ~code ~hash_fun ~jobs ~log_level
-        ~no_pager ~tty_cap ()
+        ~no_pager ~color ()
     in
     Term.term_result @@
     Term.(const conf $ b0_dir $ b0_file $ cache_dir $ code $
-          hash_fun $ jobs $ log_level $ no_pager $ tty_cap)
+          hash_fun $ jobs $ log_level $ no_pager $ color)
 end
 
 (* Drivers *)

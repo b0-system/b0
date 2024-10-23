@@ -240,12 +240,7 @@ module Test = struct
       Test_fmt.failed () Test_fmt.dur (Os.Mtime.count dur);
     1
 
-  let setup () = match Sys.backend_type with
-  | Other "js_of_ocaml" -> Fmt.set_tty_cap ~cap:`Ansi ()
-  | _ -> Fmt.set_tty_cap ()
-
   let main ?__POS__:_ f =
-    let () = setup () in
     let finish dur =
       if !test_fail_count = 0 && !fail_count = 0
       then report_pass ~dur else report_fail ~dur

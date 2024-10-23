@@ -51,38 +51,38 @@ let output_format
   Arg.(value & vflag `Normal [`Short, short; `Long, long])
 
 
-let get_tty_cap c = match Option.join c with
-| Some c -> c | None -> Tty.(cap (of_fd Unix.stdout))
+let get_styler c = match Option.join c with
+| Some c -> c | None -> Fmt.styler ()
 
 let get_log_level level = Option.value ~default:Log.Warning level
 
-let setup cap level ~log_spawns =
-  Fmt.set_tty_cap ~cap ();
+let setup styler level ~log_spawns =
+  Fmt.set_styler styler;
   Log.set_level level;
   if level >= log_spawns
   then Os.Cmd.set_spawn_tracer (Log.spawn_tracer log_spawns)
 
 (* Cli argumements *)
 
-let tty_cap_of_string s = match String.trim s with
+let styler_of_string s = match String.trim s with
 | "" | "auto" -> Ok None
-| "always" -> Ok (Some `Ansi)
-| "never" -> Ok (Some `None)
+| "always" -> Ok (Some Fmt.Ansi)
+| "never" -> Ok (Some Fmt.Plain)
 | e ->
     let pp_cap = Fmt.code in
     let kind = Fmt.any "color behaviour" in
     let dom = ["auto"; "always"; "never"] in
     Fmt.error "%a" Fmt.(unknown' ~kind pp_cap ~hint:must_be) (e, dom)
 
-let tty_cap ?(docs = Manpage.s_common_options) ?env () =
-  let parse s = Result.map_error (fun e -> `Msg e) (tty_cap_of_string s) in
+let color ?(docs = Manpage.s_common_options) ?env () =
+  let parse s = Result.map_error (fun e -> `Msg e) (styler_of_string s) in
   let pp ppf c = Fmt.string ppf @@ match c with
-    | None -> "auto" | Some `Ansi -> "always" | Some `None -> "never"
+    | None -> "auto" | Some Fmt.Ansi -> "always" | Some Fmt.Plain -> "never"
   in
   let color = Arg.conv ~docv:"WHEN" (parse, pp) in
   let doc =
     "Colorize the output. $(docv) must be $(b,auto), $(b,always) \
-       or $(b,never)."
+     or $(b,never)."
   in
   let docv = "WHEN" and none = None in
   Arg.(value & opt (some' ~none color) None &

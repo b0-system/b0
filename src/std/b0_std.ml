@@ -436,7 +436,6 @@ module Fmt = struct
     let lines = List.mapi add_newline_esc lines in
     vbox (list string) ppf lines
 
-
   (* ASCII text *)
 
   let ascii_char ppf c =
@@ -485,10 +484,11 @@ module Fmt = struct
      pager it returns false and you loose all the nice colors.
 
      Here is something that should be tried: always style. Provide
-     functions to remove styling from strings and to filter out
-     styling from ppf in the formatter functions. *)
+     functions to remove styling from strings (we have that as
+     String.strip_ansi_escapes) and to filter out styling from ppf in
+     the formatter functions. *)
 
-  type styler = [ `Ansi | `None ]
+  type styler = Ansi | Plain
   type color =
   [ `Default | `Black | `Red | `Green | `Yellow | `Blue | `Magenta | `Cyan
   | `White ]
@@ -525,38 +525,53 @@ module Fmt = struct
   let sgrs_of_styles styles = String.concat ";" (List.map sgr_of_style styles)
 
   let styler' =
-    ref begin match Sys.getenv "TERM" with
-    | exception Not_found -> `None | "dumb" -> `None | _ -> `Ansi
+    ref begin match Sys.getenv_opt "TERM" with
+    | None when Sys.backend_type = Other "js_of_ocaml" -> Ansi
+    | None | Some "dumb" -> Plain
+    | _ -> Ansi
     end
 
   let set_styler styler = styler' := styler
   let styler () = !styler'
 
-  let with_styler s f =
-    let old = styler () in
-    set_styler s; Fun.protect ~finally:(fun () -> set_styler old) f
-
-  let set_tty_cap ?cap () =
-    let cap = match cap with
-    | None -> Tty.(cap (of_fd Unix.stdout))
-    | Some cap -> cap
+  let strip_styles ppf =
+    (* Note: this code makes the assumption that out_string is always
+       going to be called without splitting escapes. Since we only ever output
+       escapes via @<0> directives we hope that this is the case. *)
+    let strip out_string s first len =
+      let max = first + len - 1 in
+      let flush first last =
+        if first > last then () else
+        out_string s first (last - first + 1)
+      in
+      let rec skip_esc i =
+        if i > max then scan i i else
+        let k = i + 1 in if s.[i] = 'm' then scan k k else skip_esc k
+      and scan first i =
+        if i > max then flush first max else match s.[i] with
+        | '\x1B' -> flush first (i - 1); skip_esc (i + 1)
+        | _ -> scan first (i + 1)
+      in
+      scan first first
     in
-    styler' := cap
+    let funs = Format.pp_get_formatter_out_functions ppf () in
+    let funs = { funs with out_string = strip funs.out_string } in
+    Format.pp_set_formatter_out_functions ppf funs
 
   let st' styles pp_v ppf v = match !styler' with
-  | `None -> pp_v ppf v
-  | `Ansi ->
+  | Plain -> pp_v ppf v
+  | Ansi ->
       (* XXX This doesn't compose well, we should get the current state
          and restore it afterwards rather than resetting. *)
-      let reset ppf = Format.fprintf ppf "@<0>%s" "\027[m" in
-      Format.kfprintf reset ppf "@<0>%s%a"
-        (String.concat "" ["\027["; sgrs_of_styles styles; "m"]) pp_v v
+      let reset ppf = Format.fprintf ppf "@<0>%s" "\x1B[m" in
+      let sgrs = String.concat "" ["\x1B["; sgrs_of_styles styles; "m"] in
+      Format.kfprintf reset ppf "@<0>%s%a" sgrs pp_v v
 
   let st styles ppf s = match !styler' with
-  | `None -> string ppf s
-  | `Ansi ->
-      pf ppf "@<0>%s%s@<0>%s"
-        (String.concat "" ["\027["; sgrs_of_styles styles; "m"]) s "\027[m"
+  | Plain -> string ppf s
+  | Ansi ->
+      let sgrs = String.concat "" ["\x1B["; sgrs_of_styles styles; "m"] in
+      pf ppf "@<0>%s%s@<0>%s" sgrs s "\x1B[m"
 
   let code' pp_v ppf v = st' [`Bold] pp_v ppf v
   let code ppf v = st [`Bold] ppf v
@@ -1391,20 +1406,20 @@ module String = struct
     let len = String.length s in
     let b = Buffer.create len in
     let max = len - 1 in
-    let flush start stop = match start < 0 || start > max with
-    | true -> ()
-    | false -> Buffer.add_substring b s start (stop - start + 1)
+    let flush start stop =
+      if start < 0 || start > max then () else
+      Buffer.add_substring b s start (stop - start + 1)
     in
-    let rec skip_esc i = match i > max with
-    | true -> loop i i
-    | false -> let k = i + 1 in if s.[i] = 'm' then loop k k else skip_esc k
+    let rec skip_esc i =
+      if i > max then loop i i else
+      let k = i + 1 in if s.[i] = 'm' then loop k k else skip_esc k
     and loop start i = match i > max with
     | true ->
         if Buffer.length b = len then s else
         (flush start max; Buffer.contents b)
     | false ->
         match s.[i] with
-        | '\027' -> flush start (i - 1); skip_esc (i + 1)
+        | '\x1B' -> flush start (i - 1); skip_esc (i + 1)
         | _ -> loop start (i + 1)
     in
     loop 0 0

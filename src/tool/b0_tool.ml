@@ -162,13 +162,13 @@ module Cli = struct
     Arg.(required & pos 0 (some string) None & info [] ~doc ~docv)
 
   let minimal_setup =
-    let minimal_setup_with_cli log_level tty_cap =
-      let tty_cap = B0_std_cli.get_tty_cap tty_cap in
+    let minimal_setup_with_cli log_level color =
+      let styler = B0_std_cli.get_styler color in
       let log_level = B0_std_cli.get_log_level log_level in
-      B0_std_cli.setup tty_cap log_level ~log_spawns:Log.Debug;
+      B0_std_cli.setup styler log_level ~log_spawns:Log.Debug;
     in
     Term.(const minimal_setup_with_cli $ B0_driver.Cli.log_level $
-          B0_driver.Cli.tty_cap)
+          B0_driver.Cli.color)
 
   let subcmd ?exits ?(envs = []) ?synopsis name ~doc ~descr term =
     let man = man_with_descr ?synopsis descr in

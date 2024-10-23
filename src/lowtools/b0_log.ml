@@ -5,10 +5,10 @@
 
 open B0_std
 
-let log tty_cap log_level no_pager format details query log_file =
-  let tty_cap = B0_std_cli.get_tty_cap tty_cap in
+let log color log_level no_pager format details query log_file =
+  let styler = B0_std_cli.get_styler color in
   let log_level = B0_std_cli.get_log_level log_level in
-  B0_std_cli.setup tty_cap log_level ~log_spawns:Log.Debug;
+  B0_std_cli.setup styler log_level ~log_spawns:Log.Debug;
   Log.if_error ~use:Cmdliner.Cmd.Exit.some_error @@
   let don't = no_pager || format = `Trace_event in
   Result.bind (B0_pager.find ~don't ()) @@ fun pager ->
@@ -42,7 +42,7 @@ let tool =
     `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ]
   in
   Cmd.v (Cmd.info "b0-log" ~version:"%%VERSION%%" ~doc ~envs ~man ~man_xrefs)
-    Term.(const log $ B0_std_cli.tty_cap () $
+    Term.(const log $ B0_std_cli.color () $
           B0_std_cli.log_level () $ B0_pager.don't () $
           B0_cli.Memo.Log.out_format_cli () $
           B0_std_cli.output_format () $

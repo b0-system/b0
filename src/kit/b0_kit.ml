@@ -5,7 +5,6 @@
 
 module V000 = struct
   module Type = B0_std.Type
-  module Tty = B0_std.Tty
   module Fmt = B0_std.Fmt
   module Result = B0_std.Result
   module Char = B0_std.Char

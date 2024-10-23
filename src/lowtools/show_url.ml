@@ -31,10 +31,10 @@ let prepare_url ~tname = function
 | "-" -> stdin_file_url ~tname
 | u -> match Url.scheme u with Some _ -> Ok u | None -> file_url u
 
-let show_urls ~tty_cap ~log_level ~background ~prefix ~browser ~urls ~tname =
-  let tty_cap = B0_std_cli.get_tty_cap tty_cap in
+let show_urls ~color ~log_level ~background ~prefix ~browser ~urls ~tname =
+  let styler = B0_std_cli.get_styler color in
   let log_level = B0_std_cli.get_log_level log_level in
-  B0_std_cli.setup tty_cap log_level ~log_spawns:Log.Debug;
+  B0_std_cli.setup styler log_level ~log_spawns:Log.Debug;
   Log.if_error ~use:Cmdliner.Cmd.Exit.some_error @@
   let* browser = B0_web_browser.find ?cmd:browser () in
   let open_url u = B0_web_browser.show ~background ~prefix browser u in
@@ -77,7 +77,7 @@ let cmd =
   ]
   in
   Cmd.v (Cmd.info "show-url" ~version:"%%VERSION%%" ~doc ~exits ~man) @@
-  let+ tty_cap = B0_std_cli.tty_cap ()
+  let+ color = B0_std_cli.color ()
   and+ log_level = B0_std_cli.log_level ()
   and+ background = B0_web_browser.background ()
   and+ prefix = B0_web_browser.prefix ~default:false ()
@@ -98,7 +98,7 @@ let cmd =
     in
     Arg.(value & pos_all string ["-"] & info [] ~doc ~docv:"URL")
   in
-  show_urls ~tty_cap ~log_level ~background ~prefix ~browser ~urls ~tname
+  show_urls ~color ~log_level ~background ~prefix ~browser ~urls ~tname
 
 let main () = Cmd.eval' cmd
 let () = if !Sys.interactive then () else exit (main ())

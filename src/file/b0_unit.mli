@@ -244,7 +244,7 @@ val of_cmdliner_cmd :
   ?units:t list -> ?dyn_units:(args:Cmd.t -> t list) ->
   ?doc:string -> ?meta:B0_meta.t -> string ->
   (B0_env.t -> t -> Os.Exit.t Cmdliner.Cmd.t) -> t
-(** [of_cmdliner_cmd name cmd] is like {!make_action} is an action from the
+(** [of_cmdliner_cmd name cmd] is like {!of_action} is an action from the
     Cmdliner command [cmd]. See also {!Action.of_cmdliner_term}.
 
     {b Note.} The command is under a thunk to avoid toplevel inits.

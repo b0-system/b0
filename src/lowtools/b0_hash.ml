@@ -14,10 +14,10 @@ let pp_hash = function
 | `Normal | `Long ->
     fun ppf (f, h) -> Hash.pp ppf h; Fmt.char ppf ' '; Fpath.pp_unquoted ppf f
 
-let hash tty_cap log_level hash_fun format files =
-  let tty_cap = B0_std_cli.get_tty_cap tty_cap in
+let hash color log_level hash_fun format files =
+  let styler = B0_std_cli.get_styler color in
   let log_level = B0_std_cli.get_log_level log_level in
-  B0_std_cli.setup tty_cap log_level ~log_spawns:Log.Debug;
+  B0_std_cli.setup styler log_level ~log_spawns:Log.Debug;
   let hash_fun = B0_cli.Memo.get_hash_fun ~hash_fun in
   let pp_hash = pp_hash format in
   Log.if_error ~use:Cmdliner.Cmd.Exit.some_error @@ match files with
@@ -55,7 +55,7 @@ let tool =
     `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ]
   in
   Cmd.v (Cmd.info "b0-hash" ~version:"%%VERSION%%" ~doc ~man ~man_xrefs)
-    Term.(const hash $ B0_std_cli.tty_cap () $
+    Term.(const hash $ B0_std_cli.color () $
           B0_std_cli.log_level () $ hash_fun $
           B0_std_cli.output_format () $ files)
 

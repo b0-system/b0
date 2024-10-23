@@ -85,7 +85,7 @@ let pp_path_for_user ctx ppf p = match ctx.log_absolute with
 let log_diff ctx file =  match B0_vcs_repo.kind ctx.vcs_repo with
 | Git ->
     let git = B0_vcs_repo.repo_cmd ctx.vcs_repo in
-    let color = match Fmt.styler () with `Ansi -> true | _ -> false in
+    let color = match Fmt.styler () with Fmt.Ansi -> true | _ -> false in
     let color = Cmd.(if' color (arg "--color=always")) in
     let cmd = Cmd.(git % "--no-pager" % "diff" %% color %% path file) in
     Log.if_error ~use:() (Os.Cmd.run cmd)

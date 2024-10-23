@@ -93,13 +93,13 @@ open Cmdliner
 let sdocs = Manpage.s_common_options
 
 let setup =
-  let setup tty_cap log_level =
-    let tty_cap = B0_std_cli.get_tty_cap tty_cap in
+  let setup color log_level =
+    let styler = B0_std_cli.get_styler color in
     let log_level = B0_std_cli.get_log_level log_level in
-    B0_std_cli.setup tty_cap log_level ~log_spawns:Log.Debug
+    B0_std_cli.setup styler log_level ~log_spawns:Log.Debug
   in
   Term.(const setup $
-        B0_std_cli.tty_cap ~docs:sdocs () $
+        B0_std_cli.color ~docs:sdocs () $
         B0_std_cli.log_level ~docs:sdocs ())
 
 let b0_dir = B0_cli.Memo.b0_dir ~docs:sdocs ()

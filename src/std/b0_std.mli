@@ -367,31 +367,36 @@ module Fmt : sig
   (** [ascii_string] prints {!Char.Ascii.is_print} characters and [' ']
       and hex escapes for other characters. *)
 
-  (** {1:styling Text styling} *)
+  (** {1:styling Text styling}
+
+      {b TODO.} If {!strip_styles} is reliable we could consider
+      removing {!type-styler} and {!set_styler}: styles are always
+      provided and the color control command line business then
+      becomes a matter of applying {!strip_styles} to the standard
+      formatters (the disavantage is that it's less reliable if
+      if you format to string and use e.g. [output_string]). *)
 
   type styler =
-  [ `Ansi (** ANSI escapes. *)
-  | `None (** Styles are ignored. *) ]
+  | Ansi (** ANSI escapes. *)
+  | Plain (** Plain text, styles are ignored. *)
   (** The styler backend. *)
 
   val set_styler : styler -> unit
-  (** [set_styler st] sets the stylers to [st]. See {!styler}. *)
+  (** [set_styler st] sets the styler to [st]. See {!styler}. *)
 
   val styler : unit -> styler
   (** [styler st] sets the stylers to [st]. The initial styler is set
-      to [`Ansi] unless the value of the [TERM] environment variable
-      is set to [dumb] *)
+      to [Ansi] unless the value of the [TERM] environment variable is
+      set to [dumb] or if it undefined and the {!Sys.backend_type}
+      is not [js_of_ocaml] (browser consoles support ANSI escapes). *)
 
-  val with_styler : styler -> (unit -> unit) -> unit
-  (** [with_styler styler f] runs [f] with styler set to [styler].
-      Not thread-safe. *)
+  val strip_styles : Format.formatter -> unit
+  (** [strip_styles ppf], this overrides the formatter's [out_string]
+      function to first stripping out styling information before
+      invoking it.
 
-  val set_tty_cap : ?cap:styler -> unit -> unit
-  (** [set_tty_cap ?cap ()] sets the global TTY formatting capabilities to
-      [cap] if specified and to [Tty.(cap (of_fd Unix.stdout))] otherwise.
-      Affects the output of {!val-tty} and {!val-tty'}.
-
-      {b TODO.} Get rid of this. *)
+      {b Note.} This assumes [ppf] is not used to write data that uses
+      raw [U+001B] characters. *)
 
   type color =
   [ `Default | `Black | `Red | `Green | `Yellow | `Blue | `Magenta | `Cyan
@@ -402,21 +407,22 @@ module Fmt : sig
   [ `Bold | `Faint | `Italic | `Underline | `Blink of [ `Slow | `Rapid ]
   | `Reverse | `Fg of [ color | `Hi of color ]
   | `Bg of [ color | `Hi of color ] ]
-  (** The type for text styles. *)
+  (** The type for text styles.
 
-  val st' : style list -> 'a t -> 'a t
-  (** [st' styles pp_v ppf v] prints [v] with [pp_v] on [ppf]
-      according to [styles] and the value of {!tty_cap}. *)
+      {b TODO} Fuse [`Hi] into {!color}. *)
 
   val st : style list -> string t
-  (** [st styles ppf s] prints [s] on [ppf] according to [styles]
-      and the value of {!tty_cap}. *)
+  (** [st styles ppf s] prints [s] on [ppf] styled by [styles]. *)
 
-  val code' : 'a t -> 'a t
-  (** [code'] is [st' [`Bold]]. *)
+  val st' : style list -> 'a t -> 'a t
+  (** [st' styles pp_v ppf v] prints [v] with [pp_v] on [ppf] styled
+      by [styles]. *)
 
   val code : string t
   (** [code] is [st [`Bold]]. *)
+
+  val code' : 'a t -> 'a t
+  (** [code'] is [st' [`Bold]]. *)
 
   val hey : string t
   (** [hey] is [st [`Bold; `Fg `Red]]. *)

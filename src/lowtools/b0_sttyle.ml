@@ -57,7 +57,7 @@ let make_base ~bold ~faint ~italic ~underline ~reverse =
 
 let sttyle bold faint italic underline reverse =
   let base = make_base ~bold ~faint ~italic ~underline ~reverse in
-  Fmt.set_tty_cap (); matrix ~base ()
+  matrix ~base ()
 
 open Cmdliner
 

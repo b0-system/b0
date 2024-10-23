@@ -7,11 +7,9 @@ open B0_std
 
 let feedback =
   let show_ui = Log.Error and show_op = Log.Info and level = Log.level () in
-  B0_cli.Memo.pp_leveled_feedback ~show_op ~show_ui ~level
-    Fmt.stderr
+  B0_cli.Memo.pp_leveled_feedback ~show_op ~show_ui ~level Fmt.stderr
 
 let with_memo ?jobs f =
-  let () = B0_std.Fmt.set_tty_cap () in
   Result.error_to_failure @@
   Result.bind (Os.Dir.cwd ()) @@ fun cwd ->
   let tmp_dir = (* Os.Dir.default_tmp () *) Fpath.v "/tmp" in

@@ -73,7 +73,7 @@ let hello =
   B0_unit.Action.scope_exec (Cmd.path ~/"scripts/hello.sh")
 ]}
 
-The two last examples actually perform {!Os.Exit.execv} so the b0
+The two last examples actually perform {!B0_std.Os.Exit.val-execv} so the b0
 invocation becomes these executables. You can also simply run cmds
 without becoming them, so rather than shell scripting around you
 can write OCaml scripts.
