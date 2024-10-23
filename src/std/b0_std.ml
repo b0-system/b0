@@ -4559,37 +4559,42 @@ module Log = struct
 
   (* Reporting levels *)
 
-  type level = Quiet | App | Error | Warning | Info | Debug
+  type level = Quiet | Stdout | Stderr | Error | Warning | Info | Debug
   let _level = ref Warning
   let level () = !_level
   let set_level l = _level := l
   let level_to_string = function
-  | Quiet -> "quiet" | App -> "app" | Error -> "error" | Warning -> "warning"
+  | Quiet -> "quiet" | Stdout -> "stdout" | Stderr -> "stderr"
+  | Error -> "error" | Warning -> "warning"
   | Info -> "info" | Debug -> "debug"
 
   let level_of_string s = match String.trim s with
   | "quiet" -> Ok Quiet
-  | "app" -> Ok App
-  | "error" -> Ok Error
+  | "stdout" -> Ok Stdout
+  | "stderr" -> Ok Stderr
   | "warning" -> Ok Warning
   | "info" ->  Ok Info
   | "debug" ->  Ok Debug
   | e ->
       let pp_level = Fmt.code in
       let kind = Fmt.any "log level" in
-      let dom = ["quiet"; "app"; "error"; "warning"; "info"; "debug"] in
+      let dom =
+        ["quiet"; "stdout"; "stderr"; "error"; "warning"; "info"; "debug"]
+      in
       Fmt.error "%a" Fmt.(unknown' ~kind pp_level ~hint:must_be) (e, dom)
 
   (* Reporting *)
 
-  let app_style = [`Fg `Cyan]
+  let stdout_style = [`Fg `Cyan]
+  let stderr_style = [`Fg `Cyan]
   let err_style = [`Fg `Red]
   let warn_style = [`Fg `Yellow]
   let info_style = [`Fg `Blue]
   let debug_style = [`Faint; `Fg `Magenta]
 
   let pp_level_str level ppf v = match level with
-  | App -> Fmt.st app_style ppf v
+  | Stdout -> Fmt.st stdout_style ppf v
+  | Stderr -> Fmt.st stderr_style ppf v
   | Error -> Fmt.st err_style ppf v
   | Warning -> Fmt.st warn_style ppf v
   | Info -> Fmt.st info_style ppf v
@@ -4597,7 +4602,7 @@ module Log = struct
   | Quiet -> assert false
 
   let pp_level ppf level = match level with
-  | App -> ()
+  | Stdout | Stderr -> ()
   | Error -> Fmt.st (`Bold :: err_style) ppf "Error"
   | Warning -> Fmt.st (`Bold :: warn_style) ppf "Warning"
   | Info -> Fmt.st (`Bold :: info_style) ppf "Info"
@@ -4610,7 +4615,9 @@ module Log = struct
     | n -> Filename.basename Sys.argv.(0)
     in
     let pp_header ppf (l, h) = match h with
-    | None -> if l = App then () else Fmt.pf ppf "%s: %a: " x pp_level l
+    | None ->
+        if l = Stderr || l = Stdout then () else
+        Fmt.pf ppf "%s: %a: " x pp_level l
     | Some "" -> ()
     | Some h -> Fmt.pf ppf "%s: [%a] " x (pp_level_str l) h
     in
@@ -4638,7 +4645,7 @@ module Log = struct
     msgf @@ fun ?header fmt ->
     let k _ = k () in
     let ppf =
-      if level = App then Format.std_formatter else Format.err_formatter
+      if level = Stdout then Format.std_formatter else Format.err_formatter
     in
     Format.kfprintf k ppf ("@[%a" ^^ fmt ^^ "@]@.") pp_header (level, header)
 
@@ -4663,7 +4670,8 @@ module Log = struct
   let kunit _ = ()
   let msg level msgf = !_kmsg.kmsg kunit level msgf
   let quiet msgf = !_kmsg.kmsg kunit Quiet msgf
-  let app msgf = !_kmsg.kmsg kunit App msgf
+  let stdout msgf = !_kmsg.kmsg kunit Stdout msgf
+  let stderr msgf = !_kmsg.kmsg kunit Stderr msgf
   let err msgf = !_kmsg.kmsg kunit Error msgf
   let warn msgf = !_kmsg.kmsg kunit Warning msgf
   let info msgf = !_kmsg.kmsg kunit Info msgf

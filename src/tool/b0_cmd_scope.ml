@@ -43,11 +43,11 @@ let exec_when cond c topmost includes excludes keep_going cmd =
       | Error e -> err s e
       | Ok false -> loop ss
       | Ok true ->
-          Log.app (fun m -> m "@[%a: %a@]" pp_name name pp_dir dir);
+          Log.stdout (fun m -> m "@[%a: %a@]" pp_name name pp_dir dir);
           match Os.Cmd.run ~cwd:dir cmd with
           | Error e when not keep_going -> err s e
           | Error _
-          | Ok () -> Log.app (fun m -> m ""); loop ss
+          | Ok () -> Log.stdout (fun m -> m ""); loop ss
   in
   loop (get_scopes c ~topmost ~includes ~excludes)
 
@@ -63,7 +63,7 @@ let list topmost includes excludes format path c =
   in
   let pp_scopes = Fmt.(list pp_scope) in
   let scopes = get_scopes c ~topmost ~includes ~excludes in
-  if scopes <> [] then Log.app (fun m -> m "@[<v>%a@]" pp_scopes scopes);
+  if scopes <> [] then Log.stdout (fun m -> m "@[<v>%a@]" pp_scopes scopes);
   Os.Exit.ok
 
 let symlink topmost includes excludes dir rm c =

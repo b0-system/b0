@@ -22,8 +22,8 @@ let boot root c =
     let* exp = B0_file.expand src in
     Ok (B0_file.expanded_b0_boots exp)
   in
-  Log.app (fun m -> m "Boot is TODO.");
-  if boots <> [] then Log.app (fun m -> m "@[<v>%a@]" pp_boots boots);
+  Log.stdout (fun m -> m "Boot is TODO.");
+  if boots <> [] then Log.stdout (fun m -> m "@[<v>%a@]" pp_boots boots);
   Ok Os.Exit.ok
 
 let compile c =
@@ -143,7 +143,7 @@ let includes root format c =
       let* exp = B0_file.expand src in
       Ok (B0_file.expanded_b0_includes exp)
   in
-  if incs <> [] then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_inc) incs);
+  if incs <> [] then Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list pp_inc) incs);
   Ok Os.Exit.ok
 
 let log format log_format op_selector c =
@@ -159,7 +159,7 @@ let log format log_format op_selector c =
 let path c =
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
   let* b0_file = B0_driver.Conf.get_b0_file c in
-  Log.app (fun m -> m "%a" Fpath.pp_unquoted b0_file);
+  Log.stdout (fun m -> m "%a" Fpath.pp_unquoted b0_file);
   Ok Os.Exit.ok
 
 let requires root c =
@@ -172,7 +172,7 @@ let requires root c =
       Ok (B0_file.expanded_requires exp)
   in
   if reqs <> []
-  then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_require) reqs);
+  then Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list pp_require) reqs);
   Ok Os.Exit.ok
 
 let source root c =
@@ -182,14 +182,14 @@ let source root c =
   match root with
   | true ->
       let* s = Os.File.read b0_file in
-      Log.app (fun m -> m "%s" s);
+      Log.stdout (fun m -> m "%s" s);
       Ok Os.Exit.ok
   | false ->
       let* s = Os.File.read b0_file in
       let* src = B0_file.of_string ~file:b0_file s in
       let* exp = B0_file.expand src in
       let esrc = B0_file.expanded_src exp in
-      Log.app (fun m -> m "%s" esrc);
+      Log.stdout (fun m -> m "%s" esrc);
       Ok Os.Exit.ok
 
 (* Command line interface *)

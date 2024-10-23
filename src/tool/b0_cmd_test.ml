@@ -57,13 +57,13 @@ let show_what
   let don't = B0_driver.Conf.no_pager c in
   let* pager = B0_pager.find ~don't () in
   let* () = B0_pager.page_stdout pager in
-  Log.app (fun m -> m "%a@." pp_run_tests tests);
+  Log.stdout (fun m -> m "%a@." pp_run_tests tests);
   B0_cmd_build.show_what ~lock ~may_build ~must_build ~is_locked ~locked_packs c
 
 (* Test command *)
 
 let run_test c build u =
-  Log.app (fun m -> m "%a %a" Test.Fmt.test () B0_unit.pp_name u);
+  Log.stdout (fun m -> m "%a %a" Test.Fmt.test () B0_unit.pp_name u);
   let action = B0_meta.find_or_default B0_unit.Action.key (B0_unit.meta u) in
   let b0_env = B0_cmd_build.env_for_unit c build u in
   let dur = Os.Mtime.counter () in
@@ -75,10 +75,10 @@ let rec run_tests c build dur fails = function
 | u :: us ->
     (* XXX Lots could be improved here, parallel spawns and run as
        soon as the build file is ready. *)
-    let log_sep () = Log.app (fun m -> m "%s" "") in
+    let log_sep () = Log.stdout (fun m -> m "%s" "") in
     match run_test c build u with
     | Error e ->
-        Log.app (fun m -> m "%a: %s" B0_unit.pp_name u e);
+        Log.stdout (fun m -> m "%a: %s" B0_unit.pp_name u e);
         log_sep (); run_tests c build dur ((u, None) :: fails) us
     | Ok (tdur, `Exited 0) ->
         let dur = Mtime.Span.add dur tdur in
@@ -100,7 +100,7 @@ let show_skip_tests us =
   in
   if B0_unit.Set.is_empty us then () else
   let count = B0_unit.Set.cardinal us in
-  Log.app @@ fun m ->
+  Log.stdout @@ fun m ->
   m "@[<v>%a@,%a@,@]" (Fmt.iter B0_unit.Set.iter pp_skip) us pp_skipped count
 
 let test allow_long allow_empty units x_units packs x_packs what lock c =
@@ -154,7 +154,7 @@ let test allow_long allow_empty units x_units packs x_packs what lock c =
       let tests = B0_unit.Set.elements tests in
       let dur, fails = run_tests c build Mtime.Span.zero [] tests in
       let () = show_skip_tests skip_tests in
-      Log.app (fun m ->
+      Log.stdout (fun m ->
           m "%a" pp_report (allow_long,
                             test_count, Os.Mtime.count total, dur, fails));
       Ok (if fails <> [] then exit_test_error else Os.Exit.ok)

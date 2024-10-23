@@ -246,8 +246,8 @@ module Archive = struct
     let force = true and make_path = true in
     let* () = B0_tar.compress ~search ~force ~make_path archive_file ~archive in
     let archive_dir = Fpath.strip_ext archive_file in
-    Log.app (fun m -> m "Wrote %a" (Fmt.code' Fpath.pp) archive_file);
-    Log.app (fun m ->
+    Log.stdout (fun m -> m "Wrote %a" (Fmt.code' Fpath.pp) archive_file);
+    Log.stdout (fun m ->
         m "TODO Checking release in %a" (Fmt.code' Fpath.pp) archive_dir);
     let make_path = true and verbose = false in
     let* _exists = Os.Path.delete ~recurse:true archive_dir in
@@ -255,10 +255,10 @@ module Archive = struct
     let* () =
       B0_tar.unarchive ~search ~make_path ~verbose ~src:archive_file ~in_dir ()
     in
-    Log.app (fun m -> m "TODO Building release");
-    Log.app (fun m -> m "TODO Testing release");
+    Log.stdout (fun m -> m "TODO Building release");
+    Log.stdout (fun m -> m "TODO Testing release");
     let* _exists = Os.Path.delete ~recurse:true archive_dir in
-    (Log.app @@ fun m ->
+    (Log.stdout @@ fun m ->
     m "@[<v>Release: %a %a@,Commit:  %a@,Archive: %a@]@."
       Fmt.code name String.pp_version_str version
       B0_vcs_repo.pp_commit commit_id
@@ -301,13 +301,14 @@ module Tag = struct
       | Some v -> Ok v
 
   let tag_repo repo tag ~commit_ish ~msg ~sign ~force ~delete ~dry_run =
-    let log_cmd cmd = Log.app (fun m -> m "%s" (Cmd.to_string cmd)) in
+    let log_cmd cmd = Log.stdout (fun m -> m "%s" (Cmd.to_string cmd)) in
     let dry_run = if dry_run then Some log_cmd else None in
-    Log.app (fun m -> m "Repo %a:" B0_vcs_repo.pp repo);
+    Log.stdout (fun m -> m "Repo %a:" B0_vcs_repo.pp repo);
     match delete with
     | true ->
         let* () = B0_vcs_repo.delete_tag ?dry_run repo tag in
-        Log.app (fun m -> m "Deleted version tag %a" String.pp_version_str tag);
+        Log.stdout
+          (fun m -> m "Deleted version tag %a" String.pp_version_str tag);
         Ok ()
     | false ->
         let msg = match msg with
@@ -316,7 +317,7 @@ module Tag = struct
         let* () =
           B0_vcs_repo.tag ?dry_run repo ~force ~sign ~msg commit_ish tag
         in
-        Log.app (fun m -> m "Tagged version %a" String.pp_version_str tag);
+        Log.stdout (fun m -> m "Tagged version %a" String.pp_version_str tag);
         Ok ()
 
   let gather_repos_and_tags version packs =
@@ -364,7 +365,7 @@ module Tag = struct
         match tag_repo repo tag ~commit_ish ~msg ~sign ~force ~delete ~dry_run
         with
         | Error _ as e -> e
-        | Ok () -> if repos <> [] then Log.app (fun m -> m ""); loop repos
+        | Ok () -> if repos <> [] then Log.stdout (fun m -> m ""); loop repos
     in
     loop repos_tags
 end
@@ -426,9 +427,9 @@ module Status = struct
     | repo :: repos ->
         let* status = status repo ~after ~last in
         let has_changes = has_changes || status_has_changes status in
-        (Log.app @@ fun m ->
+        (Log.stdout @@ fun m ->
          m "@[<v>Repo %a:@,%a@]" B0_vcs_repo.pp repo pp_status status);
-        if repos <> [] then Log.app (fun m -> m "");
+        if repos <> [] then Log.stdout (fun m -> m "");
         loop ~has_changes repos
     in
     let* has_changes = loop ~has_changes:false repos in

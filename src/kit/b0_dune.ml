@@ -14,9 +14,9 @@ let write_file ~dry_run file content =
     then Ok ()
     else Os.File.write ~force:true ~make_path:true file content
   in
-  Log.app (fun m -> m ~header:"WROTE" "%a" Fpath.pp file);
+  Log.stdout (fun m -> m ~header:"WROTE" "%a" Fpath.pp file);
   if dry_run
-  then Ok (Log.app (fun m -> m "%s@\n" content))
+  then Ok (Log.stdout (fun m -> m "%s@\n" content))
   else Ok ()
 
 let library_stanza ppf u =

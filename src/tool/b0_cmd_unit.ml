@@ -18,7 +18,7 @@ let dir us c =
     B0_build.B0_dir.unit_build_dir ~build_dir ~name:(B0_unit.name u)
   in
   let dirs = List.map unit_dir us in
-  Log.app (fun m -> m "@[<v>%a@]" (Fmt.list Fpath.pp) dirs);
+  Log.stdout (fun m -> m "@[<v>%a@]" (Fmt.list Fpath.pp) dirs);
   Ok Os.Exit.ok
 
 let edit us c =

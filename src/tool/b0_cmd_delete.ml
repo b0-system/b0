@@ -13,7 +13,7 @@ let delete clean c =
   | false -> None (* For now *)
   in
   match del_dir with
-  | None -> Log.app (fun m -> m "Nothing deleted for now!"); Ok Os.Exit.ok
+  | None -> Log.stdout (fun m -> m "Nothing deleted for now!"); Ok Os.Exit.ok
   | Some del_dir ->
       let* _existed = Os.Path.delete ~recurse:true del_dir in
       Ok Os.Exit.ok

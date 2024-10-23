@@ -55,7 +55,7 @@ let list format names all conf =
     let* pager = B0_pager.find ~don't () in
     let* () = B0_pager.page_stdout pager in
     if vs <> []
-    then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp_v) vs);
+    then Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp_v) vs);
     Ok ()
   in
   Log.if_error ~use:Os.Exit.no_such_name @@

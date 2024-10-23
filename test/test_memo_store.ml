@@ -16,7 +16,7 @@ let lookup_b0_os build_dir m =
   let* a = B0_store.get store B0_os.arch in
   let* an = B0_store.get store B0_os.arch_normalized in
   let* bits = B0_store.get store B0_os.arch_bits in
-  Log.app (fun m ->
+  Log.stdout (fun m ->
       m "@[<v>%a@,%a@,%a@,%a@,%a@,%a@,%a@]"
         Fmt.(field "name" Fun.id string) n
         Fmt.(field "version" Fun.id string) v

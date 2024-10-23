@@ -3490,15 +3490,18 @@ module Log : sig
 
   (** {1:levels Reporting levels} *)
 
-  type level = Quiet | App | Error | Warning | Info | Debug (** *)
+  type level = Quiet | Stdout | Stderr | Error | Warning | Info | Debug (** *)
   (** The type for reporting levels. They are meant to be used
       as follows:
       {ul
       {- [Quiet] doesn't report anything.}
-      {- [App] can be used for the standard output or console
-         of an application. Using this instead of [stdout] directly
-         allows the output to be silenced by [Quiet] which may
-         be desirable, or not.}
+      {- [Stdout] can be used for the standard output of an application.
+         Using this instead of [stdout] directly allows the output to be
+         silenced by [Quiet] which may be desirable, or not.}
+      {- [Stderr] can be used for the standard error of an application.
+         Using this instead of [stderr] directly
+         allows the output to be silenced by [Quiet] which may be
+         desirable, or not.}
       {- [Error] is an error condition that prevents the program from
           running.}
       {- [Warning] is a suspicious condition that does not prevent
@@ -3547,8 +3550,11 @@ module Log : sig
   val quiet : 'a log
   (** [quiet] is [msg Quiet]. *)
 
-  val app : 'a log
-  (** [app] is [msg App]. *)
+  val stdout : 'a log
+  (** [stdout] is [msg Stdout]. *)
+
+  val stderr : 'a log
+  (** [stderr] is [msg Stderr]. *)
 
   val err : 'a log
   (** [err] is [msg Error]. *)

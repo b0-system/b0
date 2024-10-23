@@ -116,7 +116,7 @@ let src_template t = match List.assoc_opt t !templates with
 let template_list () conf =
   Log.if_error ~use:Os.Exit.some_error @@
   let names = List.map fst !templates in
-  Log.app (fun m -> m "@[<v>%a@]" Fmt.(code' (list string)) names);
+  Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(code' (list string)) names);
   Ok Os.Exit.ok
 
 (* Source file init *)

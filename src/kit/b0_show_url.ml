@@ -209,14 +209,14 @@ let show_url env browser background prefix timeout dry_run no_exec args =
   match mode with
   | `Show_url_no_exec (endpoint, timeout, url) ->
       if dry_run
-      then (Log.app (fun m -> m "%s" url); Ok Os.Exit.ok) else
+      then (Log.stdout (fun m -> m "%s" url); Ok Os.Exit.ok) else
       let timeout = secs timeout in
       let* () = Os.Socket.Endpoint.wait_connectable' ~timeout endpoint in
       let* () = show url in
       Ok Os.Exit.ok
   | `Show_url_server (endpoint, timeout, url, cmd, cwd, env) ->
       if dry_run
-      then (Log.app (fun m -> m "%a" Cmd.pp cmd); Ok Os.Exit.ok) else
+      then (Log.stdout (fun m -> m "%a" Cmd.pp cmd); Ok Os.Exit.ok) else
       let* server = Os.Cmd.spawn ~cwd ~env cmd in
       let* () =
         let timeout = secs timeout in
@@ -229,7 +229,7 @@ let show_url env browser background prefix timeout dry_run no_exec args =
   | `Show_unit_urls urls ->
       let* () =
         if dry_run
-        then (Log.app (fun m -> m "@[<v>%a@]" Fmt.(list string) urls); Ok ())
+        then (Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list string) urls); Ok ())
         else List.iter_stop_on_error show urls
       in
       Ok Os.Exit.ok

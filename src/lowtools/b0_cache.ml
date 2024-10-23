@@ -69,7 +69,7 @@ let keys setup b0_dir cache_dir =
 
 let path setup b0_dir cache_dir =
   let* (_cwd, _b0_dir, cache_dir) = find_dirs ~b0_dir ~cache_dir in
-  Log.app (fun m -> m "%a" Fpath.pp cache_dir);
+  Log.stdout (fun m -> m "%a" Fpath.pp cache_dir);
   Ok 0
 
 let stats setup b0_dir cache_dir log_file  =

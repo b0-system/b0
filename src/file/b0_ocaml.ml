@@ -1704,7 +1704,7 @@ let run_ocaml
   match dry_run with
   | false -> Ok (Os.Exit.execv top)
   | true ->
-      Log.app (fun m -> m "%a" Cmd.pp_shell top);
+      Log.stdout (fun m -> m "%a" Cmd.pp_shell top);
       Ok Os.Exit.ok
 
 let run_ocaml_term func env =
@@ -2041,7 +2041,7 @@ let list format pager_don't =
   | `Normal -> pp_normal, Fmt.cut
   | `Long -> pp_long, Fmt.(cut ++ cut)
   in
-  Log.app (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp_lib) us);
+  Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp_lib) us);
   Os.Exit.ok
 
 (* OCamlfind META files (for generation) *)
@@ -2203,7 +2203,7 @@ let meta env pack =
   let* pack = B0_pack.get_or_hint pack in
   Log.if_error' ~use:Os.Exit.some_error @@
   let* meta = meta_file_of_pack pack in
-  Log.app (fun m -> m "%s" meta);
+  Log.stdout (fun m -> m "%s" meta);
   Ok Os.Exit.ok
 
 open Cmdliner

@@ -72,7 +72,7 @@ val output_format :
 
 (** {1:setup Setup}
 
-    Configure {{!B0_std.Fmt.styled}colored output} and
+    Configure {{!B0_std.Fmt.styled}styled output} and
     {{!B0_std.Log.set_level}log verbosity} and the
     {!B0_std.Os.Cmd.spawn_tracer}. *)
 

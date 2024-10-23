@@ -102,7 +102,8 @@ let log_outcome ctx o =
   | File { file; diff } ->
       match Outcome.status o with
       | `Unexpected | `New as st ->
-          Log.app (fun m -> m "%a %a" pp_label st (pp_path_for_user ctx) file);
+          Log.stdout
+            (fun m -> m "%a %a" pp_label st (pp_path_for_user ctx) file);
           if ctx.log_diffs && diff then log_diff ctx file
       | _ -> ()
 
@@ -182,10 +183,10 @@ let log_summary ctx =
   let () = List.iter incr ctx.outcomes in
   match !expected = count with
   | true ->
-      Log.app (fun m -> m "%a" pp_all_pass (count, !corrected, dur ctx));
+      Log.stdout (fun m -> m "%a" pp_all_pass (count, !corrected, dur ctx));
       Os.Exit.ok
   | false ->
-      Log.app (fun m ->
+      Log.stdout (fun m ->
           m "@[<v> @[<v>%a%a%a%a%a@]@,@,\
              Summary with %a@,Details with %a@]"
             pp_expected (!expected, !corrected) pp_new (!new', ctx.vcs_repo)

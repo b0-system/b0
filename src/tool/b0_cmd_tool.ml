@@ -34,7 +34,8 @@ let list format c =
   let don't = B0_driver.Conf.no_pager c in
   let* pager = B0_pager.find ~don't () in
   let* () = B0_pager.page_stdout pager in
-  if tools <> [] then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp) tools);
+  if tools <> []
+  then Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp) tools);
   Ok Os.Exit.ok
 
 (* Command line interface *)

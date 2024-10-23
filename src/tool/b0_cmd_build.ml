@@ -32,15 +32,15 @@ let log_explain_lock ~is_locked ~lock ~locked_packs =
   let locked_packs = B0_pack.Set.elements locked_packs in
   match is_locked with
   | true ->
-      Log.app @@ fun m ->
+      Log.stdout @@ fun m ->
       m "Build %a by%a%a." red "locked"
         (option_reason "" "--lock") lock (packs_reason lock) locked_packs
   | false ->
-      Log.app @@ fun m ->
+      Log.stdout @@ fun m ->
       m "Build %a%a" green "unlocked" (option_reason " by" "--unlock") lock
 
 let log_units color ~kind us =
-  Log.app @@ fun m ->
+  Log.stdout @@ fun m ->
   m "@[<v>%a build:@,@[<v>%a@]@]"
     color kind Fmt.(list B0_unit.pp_synopsis) (B0_unit.Set.elements us)
 
@@ -50,7 +50,7 @@ let show_what ~lock ~is_locked ~locked_packs ~must_build ~may_build c =
   let* pager = B0_pager.find ~don't () in
   let* () = B0_pager.page_stdout pager in
   if B0_unit.Set.is_empty must_build
-  then (Log.app (fun m -> m "%s" (err_nothing ())); Ok Os.Exit.ok)
+  then (Log.stdout (fun m -> m "%s" (err_nothing ())); Ok Os.Exit.ok)
   else begin
     log_explain_lock ~is_locked ~lock ~locked_packs;
     log_units red ~kind:"Must" must_build;
@@ -225,7 +225,7 @@ let do_show_path action_unit ~args =
   let p = Fut.sync path in
   (* Is there a way of quoting to make the shell notation $() work if args
      or p have spaces ? *)
-  Log.app (fun m -> m "%a" Cmd.pp Cmd.(path p %% args));
+  Log.stdout (fun m -> m "%a" Cmd.pp Cmd.(path p %% args));
   Ok Os.Exit.ok
 
 let env_for_unit c build u =

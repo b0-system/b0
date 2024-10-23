@@ -19,6 +19,8 @@
   `right`.
 - Review the error reporting strategy in file system operations
   and properly document it.
+- {!B0_std.Log} review usage of [header]. I think that
+  we could drop it in favor of some kind of label in Fmt.
 
 {1:design_b0 [b0.memo] library}
 

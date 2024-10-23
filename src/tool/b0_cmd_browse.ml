@@ -26,7 +26,7 @@ let process_url browser background prefix show_url no_pager =
   | true ->
       let* pager = B0_pager.find ~don't:no_pager () in
       let* () = B0_pager.page_stdout pager in
-      Ok (fun u -> Ok (Log.app (fun m -> m "%s" u)))
+      Ok (fun u -> Ok (Log.stdout (fun m -> m "%s" u)))
 
 let browse key packs browser background prefix show_url no_pager c =
   Log.if_error ~use:Os.Exit.no_such_name @@

@@ -197,5 +197,5 @@ let vendor_htmlit =
   let doc = "Vendor Htmlit and expose it as B0_html" in
   B0_unit.of_action "vendor-htmlit" ~doc @@
   fun _ env ~args ->
-  Log.app (fun m -> m "TODO");
+  Log.stdout (fun m -> m "TODO");
   Ok ()

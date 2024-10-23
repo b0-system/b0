@@ -353,7 +353,7 @@ let list_cmd env pkgs format =
       let pp_pkg = match format with
       | `Short -> Pkg.pp_name | `Normal | `Long -> pp_normal
       in
-      Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_pkg) ps);
+      Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list pp_pkg) ps);
       Ok Os.Exit.ok
 
 (* .opam file command *)
@@ -365,7 +365,7 @@ let lint_files ~normalize pkgs =
     Pkg.lint_opam_file opam ~normalize pkg (snd (Pkg.file ~with_name:false pkg))
   in
   let* _ = collect_results (List.map lint pkgs) in
-  Log.app (fun m -> m "%a" (Fmt.st [`Fg `Green]) "Passed.");
+  Log.stdout (fun m -> m "%a" (Fmt.st [`Fg `Green]) "Passed.");
   Ok Os.Exit.ok
 
 let gen_files pkgs ~normalize ~with_name ~dst =
@@ -386,7 +386,7 @@ let gen_files pkgs ~normalize ~with_name ~dst =
     match dir with
     | None ->
         let* file = File.to_string opam ~normalize file in
-        Log.app (fun m -> m "@[%s@]" file); Ok ()
+        Log.stdout (fun m -> m "@[%s@]" file); Ok ()
     | Some dir ->
         Pkg.write_opam_file opam ~normalize pkg ~version:None file ~dir
   in
@@ -622,10 +622,10 @@ module Publish = struct
       let action = if check_only then "Checking" else "Downloading" in
       Fmt.pf ppf "@,%s archives…" action
     in
-    Log.app @@ fun m ->
+    Log.stdout @@ fun m ->
     m "@[<v>%a%a%a@]" Fmt.(list pp_info) is pp_incs incs pp_download check_only
 
-  let log_check_success () = Log.app @@ fun m ->
+  let log_check_success () = Log.stdout @@ fun m ->
     m "%a" (Fmt.st [`Fg `Green]) "All checks succeeded"
 
   let stdout_logging () =
@@ -639,13 +639,13 @@ module Publish = struct
     let* local = B0_vcs_repo.Git.find ~dir () in
     match local with
     | Some repo ->
-        Log.app (fun m -> m "Updating %a" Fpath.pp dir);
+        Log.stdout (fun m -> m "Updating %a" Fpath.pp dir);
         let git = B0_vcs_repo.repo_cmd repo in
         let fetch = Cmd.(arg "fetch" % "origin" % master) in
         let* () = Os.Cmd.run ?stdout ?stderr Cmd.(git %% fetch) in
         Ok repo
     | None ->
-        Log.app (fun m -> m "Cloning %s to %a" pkgs_repo Fpath.pp dir);
+        Log.stdout (fun m -> m "Cloning %s to %a" pkgs_repo Fpath.pp dir);
         let clone =
           Cmd.(arg "clone" % "--bare" % "--single-branch" %
                "--branch" % master % pkgs_repo %% path dir)
@@ -658,7 +658,7 @@ module Publish = struct
   let commit opam ~local_repo:repo ~branch ~pkgs_dir is _incs =
     let stdout, stderr = stdout_logging () in
     let fetch_head = Some "FETCH_HEAD" and force = true in
-    Log.app (fun m -> m "Branching %s…" branch);
+    Log.stdout (fun m -> m "Branching %s…" branch);
     Result.join @@
     B0_vcs_repo.Git.with_transient_checkout
       ?stdout ?stderr repo ~force ~branch fetch_head
@@ -691,7 +691,7 @@ module Publish = struct
     Ok (Os.Env.to_assignments e)
 
   let push_branch ~github_auth ~local_repo ~branch ~fork_repo  =
-    Log.app (fun m -> m "Pushing %s on %s" branch fork_repo);
+    Log.stdout (fun m -> m "Pushing %s on %s" branch fork_repo);
     let stdout, stderr = stdout_logging () in
     let repo_cmd = B0_vcs_repo.repo_cmd local_repo in
     let env_creds = (* XXX Windows :-( ? *)
@@ -746,7 +746,7 @@ module Publish = struct
     let* ps = Pkg.get_unique_list_or_hints ~constraints (List.map fst pkgs) in
     match ps with
     | [] ->
-        Log.app (fun m -> m "No opam package to publish in b0 root.");
+        Log.stdout (fun m -> m "No opam package to publish in b0 root.");
         Ok Os.Exit.ok
     | ps ->
         let add_version p = p, Option.join (List.assoc_opt (Pkg.name p) pkgs) in

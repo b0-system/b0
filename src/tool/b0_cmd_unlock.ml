@@ -9,7 +9,7 @@ open Result.Syntax
 let unlock c =
   let vars = [ B0_driver.Env.b0_file; B0_driver.Env.b0_dir ] in
   let pp_unset ppf var = Fmt.pf ppf "unset %s;" var in
-  Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_unset) vars);
+  Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list pp_unset) vars);
   Os.Exit.ok
 
 (* Command line interface *)

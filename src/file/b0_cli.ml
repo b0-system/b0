@@ -135,7 +135,7 @@ module File_cache = struct
   | true ->
       Result.bind (B0_zero.File_cache.make dir) @@ fun c ->
       Result.bind (B0_zero.File_cache.keys c) @@ fun keys ->
-      Log.app (fun m -> m "@[<v>%a@]" Fmt.(list string) keys);
+      Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list string) keys);
       Ok true
 
   let stats ~dir ~used = Result.bind (Os.Dir.exists dir) @@ function
@@ -143,7 +143,7 @@ module File_cache = struct
   | true ->
       Result.bind (B0_zero.File_cache.make dir) @@ fun c ->
       Result.bind (stats_of_cache c ~used) @@ fun stats ->
-      Log.app (fun m -> m "@[<v>%a@]" pp_stats stats);
+      Log.stdout (fun m -> m "@[<v>%a@]" pp_stats stats);
       Ok true
 
   let trim ~dir ~used ~max_byte_size ~pct =

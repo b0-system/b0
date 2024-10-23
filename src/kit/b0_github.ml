@@ -411,7 +411,7 @@ module Pages = struct
   let default_branch = "gh-pages"
   let ubr = "_b0-gh-pages-update"
   let commit_updates
-      ?(log = Log.App) ?branch:(br = default_branch) r ~amend ~force ~remote
+      ?(log = Log.Stdout) ?branch:(br = default_branch) r ~amend ~force ~remote
       ~msg us
     =
     let cleanup ~commited r =
@@ -498,7 +498,7 @@ module Pull_request = struct
     in
     let pp_action ppf a = Fmt.st [`Fg `Green] ppf a in
     (* TODO we sould return this rather than log *)
-    Log.app begin fun m ->
+    Log.stdout begin fun m ->
       m "%a pull request %a" pp_action action Fmt.code url
     end;
     Ok ()

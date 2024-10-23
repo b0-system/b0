@@ -10,7 +10,7 @@ let path c =
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
   let* b0_file = B0_driver.Conf.get_b0_file c in
   let root = Fpath.parent b0_file in
-  Log.app (fun m -> m "%a" Fpath.pp root);
+  Log.stdout (fun m -> m "%a" Fpath.pp root);
   Ok Os.Exit.ok
 
 (* Command line interface *)

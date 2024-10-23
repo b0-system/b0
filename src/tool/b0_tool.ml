@@ -74,7 +74,7 @@ module Def = struct
     let don't = B0_driver.Conf.no_pager c in
     let* pager = B0_pager.find ~don't () in
     let* () = B0_pager.page_stdout pager in
-    if ds <> [] then Log.app (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp) ds);
+    if ds <> [] then Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp) ds);
     Ok Os.Exit.ok
 
   let edit (module Def : B0_def.S) _c ds =
@@ -116,14 +116,14 @@ module Def = struct
         begin match bs with
         | [] -> ()
         | [_, B0_meta.B (k, v)] ->
-            Log.app (fun m -> m "@[<h>%a@]" (B0_meta.Key.pp_value k) v)
+            Log.stdout (fun m -> m "@[<h>%a@]" (B0_meta.Key.pp_value k) v)
         | _ -> assert false
         end
     | _ ->
         let pp_bindings ppf (d, B0_meta.B (k, v)) =
           Fmt.pf ppf "@[<h>%a %a@]" Def.pp_name d (B0_meta.Key.pp_value k) v
         in
-        Log.app (fun m -> m "@[<v>%a@]" Fmt.(list pp_bindings) bs)
+        Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list pp_bindings) bs)
     end;
     Ok Os.Exit.ok
 end
