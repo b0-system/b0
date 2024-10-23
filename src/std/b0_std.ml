@@ -189,6 +189,10 @@ module Fmt = struct
     let pp_mark ppf _ = Format.pp_print_as ppf 1 mark in
     box ~indent:1 (pp_mark ++ pp_v ++ pp_mark)
 
+  (* Records *)
+
+  let record ?(sep = cut) pps = vbox (concat ~sep pps)
+
   (* Stdlib formatters *)
 
   let bool = Format.pp_print_bool
@@ -475,18 +479,7 @@ module Fmt = struct
   | [] -> unknown ~kind pp_v ppf v
   | hints -> unknown ~kind pp_v ppf v; sp ppf (); (hint pp_v) ppf hints
 
-  (* Text styling.
-
-     In Fmt the styling capability was associated to formatters, but
-     that's not practical. E.g. errors often go through strings which
-     are formatted without knowing where they will end up. Also
-     relying on isatty is not very user friendly if you pipe to a
-     pager it returns false and you loose all the nice colors.
-
-     Here is something that should be tried: always style. Provide
-     functions to remove styling from strings (we have that as
-     String.strip_ansi_escapes) and to filter out styling from ppf in
-     the formatter functions. *)
+  (* Text styling *)
 
   type styler = Ansi | Plain
 
@@ -592,7 +585,8 @@ module Fmt = struct
   let field ?(label = st [`Fg `Yellow]) ?(sep = any ":@ ") l prj pp_v ppf v =
     pf ppf "@[<1>%a%a%a@]" label l sep () pp_v (prj v)
 
-  let record ?(sep = cut) pps = vbox (concat ~sep pps)
+  let field ?(label = st [`Fg `Yellow]) ?(sep = any ":@ ") l prj pp_v ppf v =
+    pf ppf "@[<1>%a%a%a@]" label l sep () pp_v (prj v)
 end
 
 (* Result values *)

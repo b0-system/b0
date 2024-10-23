@@ -197,7 +197,7 @@ module Fmt : sig
     ?label:string t -> ?sep:unit t -> string -> ('b -> 'a) -> 'a t -> 'b t
   (** [field ~label ~sep l prj pp_v] pretty prints a labelled field value as
       [pf "@[<1>%a%a%a@]" label l sep () (using prj pp_v)]. [label] defaults
-      to [tty_string [`Yellow]] and [sep] to [any ":@ "]. *)
+      to [st [`Yellow]] and [sep] to [any ":@ "]. *)
 
   val record : ?sep:unit t -> 'a t list -> 'a t
   (** [record ~sep fields] pretty-prints a value using the concatenation of
@@ -369,60 +369,85 @@ module Fmt : sig
 
   (** {1:styling Text styling}
 
-      {b TODO.} If {!strip_styles} is reliable we could consider
-      removing {!type-styler} and {!set_styler}: styles are always
-      provided and the color control command line business then
-      becomes a matter of applying {!strip_styles} to the standard
-      formatters (the disavantage is that it's less reliable if
-      if you format to string and use e.g. [output_string]). *)
+      Text styling control happens via ANSI escape sequences and is
+      handled globally. If you want to make sure no escape sequences
+      are produced disable them with {!set_styler}. Otherwise they can
+      be selectively stripped on strings or formatters with the
+      {!B0_std.String.strip_ansi_escapes} and {!strip_styles} functions. *)
 
   type styler =
-  | Ansi (** ANSI escapes. *)
-  | Plain (** Plain text, styles are ignored. *)
-  (** The styler backend. *)
+  | Ansi (** Style with ANSI escapes. *)
+  | Plain (** No styles, plain text. *)
+  (** The kind of styler. *)
 
   val set_styler : styler -> unit
-  (** [set_styler st] sets the styler to [st]. See {!styler}. *)
+  (** [set_styler st] sets the global styler to [st]. See {!styler}. *)
 
   val styler : unit -> styler
-  (** [styler st] sets the stylers to [st]. The initial styler is set
-      to [Ansi] unless the value of the [TERM] environment variable is
+  (** [styler] is the global styler. The initial styler is only
+      set to [Plain] if the value of the [TERM] environment variable is
       set to [dumb] or if it undefined and the {!Sys.backend_type}
       is not [js_of_ocaml] (browser consoles support ANSI escapes). *)
 
   val strip_styles : Format.formatter -> unit
   (** [strip_styles ppf], this overrides the formatter's [out_string]
-      function to first stripping out styling information before
-      invoking it.
+      function to strip out styling information. See also
+      {!B0_std.String.strip_ansi_escapes}.
 
       {b Note.} This assumes [ppf] is not used to write data that uses
       raw [U+001B] characters. *)
 
   type color =
   [ `Default
-  | `Black   | `Black_bright
-  | `Red     | `Red_bright
-  | `Green   | `Green_bright
-  | `Yellow  | `Yellow_bright
-  | `Blue    | `Blue_bright
-  | `Magenta | `Magenta_bright
-  | `Cyan    | `Cyan_bright
-  | `White   | `White_bright ]
-  (** The type for colors. *)
+  | `Black
+     (** {%html:<span style="background:rgb(0,0,0)">    </span>%} *)
+  | `Black_bright
+     (** {%html:<span style="background:rgb(85,85,85)">    </span>%} *)
+  | `Red
+     (** {%html:<span style="background:rgb(170,0,0)">    </span>%} *)
+  | `Red_bright
+    (** {%html:<span style="background:rgb(255,0,0)">    </span>%} *)
+  | `Green
+     (** {%html:<span style="background:rgb(0,170,0)">    </span>%} *)
+  | `Green_bright
+    (** {%html:<span style="background:rgb(85,255,85)">    </span>%} *)
+  | `Yellow
+     (** {%html:<span style="background:rgb(187,187,0)">    </span>%} *)
+  | `Yellow_bright
+     (** {%html:<span style="background:rgb(255,255,85)">    </span>%} *)
+  | `Blue
+     (** {%html:<span style="background:rgb(0,0,170)">    </span>%} *)
+  | `Blue_bright
+     (** {%html:<span style="background:rgb(85,85,255)">    </span>%} *)
+  | `Magenta
+     (** {%html:<span style="background:rgb(170,0,170)">    </span>%} *)
+  | `Magenta_bright
+     (** {%html:<span style="background:rgb(255,85,255)">    </span>%} *)
+  | `Cyan
+     (** {%html:<span style="background:rgb(0,170,170)">    </span>%} *)
+  | `Cyan_bright
+     (** {%html:<span style="background:rgb(85,255,255)">    </span>%} *)
+  | `White
+     (** {%html:<span style="background:rgb(170,170,170)">    </span>%} *)
+  | `White_bright
+     (** {%html:<span style="background:rgb(255,255,255)">    </span>%} *) ]
+  (** The type for colors.
+
+      {b Note.} The actual color may differ in terminals.
+      See for example the table
+      {{:https://en.wikipedia.org/wiki/ANSI_escape_code#3-bit_and_4-bit}here}
+      and check out the output of the [b0-sttyle] tool. *)
 
   type style =
   [ `Bold | `Faint | `Italic | `Underline | `Blink of [ `Slow | `Rapid ]
-  | `Reverse | `Fg of color
-  | `Bg of color ]
-  (** The type for text styles.
-
-      {b TODO} Fuse [`Hi] into {!color}. *)
+  | `Reverse | `Fg of color | `Bg of color ]
+  (** The type for text styles. *)
 
   val st : style list -> string t
-  (** [st styles ppf s] prints [s] on [ppf] styled by [styles]. *)
+  (** [st styles ppf s] formats [s] on [ppf] styled by [styles]. *)
 
   val st' : style list -> 'a t -> 'a t
-  (** [st' styles pp_v ppf v] prints [v] with [pp_v] on [ppf] styled
+  (** [st' styles pp_v ppf v] formats [v] with [pp_v] on [ppf] styled
       by [styles]. *)
 
   val code : string t
@@ -435,13 +460,13 @@ module Fmt : sig
   (** [hey] is [st [`Bold; `Fg `Red]]. *)
 
   val puterr : unit t
-  (** [puterr] formats [Error:] in red. *)
+  (** [puterr] formats [Error:] with [[`Fg `Red]]. *)
 
   val putwarn : unit t
-  (** [putwarn] formats [Warning:] in yellow. *)
+  (** [putwarn] formats [Warning:] with [[`Fg `Yellow]]. *)
 
   val putnote : unit t
-  (** [putnote] formats [Note:] in blue. *)
+  (** [putnote] formats [Note:] with [[`Fg `Blue]]. *)
 end
 
 (** Result values *)
