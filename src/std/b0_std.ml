@@ -33,33 +33,6 @@ module Type = struct
   end
 end
 
-(* ANSI terminal interaction *)
-
-module Tty = struct
-
-  (* Terminals *)
-
-  type t = [ `Dumb | `Term of string] option
-  let of_fd fd =
-    let rec isatty fd = try Unix.isatty fd with
-    | Unix.Unix_error (Unix.EINTR, _, _) -> isatty fd
-    | Unix.Unix_error (e, _, _) -> false
-    in
-    if not (isatty fd) then None else
-    match Unix.getenv "TERM" with
-    | "" -> None
-    | "dumb" -> (Some `Dumb)
-    | v -> Some (`Term v)
-    | exception Not_found -> None
-
-  (* Capabilities *)
-
-  type cap = [ `None | `Ansi ]
-  let cap tty = match tty with None | (Some `Dumb) -> `None | _ -> `Ansi
-
-  (* ANSI escapes and styling *)
-end
-
 (* Characters *)
 
 module Char = struct

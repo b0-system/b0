@@ -36,27 +36,6 @@ module Type : sig
   end
 end
 
-(** {{:http://www.ecma-international.org/publications/standards/Ecma-048.htm}
-      ANSI terminal} interaction.
-
-    {b TODO get rid of this}. *)
-module Tty : sig
-
-  (** {1:terminals Terminals} *)
-
-  type t = [ `Dumb | `Term of string ] option
-  (** The type for terminals. Either no terminal, a dumb one or
-      a named terminal from the [TERM] environment variable. *)
-
-  val of_fd : Unix.file_descr -> t
-  (** [of_fd fd] determines the terminal for file descriptor [fd] by
-      using {!Unix.isatty}[ fd] and consulting the [TERM] environment
-      variable. *)
-
-  val cap : t -> [ `None | `Ansi]
-  (** [cap tty] determines [tty]'s capabilities. *)
-end
-
 (** Textual formatters.
 
     Helpers for dealing with {!Format}. *)
