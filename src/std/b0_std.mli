@@ -401,7 +401,7 @@ module Fmt : sig
   val styler : unit -> styler
   (** [styler st] sets the stylers to [st]. The initial styler is set
       to [`Ansi] unless the value of the [TERM] environment variable
-      is set to [dumb] or if {!Unix.stdout} is not a tty. *)
+      is set to [dumb] *)
 
   val with_styler : styler -> (unit -> unit) -> unit
   (** [with_styler styler f] runs [f] with styler set to [styler].
@@ -443,7 +443,7 @@ module Fmt : sig
   (** [hey] is [st [`Bold; `Fg `Red]]. *)
 
   val puterr : unit t
-  (** [putmsg] formats [Error:] in red. *)
+  (** [puterr] formats [Error:] in red. *)
 
   val putwarn : unit t
   (** [putwarn] formats [Warning:] in yellow. *)

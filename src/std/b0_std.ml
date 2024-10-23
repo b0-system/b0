@@ -505,9 +505,15 @@ module Fmt = struct
 
   (* Text styling.
 
-     XXX What we are doing here is less subtle than what we did in Fmt
-     where capability was associated to formatters and hence could
-     distinguish between stdout/stderr, maybe we should do that again. *)
+     In Fmt the styling capability was associated to formatters, but
+     that's not practical. E.g. errors often go through strings which
+     are formatted without knowing where they will end up. Also
+     relying on isatty is not very user friendly if you pipe to a
+     pager it returns false and you loose all the nice colors.
+
+     Here is something that should be tried: always style. Provide
+     functions to remove styling from strings and to filter out
+     styling from ppf in the formatter functions. *)
 
   type styler = [ `Ansi | `None ]
   type color =
@@ -545,17 +551,11 @@ module Fmt = struct
 
   let sgrs_of_styles styles = String.concat ";" (List.map sgr_of_style styles)
 
-  let guess_styler () =
-    let rec isatty fd = try Unix.isatty fd with
-    | Unix.Unix_error (Unix.EINTR, _, _) -> isatty fd
-    | Unix.Unix_error (e, _, _) -> false
-    in
-    if not (isatty Unix.stdout) then `None else
-    match Sys.getenv "TERM" with
-    | "dumb" -> `None
-    | exception Not_found -> `Ansi | _ -> `Ansi
+  let styler' =
+    ref begin match Sys.getenv "TERM" with
+    | exception Not_found -> `None | "dumb" -> `None | _ -> `Ansi
+    end
 
-  let styler' = ref (guess_styler ())
   let set_styler styler = styler' := styler
   let styler () = !styler'
 
