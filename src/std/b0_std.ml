@@ -424,11 +424,10 @@ module Fmt = struct
     in
     loop 0 s
 
-  let truncated ~max ppf s = match String.length s <= max with
-  | true -> Format.pp_print_string ppf s
-  | false ->
-      for i = 0 to max - 2 do Format.pp_print_char ppf s.[i] done;
-      Format.fprintf ppf "@<1>%s" "…"
+  let truncated ~max ppf s =
+    if String.length s <= max then Format.pp_print_string ppf s else
+    (for i = 0 to max - 2 do Format.pp_print_char ppf s.[i] done;
+     Format.pp_print_as ppf 1 "…")
 
   let suffix_lines ~suffix pp ppf v =
     let b = Buffer.create 255 in
@@ -495,8 +494,8 @@ module Fmt = struct
 
   let strip_styles ppf =
     (* Note: this code makes the assumption that out_string is always
-       going to be called without splitting escapes. Since we only ever output
-       escapes via @<0> directives we hope that this is the case. *)
+       going to be called without splitting escapes. Since we only
+       ever output escapes via pp_print_as this should not happen. *)
     let strip out_string s first len =
       let max = first + len - 1 in
       let flush first last =
@@ -558,6 +557,8 @@ module Fmt = struct
   | `Bg c -> sgr_of_bg_color c
 
   let sgrs_of_styles styles = String.concat ";" (List.map sgr_of_style styles)
+  let ansi_esc = "\x1B["
+  let sgr_reset = "\x1B[m"
 
   let st' styles pp_v ppf v = match !styler' with
   | Plain -> pp_v ppf v
@@ -565,15 +566,18 @@ module Fmt = struct
       (* This doesn't compose well, we should get the current state
          and restore it afterwards rather than resetting. But then we don't
          have access to the current state. *)
-      let reset ppf = Format.fprintf ppf "@<0>%s" "\x1B[m" in
-      let sgrs = String.concat "" ["\x1B["; sgrs_of_styles styles; "m"] in
-      Format.kfprintf reset ppf "@<0>%s%a" sgrs pp_v v
+      let sgrs = String.concat "" [ansi_esc; sgrs_of_styles styles; "m"] in
+      Format.pp_print_as ppf 0 sgrs;
+      pp_v ppf v;
+      Format.pp_print_as ppf 0 sgr_reset
 
   let st styles ppf s = match !styler' with
   | Plain -> string ppf s
   | Ansi ->
-      let sgrs = String.concat "" ["\x1B["; sgrs_of_styles styles; "m"] in
-      pf ppf "@<0>%s%s@<0>%s" sgrs s "\x1B[m"
+      let sgrs = String.concat "" [ansi_esc; sgrs_of_styles styles; "m"] in
+      Format.pp_print_as ppf 0 sgrs;
+      Format.pp_print_string ppf s;
+      Format.pp_print_as ppf 0 sgr_reset
 
   let code' pp_v ppf v = st' [`Bold] pp_v ppf v
   let code ppf v = st [`Bold] ppf v
