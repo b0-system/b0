@@ -483,6 +483,40 @@ module Fmt = struct
 
   type styler = Ansi | Plain
 
+  let styler' =
+    ref begin match Sys.getenv_opt "TERM" with
+    | None when Sys.backend_type = Other "js_of_ocaml" -> Ansi
+    | None | Some "dumb" -> Plain
+    | _ -> Ansi
+    end
+
+  let set_styler styler = styler' := styler
+  let styler () = !styler'
+
+  let strip_styles ppf =
+    (* Note: this code makes the assumption that out_string is always
+       going to be called without splitting escapes. Since we only ever output
+       escapes via @<0> directives we hope that this is the case. *)
+    let strip out_string s first len =
+      let max = first + len - 1 in
+      let flush first last =
+        if first > last then () else
+        out_string s first (last - first + 1)
+      in
+      let rec skip_esc i =
+        if i > max then scan i i else
+        let k = i + 1 in if s.[i] = 'm' then scan k k else skip_esc k
+      and scan first i =
+        if i > max then flush first max else match s.[i] with
+        | '\x1B' -> flush first (i - 1); skip_esc (i + 1)
+        | _ -> scan first (i + 1)
+      in
+      scan first first
+    in
+    let funs = Format.pp_get_formatter_out_functions ppf () in
+    let funs = { funs with out_string = strip funs.out_string } in
+    Format.pp_set_formatter_out_functions ppf funs
+
   type color =
   [ `Default
   | `Black   | `Black_bright
@@ -524,40 +558,6 @@ module Fmt = struct
   | `Bg c -> sgr_of_bg_color c
 
   let sgrs_of_styles styles = String.concat ";" (List.map sgr_of_style styles)
-
-  let styler' =
-    ref begin match Sys.getenv_opt "TERM" with
-    | None when Sys.backend_type = Other "js_of_ocaml" -> Ansi
-    | None | Some "dumb" -> Plain
-    | _ -> Ansi
-    end
-
-  let set_styler styler = styler' := styler
-  let styler () = !styler'
-
-  let strip_styles ppf =
-    (* Note: this code makes the assumption that out_string is always
-       going to be called without splitting escapes. Since we only ever output
-       escapes via @<0> directives we hope that this is the case. *)
-    let strip out_string s first len =
-      let max = first + len - 1 in
-      let flush first last =
-        if first > last then () else
-        out_string s first (last - first + 1)
-      in
-      let rec skip_esc i =
-        if i > max then scan i i else
-        let k = i + 1 in if s.[i] = 'm' then scan k k else skip_esc k
-      and scan first i =
-        if i > max then flush first max else match s.[i] with
-        | '\x1B' -> flush first (i - 1); skip_esc (i + 1)
-        | _ -> scan first (i + 1)
-      in
-      scan first first
-    in
-    let funs = Format.pp_get_formatter_out_functions ppf () in
-    let funs = { funs with out_string = strip funs.out_string } in
-    Format.pp_set_formatter_out_functions ppf funs
 
   let st' styles pp_v ppf v = match !styler' with
   | Plain -> pp_v ppf v
@@ -604,19 +604,17 @@ module Result = struct
   (* Interacting with Stdlib exceptions *)
 
   let error_to_failure = function Ok v -> v | Error e -> failwith e
-  let error_to_invalid_argument = function Ok v -> v | Error e -> invalid_arg e
-  let get_ok' = error_to_invalid_argument
+  let get_ok' = function Ok v -> v | Error e -> invalid_arg e
 
   (* Syntax *)
 
   module Syntax = struct
-    let ( let* ) x f = bind x f
+    let ( let* ) v f = bind v f
     let ( and* ) a b = product a b
-    let ( let+ ) x f = map f x
+    let ( let+ ) v f = map f v
     let ( and+ ) a b = product a b
   end
 end
-
 
 (* Strings *)
 
