@@ -263,11 +263,26 @@ let test_styling () =
   Test.string (no_42 ()) "Error: No 42" ~__POS__;
   ()
 
+let test_text_uchar () =
+  Test.test "Fmt.text_uchar" @@ fun () ->
+  let u u = Uchar.of_int u in
+  Test.string (Fmt.str "%a" Fmt.text_uchar (u 0x0000)) "U+0000" ~__POS__;
+  Test.string (Fmt.str "%a" Fmt.text_uchar (u 0x1F42B)) "🐫" ~__POS__;
+  ()
+
+let test_text_string_literal () =
+  Test.test "Fmt.text_string[_literal]" @@ fun () ->
+  Test.string (Fmt.str "%a" Fmt.text_string_literal "\n🐫\"\t")
+    "\"\\n🐫\\\"\\u{0009}\"" ~__POS__;
+    ()
+
 let main () =
   Test.main @@ fun () ->
   test_byte_size ();
   test_uint64_ns_span ();
   test_styling ();
+  test_text_uchar ();
+  test_text_string_literal ();
   ()
 
 let () = if !Sys.interactive then () else exit (main ())

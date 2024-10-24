@@ -439,18 +439,102 @@ module Fmt = struct
     let lines = List.mapi add_newline_esc lines in
     vbox (list string) ppf lines
 
-  (* ASCII text *)
-
+  let pp_escaped_char ppf c = pf ppf "\\x%02x" (Char.code c)
   let ascii_char ppf c =
-    if Char.Ascii.is_print c then char ppf c else
-    pf ppf "\\x%02x" (Char.code c)
+    if Char.Ascii.is_print c then char ppf c else pp_escaped_char ppf c
 
-  let ascii_string ppf s =
+  let _ascii_string ~for_literal ppf s =
+    let escape_char ~for_literal c =
+      (c = '\"' && for_literal) || not (Char.Ascii.is_print c)
+    in
+    let esc ~for_literal ppf c = match Char.code c with
+    | 0x22 when for_literal -> char ppf '\\'; char ppf '\"'
+    | 0x5C when for_literal -> char ppf '\\'; char ppf '\\'
+    | 0x0D when for_literal -> char ppf '\\'; char ppf 'r'
+    | 0x0A when for_literal -> char ppf '\\'; char ppf 'n'
+    | _ -> pp_escaped_char ppf c
+    in
     for i = 0 to String.length s - 1 do
       let c = s.[i] in
-      if Char.Ascii.is_print c || c = ' ' then char ppf c else
-      pf ppf "\\x%02x" (Char.code c)
+      if escape_char ~for_literal c then esc ~for_literal ppf c else
+      char ppf c
     done
+
+  let ascii_string ppf s = _ascii_string ~for_literal:false ppf s
+  let ascii_string_literal ppf s =
+    char ppf '\"'; _ascii_string ~for_literal:true ppf s; char ppf '\"'
+
+  let text_uchar ppf u =
+    let esc = match Uchar.to_int u with
+    | u when 0x0000 <= u && u <= 0x001F -> true (* C0 control characters *)
+    | u when 0x0080 <= u && u <= 0x009F -> true (* C1 control characters *)
+    | 0x2028 -> true (* line separator *)
+    | 0x2029 -> true (* paragraph separator *)
+    | 0x200E -> true (* left-to-right mark *)
+    | 0x200F -> true (* right-to-left mark *)
+    | u -> false
+    in
+    if esc then pf ppf "U+%04X" (Uchar.to_int u) else
+    let b = Bytes.create (Uchar.utf_8_byte_length u) in
+    ignore (Bytes.set_utf_8_uchar b 0 u);
+    Format.pp_print_as ppf 1 (Bytes.unsafe_to_string b)
+
+  let _text_string ~ansi ~for_literal ppf s =
+    let escape_uchar ~for_literal u = match Uchar.to_int u with
+    | 0x0022 -> for_literal
+    | u when 0x0000 <= u && u <= 0x001F -> true (* C0 control characters *)
+    | u when 0x0080 <= u && u <= 0x009F -> true (* C1 control characters *)
+    | 0x2028 -> true (* line separator *)
+    | 0x2029 -> true (* paragraph separator *)
+    | _ -> false
+    in
+    let escape ~for_literal ppf u = match Uchar.to_int u with
+    | 0x0022 when for_literal -> char ppf '\\'; char ppf '\"'
+    | 0x005C when for_literal -> string ppf "\\\\"
+    | 0x000A when for_literal -> string ppf "\\n"
+    | 0x000D when for_literal -> string ppf "\\r"
+    | u -> pf ppf "\\u{%04X}" u
+    in
+    let rec loop ~for_literal ppf i max =
+      if i > max then () else
+      let dec = String.get_utf_8_uchar s i in
+      let u = Uchar.utf_decode_uchar dec in
+      let len = Uchar.utf_decode_length dec in
+      let next =
+        if ansi && Uchar.to_int u = 0x001B && i + 1 < max && s.[i + 1] = '['
+        then begin
+          let k = ref (i + 2) in
+          while (!k <= max && s.[!k] <> 'm') do incr k done;
+          let esc = String.sub s i (!k - i + 1) in
+          Format.pp_print_as ppf 0 esc;
+          !k + 1
+        end else begin
+          let () =
+            if escape_uchar ~for_literal u then escape ~for_literal ppf u else
+            if not (Uchar.utf_decode_is_valid dec) then string ppf "\u{FFFD}"
+            else for k = 0 to len - 1 do char ppf (s.[i + k]) done
+          in
+          i + len
+        end
+      in
+      loop ~for_literal ppf next max
+    in
+    loop ~for_literal ppf 0 (String.length s - 1)
+
+  let text_string ppf s = _text_string ~ansi:false ~for_literal:false ppf s
+  let text_string_literal ppf s =
+    char ppf '\"';
+    _text_string ~ansi:false ~for_literal:true ppf s;
+    char ppf '\"'
+
+  let styled_text_string ppf s =
+    _text_string ~ansi:true ~for_literal:false ppf s
+
+  let styled_text_string_literal ppf s =
+    char ppf '\"';
+    _text_string ~ansi:true ~for_literal:true ppf s;
+    char ppf '\"'
+
 
   (* HCI fragments *)
 

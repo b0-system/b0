@@ -46,7 +46,6 @@ module Test : sig
     val count : int Fmt.t
     val count_ratio : (int * int) Fmt.t
     val pos : pos Fmt.t
-    val text_string : string Fmt.t
     val hex_string : string Fmt.t
     val list : 'a Fmt.t -> 'a list Fmt.t
     val option : 'a Fmt.t -> 'a option Fmt.t
@@ -211,6 +210,10 @@ module Test : sig
     val binary_string : string t
     (** [binary_string] tests binary string. *)
 
+    val styled_string : string t
+    (** [styled_string] tests textual string styled with ANSI escape
+        sequences. *)
+
     val bytes : bytes t
     (** [bytes] tests bytes. *)
 
@@ -274,6 +277,10 @@ module Test : sig
   val binary_string : ?__POS__:pos -> string -> string -> unit
   (** [binary_string s0 s1] asserts that [s0] and [s1] are equal assuming
       that [s0] and [s1] is binary data. *)
+
+  val styled_string : ?__POS__:pos -> string -> string -> unit
+  (** [styled_string s0 s1] asserts that [s0] and [s1] are equal assuming
+      that [s0] and [s1] have ANSI escape sequences. *)
 
   val bytes : ?__POS__:pos -> bytes -> bytes -> unit
   (** [string s0 s1] asserts that [s0] and [s1] are equal. *)

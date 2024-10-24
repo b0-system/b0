@@ -328,6 +328,49 @@ module Fmt : sig
       characters. If the string doesn't fit, it is truncated and ended
       with […] (U+2026) which does count towards [max]. *)
 
+  val ascii_char : char t
+  (** [ascii_char] prints {!Char.Ascii.is_print} characters
+      and hex escapes for other characters. *)
+
+  val ascii_string : string t
+  (** [ascii_string] prints {!Char.Ascii.is_print} characters and [' ']
+      and hex escapes for other characters. *)
+
+  val ascii_string_literal : string t
+  (** [ascii_string_literal] is like {!ascii_string} but between
+      double quotes ['\"']. Double quotes are also escaped and CR an
+      LF are escaped by ['\r'] and ['\n']. The result is a valid, single
+      line, OCaml string. *)
+
+  val text_uchar : Uchar.t t
+  (** [text_uchar] formats an UTF-8 encoded Unicode character or
+      its scalar value in [U+%04X] representation if [u] is in
+      C0 control characters (U+0000-U+001F), C1 control characters
+      (U+0080-U+009F), line separator (U+2028), paragraph separator
+      (U+2029), left-to-right mark (U+200E) or right-to-left mark
+      (U+200F). *)
+
+  val text_string : string t
+  (** [text_string] formats an UTF-8 encoded string but escapes: C0
+      control characters (U+0000-U+001F), C1 control characters
+      (U+0080-U+009F), line separator (U+2028) and paragraph separator
+      (U+2029). Decoding errors are replaced by literal {!Uchar.rep}
+      characters. *)
+
+  val text_string_literal : string t
+  (** [text_string_literal] is like {!text_string} but between
+      double quotes ['\"']. Double quotes are also escaped an CR and LF
+      are escaped by ['\r'] and ['\n']. The result is a valid, single line,
+      OCaml string. *)
+
+  val styled_text_string : string t
+  (** [styled_text_string] is like {!text_string} but ANSI escape
+      sequences are detected and output as zero width strings. *)
+
+  val styled_text_string_literal : string t
+  (** [styled_text_string_literal] combines {!text_string_literal}
+      nad {!ansi_styled_text_string}. *)
+
   (** {1:hci HCI fragments} *)
 
   val and_enum : ?empty:unit t -> 'a t -> 'a list t
@@ -357,15 +400,7 @@ module Fmt : sig
   (** [unknown ~kind pp_v ~hint (v, hints)] formats {!unknown} followed
       by a space and [hint pp_v hints] if [hints] is non-empty. *)
 
-  (** {1:ascii ASCII text} *)
-
-  val ascii_char : char t
-  (** [ascii_char] prints {!Char.Ascii.is_print} characters
-      and hex escapes for other characters. *)
-
-  val ascii_string : string t
-  (** [ascii_string] prints {!Char.Ascii.is_print} characters and [' ']
-      and hex escapes for other characters. *)
+  (** {1:ascii ASCII and UTF-8 text} *)
 
   (** {1:styling Text styling}
 

@@ -59,7 +59,10 @@ module Test_fmt = struct
 
   let exn ppf e = Fmt.string ppf (Printexc.to_string e)
 
-  let text_string ppf s = Fmt.pf ppf "%S" s (* TODO keep UTF-8  *)
+  let styled_text_string_literal ppf s =
+    (* Equality combinators add bold. Disable that. *)
+    Fmt.pf ppf "\x1B[0m%a" Fmt.styled_text_string_literal s
+
   let hex_string =
     let pp_byte ppf c = Fmt.pf ppf "%02x" (Char.code c) in
     Fmt.iter String.iter pp_byte
@@ -282,7 +285,7 @@ module Test = struct
     in
     loop pos ~kind ~first ~last first f
 
-  let block ?fail ?__POS__:pos f =
+  let block ?fail ?__POS__ f =
     let before_pass_count = !pass_count in
     let before_fail_count = !fail_count in
     let finish () =
@@ -290,11 +293,10 @@ module Test = struct
       if fail_diff = 0 then () else
       let checks = !pass_count - before_pass_count + fail_diff in
       match fail with
-      | Some fail -> fail ?__POS__:pos fail_diff ~checks
+      | Some fail -> fail ?__POS__ fail_diff ~checks
       | None ->
-          log_fail ?__POS__:pos
-            "Block %a %a checks" Test_fmt.failed ()
-            Test_fmt.count_ratio (fail_diff, checks)
+          log_fail "Block %a %a checks" Test_fmt.failed ()
+            Test_fmt.count_ratio (fail_diff, checks) ?__POS__
     in
     begin match f () with
     | exception Stop -> ()
@@ -325,22 +327,22 @@ module Test = struct
   let raises exn ?__POS__ f = match f () with
   | exception e when e = exn -> pass ()
   | exception e -> failneq ?__POS__ Test_fmt.exn e exn
-  | _ -> fail ?__POS__ "@[No exception raised, expected@ %a@]" Test_fmt.exn exn
+  | _ -> fail "@[No exception raised, expected@ %a@]" Test_fmt.exn exn ?__POS__
 
   let raises' is_exn ?__POS__ f = match f () with
   | exception e when is_exn e -> pass ()
   | exception e ->
-      fail ?__POS__
-        "Exception %a does not match expected exception" Test_fmt.exn e
-  | _ -> fail ?__POS__ "@[No exception raised, expecting one@]"
+      fail "Exception %a does not match expected exception" Test_fmt.exn e
+        ?__POS__
+  | _ -> fail "@[No exception raised, expecting one@]" ?__POS__
 
   let invalid_arg ?__POS__ f = match f () with
   | exception Invalid_argument _ -> pass ()
-  | _ -> fail ?__POS__ "Expression did not raise %a" Fmt.code "Invalid_argument"
+  | _ -> fail "Expression did not raise %a" Fmt.code "Invalid_argument" ?__POS__
 
   let failure ?__POS__ f = match f () with
   | exception Failure _ -> pass ()
-  | _ -> fail ?__POS__ "Expression did not raise %a" Fmt.code "Failure"
+  | _ -> fail "Expression did not raise %a" Fmt.code "Failure" ?__POS__
 
   (* Values *)
 
@@ -416,13 +418,19 @@ module Test = struct
       (module struct
         type t = string
         let equal = String.equal
-        let pp = Test_fmt.text_string end)
+        let pp = Fmt.text_string_literal end)
 
     let binary_string : string t =
       (module struct
         type t = string
         let equal = String.equal
         let pp = Test_fmt.hex_string end)
+
+    let styled_string : string t =
+      (module struct
+        type t = string
+        let equal = String.equal
+        let pp = Test_fmt.styled_text_string_literal end)
 
     let bytes : bytes t =
       (module struct
@@ -458,65 +466,66 @@ module Test = struct
   end
 
   let eq (type a) (module V : Eq.T with type t = a) ?__POS__ v0 v1 =
-    if V.equal v0 v1
-    then pass ()
-    else failneq ?__POS__ V.pp v0 v1
+    if V.equal v0 v1 then pass () else failneq V.pp v0 v1 ?__POS__
 
   let neq (type a) (module V : Eq.T with type t = a) ?__POS__ v0 v1 =
-    if not (V.equal v0 v1)
-    then pass ()
-    else fail ?__POS__ "@[<hov>%a =@ %a@]" V.pp v0 V.pp v1
+    if not (V.equal v0 v1) then pass () else
+    fail "@[<hov>%a =@ %a@]" V.pp v0 V.pp v1 ?__POS__
 
-  let bool ?__POS__ v0 v1 = eq ?__POS__ Eq.bool v0 v1
-  let char ?__POS__ c0 c1 = eq ?__POS__ Eq.char c0 c1
-  let int ?__POS__ i0 i1 = eq ?__POS__ Eq.int i0 i1
-  let int32 ?__POS__ i0 i1 = eq ?__POS__ Eq.int32 i0 i1
-  let uint32 ?__POS__ i0 i1 = eq ?__POS__ Eq.uint32 i0 i1
-  let int64 ?__POS__ i0 i1 = eq ?__POS__ Eq.int64 i0 i1
-  let uint64 ?__POS__ i0 i1 = eq ?__POS__ Eq.uint64 i0 i1
-  let nativeint ?__POS__ i0 i1 = eq ?__POS__ Eq.nativeint i0 i1
-  let float ?__POS__ f0 f1 = eq ?__POS__ Eq.float f0 f1
-  let string ?__POS__ s0 s1 = eq ?__POS__ Eq.string s0 s1
-  let binary_string ?__POS__ s0 s1 = eq ?__POS__ Eq.binary_string s0 s1
-  let bytes ?__POS__ b0 b1 = eq ?__POS__ Eq.bytes b0 b1
+  let bool ?__POS__ v0 v1 = eq Eq.bool v0 v1 ?__POS__
+  let char ?__POS__ c0 c1 = eq Eq.char c0 c1 ?__POS__
+  let int ?__POS__ i0 i1 = eq Eq.int i0 i1 ?__POS__
+  let int32 ?__POS__ i0 i1 = eq Eq.int32 i0 i1 ?__POS__
+  let uint32 ?__POS__ i0 i1 = eq Eq.uint32 i0 i1 ?__POS__
+  let int64 ?__POS__ i0 i1 = eq Eq.int64 i0 i1 ?__POS__
+  let uint64 ?__POS__ i0 i1 = eq Eq.uint64 i0 i1 ?__POS__
+  let nativeint ?__POS__ i0 i1 = eq Eq.nativeint i0 i1 ?__POS__
+  let float ?__POS__ f0 f1 = eq Eq.float f0 f1 ?__POS__
+  let string ?__POS__ s0 s1 = eq Eq.string s0 s1 ?__POS__
+  let binary_string ?__POS__ s0 s1 = eq Eq.binary_string s0 s1 ?__POS__
+  let styled_string ?__POS__ s0 s1 = eq Eq.styled_string s0 s1 ?__POS__
+  let bytes ?__POS__ b0 b1 = eq Eq.bytes b0 b1 ?__POS__
   let list
       (type e) ?elt:((module E : Eq.T with type t = e) = Eq.any) ?__POS__ l0 l1
     =
     if List.equal E.equal l0 l1 then pass () else
-    failneq ?__POS__ (Test_fmt.list E.pp) l0 l1
+    failneq (Test_fmt.list E.pp) l0 l1 ?__POS__
 
   let array
       (type e) ?elt:((module E : Eq.T with type t = e) = Eq.any) ?__POS__ a0 a1
     =
     if array_equal E.equal a0 a1
     then pass ()
-    else failneq ?__POS__ (Test_fmt.array E.pp) a0 a1
+    else failneq (Test_fmt.array E.pp) a0 a1 ?__POS__
 
   (* Options *)
 
   let get_some ?__POS__ = function
   | Some v -> pass (); v
-  | None -> fail ?__POS__ "@[Expected Some _ Found: None@]"; stop ()
+  | None -> fail "@[Expected Some _ Found: None@]" ?__POS__; stop ()
 
   let option
       (type a) ?some:((module V : Eq.T with type t = a) = Eq.any) ?__POS__ v0 v1
     =
     if Option.equal V.equal v0 v1
     then pass ()
-    else failneq ?__POS__ (Test_fmt.option V.pp) v0 v1
+    else failneq (Test_fmt.option V.pp) v0 v1 ?__POS__
 
   (* Results *)
 
   let get_ok ?__POS__ = function
   | Ok v -> pass (); v
-  | Error e -> fail ?__POS__ "@[<v>Expected Ok _@,Found: Error %S@]" e; stop ()
+  | Error e ->
+      fail "@[<v>Expected Ok _@,Found: Error %a@]" Fmt.text_string_literal e
+        ?__POS__;
+      stop ()
 
   let result
       (type a) ?ok:((module V : Eq.T with type t = a) = Eq.any) ?__POS__ v0 v1
     =
     if Result.equal ~ok:V.equal ~error:String.equal v0 v1
     then pass ()
-    else failneq ?__POS__ (Test_fmt.result ~ok:V.pp ~error:String.pp) v0 v1
+    else failneq (Test_fmt.result ~ok:V.pp ~error:String.pp) v0 v1 ?__POS__
 
   let result'
       (type a e)
@@ -525,7 +534,7 @@ module Test = struct
     =
     if Result.equal ~ok:V.equal ~error:E.equal r0 r1
     then pass ()
-    else failneq ?__POS__ (Test_fmt.result ~ok:V.pp ~error:E.pp) r0 r1
+    else failneq (Test_fmt.result ~ok:V.pp ~error:E.pp) r0 r1 ?__POS__
 
   module Fmt = Test_fmt
 end
