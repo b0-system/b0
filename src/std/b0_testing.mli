@@ -174,7 +174,8 @@ module Test : sig
     (** [false'] negates all values. *)
 
     val any : 'a t
-    (** [any] uses {!Stdlib.( = )} for comparing values. *)
+    (** [any] uses {!Stdlib.compare} for testing values for equality
+        (works on [nan] values). *)
 
     val bool : bool t
     (** [bool] tests booleans. *)

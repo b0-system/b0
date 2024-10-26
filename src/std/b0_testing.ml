@@ -355,7 +355,9 @@ module Test = struct
 
     type 'a t = (module T with type t = 'a)
 
-    let make (type a) ?(equal = ( = )) ?(pp = Test_fmt.anon) () : a t =
+    let equal v0 v1 = Stdlib.compare v0 v1 = 0 (* works on nan values *)
+
+    let make (type a) ?(equal = equal) ?(pp = Test_fmt.anon) () : a t =
       (module (struct type t = a let equal = equal let pp = pp end))
 
     let true' (type a) : a t =
@@ -366,7 +368,7 @@ module Test = struct
         type t = a let equal _ _ = false let pp = Test_fmt.anon end)
 
     let any (type a) : a t =
-      (module struct type t = a let equal = ( = ) let pp = Test_fmt.anon end)
+      (module struct type t = a let equal = equal let pp = Test_fmt.anon end)
 
     let bool : bool t =
       (module struct type t = bool let equal = Bool.equal let pp = Fmt.bool end)
