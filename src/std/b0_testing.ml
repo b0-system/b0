@@ -303,12 +303,10 @@ module Test = struct
     | exception exn ->
         let bt = Printexc.get_raw_backtrace () in
         log_exn_fail_loc bt exn;
+        fail' ()
     | () -> ()
     end;
     finish ()
-
-  let don't_stop f = try f () with
-  | Stop -> ()
 
   (* Test combinators *)
 
@@ -504,7 +502,7 @@ module Test = struct
 
   let get_some ?__POS__ = function
   | Some v -> pass (); v
-  | None -> fail "@[Expected Some _ Found: None@]" ?__POS__; stop ()
+  | None -> fail " @[Unexpected None@]" ?__POS__; stop ()
 
   let option
       (type a) ?some:((module V : Eq.T with type t = a) = Eq.any) ?__POS__ v0 v1
@@ -518,9 +516,17 @@ module Test = struct
   let get_ok ?__POS__ = function
   | Ok v -> pass (); v
   | Error e ->
-      fail "@[<v>Expected Ok _@,Found: Error %a@]" Fmt.text_string_literal e
-        ?__POS__;
-      stop ()
+      failstop " @[<v>Unexpected %a:@,%a@]"
+        (Fmt.st Test_fmt.fail_color) "Error" Fmt.lines e ?__POS__
+
+  let get_ok'
+      (type a) ?error:((module V : Eq.T with type t = a) = Eq.any) ?__POS__
+    =
+  function
+  | Ok v -> pass (); v
+  | Error e ->
+      failstop " @[<v>Unexpected %a _ :@,%a@]"
+        (Fmt.st Test_fmt.fail_color) "Error" V.pp e ?__POS__
 
   let result
       (type a) ?ok:((module V : Eq.T with type t = a) = Eq.any) ?__POS__ v0 v1

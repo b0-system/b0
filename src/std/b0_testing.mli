@@ -118,10 +118,6 @@ module Test : sig
       peforms a {!failstop} the block is stopped but not the test. It
       is possible to fail stop the test by stoppping in [fail]. *)
 
-  val don't_stop : (unit -> unit) -> unit
-  (** [don't_stop f] runs [f ()] and does not stop the current
-      test if [f] calls {!stop} directly or indirectly. *)
-
   (** {2:test_assert Assertions} *)
 
   val holds : ?msg:string -> ?__POS__:pos -> bool -> unit
@@ -308,8 +304,11 @@ module Test : sig
   (** {3:results Results} *)
 
   val get_ok : ?__POS__:pos -> ('a, string) result -> 'a
-  (** [get_ok] gets the value of [Ok _] and {!fail}s if that is not
-      possible. *)
+  (** [get_ok] gets the value of [Ok _] and {!failstop}s if that is not
+      possible. Calls {!pass} on success. *)
+
+  val get_ok' : ?error:'e Eq.t -> ?__POS__:pos -> ('a, 'e) result -> 'a
+  (** [get_ok'] is like {!get_ok} but uses [error] to render the error. *)
 
   val result :
     ?ok:'a Eq.t -> ?__POS__:pos ->
