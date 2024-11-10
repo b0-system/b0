@@ -3615,16 +3615,19 @@ module Os = struct
       with
       | Unix.Unix_error (e, _, _) -> ferr file (uerror e)
 
-    let read_stdin () =
+    let in_channel_to_string fd =
       let b = Bytes.create Fd.unix_buffer_size in
       let acc = Buffer.create Fd.unix_buffer_size in
-      let rec loop () = match input stdin b 0 (Bytes.length b) with
+      let rec loop () = match input fd b 0 (Bytes.length b) with
       | 0 -> Buffer.contents acc
       | n -> Buffer.add_subbytes acc b 0 n; loop ()
       in
       loop ()
 
+    let read_stdin () = in_channel_to_string stdin
+
     let read_file file ic = match in_channel_length ic with
+    | exception Sys_error e -> in_channel_to_string ic
     | len when len > Sys.max_string_length ->
         Fmt.failwith_notrace
           "File to read too large: %d bytes, max supported: %d"
