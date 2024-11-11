@@ -39,6 +39,16 @@ b0 -b -- u …  # Back to build only
 b0 -- lib     # If lib is a library gets you in a REPL
 ]}
 
+{2:bench How do I benchmark an executable ?}
+
+The following forms can be used in order to have up-to-date artefacts
+but avoiding timing the build.
+
+{@sh[
+time $(b0 --path -- u) …
+hyperfine "$(b0 --path -- u) …"
+]}
+
 {2:browser How do I open build artefacts in a browser ?}
 
 {@sh[
@@ -61,6 +71,14 @@ cd /any/where/
 b0 -- u …
 ]}
 
+{2:adding_src How can I add a new source to the project ?}
+
+{@sh[
+b0 init src > module.ml       # Default has OCaml syntax
+b0 init src unit.h unit.c     # Uses extensions for syntax
+b0 init src -x > example.ml   # Uses CC0-1.0 license
+b0 init src --help
+]}
 
 {1:build_more More on builds}
 
