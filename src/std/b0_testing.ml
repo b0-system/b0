@@ -15,7 +15,6 @@ let array_equal equal a0 a1 = (* 5.2, still no Array.equal (?!) *)
     true
   with Exit -> false
 
-let () = Printexc.record_backtrace true
 let out = ref Format.std_formatter
 
 module Test_fmt = struct
@@ -244,6 +243,7 @@ module Test = struct
     1
 
   let main ?__POS__:_ f =
+    let () = Printexc.record_backtrace true in
     let finish dur =
       if !test_fail_count = 0 && !fail_count = 0
       then report_pass ~dur else report_fail ~dur
