@@ -438,6 +438,15 @@ module Test = struct
         let equal = Bytes.equal
         let pp ppf v = Test_fmt.hex_string ppf (Bytes.unsafe_to_string v) end)
 
+    let pair
+      (type a b)
+      (module Fst : T with type t = a) (module Snd : T with type t = b) :
+      (a * b) t =
+      (module struct
+        type t = a * b
+        let equal (x0, y0) (x1, y1) = Fst.equal x0 x1 && Snd.equal y0 y1
+        let pp = Fmt.parens (Fmt.pair ~sep:Fmt.comma Fst.pp Snd.pp) end)
+
     let list (type a) (module E : T with type t = a) : a list t =
       (module struct
         type t = a list
@@ -485,18 +494,14 @@ module Test = struct
   let binary_string ?__POS__ s0 s1 = eq Eq.binary_string s0 s1 ?__POS__
   let styled_string ?__POS__ s0 s1 = eq Eq.styled_string s0 s1 ?__POS__
   let bytes ?__POS__ b0 b1 = eq Eq.bytes b0 b1 ?__POS__
-  let list
-      (type e) ?elt:((module E : Eq.T with type t = e) = Eq.any) ?__POS__ l0 l1
-    =
-    if List.equal E.equal l0 l1 then pass () else
-    failneq (Test_fmt.list E.pp) l0 l1 ?__POS__
+  let pair (type a b) ?(fst = Eq.any) ?(snd = Eq.any) ?__POS__ p0 p1 =
+    eq (Eq.pair fst snd) p0 p1 ?__POS__
 
-  let array
-      (type e) ?elt:((module E : Eq.T with type t = e) = Eq.any) ?__POS__ a0 a1
-    =
-    if array_equal E.equal a0 a1
-    then pass ()
-    else failneq (Test_fmt.array E.pp) a0 a1 ?__POS__
+  let list (type e) ?(elt = Eq.any) ?__POS__ l0 l1 =
+    eq (Eq.list elt) l0 l1 ?__POS__
+
+  let array (type e) ?(elt = Eq.any) ?__POS__ a0 a1 =
+    eq (Eq.array elt) a0 a1 ?__POS__
 
   (* Options *)
 

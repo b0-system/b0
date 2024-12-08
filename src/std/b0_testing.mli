@@ -214,6 +214,9 @@ module Test : sig
     val bytes : bytes t
     (** [bytes] tests bytes. *)
 
+    val pair : 'a t -> 'b t -> ('a * 'b) t
+    (** [pair fst snd] tests pairs with [fst] and [snd]. *)
+
     val list : 'a t -> 'a list t
     (** [list elt] tests list of elements tested with [elt]. *)
 
@@ -281,6 +284,12 @@ module Test : sig
 
   val bytes : ?__POS__:pos -> bytes -> bytes -> unit
   (** [string s0 s1] asserts that [s0] and [s1] are equal. *)
+
+  val pair :
+    ?fst:'a Eq.t -> ?snd:'b Eq.t -> ?__POS__:pos -> ('a * 'b) -> ('a * 'b) ->
+    unit
+  (** [pair ~fst ~snd p0 p1] asserts pairs [p0] and [p1] are equal using
+      [fst] and [snd] to test components (defaults to {!Eq.any}). *)
 
   val list : ?elt:'a Eq.t -> ?__POS__:pos -> 'a list -> 'a list -> unit
   (** [list ~elt l0 l1] assert lists [l0] and [l1] are equal using [elt] to
