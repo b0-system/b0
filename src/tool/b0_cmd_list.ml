@@ -6,15 +6,19 @@
 open B0_std
 open Result.Syntax
 
-let get_defs names ~with_lib_defs =
-  let keep_lib_defs ~keep (B0_def.V ((module Def), v)) =
-    keep || not (String.starts_with ~prefix:"." (Def.name v))
+let get_defs names ~with_lib_defs ~only_tests =
+  let keep ~no_lib_def_test ~no_test_tag_test (B0_def.V ((module Def), v)) =
+    (no_lib_def_test || not (String.starts_with ~prefix:"." (Def.name v)))
+    &&
+    (no_test_tag_test || Def.has_tag B0_meta.test v)
   in
   let defs = B0_tool.def_list and all_if_empty = true in
   let* vs = B0_tool.def_list_get_list_or_hint defs ~all_if_empty names in
-  Ok (List.filter (keep_lib_defs ~keep:(with_lib_defs || names <> [])) vs)
+  let no_lib_def_test = with_lib_defs || names <> [] in
+  let no_test_tag_test = not only_tests in
+  Ok (List.filter (keep ~no_lib_def_test ~no_test_tag_test) vs)
 
-let edit names conf =
+let edit names only_tests conf =
   let rec find_files not_found fs = function
   | [] -> not_found, Fpath.distinct fs
   | (B0_def.V ((module Def), def) as v) :: vs ->
@@ -23,7 +27,7 @@ let edit names conf =
      | Some f -> find_files not_found (f :: fs) vs
   in
   Log.if_error ~use:Os.Exit.no_such_name @@
-  let* vs = get_defs names ~with_lib_defs:false in
+  let* vs = get_defs names ~with_lib_defs:false ~only_tests in
   let defs = B0_tool.def_list and all_if_empty = true in
   let* vs = B0_tool.def_list_get_list_or_hint defs ~all_if_empty names in
   let not_found, files = find_files [] [] vs in
@@ -41,7 +45,7 @@ let edit names conf =
       | `Exited 0 -> Ok Os.Exit.ok
       | _ -> Ok Os.Exit.some_error
 
-let list format names all conf =
+let list format names all only_tests conf =
   let pp_v ppf (B0_def.V ((module Def), v)) = match format with
   | `Short -> Def.pp_name ppf v
   | `Normal -> Def.pp_synopsis ppf v
@@ -59,21 +63,27 @@ let list format names all conf =
     Ok ()
   in
   Log.if_error ~use:Os.Exit.no_such_name @@
-  let* vs = get_defs names ~with_lib_defs:all in
+  let* vs = get_defs names ~with_lib_defs:all ~only_tests in
   let* () = list conf vs in
   Ok Os.Exit.ok
 
-let show format names all conf =
+let show format names all conf only_tests =
   let format = if format = `Normal then `Long else format in
-  list format names all conf
+  list format names all conf only_tests
 
 (* Command line interface *)
 
 open Cmdliner
 
 let all =
-  let doc = "Include library definitions when all definitions are listed." in
+  let doc = "Include $(b,b0) library definitions when all definitions are \
+             listed."
+  in
   Arg.(value & flag & info ["a"; "all"] ~doc)
+
+let only_tests =
+  let doc = "List only tests. That is units tagged with $(b,B0_meta.test)." in
+  Arg.(value & flag & info ["tests"] ~doc)
 
 let names =
   let doc =
@@ -89,7 +99,7 @@ let cmd =
         definitions are not listed, invoke with $(b,--all) include them."
   in
   B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
-  Term.(const list $ B0_tool.Cli.format $ names $ all)
+  Term.(const list $ B0_tool.Cli.format $ names $ all $ only_tests)
 
 let cmd_show =
   let doc = "Show definition metadata" in
@@ -99,7 +109,7 @@ let cmd_show =
         not listed, invoke with $(b,--all) include them."
   in
   B0_tool.Cli.subcmd_with_b0_file "show" ~doc ~descr @@
-  Term.(const show $ B0_tool.Cli.format $ names $ all)
+  Term.(const show $ B0_tool.Cli.format $ names $ all $ only_tests)
 
 let cmd_edit =
   let doc = "Edit definitions" in
@@ -107,4 +117,4 @@ let cmd_edit =
                   definitions are defined." in
   let envs = B0_tool.Cli.editor_envs in
   B0_tool.Cli.subcmd_with_b0_file "edit" ~doc ~descr ~envs @@
-  Term.(const edit $ names)
+  Term.(const edit $ names $ only_tests)
