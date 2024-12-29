@@ -62,6 +62,8 @@ module Test_fmt = struct
     (* Equality combinators add bold. Disable that. *)
     Fmt.pf ppf "\x1B[0m%a" Fmt.styled_text_string_literal s
 
+  let unit ppf () = Fmt.string ppf "()"
+
   let hex_string =
     let pp_byte ppf c = Fmt.pf ppf "%02x" (Char.code c) in
     Fmt.iter String.iter pp_byte
@@ -78,13 +80,13 @@ module Test_fmt = struct
 
   let anon ppf _ = Fmt.string ppf "_"
 
-  let result ~ok ~error ppf = function
-  | Ok v -> Fmt.pf ppf "Ok %a" ok v
-  | Error e -> Fmt.pf ppf "Error %a" error e
-
   let option pp_v ppf = function
   | None -> Fmt.string ppf "None"
   | Some v -> Fmt.pf ppf "Some %a" pp_v v
+
+  let result ~ok ~error ppf = function
+  | Ok v -> Fmt.pf ppf "Ok %a" ok v
+  | Error e -> Fmt.pf ppf "Error %a" error e
 end
 
 module Test = struct
@@ -366,17 +368,24 @@ module Test = struct
         type t = a let equal _ _ = false let pp = Test_fmt.anon end)
 
     let any (type a) : a t =
-      (module struct type t = a let equal = equal let pp = Test_fmt.anon end)
+      (module struct
+        type t = a let equal = equal let pp = Test_fmt.anon end)
+
+    let unit : unit t =
+      (module struct
+        type t = unit let equal () () = true let pp = Test_fmt.unit end)
 
     let bool : bool t =
-      (module struct type t = bool let equal = Bool.equal let pp = Fmt.bool end)
+      (module struct
+        type t = bool let equal = Bool.equal let pp = Fmt.bool end)
 
     let char : char t =
       (module struct
         type t = char let equal = Char.equal let pp = Fmt.ascii_char end)
 
     let int : int t =
-      (module struct type t = int let equal = Int.equal let pp = Fmt.int end)
+      (module struct
+        type t = int let equal = Int.equal let pp = Fmt.int end)
 
     let int32 : int32 t =
       (module struct

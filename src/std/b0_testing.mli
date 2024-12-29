@@ -173,6 +173,9 @@ module Test : sig
     (** [any] uses {!Stdlib.compare} for testing values for equality
         (works on [nan] values). *)
 
+    val unit : unit t
+    (** [unit] tests units. *)
+
     val bool : bool t
     (** [bool] tests booleans. *)
 
