@@ -1,22 +1,29 @@
 (*---------------------------------------------------------------------------
-   Copyright (c) 2016 The b0 programmers. All rights reserved.
+   Copyright (c) 2016 The htmlit programmers. All rights reserved.
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
 (** HTML generation.
 
-    Open this module to use it.
+    See the {{!page-index.quick_start}quick start}.
 
-    {b Warning.} The module assumes strings are UTF-8 encoded. *)
+    Open this module to use it, it defines only modules in your scope.
 
-(** {1:attsels HTML attributes and elements} *)
+    {b Convention.} Whenever an attribute or element name conflicts
+    with an OCaml keyword we prime it. See for example {!At.class'} or
+    {!El.object'}.
 
-open B0_std
+    {b Warning.} The module takes care of escaping the data you
+    provide but it assumes you give it UTF-8 encoded strings; this is
+    not checked by the module. Also be careful with
+    {{!El.style}[style]} elements. *)
 
-(** Element attributes. *)
+(** HTML attributes.
+
+    See the {{!At.constructors}attribute constructors}. *)
 module At : sig
 
-  (** {1:atts Attributes} *)
+  (** {1:attributes Attributes} *)
 
   type name = string
   (** The type for attribute names. *)
@@ -25,144 +32,171 @@ module At : sig
   (** The type for attributes. *)
 
   val v : name -> string -> t
-  (** [v n value] is an attribute named [n] with value [value]. *)
+  (** [v n value] is an attribute named [n] with value [value].
+      Favour use of {{!constructors}attribute constructors} whenever
+      possible. *)
 
-  val true' : name -> t
-  (** [true' n] is [v n ""]. This sets the
-      {{:https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#boolean-attributes}boolean attribute}
-      [n] to true. The attribute must be omitted to be false. *)
+  val void : t
+  (** [void] is [v "" ""], an attribute that doesn't get rendered. See also
+      {!is_void}. *)
 
   val int : name -> int -> t
   (** [int n i] is [v n (string_of_int i)]. *)
 
-  val add_if : bool -> t -> t list -> t list
-  (** [add_if c att atts] is [att :: atts] if [c] is [true] and [atts]
-        otherwise. *)
+  val true' : name -> t
+  (** [true' n] is [v n ""]. This sets the
+      {{:https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#boolean-attributes}boolean attribute}
+      [n] to true. The attribute must be omitted to be false. See also
+      {!if'} and {!if_some}. *)
 
-  val add_if_some : name -> string option -> t list -> t list
-  (** [add_if_some n o atts] is [(v n value) :: atts] if [o] is [Some
-      value] and [atts] otherwise. *)
+  val if' : bool -> t -> t
+  (** [if' cond at] is [if cond then at else void]. *)
+
+  val if_some : t option -> t
+  (** [if_some o] is [at] if [o] is [Some at] and {!void} if [o] is [None]. *)
+
+  (** {1:preds Predicates and comparisons} *)
+
+  val is_void : t -> bool
+  (** [is_void at] is [true] iff the name of [at] is empty. These attributes
+      render nothing. See also {!void}. *)
+
+  val equal : t -> t -> bool
+  (** [equal at0 at1] is [true] if both the name and value of [at0] and
+      [at1] are {!String.equal}. *)
+
+  val compare : t -> t -> int
+  (** [compare] is a total order on attributes compatible with
+      {!equal}. *)
+
+  (** {1:conv Converting and formatting} *)
 
   val to_pair : t -> string * string
-  (** [to_pair at] is [(n,v)] the name and value of the attribute. *)
+  (** [to_pair at] is [(n, v)] the name and value of the attribute. *)
 
-  (** {1:names_cons Attribute names and constructors}
+  val of_pair : string * string -> t
+  (** [of_pair (n, value)] is [v n value]. *)
+
+  val pp : Format.formatter -> t -> unit
+  (** [pp ppf at] formats [at] on [ppf] using HTML syntax. {!is_void}
+      attributes format nothing. *)
+
+  (** {1:constructors Attribute constructors}
 
       See the
       {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes}MDN
-      HTML attribute reference}.
-
-      {b Convention.} Whenever an attribute name conflicts with
-      an OCaml keyword we prime it, see for example {!class'}. *)
-
-  (** Attribute names. *)
-  module Name : sig
-    val autofocus : name
-    val charset : name
-    val checked : name
-    val class' : name
-    val content : name
-    val defer : name
-    val disabled : name
-    val for' : name
-    val height : name
-    val href : name
-    val id : name
-    val lang : name
-    val media : name
-    val name : name
-    val placeholder : name
-    val rel : name
-    val required : name
-    val src : name
-    val tabindex : name
-    val title : name
-    val type' : name
-    val value : name
-    val wrap : name
-    val width : name
-  end
+      HTML attribute reference}. *)
 
   type 'a cons = 'a -> t
-  (** The type for attribute constructors with value of type ['a]. *)
+  (** The type for attribute constructors with attribute values of type ['a]. *)
 
   val accesskey : string cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/accesskey}accesskey} *)
 
+  val action : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form#action}
+      action} *)
+
+  val alt : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/img#alt}
+      alt} *)
+
+  val autocomplete : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/autocomplete}autocomplete} *)
+
   val autofocus : t
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/autofocus}
-      autofocus} *)
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/autofocus}autofocus} *)
 
   val charset : string cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/charset}
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes}
       charset} *)
 
   val checked : t
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/checked}
-      checked} *)
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input#checked}checked} *)
 
   val class' : string cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/class}
-      class} *)
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/class}class} *)
+
+  val cols : int cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/textarea#cols}cols} *)
+
+  val colspan : int cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/td#colspan}
+      colspan} *)
 
   val content : string cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/content}
-      content} *)
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/meta#content}content} *)
 
   val contenteditable : bool cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/contenteditable}contenteditable} *)
 
-  val cols : int cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/textarea#attr-cols}cols} *)
+  val datetime : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/time#datetime}datetime} *)
 
   val defer : t
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/defer}
-      defer} *)
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script#defer}defer} *)
+
+  val dir : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/dir}dir} *)
 
   val disabled : t
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/disabled}
       disabled} *)
 
-  val dir : string cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/dir}dir} *)
-
   val draggable : bool cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/draggable}draggable} *)
 
+  val download : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/a#download}
+      download}. *)
+
   val for' : string cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/for'}
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/for}
       for'} *)
 
   val height : int cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/height}
-      height} *)
-
-  val href : string cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/href}
-      href} *)
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes}height} *)
 
   val hidden : t
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/hidden}hidden} *)
 
+  val href : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes}href} *)
+
   val id : string cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/id}
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/id}
       id} *)
 
   val lang : string cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/lang}
-      lang} *)
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/lang}lang} *)
+
+  val list : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input#list}list} *)
 
   val media : string cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/media}
-      media} *)
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes}media} *)
+
+  val method' : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form#method}method}. *)
 
   val name : string cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/name}
-      name} *)
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes}name} *)
 
   val placeholder : string cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/placeholder}
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes}
       placeholder} *)
+
+  val popover : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/popover}
+      popover} *)
+
+  val popovertarget : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/button#popovertarget}
+      popovertarget} *)
+
+  val popovertargetaction : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/button#popovertarget}
+      popovertargetaction}. *)
 
   val rel : string cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/rel}
@@ -172,143 +206,219 @@ module At : sig
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/required}
       required} *)
 
+  val role : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Roles}
+      role} *)
+
   val rows : int cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/textarea#attr-rows}rows} *)
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/textarea#rows}rows} *)
+
+  val rowspan : int cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/td#rowspan}
+      rowspan} *)
+
+  val selected : t
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/option#selected}selected} *)
 
   val spellcheck : string cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/spellcheck}spellcheck} *)
 
   val src : string cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/src}
-      src} *)
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes}src} *)
+
+  val style : string cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/style}style} *)
 
   val tabindex : int cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/tabindex}
-      tabindex} *)
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/tabindex}tabindex} *)
 
   val title : string cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/title}
-      title} *)
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/title}title} *)
 
   val type' : string cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/type}
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes}
       type} *)
 
   val value : string cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/value}
-      value} *)
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes}value} *)
 
   val wrap : string cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/textarea#attr-wrap}wrap} *)
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/textarea#wrap}wrap} *)
 
   val width : int cons
-  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/width}
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes}
       width} *)
 end
 
-(** Elements and HTML fragments. *)
+(** HTML elements and fragments.
+
+    See the {{!El.constructors}element constructors} and
+    {{!El.section-page}minimal page generation}.  *)
 module El : sig
 
-  (** {1:els Elements} *)
+  (** {1:fragments HTML fragments} *)
+
+  type html
+  (** The type for HTML fragments. A fragment is either:
+      {ul
+      {- A single HTML {{!elements}element}.}
+      {- {{!section-text}Text}: character data.}
+      {- A {{!section-splice}splice}: a list of fragments.}
+      {- {{!unsafe_raw_data}Unsafe raw data}: character data
+         output as is, without escaping.}} *)
+
+  (** {2:elements Elements} *)
 
   type name = string
   (** The type for element names. *)
 
-  type frag
-  (** The type for HTML fragments. A fragment is either character data or
-      a single element or a sequence of elements. *)
-
-  val v : ?at:At.t list -> name -> frag list -> frag
+  val v : ?at:At.t list -> name -> html list -> html
   (** [v ?at n cs] is an element with name [n], attributes [at]
-      (defaults to [[]]) and children [cs].
+      and children [cs]. Favour {{!constructors}element constructors} whenever
+      possible.
+      Regarding [at]:
+      {ul
+      {- [at] defaults to [[]].}
+      {- Except for {!At.class'} and {!At.style} attributes, [at] must not
+         specify an attribute more than once. This is not checked by the
+         module and what happens on multiple definitions is undefined.}
+      {- For {!At.class'} attributes, multiple specifications are gathered to
+         form a single, space separated, attribute value for the
+         {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/class}[class] HTML attribute}.}
+      {- For {!At.style} attributes, multiple specifications are gathered to
+        form a single, semi-colon separated, attribute value for the
+        {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/style}[style] HTML attribute}.}} *)
 
-      Except for {!At.class'} the list [at] must not define an
-      attribute more than once; this is not checked by the module.
-      The {!At.class'} is treated specially: multiple specifications
-      are gathered to form a single, space separated, attribute value
-      for the [class] HTML attribute. *)
+  (** {2:text Text} *)
 
-  val txt : string -> frag
+  val txt : string -> html
   (** [txt d] is character data [d]. *)
 
-  val sp : frag
+  val txt_of : ('a -> string) -> 'a -> html
+  (** [txt_of f v] is [txt (f v)]. Cuts a bit on delimiter orgies. *)
+
+  val sp : html
   (** [sp] is [El.txt " "]. *)
 
-  val nbsp : frag
+  val nbsp : html
   (** [nbsp] is [El.txt "\u{00A0}"]. *)
 
-  val splice : ?sep:frag -> frag list -> frag
-  (** [splice ?sep fs] when added to a list of children in {!v} splices
-      fragments [fs] into the list, separating each fragment by
-      [sep] (if any). *)
+  (** {2:splice Splices} *)
 
-  val void : frag
-  (** [void] is [splice []]. *)
+  val splice : ?sep:html -> html list -> html
+  (** [splice ?sep hs] is the list of fragments [hs] separated by
+      [sep] (if any). When added to an element's children, the list
+      is spliced in the element's children. *)
 
-  val raw : string -> frag
-  (** [raw s] is the raw string [s] without escaping markup delimiters.
-      This can be used to include foreign markup. [s] must be well-formed
-      HTML otherwise invalid markup will be generated. *)
+  (** {2:unsafe_raw_data Unsafe raw data} *)
 
-  (** {1:output Output} *)
+  val unsafe_raw : string -> html
+  (** [unsafe_raw s] is the raw string [s] without escaping markup delimiters.
+      [s] must be well-formed HTML otherwise invalid markup is generated.
+      This can be used to:
+      {ul
+      {- Include foreign markup, for example markup generated by another
+         mechanism.}
+      {- Avoid unpleasant surprises with the {!style} element.}
+      {- Let user-generated content create
+         {{:https://owasp.org/www-community/attacks/xss/}XSS attacks}
+         in your application.}} *)
 
-  val buffer_add : doc_type:bool -> Buffer.t -> frag -> unit
-  (** [buffer_add ~doc_type b frag] adds fragment [frag]. If
+   (** {2:voids Voids}
+
+       Like {{!At.is_void}void attributes}, void fragments render nothing. *)
+
+  val void : html
+  (** [void] is [splice []]. See also {!is_void}. *)
+
+  val is_void : html -> bool
+  (** [is_void h] is [true] iff [h] is an empty {!val-splice}, an empty
+      {!txt} or an empty {!unsafe_raw}. These fragments render nothing.
+      See also {!void}. *)
+
+  (** {1:rendering Rendering} *)
+
+  val buffer_add : doctype:bool -> Buffer.t -> html -> unit
+  (** [buffer_add ~doctype b h] adds the HTML fragment [h] to [b]. If
       [doc_type] is [true] an HTML doctype declaration is
       prepended. *)
 
-  val to_string : doc_type:bool -> frag -> string
+  val to_string : doctype:bool -> html -> string
   (** [to_string] is like {!buffer_add} but returns directly a string. *)
 
-  (** {1:convenience Convenience} *)
+  (** Low level representation (unstable).
 
-  val title_of_fpath : Fpath.t -> string
-  (** [title_of_fpath p] is a page title for [p] guaranteed to be non
-      empty. Either the basename of [file] without extension or if
-      that results in ["index"] or [""] the basename of the parent
-      directory without extension or if that results in [""],
-      ["Untitled"]. *)
+      This representation may change even between minor versions
+      of the library. Use at your own risk. *)
+  module Low : sig
+    type t =
+    | El of name * At.t list * t list
+    (** Element, name attributes and children. *)
+    | Txt of string
+    (** Character data. *)
+    | Splice of t option * t list
+    (** List of parts, separated by an optional separator. *)
+    | Raw of string
+    (** Raw output string. *)
+    (** The low-level HTML fragment representation. *)
 
-  val basic_page :
+    val of_html : html -> t
+    (** [of_html h] is a low-level representation for [h]. *)
+  end
+
+  (** {1:page Page}
+
+      There's more than one way to generate a basic minimal HTML page. The
+      following provides good defaults for quick minimal pages. *)
+
+  val page :
     ?lang:string -> ?generator:string -> ?styles:string list ->
-    ?scripts:string list -> ?more_head:frag -> title:string -> frag -> frag
-  (** [basic_page ~lang ~generator ~styles ~scripts ~more_head ~title body]
-      is an {!El.html} element with a {!At.lang} attribute of [lang] (if
-      specified and non-empty) containing a {!El.head} element (see below)
-      followed by [body] which must be a {!El.body} element.
+    ?scripts:string list -> ?more_head:html -> title:string -> html -> html
+  (** [page ~lang ~title body] is an {!El.val-html} element with an
+      {!At.lang} attribute of [lang] (if specified and non-empty)
+      containing a {!El.head} element followed by [body] which must be
+      a {!El.body} element.
 
-      The other arguments are used to define the children of the page's
-      {!El.head} which are in order:
+      The children of the {!El.head} element are in order:
       {ol
-      {- A charset {!El.meta} of UTF-8 (unconditional).}
-      {- A generator {!El.meta} of [generator], if specified an non-empty.}
-      {- A viewport {!El.meta} with [width=device-width, initial-scale=1]
-         (unconditional).}
-      {- A stylesheet {!El.link} of type [text/css] for each element
-         of [styles], in order (defaults to [[]]).}
-      {- A {!El.script} with {!At.defer} and of {!At.type'}
-         [text/javascript] for each element of [scripts],
-         in order (defaults to [[]]).}
-      {- [more_head] (defaults to {!El.void}).}
-      {- The page has a title [title], which must be non-white and
-         and non-empty (falls back to ["Untitled"] in any of
-         these cases).}} *)
+      {- An {!El.meta} charset with value [utf-8], unconditional.}
+      {- An {!El.meta} generator with value [generator], if specified and
+         non-empty.}
+      {- An {!El.meta} viewport with value
+         [width=device-width, initial-scale=1], unconditional.}
+      {- For each non-empty element [href] of [styles] (defaults to [[]]), an
+         {!El.link} with {!At.type'} [text/css] and {!At.href} value [href].
+         In order.}
+      {- For each non-empty element [src] of [scripts] (defaults to [[]]),
+         an {!El.script} with {!At.defer}, {!At.type'} value
+         [text/javascript] and {!At.src} value [src]. In order.}
+      {- [more_head] fragment (defaults to {!El.void}). Be {{!style}careful}
+         if you add [style] tags with direct CSS source.}
+      {- An {!El.title} with value [title] which is {!String.trim}ed.
+         If the result is empty falls back to ["Untitled"].
+         See also {!title_of_filepath} to derive titles from
+         file paths.}} *)
 
-  (** {1:predef Predefined element constructors}
+  val title_of_filepath : string -> string
+  (** [title_of_filepath f] is a {e non-empty} page title for filepath
+      [f]. Either the basename of [f] without extension or if that
+      results in ["index"] or [""] the basename of the parent
+      directory without extension or if that results in [""] the value
+      ["Untitled"]. Directory separators can be ['/'] or ['\\']
+      regardless of the platform. *)
+
+  (** {1:constructors Element constructors}
 
       See the
       {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element}MDN
-      HTML element reference}.
+      HTML element reference}. *)
 
-      {b Convention.} Whenever an element name conflicts with an OCaml
-      keyword we prime it, see for example {!object'}. *)
-
-  type cons = ?at:At.t list -> frag list -> frag
-  (** The type for element constructors. This is simply {!v} with a
+  type cons = ?at:At.t list -> html list -> html
+  (** The type for element constructors. This is simply {!El.v} with a
       pre-applied element name. *)
 
-  type void_cons = ?at:At.t list -> unit -> frag
-  (** The type for void element constructors. This is simply {!v}
+  type void_cons = ?at:At.t list -> unit -> html
+  (** The type for void element constructors. This is simply {!El.v}
       with a pre-applied element name and without children. *)
 
   val a : cons
@@ -529,6 +639,9 @@ module El : sig
   val link : void_cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link}link} *)
 
+  val main : cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/main}main} *)
+
   val map : cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/map}map} *)
 
@@ -635,7 +748,12 @@ module El : sig
 
   val style : cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/style}
-      style} *)
+      style}
+
+      {b Warning.} If your style element contains CSS source, use
+      {!unsafe_raw} to specify it. Otherwise the
+      {{:https://developer.mozilla.org/en-US/docs/Web/CSS/Child_combinator}
+      CSS child combinator ['>']} gets escaped. *)
 
   val sub : cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/sub}

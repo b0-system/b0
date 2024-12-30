@@ -94,8 +94,8 @@ let write_page
     let sorry = "Sorry, you need to enable JavaScript to see this page." in
     El.body El.[noscript [txt sorry]]
   in
-  let page = El.basic_page ~generator ~lang ~scripts ~styles ~title body in
-  Ok (El.to_string ~doc_type:true page)
+  let page = El.page ~generator ~lang ~scripts ~styles ~title body in
+  Ok (El.to_string ~doctype:true page)
 
 (* Build fragments *)
 

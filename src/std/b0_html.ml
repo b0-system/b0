@@ -1,172 +1,174 @@
 (*---------------------------------------------------------------------------
-   Copyright (c) 2016 The b0 programmers. All rights reserved.
+   Copyright (c) 2016 The htmlit programmers. All rights reserved.
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
+
+(* HTML escaping *)
+
+module String_set = Set.Make (String)
+
+let add_escaped b s =
+  let adds = Buffer.add_string in
+  let len = String.length s in
+  let max_idx = len - 1 in
+  let flush b start i =
+    if start < len then Buffer.add_substring b s start (i - start);
+  in
+  let rec loop start i =
+    if i > max_idx then flush b start i else
+    let next = i + 1 in
+    match String.get s i with
+    | '&' -> flush b start i; adds b "&amp;"; loop next next
+    | '<' -> flush b start i; adds b "&lt;"; loop next next
+    | '>' -> flush b start i; adds b "&gt;"; loop next next
+    | '\'' -> flush b start i; adds b "&apos;"; loop next next
+    | '\"' -> flush b start i; adds b "&quot;"; loop next next
+    | c -> loop start next
+  in
+  loop 0 0
+
+let escape s = let b = Buffer.create 255 in add_escaped b s; Buffer.contents b
+
+(* Attributes *)
 
 module At = struct
   type name = string
   type t = name * string
   let v n v = (n, v)
-  let true' n = (n, "")
+  let void = ("", "")
   let int n i = (n, string_of_int i)
-  let add_if b at l = if b then at :: l else l
-  let add_if_some name o l = match o with None -> l | Some a -> (name, a) :: l
+  let true' n = (n, "")
+  let if' b at = if b then at else void
+  let if_some = function None -> void | Some at -> at
+  let is_void (n, _) = String.equal n ""
+  let equal = Stdlib.( = )
+  let compare = Stdlib.compare
   let to_pair = Fun.id
-  module Name = struct
-    let accesskey = "accesskey"
-    let autofocus = "autofocus"
-    let charset = "charset"
-    let checked = "checked"
-    let class' = "class"
-    let content = "content"
-    let contenteditable = "contenteditable"
-    let cols = "cols"
-    let defer = "defer"
-    let disabled = "disabled"
-    let dir = "dir"
-    let draggable = "draggable"
-    let for' = "for"
-    let height = "height"
-    let hidden = "hidden"
-    let href = "href"
-    let id = "id"
-    let lang = "lang"
-    let media = "media"
-    let name = "name"
-    let placeholder = "placeholder"
-    let rel = "rel"
-    let required = "required"
-    let rows = "rows"
-    let src = "src"
-    let spellcheck = "spellcheck"
-    let tabindex = "tabindex"
-    let title = "title"
-    let type' = "type"
-    let value = "value"
-    let width = "width"
-    let wrap = "wrap"
-  end
+  let of_pair = Fun.id
+  let pp ppf (n, v) = match n with
+  | "" -> () | n -> Format.fprintf ppf "@[%s=\"%s\"@]" n v
+
   type 'a cons = 'a -> t
-  let accesskey s = v Name.accesskey s
-  let autofocus = true' Name.autofocus
-  let charset = v Name.charset
-  let checked = true' Name.checked
-  let class' s = v Name.class' s
-  let cols i = int Name.cols i
-  let content s = v Name.content s
-  let contenteditable s = true' Name.contenteditable
-  let defer = true' Name.defer
-  let disabled = true' Name.disabled
-  let dir s = v Name.dir s
-  let draggable s = true' Name.draggable
-  let for' s = v Name.for' s
-  let height i = int Name.height i
-  let hidden = true' Name.hidden
-  let href s = v Name.href s
-  let id s = v Name.id s
-  let lang s = v Name.lang s
-  let media s = v Name.media s
-  let name s = v Name.name s
-  let placeholder s = v Name.placeholder s
-  let rel s = v Name.rel s
-  let required = true' Name.required
-  let rows i = int Name.rows i
-  let src s = v Name.src s
-  let spellcheck = v Name.spellcheck
-  let tabindex i = int Name.tabindex i
-  let title s = v Name.title s
-  let type' s = v Name.type' s
-  let value s = v Name.value s
-  let width i = int Name.width i
-  let wrap s = v Name.value s
+  let accesskey s = v "accesskey" s
+  let action s = v "action" s
+  let alt s = v "alt" s
+  let autocomplete s = v "autocomplete" s
+  let autofocus = true' "autofocus"
+  let charset = v "charset"
+  let checked = true' "checked"
+  let class' s = v "class" s
+  let cols i = int "cols" i
+  let colspan i = int "cols" i
+  let content s = v "content" s
+  let contenteditable s = true' "contenteditable"
+  let datetime s = v "datetime" s
+  let defer = true' "defer"
+  let dir s = v "dir" s
+  let disabled = true' "disabled"
+  let draggable b = v "draggable" (string_of_bool true) (* not a boolean attr *)
+  let download s = v "download" s
+  let for' s = v "for" s
+  let height i = int "height" i
+  let hidden = true' "hidden"
+  let href s = v "href" s
+  let id s = v "id" s
+  let lang s = v "lang" s
+  let list s = v "list" s
+  let media s = v "media" s
+  let method' s = v "method" s
+  let name s = v "name" s
+  let placeholder s = v "placeholder" s
+  let popover s = v "popover" s
+  let popovertarget s = v "popovertarget" s
+  let popovertargetaction s = v "popovertargetaction" s
+  let rel s = v "rel" s
+  let required = true' "required"
+  let role s = v "role" s
+  let rows i = int "rows" i
+  let rowspan i = int "rowspan" i
+  let selected = true' "selected"
+  let spellcheck = v "spellcheck"
+  let src s = v "src" s
+  let style s = v "style" s
+  let tabindex i = int "tabindex" i
+  let title s = v "title" s
+  let type' s = v "type" s
+  let value s = v "value" s
+  let width i = int "width" i
+  let wrap s = v "value" s
 end
 
+(* HTML elements and fragments *)
+
 module El = struct
-  type name = string
-  type frag =
-  | El of name * At.t list * frag list
-  | Txt of string
-  | Splice of frag option * frag list
-  | Raw of string
+  module Low = struct
+    type name = string
+    type t =
+    | El of name * At.t list * t list
+    | Txt of string
+    | Splice of t option * t list
+    | Raw of string
 
-  let v ?(at = []) n cs = El (n, at, cs)
-  let txt v = Txt v
-  let sp = Txt " "
-  let nbsp = Txt "\u{00A0}"
-  let splice ?sep cs = Splice (sep, cs)
-  let void = Splice (None, [])
-  let raw f = Raw f
+    let of_html f = f
+  end
+  type name = Low.name
+  type html = Low.t
 
-  (* Output *)
+  let v ?(at = []) n cs = Low.El (n, at, cs)
+  let txt v = Low.Txt v
+  let txt_of f v = Low.Txt (f v)
+  let sp = Low.Txt " "
+  let nbsp = Low.Txt "\u{00A0}"
+  let splice ?sep cs = Low.Splice (sep, cs)
+  let unsafe_raw f = Low.Raw f
+  let void = Low.Splice (None, [])
+  let is_void = function
+  | Low.Splice (_, []) | Low.Txt "" | Low.Raw "" -> true | _ -> false
+
+  (* Rendering *)
 
   let addc = Buffer.add_char
   let adds = Buffer.add_string
-  let adds_esc b s =
-    (* N.B. we also escape @'s since ocamldoc trips over them. *)
-    let len = String.length s in
-    let max_idx = len - 1 in
-    let flush b start i =
-      if start < len then Buffer.add_substring b s start (i - start);
-    in
-    let rec loop start i =
-        if i > max_idx then flush b start i else
-        let next = i + 1 in
-        match String.get s i with
-        | '&' -> flush b start i; adds b "&amp;"; loop next next
-        | '<' -> flush b start i; adds b "&lt;"; loop next next
-        | '>' -> flush b start i; adds b "&gt;"; loop next next
-        | '\'' -> flush b start i; adds b "&apos;"; loop next next
-        | '\"' -> flush b start i; adds b "&quot;"; loop next next
-        | '@' -> flush b start i; adds b "&commat;"; loop next next
-        | c -> loop start next
-    in
-    loop 0 0
+  let add_doctype b = adds b "<!DOCTYPE html>\n"
+  let add_at b n v = adds b n; adds b "=\""; add_escaped b v; addc b '\"'
+  let rec add_atts b cs (* classes *) ss (* styles *) = function
+  | ("", _) :: atts -> add_atts b cs ss atts
+  | ("class", c) :: atts -> add_atts b (c :: cs) ss atts
+  | ("style", s) :: atts -> add_atts b cs (s :: ss) atts
+  | (n, v) :: atts -> addc b ' '; add_at b n v; add_atts b cs ss atts
+  | [] ->
+      let merge sep vs = String.concat sep (List.rev vs) in
+      if cs <> [] then (addc b ' '; add_at b "class" (merge " " cs));
+      if ss <> [] then (addc b ' '; add_at b "style" (merge ";" ss))
 
-  let void_els = B0_std.String.Set.of_list
+  let void_els =
+    String_set.of_list
       [ "area"; "base"; "br"; "col"; "embed"; "hr"; "img"; "input"; "link";
         "meta"; "param"; "source"; "track"; "wbr" ]
 
-  let rec add_ats b cs atts =
-    let add_at b n v = adds b n; adds b "=\""; adds_esc b v; addc b '\"' in
-    match atts with
-    | ("class", c) :: atts -> add_ats b (c :: cs) atts
-    | (n, v) :: atts -> addc b ' '; add_at b n v; add_ats b cs atts
-    | [] when cs = [] -> ()
-    | [] -> addc b ' '; add_at b "class" (String.concat " " (List.rev cs))
-
-  let rec add_child b = function (* not T.R. *)
-  | Raw r -> adds b r
-  | Txt txt -> adds_esc b txt
-  | Splice (sep, cs) ->
-      begin match sep with
-      | None -> List.iter (add_child b) cs
-      | Some sep ->
-          begin match cs with
-          | [] -> ()
-          | c :: cs ->
-              let add b c = add_child b sep; add_child b c in
-              add_child b c; List.iter (add b) cs
-          end
-      end
-  | El (n, atts, cs) ->
-      addc b '<'; adds b n; add_ats b [] atts; addc b '>';
-      if not (B0_std.String.Set.mem n void_els)
+  let rec add_child b = function (* not tail-recursive *)
+  | Low.Raw r -> adds b r
+  | Low.Txt txt -> add_escaped b txt
+  | Low.El (n, atts, cs) ->
+      addc b '<'; adds b n; add_atts b [] [] atts; addc b '>';
+      if not (String_set.mem n void_els)
       then (List.iter (add_child b) cs; adds b "</"; adds b n; addc b '>')
+  | Low.Splice (None, cs) -> List.iter (add_child b) cs
+  | Low.Splice (Some sep, []) -> ()
+  | Low.Splice (Some sep, c :: cs) ->
+      let add b c = add_child b sep; add_child b c in
+      add_child b c; List.iter (add b) cs
 
-  let add_doc_type b = adds b "<!DOCTYPE html>\n"
-  let buffer_add ~doc_type b cs =
-    if doc_type then add_doc_type b; add_child b cs
-
-  let to_string ~doc_type g =
-    let b = Buffer.create 65525 in
-    buffer_add ~doc_type b g; Buffer.contents b
+  let buffer_add ~doctype b cs = if doctype then add_doctype b; add_child b cs
+  let to_string ~doctype g =
+    let b = Buffer.create 1024 in buffer_add ~doctype b g; Buffer.contents b
 
   (* Predefined element constructors *)
 
-  type cons = ?at:At.t list -> frag list -> frag
-  type void_cons = ?at:At.t list -> unit -> frag
-  let[@inline] cons e ?at els = v ?at e els
-  let[@inline] void_cons e ?at () = v e ?at []
+  type cons = ?at:At.t list -> html list -> html
+  type void_cons = ?at:At.t list -> unit -> html
+  let cons e ?at els = v ?at e els
+  let void_cons e ?at () = v e ?at []
   let a = cons "a"
   let abbr = cons "abbr"
   let address = cons "address"
@@ -226,6 +228,7 @@ module El = struct
   let legend = cons "legend"
   let li = cons "li"
   let link = void_cons "link"
+  let main = cons "main"
   let map = cons "map"
   let mark = cons "mark"
   let menu = cons "menu"
@@ -276,30 +279,25 @@ module El = struct
   let video = cons "video"
   let wbr = void_cons "wbr"
 
-  (* Convenience *)
+  (* Page *)
 
-  let title_of_fpath file =
-    match B0_std.Fpath.basename ~strip_ext:true file with
-    | "index" | "" ->
-        let title = B0_std.Fpath.(basename ~strip_ext:true (parent file)) in
-        if title = "" then "Untitled" else title
-    | title -> title
-
-  let basic_page
+  let page
       ?(lang = "") ?(generator = "") ?(styles = []) ?(scripts = [])
       ?(more_head = void) ~title:t body
     =
     let viewport = "width=device-width, initial-scale=1.0" in
     let generator = match generator with
+    | "" -> void | g -> meta ~at:At.[name "generator"; content g] ()
+    in
+    let style = function
     | "" -> void
-    | g -> meta ~at:At.[name "generator"; content g] ()
+    | url -> link ~at:At.[rel "stylesheet"; type' "text/css"; href url] ()
     in
-    let style uri =
-      link ~at:At.[rel "stylesheet"; type' "text/css"; href uri] ()
+    let script = function
+    | "" -> void
+    | url -> script ~at:At.[type' "text/javascript"; defer; src url] []
     in
-    let script uri =
-      script ~at:At.[type' "text/javascript"; defer; src uri] []
-    in
+    let t = match String.trim t with "" -> "Untitled" | t -> t in
     let head = head [
         meta ~at:At.[charset "utf-8"] ();
         generator;
@@ -307,8 +305,28 @@ module El = struct
         splice (List.map style styles);
         splice (List.map script scripts);
         more_head;
-        title [txt (if String.trim t = "" then "Untilted" else t)]]
+        title [txt t]]
     in
     let at = if lang = "" then [] else [At.lang lang] in
     html ~at [head; body]
+
+  let title_of_filepath f =
+    let rec base ~snd init f =
+      let start = ref init in
+      let last = ref (init + 1) in
+      while not (!start < 0  || f.[!start] = '/' || f.[!start] = '\\')
+      do if f.[!start] = '.' then last := !start; decr start done;
+      let first = !start + 1 in
+      let last = !last - 1 in
+      if first <= last && last <= init then
+        begin
+          let s = String.sub f first (last - first + 1) in
+          if not (s = "index" || s = "") then s else
+          if snd = true then "Untitled" else base ~snd:true (!start - 1) f
+        end
+      else
+      if !start < 0 || snd = true then "Untitled" else
+      base ~snd:true (!start - 1) f
+    in
+    base ~snd:false (String.length f - 1) f
 end

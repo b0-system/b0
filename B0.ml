@@ -192,6 +192,8 @@ let bowl =
   let env = Os.Env.to_assignments env in
   Ok (Os.Exit.execv ~cwd ~env Cmd.(b0_exe %% args))
 
+(* Updating vendored code. *)
+
 let copy_module ~src_dir ~dst_dir src dst =
   let mli base = Fmt.str "%s.mli" base and ml base = Fmt.str "%s.ml" base in
   let src_mli = Fpath.(src_dir / mli src) in
@@ -204,13 +206,17 @@ let copy_module ~src_dir ~dst_dir src dst =
   let* () = Os.File.copy ~force ~make_path src_ml ~dst:dst_ml in
   Ok ()
 
-let vendor_webs_modules =
-  let repo = "https://erratique.ch/repos/webs.git" in
-  let doc = "Update vendored Webs modules" in
-  B0_unit.of_action "vendor-webs" ~doc @@ fun env _ ~args ->
+let with_cloned_repo_dir ~env ~repo f =
   let* git = B0_vcs_repo.Git.get_cmd ~search:(B0_env.get_cmd env) () in
   Result.join @@ Os.Dir.with_tmp @@ fun dir ->
   let* () = Os.Cmd.run Cmd.(git % "clone" % repo %% path dir) in
+  f dir
+
+let vendor_webs_modules =
+  let doc = "Update vendored Webs modules" in
+  B0_unit.of_action "vendor-webs" ~doc @@ fun env _ ~args ->
+  let repo = "https://erratique.ch/repos/webs.git" in
+  with_cloned_repo_dir ~env ~repo @@ fun dir ->
   let dst_dir = B0_env.in_scope_dir env ~/"src/std" in
   let src_dir = Fpath.(dir / "src" / "kit") in
   let* () = copy_module ~src_dir ~dst_dir "webs_base64" "b0_base64" in
@@ -219,8 +225,11 @@ let vendor_webs_modules =
   Ok ()
 
 let vendor_htmlit =
-  let doc = "Vendor Htmlit and expose it as B0_html" in
-  B0_unit.of_action "vendor-htmlit" ~doc @@
-  fun _ env ~args ->
-  Log.stdout (fun m -> m "TODO");
+  let doc = "Update vendored Htmlit" in
+  B0_unit.of_action "vendor-htmlit" ~doc @@ fun env _ ~args ->
+  let repo = "https://erratique.ch/repos/htmlit.git" in
+  with_cloned_repo_dir ~env ~repo @@ fun dir ->
+  let dst_dir = B0_env.in_scope_dir env ~/"src/std" in
+  let src_dir = Fpath.(dir / "src") in
+  let* () = copy_module ~src_dir ~dst_dir "htmlit" "b0_html" in
   Ok ()
