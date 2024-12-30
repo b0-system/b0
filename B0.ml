@@ -99,7 +99,6 @@ let test_b0_std_fpath =
 let test_b0_std_cmd =
   test ~/"test/test_b0_std_cmd.ml" ~doc:"Test B0_std.Cmd"
 
-let test_b0_base64 = test ~/"test/test_b0_base64.ml" ~doc:"Test B0_base64"
 let test_b0_testing = test ~/"test/test_b0_testing.ml" ~doc:"Test B0_testing"
 let test_cp = test ~/"test/test_cp.ml" ~run:false ~doc:"Test for Os.Path.copy"
 let test_rm = test ~/"test/test_rm.ml" ~run:false ~doc:"Test for Os.Path.delete"
@@ -192,6 +191,23 @@ let bowl =
   let env = bootstrap_env env b0 |> Result.get_ok in
   let env = Os.Env.to_assignments env in
   Ok (Os.Exit.execv ~cwd ~env Cmd.(b0_exe %% args))
+
+let vendor_webs_base64 =
+  let repo = "https://erratique.ch/repos/webs.git" in
+  let doc = "Vendor Webs_base64 and expose it as B0_base64" in
+  B0_unit.of_action "vendor-webs-base64" ~doc @@ fun env _ ~args ->
+  let* git = B0_vcs_repo.Git.get_cmd ~search:(B0_env.get_cmd env) () in
+  Result.join @@ Os.Dir.with_tmp @@ fun dir ->
+  let* () = Os.Cmd.run Cmd.(git % "clone" % repo %% path dir) in
+  let src file = Fpath.(dir / "src" / "kit" / file) in
+  let dst file = B0_env.in_scope_dir env Fpath.(v "src" / "std" / file) in
+  let src_mli = src "Webs_base64.mli" and src_ml = src "Webs_base64.ml" in
+  let dst_mli = dst "B0_base64.mli" and dst_ml = dst "B0_base64.ml" in
+  let force = true and make_path = false in
+  Log.stdout (fun m -> m "Copying sources to %a" Fpath.pp (dst ""));
+  let* () = Os.File.copy ~force ~make_path src_mli ~dst:dst_mli in
+  let* () = Os.File.copy ~force ~make_path src_ml ~dst:dst_ml in
+  Ok ()
 
 let vendor_htmlit =
   let doc = "Vendor Htmlit and expose it as B0_html" in
