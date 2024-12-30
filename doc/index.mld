@@ -60,11 +60,21 @@ and do not specifically depend on b0.
 
 {!modules:
 B0_base64
+B0_http
 B0_html
 B0_json
 B0_sexp
 B0_tar
 B0_text
+B0_url
+}
+
+{2:tools Tools}
+
+{!modules:
+B0_rsync
+B0_testing
+B0_vcs_repo
 }
 
 {2:view Viewers and editors}
@@ -74,15 +84,6 @@ B0_editor
 B0_pager
 B0_pdf_viewer
 B0_web_browser
-}
-
-{2:tools Tools}
-
-{!modules:
-B0_http
-B0_rsync
-B0_testing
-B0_vcs_repo
 }
 
 {1:b0_memo Library [b0.memo]}

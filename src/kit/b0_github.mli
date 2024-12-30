@@ -80,7 +80,7 @@ module Repo : sig
   val make : owner:string -> string -> t
   (** [make ~owner name] identifiers a GitHub repository. *)
 
-  val of_url : Url.t -> (t, string) result
+  val of_url : B0_url.t -> (t, string) result
   (** [of_url url] parses an owner and repo name from the first
       two segments of [url]'s path. *)
 
@@ -268,8 +268,8 @@ module Pull_request : sig
   val ensure :
     Http_client.t ->
     auth:Auth.t ->
-    dst_repo:Url.t -> dst_branch:string ->
-    src_repo:Url.t -> src_branch:string ->
+    dst_repo:B0_url.t -> dst_branch:string ->
+    src_repo:B0_url.t -> src_branch:string ->
     title:string -> msg:string ->
     (unit, string) result
     (** [ensure r ~auth ~dst_repo ~dst_branch ~src_repo ~src_branch ~title

@@ -87,7 +87,7 @@ module Http_client = struct
     | None -> Error "No 'location' header found in 3XX response"
     | Some loc ->
         let url = Http.Request.url request in
-        try match Url.kind loc with
+        try match B0_url.kind loc with
         | `Abs -> Ok loc
         | `Rel `Rel_path ->
             begin match String.rindex_opt url '/' with
@@ -95,10 +95,10 @@ module Http_client = struct
             | Some i -> Ok (String.concat "/" [String.sub url 0 i; loc])
             end
         | `Rel `Abs_path ->
-            begin match Url.scheme url with
+            begin match B0_url.scheme url with
             | None -> raise Exit
             | Some s ->
-                match Url.authority url with
+                match B0_url.authority url with
                 | None -> raise Exit
                 | Some a -> Ok (String.concat "" [s; "://"; a; loc])
             end

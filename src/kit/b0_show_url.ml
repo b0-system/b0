@@ -17,9 +17,9 @@ let url_of_path _env path =
 (* URLs *)
 
 type url =
-[ `Url of Url.t
+[ `Url of B0_url.t
 | `In of B0_env.dir * Fpath.t
-| `Fun of string * (B0_env.t -> B0_unit.t -> (Url.t, string) result) ]
+| `Fun of string * (B0_env.t -> B0_unit.t -> (B0_url.t, string) result) ]
 
 let pp_url ppf = function
 | `Url u -> Fmt.pf ppf "URL %s" u
@@ -68,7 +68,7 @@ let make_server_cmd cmd args ~listen_args =
   let args = List.rev_append prev (Cmd.to_list listen_args) @ rest in
   Cmd.(cmd %% of_list Fun.id args)
 
-let endpoint_of_url_and_authority url authority = match Url.scheme url with
+let endpoint_of_url_and_authority url authority = match B0_url.scheme url with
 | None -> Fmt.error "URL %s: no scheme found" url
 | Some "http" -> Os.Socket.Endpoint.of_string ~default_port:80 authority
 | Some "https" -> Os.Socket.Endpoint.of_string ~default_port:443 authority
@@ -105,45 +105,46 @@ let find_server_mode_unit = function
             in
             Fmt.error "@[%a@]" pp (entity, suggs)
 
-let server_mode env timeout_cli no_exec ~url args = match Url.authority url with
-| None -> Fmt.error "Could not extract authority from %s" url
-| Some authority ->
-    let* endpoint = endpoint_of_url_and_authority url authority in
-    let* unit = find_server_mode_unit args in
-    match unit with
-    | None ->
-        if not no_exec then
-          (Log.warn @@ fun m ->
-           m "@[<v>No tool specified but trying to connect to %s@,\
-              Use option %a to suppress this warning.@]"
-             authority Fmt.code "--no-exec");
-        let timeout = match timeout_cli with
-        | Some timeout -> timeout
-        | None -> B0_meta.Key.get_default timeout_s
-        in
-        Ok (`Show_url_no_exec (endpoint, timeout, url))
-    | Some (unit, args) ->
-        (* XXX at somepoint we should be able to invoke the same
+let server_mode env timeout_cli no_exec ~url args =
+  match B0_url.authority url with
+  | None -> Fmt.error "Could not extract authority from %s" url
+  | Some authority ->
+      let* endpoint = endpoint_of_url_and_authority url authority in
+      let* unit = find_server_mode_unit args in
+      match unit with
+      | None ->
+          if not no_exec then
+            (Log.warn @@ fun m ->
+             m "@[<v>No tool specified but trying to connect to %s@,\
+                Use option %a to suppress this warning.@]"
+               authority Fmt.code "--no-exec");
+          let timeout = match timeout_cli with
+          | Some timeout -> timeout
+          | None -> B0_meta.Key.get_default timeout_s
+          in
+          Ok (`Show_url_no_exec (endpoint, timeout, url))
+      | Some (unit, args) ->
+          (* XXX at somepoint we should be able to invoke the same
              logic as [B0_cmd_build.find_store_and_execution]. *)
-        (* XXX We might actually want to look into actions aswell.
+          (* XXX We might actually want to look into actions aswell.
              See the todo.mld for more details.
              FIXME This is quite messy we need to clarify executable
              units ideally we should be using B0_unit.find_exec *)
-        (* FIXME this should execute according to the build unit execution
+          (* FIXME this should execute according to the build unit execution
              protocol. *)
-        let* cmd = Result.map Cmd.path (B0_env.unit_exe_file env unit) in
-        let timeout = match timeout_cli with
-        | Some timeout -> timeout
-        | None -> B0_unit.find_or_default_meta timeout_s unit
-        in
-        let listen_args =
-          (B0_unit.find_or_default_meta listen_args unit) ~authority
-        in
-        let cmd = make_server_cmd cmd args ~listen_args in
-        let* cwd = B0_unit.Action.get_cwd env unit in
-        let* env' = B0_unit.Action.get_env env unit in
-        let env' = Os.Env.to_assignments env' in
-        Ok (`Show_url_server (endpoint, timeout, url, cmd, cwd, env'))
+          let* cmd = Result.map Cmd.path (B0_env.unit_exe_file env unit) in
+          let timeout = match timeout_cli with
+          | Some timeout -> timeout
+          | None -> B0_unit.find_or_default_meta timeout_s unit
+          in
+          let listen_args =
+            (B0_unit.find_or_default_meta listen_args unit) ~authority
+          in
+          let cmd = make_server_cmd cmd args ~listen_args in
+          let* cwd = B0_unit.Action.get_cwd env unit in
+          let* env' = B0_unit.Action.get_env env unit in
+          let env' = Os.Env.to_assignments env' in
+          Ok (`Show_url_server (endpoint, timeout, url, cmd, cwd, env'))
 
 (* Unit .show-url.url mode *)
 

@@ -192,21 +192,30 @@ let bowl =
   let env = Os.Env.to_assignments env in
   Ok (Os.Exit.execv ~cwd ~env Cmd.(b0_exe %% args))
 
-let vendor_webs_base64 =
+let copy_module ~src_dir ~dst_dir src dst =
+  let mli base = Fmt.str "%s.mli" base and ml base = Fmt.str "%s.ml" base in
+  let src_mli = Fpath.(src_dir / mli src) in
+  let src_ml = Fpath.(src_dir / ml src) in
+  let dst_mli = Fpath.(dst_dir / mli dst) in
+  let dst_ml = Fpath.(dst_dir / ml dst)  in
+  Log.stdout (fun m -> m "Copying %s to %s in %a" src dst Fpath.pp dst_dir);
+  let force = true and make_path = false in
+  let* () = Os.File.copy ~force ~make_path src_mli ~dst:dst_mli in
+  let* () = Os.File.copy ~force ~make_path src_ml ~dst:dst_ml in
+  Ok ()
+
+let vendor_webs_modules =
   let repo = "https://erratique.ch/repos/webs.git" in
-  let doc = "Vendor Webs_base64 and expose it as B0_base64" in
-  B0_unit.of_action "vendor-webs-base64" ~doc @@ fun env _ ~args ->
+  let doc = "Update vendored Webs modules" in
+  B0_unit.of_action "vendor-webs" ~doc @@ fun env _ ~args ->
   let* git = B0_vcs_repo.Git.get_cmd ~search:(B0_env.get_cmd env) () in
   Result.join @@ Os.Dir.with_tmp @@ fun dir ->
   let* () = Os.Cmd.run Cmd.(git % "clone" % repo %% path dir) in
-  let src file = Fpath.(dir / "src" / "kit" / file) in
-  let dst file = B0_env.in_scope_dir env Fpath.(v "src" / "std" / file) in
-  let src_mli = src "Webs_base64.mli" and src_ml = src "Webs_base64.ml" in
-  let dst_mli = dst "B0_base64.mli" and dst_ml = dst "B0_base64.ml" in
-  let force = true and make_path = false in
-  Log.stdout (fun m -> m "Copying sources to %a" Fpath.pp (dst ""));
-  let* () = Os.File.copy ~force ~make_path src_mli ~dst:dst_mli in
-  let* () = Os.File.copy ~force ~make_path src_ml ~dst:dst_ml in
+  let dst_dir = B0_env.in_scope_dir env ~/"src/std" in
+  let src_dir = Fpath.(dir / "src" / "kit") in
+  let* () = copy_module ~src_dir ~dst_dir "webs_base64" "b0_base64" in
+  let src_dir = Fpath.(dir / "src" ) in
+  let* () = copy_module ~src_dir ~dst_dir "webs__url" "b0_url" in
   Ok ()
 
 let vendor_htmlit =

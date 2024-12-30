@@ -29,7 +29,7 @@ let file_url p =
 
 let prepare_url ~tname = function
 | "-" -> stdin_file_url ~tname
-| u -> match Url.scheme u with Some _ -> Ok u | None -> file_url u
+| u -> match B0_url.scheme u with Some _ -> Ok u | None -> file_url u
 
 let show_urls ~color ~log_level ~background ~prefix ~browser ~urls ~tname =
   let styler = B0_std_cli.get_styler color in

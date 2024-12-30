@@ -14,7 +14,7 @@ open B0_std
 
 val fetch_url :
   ?env:Os.Env.assignments -> ?stderr:Os.Cmd.stdo -> ?args:Cmd.t ->
-  ?progress:bool -> B0_env.t -> Url.t -> Fpath.t ->
+  ?progress:bool -> B0_env.t -> B0_url.t -> Fpath.t ->
   (unit, string) result
 (** [fetch_url env' url file] fetches [url] (redirections are
     followed) using [curl] looked up in [env'] and writes it to

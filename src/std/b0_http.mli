@@ -30,12 +30,12 @@ module Http : sig
     type t
     (** The type for HTTP requests. *)
 
-    val make : ?headers:headers -> ?body:string -> method' -> url:Url.t -> t
+    val make : ?headers:headers -> ?body:string -> method' -> url:B0_url.t -> t
     (** [make m ~url ~headers ~body] is a request on [url] with method [m],
         headers [headers] (defaults to [[]]) and body [body] (defaults to
         [""]). *)
 
-    val url : t -> Url.t
+    val url : t -> B0_url.t
     (** [url r] is the URL of [r]. *)
 
     val method' : t -> method'
@@ -102,7 +102,7 @@ module Http_client : sig
       line tool. *)
 
   val curl_fetch_args :
-    ?args:Cmd.t -> ?progress:bool -> Url.t -> Fpath.t -> Cmd.t
+    ?args:Cmd.t -> ?progress:bool -> B0_url.t -> Fpath.t -> Cmd.t
   (** [curl_fetch_args url file] are curl arguments to fetch the URL
       [url] and write it to [file]. If progress is [true] it is reported.
       [args] are added to the result before the URL. Redirections
