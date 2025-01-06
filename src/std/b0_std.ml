@@ -35,53 +35,7 @@ end
 
 (* Characters *)
 
-module Char = struct
-  include Char
-  module Ascii = struct
-    let max = '\x7F'
-
-    (* Decimal and hexadecimal digits *)
-
-    let is_digit = function '0' .. '9' -> true | _ -> false
-    let is_hex_digit = function
-    | '0' .. '9' | 'A' .. 'F' | 'a' .. 'f' -> true
-    | _ -> false
-
-    let hex_digit_value = function
-    | '0' .. '9' as c -> Char.code c - 0x30
-    | 'A' .. 'F' as c -> 10 + (Char.code c - 0x41)
-    | 'a' .. 'f' as c -> 10 + (Char.code c - 0x61)
-    | c -> invalid_arg (Printf.sprintf "%C: not a hex digit" c)
-
-    let lower_hex_digit n =
-      let n = n land 0xF in
-      Char.unsafe_chr (if n < 10 then 0x30 + n else 0x57 + n)
-
-    let upper_hex_digit n =
-      let n = n land 0xF in
-      Char.unsafe_chr (if n < 10 then 0x30 + n else 0x37 + n)
-
-    (* Predicates *)
-
-    let is_valid : t -> bool = fun c -> c <= max
-    let is_upper = function 'A' .. 'Z' -> true | _ -> false
-    let is_lower = function 'a' .. 'z' -> true | _ -> false
-    let is_letter = function 'A' .. 'Z' | 'a' .. 'z' -> true | _ -> false
-    let is_alphanum = function
-    | '0' .. '9' | 'A' .. 'Z' | 'a' .. 'z' -> true | _ -> false
-
-    let is_white = function ' ' | '\t' .. '\r'  -> true | _ -> false
-    let is_blank = function ' ' | '\t' -> true | _ -> false
-    let is_graphic = function '!' .. '~' -> true | _ -> false
-    let is_print = function ' ' .. '~' -> true | _ -> false
-    let is_control = function '\x00' .. '\x1F' | '\x7F' -> true | _ -> false
-
-    (* Casing transforms *)
-
-    let uppercase = function 'a' .. 'z' as c -> chr (code c - 0x20) | c -> c
-    let lowercase = function 'A' .. 'Z' as c -> chr (code c + 0x20) | c -> c
-  end
-end
+module Char = B0__char
 
 (* Formatters *)
 
@@ -1213,9 +1167,9 @@ module String = struct
       let rec loop max s i h k = match i > max with
       | true -> Bytes.unsafe_to_string h
       | false ->
-          let byte = Char.code s.[i] in
-          Bytes.set h k (Char.Ascii.lower_hex_digit (byte lsr 4));
-          Bytes.set h (k + 1) (Char.Ascii.lower_hex_digit byte);
+          let c = String.get_uint8 s i in
+          Bytes.set h (k    ) (Char.Ascii.lower_hex_digit_of_int (c lsr 4));
+          Bytes.set h (k + 1) (Char.Ascii.lower_hex_digit_of_int (c      ));
           loop max s (i + 1) h (k + 2)
       in
       let len = String.length s in
@@ -1254,19 +1208,17 @@ module String = struct
 
     let set_ascii_unicode_escape b k c = (* for c <= 0x7F *)
       let byte = Char.code c in
-      let hi = byte lsr 4 and lo = byte land 0xF in
       Bytes.blit_string "\\u{00" 0 b k 5;
-      Bytes.set b (k + 5) (Char.Ascii.upper_hex_digit hi);
-      Bytes.set b (k + 6) (Char.Ascii.upper_hex_digit lo);
+      Bytes.set b (k + 5) (Char.Ascii.upper_hex_digit_of_int (byte lsr 4));
+      Bytes.set b (k + 6) (Char.Ascii.upper_hex_digit_of_int (byte      ));
       Bytes.set b (k + 7) '}';
       k + 8
 
     let set_hex_escape b k c =
       let byte = Char.code c in
-      let hi = byte lsr 4 and lo = byte land 0xF in
       Bytes.blit_string "\\x" 0 b k 2;
-      Bytes.set b (k + 2) (Char.Ascii.upper_hex_digit hi);
-      Bytes.set b (k + 3) (Char.Ascii.upper_hex_digit lo);
+      Bytes.set b (k + 2) (Char.Ascii.upper_hex_digit_of_int (byte lsr 4));
+      Bytes.set b (k + 3) (Char.Ascii.upper_hex_digit_of_int (byte      ));
       k + 4
 
     let set_symbol_escape b k symbol =
@@ -1302,8 +1254,8 @@ module String = struct
       | true -> Bytes.set b k s.[i]; i + 1
       | false ->
           (* assert (s.[i+1] = 'x') *)
-          let hi = Char.Ascii.hex_digit_value s.[i + 2] in
-          let lo = Char.Ascii.hex_digit_value s.[i + 3] in
+          let hi = Char.Ascii.hex_digit_to_int s.[i + 2] in
+          let lo = Char.Ascii.hex_digit_to_int s.[i + 3] in
           Bytes.set b k (Char.chr @@ (hi lsl 4) lor lo); i + 4
       in
       byte_unescaper char_len_at set_char
@@ -1361,8 +1313,8 @@ module String = struct
         if s.[i] <> '\\' then (Bytes.set b k s.[i]; i + 1) else
         match s.[i + 1] with
         | 'x' ->
-            let hi = Char.Ascii.hex_digit_value s.[i + 2] in
-            let lo = Char.Ascii.hex_digit_value s.[i + 3] in
+            let hi = Char.Ascii.hex_digit_to_int s.[i + 2] in
+            let lo = Char.Ascii.hex_digit_to_int s.[i + 3] in
             Bytes.set b k (Char.chr @@ (hi lsl 4) lor lo); i + 4
         | '\\' -> Bytes.set b k '\\'; i + 2
         | 'b' -> Bytes.set b k '\b'; i + 2
@@ -1372,16 +1324,16 @@ module String = struct
         | ' ' -> Bytes.set b k ' '; i + 2
         | '"' -> Bytes.set b k '"'; i + 2
         | 'o' ->
-            let o3 = Char.Ascii.hex_digit_value s.[i + 2] in
-            let o2 = Char.Ascii.hex_digit_value s.[i + 3] in
-            let o1 = Char.Ascii.hex_digit_value s.[i + 4] in
+            let o3 = Char.Ascii.hex_digit_to_int s.[i + 2] in
+            let o2 = Char.Ascii.hex_digit_to_int s.[i + 3] in
+            let o1 = Char.Ascii.hex_digit_to_int s.[i + 4] in
             let byte = o3 * 64 + o2 * 8 + o1 in
             if byte > 255 then raise_notrace (Illegal_escape i) else
             Bytes.set b k (Char.chr byte); i + 5
         | c when Char.Ascii.is_digit c ->
-            let d3 = Char.Ascii.hex_digit_value s.[i + 1] in
-            let d2 = Char.Ascii.hex_digit_value s.[i + 2] in
-            let d1 = Char.Ascii.hex_digit_value s.[i + 3] in
+            let d3 = Char.Ascii.hex_digit_to_int s.[i + 1] in
+            let d2 = Char.Ascii.hex_digit_to_int s.[i + 2] in
+            let d1 = Char.Ascii.hex_digit_to_int s.[i + 3] in
             let byte = d3 * 100 + d2 * 10 + d1 in
             if byte > 255 then raise_notrace (Illegal_escape i) else
             Bytes.set b k (Char.chr byte); i + 4
@@ -1707,8 +1659,8 @@ module Fpath = struct
 
   let set_pct_encoded b i c =
     let c = Char.code c in
-    let hi = Char.Ascii.upper_hex_digit ((c lsr 4) land 0xF) in
-    let lo = Char.Ascii.upper_hex_digit (c land 0xF) in
+    let hi = Char.Ascii.upper_hex_digit_of_int (c lsr 4) in
+    let lo = Char.Ascii.upper_hex_digit_of_int (c      ) in
     Bytes.set b i '%'; Bytes.set b (i + 1) hi; Bytes.set b (i + 2) lo;
     i + 3
 

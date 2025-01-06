@@ -227,8 +227,8 @@ module Modname = struct
           Bytes.set b i c; i + 1
       | c ->
           let c = Char.code c in
-          Bytes.set b (i    ) (Char.Ascii.upper_hex_digit (c lsr 4));
-          Bytes.set b (i + 1) (Char.Ascii.upper_hex_digit (c      ));
+          Bytes.set b (i    ) (Char.Ascii.upper_hex_digit_of_int (c lsr 4));
+          Bytes.set b (i + 1) (Char.Ascii.upper_hex_digit_of_int (c      ));
           i + 2
       in
       String.byte_replacer char_len set_char s
@@ -1989,10 +1989,10 @@ module Crunch = struct
     adds b "let "; adds b id; adds b " =\n  \"";
     for i = 0 to String.length s - 1 do
       if i mod 18 = 0 && i <> 0 then adds b "\\\n   ";
-      let c = Char.code (String.get s i) in
+      let c = String.get_uint8 s i in
       adds b "\\x";
-      Buffer.add_char b (Char.Ascii.lower_hex_digit ((c lsr 4) land 0xF));
-      Buffer.add_char b (Char.Ascii.lower_hex_digit (c land 0xF))
+      Buffer.add_char b (Char.Ascii.lower_hex_digit_of_int (c lsr 4));
+      Buffer.add_char b (Char.Ascii.lower_hex_digit_of_int (c      ))
     done;
     adds b "\"\n";
     Buffer.contents b
