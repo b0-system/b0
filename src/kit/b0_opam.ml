@@ -96,6 +96,7 @@ module File = struct
 
   let pp_pkg_spec_list = Fmt.vbox @@ Fmt.list pp_pkg_spec
   let pp_pkg_url_list = Fmt.vbox @@ Fmt.list pp_pkg_url
+  let pp_string_list = Fmt.vbox @@ Fmt.list Fmt.string
 
   let name_field =
     let doc = "opam file name: field" in
@@ -132,6 +133,10 @@ module File = struct
   let pin_depends =
     let doc = "opam file pin-depends: field" in
     B0_meta.Key.make "pin-depends" ~doc ~pp_value:pp_pkg_url_list
+
+  let x_maintenance_intent =
+    let doc = "opam file x-maintenance-intent: field" in
+    B0_meta.Key.make "x-maintenance-intent" ~doc ~pp_value:pp_string_list
 
   let pkg_of_meta ~with_name m =
     let string field k m acc = match B0_meta.find k m with
@@ -179,7 +184,9 @@ module File = struct
         string_raw "available" available_field;
         string_raw "build" build_field;
         string_raw "install" install_field;
-        triple_string ~nl:true "description" B0_meta.description; ]
+        triple_string ~nl:true "description" B0_meta.description;
+        string_list ~by_line:false "x-maintenance-intent" x_maintenance_intent;
+      ]
     in
     let add_field m acc f = f m acc in
     let start =
@@ -214,6 +221,7 @@ let file_addendum = File.file_addendum
 let install = File.install_field
 let name = File.name_field
 let pin_depends = File.pin_depends
+let x_maintenance_intent = File.x_maintenance_intent
 
 (* Metadata derivation *)
 
@@ -240,12 +248,17 @@ let derive_depends p m =
 let derive_name p m =
   if B0_meta.mem name m then m else B0_meta.add name (pkg_name_of_pack p) m
 
+let derive_x_maintenance_intent p m =
+  if B0_meta.mem x_maintenance_intent m then m else
+  B0_meta.add x_maintenance_intent ["(latest)"] m
+
 let pkg_meta_of_pack p =
   let m = B0_pack.meta p in
   let m = derive_name p m in
   let m = B0_pack.derive_synopsis_and_description p m in
   let m = derive_build p m in
   let m = derive_depends p m in
+  let m = derive_x_maintenance_intent p m in
   m
 
 (* Package definition via packs and their lookup. *)

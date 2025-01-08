@@ -85,7 +85,9 @@ module File : sig
       {- ["maintainer:"], {!B0_meta.maintainers}.}
       {- ["name:"], {!B0_opam.name} iff [with_name] is [true].}
       {- ["synopsis:"], {!B0_meta.synopsis}.}
-      {- ["tags:"], {!B0_meta.description_tags}.}}
+      {- ["tags:"], {!B0_meta.description_tags}.}
+      {- ["x-maintenance-intent:"], {!B0_opam.x_maintenance_intent}.}
+      }
       Finally the contents of {!B0_opam.file_addendum} is appended
       after the definition of these fields.
 
@@ -159,6 +161,10 @@ val pin_depends : (string * string) list B0_meta.key
     {{:https://opam.ocaml.org/doc/Manual.html#opamfield-pindepends}
     [pin-depends:]} field value. *)
 
+val x_maintenance_intent : string list B0_meta.key
+(** [x_maintenance_intent] is an
+    {{:https://github.com/ocaml/opam-repository/blob/master/governance/policies/archiving.md#specification-of-the-x--fields-used-in-the-archiving-process}[x-maintenance-intent:]} field value. *)
+
 (** {1:pkg_derivation Package derivation} *)
 
 val pkg_name_of_pack : B0_pack.t -> string
@@ -182,6 +188,7 @@ val pkg_meta_of_pack : B0_pack.t -> B0_meta.t
        are tentatively derived using
        {!B0_pack.derive_synopsis_and_description}.}
     {- {!build}, a locked b0 build of the pack is defined.}
+    {- {!x_maintenance_intent}, the value [["(latest)"]].}
     {- {!depends}, we collect the OCaml libraries required by units
        in the pack, derive a package names out of them.
        {b FIXME.} This is the poc but it's
