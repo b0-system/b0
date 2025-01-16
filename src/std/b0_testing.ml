@@ -313,7 +313,7 @@ module Test = struct
   (* Test combinators *)
 
   let failneq ?__POS__ pp v0 v1 =
-    fail ?__POS__ "@[<hov>%a <>@ %a@]" (Fmt.code' pp) v0 (Fmt.code' pp) v1
+    fail ?__POS__ "@[<v>@[%a@] <>@,@[%a@]@]" (Fmt.code' pp) v0 (Fmt.code' pp) v1
 
   (* Assertions *)
 
