@@ -518,6 +518,10 @@ module Test = struct
   | Some v -> pass (); v
   | None -> fail " @[Unexpected None@]" ?__POS__; stop ()
 
+  let is_some ?__POS__ = function
+  | Some _ -> pass ()
+  | None -> fail "@[<v>None <>@,Some _@]" ?__POS__
+
   let option
       (type a) ?some:((module V : Eq.T with type t = a) = Eq.any) ?__POS__ v0 v1
     =
@@ -534,13 +538,25 @@ module Test = struct
         (Fmt.st Test_fmt.fail_color) "Error" Fmt.lines e ?__POS__
 
   let get_ok'
-      (type a) ?error:((module V : Eq.T with type t = a) = Eq.any) ?__POS__
+      (type e) ?error:((module V : Eq.T with type t = e) = Eq.any) ?__POS__
     =
   function
-  | Ok v -> pass (); v
+  | Ok _ -> pass ()
   | Error e ->
       failstop " @[<v>Unexpected %a _ :@,%a@]"
         (Fmt.st Test_fmt.fail_color) "Error" V.pp e ?__POS__
+
+  let is_ok'
+      (type e)
+      ?error:((module E : Eq.T with type t = e) = Eq.any) ?__POS__
+    =
+  function
+  | Ok _ -> pass ()
+  | Error e ->
+      fail "@[<v>@[%a %a@] <>@,Ok _@]"
+        (Fmt.st Test_fmt.fail_color) "Error" E.pp e ?__POS__
+
+  let is_ok ?__POS__ v = is_ok' ~error:Eq.string ?__POS__ v
 
   let result
       (type a) ?ok:((module V : Eq.T with type t = a) = Eq.any) ?__POS__ v0 v1

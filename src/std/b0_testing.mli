@@ -308,6 +308,9 @@ module Test : sig
   (** [get_some] gets the value of [Some _] and {!fail}s and {!stop}s
       if that is not possible. *)
 
+  val is_some : ?__POS__:pos -> 'a option -> unit
+  (** [is_some v] asserts that [v] is [Some _]. *)
+
   val option : ?some:'a Eq.t -> ?__POS__:pos -> 'a option -> 'a option -> unit
   (** [option ~some:(module M) v0 v1] asserts options [v0] and [v1]
       are equal according to [M]'s equality (otherwise {!Stdlib.( = )}
@@ -319,8 +322,14 @@ module Test : sig
   (** [get_ok] gets the value of [Ok _] and {!failstop}s if that is not
       possible. Calls {!pass} on success. *)
 
-  val get_ok' : ?error:'e Eq.t -> ?__POS__:pos -> ('a, 'e) result -> 'a
+  val get_ok' : ?error:'e Eq.t -> ?__POS__:pos -> ('a, 'e) result -> unit
   (** [get_ok'] is like {!get_ok} but uses [error] to render the error. *)
+
+  val is_ok : ?__POS__:pos -> ('a, string) result -> unit
+  (** [is_ok v] asserts [v] is (Ok _) value. *)
+
+  val is_ok' : ?error:'e Eq.t -> ?__POS__:pos -> ('a, 'e) result -> unit
+  (** [is_ok'] is like {!is_ok} but uses [error] to render the error. *)
 
   val result :
     ?ok:'a Eq.t -> ?__POS__:pos ->
