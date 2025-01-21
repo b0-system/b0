@@ -212,6 +212,18 @@ let with_cloned_repo_dir ~env ~repo f =
   let* () = Os.Cmd.run Cmd.(git % "clone" % repo %% path dir) in
   f dir
 
+let vendor_more_modules =
+  let doc = "Update vendored More modules" in
+  B0_unit.of_action "vendor-more" ~doc @@ fun env _ ~args ->
+  let repo = "https://erratique.ch/repos/more.git" in
+  with_cloned_repo_dir ~env ~repo @@ fun dir ->
+  let dst_dir = B0_env.in_scope_dir env ~/"src/std" in
+  let src_dir = Fpath.(dir / "src") in
+  let* () = copy_module ~src_dir ~dst_dir "more__char" "b0__char" in
+  let* () = copy_module ~src_dir ~dst_dir "more__fmt" "b0__fmt" in
+  Ok ()
+
+
 let vendor_webs_modules =
   let doc = "Update vendored Webs modules" in
   B0_unit.of_action "vendor-webs" ~doc @@ fun env _ ~args ->

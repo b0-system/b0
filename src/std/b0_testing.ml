@@ -64,9 +64,7 @@ module Test_fmt = struct
 
   let unit ppf () = Fmt.string ppf "()"
 
-  let hex_string =
-    let pp_byte ppf c = Fmt.pf ppf "%02x" (Char.code c) in
-    Fmt.iter String.iter pp_byte
+  let hex_string = Fmt.binary_string
 
   let list pp_v ppf l =
     let pp_sep ppf () = Fmt.pf ppf ";@ " in

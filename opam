@@ -29,3 +29,4 @@ depends: [
 ]
 build: ["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]
 dev-repo: "git+https://erratique.ch/repos/b0.git"
+x-maintenance-intent: ["(latest)"]
