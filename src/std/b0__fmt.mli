@@ -1,12 +1,11 @@
 (*---------------------------------------------------------------------------
-   Copyright (c) 2025 The b0 programmers. All rights reserved.
+   Copyright (c) 2025 The more programmers. All rights reserved.
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
 (** Textual formatters.
 
     Helpers for dealing with {!Format}. *)
-
 
 (** {1:stdoutput Standard outputs} *)
 

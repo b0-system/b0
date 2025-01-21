@@ -1,5 +1,5 @@
 (*---------------------------------------------------------------------------
-   Copyright (c) 2025 The b0 programmers. All rights reserved.
+   Copyright (c) 2025 The more programmers. All rights reserved.
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
@@ -361,11 +361,11 @@ let suffix_lines ~suffix pp ppf v =
 
 let pp_escaped_char ppf c = pf ppf "\\x%02x" (Char.code c)
 let ascii_char ppf c =
-  if Char.Ascii.is_print c then char ppf c else pp_escaped_char ppf c
+  if B0__char.Ascii.is_print c then char ppf c else pp_escaped_char ppf c
 
 let _ascii_string ~for_literal ppf s =
   let escape_char ~for_literal c =
-    (c = '\"' && for_literal) || not (Char.Ascii.is_print c)
+    (c = '\"' && for_literal) || not (B0__char.Ascii.is_print c)
   in
   let esc ~for_literal ppf c = match Char.code c with
   | 0x22 when for_literal -> char ppf '\\'; char ppf '\"'

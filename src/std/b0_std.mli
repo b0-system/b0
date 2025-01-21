@@ -37,41 +37,7 @@ module Type : sig
 end
 
 module Fmt = B0__fmt
-
-(** Result values *)
-module Result : sig
-
-  include module type of Stdlib.Result (** @closed *)
-
-  val get_ok' : ('a, string) result -> 'a
-  (** [get_ok' r] is like {!get_ok} but the message of [Invalid_argument]
-      is the error meesage. *)
-
-  val retract : ('a, 'a) result -> 'a
-  (** [retract r] is [v] if [r] is [Ok v] or [Error v]. *)
-
-  val error_to_failure : ('a, string) result -> 'a
-  (** [error_to_failure r] is [failwith e] if [r] is [Error e] and [v]
-      if [r] is [Ok v]. *)
-
-  (** let operators. *)
-  module Syntax : sig
-    val ( let* ) :
-      ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
-    (** [( let* )] is {!bind}. *)
-
-    val ( and* ) : ('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e) result
-    (** [( and* )] is [product]. *)
-
-    val ( let+ ) : ('a, 'e) result -> ('a -> 'b) -> ('b, 'e) result
-    (** [( let+ )] is {!map}. *)
-
-    val ( and+ ) : ('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e) result
-    (** [( and* )] is [product]. *)
-  end
-end
-
-(** Characters (bytes in fact). *)
+module Result = B0__result
 module Char = B0__char
 
 (** Strings. *)

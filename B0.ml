@@ -90,9 +90,6 @@ let test ?(requires = []) =
   let reqs = b0_std :: b0_memo :: b0_file :: b0_kit :: cmdliner :: requires in
   B0_ocaml.test ~requires:reqs
 
-let test_b0_std_fmt =
-  test ~/"test/test_b0_std_fmt.ml" ~doc:"Test B0_std.Fmt"
-
 let test_b0_std_fpath =
   test ~/"test/test_b0_std_fpath.ml" ~doc:"Test B0_std.Fpath"
 
@@ -136,7 +133,6 @@ let example_driver =
 
 let example_testing =
   test ~/"test/example_testing.ml" ~run:false ~doc:"Example from the docs"
-
 
 (* Packs *)
 
@@ -194,7 +190,7 @@ let bowl =
 
 (* Updating vendored code. *)
 
-let copy_module ~src_dir ~dst_dir src dst =
+let copy_module ?subst ~src_dir ~dst_dir src dst =
   let mli base = Fmt.str "%s.mli" base and ml base = Fmt.str "%s.ml" base in
   let src_mli = Fpath.(src_dir / mli src) in
   let src_ml = Fpath.(src_dir / ml src) in
@@ -203,7 +199,13 @@ let copy_module ~src_dir ~dst_dir src dst =
   Log.stdout (fun m -> m "Copying %s to %s in %a" src dst Fpath.pp dst_dir);
   let force = true and make_path = false in
   let* () = Os.File.copy ~force ~make_path src_mli ~dst:dst_mli in
-  let* () = Os.File.copy ~force ~make_path src_ml ~dst:dst_ml in
+  let* () = match subst with
+  | None -> Os.File.copy ~force ~make_path src_ml ~dst:dst_ml
+  | Some (src_ns, dst_ns) ->
+      let* src = Os.File.read src_ml in
+      let src = String.replace_all ~sub:src_ns ~by:dst_ns src in
+      Os.File.write ~force ~make_path dst_ml src
+  in
   Ok ()
 
 let with_cloned_repo_dir ~env ~repo f =
@@ -219,8 +221,10 @@ let vendor_more_modules =
   with_cloned_repo_dir ~env ~repo @@ fun dir ->
   let dst_dir = B0_env.in_scope_dir env ~/"src/std" in
   let src_dir = Fpath.(dir / "src") in
-  let* () = copy_module ~src_dir ~dst_dir "more__char" "b0__char" in
-  let* () = copy_module ~src_dir ~dst_dir "more__fmt" "b0__fmt" in
+  let subst = "More__", "B0__" in
+  let* () = copy_module ~subst ~src_dir ~dst_dir "more__char" "b0__char" in
+  let* () = copy_module ~subst ~src_dir ~dst_dir "more__fmt" "b0__fmt" in
+  let* () = copy_module ~subst ~src_dir ~dst_dir "more__result" "b0__result" in
   Ok ()
 
 
