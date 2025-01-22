@@ -33,12 +33,12 @@ let test_unit_msg n = if n <= 1 then "test unit" else "test units"
 let pp_report ppf (allow_long, test_count, total, dur, fails) =
   match fails with
   | [] ->
-      Fmt.pf ppf "@[<v>%a The build %a all %a %s in %a (%a with build)@]"
+      Fmt.pf ppf "@[<v>%a The build %a all %a %s in %a (+%a for the build)@]"
         Test.Fmt.pass () Test.Fmt.passed ()
         Test.Fmt.count test_count
         (test_unit_msg test_count)
         Test.Fmt.dur dur
-        Mtime.Span.pp total
+        Mtime.Span.pp (Mtime.Span.abs_diff total dur)
   | fails ->
       let count = List.length fails in
       Fmt.pf ppf "%a @[<v>The build %a %a %s in %a:@,%a@]"
