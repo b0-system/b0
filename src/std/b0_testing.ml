@@ -95,9 +95,21 @@ module Test = struct
 
   let log' fmt = Fmt.pf !out (fmt ^^ "@.")
 
+  let log_raw fmt = Fmt.pf !out fmt
+
   let _log fmt =
     let pad = (Fmt.st Test_fmt.test_color) in
     Fmt.pf !out ("%a @[" ^^ fmt ^^ "@]@.") pad Test_fmt.padding
+
+  let _log_start fmt =
+    let pad = (Fmt.st Test_fmt.test_color) in
+    Fmt.pf !out ("%a @[" ^^ fmt ^^ "@]@?") pad Test_fmt.padding
+
+  let log_start ?__POS__:pos fmt = match pos with
+  | None -> _log_start fmt
+  | Some pos -> _log "%a" Test_fmt.pos pos; _log fmt
+
+  let log_finish fmt = Fmt.pf !out ("@[" ^^ fmt ^^ "@]@.")
 
   let _log_fail fmt =
     let pad = Fmt.st Test_fmt.fail_color in

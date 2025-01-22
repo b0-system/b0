@@ -96,6 +96,17 @@ module Test : sig
   (** [log_fail fmt …] is like {!log} but formatted for failures. This
       does not increment failed checks, use {!fail} to register a failure. *)
 
+  val log_start :
+    ?__POS__:pos -> ('a, Format.formatter, unit, unit) format4 -> 'a
+  (** [log_start] is like {!log} but does not finish the line. {!log_end}
+      does. *)
+
+  val log_finish : ('a, Format.formatter, unit, unit) format4 -> 'a
+  (** [log_end] ends a line started with {!log_start}. *)
+
+  val log_raw : ('a, Format.formatter, unit, unit) format4 -> 'a
+  (** [log_raw fmt …] outputs to the test log. *)
+
   (** {1:combinators Test combinators} *)
 
   (** {2:loops Loops and blocks} *)
