@@ -96,6 +96,9 @@ let test_b0_std_fpath =
 let test_b0_std_cmd =
   test ~/"test/test_b0_std_cmd.ml" ~doc:"Test B0_std.Cmd"
 
+let test_b0_std_string =
+  test ~/"test/test_b0_string.ml" ~doc:"Test B0_std.String"
+
 let test_b0_testing = test ~/"test/test_b0_testing.ml" ~doc:"Test B0_testing"
 let test_cp = test ~/"test/test_cp.ml" ~run:false ~doc:"Test for Os.Path.copy"
 let test_rm = test ~/"test/test_rm.ml" ~run:false ~doc:"Test for Os.Path.delete"
