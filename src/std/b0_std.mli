@@ -280,16 +280,25 @@ module String : sig
 
   (** {1:suggesting Suggesting} *)
 
-  val edit_distance : string -> string -> int
-  (** [edit_distance s0 s1] is the number of single character edits (insertion,
-      deletion, substitution) that are needed to change [s0] into [s1]. *)
+  val edit_distance : ?limit:int -> string -> string -> int
+  (** [edit_distance s0 s1] is the number of single character edits
+      (understood as insertion, deletion, substitution, transposition)
+      that are needed to change [s0] into [s1].
 
-  val suggest : ?dist:int -> string list -> string -> string list
-  (** [suggest ~dist candidates s] are the elements of [candidates]
-      whose {{!edit_distance}edit distance} is the smallest to [s] and
-      at most at a distance of [dist] of [s] (defaults to [2]). If
-      multiple results are returned the order of [candidates] is
-      preserved. *)
+      The function assumes the strings are UTF-8 encoded and uses {!Uchar.t}
+      for the notion of character. Decoding errors are replaced by
+      {!Uchar.rep}. Normalizing the strings to
+      {{:https://unicode.org/glossary/#normalization_form_c}NFC} gives
+      better results.
+
+      If [limit] is provided the function returns with [limit] as soon
+      as it was determined that [s0] and [s1] have distance of at
+      least [limit]. This is faster if you have a fixed limit, for
+      example for spellchecking.
+
+      {b Note.} This implements the simpler optimal string alignement
+      distance, not the Damerau–Levenshtein distance (["ca"] and
+      ["abc"] have a distance of 3 not 2). *)
 
   (** {1:escunesc (Un)escaping bytes}
 
