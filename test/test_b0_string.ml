@@ -38,9 +38,30 @@ let test_edit_distance () =
   test "OCaml🐫" "O'Caml🐪" 2 ~__POS__;
   ()
 
+let test_spellcheck () =
+  Test.test "String.spellcheck" @@ fun () ->
+  let test ?__POS__ ?max_dist dict s res =
+    Test.(list ~elt:Eq.string) ?__POS__ (String.spellcheck ?max_dist dict s) res
+  in
+  test ["abcd"; "abca"; "abcdef"] "" [] ~__POS__;
+  test ["abcd"; "abca"; "abcdef"] "a" [] ~__POS__;
+  test ["abcd"; "abca"; "abcdef"] "ag" [] ~__POS__;
+  test ["abcd"; "abca"; "abcdef"] "ab" ["abcd"; "abca"] ~__POS__;
+  test ["abcd"; "abca"; "abcdef"] "ac" ["abcd"; "abca"] ~__POS__;
+  test ["abcd"; "abca"; "abcdef"] "abc" ["abcd"; "abca"] ~__POS__;
+  test ["abcd"; "abca"; "abcdef"] "aba" ["abca"] ~__POS__;
+  test ["abcd"; "abca"; "abcdef"] "abcd" ["abcd"] ~__POS__;
+  let max_dist s = if String.length s <= 1 then 1 else 2 in
+  test ["abc"] "a" ["abc"] ~__POS__;
+  test ~max_dist ["abc"] "a" [] ~__POS__;
+  test ~max_dist ["abc"; "ab"; "b"] "a" ["ab"; "b"] ~__POS__;
+  ()
+
+
 let main () =
   Test.main @@ fun () ->
   test_edit_distance ();
+  test_spellcheck ();
   ()
 
 let () = if !Sys.interactive then () else exit (main ())

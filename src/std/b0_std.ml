@@ -447,16 +447,14 @@ let edit_distance ?(limit = Int.max_int) s0 s1 =
   let d = loop row_minus2 row_minus1 row 1 len0 limit in
   if d > limit then limit else d
 
-
-  let suggest ?(dist = 2) candidates s =
-    let add (min, acc) name =
-      let d = edit_distance s name in
-      if d = min then min, (name :: acc) else
-      if d < min then d, [name] else
-      min, acc
+  let spellcheck ?(max_dist = Fun.const 2) dict s =
+    let select_words (min, acc) word =
+      let d = edit_distance ~limit:(min + 1) s word in
+      if d = min then min, (word :: acc) else
+      if d < min then d, [word] else min, acc
     in
-    let d, suggs = List.fold_left add (max_int, []) candidates in
-    if d <= dist (* suggest only if not too far *) then List.rev suggs else []
+    let _min, words = List.fold_left select_words (max_dist s, []) dict in
+    List.rev words
 
   (* Escaping and unescaping bytes
 
@@ -1719,7 +1717,7 @@ module Hash = struct
         let kind = Fmt.any "hash" in
         let pp_id = Fmt.code in
         let ids = List.map (fun (module H : T) -> H.id) funs in
-        let hint, ids = match String.suggest ids id with
+        let hint, ids = match String.spellcheck ids id with
         | [] -> Fmt.must_be, ids
         | ids -> Fmt.did_you_mean, ids
         in

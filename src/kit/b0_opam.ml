@@ -284,7 +284,7 @@ module Pkg = struct
       let kind ppf () = Fmt.string ppf "opam package" in
       let hint = Fmt.did_you_mean in
       let pp = Fmt.unknown' ~kind pp_name_str ~hint in
-      Fmt.str "@[%a@]" pp (u, String.suggest pkg_dom u) :: acc
+      Fmt.str "@[%a@]" pp (u, String.spellcheck pkg_dom u) :: acc
     in
     String.concat "\n" (List.rev (String.Set.fold add unknown []))
 

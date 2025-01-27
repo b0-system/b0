@@ -271,7 +271,7 @@ module Theme = struct
   | t -> Ok t
   | exception Not_found ->
       let pp_name = Fmt.code in
-      let ss = String.suggest (List.rev_map name ts) n in
+      let ss = String.spellcheck (List.rev_map name ts) n in
       let pp_fallback ppf = function
       | None -> ()
       | Some f -> Fmt.pf ppf "@ using %a instead" pp_name f

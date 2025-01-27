@@ -278,7 +278,7 @@ module String : sig
       if [false]. If no [d] in \[[1];[1e9]\] satisfies the condition
       [Invalid_argument] is raised, [limit] defaults to [1e9]. *)
 
-  (** {1:suggesting Suggesting} *)
+  (** {1:spellchecking Spellchecking} *)
 
   val edit_distance : ?limit:int -> string -> string -> int
   (** [edit_distance s0 s1] is the number of single character edits
@@ -299,6 +299,15 @@ module String : sig
       {b Note.} This implements the simpler optimal string alignement
       distance, not the Damerau–Levenshtein distance (["ca"] and
       ["abc"] have a distance of 3 not 2). *)
+
+  val spellcheck :
+    ?max_dist:(string -> int) -> string list -> string -> string list
+  (** [spellcheck dict s] are the elements of [dict] whose
+      {{!edit_distance}edit distance} to [s] is the smallest and at
+      most [max_dist s] (default is [Fun.const 2], this is subject to
+      change in the future, use your own function if you want to rely
+      on that). If multiple corrections are returned their order is as
+      given in [dict]. *)
 
   (** {1:escunesc (Un)escaping bytes}
 
