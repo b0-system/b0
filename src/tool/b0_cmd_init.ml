@@ -108,7 +108,7 @@ let templates = ref []
 let src_template t = match List.assoc_opt t !templates with
 | Some t -> Ok t
 | None ->
-    let names = List.map fst !templates in
+    let names = fun yield -> List.iter yield (List.map fst !templates) in
     let suggestions = String.spellcheck names t in
     Fmt.error "@[%s: @[<v>No such template. %a@]"
       t Fmt.(did_you_mean string) suggestions

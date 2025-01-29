@@ -280,10 +280,15 @@ module String : sig
 
   (** {1:spellchecking Spellchecking} *)
 
-  val edit_distance : ?limit:int -> string -> string -> int
+  val edit_distance : ?limit:int -> t -> t -> int
   (** [edit_distance s0 s1] is the number of single character edits
       (understood as insertion, deletion, substitution, transposition)
       that are needed to change [s0] into [s1].
+
+      If [limit] is provided the function returns with [limit] as soon
+      as it was determined that [s0] and [s1] have distance of at least
+      [limit]. This is faster if you have a fixed limit, for example for
+      spellchecking.
 
       The function assumes the strings are UTF-8 encoded and uses {!Uchar.t}
       for the notion of character. Decoding errors are replaced by
@@ -291,23 +296,33 @@ module String : sig
       {{:https://unicode.org/glossary/#normalization_form_c}NFC} gives
       better results.
 
-      If [limit] is provided the function returns with [limit] as soon
-      as it was determined that [s0] and [s1] have distance of at
-      least [limit]. This is faster if you have a fixed limit, for
-      example for spellchecking.
+      {b Note.} This implements the simpler Optimal String Alignement (OSA)
+      distance, not the Damerau-Levenshtein distance. With this function
+      ["ca"] and ["abc"] have a distance of 3 not 2.
 
-      {b Note.} This implements the simpler optimal string alignement
-      distance, not the Damerau–Levenshtein distance (["ca"] and
-      ["abc"] have a distance of 3 not 2). *)
+      {b Note.} Available in 5.4.  *)
 
   val spellcheck :
-    ?max_dist:(string -> int) -> string list -> string -> string list
-  (** [spellcheck dict s] are the elements of [dict] whose
-      {{!edit_distance}edit distance} to [s] is the smallest and at
-      most [max_dist s] (default is [Fun.const 2], this is subject to
-      change in the future, use your own function if you want to rely
-      on that). If multiple corrections are returned their order is as
-      given in [dict]. *)
+    ?max_dist:(string -> int) -> ((string -> unit) -> unit) -> string ->
+    string list
+  (** [spellcheck iter_dict s] are the strings enumerated by the
+      iterator [iter_dict] whose {{!edit_distance}edit distance} to [s]
+      is the smallest and at most [max_dist s]. If multiple corrections
+      are returned their order is as found in [iter_dict]. The default
+      [max_dist s] is:
+
+      {ul
+      {- [0] if [s] has 0 to 2 Unicode characters.}
+      {- [1] if [s] has 3 to 4 Unicode characters.}
+      {- [2] otherwise.}}
+
+      If your dictionary is a list [l], a suitable [iter_dict] is given
+      by [(fun yield -> List.iter yield l)].
+
+      All strings are assumed to be UTF-8 encoded, decoding
+      errors are replaced by {!Uchar.rep} characters.
+
+      {b Note.} Available in 5.4.  *)
 
   (** {1:escunesc (Un)escaping bytes}
 

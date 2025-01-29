@@ -279,7 +279,7 @@ module Pkg = struct
     meta, file
 
   let name_hints ~dom ~unknown =
-    let pkg_dom = String.Set.elements dom in
+    let pkg_dom = fun yield -> List.iter yield (String.Set.elements dom) in
     let add u acc =
       let kind ppf () = Fmt.string ppf "opam package" in
       let hint = Fmt.did_you_mean in
