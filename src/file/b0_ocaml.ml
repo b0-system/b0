@@ -1467,7 +1467,10 @@ let lib_proc set_modsrcs set_lib srcs b =
     in
     List.rev_append bimpls impls
   in
-  let* c_objs = compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs in
+  let* c_objs =
+    let comp = Tool.ocamlc (* https://github.com/ocaml/ocaml/issues/13798 *) in
+    compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs
+  in
   let modsrcs = Modsrc.sort (* for link *) ~deps:Modsrc.ml_deps modsrcs in
   let cobjs = List.filter_map (Modsrc.impl_file ~code) modsrcs  in
   let odir = build_dir and oname = archive_name in
