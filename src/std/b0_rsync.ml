@@ -18,7 +18,7 @@ let copy
   let cmd = Cmd.(rsyncc %%
                  if' delete (arg "--delete") %%
                  if' stats (arg "--stats") %%
-                 if' progress (arg "--progress") %%
+                 if' progress (arg "--info=progress2") %%
                  opts % src % dst)
   in
   Os.Cmd.run cmd

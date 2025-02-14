@@ -16,11 +16,12 @@ val get : ?search:Cmd.tool_search -> ?cmd:Cmd.t -> unit -> (t, string) result
 
 val copy :
   t -> ?opts:Cmd.t -> ?stats:bool -> ?progress:bool -> delete:bool ->
-  ?src_host:string -> ?dst_host:string ->
-  Fpath.t -> dst:Fpath.t -> (unit, string) result
+  ?src_host:string -> ?dst_host:string -> Fpath.t -> dst:Fpath.t ->
+  (unit, string) result
 (** [copy src ~dst] copies the contents of directory [src] to [dst]
     with [rsync]. As per [rsync] semantics, directoryness of [src] is
-    important ([dst]'s one is not):
+    important and [dst]'s one is not:
+
     {ul
     {- If [src] has a trailing directory separator, the contents
        [src/*] is copied to [dst/*].}
@@ -29,10 +30,14 @@ val copy :
 
     [src_host] and [dst_host] specify the host for source
     and destination directory (e.g. ["myhost:"]). They default to [""].
-
-    If [delete] is [true], deletes files at destination that do not
-    exist in [src]. If [stats] is [true] (default to [false]) outputs
-    statistics about the transfer. If [progress] is [true] (default)
-    outputs progress about the transfer. [opts] defaults to [-azh],
-    this means transfer in archive mode which preserves symlinks and
-    file attributes and compression is enabled. *)
+    The rest of the arguments are:
+    {ul
+    {- If [delete] is [true], deletes files at destination that do not
+       exist in [src] using the [--delete] flag. Defaults to [false].}
+    {- If [stats] is [true] outputs statistics about the transfer using the
+       [--stats] flag. Defaults to [false].}
+    {- If [progress] is [true] (default) outputs progress about the transfer
+       using [--info=progress2].}
+    {- [opts] are other options for rsync. It defaults to [-azh] which
+       means transfer in archive mode which preserves symlinks and
+       file attributes and compression is enabled.}} *)
