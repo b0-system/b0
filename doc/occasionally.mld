@@ -25,11 +25,13 @@ b0 list
 {2:test How do I run tests ?}
 
 {@sh[
-b0 test
-b0 test -l       # Also run the long test
-b0 test --what   # Show what will run
 b0 list --tests  # List tests
+b0 test          # Run all tests
+b0 test -l       # Run all tests, including the long ones
+b0 test --what   # Show what will run
 b0 test -u this -u that  # Only run the 'this' and 'that' tests
+b0 test --seed 123 # Run random tests with seed 123
+b0 test --correct  # Correct failed snapshot tests
 ]}
 
 {2:run How do I run build artefacts ?}

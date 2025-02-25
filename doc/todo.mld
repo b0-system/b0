@@ -206,24 +206,24 @@ On hold until we get the {!B0_srcs} thing right.
 
 {2:b0_test Testing and [B0_testing] and [B0_expect]}
 
-- `b0 test` parametrization. Ideas: a token passed in `TEST_TOKEN`
-  that has all the parameters for repro. More meta to specify
-  cli options to use e.g. for seed and/or long tests ?
-- The testing module of ptime had a nice mecanism
-  to print arguments. It would be nice to recover that
-  https://github.com/dbuenzli/ptime/blob/fd59e25cef4eceb2d13311ce2d42794fed3dc4de/test/testing.ml#L151-L248
-  Somehow it overlaps with block which is more powerful. But it would be nice
-  to have something for [Test.get_{some,ok}] failures.
-- Long requests, return exit code 2 if test pass but there
-  were ungranted long requests ? Perhaps not, for now we decided not to
-  integrate long tests in the framework but keep it at the b0 unit level.
-- `b0 test`, run as soon as build.
-- Default b0_expect cli driver, needs a new design round now that we have
-  actions.
-- Parallel execution
-- Timeouts
-- Progress
-- VCS agnostic, i.e. fill-in the hg support
+- Implicit source location improvements. We could get rid of
+  [__POS__] and [__POS_OF__]. We could add a --test-locs option,
+  which outputs test function locations (we did not add a [__POS__]
+  argument to Test.test
+
+- Now that we added [Test.Snapshot] we should try to meld [B0_expect] into
+  [B0_testing].
+- [b0 test], run as soon as build, run in parallel.
+- [b0 test], more exit code semantics for skips and long tests.
+- [b0 test], document the full test executable protocol (env var + exit codes)
+  concisely.
+- [b0 test] now that we have a protocol with test executables should
+  we drop the skips at the unit level ?
+- Timeouts (see pathological.ml in cmarkit)
+- Progress.
+- [Test.Arg] add lazy arguments.
+- We want tests to be [let] bound so that it's easy to invoke
+  them induvidually, e.g. in the toplevel.
 - Have test for a full program execution effect (file system, exit
   code, standard outputs) via a dedicated machine readable file that
   is updated by the run.
@@ -243,7 +243,6 @@ On hold until we get the {!B0_srcs} thing right.
   {- normal, paths but no diff}
   {- long, paths and diffs}
   {- short, only final summary}}
-- Add a small manual to the action.
 
 {2:b0_opam [B0_opam]}
 

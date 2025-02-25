@@ -6,7 +6,7 @@
 open B0_std
 open B0_testing
 
-let test_double_sep () =
+let test_double_sep =
   Test.test "Fpath double sep normalization" @@ fun () ->
   let test ?__POS__ p q =
     Test.string ?__POS__ (Fpath.to_string (Fpath.v p)) q
@@ -19,7 +19,7 @@ let test_double_sep () =
   test "a///bc//c///////////////d" "a/bc/c/d" ~__POS__;
   ()
 
-let test_is_prefix_strip_prefix () =
+let test_is_prefix_strip_prefix =
   Test.test "Fpath.{is,strip}_prefix" @@ fun () ->
   let test ?__POS__:pos p q r =
     Test.block ?__POS__:pos @@ fun () ->
@@ -61,7 +61,7 @@ let test_is_prefix_strip_prefix () =
   end;
   ()
 
-let test_basename () =
+let test_basename =
   Test.test "Fpath.basename" @@ fun () ->
   let test ?__POS__:pos p b ~strip_ext:b' =
     Test.block ?__POS__:pos @@ fun () ->
@@ -101,7 +101,7 @@ let test_basename () =
   end;
   ()
 
-let test_parent () =
+let test_parent =
   Test.test "Fpath.parent" @@ fun () ->
   let test ?__POS__ p pp =
     Test.eq ?__POS__ (module Fpath) (Fpath.parent (Fpath.v p)) (Fpath.v pp);
@@ -141,7 +141,7 @@ let test_parent () =
   test "/a/b/.." "/a/b/../.." ~__POS__;
   ()
 
-let test_relative () =
+let test_relative =
   Test.test "Fpath.relative" @@ fun () ->
   let test ?__POS__ p ~to_dir q =
     let to_dir = Fpath.v to_dir and p = Fpath.v p and q = Fpath.v q in
@@ -153,13 +153,5 @@ let test_relative () =
   test "a/b" ~to_dir:"a/b" "../b" ~__POS__;
   ()
 
-let main () =
-  Test.main @@ fun () ->
-  test_double_sep ();
-  test_is_prefix_strip_prefix ();
-  test_parent ();
-  test_basename ();
-  test_relative ();
-  ()
-
+let main () = Test.main @@ fun () -> Test.autorun ()
 let () = if !Sys.interactive then () else exit (main ())

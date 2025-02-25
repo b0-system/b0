@@ -150,6 +150,10 @@ let tool_pack =
 let driver_pack =
   B0_pack.make "b0-drivers" ~doc:"The b0 drivers" ~locked:false @@ [b0]
 
+let tests_pack =
+  B0_pack.make "tests" ~doc:"The b0 tests" ~locked:false @@
+  List.filter (B0_unit.has_tag B0_meta.test) (B0_unit.list ())
+
 let default =
   let meta =
     B0_meta.empty

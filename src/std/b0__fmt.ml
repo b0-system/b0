@@ -33,6 +33,26 @@ let nop ppf _ = ()
 let any fmt ppf _ = pf ppf fmt
 let using f pp_v ppf v = pp_v ppf (f v)
 
+let raw_char = Format.pp_print_char
+let raw_string = Format.pp_print_string
+
+(* Boxes *)
+
+let box ?(indent = 0) pp_v ppf v =
+  Format.(pp_open_box ppf indent; pp_v ppf v; pp_close_box ppf ())
+
+let hbox pp_v ppf v =
+  Format.(pp_open_hbox ppf (); pp_v ppf v; pp_close_box ppf ())
+
+let vbox ?(indent = 0) pp_v ppf v =
+  Format.(pp_open_vbox ppf indent; pp_v ppf v; pp_close_box ppf ())
+
+let hvbox ?(indent = 0) pp_v ppf v =
+  Format.(pp_open_hvbox ppf indent; pp_v ppf v; pp_close_box ppf ())
+
+let hovbox ?(indent = 0) pp_v ppf v =
+  Format.(pp_open_hovbox ppf indent; pp_v ppf v; pp_close_box ppf ())
+
 (* Separators *)
 
 let cut ppf _ = Format.pp_print_cut ppf ()
@@ -51,6 +71,16 @@ let semi ppf _ = Format.pp_print_string ppf ";"; sp ppf ()
     Format.pp_set_formatter_out_functions ppf outf_with_nl;
     Fun.protect ~finally @@ fun () -> pp ppf v
   *)
+
+let suffix_lines ~suffix pp ppf v =
+  let b = Buffer.create 255 in
+  let () = box pp (Format.formatter_of_buffer b) v in
+  let lines = Buffer.contents b in
+  let lines = String.split_on_char '\n' lines in
+  let last = List.length lines - 1 in
+  let add_newline_esc i l = if i = last then l else l ^ suffix in
+  let lines = List.mapi add_newline_esc lines in
+  vbox (Format.pp_print_list raw_string) ppf lines
 
 (* Sequencing *)
 
@@ -75,23 +105,6 @@ let ( ++ ) = append
 let concat ?sep pps ppf v =
   iter ?sep List.iter (fun ppf pp -> pp ppf v) ppf pps
 
-(* Boxes *)
-
-let box ?(indent = 0) pp_v ppf v =
-  Format.(pp_open_box ppf indent; pp_v ppf v; pp_close_box ppf ())
-
-let hbox pp_v ppf v =
-  Format.(pp_open_hbox ppf (); pp_v ppf v; pp_close_box ppf ())
-
-let vbox ?(indent = 0) pp_v ppf v =
-  Format.(pp_open_vbox ppf indent; pp_v ppf v; pp_close_box ppf ())
-
-let hvbox ?(indent = 0) pp_v ppf v =
-  Format.(pp_open_hvbox ppf indent; pp_v ppf v; pp_close_box ppf ())
-
-let hovbox ?(indent = 0) pp_v ppf v =
-  Format.(pp_open_hovbox ppf indent; pp_v ppf v; pp_close_box ppf ())
-
 (* Brackets *)
 
 let surround s1 s2 pp_v ppf v =
@@ -109,6 +122,138 @@ let quote ?(mark = "\"") pp_v =
 
 let record ?(sep = cut) pps = vbox (concat ~sep pps)
 
+(* Text *)
+
+let char = raw_char
+let text = Format.pp_print_text
+
+let lines ppf s =
+  let rec stop_at sat ~start ~max s =
+    if start > max then start else
+    if sat s.[start] then start else
+    stop_at sat ~start:(start + 1) ~max s
+  in
+  let sub s start stop ~max =
+    if start = stop then "" else
+    if start = 0 && stop > max then s else
+    String.sub s start (stop - start)
+  in
+  let is_nl c = c = '\n' in
+  let max = String.length s - 1 in
+  let rec loop start s = match stop_at is_nl ~start ~max s with
+  | stop when stop > max -> Format.pp_print_string ppf (sub s start stop ~max)
+  | stop ->
+      Format.pp_print_string ppf (sub s start stop ~max);
+      Format.pp_force_newline ppf ();
+      loop (stop + 1) s
+  in
+  loop 0 s
+
+let truncated ~max ppf s =
+  if String.length s <= max then raw_string ppf s else
+  (for i = 0 to max - 2 do raw_char ppf s.[i] done;
+   Format.pp_print_as ppf 1 "…")
+
+let pp_hex_escaped_char ppf c = pf ppf "\\x%02x" (Char.code c)
+let ascii_char ppf c =
+  if B0__char.Ascii.is_print c
+  then raw_char ppf c
+  else pp_hex_escaped_char ppf c
+
+let _ascii_string ~for_literal ppf s =
+  let escape_char ~for_literal c =
+    (c = '\"' && for_literal) || not (B0__char.Ascii.is_print c)
+  in
+  let esc ~for_literal ppf c = match Char.code c with
+  | 0x22 when for_literal -> raw_char ppf '\\'; raw_char ppf '\"'
+  | 0x5C when for_literal -> raw_char ppf '\\'; raw_char ppf '\\'
+  | 0x0D when for_literal -> raw_char ppf '\\'; raw_char ppf 'r'
+  | 0x0A when for_literal -> raw_char ppf '\\'; raw_char ppf 'n'
+  | _ -> pp_hex_escaped_char ppf c
+  in
+  for i = 0 to String.length s - 1 do
+    let c = s.[i] in
+    if escape_char ~for_literal c then esc ~for_literal ppf c else
+    raw_char ppf c
+  done
+
+let ascii_string ppf s = _ascii_string ~for_literal:false ppf s
+let ascii_string_literal ppf s =
+  raw_char ppf '\"'; _ascii_string ~for_literal:true ppf s; raw_char ppf '\"'
+
+let text_uchar ppf u =
+  let esc = match Uchar.to_int u with
+  | u when 0x0000 <= u && u <= 0x001F -> true (* C0 control characters *)
+  | u when 0x0080 <= u && u <= 0x009F -> true (* C1 control characters *)
+  | 0x2028 -> true (* line separator *)
+  | 0x2029 -> true (* paragraph separator *)
+  | 0x200E -> true (* left-to-right mark *)
+  | 0x200F -> true (* right-to-left mark *)
+  | u -> false
+  in
+  if esc then pf ppf "U+%04X" (Uchar.to_int u) else
+  let b = Bytes.create (Uchar.utf_8_byte_length u) in
+  ignore (Bytes.set_utf_8_uchar b 0 u);
+  Format.pp_print_as ppf 1 (Bytes.unsafe_to_string b)
+
+let _text_string ~ansi ~for_literal ppf s =
+  let escape_uchar ~for_literal u = match Uchar.to_int u with
+  | 0x0022 -> for_literal
+  | u when 0x0000 <= u && u <= 0x001F -> true (* C0 control characters *)
+  | u when 0x0080 <= u && u <= 0x009F -> true (* C1 control characters *)
+  | 0x2028 -> true (* line separator *)
+  | 0x2029 -> true (* paragraph separator *)
+  | _ -> false
+  in
+  let escape ~for_literal ppf u = match Uchar.to_int u with
+  | 0x0022 when for_literal -> raw_char ppf '\\'; raw_char ppf '\"'
+  | 0x005C when for_literal -> raw_string ppf "\\\\"
+  | 0x000A when for_literal -> raw_string ppf "\\n"
+  | 0x000D when for_literal -> raw_string ppf "\\r"
+  | u -> pf ppf "\\u{%04X}" u
+  in
+  let rec loop ~for_literal ppf i max =
+    if i > max then () else
+    let dec = String.get_utf_8_uchar s i in
+    let u = Uchar.utf_decode_uchar dec in
+    let len = Uchar.utf_decode_length dec in
+    let next =
+      if ansi && Uchar.to_int u = 0x001B && i + 1 < max && s.[i + 1] = '['
+      then begin
+        let k = ref (i + 2) in
+        while (!k <= max && s.[!k] <> 'm') do incr k done;
+        let esc = String.sub s i (!k - i + 1) in
+        Format.pp_print_as ppf 0 esc;
+        !k + 1
+      end else begin
+        let () =
+          if escape_uchar ~for_literal u then escape ~for_literal ppf u else
+          if not (Uchar.utf_decode_is_valid dec) then raw_string ppf "\u{FFFD}"
+          else for k = 0 to len - 1 do raw_char ppf (s.[i + k]) done
+        in
+        i + len
+      end
+    in
+    loop ~for_literal ppf next max
+  in
+  loop ~for_literal ppf 0 (String.length s - 1)
+
+let text_string ppf s = _text_string ~ansi:false ~for_literal:false ppf s
+let text_bytes ppf b = text_string ppf (Bytes.unsafe_to_string b)
+let string = raw_string
+let text_string_literal ppf s =
+  raw_char ppf '\"';
+  _text_string ~ansi:false ~for_literal:true ppf s;
+  raw_char ppf '\"'
+
+let styled_text_string ppf s =
+  _text_string ~ansi:true ~for_literal:false ppf s
+
+let styled_text_string_literal ppf s =
+  raw_char ppf '\"';
+  _text_string ~ansi:true ~for_literal:true ppf s;
+  raw_char ppf '\"'
+
 (* Stdlib formatters *)
 
 let bool = Format.pp_print_bool
@@ -117,12 +262,14 @@ let int32 ppf i = pf ppf "%ld" i
 let uint32 ppf i = pf ppf "%lu" i
 let int64 ppf i = pf ppf "%Ld" i
 let uint64 ppf i = pf ppf "%Lu" i
+let nativeint ppf i = pf ppf "%nd" i
+let nativeuint ppf i = pf ppf "%nu" i
 let float ppf f = pf ppf "%g" f
-let char = Format.pp_print_char
-let string = Format.pp_print_string
 let binary_string =
   let pp_byte ppf c = pf ppf "%02x" (Char.code c) in
   iter String.iter pp_byte
+
+let bytes ppf v = binary_string ppf (Bytes.unsafe_to_string v)
 
 let sys_signal ppf snum =
   let sigs = [
@@ -137,27 +284,27 @@ let sys_signal ppf snum =
     Sys.sigsys, "SIGSYS"; Sys.sigtrap, "SIGTRAP"; Sys.sigurg, "SIGURG";
     Sys.sigxcpu, "SIGXCPU"; Sys.sigxfsz, "SIGXFSZ"; ]
   in
-  try string ppf (List.assoc snum sigs) with
+  try raw_string ppf (List.assoc snum sigs) with
   | Not_found -> pf ppf "SIG(%d)" snum
 
 let pp_backtrace_str ppf s =
   let stop = String.length s - 1 (* there's a newline at the end *) in
   let rec loop left right =
-    if right = stop then string ppf (String.sub s left (right - left)) else
+    if right = stop then raw_string ppf (String.sub s left (right - left)) else
     if s.[right] <> '\n' then loop left (right + 1) else
     begin
-      string ppf (String.sub s left (right - left));
+      raw_string ppf (String.sub s left (right - left));
       cut ppf ();
       loop (right + 1) (right + 1)
     end
   in
-  if s = "" then (string ppf "No backtrace available.") else
+  if s = "" then (raw_string ppf "No backtrace available.") else
   loop 0 0
 
 let backtrace =
   vbox @@ (using Printexc.raw_backtrace_to_string) pp_backtrace_str
 
-let exn ppf e = string ppf (Printexc.to_string e)
+let exn ppf e = raw_string ppf (Printexc.to_string e)
 let exn_backtrace ppf (e, bt) =
   pf ppf "@[<v>Exception: %a@,%a@]"
     exn e pp_backtrace_str (Printexc.raw_backtrace_to_string bt)
@@ -165,10 +312,14 @@ let exn_backtrace ppf (e, bt) =
 let pair ?sep:(pp_sep = cut) pp_fst pp_snd ppf (fst, snd) =
   pp_fst ppf fst; pp_sep ppf (); pp_snd ppf snd
 
-let none ppf () = string ppf "<none>"
+let none ppf () = raw_string ppf "<none>"
 let option ?none:(pp_none = nop) pp_v ppf = function
 | None -> pp_none ppf ()
 | Some v -> pp_v ppf v
+
+let either ~left ~right ppf = function
+| Either.Left v -> left ppf v
+| Either.Right v -> right ppf v
 
 let result ~ok ~error ppf = function Ok v -> ok ppf v | Error e -> error ppf e
 
@@ -179,6 +330,69 @@ let list ?(empty = nop) ?sep:pp_sep pp_elt ppf = function
 let array ?(empty = nop) ?sep pp_elt ppf a = match Array.length a with
 | 0 -> empty ppf ()
 | n -> iter ?sep Array.iter pp_elt ppf a
+
+module Lit = struct
+  let unit ppf () = string ppf "()"
+  let bool = Format.pp_print_bool
+  let int = Format.pp_print_int
+  let int32 ppf i = pf ppf "%ldl" i
+  let uint32 ppf i = pf ppf "0x%lxl" i
+  let int64 ppf i = pf ppf "%LdL" i
+  let uint64 ppf i = pf ppf "0x%LxL" i
+  let nativeint ppf i = pf ppf "%ndn" i
+  let nativeuint ppf i = pf ppf "0x%nxn" i
+  let float ppf f = pf ppf "%F" f
+  let hex_float ppf f = pf ppf "%#F" f
+
+  let char ppf = function
+  | '\'' -> string ppf {|'\''|}
+  | ' ' .. '~' as c -> raw_char ppf '\''; raw_char ppf c; raw_char ppf '\''
+  | '\n' -> string ppf {|'\n'|}
+  | '\r' -> string ppf {|'\r'|}
+  | '\t' -> string ppf {|'\t'|}
+  | c -> raw_char ppf '\''; pp_hex_escaped_char ppf c; raw_char ppf '\''
+
+  let ascii_string ppf s =
+    raw_char ppf '\"';
+    for i = 0 to String.length s - 1 do match s.[i] with
+    | '\'' as c -> raw_char ppf c
+    | '\"' -> raw_string ppf {|\"|}
+    | c -> char ppf c
+    done;
+    raw_char ppf '\"'
+
+  let string ppf s = (* FIXME do not convert unknown bytes to U+FFFE *)
+    raw_char ppf '\"';
+    _text_string ~ansi:false ~for_literal:true ppf s;
+    raw_char ppf '\"'
+
+  let binary_string ppf s =
+    raw_char ppf '\"';
+    for i = 0 to String.length s - 1 do pp_hex_escaped_char ppf s.[i] done;
+    raw_char ppf '\"'
+
+  let pair fst snd ppf (a, b) = pf ppf "@[<1>(%a,@ %a)@]" fst a snd b
+
+  let option pp_v ppf = function
+  | None -> raw_string ppf "None"
+  | Some v -> pf ppf "@[<2>Some %a@]" pp_v v
+
+  let either ~left ~right ppf = function
+  | Either.Left v -> pf ppf "@[<2>Either.Left@ %a@]" left v
+  | Either.Right v -> pf ppf "@[<2>Either.Right@ %a@]" right v
+
+  let result ~ok ~error ppf = function
+  | Ok v -> pf ppf "@[<2>Ok@ %a@]" ok v
+  | Error e -> pf ppf "@[<2>Error@ %a@]" error e
+
+  let list pp_v ppf l =
+    let pp_sep ppf () = pf ppf ";@ " in
+    pf ppf "@[<1>[%a]@]" (Format.pp_print_list ~pp_sep pp_v) l
+
+  let array pp_v ppf a =
+    let sep ppf () = pf ppf ";@ " in
+    pf ppf "@[<2>[|%a|]@]" (iter ~sep Array.iter pp_v) a
+end
 
 (* Magnitudes *)
 
@@ -319,142 +533,6 @@ and uint64_ns_span ppf span =
       | f when geq f 366L -> pf ppf "%Lda" (Int64.succ m)
       | f -> pf ppf "%Lda%Ldd" m f
 
-(* Text *)
-
-let text = Format.pp_print_text
-let lines ppf s =
-  let rec stop_at sat ~start ~max s =
-    if start > max then start else
-    if sat s.[start] then start else
-    stop_at sat ~start:(start + 1) ~max s
-  in
-  let sub s start stop ~max =
-    if start = stop then "" else
-    if start = 0 && stop > max then s else
-    String.sub s start (stop - start)
-  in
-  let is_nl c = c = '\n' in
-  let max = String.length s - 1 in
-  let rec loop start s = match stop_at is_nl ~start ~max s with
-  | stop when stop > max -> Format.pp_print_string ppf (sub s start stop ~max)
-  | stop ->
-      Format.pp_print_string ppf (sub s start stop ~max);
-      Format.pp_force_newline ppf ();
-      loop (stop + 1) s
-  in
-  loop 0 s
-
-let truncated ~max ppf s =
-  if String.length s <= max then Format.pp_print_string ppf s else
-  (for i = 0 to max - 2 do Format.pp_print_char ppf s.[i] done;
-   Format.pp_print_as ppf 1 "…")
-
-let suffix_lines ~suffix pp ppf v =
-  let b = Buffer.create 255 in
-  let () = box pp (Format.formatter_of_buffer b) v in
-  let lines = Buffer.contents b in
-  let lines = String.split_on_char '\n' lines in
-  let last = List.length lines - 1 in
-  let add_newline_esc i l = if i = last then l else l ^ suffix in
-  let lines = List.mapi add_newline_esc lines in
-  vbox (list string) ppf lines
-
-let pp_escaped_char ppf c = pf ppf "\\x%02x" (Char.code c)
-let ascii_char ppf c =
-  if B0__char.Ascii.is_print c then char ppf c else pp_escaped_char ppf c
-
-let _ascii_string ~for_literal ppf s =
-  let escape_char ~for_literal c =
-    (c = '\"' && for_literal) || not (B0__char.Ascii.is_print c)
-  in
-  let esc ~for_literal ppf c = match Char.code c with
-  | 0x22 when for_literal -> char ppf '\\'; char ppf '\"'
-  | 0x5C when for_literal -> char ppf '\\'; char ppf '\\'
-  | 0x0D when for_literal -> char ppf '\\'; char ppf 'r'
-  | 0x0A when for_literal -> char ppf '\\'; char ppf 'n'
-  | _ -> pp_escaped_char ppf c
-  in
-  for i = 0 to String.length s - 1 do
-    let c = s.[i] in
-    if escape_char ~for_literal c then esc ~for_literal ppf c else
-    char ppf c
-  done
-
-let ascii_string ppf s = _ascii_string ~for_literal:false ppf s
-let ascii_string_literal ppf s =
-  char ppf '\"'; _ascii_string ~for_literal:true ppf s; char ppf '\"'
-
-let text_uchar ppf u =
-  let esc = match Uchar.to_int u with
-  | u when 0x0000 <= u && u <= 0x001F -> true (* C0 control characters *)
-  | u when 0x0080 <= u && u <= 0x009F -> true (* C1 control characters *)
-  | 0x2028 -> true (* line separator *)
-  | 0x2029 -> true (* paragraph separator *)
-  | 0x200E -> true (* left-to-right mark *)
-  | 0x200F -> true (* right-to-left mark *)
-  | u -> false
-  in
-  if esc then pf ppf "U+%04X" (Uchar.to_int u) else
-  let b = Bytes.create (Uchar.utf_8_byte_length u) in
-  ignore (Bytes.set_utf_8_uchar b 0 u);
-  Format.pp_print_as ppf 1 (Bytes.unsafe_to_string b)
-
-let _text_string ~ansi ~for_literal ppf s =
-  let escape_uchar ~for_literal u = match Uchar.to_int u with
-  | 0x0022 -> for_literal
-  | u when 0x0000 <= u && u <= 0x001F -> true (* C0 control characters *)
-  | u when 0x0080 <= u && u <= 0x009F -> true (* C1 control characters *)
-  | 0x2028 -> true (* line separator *)
-  | 0x2029 -> true (* paragraph separator *)
-  | _ -> false
-  in
-  let escape ~for_literal ppf u = match Uchar.to_int u with
-  | 0x0022 when for_literal -> char ppf '\\'; char ppf '\"'
-  | 0x005C when for_literal -> string ppf "\\\\"
-  | 0x000A when for_literal -> string ppf "\\n"
-  | 0x000D when for_literal -> string ppf "\\r"
-  | u -> pf ppf "\\u{%04X}" u
-  in
-  let rec loop ~for_literal ppf i max =
-    if i > max then () else
-    let dec = String.get_utf_8_uchar s i in
-    let u = Uchar.utf_decode_uchar dec in
-    let len = Uchar.utf_decode_length dec in
-    let next =
-      if ansi && Uchar.to_int u = 0x001B && i + 1 < max && s.[i + 1] = '['
-      then begin
-        let k = ref (i + 2) in
-        while (!k <= max && s.[!k] <> 'm') do incr k done;
-        let esc = String.sub s i (!k - i + 1) in
-        Format.pp_print_as ppf 0 esc;
-        !k + 1
-      end else begin
-        let () =
-          if escape_uchar ~for_literal u then escape ~for_literal ppf u else
-          if not (Uchar.utf_decode_is_valid dec) then string ppf "\u{FFFD}"
-          else for k = 0 to len - 1 do char ppf (s.[i + k]) done
-        in
-        i + len
-      end
-    in
-    loop ~for_literal ppf next max
-  in
-  loop ~for_literal ppf 0 (String.length s - 1)
-
-let text_string ppf s = _text_string ~ansi:false ~for_literal:false ppf s
-let text_string_literal ppf s =
-  char ppf '\"';
-  _text_string ~ansi:false ~for_literal:true ppf s;
-  char ppf '\"'
-
-let styled_text_string ppf s =
-  _text_string ~ansi:true ~for_literal:false ppf s
-
-let styled_text_string_literal ppf s =
-  char ppf '\"';
-  _text_string ~ansi:true ~for_literal:true ppf s;
-  char ppf '\"'
-
 (* HCI fragments *)
 
 let op_enum op ?(empty = nop) pp_v ppf = function
@@ -497,8 +575,8 @@ let styler () = !styler'
 
 let strip_styles ppf =
   (* Note: this code makes the assumption that out_string is always
-       going to be called without splitting escapes. Since we only
-       ever output escapes via pp_print_as this should not happen. *)
+     going to be called without splitting escapes. Since we only
+     ever output escapes via pp_print_as this should not happen. *)
   let strip out_string s first len =
     let max = first + len - 1 in
     let flush first last =
@@ -575,7 +653,7 @@ let st' styles pp_v ppf v = match !styler' with
     Format.pp_print_as ppf 0 sgr_reset
 
 let st styles ppf s = match !styler' with
-| Plain -> string ppf s
+| Plain -> raw_string ppf s
 | Ansi ->
     let sgrs = String.concat "" [ansi_esc; sgrs_of_styles styles; "m"] in
     Format.pp_print_as ppf 0 sgrs;
@@ -585,9 +663,9 @@ let st styles ppf s = match !styler' with
 let code' pp_v ppf v = st' [`Bold] pp_v ppf v
 let code ppf v = st [`Bold] ppf v
 let hey ppf v = st [`Bold; `Fg `Red] ppf v
-let puterr ppf () = st [`Bold; `Fg `Red] ppf "Error"; char ppf ':'
-let putwarn ppf () = st [`Bold; `Fg `Yellow] ppf "Warning"; char ppf ':'
-let putnote ppf () = st [`Bold; `Fg `Blue] ppf "Note"; char ppf ':'
+let puterr ppf () = st [`Bold; `Fg `Red] ppf "Error"; raw_char ppf ':'
+let putwarn ppf () = st [`Bold; `Fg `Yellow] ppf "Warning"; raw_char ppf ':'
+let putnote ppf () = st [`Bold; `Fg `Blue] ppf "Note"; raw_char ppf ':'
 
 let field ?(label = st [`Fg `Yellow]) ?(sep = any ":@ ") l prj pp_v ppf v =
   pf ppf "@[<1>%a%a%a@]" label l sep () pp_v (prj v)

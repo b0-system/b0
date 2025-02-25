@@ -3924,6 +3924,10 @@ module Os = struct
   module Mtime = struct
     include Os_mtime
   end
+
+  let exn_don't_catch = function
+  | Stack_overflow | Out_of_memory | Sys.Break -> true
+  | _ -> false
 end
 
 module Log = struct

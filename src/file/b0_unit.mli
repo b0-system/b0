@@ -192,11 +192,14 @@ module Action : sig
          behaviour the action should resolve the tool itself.}} *)
 
   val run :
+    ?env:(Os.Env.t -> Os.Env.t) ->
     B0_env.t -> b0_unit -> args:Cmd.t -> t -> (Os.Cmd.status, string) result
   (** [run env u ~args a] runs the action [a]. If the action is an executable
-      to run it is run with {!B0_std.Os.Cmd.run_status}. *)
+      to run it is run with {!B0_std.Os.Cmd.run_status}. [env] can be
+      used to transform the environment just before execution. *)
 
   val exit :
+    ?env:(Os.Env.t -> Os.Env.t) ->
     B0_env.t -> b0_unit -> args:Cmd.t -> t -> (Os.Exit.t, string) result
     (** [exit] is like {!run} except that instead of using
         {!B0_std.Os.Cmd.run_status} to run executables it returns

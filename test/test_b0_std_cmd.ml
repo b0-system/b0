@@ -21,7 +21,7 @@ let ocamlopt ?(profile = false) ?(debug = false) incs file =
   let incs = Cmd.(unstamp (paths ~slip:"-I" incs)) in
   Cmd.(arg "ocamlopt" % "-c" %% debug %% profile %% incs %% (path file))
 
-let test_stamp () =
+let test_stamp =
   Test.test "stamps" @@ fun () ->
   let test cl cmd wit =
     assert ((cmd, wit) = Cmd.to_list_and_stamp cl)
@@ -44,9 +44,5 @@ let test_stamp () =
     [ "ocamlopt"; "-c"; "-p"; "m.ml" ];
   ()
 
-let main () =
-  Test.main @@ fun () ->
-  test_stamp ();
-  ()
-
+let main () = Test.main @@ fun () -> Test.autorun ()
 let () = if !Sys.interactive then () else exit (main ())

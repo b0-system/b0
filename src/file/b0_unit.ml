@@ -223,10 +223,10 @@ module Action = struct
     Fmt.error "Unit %a not actionable, no executable file found (no %a key)"
       pp_name u B0_meta.Key.pp_name exe_file
 
-  let run' exit_rc run b0_env u ~args action =
+  let run' ?(envf = Fun.id) exit_rc run b0_env u ~args action =
     let open Result.Syntax in
     let* env = get_env b0_env u in
-    let env = Os.Env.to_assignments env in
+    let env = Os.Env.to_assignments (envf env) in
     let* cwd = get_cwd b0_env u in
     match action with
     | `Unit_exe ->
@@ -249,15 +249,16 @@ module Action = struct
             run ~env ~cwd ~argv0 cmd
         end
 
-  let run b0_env u ~args action =
+  let run ?env:envf b0_env u ~args action =
     let exit_rc rc = `Exited rc in
-    let run ~env ~cwd ~argv0:_ cmd = Os.Cmd.run_status ~env ~cwd cmd in
-    run' exit_rc run b0_env u ~args action
+    let run ~env ~cwd ~argv0:_ cmd = Os.Cmd.run_status ~env ~cwd cmd
+    in
+    run' ?envf exit_rc run b0_env u ~args action
 
-  let exit b0_env u ~args action =
+  let exit ?env:envf b0_env u ~args action =
     let exit_rc rc = Os.Exit.code rc in
     let run ~env ~cwd ~argv0 cmd = Ok (Os.Exit.execv ~env ~cwd ?argv0 cmd) in
-    run' exit_rc run b0_env u ~args action
+    run' ?envf exit_rc run b0_env u ~args action
 end
 
 let is_actionable u = match find_or_default_meta Action.key u with

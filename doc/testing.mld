@@ -1,21 +1,39 @@
 {0 Testing with [b0 test]}
 
-{1:run Running tests}
+This manual tells you everything you need to know to specify and run
+tests with [b0 test].
 
 The [b0 test] command is a simple test runner for your [B0.ml] file.
+It provides support to run your test executables and interface with
+random and snapshot testing. It is agnostic to the testing
+frameworks you use.
 
-A test unit is a unit tagged with {!B0_meta.test} and {!B0_meta.run}
-and, for lengthy tests, the {!B0_meta.long} tag. Tests can be spotted by
-a [T] in [b0 list]; the non-lengthy ones are in green.
+{1:spec Specifying and listing tests}
 
-The operating principle of [b0 test] is simple:
+A test is a {{!page-unit}b0 unit} tagged with {!B0_meta.test} and
+{!B0_meta.run}. Long tests can be tagged with {!B0_meta.long} tag,
+this prevents them from running by default on [b0 test].
+
+Tests are labelled by a [T] in [b0 list] invocations, they can be filtered
+with:
+
+{@sh[
+b0 list --tests
+]}
+
+Those that are in green are executed by default on [b0 test].
+
+{1:run Running tests}
+
+Tests are run with the [b0 test] command. The operating principle of
+[b0 test] is simple:
 
 {ol
 {- It makes a build exactly like a [b0] invocation does.}
-{- It executes the action of any test unit that {e must} build in that build.}}
+{- It executes the action of any tests that {e must} build in that build.}}
 
 For example the following invocations build the default pack and
-execute the test units therein:
+execute the tests therein:
 
 {@sh[
 b0 test
@@ -39,28 +57,52 @@ options [-u], [-p], [-x] and [-X]. For example:
 b0 test -p special-tests -x known_to_fail
 ]}
 
-Since tests are just executable units you can also run them
+Finally since tests are just executable units you can also run them
 individually with the usual [b0] invocation:
 
 {@sh[
-b0 -- mytest
+b0 -- mytest …
 ]}
 
-That's all there is to know about b0 and testing.
+This can be useful if the testing framework used by [mytest] provides
+command line options that cannot be specified by using the generic [b0
+test] interface. For example to run tests with a finer granularity.
+
+{1:random_snapshot Random and snapshot testing}
+
+The [b0 test] command supports an environment variable interface for
+random and snapshot testing. By invoking [b0 test] with:
+
+{[
+b0 test --seed 123    # Set SEED=123 while running tests
+b0 test --correct     # Set CORRECT=true while running tests
+]}
+
+The environment variables [SEED] and/or [CORRECT] are set for running the
+test executables. What the tests do with these environment variables
+is left to them but here is the expected semantics:
+
+{ul
+{- If [SEED] is set to [n], the executable should use [n] to seed the
+   pseudorandom number generator (PRNG) used for randomized testing.}
+{- If [CORRECT] is set to [true], the executable should correct failed
+   snapshot tests to the values computed during the run.}}
 
 {1:testing_ocaml_code Testing OCaml code}
 
 The infrastructure described above allows to hook the testing
 framework of your wish by simply tagging your test executables with
-{!B0_meta.test} and {!B0_meta.run}.
+{!B0_meta.test} and {!B0_meta.run} and, if appropriate, looking up the
+[SEED] and [CORRECT] environment variables.
 
 b0 itself provides a few testing tools to make such executables for
 OCaml:
 
 {ul
-{- {!B0_testing} in the [b0.std] library simply runs tests
-   as functions from [unit -> unit], provides a few asserting tools
-   and integrates nicely with [b0 test]'s rendering.}
-{- {!B0_expect} in the [b0.kit] library provides expectation testing.
-   It is expected to change a little bit in order to integrate better
-   with [b0 test] and {!B0_testing}.}}
+{- {!B0_testing} in the [b0.std] library is a basic testing framework
+   with support for unit, random and snapshot testing and integrates nicely
+   with [b0 test]'s rendering.}
+{- FIXME get rid of it in favor of {!B0_testing}.
+   {!B0_expect} in the [b0.kit] library provides
+   snapshot testing. It is expected to change a little bit in order to
+   integrate better with [b0 test] and {!B0_testing}.}}

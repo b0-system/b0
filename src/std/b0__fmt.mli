@@ -174,7 +174,102 @@ val record : ?sep:unit t -> 'a t list -> 'a t
 
     Formatters for structures give full control to the client over
     the formatting process and do not wrap the formatted structures
-    with boxes. *)
+    with boxes. If you want to print literal OCaml values use the {!Lit}
+    module. *)
+
+(** Formatting OCaml literal values. *)
+module Lit : sig
+
+  val unit : unit t
+  (** [unit] formats [unit] literals. *)
+
+  val bool : bool t
+  (** [bool] formats [bool] literals.  *)
+
+  val int : int t
+  (** [int] formats [int] literals. {b Warning.}
+      Values formatted on a 64-bit platform may not parse on
+      32-bit platforms. *)
+
+  val int32 : int32 t
+  (** [int32] formats signed [int32] literals. *)
+
+  val uint32 : int32 t
+  (** [uint32] formats unsigned [int32] literals (i.e. as hexadecimal). *)
+
+  val int64 : int64 t
+  (** [int64] formats signed [int64] literals. *)
+
+  val uint64 : int64 t
+  (** [uint64] formats unsigned [int64] literals (i.e. as hexadecimal). *)
+
+  val nativeint : nativeint t
+  (** [nativeint] formats signed [nativeint] literals. *)
+
+  val nativeuint : nativeint t
+  (** [nativeuint] formats unsigned [nativeint] literals (i.e. as
+      hexadecimal). *)
+
+  val float : float t
+  (** [float] formats [float] literals (using "%F"). *)
+
+  val hex_float : float t
+  (** [float] formats hex [float] literals (using "%#F"). *)
+
+  (** {1:string Chars and strings}
+
+      {b FIXME.} Can we make the string combinators multi line ? *)
+
+  val char : char t
+  (** [char] formats [char] literals as follows:
+      {ul
+      {- {!Char.Ascii.is_print} except single quote and slash are
+         printed verbatim.}
+      {- Characters ['\''], ['\\'], ['\n'], ['\r'] and ['\t'] are
+         printed just as written here.}
+      {- Other charactres use hex escapes ['\xhh'].}} *)
+
+  val ascii_string : string t
+  (** [ascii_string] formats [string] literals using {!char}, except
+      that double quotes are escaped and single quotes are not. *)
+
+  val string : string t
+  (** [string] formats [string] literals. Assumes an UTF-8 encoded string
+      but escapes:
+      {ul
+      {- Double quotes.}
+      {- C0 control characters (U+0000-U+001F)}
+      {- C1 control characters (U+0080-U+009F)}
+      {- Line separator (U+2028) and paragraph separator (U+2029).}
+      {- UTF-8 decode errors by hex escapes [\xhh].}} *)
+
+  val binary_string : string t
+  (** [binary_string] formats binary string literals. All characters
+      are formatted using [\xhh] escapes. *)
+
+  (** {1:cons Type constructors}
+
+      {b Note.} Depending on what you print an enclosing
+      {!parens} may be due on the arguments. *)
+
+  val pair : 'a t -> 'b t -> ('a * 'b) t
+  (** [pair] formats pair literals. *)
+
+  val option : 'a t -> 'a option t
+  (** [option] formats [option] literals. *)
+
+  val either : left:'a t -> right:'b t -> ('a, 'b) Either.t t
+  (** [either] formats [Either.t] literals. *)
+
+  val result : ok:'a t -> error:'b t -> ('a, 'b) result t
+  (** [result ~ok ~error] formats result literals. *)
+
+  val list : 'a t -> 'a list t
+  (** [list] formats [list] literals. *)
+
+  val array : 'a t -> 'a array t
+  (** [array] formats [array] literals. *)
+end
 
 val bool : bool t
 (** [bool] is {!Format.pp_print_bool}. *)
@@ -194,6 +289,12 @@ val int64 : int64 t
 val uint64 : int64 t
 (** [uint64] is [pf ppf "%Lu"]. *)
 
+val nativeint : nativeint t
+(** [nativeint] is [pf ppf "%nd"]. *)
+
+val nativeuint : nativeint t
+(** [nativeuint] is [pf ppf "%nu"]. *)
+
 val float : float t
 (** [float] is [pf ppf "%g"]. *)
 
@@ -201,10 +302,13 @@ val char : char t
 (** [char] is {!Format.pp_print_char}. *)
 
 val string : string t
-(** [string] is {!Format.pp_print_string}. See also {!text_lines}. *)
+(** [string] is {!Format.pp_print_string}. *)
 
 val binary_string : string t
 (** [binary_string] formats strings as ASCII hex. See also {!text_lines}. *)
+
+val bytes : bytes t
+(** [bytes] formats bytes as ASCII hex. See also {!text_lines}. *)
 
 val sys_signal : int t
 (** [sys_signal] formats an OCaml {{!Sys.sigabrt}signal number} as
@@ -215,10 +319,11 @@ val backtrace : Printexc.raw_backtrace t
 (** [backtrace] formats a backtrace. *)
 
 val exn : exn t
-(** [exn] formats an exception. *)
+(** [exn] formats an exception using {!Printexc.to_string}. *)
 
 val exn_backtrace : (exn * Printexc.raw_backtrace) t
-(** [exn_backtrace] formats an exception backtrace. *)
+(** [exn_backtrace] formats an exception backtrace using {!exn} and
+    the format use by the OCaml runtime system. *)
 
 val pair : ?sep:unit t -> 'a t -> 'b t -> ('a * 'b) t
 (** [pair ~sep pp_fst pp_snd] formats a pair. The first and second
@@ -232,9 +337,13 @@ val option : ?none:unit t -> 'a t -> 'a option t
 (** [option ~none pp_v] formats an option. The [Some] case uses
     [pp_v] and [None] uses [none] (defaults to {!nop}). *)
 
+val either : left:'a t -> right:'b t -> ('a, 'b) Either.t t
+(** [either ~left ~right] formats an [Either.t] value. The [Left]
+    case uses [left] and the [Right] cases uses [right]. *)
+
 val result : ok:'a t -> error:'b t -> ('a, 'b) result t
-(** [result ~ok ~error] formats a result value. The [Ok _] case uses
-    [ok] and the [Error _] case uses [error]. *)
+(** [result ~ok ~error] formats a result value. The [Ok] case uses
+    [ok] and the [Error] case uses [error]. *)
 
 val list : ?empty:unit t -> ?sep:unit t -> 'a t -> 'a list t
 (** [list ~sep pp_v] formats list elements. Each element of the list is
@@ -263,18 +372,12 @@ val truncated : max:int -> string t
     with […] (U+2026) which does count towards [max]. *)
 
 val ascii_char : char t
-(** [ascii_char] prints {!Char.Ascii.is_print} characters
-    and hex escapes for other characters. *)
+(** [ascii_char] prints {!Char.Ascii.is_print} characters and hex
+    escapes for other characters. *)
 
 val ascii_string : string t
-(** [ascii_string] prints {!Char.Ascii.is_print} characters and [' ']
-    and hex escapes for other characters. *)
-
-val ascii_string_literal : string t
-(** [ascii_string_literal] is like {!ascii_string} but between
-    double quotes ['\"']. Double quotes are also escaped and CR an
-    LF are escaped by ['\r'] and ['\n']. The result is a valid, single
-    line, OCaml string. *)
+(** [ascii_string] prints {!Char.Ascii.is_print} characters and hex
+    escapes for other characters. *)
 
 val text_uchar : Uchar.t t
 (** [text_uchar] formats an UTF-8 encoded Unicode character or
@@ -291,19 +394,31 @@ val text_string : string t
     (U+2029). Decoding errors are replaced by literal {!Uchar.rep}
     characters. *)
 
+val styled_text_string : string t
+(** [styled_text_string] is like {!text_string} but ANSI escape
+    sequences are detected and output as zero width strings. *)
+
+val text_bytes : bytes t
+(** [text_bytes] is like {!text_string} but on [bytes] values. *)
+
+(** {b FIXME.} Get rid of these in favour of {!Lit} *)
+
+val ascii_string_literal : string t
+(** [ascii_string_literal] is like {!ascii_string} but between
+    double quotes ['\"']. Double quotes are also escaped and CR an
+    LF are escaped by ['\r'] and ['\n']. The result is a valid, single
+    line, OCaml string. *)
+
 val text_string_literal : string t
 (** [text_string_literal] is like {!text_string} but between
     double quotes ['\"']. Double quotes are also escaped an CR and LF
     are escaped by ['\r'] and ['\n']. The result is a valid, single line,
     OCaml string. *)
 
-val styled_text_string : string t
-(** [styled_text_string] is like {!text_string} but ANSI escape
-    sequences are detected and output as zero width strings. *)
-
 val styled_text_string_literal : string t
 (** [styled_text_string_literal] combines {!text_string_literal}
     and {!ansi_styled_text_string}. *)
+
 
 (** {1:mag Magnitudes} *)
 
@@ -394,7 +509,7 @@ val styler : unit -> styler
 val strip_styles : Format.formatter -> unit
 (** [strip_styles ppf], this overrides the formatter's [out_string]
     function to strip out styling information. See also
-    {!B0_std.String.strip_ansi_escapes}.
+    {!String.strip_ansi_escapes}.
 
     {b Note.} This assumes [ppf] is not used to write data that uses
     raw [U+001B] characters. *)

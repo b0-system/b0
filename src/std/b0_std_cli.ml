@@ -28,7 +28,7 @@ end
 
 (* Argument converters *)
 
-let cmd = Arg.conv' ~docv:"CMD" (B0_std.Cmd.of_string, B0_std.Cmd.pp_dump)
+let cmd = Arg.conv' ~docv:"CMD" (B0_std.Cmd.of_string, B0_std.Cmd.pp)
 let fpath = Arg.conv' ~docv:"PATH" (Fpath.of_string, Fpath.pp_unquoted)
 
 (* Specifying output detail *)

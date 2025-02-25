@@ -23,7 +23,8 @@ let pp_run_tests ppf tests =
     Fmt.(list B0_unit.pp_synopsis) (B0_unit.Set.elements tests)
 
 let pp_fail ppf ~allow_long (u, st) =
-  Fmt.pf ppf "@[%a%a %a %a %a@]"
+  Fmt.pf ppf "@[%a %a%a %a %a %a@]"
+    (Fmt.st Test.Fmt.fail_color) Test.Fmt.padding
     Fmt.code "b0 test"
     Fmt.code (if allow_long then " -l" else "")
     Fmt.code "-u" B0_unit.pp_name u (Fmt.option Os.Cmd.pp_status) st
@@ -41,9 +42,9 @@ let pp_report ppf (allow_long, test_count, total, dur, fails) =
         Mtime.Span.pp (Mtime.Span.abs_diff total dur)
   | fails ->
       let count = List.length fails in
-      Fmt.pf ppf "%a @[<v>The build %a %a %s in %a:@,%a@]"
+      Fmt.pf ppf "@[<v>%a The build %a on %a %s in %a:@,%a@]"
         Test.Fmt.fail () Test.Fmt.failed ()
-        Test.Fmt.count_ratio (count, test_count)
+        Test.Fmt.fail_count_ratio (count, test_count)
         (test_unit_msg test_count)
         Test.Fmt.dur dur (Fmt.list (pp_fail ~allow_long)) fails
 
@@ -62,35 +63,43 @@ let show_what
 
 (* Test command *)
 
-let run_test c build u =
+let run_test ~long ~seed ~correct c build u =
   Log.stdout (fun m -> m "%a %a" Test.Fmt.test () B0_unit.pp_name u);
   let action = B0_meta.find_or_default B0_unit.Action.key (B0_unit.meta u) in
   let b0_env = B0_cmd_build.env_for_unit c build u in
+  let env env =
+    let env = Os.Env.add "SEED" (string_of_int seed) env in
+    let env = Os.Env.add "LONG_SKIP_EXIT" "true" env in
+    let env =
+      if correct then Os.Env.add "CORRECT" (string_of_bool correct) env else env
+    in
+    if long then Os.Env.add "LONG" (string_of_bool long) env else env
+
+  in
   let dur = Os.Mtime.counter () in
-  let* st = B0_unit.Action.run b0_env u ~args:Cmd.empty action in
+  let* st = B0_unit.Action.run ~env b0_env u ~args:Cmd.empty action in
   Ok (Os.Mtime.count dur, st)
 
-let rec run_tests c build dur fails = function
-| [] -> dur, fails
+let rec run_tests ~long ~seed ~correct c build dur rets = function
+| [] -> dur, rets
 | u :: us ->
     (* XXX Lots could be improved here, parallel spawns and run as
        soon as the build file is ready. *)
     let log_sep () = Log.stdout (fun m -> m "%s" "") in
-    match run_test c build u with
+    match run_test ~long ~seed ~correct c build u with
     | Error e ->
         Log.stdout (fun m -> m "%a: %s" B0_unit.pp_name u e);
-        log_sep (); run_tests c build dur ((u, None) :: fails) us
-    | Ok (tdur, `Exited 0) ->
-        let dur = Mtime.Span.add dur tdur in
-        log_sep (); run_tests c build dur fails us
+        log_sep ();
+        run_tests ~long ~seed ~correct c build dur ((u, None) :: rets) us
     | Ok (tdur, st) ->
         let dur = Mtime.Span.add dur tdur in
-        log_sep (); run_tests c build dur ((u, Some st) :: fails) us
+        log_sep ();
+        run_tests ~long ~seed ~correct c build dur ((u, Some st) :: rets) us
 
 let show_skip_tests us =
   let pp_skipped ppf skipped =
     if skipped = 0 then () else
-    Fmt.pf ppf "%s %a long %s %a, invoke with %a to run."
+    Fmt.pf ppf "%s %a long %s %a. Run with %a to execute."
       Test.Fmt.padding
       Test.Fmt.count skipped (test_unit_msg skipped)
       Test.Fmt.skipped () Fmt.code "-l"
@@ -103,7 +112,36 @@ let show_skip_tests us =
   Log.stdout @@ fun m ->
   m "@[<v>%a@,%a@,@]" (Fmt.iter B0_unit.Set.iter pp_skip) us pp_skipped count
 
-let test allow_long allow_empty units x_units packs x_packs what lock c =
+let show_tests_with_skips us =
+  if B0_unit.Set.is_empty us then () else
+  let count = B0_unit.Set.cardinal us in
+  let pp_skip ppf u =
+    Fmt.pf ppf "@[%a %a %a %a@]"
+      (Fmt.st Test.Fmt.skip_color) Test.Fmt.padding
+      Fmt.code "b0 test"
+      Fmt.code "-u" B0_unit.pp_name u
+(*    if skipped = 0 then () else
+    Fmt.pf ppf "%s %a long %s %a, invoke with %a to run."
+      Test.Fmt.padding
+      Test.Fmt.count skipped (test_unit_msg skipped)
+      Test.Fmt.skipped () Fmt.code "-l" *)
+  in
+  let pp_skip_stats ppf count =
+    Fmt.pf ppf "%a The build had %a %s with %a long tests:"
+      Test.Fmt.skip () Test.Fmt.count count (test_unit_msg count)
+      Test.Fmt.skipped ()
+  in
+  let pp_with_l ppf () =
+    Fmt.pf ppf "%a Run with %a to execute them."
+      (Fmt.st Test.Fmt.skip_color) Test.Fmt.padding Fmt.code "-l"
+  in
+  Log.stdout @@ fun m ->
+  m "@[<v>%a@,%a@,%a@,@]"
+    pp_skip_stats count (Fmt.iter B0_unit.Set.iter pp_skip) us pp_with_l ()
+
+let test
+    allow_long allow_empty seed correct units x_units packs x_packs what lock c
+  =
   let total = Os.Mtime.counter () in
   Log.if_error ~use:Os.Exit.no_such_name @@
   let* units = B0_unit.get_list_or_hint ~all_if_empty:false units in
@@ -152,7 +190,26 @@ let test allow_long allow_empty units x_units packs x_packs what lock c =
   | Ok () ->
       let test_count = B0_unit.Set.cardinal tests in
       let tests = B0_unit.Set.elements tests in
-      let dur, fails = run_tests c build Mtime.Span.zero [] tests in
+      let seed = match seed with
+      | Some seed -> seed
+      | None -> Random.State.bits (Random.State.make_self_init ())
+      in
+      let dur, rets =
+        run_tests
+          ~long:allow_long ~seed ~correct c build Mtime.Span.zero [] tests
+      in
+      let fails, tests_with_skips =
+        let rec loop fails skip_tests = function
+        | [] -> List.rev fails, skip_tests
+        | (u, Some (`Exited 0)) :: us ->
+            loop fails skip_tests us
+        | (u, Some (`Exited 99)) :: us ->
+            loop fails (B0_unit.Set.add u skip_tests) us
+        | fail :: us -> loop (fail :: fails) skip_tests us
+        in
+        loop [] skip_tests rets
+      in
+      let () = show_tests_with_skips tests_with_skips in
       let () = show_skip_tests skip_tests in
       Log.stdout (fun m ->
           m "%a" pp_report (allow_long,
@@ -163,19 +220,46 @@ let test allow_long allow_empty units x_units packs x_packs what lock c =
 
 open Cmdliner
 
+let s_test_options = "OPTIONS FOR RUNNING TESTS"
+
 let cmd =
   let doc = "Build and run tests" in
   let descr = `Blocks
-      [ `P "The $(iname) command builds and runs tests. \
-            A test is a unit tagged with both $(b,B0_meta.test) and \
+      [ `P "The $(iname) command builds and runs tests.";
+        `Pre "$(mname) $(b,list --tests)     # List all tests"; `Noblank;
+        `Pre "$(iname)             # Run all tests"; `Noblank;
+        `Pre "$(iname) $(b,-l)          # Run all tests including long ones";
+        `Noblank;
+        `Pre "$(iname) $(b,-u mytest)   # Only run test of unit $(b,mytest)";
+        `Noblank;
+        `Pre "$(iname) $(b,--seed 123)  # Set env $(b,SEED=123) for running";
+        `Noblank;
+        `Pre "$(iname) $(b,--correct)   # Set env $(b,CORRECT=true) for \
+              running";
+        `P "A test is a unit tagged with both $(b,B0_meta.test) and \
             $(b,B0_meta.run). The command builds like \
             $(b,b0 build) does and then runs all the tests that are in \
-            the units that $(b,must) build.";
-        `P "Tests that are tagged with $(b,B0_meta.long) are only run \
-            if the $(b,--long) option is used.";
+            the units that $(b,must) build. Use option $(b,--what) with \
+            a given invocation to understand what builds and which tests \
+            are run.";
         `P "The command exits with 1 if one of the tests exits with \
-            non-zero. Use option $(b,--what) with a given invocation \
-            to understand what builds and which tests are run.";]
+            non-zero. The exit code 2 of tests is interpreted as success but \
+            means that long tests having been skipped.";
+        `P "Tests that are tagged with $(b,B0_meta.long) are only run \
+            if the $(b,--long) option is used. This also sets the environment \
+            variable $(b,LONG) to $(b,true) for running tests.";
+        `P "If the option $(b,--seed) $(i,NUM) is specified the environment \
+            variable $(b,SEED) is set to $(i,NUM) for running tests. This \
+            value should be used by randomized tests for seeding the \
+            pseudorandom number generator (PRNG).";
+        `P "If the option $(b,--correct) is specified the environment variable \
+            $(b,CORRECT) is set to $(b,true) for running tests. This should \
+            indicate that expected snapshots test mismatches must be updated \
+            to the snapshots cmoputed during the program run.";
+        `P "The environment variable $(b,LONG_SKIP_EXIT) is set to $(b,true) \
+            for running tests.";
+        `S s_test_options;
+      ]
   in
   let exits =
     Cmdliner.Cmd.Exit.info
@@ -184,17 +268,35 @@ let cmd =
       (Os.Exit.get_code exit_no_tests) ~doc:"If there are no tests to run." ::
     B0_driver.Exit.infos
   in
+  let docs = s_test_options in
   let allow_empty =
-    let doc = "Do not fail if there are no tests in the build." in
-    Arg.(value & flag & info ["e";"allow-empty"] ~doc)
+    let doc = "Do not fail if there is no test to run in the build." in
+    Arg.(value & flag & info ["e"; "allow-empty"] ~doc ~docs)
   in
   let long =
-    let doc = "Run long tests. By default tests tagged with \
-               $(b,B0_meta.long) are not run."
+    let doc =
+      "Run long tests. By default tests tagged with $(b,B0_meta.long) are \
+       not run. Also set environment variable $(b,LONG) to $(b,true) for \
+       running tests."
     in
-    Arg.(value & flag & info ["l";"long"] ~doc)
+    Arg.(value & flag & info ["l";"long"] ~doc ~docs)
+  in
+  let rand_seed =
+    let doc =
+      "Set environment variable $(b,SEED) to $(docv) for running tests."
+    in
+    let absent = "Randomly generated value" in
+    let docv = "INT" in
+    Arg.(value & opt (some int) None & info ["seed"] ~doc ~docv ~absent ~docs)
+  in
+  let correct =
+    let doc =
+      "Set environment variable $(b,CORRECT) to $(b,true) for running tests."
+    in
+    Arg.(value & flag & info ["correct"] ~doc ~docs)
   in
   B0_tool.Cli.subcmd_with_b0_file "test" ~exits ~doc ~descr @@
-  Term.(const test $ long $ allow_empty $ B0_cmd_build.units $
+  Term.(const test $ long $ allow_empty $ rand_seed $ correct $
+        B0_cmd_build.units $
         B0_cmd_build.x_units $ B0_cmd_build.packs $ B0_cmd_build.x_packs $
         B0_cmd_build.what $ B0_cmd_build.lock)

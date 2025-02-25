@@ -2896,6 +2896,10 @@ module Os : sig
         {- Windows uses
         {{:https://msdn.microsoft.com/en-us/library/windows/desktop/aa373083%28v=vs.85%29.aspx}Performance counters}.}} *)
   end
+
+  val exn_don't_catch : exn -> bool
+  (** [exn_don't_cath exn] is [true] iff [exn] is [Stack_overflow],
+      [Out_of_memory] or [Sys.Break]. *)
 end
 
 (** Program log.
