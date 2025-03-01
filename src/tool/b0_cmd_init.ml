@@ -392,11 +392,11 @@ let cmd =
 
 let templates' = [
 "cmdliner",
-"let cmd ~flag = 0\n\n\
+"let cmd ~flag = Cmdliner.Cmd.Exit.ok\n\n\
  open Cmdliner\n\
  open Cmdliner.Term.Syntax\n\n\
  let cmd =\n\
-\  Cmd.v (Cmd.info \"TODO\" ~version:\"\x25%VERSION%%\") @@\n\
+\  Cmd.make (Cmd.info \"TODO-toolname\" ~version:\"\x25%VERSION%%\") @@\n\
 \  let+ flag = Arg.(value & flag & info [\"flag\"]) in\n\
 \  cmd ~flag\n\n\
  let main () = Cmd.eval' cmd\n\
