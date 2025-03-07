@@ -77,6 +77,10 @@ module Test : sig
   (** [main'] is like {!main} but allows to define your own additional
       command line. *)
 
+  val set_main_exit : (unit -> int) -> unit
+  (** [set_main_exit f] will disable the final report performed
+      by {!main} and invoke [f] instead. {b TODO.} A bit ad-hoc. *)
+
   (** Test arguments. *)
   module Arg : sig
     type 'a t
@@ -313,11 +317,15 @@ module Test : sig
     (** [styled_string] tests strings and prints them with
         with {!B0_std.Fmt.styled_text_string}. *)
 
+    val lines : string t
+    (** [lines] tests strings and prints them by lines using
+        {!B0_std.Fmt.lines}. *)
+
     val bytes : bytes t
     (** [bytes] tests bytes and prints them with
         {!B0_std.Fmt.bytes}. *)
 
-    (** {2:cons Type contructors} *)
+    (** {2:parametric Parametric types} *)
 
     val option : 'a t -> 'a option t
     (** [option v] tests options of values tested with [v] and prints
@@ -337,10 +345,6 @@ module Test : sig
         equalities for the values of each cas and prints
         them as OCaml syntax with {!B0_std.Fmt.Lit.result}. *)
 
-    val pair : 'a t -> 'b t -> ('a * 'b) t
-    (** [pair fst snd] tests pairs with [fst] and [snd] and prints them
-        as OCaml syntax with {!B0_std.Fmt.Lit.pair}. *)
-
     val list : 'a t -> 'a list t
     (** [list elt] tests list of elements tested with [elt] and prints
         them as OCaml syntax with {!B0_std.Fmt.Lit.list}. *)
@@ -348,6 +352,31 @@ module Test : sig
     val array : 'a t -> 'a array t
     (** [array elt] test array of elements tested with [elt] and prints
         them as OCaml syntax with {!B0_std.Fmt.Lit.array}. *)
+
+    val pair : 'a t -> 'b t -> ('a * 'b) t
+    (** [pair fst snd] tests pairs with [fst] and [snd] and prints them
+        as OCaml syntax with {!B0_std.Fmt.Lit.pair}. *)
+
+    val t2 : 'a t -> 'b t -> ('a * 'b) t
+    (** [t2] is {!pair}. *)
+
+    val t3 : 'a t -> 'b t -> 'c t -> ('a * 'b * 'c) t
+    (** [t3] tests triplets and prints them as OCaml syntax with
+        {!B0_std.Fmt.List.t3}. *)
+
+    val t4 : 'a t -> 'b t -> 'c t -> 'd t -> ('a * 'b * 'c * 'd) t
+    (** [t4] tests quadruplets and prints them as OCaml syntax with
+        {!B0_std.Fmt.List.t4}. *)
+
+    val t5 : 'a t -> 'b t -> 'c t -> 'd t -> 'e t -> ('a * 'b * 'c * 'd * 'e) t
+    (** [t5] tests quintuplets and prints them as OCaml syntax with
+        {!B0_std.Fmt.List.t5}. *)
+
+    val t6 :
+      'a t -> 'b t -> 'c t -> 'd t -> 'e t -> 'f t ->
+      ('a * 'b * 'c * 'd * 'e * 'f) t
+    (** [t6] tests sextuplets and prints them as OCaml syntax with
+        {!B0_std.Fmt.List.t6}. *)
   end
 
   (** Reporting value differences.
@@ -381,8 +410,8 @@ module Test : sig
 
     val of_cmd : Cmd.t -> 'a t
     (** [of_cmd cmd] is a differ from command [cmd] which must
-        expect to receive [fnd] and [exp] as text files as the two
-        first positional arguments. The text files have rendering
+        expect to receive [exp] and [fnd] as text files as the two
+        first positional arguments in that order. The text files have rendering
         of the values with the test files to which a final newline is
         appended. *)
 
@@ -546,11 +575,16 @@ module Test : sig
   val float : float eq
   (** [float] is [eq ]{!T.float}. *)
 
+  (** {2:chars_and_strings Character and strings} *)
+
   val char : char eq
   (** [char] is [eq ]{!T.char}. *)
 
   val string : string eq
   (** [string] is [eq ]{!T.string}. Assumes UTF-8 encoded strings. *)
+
+  val lines : string eq
+  (** [lines] is [eq ]{!T.lines}. Assumes UTF-8 encoded strings. *)
 
   val binary_string : string eq
   (** [binary_string] is [eq ]{!T.binary_string}. Assumes arbitrary binary
@@ -565,6 +599,9 @@ module Test : sig
 
   (** {2:parametric Parametric types} *)
 
+  val any : 'a eq
+  (** [any] uses {!T.any}. *)
+
   val option : 'a T.t -> 'a option eq
   (** [option some] is [eq (]{!T.option}[ some)]. *)
 
@@ -577,14 +614,33 @@ module Test : sig
   val result' : ok:'a T.t -> error:'e T.t -> ('a, 'e) result eq
   (** [result' ~ok ~error] is [eq (]{!T.result'}[ ~ok ~error)]. *)
 
-  val pair : 'a T.t -> 'b T.t -> ('a * 'b) eq
-  (** [pair fst snd] is [eq (]{!T.pair}[ fst snd)]. *)
-
   val list : 'a T.t -> 'a list eq
   (** [list elt] is [eq (]{!T.list}[ elt)]. *)
 
   val array : 'a T.t -> 'a array eq
   (** [array elt] is [eq (]{!T.array}[ elt)]. *)
+
+  val pair : 'a T.t -> 'b T.t -> ('a * 'b) eq
+  (** [pair fst snd] is [eq (]{!T.pair}[ fst snd)]. *)
+
+  val t2 : 'a T.t -> 'b T.t -> ('a * 'b) eq
+  (** [t2] is {!pair}. *)
+
+  val t3 : 'a T.t -> 'b T.t -> 'c T.t -> ('a * 'b * 'c) eq
+  (** [t3] is {!eq} for triplets. *)
+
+  val t4 : 'a T.t -> 'b T.t -> 'c T.t -> 'd T.t -> ('a * 'b * 'c * 'd) eq
+  (** [t4] is {!eq} for quadruplets. *)
+
+  val t5 :
+    'a T.t -> 'b T.t -> 'c T.t -> 'd T.t -> 'e T.t ->
+    ('a * 'b * 'c * 'd * 'e) eq
+  (** [t5] is {!eq} for quintuplets. *)
+
+  val t6 :
+    'a T.t -> 'b T.t -> 'c T.t -> 'd T.t -> 'e T.t -> 'f T.t ->
+    ('a * 'b * 'c * 'd * 'e * 'f) eq
+  (** [t6] is {!eq} for sextuplets. *)
 
   (** {1:random Randomized testing} *)
 
@@ -775,15 +831,23 @@ module Snap : sig
   (** [hex_float] is {!Test.val-snap}[ ]{!Test.module-T.hex_float}
       N.B. not exactly. *)
 
-  (** {1:strings Characters and strings} *)
+  (** {2:chars_and_strings Character and strings}
+
+      {b Note.} The string snapshoters have a special
+      substitution function that respects quoted literals.
+  *)
 
   val char : char Test.snap
   (** [char] is {!Test.val-snap}[ ]{!Test.module-T.char}. *)
 
   val ascii_string : string Test.snap
   val string : string Test.snap
+
   val line : string Test.snap
   (** like {!string} but on a single line. *)
+
+  val lines : string Test.snap
+  (** [lines] uses {!Test.module-T.lines} to produce the diffs. *)
 
   (*
   val binary_string : string eq
@@ -814,14 +878,35 @@ module Snap : sig
   (** [result ok error] is
       {!Test.val-snap}[ (]{!Test.module-T.result}[ ok error)] *)
 
-  val pair : 'a Test.T.t -> 'b Test.T.t -> ('a * 'b) Test.snap
-  (** [pair fst snd] is {!Test.val-snap}[ (]{!Test.module-T.pair}[ fst snd)] *)
-
   val list : 'a Test.T.t -> 'a list Test.snap
   (** [list elt] is {!Test.val-snap}[ (]{!Test.module-T.list}[ elt)] *)
 
   val array : 'a Test.T.t -> 'a array Test.snap
   (** [array elt] is {!Test.val-snap}[ (]{!Test.module-T.array}[ elt)] *)
+
+  val pair : 'a Test.T.t -> 'b Test.T.t -> ('a * 'b) Test.snap
+  (** [pair fst snd] is {!Test.val-snap}[ (]{!Test.module-T.pair}[ fst snd)] *)
+
+  val t2 : 'a Test.T.t -> 'b Test.T.t -> ('a * 'b) Test.snap
+  (** [t2] is {!pair}. *)
+
+  val t3 : 'a Test.T.t -> 'b Test.T.t -> 'c Test.T.t -> ('a * 'b * 'c) Test.snap
+  (** [t3 v0 v1 v2] is {!Test.val-snap} for triplets. *)
+
+  val t4 :
+    'a Test.T.t -> 'b Test.T.t -> 'c Test.T.t -> 'd Test.T.t ->
+    ('a * 'b * 'c * 'd) Test.snap
+  (** [t4] is {!Test.val-snap} for quadruplets. *)
+
+  val t5 :
+    'a Test.T.t -> 'b Test.T.t -> 'c Test.T.t -> 'd Test.T.t -> 'e Test.T.t ->
+    ('a * 'b * 'c * 'd * 'e) Test.snap
+  (** [t5] is {!Test.val-snap} for quintuplets. *)
+
+  val t6 :
+    'a Test.T.t -> 'b Test.T.t -> 'c Test.T.t -> 'd Test.T.t -> 'e Test.T.t ->
+    'f Test.T.t -> ('a * 'b * 'c * 'd * 'e * 'f) Test.snap
+  (** [t6] is {!Test.val-snap} for sextuplets. *)
 
   (** {1:exec Command executions} *)
 

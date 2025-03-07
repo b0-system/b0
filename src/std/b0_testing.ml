@@ -75,7 +75,7 @@ module Test_fmt = struct
         (l.Printexc.filename, l.Printexc.line_number, l.Printexc.start_char,
          l.Printexc.end_char)
 
-  let anon ppf _ = Fmt.string ppf "_"
+  let anon ppf _ = Fmt.string ppf "<abstr>"
 end
 
 module Test = struct
@@ -330,6 +330,7 @@ module Test = struct
     let char = make ~equal:Char.equal ~pp:Fmt.Lit.char ()
     let ascii_string = make ~equal:String.equal ~pp:Fmt.Lit.ascii_string ()
     let string = make ~equal:String.equal ~pp:Fmt.Lit.string ()
+    let lines = make ~equal:String.equal ~pp:Fmt.lines ()
     let binary_string = make ~equal:String.equal ~pp:Fmt.binary_string ()
     let styled_string =
       make ~equal:String.equal ~pp:Fmt.styled_text_string_literal ()
@@ -355,6 +356,13 @@ module Test = struct
       make ~equal ~pp ()
 
     let result ~ok = result' ~ok ~error:string
+
+    let list (type a) (module Elt : T with type t = a) =
+      make ~equal:(List.equal Elt.equal) ~pp:(Fmt.Lit.list Elt.pp) ()
+
+    let array (type a) (module Elt : T with type t = a) =
+      make ~equal:(array_equal Elt.equal) ~pp:(Fmt.Lit.array Elt.pp) ()
+
     let pair
         (type a) (module Fst : T with type t = a)
         (type b) (module Snd : T with type t = b)
@@ -363,11 +371,37 @@ module Test = struct
       let pp = Fmt.Lit.pair Fst.pp Snd.pp in
       make ~equal ~pp ()
 
-    let list (type a) (module Elt : T with type t = a) =
-      make ~equal:(List.equal Elt.equal) ~pp:(Fmt.Lit.list Elt.pp) ()
+    let t2 = pair
+    let t3 v0 v1 v2 =
+      let equal (a0, a1, a2) (b0, b1, b2) =
+        (equal v0) a0 b0 && (equal v1) a1 b1 && (equal v2) a2 b2
+      in
+      let pp = Fmt.Lit.t3 (pp v0) (pp v1) (pp v2) in
+      make ~equal ~pp ()
 
-    let array (type a) (module Elt : T with type t = a) =
-      make ~equal:(array_equal Elt.equal) ~pp:(Fmt.Lit.array Elt.pp) ()
+    let t4 v0 v1 v2 v3 =
+      let equal (a0, a1, a2, a3) (b0, b1, b2, b3) =
+        (equal v0) a0 b0 && (equal v1) a1 b1 && (equal v2) a2 b2 &&
+        (equal v3) a3 b3
+      in
+      let pp = Fmt.Lit.t4 (pp v0) (pp v1) (pp v2) (pp v3) in
+      make ~equal ~pp ()
+
+    let t5 v0 v1 v2 v3 v4 =
+      let equal (a0, a1, a2, a3, a4) (b0, b1, b2, b3, b4) =
+        (equal v0) a0 b0 && (equal v1) a1 b1 && (equal v2) a2 b2 &&
+        (equal v3) a3 b3 && (equal v4) a4 b4
+      in
+      let pp = Fmt.Lit.t5 (pp v0) (pp v1) (pp v2) (pp v3) (pp v4) in
+      make ~equal ~pp ()
+
+    let t6 v0 v1 v2 v3 v4 v5 =
+      let equal (a0, a1, a2, a3, a4, a5) (b0, b1, b2, b3, b4, b5) =
+        (equal v0) a0 b0 && (equal v1) a1 b1 && (equal v2) a2 b2 &&
+        (equal v3) a3 b3 && (equal v4) a4 b4 && (equal v5) a5 b5
+      in
+      let pp = Fmt.Lit.t6 (pp v0) (pp v1) (pp v2) (pp v3) (pp v4) (pp v5) in
+      make ~equal ~pp ()
   end
 
   module Diff = struct
@@ -383,9 +417,9 @@ module Test = struct
     let run_diff_cmd ?env cmd ~fnd ~exp =
       Result.join @@ Os.Dir.with_tmp @@ fun dir ->
       let force = false and make_path = false in
-      let* () = Os.File.write ~force ~make_path Fpath.(dir / "found") fnd in
       let* () = Os.File.write ~force ~make_path Fpath.(dir / "expected") exp in
-      let diff = Cmd.(cmd % "found" % "expected") in
+      let* () = Os.File.write ~force ~make_path Fpath.(dir / "found") fnd in
+      let diff = Cmd.(cmd % "expected" % "found") in
       match Os.Cmd.run_status_out ?env ~trim:false ~cwd:dir diff with
       | Error _ as e -> e
       | Ok (st, diff) -> Ok diff
@@ -399,7 +433,8 @@ module Test = struct
       | Error e -> Fmt.pf ppf  "diff command error: %s" e
       | Ok diff -> Fmt.pf ppf "@[%a@]" Fmt.lines diff
 
-    let git_diff = lazy (Os.Cmd.get Cmd.(tool "git" % "diff"))
+    let git_diff_cmd = B0_std.Cmd.(tool "git" % "diff")
+    let git_diff = lazy (Os.Cmd.get git_diff_cmd)
     let git_diff ~fnd ~exp =
       let* git_diff = Lazy.force git_diff in
       let opts =
@@ -572,6 +607,7 @@ module Test = struct
 
   (* Values *)
 
+  let any ?(diff = Diff.dumb) = eq T.any ~diff
   let exn = eq T.exn
   let unit = eq T.unit
   let bool = eq T.bool
@@ -585,16 +621,22 @@ module Test = struct
   let nativeuint = eq T.nativeuint
   let float = eq T.float
   let string = eq T.string
+  let lines = eq T.lines
   let binary_string = eq T.binary_string
   let styled_string = eq T.styled_string
   let bytes = eq T.bytes
-  let pair fst snd = eq (T.pair fst snd)
-  let list elt = eq (T.list elt)
-  let array elt = eq (T.array elt)
   let option some = eq (T.option some)
   let either ~left ~right = eq (T.either ~left ~right)
   let result ~ok = eq (T.result ~ok)
   let result' ~ok ~error = eq (T.result' ~ok ~error)
+  let list elt = eq (T.list elt)
+  let array elt = eq (T.array elt)
+  let pair fst snd = eq (T.pair fst snd)
+  let t2 = pair
+  let t3 v0 v1 v2 = eq (T.t3 v0 v1 v2)
+  let t4 v0 v1 v2 v3 = eq (T.t4 v0 v1 v2 v3)
+  let t5 v0 v1 v2 v3 v4 = eq (T.t5 v0 v1 v2 v3 v4)
+  let t6 v0 v1 v2 v3 v4 v5 = eq (T.t6 v0 v1 v2 v3 v4 v5)
 
   (* Randomized testing *)
 
@@ -949,15 +991,14 @@ module Test = struct
     let diff_cmd =
       let doc =
         "$(docv) is the command used for making textual diffs. The tool is \
-         invoked as $(docv) $(b,fnd) $(b,exp) with $(b,fnd) and $(b,exp) the \
+         invoked as $(docv) $(b,exp) $(b,fnd) with $(b,exp) and $(b,fnd) the \
          text files to compare. The tool should output a visual represention \
          of the differences between the file contents. This representation
          can be ANSI styled. If $(docv) is $(b,dumb) no external tool \
          is invoked, an internal, non-helpful depiction of the value \
          differences is used."
       in
-      let none = B0_std.Cmd.(tool "git" % "diff") in
-      Arg.(value & opt (some' ~none B0_std_cli.cmd) None &
+      Arg.(value & opt (some' ~none:Diff.git_diff_cmd B0_std_cli.cmd) None &
            info ["diff-cmd"] ~doc ~docv:"CMD" ~docs)
 
     let correct =
@@ -965,7 +1006,7 @@ module Test = struct
                  during the run. See also $(b,--force-correct)."
       in
       let env = Cmd.Env.info "CORRECT" in
-      Arg.(value & flag & info [Snapshot.cli_correct] ~env ~doc ~docs)
+      Arg.(value & flag & info ["c"; Snapshot.cli_correct] ~env ~doc ~docs)
 
     let force_correct =
       let doc = "Force all expected snapshots to update to the snapshots \
@@ -1041,6 +1082,9 @@ module Test = struct
 
   (* Main *)
 
+  let main_exit = Atomic.make None
+  let set_main_exit f = Atomic.set main_exit (Some f)
+
   let report_pass ~dur =
     Skip.report ();
     Long.report ();
@@ -1057,13 +1101,15 @@ module Test = struct
       if Def.output_list () then (Def.show_list (); 0) else
       let () = Printexc.record_backtrace true in
       let dur = Os.Mtime.counter () in
-      let exit_main dur =
-        Patch.write_files ();
-        if Atomic.get Fail.test_count = 0 && Atomic.get Fail.count = 0
-        then (report_pass ~dur;
-              if Long.skip_exit () && not (Long.run ()) &&
-                 Atomic.get Long.count <> 0 then Cli.exit_long_skip else 0)
-        else (report_fail ~dur; 1)
+      let exit_main dur = match Atomic.get main_exit with
+      | Some f -> f ()
+      | None ->
+          Patch.write_files ();
+          if Atomic.get Fail.test_count = 0 && Atomic.get Fail.count = 0
+          then (report_pass ~dur;
+                if Long.skip_exit () && not (Long.run ()) &&
+                   Atomic.get Long.count <> 0 then Cli.exit_long_skip else 0)
+          else (report_fail ~dur; 1)
       in
       try (f args; exit_main dur) with
       | Stop -> exit_main dur
@@ -1124,6 +1170,7 @@ module Snap = struct
   let hex_float = Test.(snap (negative_parens T.hex_float))
   let char = Test.(snap T.char)
   let string = Test.snap ~subst:Test.Snapshot.string_subst Test.T.string
+  let lines = Test.snap ~subst:Test.Snapshot.string_subst Test.T.lines
   let ascii_string =
     Test.snap ~subst:Test.Snapshot.string_subst Test.T.ascii_string
 
@@ -1134,9 +1181,14 @@ module Snap = struct
   let either left right = Test.(snap (T.either ~left ~right))
   let result ok  = Test.(snap (T.result ~ok))
   let result' ok error = Test.(snap (T.result' ~ok ~error))
-  let pair fst snd = Test.(snap (T.pair fst snd))
   let list elt = Test.(snap (T.list elt))
   let array elt = Test.(snap (T.array elt))
+  let pair fst snd = Test.(snap (T.pair fst snd))
+  let t2 = pair
+  let t3 v0 v1 v2 = Test.(snap (T.t3 v0 v1 v2))
+  let t4 v0 v1 v2 v3 = Test.(snap (T.t4 v0 v1 v2 v3))
+  let t5 v0 v1 v2 v3 v4 = Test.(snap (T.t5 v0 v1 v2 v3 v4))
+  let t6 v0 v1 v2 v3 v4 v5 = Test.(snap (T.t6 v0 v1 v2 v3 v4 v5))
 
   (* Command spawns. *)
 

@@ -371,8 +371,6 @@ module Lit = struct
     for i = 0 to String.length s - 1 do pp_hex_escaped_char ppf s.[i] done;
     raw_char ppf '\"'
 
-  let pair fst snd ppf (a, b) = pf ppf "@[<1>(%a,@ %a)@]" fst a snd b
-
   let option pp_v ppf = function
   | None -> raw_string ppf "None"
   | Some v -> pf ppf "@[<2>Some %a@]" pp_v v
@@ -392,6 +390,18 @@ module Lit = struct
   let array pp_v ppf a =
     let sep ppf () = pf ppf ";@ " in
     pf ppf "@[<2>[|%a|]@]" (iter ~sep Array.iter pp_v) a
+
+  let pair fst snd ppf (a, b) = pf ppf "@[<1>(%a,@ %a)@]" fst a snd b
+  let t2 = pair
+  let t3 v0 v1 v2 ppf (a, b, c) = pf ppf "@[<1>(%a,@ %a,@ %a)@]" v0 a v1 b v2 c
+  let t4 v0 v1 v2 v3 ppf (a, b, c, d) =
+    pf ppf "@[<1>(%a,@ %a,@ %a,@ %a)@]" v0 a v1 b v2 c v3 d
+
+  let t5 v0 v1 v2 v3 v4 ppf (a, b, c, d, e) =
+    pf ppf "@[<1>(%a,@ %a,@ %a,@ %a,@ %a)@]" v0 a v1 b v2 c v3 d v4 e
+
+  let t6 v0 v1 v2 v3 v4 v5 ppf (a, b, c, d, e, f) =
+    pf ppf "@[<1>(%a,@ %a,@ %a,@ %a,@ %a, @%a)@]" v0 a v1 b v2 c v3 d v4 e v5 f
 end
 
 (* Magnitudes *)

@@ -247,13 +247,10 @@ module Lit : sig
   (** [binary_string] formats binary string literals. All characters
       are formatted using [\xhh] escapes. *)
 
-  (** {1:cons Type constructors}
+  (** {1:params Parametric types}
 
       {b Note.} Depending on what you print an enclosing
       {!parens} may be due on the arguments. *)
-
-  val pair : 'a t -> 'b t -> ('a * 'b) t
-  (** [pair] formats pair literals. *)
 
   val option : 'a t -> 'a option t
   (** [option] formats [option] literals. *)
@@ -269,6 +266,26 @@ module Lit : sig
 
   val array : 'a t -> 'a array t
   (** [array] formats [array] literals. *)
+
+  val pair : 'a t -> 'b t -> ('a * 'b) t
+  (** [pair] formats pair literals. *)
+
+  val t2 : 'a t -> 'b t -> ('a * 'b) t
+  (** [t2] is {!pair}. *)
+
+  val t3 : 'a t -> 'b t -> 'c t -> ('a * 'b * 'c) t
+  (** [t3] formats triples. *)
+
+  val t4 : 'a t -> 'b t -> 'c t -> 'd t -> ('a * 'b * 'c * 'd) t
+  (** [t4] formats quadruples. *)
+
+  val t5 : 'a t -> 'b t -> 'c t -> 'd t -> 'e t -> ('a * 'b * 'c * 'd * 'e) t
+  (** [t5] formats quintuplets. *)
+
+  val t6 :
+    'a t -> 'b t -> 'c t -> 'd t -> 'e t -> 'f t ->
+    ('a * 'b * 'c * 'd * 'e * 'f) t
+  (** [t6] formats sextuplets. *)
 end
 
 val bool : bool t

@@ -34,6 +34,14 @@ b0 test --seed 123 # Run random tests with seed 123
 b0 test --correct  # Correct failed snapshot tests
 ]}
 
+Since tests are executable you can also run them directly. See
+{!run}. In particular certain tests may offer specific options,
+consult them by invoking the test directly.
+
+{@sh[
+b0 -- this_test --help
+]}
+
 {2:run How do I run build artefacts ?}
 
 {@sh[

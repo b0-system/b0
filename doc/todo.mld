@@ -223,6 +223,8 @@ On hold until we get the {!B0_srcs} thing right.
   we drop the skips at the unit level ?
 - Timeouts (see pathological.ml in cmarkit)
 - Progress.
+- Once we run snapshot tests on Windows we will likely need a newline
+  normalization business.
 - [Test.Arg] add lazy arguments.
 - We want tests to be [let] bound so that it's easy to invoke
   them induvidually, e.g. in the toplevel.
