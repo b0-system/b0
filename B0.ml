@@ -234,7 +234,6 @@ let vendor_more_modules =
   let* () = copy_module ~subst ~src_dir ~dst_dir "more__result" "b0__result" in
   Ok ()
 
-
 let vendor_webs_modules =
   let doc = "Update vendored Webs modules" in
   B0_unit.of_action "vendor-webs" ~doc @@ fun env _ ~args ->

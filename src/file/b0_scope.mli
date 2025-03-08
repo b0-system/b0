@@ -42,6 +42,9 @@ val sep : string
 type t
 (** The type for scopes. *)
 
+val equal : t -> t -> bool
+(** [equal s0 s1] is [true] iff [s0] and [s1] are equal. *)
+
 val file : t -> Fpath.t option
 (** [file s] is the file in which the scope is opened. *)
 
@@ -73,9 +76,11 @@ val make_unique_qualified_name :
 
 val current_scope_prefix : unit -> string
 
-
 val current : unit -> t option
 (** [current ()] is the current scope (if any). *)
+
+val is_current : t -> bool
+(** [is_current scope] is [true] iff [scope] is the current scope. *)
 
 val current_is_root : unit -> bool
 (** [is_root ()] is [true] if we are in the root scope. *)

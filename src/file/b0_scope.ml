@@ -49,6 +49,8 @@ type t = (* XXX add a case for Root ? *)
 | Lib of lib
 | File of file * file list (* parents, from nearest to root *)
 
+let equal = Stdlib.( = )
+
 let file = function File (file, _) -> Some file.file | Lib _ -> None
 let dir = function File (file, _) -> Some file.dir | Lib _ -> None
 
@@ -222,8 +224,10 @@ let open_file name file = match !current with
 
 (* Current *)
 
-
 let current () = !current
+
+let is_current scope = match current () with
+| None -> false | Some current -> equal scope current
 
 let current_make_unique_qualified_name ~defs ~kind name = match current () with
 | Some scope ->

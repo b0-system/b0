@@ -78,6 +78,8 @@ the [wrap] parameter to units.
 {2:b0_scope [B0_scope]}
 
 * Is still quite dirty. Review.
+* When we B0.include a scope `B0_unit.list ()` will have
+  them is that expected ?
 
 {2:b0_env [B0_env]}
 

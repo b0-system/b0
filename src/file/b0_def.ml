@@ -183,10 +183,7 @@ module Make (V : VALUE) = struct
 
   let scope_path v = B0_scope.path (scope v)
   let in_root_scope v = B0_scope.is_root (scope v)
-
-  let in_current_scope v =
-    let prefix = B0_scope.current_scope_prefix () in
-    String.starts_with ~prefix (name v)
+  let in_current_scope v = B0_scope.is_current (scope v)
 
   let scope_dir v = scope_dir (def v)
   let scope_dir' v = match scope_dir v with
