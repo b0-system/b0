@@ -38,6 +38,11 @@ let vcs_repo_version_of_pack ?(commit_ish = "HEAD") pack =
 
 (* Package selection *)
 
+let err_no_pack () =
+  Fmt.error
+    "@[<v>No pack found. Specify one with option %a or define@,\
+     a pack named %a.@]" Fmt.code "-p" Fmt.code "default"
+
 let select_packs packs x_packs =
   (* XXX default pack selection. I don't really like that. I think
      it would be better to select packs that have a `B0_release.tag`
@@ -352,12 +357,7 @@ module Tag = struct
     Log.if_error ~use:Os.Exit.no_such_name @@
     let* packs = select_packs packs x_packs in
     Log.if_error' ~use:Os.Exit.some_error @@
-    let* () =
-      if packs <> [] then Ok () else
-      Fmt.error
-        "@[<v>No pack found. Specify one with option %a or define@,\
-         a pack named %a.@]" Fmt.code "-p" Fmt.code "default"
-    in
+    let* () = if packs <> [] then Ok () else err_no_pack () in
     let* repos_tags = gather_repos_and_tags version packs in
     let rec loop = function
     | [] -> Ok Os.Exit.ok
@@ -418,10 +418,12 @@ module Status = struct
     Log.if_error ~use:Os.Exit.no_such_name @@
     let* packs = select_packs packs x_packs in
     Log.if_error' ~use:Os.Exit.some_error @@
+    let* () = if packs <> [] then Ok () else err_no_pack () in
     let* pager = B0_pager.find ~don't:pager_don't () in
     let* () = B0_pager.page_stdout pager in
     let* repos = gather_repos packs in
-    if repos = [] then Fmt.error "No VCS repository found." else
+    if repos = []
+    then Fmt.error "No VCS repository found." else
     let rec loop ~has_changes = function
     | [] -> Ok has_changes
     | repo :: repos ->
