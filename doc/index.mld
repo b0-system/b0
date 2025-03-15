@@ -73,9 +73,13 @@ B0_url
 
 {!modules:
 B0_rsync
-B0_testing
+B0_testing}
+
+{2:vcs VCS and code hosting}
+
+{!modules:
 B0_vcs_repo
-}
+B0_github}
 
 {2:view Viewers and editors}
 
@@ -148,14 +152,6 @@ B0_init
 B0_os
 B0_srcs
 B0_web_page
-}
-
-{2:vcs VCS and code hosting}
-
-See also {!B0_vcs_repo}.
-
-{!modules:
-B0_github
 }
 
 {2:testing Testing and releasing}

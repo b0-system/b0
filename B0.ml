@@ -134,6 +134,11 @@ let example_driver =
   let requires = [b0_file] in
   test ~/"test/example_driver.ml" ~run:false ~requires ~doc
 
+let example_open_gh_issue =
+  let doc = "B0_github example" in
+  let requires = [b0_std; b0_kit] in
+  test ~/"test/example_open_gh_issue.ml" ~run:false ~requires ~doc
+
 let example_testing =
   test ~/"test/example_testing.ml" ~run:false ~doc:"Example from the docs"
 

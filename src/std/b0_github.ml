@@ -11,7 +11,6 @@ open B0_http
 (* GitHub authentication. *)
 
 module Auth = struct
-
   let conf_dir () =
     let* c = Os.Dir.config () in
     Ok Fpath.(c / "b0" / "github")
@@ -366,12 +365,12 @@ module Pages = struct
         Log.msg log begin fun m ->
           m ~header "%s changes." (if amend then "Amending" else "Commiting")
         end;
-        Result.bind (B0_vcs_repo.Git.commit_exists r "HEAD") @@ fun has_commit ->
+        let* has_commit = B0_vcs_repo.Git.commit_exists r "HEAD" in
         let amend = has_commit && amend in
         let reset_author = amend in
         let stdout = Os.Cmd.out_null in
-        Result.bind (B0_vcs_repo.Git.commit ~amend ~reset_author ~stdout ~msg r)
-        @@ fun () -> Ok true
+        let* () = B0_vcs_repo.Git.commit ~amend ~reset_author ~stdout ~msg r in
+        Ok true
     | false ->
         Log.msg log (fun m -> m ~header "No changes to commit.");
         Ok false
@@ -380,8 +379,8 @@ module Pages = struct
     Log.msg log (fun m -> m ~header "Copying updates.");
     let rm p = (* This makes sure [p] is in the repo *)
       let stdout = Os.Cmd.out_null in
-      B0_vcs_repo.Git.rm r ~stdout ~force:true ~recurse:true ~ignore_unmatch:true
-        [p]
+      B0_vcs_repo.Git.rm r ~stdout ~force:true ~recurse:true
+        ~ignore_unmatch:true [p]
     in
     let cp r ~follow_symlinks src dst =
       let dst = Fpath.(B0_vcs_repo.(work_dir r) // dst) in
