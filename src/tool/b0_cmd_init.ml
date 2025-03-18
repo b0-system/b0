@@ -392,26 +392,20 @@ let cmd =
 
 let templates' = [
 "cmdliner",
-"let cmd ~flag = Cmdliner.Cmd.Exit.ok\n\n\
- open Cmdliner\n\
- open Cmdliner.Term.Syntax\n\n\
- let cmd =\n\
-\  Cmd.make (Cmd.info \"TODO-toolname\" ~version:\"\x25%VERSION%%\") @@\n\
-\  let+ flag = Arg.(value & flag & info [\"flag\"]) in\n\
-\  cmd ~flag\n\n\
- let main () = Cmd.eval' cmd\n\
- let () = if !Sys.interactive then () else exit (main ())\n";
-
-"b0.testing",
-"open B0_testing\n\n\
- let test_that () =\n\
-\  Test.test \"that\" @@ fun () ->\n\
-\  Test.int ~__POS__ 1 1;\n\
-\  ()\n\n\
- let main () =\n\
-\  Test.main @@ fun () ->
-\  test_that ();
-\  ()\n\n\
-let () = if !Sys.interactive then () else exit (main ())\n";]
+"\
+let tool () = Cmdliner.Cmd.Exit.ok\n\
+\n\
+open Cmdliner\n\
+open Cmdliner.Term.Syntax\n\
+\n\
+let tool_cmd =\n\
+\  Cmd.make (Cmd.info \"TODO\" ~version:\"%%VERSION%%\") @@\n\
+\  let+ unit = Term.const () in\n\
+\  tool unit\n\
+\n\
+let main () = Cmd.eval' tool_cmd\n\
+let () = if !Sys.interactive then () else exit (main ())\n\
+"
+]
 
 let () = templates := templates'

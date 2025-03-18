@@ -313,6 +313,8 @@ v}
 - Move away from the hardcoded stuff. Take the best of `carcass` and
   integrate it. Focus on {e files} and {e fragments} that output on stdout
   rather than file hierarchies.
+- The command operation is confusing. I think the fragments should
+  move to a [b0 snippet] command.
 
 {1:doc Documentation overhaul}
 
