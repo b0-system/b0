@@ -116,7 +116,7 @@ let kind s = match find_scheme_colon s with
 
 (* Operations *)
 
-let update ?scheme:s ?authority:a ?path:p ?query:q ?fragment:f u =
+let of_url u ?scheme:s ?authority:a ?path:p ?query:q ?fragment:f () =
   let add_scheme s u = match s with None -> u | Some s -> s :: ":" :: u in
   let add_authority a u = match a with None -> u | Some a -> "//" :: a :: u in
   let add_path p u = match p with None -> u | Some p -> p :: u in
@@ -155,6 +155,35 @@ let append root u = match kind u with
         | Some _ -> String.concat "" [string_subrange ~last:i root; u]
     end
 | `Rel `Empty -> root
+
+(* Authority *)
+
+module Authority = struct
+  type t = authority
+  let find_userinfo_at a = String.index_opt a '@'
+  let find_port_colon a =
+    if a = "" then None else
+    let max = String.length a - 1 in
+    let i = ref max in
+    while !i >= 0 && digit a.[!i] do decr i done;
+    if !i < 0 then None else
+    if a.[!i] = ':' then Some !i else None
+
+  let userinfo a = match find_userinfo_at a with
+  | None -> None | Some i -> Some (String.sub a 0 i)
+
+  let host a =
+    let first = match find_userinfo_at a with None -> 0 | Some at -> at + 1 in
+    let last = match find_port_colon a with
+    | None -> String.length a - 1
+    | Some colon -> colon - 1
+    in
+    string_subrange a ~first ~last
+
+  let port a = match find_port_colon a with
+  | None -> None
+  | Some c -> int_of_string_opt (string_subrange a ~first:(c + 1))
+end
 
 (* Scraping *)
 

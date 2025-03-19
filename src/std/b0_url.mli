@@ -67,12 +67,13 @@ val kind : t -> kind
 
 (** {1:ops Operations} *)
 
-val update :
-  ?scheme:scheme option -> ?authority:string option ->
+val of_url : t ->
+  ?scheme:scheme option -> ?authority:authority option ->
   ?path:path option -> ?query:query option -> ?fragment:fragment option ->
-  t -> t
-(** [update u] updates the specified components of [u]. If unspecified
-    kept as in [u], if updated with [None] the component is deleted from [u]. *)
+  unit -> t
+(** [of_url u ()] is a new url whith unspecified components defaulting
+    to those of [u]. If specified with [None] the given component is
+    deleted. *)
 
 val append : t -> t -> t
 (** [append root u] is [u] if [kind u] is [`Abs]. Otherwise
@@ -89,6 +90,24 @@ val path_and_rest : t -> string option
 val drop_path_and_rest : t -> string
 (** [drop_path_and_rest u] is [u] without the path and query. *)
 *)
+
+(** {1:authorities Authorities} *)
+
+(** Sloppy authority processing. *)
+module Authority : sig
+  type t = authority
+  (** See {!authority}. *)
+
+  val userinfo : authority -> string option
+  (** [userinfo a] is anything before the lefmost ['@'] (if any) *)
+
+  val host : authority -> string
+  (** [host a] is anything between the first ['@'] (if any) and the
+      [':'] separating the {!port}. *)
+
+  val port : authority -> int option
+  (** [port a] is the port made of suffix decimal digits before a [':']. *)
+end
 
 (** {1:scraping Scraping} *)
 
