@@ -3555,7 +3555,11 @@ module Os = struct
     | Unix.WSTOPPED _ -> assert false
 
     let pp_status ppf = function
-    | `Exited n -> Fmt.pf ppf "@[exited [%d]@]" n
+    | `Exited n ->
+        if Sys.win32 && n < 0 then
+          Fmt.pf ppf "@[exited [0x%08lx]@]" (Int32.of_int n)
+        else
+          Fmt.pf ppf "@[exited [%d]@]" n
     | `Signaled s -> Fmt.pf ppf "@[signaled [%a]@]" Fmt.sys_signal s
 
     let pp_cmd_status ppf (cmd, st) =
