@@ -28,5 +28,17 @@ depends: [
   "cmdliner" {>= "1.3.0"}
 ]
 build: ["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]
+install: [
+  "cmdliner"
+  "install"
+  "tool-completion"
+  "b0"
+  "show-url"
+  "b0-cache"
+  "b0-hash"
+  "b0-log"
+  "b0-sttyle"
+  "%{share}%"
+]
 dev-repo: "git+https://erratique.ch/repos/b0.git"
 x-maintenance-intent: ["(latest)"]

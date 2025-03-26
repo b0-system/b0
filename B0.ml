@@ -173,6 +173,9 @@ let default =
       ["dev"; "org:erratique"; "org:b0-system"; "build"]
     |> ~~ B0_opam.build
       {|[["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]]|}
+    |> ~~ B0_opam.install
+      {|["cmdliner" "install" "tool-completion" "b0" "show-url"
+         "b0-cache" "b0-hash" "b0-log" "b0-sttyle" "%{share}%"]|}
     |> ~~ B0_opam.depends [
       "ocaml", {|>= "4.08.0"|};
       "ocamlfind", {|build|};
