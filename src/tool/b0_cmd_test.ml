@@ -293,7 +293,7 @@ let cmd =
     let doc =
       "Set environment variable $(b,CORRECT) to $(b,true) for running tests."
     in
-    Arg.(value & flag & info ["correct"] ~doc ~docs)
+    Arg.(value & flag & info ["c"; "correct"] ~doc ~docs)
   in
   B0_tool.Cli.subcmd_with_b0_file "test" ~exits ~doc ~descr @@
   Term.(const test $ long $ allow_empty $ rand_seed $ correct $
