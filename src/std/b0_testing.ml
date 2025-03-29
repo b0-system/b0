@@ -722,10 +722,18 @@ module Test = struct
 
     let relayout_to_multi_line_string_literal ~indent s =
       (* Note we could perhaps have something adequate directly in Fmt.
-         This breaks on '\n' escapes with a slash and newline and indents *)
+         This breaks on '\n', escapes with a slash and newline and indents. *)
       let white_start l = if l = "" then false else Char.Ascii.is_white l.[0] in
       let escape_start l = if white_start l then "\\" ^ l else " " ^ l in
-      let lines = String.cuts_left ~sep:"\\n" s in
+      let lines = String.cuts_left ~sep:{|\n|} s in
+      let lines = match List.rev lines with
+      | "\"" :: prevs -> (* Last empty line, dont add a line for that *)
+          begin match prevs with
+          | [] -> lines
+          | prev :: prevs -> List.rev ((prev ^ {|\n"|}) :: prevs)
+          end
+      | _ -> lines
+      in
       let split_line = "\\n\\\n" in
       if indent = 0 then String.concat split_line lines else
       let indent = String.make indent ' ' in
