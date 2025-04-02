@@ -338,7 +338,11 @@ let action =
 
 let args =
   let doc = "Arguments given as is to the action." in
-  Arg.(value & pos_right 0 string [] & info [] ~doc ~docv:"ARG")
+  let aargs =
+    let completion = Arg.Completion.make ~restart:true () in
+    Arg.Conv.of_conv ~docv:"ARG" ~completion Arg.string ()
+  in
+  Arg.(value & pos_right 0 aargs [] & info [] ~doc)
 
 let term =
   Term.(const build $ units $ x_units $ packs $ x_packs $ what $ lock $

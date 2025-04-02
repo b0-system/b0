@@ -144,9 +144,13 @@ let keep_going =
   let fail_stop = false, Arg.info ["f"; "fail-stop"] ~doc in
   Arg.(value & vflag true [keep_going; fail_stop])
 
+let cli_arg ~docv =
+  let completion = Arg.Completion.make ~restart:true () in
+  Arg.Conv.of_conv ~docv Arg.string ~completion ()
+
 let tool =
   let doc = "Invoke tool $(docv)." in
-  Arg.(required & pos 0 (some string) None & info [] ~doc ~docv:"TOOL")
+  Arg.(required & pos 0 (some (cli_arg ~docv:"TOOL")) None & info [] ~doc)
 
 let all =
   let doc = "Apply command to all VCS scopes, not only those that are dirty." in
@@ -167,7 +171,7 @@ let tool_args =
   let doc = "Argument for the tool. Start with a $(b,--) \
              token otherwise options get interpreted by $(mname)."
   in
-  Arg.(value & pos_right 0 string [] & info [] ~doc ~docv:"ARG")
+  Arg.(value & pos_right 0 (cli_arg ~docv:"ARG") [] & info [] ~doc)
 
 let vcs_syn =
   "$(iname) [$(i,OPTION)]… $(b,--) $(i,SUBCMD) [$(i,ARG)]…"
