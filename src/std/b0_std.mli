@@ -2385,29 +2385,34 @@ module Os : sig
 
     (** {1:env Process environement} *)
 
-    type t = string String.Map.t
+    type t
     (** The type for process environments. *)
 
     val empty : t
-    (** [empty] is {!String.Map.empty}. *)
+    (** [empty] is an empty environment. *)
+
+    val current : unit -> (t, string) result
+    (** [current ()] is the current process environment. *)
 
     val find : var_name -> t -> string option
     (** [find name env] lookups [name] in [env]. *)
 
     val override : t -> by:t -> t
-    (** [override env ~by:o] overrides the definitions in [env] by [o]. *)
+    (** [override env ~by:over] overrides the definitions in [env] by
+        those in [by]. *)
 
     val add : var_name -> string -> t -> t
-    (** [add] is {!String.Map.val-add}. *)
+    (** [add name v env] is [env] but with [name] bound to [v] *)
+
+    val fold : (var_name -> string -> 'a -> 'a) -> t -> 'a -> 'a
+    (** [fold f env init] folds [f] on [env]'s bindings starting with
+        [env]. *)
 
     val remove : var_name -> t -> t
-    (** [remove] is {!String.Map.val-remove}. *)
+    (** [remove name env] is [env] without a binding for [name]. *)
 
     val mem : var_name -> t -> bool
-    (** [mem] is {!String.Map.val-mem}. *)
-
-    val current : unit -> (t, string) result
-    (** [current ()] is the current process environment. *)
+    (** [mem name env] is [true] iff [name] is bound in [env]. *)
 
     val pp : t Fmt.t
     (** [pp] formats environments for inspection. *)

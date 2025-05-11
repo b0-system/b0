@@ -40,11 +40,11 @@ module Tool = struct
   let unstamped_vars t = t.unstamped_vars
   let response_file t = t.response_file
   let read_env ~forced_env_vars t env =
-    let add_var acc var = match String.Map.find_opt var env with
-    | Some v -> String.Map.add var v acc
+    let add_var acc var = match Os.Env.find var env with
+    | Some v -> Os.Env.add var v acc
     | None -> acc
     in
-    let stamped = List.fold_left add_var String.Map.empty t.vars in
+    let stamped = List.fold_left add_var Os.Env.empty t.vars in
     let stamped = List.fold_left add_var stamped forced_env_vars in
     let all = List.fold_left add_var stamped t.unstamped_vars in
     all, stamped
@@ -112,19 +112,19 @@ let cache_lookup lookup =
       let p = lookup m tool in Hashtbl.add cache tool p; p
 
 let tool_lookup_of_os_env ?sep ?(var = "PATH") env =
-  let search_path = match String.Map.find var env with
-  | exception Not_found -> "" | s -> s
-  in
-  match Fpath.list_of_search_path ?sep search_path with
-  | Error _ as e -> fun _ _ -> Fut.return e
-  | Ok path ->
-      fun m t ->
-        let search = Os.Cmd.path_search ~win_exe:m.m.win_exe ~path () in
-        match Os.Cmd.get ~search (Cmd.path t) with
-        | Error _ as e -> Fut.return e
-        | Ok cmd ->
-            let file = Cmd.find_tool cmd |> Option.get in
-            ready_file m file; Fut.return (Ok file)
+  match Os.Env.find var env with
+  | None -> fun _ _ -> Fut.return (Fmt.error "%s env: undefined" var)
+  | Some search_path ->
+      match Fpath.list_of_search_path ?sep search_path with
+      | Error _ as e -> fun _ _ -> Fut.return e
+      | Ok path ->
+          fun m t ->
+            let search = Os.Cmd.path_search ~win_exe:m.m.win_exe ~path () in
+            match Os.Cmd.get ~search (Cmd.path t) with
+            | Error _ as e -> Fut.return e
+            | Ok cmd ->
+                let file = Cmd.find_tool cmd |> Option.get in
+                ready_file m file; Fut.return (Ok file)
 
 let make_zero
     ?clock ?cpu_clock:cc ~feedback ~cwd ?(win_exe = Sys.win32)
@@ -204,7 +204,7 @@ let fail m fmt =
 let fail_if_error m = function Ok v -> v | Error e -> fail m "%s" e
 
 module Env = struct
-  let var ~empty_is_none n m = match String.Map.find_opt n m.m.env with
+  let var ~empty_is_none n m = match Os.Env.find n m.m.env with
   | None -> None
   | Some "" when empty_is_none -> None
   | Some _ as v -> v
@@ -216,7 +216,7 @@ module Env = struct
       | Ok v -> Some v
       | Error e -> fail m "parsing %a: %s" Fmt.code n e
 
-  let var_exists var m = String.Map.mem var m.m.env
+  let var_exists var m = Os.Env.mem var m.m.env
 end
 
 let invoke_k m ~pp_kind k v = try k v with
