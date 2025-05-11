@@ -251,7 +251,7 @@ module Compile = struct
     Fut.of_list @@ List.map (B0_ocaml.Libresolver.get m r) libs
 
   let find_boot_libs m ~clib_ext ~env libs r =
-    match Os.Env.find ~empty_is_none:true "B0_BOOTSTRAP" with
+    match Os.Env.var ~empty_is_none:true "B0_BOOTSTRAP" with
     | None -> find_libs m r libs
     | Some bdir ->
         let bdir = Fpath.v bdir in

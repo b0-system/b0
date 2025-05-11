@@ -38,7 +38,7 @@ module Auth = struct
     Os.Dir.fold_files ~recurse:false add conf_dir []
 
   let get_token conf_dir ~user =
-    match Os.Env.find ~empty_is_none:true token_env with
+    match Os.Env.var ~empty_is_none:true token_env with
     | Some token -> Result.map (fun t -> t, `Env) (parse_token token)
     | None ->
         let tokfile = Fpath.(conf_dir / Fmt.str "%s.token" user) in
@@ -95,7 +95,7 @@ module Auth = struct
     match user with
     | Some user -> Ok user
     | None ->
-        match Os.Env.find ~empty_is_none:true user_env with
+        match Os.Env.var ~empty_is_none:true user_env with
         | Some user -> Ok user
         | None ->
             let default_user_file = Fpath.(conf_dir / default_user_file) in

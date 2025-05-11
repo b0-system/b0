@@ -34,7 +34,7 @@ let find ?search ?cmd () = match cmd with
     | Error _ as e -> e
     | Ok cmds as r ->
         let empty_is_none = true in
-        match Os.Env.find' ~empty_is_none Cmd.of_string env with
+        match Os.Env.var' ~empty_is_none Cmd.of_string env with
         | Error _ as e -> e
         | Ok None -> r
       | Ok (Some cmd) -> Ok (cmd :: cmds)

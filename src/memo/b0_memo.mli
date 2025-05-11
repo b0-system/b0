@@ -118,19 +118,18 @@ end
 (** Memo environment lookups. *)
 module Env : sig
 
-  val find : empty_is_none:bool -> Os.Env.var_name -> t -> string option
-  (** [find var m] looks up [var] in [m]'s {!env}.
-      This {!B0_memo.fail}s the memo in case of error. *)
+  val var : empty_is_none:bool -> Os.Env.var_name -> t -> string option
+  (** [var name m] looks up variable [name] in [m]'s {!env}. *)
 
-  val find' : empty_is_none:bool ->
+  val var' : empty_is_none:bool ->
     (Os.Env.var_name -> ('a, string) result) -> Os.Env.var_name -> t ->
     'a option
-  (** [find' m parse var] looks up [var] in [m]'s {!env} and
+  (** [var' m parse name] looks up [name] in [m]'s {!env} and
       parses it with [parse]. This {!B0_memo.fail}s the memo in case of
       error. *)
 
-  val mem : Os.Env.var_name -> t -> bool
-  (** [mem var m] is [true] if [var] is defined in [m]'s {!env},
+  val var_exists : Os.Env.var_name -> t -> bool
+  (** [var_exists var m] is [true] if [var] is defined in [m]'s {!env},
       even if empty. *)
 end
 

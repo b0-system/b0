@@ -659,7 +659,7 @@ module Test = struct
     let rec state () = match !rstate with
     | Some s -> s
     | None ->
-        match Os.Env.find ~empty_is_none:true env_seed with
+        match Os.Env.var ~empty_is_none:true env_seed with
         | None -> init_random_state None; state ()
         | Some i ->
             match int_of_string_opt i with

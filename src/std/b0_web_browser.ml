@@ -35,7 +35,7 @@ type t =
 
 let browser_env_fallback browser = match browser with
 | Some _ as b -> Ok b
-| None -> Os.Env.find' ~empty_is_none:true Cmd.of_string Env.browser
+| None -> Os.Env.var' ~empty_is_none:true Cmd.of_string Env.browser
 
 let find_browser_cmd ?search cmd = match Os.Cmd.find ?search cmd with
 | None -> None | Some c -> Some (Cmd c)

@@ -91,7 +91,10 @@ let uname = (* gets system name, release version, machine arch *)
 let name =
   let of_uname m = function
   | None ->
-      if B0_memo.Env.mem "COMSPEC" m || B0_memo.Env.mem "ComSpec" m
+      (* Note once we solve the case insensitivity business this
+         should no longer be required. *)
+      if B0_memo.Env.var_exists "COMSPEC" m ||
+         B0_memo.Env.var_exists "ComSpec" m
       then "windows"
       else "unknown"
   | Some (s, _, _) ->
@@ -223,11 +226,11 @@ let arch =
   let det s m = Fut.bind (B0_store.get s uname) @@ function
   | Some (_, _, a) -> Fut.return (ret a)
   | None ->
-      match B0_memo.Env.find ~empty_is_none:true "PROCESSOR_ARCHITECTURE" m with
+      match B0_memo.Env.var ~empty_is_none:true "PROCESSOR_ARCHITECTURE" m with
       | None -> Fut.return "unknown"
       | Some ("x86" as a) ->
           begin match
-            B0_memo.Env.find ~empty_is_none:true "PROCESSOR_ARCHITEW6432" m
+            B0_memo.Env.var ~empty_is_none:true "PROCESSOR_ARCHITEW6432" m
           with
           | None -> Fut.return a
           | Some a -> Fut.return (ret a)

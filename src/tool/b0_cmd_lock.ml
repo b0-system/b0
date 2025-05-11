@@ -18,8 +18,8 @@ let lock c =
     [ B0_driver.Env.b0_file, b0_file;
       B0_driver.Env.b0_dir, b0_dir]
   in
-  let env_b0_file = Os.Env.find ~empty_is_none:false B0_driver.Env.b0_file in
-  let env_b0_dir = Os.Env.find ~empty_is_none:false B0_driver.Env.b0_dir in
+  let env_b0_file = Os.Env.var ~empty_is_none:false B0_driver.Env.b0_file in
+  let env_b0_dir = Os.Env.var ~empty_is_none:false B0_driver.Env.b0_dir in
   let () = match env_b0_file, env_b0_dir with
   | Some f, _ when f = Fpath.to_string b0_file -> warn ()
   | _, Some d when d = Fpath.to_string b0_dir -> warn ()

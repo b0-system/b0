@@ -204,19 +204,19 @@ let fail m fmt =
 let fail_if_error m = function Ok v -> v | Error e -> fail m "%s" e
 
 module Env = struct
-  let find ~empty_is_none var m = match String.Map.find_opt var m.m.env with
+  let var ~empty_is_none n m = match String.Map.find_opt n m.m.env with
   | None -> None
   | Some "" when empty_is_none -> None
   | Some _ as v -> v
 
-  let find' ~empty_is_none parse var m = match find ~empty_is_none var m with
+  let var' ~empty_is_none parse n m = match var ~empty_is_none n m with
   | None -> None
   | Some v ->
       match parse v with
       | Ok v -> Some v
-      | Error e -> fail m "parsing %a: %s" Fmt.code var e
+      | Error e -> fail m "parsing %a: %s" Fmt.code n e
 
-  let mem var m = String.Map.mem var m.m.env
+  let var_exists var m = String.Map.mem var m.m.env
 end
 
 let invoke_k m ~pp_kind k v = try k v with

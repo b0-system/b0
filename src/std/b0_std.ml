@@ -2393,12 +2393,12 @@ module Os = struct
 
     type var_name = string
 
-    let find ~empty_is_none name = match Unix.getenv name with
+    let var ~empty_is_none name = match Unix.getenv name with
     | "" when empty_is_none -> None
     | v -> Some v
     | exception Not_found -> None
 
-    let find' ~empty_is_none parse name = match find ~empty_is_none name with
+    let var' ~empty_is_none parse name = match var ~empty_is_none name with
     | None -> Ok None
     | Some v ->
         match parse v with
@@ -2722,7 +2722,7 @@ module Os = struct
 
     let default_dir =
       let tmp_from_env var ~default =
-        Option.value ~default (Env.find ~empty_is_none:true var)
+        Option.value ~default (Env.var ~empty_is_none:true var)
       in
       let dir = match Sys.win32 with
       | true -> tmp_from_env "TEMP" ~default:Fpath.(v "./")
@@ -3328,7 +3328,7 @@ module Os = struct
     (* Base directories *)
 
     let err_dir dir fmt = Fmt.error ("%s directory: " ^^ fmt) dir
-    let fpath_of_env_var dir var = match Env.find ~empty_is_none:true var with
+    let fpath_of_env_var dir var = match Env.var ~empty_is_none:true var with
     | None -> None
     | Some p ->
         match Fpath.of_string p with

@@ -2369,16 +2369,16 @@ module Os : sig
     type var_name = string
     (** The type for environment variable names. *)
 
-    val find : empty_is_none:bool -> var_name -> string option
-    (** [find ~empty_is_none name] is the value of the environment
+    val var : empty_is_none:bool -> var_name -> string option
+    (** [var ~empty_is_none name] is the value of the environment
         variable [name] in the current process environment, if
         defined. If [empty_is_none] is [true], [None] is returned if
         the variable value is the empty string. *)
 
-    val find' :
+    val var' :
       empty_is_none:bool -> (var_name -> ('a, string) result) -> var_name ->
       ('a option, string) result
-    (** [find' ~empty_is_none parse name] is like {!find} but
+    (** [var' ~empty_is_none parse name] is like {!var} but
         the value is parsed with [parse]. If the latter errors
         with [Error e], [Error (Fmt.str "%s env: %s" name e)]
         is returned. *)

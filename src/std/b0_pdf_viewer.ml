@@ -19,7 +19,7 @@ type t = Cmd.t
 
 let env_fallback cmd = match cmd with
 | Some _ as v -> Ok v
-| None -> Os.Env.find' ~empty_is_none:true Cmd.of_string Env.pdfviewer
+| None -> Os.Env.var' ~empty_is_none:true Cmd.of_string Env.pdfviewer
 
 let find ?search ?cmd () =
   let* cmd = env_fallback cmd in

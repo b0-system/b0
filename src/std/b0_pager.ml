@@ -32,20 +32,20 @@ let find ?search ?cmd ~don't () =
   match cmd with
   | Some cmd -> Ok (Os.Cmd.find ?search cmd)
   | None ->
-      match Os.Env.find ~empty_is_none:true Env.term with
+      match Os.Env.var ~empty_is_none:true Env.term with
       | Some "dumb" | None -> Ok None
       | Some _ ->
           let cmds = [Cmd.tool "less"; Cmd.tool "more"] in
           let* cmds =
             let empty_is_none = true in
-            match Os.Env.find' ~empty_is_none Cmd.of_string Env.pager with
+            match Os.Env.var' ~empty_is_none Cmd.of_string Env.pager with
             | Error _ as e -> e
             | Ok None -> Ok cmds
             | Ok (Some cmd) -> Ok (cmd :: cmds)
           in
           Ok (Os.Cmd.find_first ?search cmds)
 
-let pager_env () = match Os.Env.find ~empty_is_none:false Env.less with
+let pager_env () = match Os.Env.var ~empty_is_none:false Env.less with
 | Some _ -> Ok None
 | None ->
     Result.bind (Os.Env.current_assignments ()) @@ fun env ->
