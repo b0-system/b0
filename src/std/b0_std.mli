@@ -2391,6 +2391,9 @@ module Os : sig
     val empty : t
     (** [empty] is {!String.Map.empty}. *)
 
+    val find : var_name -> t -> string option
+    (** [find name env] lookups [name] in [env]. *)
+
     val override : t -> by:t -> t
     (** [override env ~by:o] overrides the definitions in [env] by [o]. *)
 

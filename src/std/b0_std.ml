@@ -2409,6 +2409,7 @@ module Os = struct
 
     type t = string String.Map.t
     let empty = String.Map.empty
+    let find = String.Map.find_opt
     let add = String.Map.add
     let remove = String.Map.remove
     let mem = String.Map.mem
