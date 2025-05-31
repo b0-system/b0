@@ -13,4 +13,4 @@ val write :
     {!B0_html.El.body} using {!B0_html.El.raw} and writes a full HTML
     document to [o] using {!B0_html.El.basic_page} (see doc of the
     corresponding arguments). If [title] is [""] or unspecified
-    {!B0_html.El.title_of_fpath}[ o] is used. *)
+    {!B0_html.El.title_of_filepath}[ o] is used. *)

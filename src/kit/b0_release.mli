@@ -74,14 +74,14 @@ val src_archive_url_of_pack :
     {- If the hostname of {!B0_meta.homepage} is github the following
        URL pattern is used:
        {v
-%‌%REPO%‌%/releases/download/%‌%VERSION%‌%/\
-%‌%ARCHIVE_NAME%‌%-%‌%VERSION_NUM%‌%‌%‌%ARCHIVE_EXT%‌%
+       %‌%REPO%‌%/releases/download/%‌%VERSION%‌%/\
+       %‌%ARCHIVE_NAME%‌%-%‌%VERSION_NUM%‌%‌%‌%ARCHIVE_EXT%‌%
        v}}
     {- Otherwise the following URL pattern is used:
       {v
-%‌%HOMEPAGE%‌%/releases/\
-%‌%ARCHIVE_NAME%‌%-%‌%VERSION_NUM%‌%‌%‌%ARCHIVE_EXT%‌%
-       v}}} *)
+      %‌%HOMEPAGE%‌%/releases/\
+      %‌%ARCHIVE_NAME%‌%-%‌%VERSION_NUM%‌%‌%‌%ARCHIVE_EXT%‌%
+      v}}} *)
 
 (** {2:archive_creation Archive file creation} *)
 

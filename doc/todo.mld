@@ -26,7 +26,7 @@
 
 - The signature of {!B0_memo.write} looks wrong you want a fut. E.g.
   we don't want to the [Fut.sync] here:
-  {[
+{[
 let crunch_file m file ~in_dir =
   let open Fut.Syntax in
   let mn = B0_ocaml.Mod.Name.of_mangled_filename (Fpath.basename file) in

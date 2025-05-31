@@ -823,7 +823,7 @@ val script :
     build unit simply checks that it typechecks and is runnable. Due to
     upstream limitations this is a hack. You should invoke your main as:
     {[
-let () = if !Sys.interactive then () else main ()
+    let () = if !Sys.interactive then () else main ()
     ]}
     {ul
     {- [public] indicates whether the basename of [file] is made available

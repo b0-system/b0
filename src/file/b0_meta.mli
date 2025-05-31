@@ -11,7 +11,7 @@
     The module defines a few {{!std}standard keys}.
 
     The recommended way of formatting constant dictionaries is:
-    {[
+{[
 open B0_kit.V000 (* Defines the ~~ operator *)
 let meta =
   B0_meta.empty
