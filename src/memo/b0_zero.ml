@@ -883,7 +883,7 @@ module Op = struct
             | [] -> errs
             | readers -> Read_before_written { file; writer; readers } :: errs
         end
-    | n -> Multiple_writes { file; writers = Set.to_list writers } :: errs
+    | n -> Multiple_writes { file; writers = Set.elements writers } :: errs
     in
     match Fpath.Map.fold add_error written_by [] with
     | [] -> Ok () | errs -> Error (List.rev errs)

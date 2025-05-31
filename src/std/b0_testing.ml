@@ -497,7 +497,7 @@ module Test = struct
     let make ~src = { src; substs = [] }
     let src p = p.src
     let substs p = p.substs
-    let is_empty p = List.is_empty p.substs
+    let is_empty p = p.substs = []
     let add_subst p subst = { p with substs = subst :: p.substs }
     let apply { src; substs } =
       let rec loop acc src ~start = function
