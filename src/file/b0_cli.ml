@@ -698,7 +698,7 @@ module Memo = struct
 
     type out_format =
     [ `Hashed_files | `Op_hashes | `Ops | `Path | `Stats | `Root_hashed_files
-    | `Trace_event ]
+    | `Trace_event | `Diagnosis ]
 
     let pp_op = function
     | `Short -> B0_zero_conv.Op.pp_line
@@ -760,6 +760,20 @@ module Memo = struct
         let file_hashes = B0_memo_log.file_hashes l in
         if Fpath.Map.is_empty file_hashes then () else
         Fmt.pf ppf "@[<v>%a@]@." pp_hashed_files file_hashes
+    | `Diagnosis ->
+        let ops = query (B0_memo_log.ops l) in
+        if ops = []
+        then Log.warn (fun m -> m "No operation selected") else
+        match B0_zero.Op.find_build_correctness_errors ops with
+        | Ok () ->
+            Fmt.pf ppf "@[%a found.@]@." (Fmt.st [`Fg `Green]) "No problem"
+        | Error errs ->
+            let pp_op = pp_op details in
+            let pp_err = B0_zero_conv.Op.pp_build_correctness_error ~pp_op in
+            let count = List.length errs in
+            let s = if count < 1 then "s" else "s" in
+            Fmt.pf ppf "@[<v>%a Found %d problem%s@,%a@]" Fmt.puterr ()
+              count s Fmt.(list pp_err) errs
 
     let out_format_cli ?(docs = B0_std_cli.s_output_format_options) () =
       let a opt doc = Arg.info [opt] ~doc ~docs in
@@ -778,7 +792,11 @@ module Memo = struct
           `Stats, a "stats"
             "Output statistics about the build and selected operations.";
           `Trace_event, a "trace-event"
-            "Output selected operations in Trace Event format." ]
+            "Output selected operations in Trace Event format.";
+          `Diagnosis, a "diagnosis"
+            "Output a diagnosis of the build correctness of selected \
+             operations.";
+        ]
       in
       Arg.(value & vflag `Ops fmts)
   end

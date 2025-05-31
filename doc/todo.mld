@@ -47,6 +47,9 @@ let crunch_file m file ~in_dir =
   add a written file that is not written by the spawn but by the
   memo machinery.
 
+- Shouldn't we warn against multiple writes/out of order reads as soon as
+  they happen ?
+
 {1:design_b0_file [b0.file] library}
 
 - [B0.ml] file finding. Should we stop at the last (vs the first now)

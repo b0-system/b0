@@ -46,7 +46,7 @@ module Op : sig
   val bincode : Op.t B0_bincode.t
   (** [bincode] binary codes an operation. *)
 
-  (** {1:errors Aggregate errors} *)
+  (** {1:errors Errors} *)
 
   val pp_aggregate_error :
     ?sep:unit Fmt.t -> ?read_howto:Fpath.t Fmt.t ->
@@ -62,4 +62,7 @@ module Op : sig
         {- {!B0_zero.Op.Cycle}, formats the operations of the cycle.
          by writing the files that form the cycle and prefixing
          them with [write_howto].}} *)
+
+  val pp_build_correctness_error :
+    pp_op:Op.t Fmt.t -> B0_zero.Op.build_correctness_error Fmt.t
 end

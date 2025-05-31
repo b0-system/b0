@@ -394,7 +394,7 @@ module Memo : sig
 
     type out_format =
     [ `Hashed_files | `Op_hashes | `Ops | `Path | `Stats | `Root_hashed_files
-    | `Trace_event ]
+    | `Trace_event | `Diagnosis ]
     (** The type for output format. *)
 
     val out :

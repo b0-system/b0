@@ -729,6 +729,26 @@ module Op : sig
       the list of operation [os], assuming files [ready_roots] were made
       ready. This is [Ok ()] if all operations [os] are
       {!Success}. *)
+
+  type build_correctness_error =
+  | Read_before_written of { file : Fpath.t; writer : t; readers : t list }
+  | Multiple_writes of { file : Fpath.t; writers : t list } (** *)
+  (** The type for build correctness errors.
+
+      {b Important.} The first kind of error indicates a bug in the memo
+      abstraction, not in user memo usage. *)
+
+  val find_build_correctness_errors :
+    t list -> (unit, build_correctness_error list) result
+  (** [find_build_correctness_errors ops] finds correctness errors in the
+      set of operations [ops]. More precisely it checks that for
+      each written file in [ops]:
+      {ol
+      {- It is written by a single operation in [ops]}
+      {- If the previous point is satisfied. That each operation that reads
+         the written file, is started after the the operation that
+         writes the file has finished. Note that this should be guaranteed
+         by the memo abstraction.}} *)
 end
 
 (** Build operation revivers.

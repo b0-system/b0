@@ -859,6 +859,34 @@ module Op = struct
         | Aborted | Failed _ -> Error Failures
     in
     loop [] os
+
+  type build_correctness_error =
+  | Read_before_written of { file : Fpath.t; writer : t; readers : t list }
+  | Multiple_writes of { file : Fpath.t; writers : t list } (** *)
+
+  let find_build_correctness_errors ops =
+    let read_by, written_by = read_write_maps ops in
+    let add_error file writers errs = match Set.cardinal writers with
+    | 0 -> assert false
+    | 1 ->
+        begin match Fpath.Map.find_opt file read_by with
+        | None -> errs
+        | Some readers ->
+            let writer = Set.choose writers in
+            let t_ended = time_ended writer in
+            let add_out_of_order reader acc =
+              let t_start = time_started reader in
+              if Mtime.Span.is_shorter t_start ~than:t_ended
+              then reader :: acc else acc
+            in
+            match Set.fold add_out_of_order readers [] with
+            | [] -> errs
+            | readers -> Read_before_written { file; writer; readers } :: errs
+        end
+    | n -> Multiple_writes { file; writers = Set.to_list writers } :: errs
+    in
+    match Fpath.Map.fold add_error written_by [] with
+    | [] -> Ok () | errs -> Error (List.rev errs)
 end
 
 module Reviver = struct

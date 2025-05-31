@@ -722,4 +722,15 @@ module Op = struct
     | B0_zero.Op.Cycle ops -> pp_ops_cycle ?write_howto ppf ops; sep ppf ()
     | B0_zero.Op.Never_became_ready fs ->
         pp_never_ready ?read_howto ppf fs; sep ppf ()
+
+  let pp_build_correctness_error ~pp_op ppf = function
+  | B0_zero.Op.Read_before_written { file; writer; readers } ->
+      Fmt.pf ppf
+        "@[<v>File %a@,is read by:@, @[%a@]@,before being written by:@, \
+         @[<v>%a@]@]"
+        pp_file_read file pp_op writer Fmt.(list pp_op) readers
+  | B0_zero.Op.Multiple_writes { file; writers } ->
+      Fmt.pf ppf
+        "@[<v>File %a@,is written by more than one operation:@, @[<v>%a@]@]"
+        pp_file_write file Fmt.(list pp_op) writers
 end
