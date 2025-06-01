@@ -501,6 +501,26 @@ val unknown' :
 (** [unknown ~kind pp_v ~hint (v, hints)] formats {!unknown} followed
       by a space and [hint pp_v hints] if [hints] is non-empty. *)
 
+val cardinal : ?zero:int t -> one:int t -> ?other:int t -> unit -> int t
+(** [cardinal ?zero ~one ?other ()] formats an integer [n] by selecting
+    a formatter according to its cardinal english plural form:
+    {ul
+    {- [0], uses [zero] or, if unspecified, [other] (as per english
+       rules).}
+    {- [1], uses [one].}
+    {- [n], uses [other] or, if unspecified, [one] followed by a ['s']
+       character.}} *)
+
+val ordinal :
+  one:int t -> two:int t -> three:int t -> other:int t -> unit -> int t
+(** [ordinal ~one ~two ~three ~other ()] formats an integer [n] by selecting
+    a formatter according to its ordinal english plural form:
+    {ul
+    {- [one], if [n mod 10 = 1 && n mod 100 <> 11]}
+    {- [two], if [n mod 10 = 2 && n mod 100 <> 12]}
+    {- [three], if [n mod 10 = 3 && n mod 100 <> 13]}
+    {- [other] otherwise.}} *)
+
 (** {1:styling Text styling}
 
     Text styling control happens via ANSI escape sequences and is
