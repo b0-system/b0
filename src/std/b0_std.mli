@@ -251,6 +251,16 @@ module String : sig
 
   (** {2:tokenize Tokenize} *)
 
+  val next_token :
+    ?is_sep:(char -> bool) -> ?is_token:(char -> bool) -> string ->
+    string * string
+  (** [next_token ~is_sep ~is_token s] skips characters satisfying
+      [is_sep] from [s], then gather zero or more consecutive
+      characters satisfying [is_token] into a string which is returned
+      along the remaining characters after that. [is_sep] defaults to
+      {!Char.Ascii.is_white} and [is_token] is
+      {!Char.Ascii.is_graphic}. *)
+
   val tokens : ?is_sep:(char -> bool) -> string -> string list
   (** [tokens s] are the strings separated by sequences of [is_sep]
       characters (default to {!Char.Ascii.is_white}). The empty list is

@@ -329,6 +329,18 @@ module String = struct
 
   (* Tokenize *)
 
+  let next_token
+      ?(is_sep = Char.Ascii.is_white) ?(is_token = Char.Ascii.is_graphic) s
+    =
+    let max = String.length s - 1 in
+    let first = ref 0 in
+    while !first <= max && is_sep s.[!first] do incr first done;
+    if !first > max then "", s else
+    if not (is_token s.[!first]) then ("", subrange ~first:!first s) else
+    let after = ref (!first + 1) in
+    while !after <= max && is_token s.[!after] do incr after done;
+    subrange ~first:!first ~last:(!after - 1) s, subrange ~first:(!after) s
+
   let tokens ?(is_sep = Char.Ascii.is_white) s =
     let rec skip_seps s i =
       if i < 0 || not (is_sep s.[i]) then i else skip_seps s (i - 1)
