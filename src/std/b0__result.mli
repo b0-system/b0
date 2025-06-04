@@ -3,7 +3,9 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** Result values. *)
+(** Result values.
+
+    Additions available since 5.4. *)
 
 include module type of Stdlib.Result (** @closed *)
 

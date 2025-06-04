@@ -502,24 +502,28 @@ val unknown' :
       by a space and [hint pp_v hints] if [hints] is non-empty. *)
 
 val cardinal : ?zero:int t -> one:int t -> ?other:int t -> unit -> int t
-(** [cardinal ?zero ~one ?other ()] formats an integer [n] by selecting
-    a formatter according to its cardinal english plural form:
+(** [cardinal ?zero ~one ?other ()] formats an integer by selecting a
+    formatter according to the cardinal english plural form of its absolute
+    value [n]:
     {ul
-    {- [0], uses [zero] or, if unspecified, [other] (as per english
-       rules).}
-    {- [1], uses [one].}
-    {- [n], uses [other] or, if unspecified, [one] followed by a ['s']
-       character.}} *)
+    {- [zero], if [n = 0]. Defaults to [other] (as per
+    {{:https://www.unicode.org/cldr/charts/47/supplemental/language_plural_rules.html#en}english rules}).}
+    {- [one], if [n = 1].}
+    {- [other], otherwise. Defaults to [one] followed by a ['s'] character.}} *)
 
 val ordinal :
-  one:int t -> two:int t -> three:int t -> other:int t -> unit -> int t
-(** [ordinal ~one ~two ~three ~other ()] formats an integer [n] by selecting
-    a formatter according to its ordinal english plural form:
+  ?zero:int t -> ?one:int t -> ?two:int t -> ?three:int t -> ?other:int t ->
+  unit -> int t
+(** [ordinal ?zero ?one ?two ?three ?other ()] formats an integer by selecting a
+    formatter according to the ordinal english plural form of its absolute
+    value [n]:
     {ul
-    {- [one], if [n mod 10 = 1 && n mod 100 <> 11]}
-    {- [two], if [n mod 10 = 2 && n mod 100 <> 12]}
-    {- [three], if [n mod 10 = 3 && n mod 100 <> 13]}
-    {- [other] otherwise.}} *)
+    {- [zero], if [n = 0]. Defaults to [other] (as per
+    {{:https://www.unicode.org/cldr/charts/47/supplemental/language_plural_rules.html#en}english rules}).}
+    {- [one], if [n mod 10 = 1 && n mod 100 <> 11]. Defaults to ["%dst"].}
+    {- [two], if [n mod 10 = 2 && n mod 100 <> 12]. Defaults to ["%dnd"].}
+    {- [three], if [n mod 10 = 3 && n mod 100 <> 13]. Defaults to ["%drd"].}
+    {- [other] otherwise. Defaults to ["%dth"].}} *)
 
 (** {1:styling Text styling}
 
