@@ -2387,8 +2387,15 @@ module Os = struct
     end
   end
 
-
   module Env = struct
+
+    (* On Windows environment variables are case insensitive. Direct
+       calls to [getenv] syscalls handle that. We need to care about
+       it when we munge the results of [Unix.environment] into a
+       string map. *)
+
+    let normalize = if Sys.win32 then String.Ascii.uppercase else Fun.id
+
     (* Variables *)
 
     type var_name = string
@@ -2405,15 +2412,29 @@ module Os = struct
         | Error e -> Fmt.error "%s env: %s" name e
         | Ok v -> Ok (Some v)
 
+    (* Assignements *)
+
+    type assignments = string list
+
+    let env_err e = Fmt.error "process environment: %s" e
+    let current_assignments () =
+      try Ok (Array.to_list (Unix.environment ())) with
+      | Sys_error e -> env_err e
+      | Unix.Unix_error (e, _, _) -> env_err (uerror e)
+
+    let pp_assignments = Fmt.(vbox @@ list string)
+
     (* Process environment *)
 
-    type t = string String.Map.t
+    type binding = var_name (* not normalized *) * string
+    type t = binding String.Map.t (* map keys are normalized *)
+
     let empty = String.Map.empty
-    let fold = String.Map.fold
-    let find = String.Map.find_opt
-    let add = String.Map.add
-    let remove = String.Map.remove
-    let mem = String.Map.mem
+    let fold f env acc = String.Map.fold (fun _ (n, v) acc -> f n v acc) env acc
+    let find var env = Option.map snd (String.Map.find_opt (normalize var) env)
+    let add var v env = String.Map.add (normalize var) (var, v) env
+    let remove var env = String.Map.remove (normalize var) env
+    let mem var env = String.Map.mem (normalize var) env
     let override env ~by =
       if String.Map.is_empty by then env else
       let lean_right _ l r = match r with
@@ -2422,31 +2443,16 @@ module Os = struct
       in
       String.Map.merge lean_right env by
 
-    (* Assignements *)
-
-    let env_err e = Fmt.error "process environment: %s" e
-
-    type assignments = string list
-    let current_assignments () =
-      try Ok (Array.to_list @@ Unix.environment ()) with
-      | Sys_error e -> env_err e
-      | Unix.Unix_error (e, _, _) -> env_err (uerror e)
-
     let parse_assignments ?(init = String.Map.empty) fold v =
       try
         let add acc assign = match String.cut_left ~sep:"=" assign with
-        | Some (var, value) -> String.Map.add var value acc
+        | Some (var, value) -> add var value acc
         | None ->
-            Fmt.failwith_notrace "%S: cannot parse VAR=VAL assignement" assign
+            Fmt.failwith_notrace "%S: cannot parse VAR=val assignement" assign
         in
         Ok (fold add init v)
       with
-      | Failure e -> Result.error e
-
-    let of_assignments ?init l = parse_assignments ?init List.fold_left l
-    let to_assignments env =
-      let add var v acc = String.concat "=" [var; v] :: acc in
-      String.Map.fold add env []
+      | Failure e -> Error e
 
     let current () =
       match parse_assignments Array.fold_left (Unix.environment ()) with
@@ -2455,7 +2461,11 @@ module Os = struct
       | exception Sys_error e -> env_err e
       | exception Unix.Unix_error (e, _, _) -> env_err (uerror e)
 
-    let pp_assignments = Fmt.(vbox @@ list string)
+    let of_assignments ?init l = parse_assignments ?init List.fold_left l
+    let to_assignments env =
+      let add var v acc = String.concat "=" [var; v] :: acc in
+      fold add env []
+
     let pp ppf env = pp_assignments ppf (to_assignments env)
   end
 

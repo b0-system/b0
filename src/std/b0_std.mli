@@ -2361,27 +2361,32 @@ module Os : sig
 
   (** {1:process Processes} *)
 
-    (** Environment variables. *)
+  (** Environment variables.
+
+      {b Note.} On Windows environment variable names are case
+      insensitive. All the operations performed by this module take this
+      into account when {!Sys.win32} is [true]. Be careful if you deal
+      with {!Env.assignments} directly. *)
   module Env : sig
 
     (** {1:var Variables} *)
 
     type var_name = string
-    (** The type for environment variable names. *)
+    (** The type for environment variable names. Case insensitive
+        on Windows. *)
 
     val var : empty_is_none:bool -> var_name -> string option
     (** [var ~empty_is_none name] is the value of the environment
         variable [name] in the current process environment, if
         defined. If [empty_is_none] is [true], [None] is returned if
-        the variable value is the empty string. *)
+        the variable value is the empty string [""]. *)
 
     val var' :
       empty_is_none:bool -> (var_name -> ('a, string) result) -> var_name ->
       ('a option, string) result
-    (** [var' ~empty_is_none parse name] is like {!var} but
-        the value is parsed with [parse]. If the latter errors
-        with [Error e], [Error (Fmt.str "%s env: %s" name e)]
-        is returned. *)
+    (** [var' ~empty_is_none parse name] is like {!var} but the value
+        is parsed with [parse]. If the latter errors with [Error e],
+        [Error (Fmt.str "%s env: %s" name e)] is returned. *)
 
     (** {1:env Process environement} *)
 
@@ -2395,24 +2400,24 @@ module Os : sig
     (** [current ()] is the current process environment. *)
 
     val find : var_name -> t -> string option
-    (** [find name env] lookups [name] in [env]. *)
+    (** [find name env] lookups variable [name] in [env]. *)
 
     val override : t -> by:t -> t
     (** [override env ~by:over] overrides the definitions in [env] by
         those in [by]. *)
 
     val add : var_name -> string -> t -> t
-    (** [add name v env] is [env] but with [name] bound to [v] *)
+    (** [add name v env] is [env] but with variable [name] bound to [v] *)
 
     val fold : (var_name -> string -> 'a -> 'a) -> t -> 'a -> 'a
     (** [fold f env init] folds [f] on [env]'s bindings starting with
-        [env]. *)
+        [init]. *)
 
     val remove : var_name -> t -> t
-    (** [remove name env] is [env] without a binding for [name]. *)
+    (** [remove name env] is [env] without a binding for variable [name]. *)
 
     val mem : var_name -> t -> bool
-    (** [mem name env] is [true] iff [name] is bound in [env]. *)
+    (** [mem name env] is [true] iff variable [name] is bound in [env]. *)
 
     val pp : t Fmt.t
     (** [pp] formats environments for inspection. *)
@@ -2421,7 +2426,7 @@ module Os : sig
 
     type assignments = string list
     (** The type for environments as lists of strings of the form
-        ["var=value"]. *)
+        ["VAR=value"]. *)
 
     val current_assignments : unit -> (assignments, string) result
     (** [current_assignments ()] is the current process environment as
