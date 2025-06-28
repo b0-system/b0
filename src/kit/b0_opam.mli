@@ -123,6 +123,12 @@ val build : string B0_meta.key
     opam syntax that defines the whole field. Used to override
     automatic opam file generation, see {!pkg_meta_of_pack}.  *)
 
+val build_env : string B0_meta.key
+(** [build_env] is an opam
+    {{:https://opam.ocaml.org/doc/Manual.html#opamfield-build-env}
+    [build-env:]} field value. This a raw string in opam syntax that
+    defines the whole field. *)
+
 val depends : pkg_spec list B0_meta.key
 (** [depends] is an opam
     {{:https://opam.ocaml.org/doc/Manual.html#opamfield-depends}

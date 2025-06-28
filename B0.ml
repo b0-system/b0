@@ -173,9 +173,29 @@ let default =
       ["dev"; "org:erratique"; "org:b0-system"; "build"]
     |> ~~ B0_opam.build
       {|[["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]]|}
+    |> ~~ B0_opam.build_env
+      (* This doesn't seem to work see
+         https://github.com/ocaml/opam/issues/6574
+         this means the install: step is currently broken
+         in bytecode only switches. *)
+      {| [[CAML_LD_LIBRARY_PATH += "_build/src/std"]]|}
     |> ~~ B0_opam.install
-      {|["cmdliner" "install" "tool-completion" "b0" "show-url"
-         "b0-cache" "b0-hash" "b0-log" "b0-sttyle" "%{share}%"]|}
+      {|["cmdliner" "install" "tool-support"
+         "--mandir=%{man}%"
+         "--sharedir=%{share}%"
+         "_build/src/tool/b0_main_run.native:b0" {ocaml:native}
+         "_build/src/tool/b0_main_run.byte:b0" {!ocaml:native}
+         "_build/src/lowtools/show_url.native:show-url" {ocaml:native}
+         "_build/src/lowtools/show_url.byte:show-url" {!ocaml:native}
+         "_build/src/lowtools/b0_cache.native:b0-cache" {ocaml:native}
+         "_build/src/lowtools/b0_cache.byte:b0-cache" {!ocaml:native}
+         "_build/src/lowtools/b0_hash.native:b0-hash" {ocaml:native}
+         "_build/src/lowtools/b0_hash.byte:b0-hash" {!ocaml:native}
+         "_build/src/lowtools/b0_log.native:b0-log" {ocaml:native}
+         "_build/src/lowtools/b0_log.byte:b0-log" {!ocaml:native}
+         "_build/src/lowtools/b0_log.native:b0-sttyle" {ocaml:native}
+         "_build/src/lowtools/b0_log.byte:b0-sttyle" {!ocaml:native}
+         "%{prefix}%"]|}
     |> ~~ B0_opam.depends [
       "ocaml", {|>= "4.08.0"|};
       "ocamlfind", {|build|};

@@ -114,6 +114,10 @@ module File = struct
     let doc = "opam file build: field" in
     B0_meta.Key.make "build" ~doc ~pp_value:Fmt.string
 
+  let build_env_field =
+    let doc = "opam file build-env: field" in
+    B0_meta.Key.make "build-env" ~doc ~pp_value:Fmt.string
+
   let conflicts_field =
     let doc = "opam file conflicts: field" in
     B0_meta.Key.make "conflicts" ~doc ~pp_value:pp_pkg_spec_list
@@ -183,6 +187,7 @@ module File = struct
         pkg_spec_list "conflicts" conflicts_field;
         string_raw "available" available_field;
         string_raw "build" build_field;
+        string_raw "build-env" build_env_field;
         string_raw "install" install_field;
         triple_string ~nl:true "description" B0_meta.description;
         string_list ~by_line:false "x-maintenance-intent" x_maintenance_intent;
@@ -214,6 +219,7 @@ let pkg_name_of_pack p =
 type pkg_spec = string * string
 let available = File.available_field
 let build = File.build_field
+let build_env = File.build_env_field
 let conflicts = File.conflicts_field
 let depends = File.depends_field
 let depopts = File.depopts_field
