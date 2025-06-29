@@ -331,7 +331,7 @@ let array ?(empty = nop) ?sep pp_elt ppf a = match Array.length a with
 | 0 -> empty ppf ()
 | n -> iter ?sep Array.iter pp_elt ppf a
 
-module Lit = struct
+module OCaml = struct
   let unit ppf () = string ppf "()"
   let bool = Format.pp_print_bool
   let int = Format.pp_print_int

@@ -316,20 +316,20 @@ module Test = struct
       in
       make ~equal ~pp ()
 
-    let unit = make ~equal:(fun () () -> true) ~pp:Fmt.Lit.unit ()
-    let bool = make ~equal:Bool.equal ~pp:Fmt.Lit.bool ()
-    let int = make ~equal:Int.equal ~pp:Fmt.Lit.int ()
-    let int32 = make ~equal:Int32.equal ~pp:Fmt.Lit.int32 ()
-    let uint32 = make ~equal:Int32.equal ~pp:Fmt.Lit.uint32 ()
-    let int64 = make ~equal:Int64.equal ~pp:Fmt.Lit.int64 ()
-    let uint64 = make ~equal:Int64.equal ~pp:Fmt.Lit.uint64 ()
-    let nativeint = make ~equal:Nativeint.equal ~pp:Fmt.Lit.nativeint ()
-    let nativeuint = make ~equal:Nativeint.equal ~pp:Fmt.Lit.nativeuint ()
-    let float = make ~equal:Float.equal ~pp:Fmt.Lit.float ()
-    let hex_float = make ~equal:Float.equal ~pp:Fmt.Lit.hex_float ()
-    let char = make ~equal:Char.equal ~pp:Fmt.Lit.char ()
-    let ascii_string = make ~equal:String.equal ~pp:Fmt.Lit.ascii_string ()
-    let string = make ~equal:String.equal ~pp:Fmt.Lit.string ()
+    let unit = make ~equal:(fun () () -> true) ~pp:Fmt.OCaml.unit ()
+    let bool = make ~equal:Bool.equal ~pp:Fmt.OCaml.bool ()
+    let int = make ~equal:Int.equal ~pp:Fmt.OCaml.int ()
+    let int32 = make ~equal:Int32.equal ~pp:Fmt.OCaml.int32 ()
+    let uint32 = make ~equal:Int32.equal ~pp:Fmt.OCaml.uint32 ()
+    let int64 = make ~equal:Int64.equal ~pp:Fmt.OCaml.int64 ()
+    let uint64 = make ~equal:Int64.equal ~pp:Fmt.OCaml.uint64 ()
+    let nativeint = make ~equal:Nativeint.equal ~pp:Fmt.OCaml.nativeint ()
+    let nativeuint = make ~equal:Nativeint.equal ~pp:Fmt.OCaml.nativeuint ()
+    let float = make ~equal:Float.equal ~pp:Fmt.OCaml.float ()
+    let hex_float = make ~equal:Float.equal ~pp:Fmt.OCaml.hex_float ()
+    let char = make ~equal:Char.equal ~pp:Fmt.OCaml.char ()
+    let ascii_string = make ~equal:String.equal ~pp:Fmt.OCaml.ascii_string ()
+    let string = make ~equal:String.equal ~pp:Fmt.OCaml.string ()
     let lines = make ~equal:String.equal ~pp:Fmt.lines ()
     let binary_string = make ~equal:String.equal ~pp:Fmt.binary_string ()
     let styled_string =
@@ -337,14 +337,14 @@ module Test = struct
 
     let bytes : bytes t = make ~equal:Bytes.equal ~pp:Fmt.bytes  ()
     let option (type a) (module Some : T with type t = a) : a option t =
-      make ~equal:(Option.equal Some.equal) ~pp:(Fmt.Lit.option Some.pp) ()
+      make ~equal:(Option.equal Some.equal) ~pp:(Fmt.OCaml.option Some.pp) ()
 
     let either
         (type a) ~left:(module Left : T with type t = a)
         (type b) ~right:(module Right : T with type t = b)
       =
       let equal = Either.equal ~left:Left.equal ~right:Right.equal in
-      let pp = Fmt.Lit.either ~left:Left.pp ~right:Right.pp in
+      let pp = Fmt.OCaml.either ~left:Left.pp ~right:Right.pp in
       make ~equal ~pp ()
 
     let result'
@@ -352,23 +352,23 @@ module Test = struct
         (type b) ~error:(module Error : T with type t = b)
       =
       let equal = Result.equal ~ok:Ok.equal ~error:Error.equal in
-      let pp = Fmt.Lit.result ~ok:Ok.pp ~error:Error.pp in
+      let pp = Fmt.OCaml.result ~ok:Ok.pp ~error:Error.pp in
       make ~equal ~pp ()
 
     let result ~ok = result' ~ok ~error:string
 
     let list (type a) (module Elt : T with type t = a) =
-      make ~equal:(List.equal Elt.equal) ~pp:(Fmt.Lit.list Elt.pp) ()
+      make ~equal:(List.equal Elt.equal) ~pp:(Fmt.OCaml.list Elt.pp) ()
 
     let array (type a) (module Elt : T with type t = a) =
-      make ~equal:(array_equal Elt.equal) ~pp:(Fmt.Lit.array Elt.pp) ()
+      make ~equal:(array_equal Elt.equal) ~pp:(Fmt.OCaml.array Elt.pp) ()
 
     let pair
         (type a) (module Fst : T with type t = a)
         (type b) (module Snd : T with type t = b)
       =
       let equal (x0, y0) (x1, y1) = Fst.equal x0 x1 && Snd.equal y0 y1 in
-      let pp = Fmt.Lit.pair Fst.pp Snd.pp in
+      let pp = Fmt.OCaml.pair Fst.pp Snd.pp in
       make ~equal ~pp ()
 
     let t2 = pair
@@ -376,7 +376,7 @@ module Test = struct
       let equal (a0, a1, a2) (b0, b1, b2) =
         (equal v0) a0 b0 && (equal v1) a1 b1 && (equal v2) a2 b2
       in
-      let pp = Fmt.Lit.t3 (pp v0) (pp v1) (pp v2) in
+      let pp = Fmt.OCaml.t3 (pp v0) (pp v1) (pp v2) in
       make ~equal ~pp ()
 
     let t4 v0 v1 v2 v3 =
@@ -384,7 +384,7 @@ module Test = struct
         (equal v0) a0 b0 && (equal v1) a1 b1 && (equal v2) a2 b2 &&
         (equal v3) a3 b3
       in
-      let pp = Fmt.Lit.t4 (pp v0) (pp v1) (pp v2) (pp v3) in
+      let pp = Fmt.OCaml.t4 (pp v0) (pp v1) (pp v2) (pp v3) in
       make ~equal ~pp ()
 
     let t5 v0 v1 v2 v3 v4 =
@@ -392,7 +392,7 @@ module Test = struct
         (equal v0) a0 b0 && (equal v1) a1 b1 && (equal v2) a2 b2 &&
         (equal v3) a3 b3 && (equal v4) a4 b4
       in
-      let pp = Fmt.Lit.t5 (pp v0) (pp v1) (pp v2) (pp v3) (pp v4) in
+      let pp = Fmt.OCaml.t5 (pp v0) (pp v1) (pp v2) (pp v3) (pp v4) in
       make ~equal ~pp ()
 
     let t6 v0 v1 v2 v3 v4 v5 =
@@ -400,7 +400,7 @@ module Test = struct
         (equal v0) a0 b0 && (equal v1) a1 b1 && (equal v2) a2 b2 &&
         (equal v3) a3 b3 && (equal v4) a4 b4 && (equal v5) a5 b5
       in
-      let pp = Fmt.Lit.t6 (pp v0) (pp v1) (pp v2) (pp v3) (pp v4) (pp v5) in
+      let pp = Fmt.OCaml.t6 (pp v0) (pp v1) (pp v2) (pp v3) (pp v4) (pp v5) in
       make ~equal ~pp ()
   end
 

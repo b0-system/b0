@@ -174,11 +174,11 @@ val record : ?sep:unit t -> 'a t list -> 'a t
 
     Formatters for structures give full control to the client over
     the formatting process and do not wrap the formatted structures
-    with boxes. If you want to print literal OCaml values use the {!Lit}
+    with boxes. If you want to print literal OCaml values use the {!OCaml}
     module. *)
 
 (** Formatting OCaml literal values. *)
-module Lit : sig
+module OCaml : sig
 
   val unit : unit t
   (** [unit] formats [unit] literals. *)
@@ -418,7 +418,7 @@ val styled_text_string : string t
 val text_bytes : bytes t
 (** [text_bytes] is like {!text_string} but on [bytes] values. *)
 
-(** {b FIXME.} Get rid of these in favour of {!Lit} *)
+(** {b FIXME.} Get rid of these in favour of {!OCaml} *)
 
 val ascii_string_literal : string t
 (** [ascii_string_literal] is like {!ascii_string} but between
