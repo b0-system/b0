@@ -64,7 +64,7 @@ let cmd =
     `P "The $(iname) command shows URLs specified on the command line.";
     `Blocks B0_web_browser.man_best_effort_reload;
     `P "For example:";
-    `Pre "$(iname) $(b,https://example.org"; `Noblank;
+    `Pre "$(iname) $(b,https://example.org)"; `Noblank;
     `Pre "$(iname) $(b,index.html) $(b,doc.pdf)";
     `P "It can also directly read $(b,stdin) by writing it to a temporary \
         file. Certain browser do not recognize certain file types without \
