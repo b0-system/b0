@@ -44,8 +44,8 @@ install: [
   "_build/src/lowtools/b0_hash.byte:b0-hash" {!ocaml:native}
   "_build/src/lowtools/b0_log.native:b0-log" {ocaml:native}
   "_build/src/lowtools/b0_log.byte:b0-log" {!ocaml:native}
-  "_build/src/lowtools/b0_log.native:b0-sttyle" {ocaml:native}
-  "_build/src/lowtools/b0_log.byte:b0-sttyle" {!ocaml:native}
+  "_build/src/lowtools/b0_sttyle.native:b0-sttyle" {ocaml:native}
+  "_build/src/lowtools/b0_sttyle.byte:b0-sttyle" {!ocaml:native}
   "%{prefix}%"
 ]
 build-env: CAML_LD_LIBRARY_PATH += "_build/src/std"

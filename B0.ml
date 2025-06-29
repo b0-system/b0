@@ -193,8 +193,8 @@ let default =
          "_build/src/lowtools/b0_hash.byte:b0-hash" {!ocaml:native}
          "_build/src/lowtools/b0_log.native:b0-log" {ocaml:native}
          "_build/src/lowtools/b0_log.byte:b0-log" {!ocaml:native}
-         "_build/src/lowtools/b0_log.native:b0-sttyle" {ocaml:native}
-         "_build/src/lowtools/b0_log.byte:b0-sttyle" {!ocaml:native}
+         "_build/src/lowtools/b0_sttyle.native:b0-sttyle" {ocaml:native}
+         "_build/src/lowtools/b0_sttyle.byte:b0-sttyle" {!ocaml:native}
          "%{prefix}%"]|}
     |> ~~ B0_opam.depends [
       "ocaml", {|>= "4.08.0"|};
