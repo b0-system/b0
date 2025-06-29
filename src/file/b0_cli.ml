@@ -165,11 +165,13 @@ module File_cache = struct
     in
     Arg.conv' (of_string, String.pp) ~docv:"KEY"
 
-  let keys_none_is_all ?(pos_right = -1) () =
+  let keys_none_is_all ?pos_right:(kp = -1) () =
     let doc =
       "Select $(docv) (repeatable). If unspecified selects all keys."
     in
-    let keys = Arg.(value & pos_right 0 key_arg [] & info [] ~doc ~docv:"KEY")in
+    let keys =
+      Arg.(value & pos_right kp key_arg [] & info [] ~doc ~docv:"KEY")
+    in
     Term.(const (function [] -> `All | ks -> `Keys ks) $ keys)
 
   let trim_cli ?(mb_opts = ["to-mb"]) ?(pct_opts = ["to-pct"]) ?docs () =
