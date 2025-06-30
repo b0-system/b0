@@ -197,7 +197,7 @@ let default =
          "_build/src/lowtools/b0_sttyle.byte:b0-sttyle" {!ocaml:native}
          "%{prefix}%"]|}
     |> ~~ B0_opam.depends [
-      "ocaml", {|>= "4.08.0"|};
+      "ocaml", {|>= "4.14.0"|};
       "ocamlfind", {|build|};
       "ocamlbuild", {|build|};
       "topkg", {|build & >= "1.0.3"|};
