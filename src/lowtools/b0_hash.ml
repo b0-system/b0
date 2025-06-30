@@ -4,44 +4,34 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
-
-let hash_file (module H : Hash.T) f = match Fpath.equal f Fpath.dash with
-| false -> Result.bind (H.file f) @@ fun h -> Ok (f, h)
-| true -> Result.bind (Os.File.read f) @@ fun data -> Ok (f, H.string data)
+open Result.Syntax
 
 let pp_hash = function
 | `Short -> Fmt.using snd Hash.pp
 | `Normal | `Long ->
     fun ppf (f, h) -> Hash.pp ppf h; Fmt.char ppf ' '; Fpath.pp_unquoted ppf f
 
-let hash color log_level hash_fun format files =
-  let styler = B0_std_cli.get_styler color in
-  let log_level = B0_std_cli.get_log_level log_level in
-  B0_std_cli.setup styler log_level ~log_spawns:Log.Debug;
+let hash_file (module Hash : Hash.T) file  =
+  let* hash =
+    if Fpath.is_dash file
+    then Result.map Hash.string (Os.File.read file)
+    else Hash.file file
+  in
+  Ok (file, hash)
+
+let hash ~output_format ~hash_fun ~files =
+  let pp_hash = pp_hash output_format in
   let hash_fun = B0_cli.Memo.get_hash_fun ~hash_fun in
-  let pp_hash = pp_hash format in
-  Log.if_error ~use:Cmdliner.Cmd.Exit.some_error @@ match files with
-  | [] -> Ok 0
-  | files ->
-      let rec loop = function
-      | [] -> Fmt.pr "@]"; Fmt.flush Fmt.stdout (); Ok 0
-      | f :: fs ->
-          match hash_file hash_fun f with
-          | Ok h -> Fmt.pr "%a@," pp_hash h; loop fs
-          | Error _ as e -> Fmt.pr "@]"; e
-      in
-      Fmt.pr "@[<v>"; loop files
+  let do_hash file =
+    let* h = hash_file hash_fun file in
+    Ok (Log.stdout (fun m -> m "%a" pp_hash h))
+  in
+  List.iter_stop_on_error do_hash files
 
 (* Command line interface *)
 
 open Cmdliner
-
-let files =
-  let doc = "File to hash. Use $(b,-) for stdin." in
-  Arg.(value & pos_all B0_std_cli.fpath [] & info [] ~doc ~docv:"FILE")
-
-let hash_fun =
-  B0_cli.Memo.hash_fun ~opts:["H"; "hash-fun"] ~docs:Manpage.s_options ()
+open Cmdliner.Term.Syntax
 
 let tool =
   let doc = "Hash like b0" in
@@ -52,12 +42,19 @@ let tool =
     `S Manpage.s_options;
     `S B0_std_cli.s_output_format_options;
     `S Manpage.s_bugs;
-    `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ]
+    `P "This program is distributed with the $(b,b0) system. See
+        $(i,https:/erratique.ch/software/b0) for contact information.";]
   in
   Cmd.make (Cmd.info "b0-hash" ~version:"%%VERSION%%" ~doc ~man ~man_xrefs) @@
-  Term.(const hash $ B0_std_cli.color () $
-        B0_std_cli.log_level () $ hash_fun $
-        B0_std_cli.output_format () $ files)
+  let+ () = B0_std_cli.log_setup ()
+  and+ output_format = B0_std_cli.output_format ()
+  and+ hash_fun =
+    B0_cli.Memo.hash_fun ~opts:["H"; "hash-fun"] ~docs:Manpage.s_options ()
+  and+ files =
+    let doc = "File to hash. Use $(b,-) for stdin." in
+    Arg.(value & pos_all B0_std_cli.fpath [] & info [] ~doc ~docv:"FILE")
+  in
+  hash ~output_format ~hash_fun ~files
 
-let main () = Cmd.eval' tool
+let main () = Cmd.eval_result tool
 let () = if !Sys.interactive then () else exit (main ())

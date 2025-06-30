@@ -3915,6 +3915,7 @@ module Log = struct
   | "quiet" -> Ok Quiet
   | "stdout" -> Ok Stdout
   | "stderr" -> Ok Stderr
+  | "error" -> Ok Error
   | "warning" -> Ok Warning
   | "info" ->  Ok Info
   | "debug" ->  Ok Debug

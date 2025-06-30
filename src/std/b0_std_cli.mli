@@ -68,7 +68,8 @@ val output_format :
 (** Fragments for setting up {!B0_std}.
 
     TODO maybe we should just side effect in the options, it would be simpler
-    to setup. *)
+    to setup. There is now {!log_setup} that does so. Also I think the color
+    madness stuff should go. *)
 
 (** {1:setup Setup}
 
@@ -85,9 +86,9 @@ val get_log_level : Log.level option -> Log.level
     [level] is [None]. *)
 
 val setup : Fmt.styler -> Log.level -> log_spawns:Log.level -> unit
-(** [setup tty_cap log_level ~log_spawns] sets:
+(** [setup styler log_level ~log_spawns] sets:
     {ul
-    {- {!B0_std.Fmt.set_tty_styling_cap} with [tty_cap].}
+    {- {!B0_std.Fmt.set_styler} with [styler].}
     {- {!B0_std.Log.set_level} with [log_level].}
     {- {!B0_std.Os.Cmd.set_spawn_tracer} with
       {!B0_std.Log.spawn_tracer}[ log_spawns]
@@ -118,8 +119,8 @@ val color :
     on the cli or via the env var. *)
 
 val log_level :
-  ?none:Log.level -> ?docs:string -> ?env:Cmdliner.Cmd.Env.info -> unit ->
-  Log.level option Cmdliner.Term.t
+  ?none:Log.level -> ?docs:Cmdliner.Manpage.section_name ->
+  ?env:Cmdliner.Cmd.Env.info -> unit -> Log.level option Cmdliner.Term.t
   (** [log_level ~none ~docs ~env ()] is a cli interface for
        specifiying a logging level with various options. [docs] is
        where the options are documented (defaults to
@@ -129,3 +130,21 @@ val log_level :
        when the log level is unspecified (defaults to
        [Log.Warning]). [None] is returned if the value is not set on
        the cli or via the env var. *)
+
+
+val log_setup :
+  ?spawns:Log.level -> ?absent:Log.level ->
+  ?docs:Cmdliner.Manpage.section_name -> ?env:Cmdliner.Cmd.Env.info -> unit ->
+  unit Cmdliner.Term.t
+(** [log_setup] is a cli interface for specifying a logging level with
+    various options and setting up {!B0_std.Log.set_level}
+    and {!B0_std.Os.Cmd.spawn_tracer} with it.
+
+    The default value of [absent] is [Log.Warning] and the default value
+    of [spawns] is {!Log.Debug}. The default value of [env] is a
+    [LOG_LEVEL] environment variable.
+
+    {b Warning.} If [level < log_spawn] but {!B0_std.Log.level} is
+    increased after this call, the spawns won't be traced (most cli
+    programs do not change after the initial setup). Do your own
+    setup if that is a problem for you. *)

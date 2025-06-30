@@ -31,11 +31,7 @@ let prepare_url ~tname = function
 | "-" -> stdin_file_url ~tname
 | u -> match B0_url.scheme u with Some _ -> Ok u | None -> file_url u
 
-let show_urls ~color ~log_level ~background ~prefix ~browser ~urls ~tname =
-  let styler = B0_std_cli.get_styler color in
-  let log_level = B0_std_cli.get_log_level log_level in
-  B0_std_cli.setup styler log_level ~log_spawns:Log.Debug;
-  Log.if_error ~use:Cmdliner.Cmd.Exit.some_error @@
+let show_urls ~background ~prefix ~browser ~urls ~tname =
   let* browser = B0_web_browser.find ?cmd:browser () in
   let open_url u = B0_web_browser.show ~background ~prefix browser u in
   Log.if_error' ~use:url_error @@
@@ -54,7 +50,7 @@ open Cmdliner
 open Cmdliner.Term.Syntax
 
 let cmd =
-  let doc = "Show URLs in web browsers" in
+  let doc = "Show URL, files and stdin in web browsers" in
   let exits =
     Cmd.Exit.info url_error ~doc:"if the URL failed to load in some way" ::
     Cmd.Exit.defaults
@@ -64,21 +60,23 @@ let cmd =
     `P "The $(iname) command shows URLs specified on the command line.";
     `Blocks B0_web_browser.man_best_effort_reload;
     `P "For example:";
-    `Pre "$(iname) $(b,https://example.org)"; `Noblank;
-    `Pre "$(iname) $(b,index.html) $(b,doc.pdf)";
+    `Pre "$(cmd) $(b,https://example.org)"; `Noblank;
+    `Pre "$(cmd) $(b,index.html) $(b,doc.pdf)";
     `P "It can also directly read $(b,stdin) by writing it to a temporary \
         file. Certain browser do not recognize certain file types without \
         an extension use $(b,-t) to specify a file name; it allows \
         reloads while keeping the file in a temporary directory.";
-    `Pre "$(b,echo 'Hey' |) $(iname)"; `Noblank;
-    `Pre "$(b,echo 'Hey' |) $(iname) $(b,-t hey.txt) "; `Noblank;
-    `Pre "$(b,echo 'Ho!' |) $(iname) $(b,-t hey.txt) "; `Noblank;
-    `Pre "$(b,dot -Tsvg graph.dot |) $(iname) $(b,-t g.svg)";
+    `Pre "$(b,echo 'Hey' |) $(cmd)"; `Noblank;
+    `Pre "$(b,echo 'Hey' |) $(cmd) $(b,-t hey.txt) "; `Noblank;
+    `Pre "$(b,echo 'Ho!' |) $(cmd) $(b,-t hey.txt) "; `Noblank;
+    `Pre "$(b,dot -Tsvg graph.dot |) $(cmd) $(b,-t graph.svg)";
+    `S Manpage.s_bugs;
+    `P "This program is distributed with the $(b,b0) system. See
+        $(i,https:/erratique.ch/software/b0) for contact information.";
   ]
   in
   Cmd.make (Cmd.info "show-url" ~version:"%%VERSION%%" ~doc ~exits ~man) @@
-  let+ color = B0_std_cli.color ()
-  and+ log_level = B0_std_cli.log_level ()
+  let+ () = B0_std_cli.log_setup ()
   and+ background = B0_web_browser.background ()
   and+ prefix = B0_web_browser.prefix ~default:false ()
   and+ browser = B0_web_browser.browser ()
@@ -93,12 +91,12 @@ let cmd =
   and+ urls =
     let doc =
       "Show $(docv). If $(docv) is an existing file path a corresponding \
-       file:// $(docv) is opened. If $(docv) is $(b,-) data from $(b,stdin) \
+       file://$(docv) is shown. If $(docv) is $(b,-), data from $(b,stdin) \
        is read and written to a temporary file which is shown."
     in
-    Arg.(value & pos_all string ["-"] & info [] ~doc ~docv:"URL")
+    Arg.(value & pos_all Arg.filepath ["-"] & info [] ~doc ~docv:"URL")
   in
-  show_urls ~color ~log_level ~background ~prefix ~browser ~urls ~tname
+  show_urls ~background ~prefix ~browser ~urls ~tname
 
-let main () = Cmd.eval' cmd
+let main () = Cmd.eval_result' cmd
 let () = if !Sys.interactive then () else exit (main ())

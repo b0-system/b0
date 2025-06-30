@@ -581,11 +581,10 @@ module Memo = struct
 
   (* Hash fun *)
 
-  let hash_fun =
-    let of_string s = Result.map_error (fun m -> `Msg m) @@ Hash.get_fun s in
-    let pp ppf (module H : Hash.T) = Fmt.string ppf H.id in
-    Arg.conv ~docv:"HASHFUN" (of_string, pp)
+  let hash_fun_assoc =
+    List.map (fun ((module H : Hash.T) as h) -> H.id, h) (Hash.funs ())
 
+  let hash_fun_conv = Arg.enum ~docv:"HASHFUN" hash_fun_assoc
   let hash_fun_env = "B0_HASH_FUN"
   let hash_fun
       ?(opts = ["hash-fun"]) ?docs ?doc ?(doc_none = Hash.Xxh3_64.id)
@@ -594,16 +593,14 @@ module Memo = struct
     let doc = match doc with
     | Some doc -> doc
     | None ->
-        let ids = List.map (fun (module H : Hash.T) -> H.id) (Hash.funs ()) in
-        Fmt.str "Hash function to use for caching. %a"
-          Fmt.(must_be Fmt.code) ids
+        Fmt.str "$(docv) is the hash function to use. Must be %s."
+          (Arg.doc_alts_enum hash_fun_assoc)
     in
-    Arg.(value & opt (some ~none:doc_none hash_fun) None &
-         info opts ~env ~doc ?docs ~docv:"HASHFUN")
+    Arg.(value & opt (some ~none:doc_none hash_fun_conv) None &
+         info opts ~env ~doc ?docs)
 
   let get_hash_fun ~hash_fun = match hash_fun with
-  | Some m -> m
-  | None -> (module Hash.Xxh3_64 : Hash.T)
+  | None -> (module Hash.Xxh3_64 : Hash.T) | Some m -> m
 
   (* Logs *)
 

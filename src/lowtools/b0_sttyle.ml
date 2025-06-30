@@ -22,10 +22,10 @@ let colors =
 
 let color_to_string = function
 | `Default -> "dft "
-| `Black -> "blk "  | `Black_bright  -> "blkB"
-| `Red -> "red "    | `Red_bright  -> "redB"
-| `Green -> "grn "  | `Green_bright  -> "grnB"
-| `Yellow -> "yel " | `Yellow_bright -> "yelB"
+| `Black -> "blk "   | `Black_bright  -> "blkB"
+| `Red -> "red "     | `Red_bright  -> "redB"
+| `Green -> "grn "   | `Green_bright  -> "grnB"
+| `Yellow -> "yel "  | `Yellow_bright -> "yelB"
 | `Blue -> "blu "    | `Blue_bright -> "bluB"
 | `Magenta -> "mag " | `Magenta_bright -> "magB"
 | `Cyan    -> "cya " | `Cyan_bright    -> "cyaB"
@@ -56,36 +56,37 @@ let make_base ~bold ~faint ~italic ~underline ~reverse =
   add_if italic `Italic @@ add_if underline `Underline @@
   add_if reverse `Reverse @@ []
 
-let sttyle bold faint italic underline reverse =
+let sttyle ~bold ~faint ~italic ~underline ~reverse =
   let base = make_base ~bold ~faint ~italic ~underline ~reverse in
   matrix ~base ()
 
 open Cmdliner
+open Cmdliner.Term.Syntax
 
 let cmd =
-  let doc = "Show ANSI styles" in
+  let doc = "Show ANSI style matrix" in
   let man =
     [ `S Manpage.s_description;
-      `P "The $(iname) tool outputs the various ANSI styles that \
+      `P "The $(cmd) tool outputs the various ANSI styles that \
           can be devised using $(b,B0_std.Fmt.style) specifications. \
           It shows a basic color matrix (which does not fit on 80 columns) \
           and options can add more styling.";
-      `Pre "$(iname)"; `Noblank;
-      `Pre "$(iname) $(b,--bold)"; `Noblank;
-      `Pre "$(iname) $(b,--italic --bold)";
+      `Pre "$(cmd)"; `Noblank;
+      `Pre "$(cmd) $(b,--bold)"; `Noblank;
+      `Pre "$(cmd) $(b,--italic --bold)";
       `P "See more options below.";
       `S Manpage.s_bugs;
-      `P "This program is distributed with the b0 system. \
-          See https://erratique.ch/software/b0 for contact information."; ]
+      `P "This program is distributed with the $(b,b0) system. \
+          See $(i,https://erratique.ch/software/b0) for contact information." ]
   in
-  let bold = Arg.(value & flag & info ["b"; "bold"] ~doc:"Use bold.") in
-  let faint = Arg.(value & flag & info ["f"; "faint"] ~doc:"Use faint.") in
-  let italic = Arg.(value & flag & info ["i"; "italic"] ~doc:"Use italic.") in
-  let underline =
-    Arg.(value & flag & info ["u"; "underline"] ~doc:"Use underline.")
-  in
-  let reverse = Arg.(value & flag & info ["r"; "reverse"] ~doc:"Use reverse.")in
   Cmd.make (Cmd.info "b0-sttyle" ~version:"%%VERSION%%" ~doc ~man) @@
-  Term.(const sttyle $ bold $ faint $ italic $ underline $ reverse)
+  let+ bold = Arg.(value & flag & info ["b"; "bold"] ~doc:"Use bold.")
+  and+ faint = Arg.(value & flag & info ["f"; "faint"] ~doc:"Use faint.")
+  and+ italic = Arg.(value & flag & info ["i"; "italic"] ~doc:"Use italic.")
+  and+ underline =
+    Arg.(value & flag & info ["u"; "underline"] ~doc:"Use underline.")
+  and+ reverse = Arg.(value & flag & info ["r"; "reverse"] ~doc:"Use reverse.")
+  in
+  sttyle ~bold ~faint ~italic ~underline ~reverse
 
 let () = if !Sys.interactive then () else exit (Cmd.eval cmd)
