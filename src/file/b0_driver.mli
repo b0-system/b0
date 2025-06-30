@@ -215,7 +215,7 @@ val has_b0_file : unit -> bool
 
 val has_failed_b0_file : unit -> bool
 (** [has_failed_b0_file ()] is [true] for {!with_b0_file_if_any} when
-    there is a b0 file but it file to compile. *)
+    there is a b0 file but it failed to compile. *)
 
 (** {1:compile Compilation} *)
 
