@@ -329,12 +329,32 @@ let build_only =
   let doc = "Build only. Do not execute the action." in
   Arg.(value & flag & info ["b"; "build"] ~doc)
 
+let action_arg =
+  let docv = "ACTION" in
+  let complete pre =
+    let keep u =
+      if not (B0_unit.is_actionable u) then None else
+      let name = match B0_unit.find_meta B0_unit.tool_name u with
+      | Some name when String.starts_with ~prefix:pre name -> Some name
+      | _ ->
+          match B0_unit.name u with
+          | name when String.starts_with ~prefix:pre name -> Some name
+          | _ -> None
+      in
+      Option.map (fun n -> n, B0_unit.doc u) name
+    in
+    List.filter_map keep (B0_unit.list ())
+
+  in
+  let completion = Arg.Completion.make ~complete () in
+  Arg.Conv.of_conv Arg.string ~completion ~docv ()
+
 let action =
   let doc = "Action or tool to run. Specify it after a $(b,--) otherwise \
-             it gets taken for a $(mname) command when $(b,b0) is used \
+             it gets taken for a $(tool) command when $(b,b0) is used \
              without a command."
   in
-  Arg.(value & pos 0 (some string) None & info [] ~doc ~docv:"ACTION")
+  Arg.(value & pos 0 (some action_arg) None & info [] ~doc)
 
 let args =
   let doc = "Arguments given as is to the action." in
