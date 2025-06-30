@@ -176,7 +176,7 @@ module Action = struct
       Cmd.info ?man_xrefs ?man ?envs ~exits ?sdocs ?docs ?version name ~doc
     in
     let argv = Array.of_list (name :: B0_std.Cmd.to_list args) in
-    let cmd = Cmdliner.Cmd.v info (termf env u) in
+    let cmd = Cmdliner.Cmd.make info (termf env u) in
     (* FIXME use Cmd.eval_value' *)
     Ok (B0_std_cli.Exit.of_eval_result (Cmd.eval_value ~argv cmd))
 

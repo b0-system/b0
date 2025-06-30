@@ -815,7 +815,7 @@ let unit =
     let pkgs = pkgs ~doc:"Only list opam package $(docv) (repeatable)." () in
     let format = B0_std_cli.output_format () in
     let doc = "List opam packages and their defining packs" in
-    Cmd.v (Cmd.info "list" ~doc ~man) @@
+    Cmd.make (Cmd.info "list" ~doc ~man) @@
     Term.(const list_cmd $ const env $ pkgs $ format)
   in
   let file_cmd =
@@ -848,7 +848,7 @@ let unit =
       Arg.(value & flag & info ["no-name"] ~doc)
     in
     let doc = "Generate opam files" in
-    Cmd.v (Cmd.info "file" ~doc ~man) @@
+    Cmd.make (Cmd.info "file" ~doc ~man) @@
     Term.(const file_cmd $ const env $ constraints $ pkgs $ lint $
           raw $ dst $ in_scope $ no_name)
   in
@@ -909,7 +909,7 @@ let unit =
                     use $(b,b0 --) $(b,.opam file) $(i,PKG)….";
                 `Blocks man]
     in
-    Cmd.v (Cmd.info "publish" ~doc ~envs ~man) @@
+    Cmd.make (Cmd.info "publish" ~doc ~envs ~man) @@
     Term.(const Publish.cmd $ const env $ pkgs_dir $ pkgs_repo $
           fork_repo $ local_repo $ github_auth $ constraints $
           pkgs $ incompats $ check_only $ no_pr)

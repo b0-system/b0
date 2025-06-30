@@ -76,7 +76,7 @@ let cmd =
     `Pre "$(b,dot -Tsvg graph.dot |) $(iname) $(b,-t g.svg)";
   ]
   in
-  Cmd.v (Cmd.info "show-url" ~version:"%%VERSION%%" ~doc ~exits ~man) @@
+  Cmd.make (Cmd.info "show-url" ~version:"%%VERSION%%" ~doc ~exits ~man) @@
   let+ color = B0_std_cli.color ()
   and+ log_level = B0_std_cli.log_level ()
   and+ background = B0_web_browser.background ()

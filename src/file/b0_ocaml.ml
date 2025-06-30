@@ -2231,7 +2231,7 @@ let unit =
       let docv = "ID" and absent = "Derived from the basename of $(i,INPUT)" in
       Arg.(value & opt (some string) None & info ["id"] ~doc ~docv ~absent)
     in
-    Cmd.v (Cmd.info "crunch" ~doc ~man ~exits) @@
+    Cmd.make (Cmd.info "crunch" ~doc ~man ~exits) @@
     Term.(const crunch $ id $ infile)
   in
   let list =
@@ -2244,7 +2244,7 @@ let unit =
     let envs = B0_pager.Env.infos in
     let exits = B0_std_cli.Exit.infos in
     let format = B0_std_cli.output_format () in
-    Cmd.v (Cmd.info "libs" ~doc ~man ~exits ~envs) @@
+    Cmd.make (Cmd.info "libs" ~doc ~man ~exits ~envs) @@
     Term.(const list $ format $ pager_don't)
   in
   let meta =
@@ -2262,7 +2262,7 @@ let unit =
       in
       Arg.(value & pos 0 string "default" & info [] ~doc ~docv:"PACK")
     in
-    Cmd.v (Cmd.info "META" ~doc ~man) @@
+    Cmd.make (Cmd.info "META" ~doc ~man) @@
     Term.(const meta $ const env $ pack)
   in
   let man =
@@ -2305,7 +2305,7 @@ let ocaml_ocaml_cmd env u =
     ]
   in
   let name = B0_unit.name u and doc = B0_unit.doc u in
-  Cmd.v (Cmd.info name ~doc ~man) @@
+  Cmd.make (Cmd.info name ~doc ~man) @@
   run_ocaml_term ocaml env
 
 let unit_ocaml =

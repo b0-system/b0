@@ -100,7 +100,7 @@ let dune_cmd env u =
       let doc = "Do not write the files action, just print them." in
       Arg.(value & flag & info ["dry-run"] ~doc)
     in
-    Cmd.v (Cmd.info "file" ~doc ~man) @@
+    Cmd.make (Cmd.info "file" ~doc ~man) @@
     Term.(const file $ const env $ units_all $ dry_run)
   in
   let man =

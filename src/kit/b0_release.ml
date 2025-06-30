@@ -482,7 +482,7 @@ let unit =
       let doc = "Commit-ish $(docv) to checkout for the release." in
       Arg.(value & opt string "HEAD" & info ["commit"] ~doc ~docv:"COMMIT-ISH")
     in
-    Cmd.v (Cmd.info "archive" ~doc ~man) @@
+    Cmd.make (Cmd.info "archive" ~doc ~man) @@
     Term.(const Archive.cmd $ const env $ commit $ packs $ x_packs)
   in
   let tag =
@@ -539,7 +539,7 @@ let unit =
       Arg.(value & pos 0 (some string) None & info [] ~doc ~docv:"VERSION")
     in
     let exits = B0_std_cli.Exit.infos in
-    Cmd.v (Cmd.info "tag" ~doc ~exits ~man) @@
+    Cmd.make (Cmd.info "tag" ~doc ~exits ~man) @@
     Term.(const Tag.cmd $ version $ commit $ msg $ sign $ force $ delete $
           dry_run $ packs $ x_packs)
   in
@@ -575,7 +575,7 @@ let unit =
     in
     let pager_don't = B0_pager.don't () in
     let envs = B0_pager.Env.infos in
-    Cmd.v (Cmd.info "status" ~doc ~man ~exits ~envs) @@
+    Cmd.make (Cmd.info "status" ~doc ~man ~exits ~envs) @@
     Term.(const Status.cmd $ after $ last $ packs $ x_packs $ pager_don't)
   in
   let man =

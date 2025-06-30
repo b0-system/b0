@@ -302,7 +302,7 @@ let unit =
     let doc = "Show URL but do not invoke a tool." in
     Arg.(value & flag & info ["n"; "no-exec"] ~doc)
   in
-  Cmd.v (Cmd.info (B0_unit.name u) ~doc ~man) @@
+  Cmd.make (Cmd.info (B0_unit.name u) ~doc ~man) @@
   Term.(const show_url $ const env $ B0_web_browser.browser () $
         B0_web_browser.background () $ B0_web_browser.prefix ~default:true () $
         timeout $ dry_run $ no_exec $ args)

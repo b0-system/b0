@@ -54,10 +54,10 @@ let tool =
     `S Manpage.s_bugs;
     `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ]
   in
-  Cmd.v (Cmd.info "b0-hash" ~version:"%%VERSION%%" ~doc ~man ~man_xrefs)
-    Term.(const hash $ B0_std_cli.color () $
-          B0_std_cli.log_level () $ hash_fun $
-          B0_std_cli.output_format () $ files)
+  Cmd.make (Cmd.info "b0-hash" ~version:"%%VERSION%%" ~doc ~man ~man_xrefs) @@
+  Term.(const hash $ B0_std_cli.color () $
+        B0_std_cli.log_level () $ hash_fun $
+        B0_std_cli.output_format () $ files)
 
-let main () = exit (Cmd.eval' tool)
-let () = if !Sys.interactive then () else main ()
+let main () = Cmd.eval' tool
+let () = if !Sys.interactive then () else exit (main ())

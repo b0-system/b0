@@ -53,9 +53,9 @@ let main () =
   let cmd =
     let doc = "My driver" in
     let exits = B0_driver.Exit.infos in
-    let man = [ `S Manpage.s_description; `P "$(iname) does not much." ] in
+    let man = [ `S Manpage.s_description; `P "$(cmd) does not much." ] in
     let name = B0_driver.name driver and version = B0_driver.version driver in
-    Cmd.v (Cmd.info name ~version ~doc ~exits ~man) @@
+    Cmd.make (Cmd.info name ~version ~doc ~exits ~man) @@
     B0_driver.with_b0_file ~driver (Term.const my_driver)
   in
   Cmd.eval_value cmd
@@ -85,7 +85,6 @@ A few things to note:
    imported in the b0 file by using the [#require] directive.}}
 
 {1:fixme FIXME}
-
 
 The driver dance seems to be a bit slow for now. Even for the
 up-to-date dance we get into the 18-30ms [b0 unit list]. But there's room

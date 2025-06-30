@@ -173,7 +173,7 @@ module Cli = struct
   let subcmd ?exits ?(envs = []) ?synopsis name ~doc ~descr term =
     let man = man_with_descr ?synopsis descr in
     let term = Term.(term $ minimal_setup) in
-    Cmd.v (Cmd.info name ~doc ?exits ~envs ~man) term
+    Cmd.make (Cmd.info name ~doc ?exits ~envs ~man) term
 
   let subcmd_with_driver_conf
       ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
@@ -182,7 +182,7 @@ module Cli = struct
     let man = man_with_descr ?synopsis descr in
     let envs = List.rev_append envs pager_envs (* driver conf has no-pager *)in
     let term = Term.(term $ B0_driver.Cli.conf) in
-    Cmd.v (Cmd.info name ~doc ~exits ~envs ~man) term
+    Cmd.make (Cmd.info name ~doc ~exits ~envs ~man) term
 
   let subcmd_with_b0_file_if_any
       ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
@@ -191,7 +191,7 @@ module Cli = struct
     let man = man_with_descr ?synopsis descr in
     let envs = List.rev_append envs pager_envs (* driver conf has no-pager *)in
     let term = B0_driver.with_b0_file_if_any ~driver term in
-    Cmd.v (Cmd.info name ~doc ~exits ~envs ~man) term
+    Cmd.make (Cmd.info name ~doc ~exits ~envs ~man) term
 
   let subcmd_with_b0_file
       ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
@@ -200,7 +200,7 @@ module Cli = struct
     let man = man_with_descr ?synopsis descr in
     let envs = List.rev_append envs pager_envs (* driver conf has no-pager *)in
     let term = B0_driver.with_b0_file ~driver term in
-    Cmd.v (Cmd.info name ~doc ~exits ~envs ~man) term
+    Cmd.make (Cmd.info name ~doc ~exits ~envs ~man) term
 
   let cmd_group ?exits ?(envs = []) ?synopsis name ~doc ~descr ?default subs =
     let man = man_with_descr ?synopsis descr in

@@ -85,7 +85,7 @@ let cmd =
     Arg.(value & flag & info ["u"; "underline"] ~doc:"Use underline.")
   in
   let reverse = Arg.(value & flag & info ["r"; "reverse"] ~doc:"Use reverse.")in
-  Cmd.v (Cmd.info "b0-sttyle" ~version:"%%VERSION%%" ~doc ~man) @@
+  Cmd.make (Cmd.info "b0-sttyle" ~version:"%%VERSION%%" ~doc ~man) @@
   Term.(const sttyle $ bold $ faint $ italic $ underline $ reverse)
 
 let () = if !Sys.interactive then () else exit (Cmd.eval cmd)

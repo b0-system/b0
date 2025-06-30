@@ -1140,7 +1140,7 @@ module Test = struct
     in
     let info = Cmdliner.Cmd.info ?doc ~man ~exits:Cli.exits name in
     let term = Cmdliner.Term.(const run $ Cli.setup $ args) in
-    let cmd = Cmdliner.Cmd.v info term in
+    let cmd = Cmdliner.Cmd.make info term in
     Cmdliner.Cmd.eval' cmd
 
   let main ?doc ?name f = main' ?doc (Cmdliner.Term.const ()) f

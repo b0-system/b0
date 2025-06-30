@@ -20,7 +20,7 @@ let main () =
     let exits = B0_driver.Exit.infos in
     let man = [ `S Manpage.s_description; `P "$(iname) does not much." ] in
     let name = B0_driver.name driver and version = B0_driver.version driver in
-    Cmd.v (Cmd.info name ~version ~doc ~exits ~man) @@
+    Cmd.make (Cmd.info name ~version ~doc ~exits ~man) @@
     B0_driver.with_b0_file ~driver (Term.const my_driver)
   in
   Cmd.eval_value cmd

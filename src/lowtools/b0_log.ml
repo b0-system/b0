@@ -41,12 +41,13 @@ let tool =
     `S Manpage.s_bugs;
     `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information." ]
   in
-  Cmd.v (Cmd.info "b0-log" ~version:"%%VERSION%%" ~doc ~envs ~man ~man_xrefs)
-    Term.(const log $ B0_std_cli.color () $
-          B0_std_cli.log_level () $ B0_pager.don't () $
-          B0_cli.Memo.Log.out_format_cli () $
-          B0_std_cli.output_format () $
-          B0_cli.Op.query_cli () $ log_file)
+  let version = "%%VERSION%%" in
+  Cmd.make (Cmd.info "b0-log" ~version ~doc ~envs ~man ~man_xrefs) @@
+  Term.(const log $ B0_std_cli.color () $
+        B0_std_cli.log_level () $ B0_pager.don't () $
+        B0_cli.Memo.Log.out_format_cli () $
+        B0_std_cli.output_format () $
+        B0_cli.Op.query_cli () $ log_file)
 
-let main () = exit (Cmd.eval' tool)
-let () = if !Sys.interactive then () else main ()
+let main () = Cmd.eval' tool
+let () = if !Sys.interactive then () else exit (main ())

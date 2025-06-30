@@ -134,21 +134,23 @@ let info ?(man = []) name ~doc =
 let delete =
   let doc = "Delete cache or given keys" in
   let keys = B0_cli.File_cache.keys_none_is_all ~pos_right:(-1) () in
-  Cmd.v (info "delete" ~doc)
-    Term.(const delete $ setup $ b0_dir $ cache_dir $ keys)
+  Cmd.make (info "delete" ~doc) @@
+  Term.(const delete $ setup $ b0_dir $ cache_dir $ keys)
 
 let gc =
   let doc = "Only keep keys used by the build described by $(i,LOG_FILE)" in
-  Cmd.v (info "gc" ~doc)
-    Term.(const gc $ setup $ b0_dir $ cache_dir $ log_file)
+  Cmd.make (info "gc" ~doc) @@
+  Term.(const gc $ setup $ b0_dir $ cache_dir $ log_file)
 
 let keys =
   let doc = "List cache keys" in
-  Cmd.v (info "keys" ~doc) Term.(const keys $ setup $ b0_dir $ cache_dir)
+  Cmd.make (info "keys" ~doc) @@
+  Term.(const keys $ setup $ b0_dir $ cache_dir)
 
 let path =
   let doc = "Output cache directory path (may not exist)" in
-  Cmd.v (info "path" ~doc) Term.(const path $ setup $ b0_dir $ cache_dir)
+  Cmd.make (info "path" ~doc) @@
+  Term.(const path $ setup $ b0_dir $ cache_dir)
 
 let stats_term = Term.(const stats $ setup $ b0_dir $ cache_dir $ log_file)
 let stats =
@@ -157,7 +159,7 @@ let stats =
              `P "$(tname) outputs cache statistics. The $(i,LOG_FILE) is used \
                  to determine used keys." ]
   in
-  Cmd.v (info "stats" ~doc ~man) stats_term
+  Cmd.make (info "stats" ~doc ~man) stats_term
 
 let trim =
   let doc = "Trim the cache to the minimal budget specified." in
@@ -168,8 +170,8 @@ let trim =
                   preserved if possible."; ]
   in
   let trim_args = B0_cli.File_cache.trim_cli () in
-  Cmd.v (info "trim" ~doc ~man)
-    Term.(const trim $ setup $ b0_dir $ cache_dir $ log_file $ trim_args)
+  Cmd.make (info "trim" ~doc ~man) @@
+  Term.(const trim $ setup $ b0_dir $ cache_dir $ log_file $ trim_args)
 
 let cmds = [delete; gc; keys; path; stats; trim ]
 
@@ -187,5 +189,5 @@ let tool =
   let info = Cmd.info "b0-cache" ~version ~doc ~sdocs ~exits ~man ~man_xrefs in
   Cmd.group ~default:stats_term info cmds
 
-let main () = exit (Cmd.eval_result' tool)
-let () = if !Sys.interactive then () else main ()
+let main () = Cmd.eval_result' tool
+let () = if !Sys.interactive then () else exit (main ())
