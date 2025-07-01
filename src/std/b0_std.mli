@@ -99,11 +99,11 @@ module String : sig
   (** [rdrop n s] is [s] without the last [n] bytes of [s]. This is [""]
       if [n >= length s] and [s] if [n <= 0]. *)
 
-  val break : int -> string -> string * string
-  (** [break n v] is [(take n v, drop n v)]. *)
+  val span : int -> string -> string * string
+  (** [span n v] is [(take n v, drop n v)]. *)
 
-  val rbreak : int -> string -> string * string
-  (** [rbreak n v] is [(rdrop n v, rtake n v)]. *)
+  val rspan : int -> string -> string * string
+  (** [rspan n v] is [(rdrop n v, rtake n v)]. *)
 
   (** {2:break_pred Breaking with predicates} *)
 
@@ -123,11 +123,11 @@ module String : sig
   (** [rdrop_while sat s] is [s] without the last consecutive [sat]
       satisfying bytes of [s]. *)
 
-  val span : (char -> bool) -> string -> string * string
-  (** [span sat s] is [(take_while sat s, drop_while sat s)]. *)
+  val span_while : (char -> bool) -> string -> string * string
+  (** [span_while sat s] is [(take_while sat s, drop_while sat s)]. *)
 
-  val rspan : (char -> bool) -> string -> string * string
-  (** [rspan sat s] is [(rdrop_while sat s, take_while sat s)]. *)
+  val rspan_while : (char -> bool) -> string -> string * string
+  (** [rspan_while sat s] is [(rdrop_while sat s, take_while sat s)]. *)
 
   (** {2:break_sep Breaking with separators} *)
 

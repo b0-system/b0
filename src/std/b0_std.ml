@@ -135,10 +135,10 @@ module String = struct
 
   let take n s = subrange ~last:(n - 1) s
   let drop n s = subrange ~first:n s
-  let break n s = (take n s, drop n s)
+  let span n s = (take n s, drop n s)
   let rtake n s = subrange ~first:(String.length s - n) s
   let rdrop n s = subrange ~last:(String.length s - n - 1) s
-  let rbreak n s = (rdrop n s, rtake n s)
+  let rspan n s = (rdrop n s, rtake n s)
 
   (* Breaking with predicates *)
 
@@ -160,7 +160,7 @@ module String = struct
     in
     loop max s 0
 
-  let span sat s =
+  let span_while sat s =
     let max = String.length s - 1 in
     let rec loop max s i = match i > max with
     | true -> s, ""
@@ -187,7 +187,7 @@ module String = struct
     in
     loop s max
 
-  let rspan sat s =
+  let rspan_while sat s =
     let max = String.length s - 1 in
     let rec loop s i = match i < 0 with
     | true -> "", s
@@ -783,7 +783,7 @@ module String = struct
   let commonmark_first_section ~preamble md =
     let atx_heading s (* trimmed *) =
       (* approximate https://spec.commonmark.org/0.29/#atx-headings *)
-      let num, title = span (Char.equal '#') s in
+      let num, title = span_while (Char.equal '#') s in
       let num = String.length num and tlen = String.length title in
       if num = 0 || num > 6 then None else
       if tlen = 0 then Some (num, "") else
@@ -1843,14 +1843,14 @@ module Cmd = struct
       let not_squote c = c <> '\'' in
       let tail s = (* Yikes *) String.subrange ~first:1 s in
       let parse_squoted s =
-        let tok, rem = String.span not_squote (tail s) in
+        let tok, rem = String.span_while not_squote (tail s) in
         if not (String.equal rem "") then tok, tail rem else
         err_unclosed "single" s
       in
       let parse_dquoted acc s =
       let is_data = function '\\' | '"' -> false | _ -> true in
       let rec loop acc s =
-        let data, rem = String.span is_data s in
+        let data, rem = String.span_while is_data s in
         match String.head rem with
         | Some '"' -> (data :: acc), (tail rem)
         | Some '\\' ->
@@ -1882,7 +1882,7 @@ module Cmd = struct
             let acc, rem = parse_dquoted acc s in loop acc rem
         | Some c ->
             let sat = tok_char in
-            let tok, rem = String.span sat s in loop (tok :: acc) rem
+            let tok, rem = String.span_while sat s in loop (tok :: acc) rem
         in
         loop [] s
       in
