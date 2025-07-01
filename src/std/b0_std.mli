@@ -63,33 +63,9 @@ module String : sig
   val is_empty : string -> bool
   (** [is_empty s] is [equal empty s]. *)
 
-  val starts_with : prefix:string -> string -> bool
-  (** [starts_with ~prefix s] is [true] iff [sub.[i] = s.[i]] for
-      all indices [i] of [prefix].
-
-      {b Note.} Available in 4.12. *)
-
-  val ends_with : suffix:string -> string -> bool
-  (** [eds_with ~suffix s] is true iff [sub.[i] = s.[m - i]] for all
-      indices [i] of [sufix] and with [m = String.length s - 1].
-
-      {b Note.} Available in 4.12. *)
-
   val includes : affix:string -> string -> bool
   (** [includes ~affix s] is [true] iff there exists an index [j]
       such that for all indices [i] of [affix], [sub.[i] = s.[j+ 1]]. *)
-
-  val for_all : (char -> bool) -> string -> bool
-  (** [for_all p s] is [true] iff for all indices [i] of [s], [p s.[i]
-      = true].
-
-      {b Note.} Available in 4.13 *)
-
-  val exists : (char -> bool) -> string -> bool
-  (** [exists p s] is [true] iff there exists an index [i] of [s] with
-      [p s.[i] = true].
-
-      {b Note.} Available in 4.13 *)
 
   (** {1:find Finding indices} *)
 
@@ -687,18 +663,6 @@ module List : sig
   include module type of List (** @closed *)
 
   (** {1:adds Additions} *)
-
-  val find_map : ('a -> 'b option) -> 'a list -> 'b option
-  (** [find_map f l] is the first element of [l] such that
-      [f v] is [Some r] or [None] otherwise.
-
-      {b Note.} Available in 4.10. *)
-
-  val concat_map : ('a -> 'b list) -> 'a list -> 'b list
-  (** [concat_map f l] maps [l] with [f] and concatenates
-      the result. Tail recursive.
-
-      {b Note.} Available in 4.10. *)
 
   val classify :
     ?cmp_elts:('a -> 'a -> int) ->

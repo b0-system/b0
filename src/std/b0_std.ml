@@ -49,35 +49,6 @@ module String = struct
   (* Predicates *)
 
   let is_empty s = equal empty s
-  let starts_with ~prefix s =
-    let len_a = String.length prefix in
-    let len_s = String.length s in
-    if len_a > len_s then false else
-    let max_idx_a = len_a - 1 in
-    let rec loop i =
-      if i > max_idx_a then true else
-      if unsafe_get prefix i <> unsafe_get s i then false else loop (i + 1)
-    in
-    loop 0
-
-  let ends_with ~suffix s =
-    let len_a = String.length suffix in
-    let len_s = String.length s in
-    if len_a > len_s then false else
-    let max_idx_a = len_a - 1 in
-    let max_idx_s = len_s - len_a in
-    let rec loop i k =
-      if i > max_idx_s then false else
-      if k > max_idx_a then true else
-      if k > 0 then
-        if unsafe_get suffix k = unsafe_get s (i + k)
-        then loop i (k + 1) else loop (i + 1) 0
-      else
-        if unsafe_get suffix 0 = unsafe_get s i
-        then loop i 1 else loop (i + 1) 0
-    in
-    loop 0 0
-
   let includes ~affix s =
     let len_a = String.length affix in
     let len_s = String.length s in
@@ -95,22 +66,6 @@ module String = struct
       then loop i 1 else loop (i + 1) 0
     in
     loop 0 0
-
-  let for_all sat s =
-    let max_idx = String.length s - 1 in
-    let rec loop i =
-      if i > max_idx then true else
-      if sat (unsafe_get s i) then loop (i + 1) else false
-    in
-    loop 0
-
-  let exists sat s =
-    let max_idx = String.length s - 1 in
-    let rec loop i =
-      if i > max_idx then false else
-      if sat (unsafe_get s i) then true else loop (i + 1)
-    in
-    loop 0
 
   (* Finding indices *)
 
@@ -1042,17 +997,6 @@ end
 
 module List = struct
   include List
-
-  let rec find_map f = function
-  | [] -> None
-  | v :: vs -> match f v with Some _ as r -> r | None -> find_map f vs
-
-  let concat_map f l =
-    let rec loop f acc = function
-    | [] -> rev acc
-    | v :: vs -> loop f (List.rev_append (f v) acc) vs
-    in
-    loop f [] l
 
   let classify
       (type a) (type b)
