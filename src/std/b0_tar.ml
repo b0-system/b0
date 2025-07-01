@@ -128,14 +128,15 @@ let of_dir ~dir ~exclude_paths ~root ~mtime =
 
 (* Compressing and unarchiving *)
 
-let compress_tool_for_file_ext ?(de = "") file = match Fpath.get_ext file with
-| ".tar" -> Ok None
-| ".tgz" | ".gz" -> Ok (Some (Cmd.tool "gzip"))
-| ".tbz" | ".bzip2" -> Ok (Some (Cmd.tool "bzip2"))
-| ".xz" -> Ok (Some (Cmd.tool "lzma"))
-| ".zst" -> Ok (Some (Cmd.tool "zstd"))
-| ext ->
-    Fpath.error file "Unknown extension %a, cannot %scompress" Fmt.code ext de
+let compress_tool_for_file_ext ?(de = "") file =
+  match Fpath.get_ext ~multi:false file with
+  | ".tar" -> Ok None
+  | ".tgz" | ".gz" -> Ok (Some (Cmd.tool "gzip"))
+  | ".tbz" | ".bzip2" -> Ok (Some (Cmd.tool "bzip2"))
+  | ".xz" -> Ok (Some (Cmd.tool "lzma"))
+  | ".zst" -> Ok (Some (Cmd.tool "zstd"))
+  | ext ->
+      Fpath.error file "Unknown extension %a, cannot %scompress" Fmt.code ext de
 
 let compress ?search ~force ~make_path file ~archive =
   let* compress = compress_tool_for_file_ext file in

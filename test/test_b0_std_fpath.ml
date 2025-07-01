@@ -63,41 +63,41 @@ let test_is_prefix_strip_prefix =
 
 let test_basename =
   Test.test "Fpath.basename" @@ fun () ->
-  let test ?__POS__:pos p b ~strip_ext:b' =
+  let test ?__POS__:pos p b ~strip_exts:b' =
     Test.block ?__POS__:pos @@ fun () ->
     let p = Fpath.v p in
     Test.string (Fpath.basename p) b ~__POS__;
-    Test.string (Fpath.basename ~strip_ext:true p) b' ~__POS__;
+    Test.string (Fpath.basename ~strip_exts:true p) b' ~__POS__;
   in
-  test "bla" "bla" ~strip_ext:"bla" ~__POS__;
-  test "bla" "bla" ~strip_ext:"bla" ~__POS__;
-  test "/" "" ~strip_ext:"" ~__POS__;
-  test "/.." "" ~strip_ext:"" ~__POS__;
-  test "/." "" ~strip_ext:"" ~__POS__;
-  test "bla/.." "" ~strip_ext:"" ~__POS__;
-  test "bla/." "" ~strip_ext:"" ~__POS__;
-  test ".." "" ~strip_ext:"" ~__POS__;
-  test "." "" ~strip_ext:"" ~__POS__;
-  test "./a" "a" ~strip_ext:"a" ~__POS__;
-  test "./a/" "a" ~strip_ext:"a" ~__POS__;
-  test "./abla" "abla" ~strip_ext:"abla" ~__POS__;
-  test "./abla/" "abla" ~strip_ext:"abla" ~__POS__;
-  test "/abla" "abla" ~strip_ext:"abla" ~__POS__;
-  test "/abla/" "abla" ~strip_ext:"abla" ~__POS__;
-  test "/.ocamlinit" ".ocamlinit" ~strip_ext:".ocamlinit" ~__POS__;
-  test "/.ocamlinit/" ".ocamlinit" ~strip_ext:".ocamlinit" ~__POS__;
-  test "/..ocamlinit/" "..ocamlinit" ~strip_ext:"..ocamlinit" ~__POS__;
-  test "hop/.emacs.d" ".emacs.d" ~strip_ext:".emacs" ~__POS__;
-  test "hap/.emacs.d/" ".emacs.d" ~strip_ext:".emacs" ~__POS__;
-  test "hop/.emacs.d" ".emacs.d" ~strip_ext:".emacs" ~__POS__;
-  test "hap/.emacs.d/" ".emacs.d" ~strip_ext:".emacs" ~__POS__;
-  test "hap/archive.tar.gz/" "archive.tar.gz" ~strip_ext:"archive" ~__POS__;
-  test "hap/archive.tar.gz" "archive.tar.gz" ~strip_ext:"archive" ~__POS__;
-  test "/archive.tar.gz" "archive.tar.gz" ~strip_ext:"archive" ~__POS__;
-  test "archive.tar.gz/" "archive.tar.gz" ~strip_ext:"archive" ~__POS__;
-  test "archive.tar.gz" "archive.tar.gz" ~strip_ext:"archive" ~__POS__;
+  test "bla" "bla" ~strip_exts:"bla" ~__POS__;
+  test "bla" "bla" ~strip_exts:"bla" ~__POS__;
+  test "/" "" ~strip_exts:"" ~__POS__;
+  test "/.." "" ~strip_exts:"" ~__POS__;
+  test "/." "" ~strip_exts:"" ~__POS__;
+  test "bla/.." "" ~strip_exts:"" ~__POS__;
+  test "bla/." "" ~strip_exts:"" ~__POS__;
+  test ".." "" ~strip_exts:"" ~__POS__;
+  test "." "" ~strip_exts:"" ~__POS__;
+  test "./a" "a" ~strip_exts:"a" ~__POS__;
+  test "./a/" "a" ~strip_exts:"a" ~__POS__;
+  test "./abla" "abla" ~strip_exts:"abla" ~__POS__;
+  test "./abla/" "abla" ~strip_exts:"abla" ~__POS__;
+  test "/abla" "abla" ~strip_exts:"abla" ~__POS__;
+  test "/abla/" "abla" ~strip_exts:"abla" ~__POS__;
+  test "/.ocamlinit" ".ocamlinit" ~strip_exts:".ocamlinit" ~__POS__;
+  test "/.ocamlinit/" ".ocamlinit" ~strip_exts:".ocamlinit" ~__POS__;
+  test "/..ocamlinit/" "..ocamlinit" ~strip_exts:"..ocamlinit" ~__POS__;
+  test "hop/.emacs.d" ".emacs.d" ~strip_exts:".emacs" ~__POS__;
+  test "hap/.emacs.d/" ".emacs.d" ~strip_exts:".emacs" ~__POS__;
+  test "hop/.emacs.d" ".emacs.d" ~strip_exts:".emacs" ~__POS__;
+  test "hap/.emacs.d/" ".emacs.d" ~strip_exts:".emacs" ~__POS__;
+  test "hap/archive.tar.gz/" "archive.tar.gz" ~strip_exts:"archive" ~__POS__;
+  test "hap/archive.tar.gz" "archive.tar.gz" ~strip_exts:"archive" ~__POS__;
+  test "/archive.tar.gz" "archive.tar.gz" ~strip_exts:"archive" ~__POS__;
+  test "archive.tar.gz/" "archive.tar.gz" ~strip_exts:"archive" ~__POS__;
+  test "archive.tar.gz" "archive.tar.gz" ~strip_exts:"archive" ~__POS__;
   if Sys.win32 then begin
-    test "C:archive.tar.gz" "archive.tar.gz" ~strip_ext:"archive" ~__POS__;
+    test "C:archive.tar.gz" "archive.tar.gz" ~strip_exts:"archive" ~__POS__;
   end;
   ()
 

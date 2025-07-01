@@ -257,8 +257,7 @@ module String : sig
   (** [distinct ss] is [ss] without duplicates, the list order is
       preserved. *)
 
-  val unique :
-    ?limit:int -> exists:(string -> bool) -> string -> string
+  val unique : ?limit:int -> exists:(string -> bool) -> string -> string
   (** [unique ~exist n] is [n] if [exists n] is [false] or [r = strf
       "%s~%d" n d] with [d] the smallest integer such that exists [r]
       if [false]. If no [d] in \[[1];[1e9]\] satisfies the condition
@@ -704,7 +703,7 @@ end
     system hierarchy. It is made of three parts:
 
     {ol
-    {- An optional, platform-dependent, volume.}
+    {- An optional, platform-dependent, volume (e.g. [C:]).}
     {- An optional root directory separator {!Fpath.dir_sep} whose presence
        distinguishes absolute paths (["/a"]) from {e relative} ones
        (["a"])}
@@ -720,34 +719,36 @@ end
     on ["/"] or [".."]). *)
 module Fpath : sig
 
-  (** {1:segments Separators and segments} *)
+  (** {1:segments Directory separators and segments} *)
 
   val dir_sep_char : char
   (** [dir_sep_char] is the platform dependent natural directory
-      separator.  This is / on POSIX and \ on Windows. *)
+      separator.  This is character ['\\'] if {!Sys.win32} and ['/']
+      otherwise. *)
 
   val dir_sep : string
   (** [dir_sep] is {!dir_sep_char} as a string. *)
 
   val has_dir_sep : string -> bool
-  (** [has_dir_sep s] is [true] iff [s] contains {!dir_sep_char} (on
-      Windows also if it contains ['/']). *)
+  (** [has_dir_sep s] is [true] iff [s] contains {!dir_sep_char} (and
+      if {!Sys.win32} also if it contains ['/']). *)
 
   val is_seg : string -> bool
-  (** [is_seg s] is [true] iff [s] does not contain a {!dir_sep_char}
-      (on Windows also that it does not contain ['/']) or a null byte. *)
+  (** [is_seg s] is [true] iff [s] does not contain a null byte or a
+      {!dir_sep_char} (and if {!Sys.win32} also that it does not
+      contain ['/']). *)
 
   val is_rel_seg : string -> bool
-  (** [is_rel_seg s] is [true] iff [s] is a relative segment in other
-      words either ["."] or [".."]. *)
+  (** [is_rel_seg s] is [true] iff [s] is a relative segment, that is
+      either ["."] or [".."]. *)
 
-  (** {1:paths Paths} *)
+  (** {1:paths File paths} *)
 
   type t
-  (** The type for paths *)
+  (** The type for file paths. *)
 
   val v : string -> t
-  (** [v s] is the string [s] as a path.
+  (** [v s] is the string [s] as a file path.
 
       {b Warning.} In code only use ["/"] as the directory separator
       even on Windows platforms (don't be upset, the module gives them
@@ -760,9 +761,9 @@ module Fpath : sig
   (** [fmt …] is [Fmt.kstr v …]. *)
 
   val add_seg : t -> string -> (t, string) result
-  (** [add_seg p seg] if [p]'s last segment is non-empty this is
-      [p] with [seg] added. If [p]'s last segment is empty, this is
-      [p] with the empty segment replaced by [seg].
+  (** [add_seg p seg] if [p]'s last segment is non-empty this is [p]
+      with [seg] added. If [p]'s last segment is empty, this is [p]
+      with the empty segment replaced by [seg].
 
       This errors if [is_seg seg] is [false]. *)
 
@@ -785,11 +786,12 @@ module Fpath : sig
 
   val null : t
   (** [null] represents a file on the OS that discards all writes
-      and returns end of file on reads. *)
+      and returns end of file on reads. This is [NUL] if {!Sys.win32}
+      is [true] and [/dev/null] otherwise. See also {!is_null}. *)
 
   val dash : t
-  (** [dash] is ["-"]. This value is used in cli interface
-      to respectively denote standard input and output. *)
+  (** [dash] is ["-"]. This value is used in command line interfaces
+      to denote standard input or output. See also {!is_dash}. *)
 
   (** {1:dirpaths Directory paths}
 
@@ -818,11 +820,11 @@ module Fpath : sig
       properties of paths. Given a path, these properties can be
       different from the ones your file system attributes to it. *)
 
-  val basename : ?strip_ext:bool -> t -> string
+  val basename : ?strip_exts:bool -> t -> string
   (** [basename p] is the last non-empty segment of [p] or the empty
       string otherwise. The latter occurs only on root paths and on
       paths whose last non-empty segment is a {{!is_rel_seg}relative
-      segment}. If [strip_ext] is [true] (default to [false]) the basename's
+      segment}. If [strip_exts] is [true] (default to [false]) the basename's
       {{!file_exts}multiple extension}, if any, is removed from the result. *)
 
   val parent : t -> t
@@ -893,6 +895,12 @@ module Fpath : sig
   (** [is_root p] is [true] iff [p] is a root directory, i.e. [p] has
       the root directory separator and a single, empty, segment. *)
 
+  val is_null : t -> bool
+  (** [is_null p] is [equal p null]. *)
+
+  val is_dash : t -> bool
+  (** [is_dash p] is [equal p dash]. *)
+
   val is_current_dir : t -> bool
   (** [is_current_dir p] is [true] iff [p] is either ["."] or ["./"]. *)
 
@@ -910,25 +918,41 @@ module Fpath : sig
 
   (** {1:file_exts File extensions}
 
-      The {e file extension} (resp. {e multiple file extension}) of a
+      The {e file extension} (resp. {e multiple file extensions}) of a
       path segment is the suffix that starts at the last (resp. first)
       occurence of a ['.'] that is preceeded by at least one non ['.']
-      character.  If there is no such occurence in the segment, the
+      character. If there is no such occurence in the segment, the
       extension is empty.  With these definitions, ["."], [".."],
       ["..."] and dot files like [".ocamlinit"] or ["..ocamlinit"] have
-      no extension, but [".emacs.d"] and ["..emacs.d"] do have one. *)
+      no extension, but [".emacs.d"] and ["..emacs.d"] do have a single one.
+
+      {b TODO} In the [fpath] package we correct e.g. [has_ext] if the
+      given [ext] has no [ext]. I think we should either check and raise
+      [Invalid_argument] or correct. *)
 
   type ext = string
-  (** The type for file extensions, ['.'] separator included.  *)
+  (** The type for file or multiple file extensions, ['.'] separator
+      included. *)
 
-  val get_ext : ?multi:bool -> t -> ext
-  (** [get_ext p] is [p]'s {{!basename}basename} file extension or the empty
-      string if there is no extension. If [multi] is [true] (defaults to
-      [false]), returns the multiple file extension. *)
+  val exists_ext : t -> bool
+  (** [exists_ext p] is [true] iff [p] has a file or multiple file extension. *)
+
+  val exists_multi_ext : t -> bool
+  (** [exists_multi_ext p] is [true] iff [p] has a multiple file extension. *)
+
+  val get_ext : multi:bool -> t -> ext
+  (** [get_ext ~multi p] is the file extension or multiple file extension
+      if [multi] is [true] of the {!basename} of [p].
+
+      The empty string is returned if there is no extension. By definition
+      this works on the directory name of directory paths.
+
+      {b TODO} Is returning the empty string really a good idea ? I vaguely
+      remember that this was an annoyance though. *)
 
   val has_ext : ext -> t -> bool
-  (** [has_ext ext p] is [true] iff
-      [String.equal (get_ext p) e || String.equal (get_ext ~multi:true p) e]. *)
+  (** [has_ext ext p] is [true] iff [String.equal (get_ext n multi:false p) e ||
+      String.equal (get_ext ~multi:true p) e]. *)
 
   val mem_ext : ext list -> t -> bool
   (** [mem_ext exts p] is [List.exists (fun e -> has_ext e p) exts] *)
@@ -937,22 +961,22 @@ module Fpath : sig
   (** [add_ext ext p] is [p] with [ext] concatenated to [p]'s
       {{!basename}basename}. *)
 
-  val strip_ext : ?multi:bool -> t -> t
-  (** [strip_ext ?multi p] is [p] with the extension of [p]'s
+  val strip_ext : multi:bool -> t -> t
+  (** [strip_ext multi p] is [p] with the extension of [p]'s
       {{!basename}basename} removed. If [multi] is [true] (defaults to
       [false]), the multiple file extension is removed. *)
 
-  val set_ext : ?multi:bool -> ext -> t -> t
-  (** [set_ext ?multi p] is [add_ext ext (strip_ext ?multi p)]. *)
+  val set_ext : multi:bool -> ext -> t -> t
+  (** [set_ext ~multi p] is [add_ext ext (strip_ext ~multi p)]. *)
 
-  val cut_ext : ?multi:bool -> t -> t * ext
-  (** [cut_ext ?multi p] is [(strip_ext ?multi p, get_ext ?multi p)]. *)
+  val cut_ext : multi:bool -> t -> t * ext
+  (** [cut_ext ~multi p] is [(strip_ext ~multi p, get_ext ~multi p)]. *)
 
   val ( + ) : t -> ext -> t
   (** [p + ext] is [add_ext p ext]. Left associative. *)
 
   val ( -+ ) : t -> ext -> t
-  (** [p -+ ext] is [set_ext p ext]. Left associative. *)
+  (** [p -+ ext] is [set_ext ~multi:false p ext]. Left associative. *)
 
   (** {1:converting Converting} *)
 
@@ -971,12 +995,11 @@ module Fpath : sig
       be safely converted back with {!v}. *)
 
   val to_url_path : ?escape_space:bool -> t -> string
-  (** [to_url_path p] is the path [p] as an URL path. This is [p] with
-      the system specific {!dir_sep_char} directory separator replaced
-      by ['/'] and with the following characters percent encoded:
-      ['%'], ['?'], ['#'], [' '] (unless [escape_space] is [false],
-      defaults to [true]), and the US-ASCII
-      {{!Char.Ascii.is_control}control characters}.
+  (** [to_url_path ~escape_space p] is the path [p] as an URL path. This
+      is [p] with the system specific {!dir_sep_char} directory separator
+      replaced by ['/'] and with the following characters percent encoded:
+      ['%'], ['?'], ['#'], [' '] (if [escape_space] is [true], default),
+      and the US-ASCII {{!Char.Ascii.is_control}control characters}.
 
       {b Note.} In 2019, the standard definition of URLs is in a sorry
       state. Assuming [p] is UTF-8 encoded. It is {e believed} the
@@ -987,8 +1010,9 @@ module Fpath : sig
 
   val to_segments : t -> string list
   (** [to_segments p] is [p]'s {e non-empty} list of segments. Absolute
-      paths have an empty stirng added, this allows to recover the path's
-      string with [String.concat dir_sep]. *)
+      paths have an empty string added, this allows to recover the path's
+      string with [String.concat dir_sep], note however that you may
+      have lost the {!volume} along the way. *)
 
   (** {1:fmt Formatting} *)
 
@@ -1011,7 +1035,7 @@ module Fpath : sig
   (** [error p fmt …] is [Fmt.error ("%a:" ^^ fmt) pp_unquoted p … ]. *)
 
   val prefix_msg : t -> string -> string
-  (** [prefix_msg p msg] is Fmt.str "%a: %s" pp_unquoted msg *)
+  (** [prefix_msg p msg] is [Fmt.str "%a: %s" pp_unquoted msg]. *)
 
   (** {1:unique Uniqueness} *)
 
@@ -1094,26 +1118,34 @@ module Fpath : sig
   val sort_by_parent : Set.t -> Set.t Map.t
   (** [sort_by_parent ps] maps elements of [ps] by their {!Fpath.parent}. *)
 
-  val sort_by_ext : ?multi:bool -> Set.t -> Set.t String.Map.t
+  val sort_by_ext : multi:bool -> Set.t -> Set.t String.Map.t
   (** [sort_by_ext ~multi ps] maps elements of [ps] by their extension as
       determined by {!Fpath.get_ext}[ ~multi]. *)
 
   (** {1:sp Search paths}
 
       A {e search path} is a list of paths separated by a designated
-      separator. A well known search path is [PATH] in which executable
-      binaries are looked up. *)
+      separator in which elements are looked up in left to right
+      priority order. A well known search path is [PATH] in which
+      executable binaries are looked up. *)
 
   val search_path_sep : string
   (** [search_path_sep] is the default platform specific separator for
-      search paths, this is [";"] if {!Sys.win32} is [true] and [":"]
+      search paths. This is [";"] if {!Sys.win32} and [":"]
       otherwise. *)
 
   val list_of_search_path : ?sep:string -> string -> (t list, string) result
-  (** [list_of_search_path ~sep s] parses [sep] separated file paths
-      from [s]. [sep] is not allowed to appear in the file paths, it
-      defaults to {!search_path_sep}. The order in the list
-      matches the order from left to right in [s]. *)
+  (** [list_of_search_path ~sep s] splits [s] on [sep] (defaults to
+      {!search_path_sep}) and parses the result with {!of_string},
+      ignoring empty strings.
+
+      This means that [sep] is not allowed to appear in the file
+      paths, consecutive [sep] are ignored and the order in the
+      resulting list matches the left-to-right order of paths in [s].
+
+      If one {!of_string} errors on a path [p] with [e] the function errors
+      with the message:
+      {[Fmt.str "Illegal path %a in search path: %s" pp p e]} *)
 end
 
 (** Hash values and functions.

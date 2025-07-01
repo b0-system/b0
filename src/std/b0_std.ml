@@ -1281,7 +1281,7 @@ module Fpath = struct
 
   (* Paths *)
 
-  type t = string (* N.B. a path is never "" *)
+  type t = string (* Note: a path is never "" *)
   let of_string = if Sys.win32 then Windows.of_string else Posix.of_string
   let to_string p = p
   let v s = match of_string s with Ok p -> p | Error m -> invalid_arg m
@@ -1362,18 +1362,19 @@ module Fpath = struct
 
   (* Predicates and comparisons *)
 
+  let equal = String.equal
+  let compare = String.compare
   let is_rel = if Sys.win32 then Windows.is_rel else Posix.is_rel
   let is_abs p = not (is_rel p)
   let is_root = if Sys.win32 then Windows.is_root else Posix.is_root
+  let is_null p = equal p null
+  let is_dash p = equal p dash
 
   (* FIXME this is wrong on windows. *)
   let current_dir_dir = "." ^ dir_sep
   let is_current_dir p = String.equal p "." || String.equal p current_dir_dir
   let parent_dir_dir = ".." ^ dir_sep
   let is_parent_dir p = String.equal p ".." || String.equal p parent_dir_dir
-
-  let equal = String.equal
-  let compare = String.compare
 
   (* File extensions *)
 
@@ -1401,16 +1402,28 @@ module Fpath = struct
   let ext_range ?(multi = false) p =
     let plen = String.length p in
     let seg_start = last_non_empty_seg_start p in
-    let seg_stop = match last_is_dir_sep p with
-    | true -> plen - 2
-    | false -> plen - 1
-    in
+    let seg_stop = plen - (if last_is_dir_sep p then 2 else 1) in
     if seg_start >= seg_stop then raise Not_found else
-    match multi with
-    | true -> ext_multi_range seg_stop (seg_start + 1) p
-    | false -> ext_single_range seg_start seg_stop seg_stop p
+    if multi
+    then ext_multi_range seg_stop (seg_start + 1) p
+    else ext_single_range seg_start seg_stop seg_stop p
 
-  let get_ext ?multi p = match ext_range ?multi p with
+  let exists_ext p = match ext_range ~multi:false p with
+  | exception Not_found -> false
+  | _ -> true
+
+  let exists_multi_ext p = match ext_range ~multi:false p with
+  | exception Not_found -> false
+  | first, last ->
+      let dots = ref 0 in
+      let i = ref first in
+      while !i <= last && !dots <= 0 do
+        if Char.equal p.[!i] ext_sep_char then incr dots;
+        incr i
+      done;
+      !dots > 1
+
+  let get_ext ~multi p = match ext_range ~multi p with
   | exception Not_found -> ""
   | first, last -> String.subrange ~first ~last p
 
@@ -1455,13 +1468,13 @@ module Fpath = struct
         Bytes.set n (nlen - 1) dir_sep_char;
         Bytes.unsafe_to_string n
 
-  let strip_ext ?multi p = match ext_range ?multi p with
+  let strip_ext ~multi p = match ext_range ~multi p with
   | exception Not_found -> p
   | efirst, elast -> _rem_ext efirst elast p
 
-  let set_ext ?multi e p = add_ext e (strip_ext ?multi p)
+  let set_ext ~multi e p = add_ext e (strip_ext ~multi p)
 
-  let cut_ext ?multi p = match ext_range ?multi p with
+  let cut_ext ~multi p = match ext_range ~multi p with
   | exception Not_found -> p, ""
   | efirst, elast ->
       let ext = String.subrange ~first:efirst ~last:elast p in
@@ -1470,7 +1483,7 @@ module Fpath = struct
 
   (* Basename and parent directory *)
 
-  let basename ?(strip_ext = false) p =
+  let basename ?(strip_exts = false) p =
     let max = String.length p - 1 in
     let first, last = match String.rindex p dir_sep_char with
     | exception Not_found -> (* B *) path_start p, max
@@ -1484,8 +1497,8 @@ module Fpath = struct
     match last - first + 1 with
     | 1 when p.[first] = '.' -> ""
     | 2 when p.[first] = '.' && p.[first + 1] = '.' -> ""
-    | _ when not strip_ext -> String.subrange ~first ~last p
-    | _ -> (* Drop multi ext *)
+    | _ when not strip_exts -> String.subrange ~first ~last p
+    | _ -> (* Drop multiple extension *)
         let rec loop first last i = match i > last with
         | true -> String.subrange ~first ~last p
         | false ->
@@ -1579,9 +1592,9 @@ module Fpath = struct
     let add_path p acc = Map.add_to_set (module Set) (parent p) p acc in
     Set.fold add_path ps Map.empty
 
-  let sort_by_ext ?multi ps =
+  let sort_by_ext ~multi ps =
     let add_path p acc =
-      String.Map.add_to_set (module Set) (get_ext ?multi p) p acc
+      String.Map.add_to_set (module Set) (get_ext ~multi p) p acc
     in
     Set.fold add_path ps String.Map.empty
 
@@ -1591,15 +1604,15 @@ module Fpath = struct
   let list_of_search_path ?(sep = search_path_sep) path =
     let rec loop acc = function
     | ""  -> Ok (List.rev acc)
-    | p ->
-        let dir, p = match String.cut_left ~sep p with
-        | None -> p, ""
-        | Some (dir, p) -> dir, p
+    | rest ->
+        let dir, rest = match String.cut_left ~sep rest with
+        | None -> rest, ""
+        | Some (dir, rest) -> dir, rest
         in
-        if dir = "" then loop acc p else
+        if dir = "" then loop acc rest else
         match of_string dir with
-        | Error e -> Fmt.error "search path %s: %S: %s" path dir e
-        | Ok d -> loop (d :: acc) p
+        | Ok dir -> loop (dir :: acc) rest
+        | Error e -> Fmt.error "Illegal path %a in search path: %s" pp dir e
     in
     loop [] path
 
@@ -1608,7 +1621,7 @@ module Fpath = struct
   let ( / ) = add_seg'
   let ( // ) = append
   let ( + ) p e = add_ext e p
-  let ( -+ ) p e = set_ext e p
+  let ( -+ ) p e = set_ext ~multi:false e p
 end
 
 (* Hash values and functions *)

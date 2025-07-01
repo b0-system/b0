@@ -125,7 +125,7 @@ let get_lang ~file ~lang = match lang with
 | Some lang -> Ok lang
 | None when Fpath.equal file Fpath.dash -> Ok `Ocaml
 | None ->
-    let ext = Fpath.get_ext file in
+    let ext = Fpath.get_ext ~multi:false file in
     match B0_init.lang_of_file_ext ext with
     | Some lang -> Ok lang
     | None ->

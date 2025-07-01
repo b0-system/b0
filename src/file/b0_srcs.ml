@@ -39,7 +39,9 @@ let select_files m u (seen, by_ext) fs =
       | true ->
           if Fpath.Set.mem f seen then loop m u seen by_ext fs else
           let seen = Fpath.Set.add f seen in
-          let by_ext = String.Map.add_to_list (Fpath.get_ext f) f by_ext in
+          let by_ext =
+            String.Map.add_to_list (Fpath.get_ext ~multi:false f) f by_ext
+          in
           loop m u seen by_ext fs
   in
   loop m u seen by_ext fs
@@ -64,7 +66,8 @@ let select_files_in_dirs m u xs (seen, by_ext as acc) ds =
     | Unix.S_DIR -> acc
     | _ ->
         if Fpath.Set.mem p seen then acc else
-        Fpath.Set.add p seen, String.Map.add_to_list (Fpath.get_ext p) p by_ext
+        Fpath.Set.add p seen,
+        String.Map.add_to_list (Fpath.get_ext ~multi:false p) p by_ext
   in
   let rec loop m u xs (seen, by_ext as acc) = function
   | [] -> acc
@@ -109,7 +112,7 @@ let select b sels =
   let add_files acc files =
     let add_file file (seen, by_ext as acc) =
       if Fpath.Set.mem file seen then acc else
-      let ext = Fpath.get_ext file in
+      let ext = Fpath.get_ext ~multi:false file in
       let by_ext = String.Map.add_to_list ext file by_ext in
       (Fpath.Set.add file seen), by_ext
     in

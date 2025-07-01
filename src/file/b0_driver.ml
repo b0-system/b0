@@ -327,7 +327,7 @@ module Compile = struct
     in
     write_src m c expanded_src ~file_api_stamp ~src_file;
     let writes =
-      let base = Fpath.strip_ext src_file in
+      let base = Fpath.strip_ext ~multi:false src_file in
       let base ext = Fpath.(base + ext) in
       match code with
       | `Byte -> [base ".cmo"; exe ]
