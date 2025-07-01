@@ -118,7 +118,7 @@ val get_changes_file_of_pack : B0_pack.t -> (Fpath.t, string) result
 val changes_latest_of_file :
   Fpath.t -> ((string * string) option, string) result
 (** [changes_latest_of_file f] extracts the latest release notes as the
-    {{!B0_std.String.commonmark_first_section}first markdown section} of
+    {{!B0_adhoc.commonmark_first_section}first markdown section} of
     file [f]. *)
 
 val changes_latest_version_of_title : string -> string option

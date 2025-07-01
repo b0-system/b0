@@ -96,9 +96,6 @@ let test_b0_std_fpath =
 let test_b0_std_cmd =
   test ~/"test/test_b0_std_cmd.ml" ~doc:"Test B0_std.Cmd"
 
-let test_b0_std_string =
-  test ~/"test/test_b0_string.ml" ~doc:"Test B0_std.String"
-
 let test_b0_testing = test ~/"test/test_b0_testing.ml" ~doc:"Test B0_testing"
 let test_cp = test ~/"test/test_cp.ml" ~run:false ~doc:"Test for Os.Path.copy"
 let test_rm = test ~/"test/test_rm.ml" ~run:false ~doc:"Test for Os.Path.delete"
@@ -225,7 +222,7 @@ let bowl =
 
 (* Updating vendored code. *)
 
-let copy_module ?subst ~src_dir ~dst_dir src dst =
+let copy_module ?substs ~src_dir ~dst_dir src dst =
   let mli base = Fmt.str "%s.mli" base and ml base = Fmt.str "%s.ml" base in
   let src_mli = Fpath.(src_dir / mli src) in
   let src_ml = Fpath.(src_dir / ml src) in
@@ -233,14 +230,20 @@ let copy_module ?subst ~src_dir ~dst_dir src dst =
   let dst_ml = Fpath.(dst_dir / ml dst)  in
   Log.stdout (fun m -> m "Copying %s to %s in %a" src dst Fpath.pp dst_dir);
   let force = true and make_path = false in
-  let* () = Os.File.copy ~force ~make_path src_mli ~dst:dst_mli in
-  let* () = match subst with
-  | None -> Os.File.copy ~force ~make_path src_ml ~dst:dst_ml
-  | Some (src_ns, dst_ns) ->
-      let* src = Os.File.read src_ml in
-      let src = String.replace_all ~sub:src_ns ~by:dst_ns src in
-      Os.File.write ~force ~make_path dst_ml src
+  let copy_file src ~dst = match substs with
+  | None -> Os.File.copy ~force ~make_path src ~dst:dst
+  | Some substs ->
+      let* src = Os.File.read src in
+      let src =
+        let replace src (src_tok, dst_tok) =
+          String.replace_all ~sub:src_tok ~by:dst_tok src
+        in
+        List.fold_left replace src substs
+      in
+      Os.File.write ~force ~make_path dst src
   in
+  let* () = copy_file src_mli ~dst:dst_mli in
+  let* () = copy_file src_ml ~dst:dst_ml in
   Ok ()
 
 let with_cloned_repo_dir ~env ~repo f =
@@ -256,12 +259,13 @@ let vendor_more_modules =
   with_cloned_repo_dir ~env ~repo @@ fun dir ->
   let dst_dir = B0_env.in_scope_dir env ~/"src/std" in
   let src_dir = Fpath.(dir / "src") in
-  let subst = "More__", "B0__" in
-  let* () = copy_module ~subst ~src_dir ~dst_dir "more__char" "b0__char" in
-  let* () = copy_module ~subst ~src_dir ~dst_dir "more__fmt" "b0__fmt" in
-  let* () = copy_module ~subst ~src_dir ~dst_dir "more__list" "b0__list" in
-  let* () = copy_module ~subst ~src_dir ~dst_dir "more__result" "b0__result" in
-  let* () = copy_module ~subst ~src_dir ~dst_dir "more__type" "b0__type" in
+  let substs = ["More__", "B0__"; "More.", "B0_std."] in
+  let* () = copy_module ~substs ~src_dir ~dst_dir "more__char" "b0__char" in
+  let* () = copy_module ~substs ~src_dir ~dst_dir "more__fmt" "b0__fmt" in
+  let* () = copy_module ~substs ~src_dir ~dst_dir "more__list" "b0__list" in
+  let* () = copy_module ~substs ~src_dir ~dst_dir "more__result" "b0__result" in
+  let* () = copy_module ~substs ~src_dir ~dst_dir "more__string" "b0__string" in
+  let* () = copy_module ~substs ~src_dir ~dst_dir "more__type" "b0__type" in
   Ok ()
 
 let vendor_webs_modules =

@@ -32,7 +32,7 @@ let vcs_repo_version_of_pack ?(commit_ish = "HEAD") pack =
   let* _scope_dir, repo = vcs_repo_of_pack pack in
   let* tag = B0_vcs_repo.latest_tag repo commit_ish in
   match tag with
-  | Some t -> Ok (String.drop_initial_v t)
+  | Some t -> Ok (B0_version.string_drop_initial_v t)
   | None ->
       Fmt.error "No annotated tag for %s in %a" commit_ish B0_vcs_repo.pp repo
 
@@ -134,7 +134,7 @@ let src_archive_url_of_pack ~version p =
   | "ARCHIVE_NAME" -> Some archive_name
   | "ARCHIVE_EXT" -> Some archive_ext
   | "VERSION" -> Some version
-  | "VERSION_NUM" -> Some (String.drop_initial_v version)
+  | "VERSION_NUM" -> Some (B0_version.string_drop_initial_v version)
   | _ -> None
   in
   Result.map_error (Fmt.str "@[<v>Cannot determine release URL:@,%s@]") @@
@@ -161,7 +161,7 @@ let src_archive_url_of_pack ~version p =
   Ok (String.subst_pct_vars vars archive_url)
 
 let src_archive_dirname name version =
-  let vnum = String.drop_initial_v version in
+  let vnum = B0_version.string_drop_initial_v version in
   Fpath.v (Fmt.str "%s-%s" name vnum)
 
 let default_exclude_paths =
@@ -223,7 +223,7 @@ let get_changes_file_of_pack pack =
 
 let changes_latest_of_file f =
   let* contents = Os.File.read f in
-  Ok (String.commonmark_first_section ~preamble:false contents)
+  Ok (B0_adhoc.commonmark_first_section ~preamble:false contents)
 
 let changes_latest_version_of_title title =
   match String.take_while Char.Ascii.is_graphic title with
@@ -265,7 +265,7 @@ module Archive = struct
     let* _exists = Os.Path.delete ~recurse:true archive_dir in
     (Log.stdout @@ fun m ->
     m "@[<v>Release: %a %a@,Commit:  %a@,Archive: %a@]@."
-      Fmt.code name String.pp_version_str version
+      Fmt.code name B0_version.pp_string version
       B0_vcs_repo.pp_commit commit_id
       (Fmt.code' Fpath.pp) archive_file);
     if is_dirty then
@@ -313,7 +313,7 @@ module Tag = struct
     | true ->
         let* () = B0_vcs_repo.delete_tag ?dry_run repo tag in
         Log.stdout
-          (fun m -> m "Deleted version tag %a" String.pp_version_str tag);
+          (fun m -> m "Deleted version tag %a" B0_version.pp_string tag);
         Ok ()
     | false ->
         let msg = match msg with
@@ -322,7 +322,7 @@ module Tag = struct
         let* () =
           B0_vcs_repo.tag ?dry_run repo ~force ~sign ~msg commit_ish tag
         in
-        Log.stdout (fun m -> m "Tagged version %a" String.pp_version_str tag);
+        Log.stdout (fun m -> m "Tagged version %a" B0_version.pp_string tag);
         Ok ()
 
   let gather_repos_and_tags version packs =
@@ -342,8 +342,8 @@ module Tag = struct
                      pack %a has version %a@,\
                      pack %a has version %a@]"
             Fpath.pp repo_dir
-            B0_pack.pp_name pack String.pp_version_str tag
-            B0_pack.pp_name pack' String.pp_version_str tag'
+            B0_pack.pp_name pack B0_version.pp_string tag
+            B0_pack.pp_name pack' B0_version.pp_string tag'
       | _ -> Ok acc
     in
     try
@@ -373,7 +373,7 @@ end
 (* Release status *)
 
 module Status = struct
-  let pp_since ppf v = Fmt.pf ppf "since %a" String.pp_version_str v
+  let pp_since ppf v = Fmt.pf ppf "since %a" B0_version.pp_string v
   let pp_status ppf (dirty, version, changes) = match changes with
   | [] when not dirty -> Fmt.pf ppf "@[<v>No changes %a@]" pp_since version
   | changes ->

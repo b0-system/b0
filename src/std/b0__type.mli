@@ -5,7 +5,9 @@
 
 (** Type introspection.
 
-    {b All additions available} since OCaml 5.1 *)
+    {b All additions available} since OCaml 5.1
+
+    @canonical B0_std.Type *)
 
 type (_, _) eq = Equal : ('a, 'a) eq (** *)
 (** The type for type quality testing. *)

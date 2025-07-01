@@ -3,7 +3,9 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** Lists. *)
+(** Lists.
+
+    @canonical B0_std.List *)
 
 include module type of List (** @closed *)
 

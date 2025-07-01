@@ -5,7 +5,9 @@
 
 (** Character operations.
 
-    {b All additions available} since 5.4 *)
+    {b All additions available} since 5.4
+
+    @canonical B0_std.Char *)
 
 include module type of Char (** @closed *)
 

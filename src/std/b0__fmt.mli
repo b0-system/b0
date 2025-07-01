@@ -5,7 +5,9 @@
 
 (** Textual formatters.
 
-    Helpers for dealing with {!Format}. *)
+    Helpers for dealing with {!Format}.
+
+    @canonical B0_std.Fmt *)
 
 (** {1:stdoutput Standard outputs} *)
 

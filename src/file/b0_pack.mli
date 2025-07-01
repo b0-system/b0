@@ -43,7 +43,7 @@ val derive_synopsis_and_description : t -> B0_meta.t -> B0_meta.t
     {!B0_meta.description} are undefined in [m] it tries to fill them
     in from an existing [README.md] in the scope directory of [p]. The
     first marked up section of the file is extracted using
-    {!B0_std.String.commonmark_first_section} its title is parsed
+    {!B0_adhoc.commonmark_first_section} its title is parsed
     according to the pattern '$(NAME) $(SEP) $(SYNOPSIS)' to get a
     synopsis line and the body up to the next (sub)section defines the
     description.

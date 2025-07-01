@@ -486,7 +486,7 @@ let latest_tag (r, (module Vcs : VCS)) = Vcs.latest_tag r
 let find_greatest_version_tag vcs =
   let* tags = tags vcs in
   let rev_compare v v' = -1 * compare v v' in
-  let parse_tag acc tag = match String.to_version tag with
+  let parse_tag acc tag = match B0_version.of_string tag with
   | None -> acc
   | Some version -> (version, tag) :: acc
   in

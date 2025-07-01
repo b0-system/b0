@@ -131,7 +131,7 @@ module Conf = struct
     in
     let version =
       let v = find "version" fields in
-      match String.to_version v with
+      match B0_version.of_string v with
       | None -> err "could not parse version string %S" v
       | Some v -> v
     in

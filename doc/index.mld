@@ -54,7 +54,9 @@ and do not specifically depend on b0.
 
 {2:std Standard needs}
 
-{!modules: B0_std B0_std_cli}
+{!modules:
+B0_std
+B0_std_cli}
 
 {2:codecs Codecs}
 
@@ -68,6 +70,7 @@ B0_sexp
 B0_tar
 B0_text
 B0_url
+B0_version
 }
 
 {2:tools Tools}

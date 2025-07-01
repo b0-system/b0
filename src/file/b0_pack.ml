@@ -41,7 +41,7 @@ let synopsis_and_description_of_cmark file =
   in
   let contents = Os.File.read file |> Log.if_error ~use:"" in
   let convert (t, d) = syn_of_title t, descr_of_section d in
-  Option.map convert (String.commonmark_first_section ~preamble:true contents)
+  Option.map convert (B0_adhoc.commonmark_first_section ~preamble:true contents)
 
 
 let derive_synopsis_and_description p m =

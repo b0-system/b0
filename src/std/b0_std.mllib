@@ -1,8 +1,10 @@
-B0__result
 B0__char
 B0__fmt
 B0__list
+B0__result
+B0__string
 B0__type
+B0_adhoc
 B0_base64
 B0_bincode
 B0_editor
@@ -21,4 +23,5 @@ B0_text
 B0_testing
 B0_url
 B0_vcs_repo
+B0_version
 B0_web_browser
