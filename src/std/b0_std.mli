@@ -127,7 +127,7 @@ module String : sig
   (** [span_while sat s] is [(take_while sat s, drop_while sat s)]. *)
 
   val rspan_while : (char -> bool) -> string -> string * string
-  (** [rspan_while sat s] is [(rdrop_while sat s, take_while sat s)]. *)
+  (** [rspan_while sat s] is [(rdrop_while sat s, rtake_while sat s)]. *)
 
   (** {2:break_sep Breaking with separators} *)
 

@@ -143,58 +143,42 @@ module String = struct
   (* Breaking with predicates *)
 
   let take_while sat s =
-    let max = String.length s - 1 in
-    let rec loop max s i = match i > max with
-    | true -> s
-    | false when sat s.[i] -> loop max s (i + 1)
-    | false -> subrange ~last:(i - 1) s
-    in
-    loop max s 0
+    let len = length s and i = ref 0 in
+    while !i < len && sat (unsafe_get s !i) do incr i done;
+    if !i = len then s else sub s 0 !i
 
   let drop_while sat s =
-    let max = String.length s - 1 in
-    let rec loop max s i = match i > max with
-    | true -> ""
-    | false when sat s.[i] -> loop max s (i + 1)
-    | false -> subrange ~first:i s
-    in
-    loop max s 0
+    let len = length s and i = ref 0 in
+    while !i < len && sat (unsafe_get s !i) do incr i done;
+    if !i = 0 then s else sub s !i (len - !i)
 
   let span_while sat s =
-    let max = String.length s - 1 in
-    let rec loop max s i = match i > max with
-    | true -> s, ""
-    | false when sat s.[i] -> loop max s (i + 1)
-    | false -> subrange ~last:(i - 1) s, subrange ~first:i s
-    in
-    loop max s 0
+    let len = length s and i = ref 0 in
+    while !i < len && sat (unsafe_get s !i) do incr i done;
+    if !i = len then s, "" else
+    if !i = 0 then "", s else
+    sub s 0 !i, sub s !i (len - !i)
 
   let rtake_while sat s =
-    let max = String.length s - 1 in
-    let rec loop s i = match i < 0 with
-    | true -> s
-    | false when sat s.[i] -> loop s (i - 1)
-    | false -> subrange ~first:(i + 1) s
-    in
-    loop s max
+    let len = String.length s in
+    let i = ref (len - 1) in
+    while !i >= 0 && sat (unsafe_get s !i) do decr i done;
+    if !i < 0 then s else sub s (!i + 1) (len - (!i + 1))
 
   let rdrop_while sat s =
-    let max = String.length s - 1 in
-    let rec loop s i = match i < 0 with
-    | true -> ""
-    | false when sat s.[i] -> loop s (i - 1)
-    | false -> subrange ~last:i s
-    in
-    loop s max
+    let len = length s in
+    let i = ref (len - 1) in
+    while !i >= 0 && sat (unsafe_get s !i) do decr i done;
+    if !i < 0 then "" else sub s 0 (!i + 1)
 
   let rspan_while sat s =
-    let max = String.length s - 1 in
-    let rec loop s i = match i < 0 with
-    | true -> "", s
-    | false when sat s.[i] -> loop s (i - 1)
-    | false -> subrange ~last:i s, subrange ~first:(i + 1) s
-    in
-    loop s max
+    let len = length s in
+    let i = ref (len - 1) in
+    while !i >= 0 && sat s.[!i] do decr i done;
+    if !i < 0 then "", s else
+    if !i = len - 1 then s, "" else
+    let j = !i + 1 in
+    sub s 0 j, sub s j (len - j)
 
   (* Breaking with separators *)
 
