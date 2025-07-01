@@ -725,7 +725,7 @@ module Test = struct
          This breaks on '\n', escapes with a slash and newline and indents. *)
       let white_start l = if l = "" then false else Char.Ascii.is_white l.[0] in
       let escape_start l = if white_start l then "\\" ^ l else " " ^ l in
-      let lines = String.cuts_left ~sep:{|\n|} s in
+      let lines = String.split ~sep:{|\n|} s in
       let lines = match List.rev lines with
       | "\"" :: prevs -> (* Last empty line, dont add a line for that *)
           begin match prevs with

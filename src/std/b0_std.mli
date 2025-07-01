@@ -133,23 +133,22 @@ module String : sig
 
   (** {2:break_sep Breaking with separators} *)
 
-  val cut_left : sep:string -> string -> (string * string) option
+  val cut : sep:string -> string -> (string * string) option
   (** [cut ~sep s] is either the pair [Some (l,r)] of the two
       (possibly empty) substrings of [s] that are delimited by the
-      first match of the separator character [sep] or [None] if
-      [sep] can't be matched in [s]. Matching starts from the
-      left of [s].
+      first match of the separator character [sep] or [None] if [sep]
+      can't be matched in [s]. Matching starts from the left of [s].
 
       The invariant [l ^ sep ^ r = s] holds.
 
       @raise Invalid_argument if [sep] is the empty string. *)
 
-  val cut_right : sep:string -> string -> (string * string) option
-  (** [cut_right ~sep s] is like {!cut_left} but matching starts
+  val rcut : sep:string -> string -> (string * string) option
+  (** [rcut ~sep s] is like {!cut_left} but matching starts
       on the right of [s]. *)
 
-  val cuts_left : ?drop_empty:bool -> sep:string -> string -> string list
-  (** [cuts_left sep s] is the list of all substrings of [s] that are
+  val split : ?drop_empty:bool -> sep:string -> string -> string list
+  (** [split sep s] is the list of all substrings of [s] that are
       delimited by matches of the non empty separator string
       [sep]. Empty substrings are omitted in the list if [drop_empty]
       is [true] (defaults to [false]).
@@ -167,8 +166,8 @@ module String : sig
 
       @raise Invalid_argument if [sep] is the empty string. *)
 
-  val cuts_right : ?drop_empty:bool -> sep:string -> string -> string list
-  (** [cuts_right sep s] is like {!cuts_left} but matching starts on the
+  val rsplit : ?drop_empty:bool -> sep:string -> string -> string list
+  (** [rsplit sep s] is like {!split} but matching starts on the
       right of [s]. *)
 
   (** {2:break_lines Breaking lines} *)

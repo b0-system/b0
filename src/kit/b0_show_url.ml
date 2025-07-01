@@ -149,7 +149,7 @@ let server_mode env timeout_cli no_exec ~url args =
 (* Unit .show-url.url mode *)
 
 let parse_unit_specs args =
-  let parse_arg arg = match String.cut_left ~sep:":" arg with
+  let parse_arg arg = match String.cut ~sep:":" arg with
   | None -> arg, (arg, None)
   | Some (uname, path) -> uname, (arg, Some path)
   in

@@ -35,7 +35,7 @@ module Compile = struct
     let pp ppf (n, d) = Fmt.pf ppf "@[%s %s@]" n (Digest.to_hex d)
     let parse_dep n acc line =
       if line = "" then acc else
-      match String.cut_right ~sep:" " line with
+      match String.rcut ~sep:" " line with
       | None -> Fmt.failwith_line n " Could not parse line %S" line
       | Some (name, digest) ->
           let digest = try Digest.from_hex digest with
@@ -96,14 +96,14 @@ module Html = struct
     let to_compile_dep (_, n, d) = (n, d)
     let parse_dep n acc line =
       if line = "" then acc else
-      match String.cut_right ~sep:" " line with
+      match String.rcut ~sep:" " line with
       | None -> Fmt.failwith_line n " Could not parse line %S" line
       | Some (rest, digest) ->
           let digest = try Digest.from_hex digest with
           | Invalid_argument _ (* sic *) ->
               Fmt.failwith_line n " Could not parse digest %S" digest
           in
-          match String.cut_right ~sep:" " rest with
+          match String.rcut ~sep:" " rest with
           | Some (pkg, name) -> (pkg, name, digest) :: acc
           | None ->
               Fmt.failwith_line n " Could not parse pkg and mod names %S" rest

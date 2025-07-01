@@ -119,10 +119,10 @@ let default_src_archive_url homepage =
   Fmt.str "%s/releases/%s" (drop_final_slash homepage) default_archive
 
 let default_github_src_archive_url repo =
-  let repo = match String.cut_left ~sep:"git+" repo with
+  let repo = match String.cut ~sep:"git+" repo with
   | Some (_, repo) -> repo | _ -> repo
   in
-  let repo = match String.cut_right ~sep:"." repo with
+  let repo = match String.rcut ~sep:"." repo with
   | Some (repo, _) -> repo | _ -> repo
   in
   Fmt.str "%s/releases/download/\x25\x25VERSION\x25\x25/%s" repo default_archive

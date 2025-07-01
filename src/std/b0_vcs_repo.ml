@@ -7,7 +7,7 @@ open B0_std
 open Result.Syntax
 
 let parse_changes s =
-  let line n acc line = match String.cut_left ~sep:" " line with
+  let line n acc line = match String.cut ~sep:" " line with
   | None -> Fmt.failwith "line %d: %S: can't parse log line" n line
   | Some cut -> cut :: acc
   in
@@ -19,7 +19,7 @@ let parse_ptime ptime = try Ok (int_of_string ptime) with
 
 let parse_files ~err o =
   let file_of_string l = Fpath.of_string l |> Result.error_to_failure in
-  try Ok (List.map file_of_string (String.cuts_left ~sep:"\n" o)) with
+  try Ok (List.map file_of_string (String.split ~sep:"\n" o)) with
   | Failure e -> Fmt.error "%s: %s" err e
 
 let dirtify id = id ^ "-dirty"
@@ -223,7 +223,7 @@ module Git_vcs = struct
 
   let tags r =
     let args = Cmd.(arg "tag" % "--list") in
-    Result.bind (run r args) @@ fun o -> Ok (String.cuts_left ~sep:"\n" o)
+    Result.bind (run r args) @@ fun o -> Ok (String.split ~sep:"\n" o)
 
   let tag ?dry_run ?msg:m r ~force ~sign commit_ish tag =
     let msg = match m with None -> Cmd.empty | Some m -> Cmd.(arg "-m" % m) in
@@ -373,7 +373,7 @@ module Hg_vcs = struct
 
   let tags r =
     let args = Cmd.(arg "tags" % "--quiet" (* sic *)) in
-    Result.bind (run r args) @@ fun o -> Ok (String.cuts_left ~sep:"\n" o)
+    Result.bind (run r args) @@ fun o -> Ok (String.split ~sep:"\n" o)
 
   let tag ?dry_run ?msg:m r ~force ~sign commit_ish tag =
     if sign then Error "Tag signing is not supported by hg" else

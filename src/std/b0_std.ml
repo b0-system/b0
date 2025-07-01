@@ -200,7 +200,7 @@ module String = struct
 
   let err_empty_sep = "~sep is an empty string"
 
-  let cut_left ~sep s =
+  let cut ~sep s =
     let sep_len = length sep in
     if sep_len = 0 then invalid_arg err_empty_sep else
     let s_len = length s in
@@ -220,7 +220,7 @@ module String = struct
     in
     scan 0
 
-  let cut_right ~sep s =
+  let rcut ~sep s =
     let sep_len = length sep in
     if sep_len = 0 then invalid_arg err_empty_sep else
     let s_len = length s in
@@ -240,15 +240,15 @@ module String = struct
     in
     rscan (max_s_idx - max_sep_idx)
 
-  let cuts_left ?(drop_empty = false) ~sep s =
-    let rec loop acc s = match cut_left ~sep s with
+  let split ?(drop_empty = false) ~sep s =
+    let rec loop acc s = match cut ~sep s with
     | Some (v, vs) -> loop (if drop_empty && v = "" then acc else (v :: acc)) vs
     | None -> List.rev (if drop_empty && s = "" then acc else (s :: acc))
     in
     loop [] s
 
-  let cuts_right ?(drop_empty = false) ~sep s =
-    let rec loop acc s = match cut_right ~sep s with
+  let rsplit ?(drop_empty = false) ~sep s =
+    let rec loop acc s = match rcut ~sep s with
     | Some (vs, v) -> loop (if drop_empty && v = "" then acc else (v :: acc)) vs
     | None -> if drop_empty && s = "" then acc else (s :: acc)
     in
@@ -752,11 +752,11 @@ module String = struct
       | None -> None
       | Some i -> Some (subrange ~last:(i - 1) s, subrange ~first:i s)
     in
-    try match cut_left ~sep:"." s with
+    try match cut ~sep:"." s with
     | None -> None
     | Some (maj, rest) ->
         let maj = int_of_string (drop_initial_v maj) in
-        match cut_left ~sep:"." rest with
+        match cut ~sep:"." rest with
         | None ->
             begin match cut_left_plus_or_tilde rest with
             | None -> Some (maj, int_of_string rest, 0, None)
@@ -1528,7 +1528,7 @@ module Fpath = struct
     let rec loop acc = function
     | ""  -> Ok (List.rev acc)
     | rest ->
-        let dir, rest = match String.cut_left ~sep rest with
+        let dir, rest = match String.cut ~sep rest with
         | None -> rest, ""
         | Some (dir, rest) -> dir, rest
         in
@@ -2325,7 +2325,7 @@ module Os = struct
 
     let parse_assignments ?(init = String.Map.empty) fold v =
       try
-        let add acc assign = match String.cut_left ~sep:"=" assign with
+        let add acc assign = match String.cut ~sep:"=" assign with
         | Some (var, value) -> add var value acc
         | None ->
             Fmt.failwith_notrace "%S: cannot parse VAR=val assignement" assign
@@ -3378,7 +3378,7 @@ module Os = struct
         | "" ->
             Error (`Dirs (String.split_on_char Fpath.search_path_sep.[0] p))
         | p ->
-            let dir, p = match String.cut_left ~sep:Fpath.search_path_sep p with
+            let dir, p = match String.cut ~sep:Fpath.search_path_sep p with
             | None -> p, ""
             | Some (dir, p) -> dir, p
             in
