@@ -760,8 +760,8 @@ module Libresolver = struct
       | requires ->
           let to_libname = parse_field "required library" Libname.of_string in
           (* ocamlfind does not normalize *)
-          let skip_ws = String.lose_left Char.Ascii.is_white in
-          let get_tok = String.span_left (Fun.negate Char.Ascii.is_white) in
+          let skip_ws = String.drop_while Char.Ascii.is_white in
+          let get_tok = String.span (Fun.negate Char.Ascii.is_white) in
           let rec rev_toks acc s =
             let s = skip_ws s in
             match get_tok s with

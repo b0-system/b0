@@ -142,7 +142,7 @@ module String = struct
 
   (* Breaking with predicates *)
 
-  let keep_left sat s =
+  let take_while sat s =
     let max = String.length s - 1 in
     let rec loop max s i = match i > max with
     | true -> s
@@ -151,7 +151,7 @@ module String = struct
     in
     loop max s 0
 
-  let lose_left sat s =
+  let drop_while sat s =
     let max = String.length s - 1 in
     let rec loop max s i = match i > max with
     | true -> ""
@@ -160,7 +160,7 @@ module String = struct
     in
     loop max s 0
 
-  let span_left sat s =
+  let span sat s =
     let max = String.length s - 1 in
     let rec loop max s i = match i > max with
     | true -> s, ""
@@ -169,7 +169,7 @@ module String = struct
     in
     loop max s 0
 
-  let keep_right sat s =
+  let rtake_while sat s =
     let max = String.length s - 1 in
     let rec loop s i = match i < 0 with
     | true -> s
@@ -178,7 +178,7 @@ module String = struct
     in
     loop s max
 
-  let lose_right sat s =
+  let rdrop_while sat s =
     let max = String.length s - 1 in
     let rec loop s i = match i < 0 with
     | true -> ""
@@ -187,7 +187,7 @@ module String = struct
     in
     loop s max
 
-  let span_right sat s =
+  let rspan sat s =
     let max = String.length s - 1 in
     let rec loop s i = match i < 0 with
     | true -> "", s
@@ -783,7 +783,7 @@ module String = struct
   let commonmark_first_section ~preamble md =
     let atx_heading s (* trimmed *) =
       (* approximate https://spec.commonmark.org/0.29/#atx-headings *)
-      let num, title = span_left (Char.equal '#') s in
+      let num, title = span (Char.equal '#') s in
       let num = String.length num and tlen = String.length title in
       if num = 0 || num > 6 then None else
       if tlen = 0 then Some (num, "") else
@@ -1837,20 +1837,20 @@ module Cmd = struct
       let err_unclosed kind _ =
         Fmt.failwith "unclosed %s quote delimited string" kind
       in
-      let skip_white s = String.lose_left Char.Ascii.is_white s in
+      let skip_white s = String.drop_while Char.Ascii.is_white s in
       let tok_sep c = c = '\'' || c = '\"' || Char.Ascii.is_white c in
       let tok_char c = not (tok_sep c) in
       let not_squote c = c <> '\'' in
       let tail s = (* Yikes *) String.subrange ~first:1 s in
       let parse_squoted s =
-        let tok, rem = String.span_left not_squote (tail s) in
+        let tok, rem = String.span not_squote (tail s) in
         if not (String.equal rem "") then tok, tail rem else
         err_unclosed "single" s
       in
       let parse_dquoted acc s =
       let is_data = function '\\' | '"' -> false | _ -> true in
       let rec loop acc s =
-        let data, rem = String.span_left is_data s in
+        let data, rem = String.span is_data s in
         match String.head rem with
         | Some '"' -> (data :: acc), (tail rem)
         | Some '\\' ->
@@ -1882,7 +1882,7 @@ module Cmd = struct
             let acc, rem = parse_dquoted acc s in loop acc rem
         | Some c ->
             let sat = tok_char in
-            let tok, rem = String.span_left sat s in loop (tok :: acc) rem
+            let tok, rem = String.span sat s in loop (tok :: acc) rem
         in
         loop [] s
       in

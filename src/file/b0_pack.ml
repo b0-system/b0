@@ -28,7 +28,7 @@ let locked p = p.locked
 let synopsis_and_description_of_cmark file =
   let syn_of_title t = (* Get $SYN in "$NAME $SEP $SYN" *)
     let ws = Char.Ascii.is_white and tok c = not @@ Char.Ascii.is_white c in
-    let skip = String.lose_left in
+    let skip = String.drop_while in
     let d = t |> skip ws |> skip tok |> skip ws |> skip tok |> skip ws in
     if d <> "" then Some d else None
   in

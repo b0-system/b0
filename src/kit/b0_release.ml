@@ -226,7 +226,7 @@ let changes_latest_of_file f =
   Ok (String.commonmark_first_section ~preamble:false contents)
 
 let changes_latest_version_of_title title =
-  match String.keep_left Char.Ascii.is_graphic title with
+  match String.take_while Char.Ascii.is_graphic title with
   | "" -> None | token -> Some token
 
 (* Release archive *)

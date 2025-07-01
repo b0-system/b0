@@ -107,27 +107,27 @@ module String : sig
 
   (** {2:break_pred Breaking with predicates} *)
 
-  val keep_left : (char -> bool) -> string -> string
-  (** [keep_left sat s] are the first consecutive [sat] statisfying
+  val take_while : (char -> bool) -> string -> string
+  (** [take_while sat s] are the first consecutive [sat] statisfying
       bytes of [s]. *)
 
-  val keep_right : (char -> bool) -> string -> string
+  val rtake_while : (char -> bool) -> string -> string
   (** [keep_right sat s] are the last consecutive [sat] satisfying
       bytes of [s]. *)
 
-  val lose_left : (char -> bool) -> string -> string
-  (** [lose_left sat s] is [s] without the first consecutive [sat]
+  val drop_while : (char -> bool) -> string -> string
+  (** [drop_while sat s] is [s] without the first consecutive [sat]
       satisfying bytes of [s]. *)
 
-  val lose_right : (char -> bool) -> string -> string
-  (** [lose_right sat s] is [s] without the last consecutive [sat]
+  val rdrop_while : (char -> bool) -> string -> string
+  (** [rdrop_while sat s] is [s] without the last consecutive [sat]
       satisfying bytes of [s]. *)
 
-  val span_left : (char -> bool) -> string -> string * string
-  (** [span_left sat s] is [(keep_left sat s, lose_left sat s)]. *)
+  val span : (char -> bool) -> string -> string * string
+  (** [span sat s] is [(take_while sat s, drop_while sat s)]. *)
 
-  val span_right : (char -> bool) -> string -> string * string
-  (** [span_right sat s] is [(lose_right sat s, keep_right sat s)]. *)
+  val rspan : (char -> bool) -> string -> string * string
+  (** [rspan sat s] is [(rdrop_while sat s, take_while sat s)]. *)
 
   (** {2:break_sep Breaking with separators} *)
 
