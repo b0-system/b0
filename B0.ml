@@ -259,7 +259,9 @@ let vendor_more_modules =
   let subst = "More__", "B0__" in
   let* () = copy_module ~subst ~src_dir ~dst_dir "more__char" "b0__char" in
   let* () = copy_module ~subst ~src_dir ~dst_dir "more__fmt" "b0__fmt" in
+  let* () = copy_module ~subst ~src_dir ~dst_dir "more__list" "b0__list" in
   let* () = copy_module ~subst ~src_dir ~dst_dir "more__result" "b0__result" in
+  let* () = copy_module ~subst ~src_dir ~dst_dir "more__type" "b0__type" in
   Ok ()
 
 let vendor_webs_modules =

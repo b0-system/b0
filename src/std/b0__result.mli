@@ -5,9 +5,11 @@
 
 (** Result values.
 
-    Additions available since 5.4. *)
+    {b All additions available} since OCaml 5.4 *)
 
 include module type of Stdlib.Result (** @closed *)
+
+(** {1:extract Extracting results} *)
 
 val get_ok' : ('a, string) result -> 'a
 (** [get_ok' r] is like {!get_ok} but the message of [Invalid_argument]
@@ -19,6 +21,8 @@ val error_to_failure : ('a, string) result -> 'a
 
 val retract : ('a, 'a) result -> 'a
 (** [retract r] is [v] if [r] is [Ok v] or [Error v]. *)
+
+(** {1:let_ops Let operators} *)
 
 (** let operators. *)
 module Syntax : sig

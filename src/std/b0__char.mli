@@ -3,13 +3,13 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** Character operations. *)
+(** Character operations.
+
+    {b All additions available} since 5.4 *)
 
 include module type of Char (** @closed *)
 
-(** {1:ascii_characters ASCII characters}
-
-    Available since 5.4 *)
+(** {1:ascii_characters ASCII characters} *)
 
 (** ASCII character set support.
 

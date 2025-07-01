@@ -10,35 +10,11 @@
 
 (** {1:std Std} *)
 
-(** Type introspection.
-
-    {b Note.} Available in 5.1. *)
-module Type : sig
-
-  type (_, _) eq = Equal : ('a, 'a) eq (** *)
-  (** The type for type quality testing. *)
-
-  module Id : sig
-
-    (** {1:typeids Type identifiers} *)
-
-    type 'a t
-    (** The type for type identifiers for a type ['a]. *)
-
-    val make : unit -> 'a t
-    (** [make ()] is a new type identifier. *)
-
-    val provably_equal : 'a t -> 'b t -> ('a, 'b) eq option
-    (** [provably_equal id0 id1] determines if [id0] and [id1] are equal. *)
-
-    val uid : 'a t -> int
-    (** [uid id] is a runtime unique identifier for [id]. *)
-  end
-end
-
-module Fmt = B0__fmt
-module Result = B0__result
 module Char = B0__char
+module Fmt = B0__fmt
+module List = B0__list
+module Result = B0__result
+module Type = B0__type
 
 (** Strings. *)
 module String : sig
@@ -652,49 +628,6 @@ let escape_dquotes s =
     ?buf:Buffer.t -> (string -> string option) -> string -> string
   (** [subst_pct_vars ~buf vars s] substitutes in [s] sub-strings of the
       form [%%VAR%%] by the value of [vars "VAR"] (if any). *)
-end
-
-(** Lists. *)
-module List : sig
-
-  (** {1:stdlib_list Stdlib [List]} *)
-
-  include module type of List (** @closed *)
-
-  (** {1:adds Additions} *)
-
-  val classify :
-    ?cmp_elts:('a -> 'a -> int) ->
-    ?cmp_classes:('b -> 'b -> int) -> classes:('a -> 'b list) -> 'a list ->
-    ('b * 'a list) list
-  (** [classify ~cmp_elts ~cmp_classes ~classes els] bins elements [els]
-      into classes as determined by [classes]. [cmp_elts] is used to
-      compare elements and [cmp_classes] to compare classes, both
-      default to {!compare}. *)
-
-  val distinct : ('a -> 'a -> int) -> 'a list -> 'a list
-  (** [distinct cmp l] are the distinct elements of [l] according to
-      [cmp]. The first occurence of an element in [l] is kept and
-      their order in [l] is preserved. *)
-
-  (** {1:result Interaction with result} *)
-
-  val fold_stop_on_error :
-    ('a -> 'b -> ('b, 'e) result) -> 'a list -> 'b -> ('b, 'e) result
-  (** [fold_stop_on_error f l acc] folds [f] on the elements of
-      [l] starting with [acc] and stops at the first error. *)
-
-  val iter_stop_on_error :
-    ('a -> (unit, 'e) result) -> 'a list -> (unit, 'e) result
-  (** [iter_stop_on_error f acc] applies [f] to the elements of
-      [l] and stops at the first error. *)
-
-  val iter_iter_on_error :
-    error:((unit, 'e) result -> unit) -> ('a -> (unit, 'e) result) ->
-    'a list -> unit
-  (** [iter_iter_on_error ~error f] applies [f] to the elements
-      of [l] starting with [acc] and invoked [error] on those that
-      do. *)
 end
 
 (** File paths.

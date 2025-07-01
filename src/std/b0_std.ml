@@ -3,39 +3,11 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(* Type identifiers *)
-
-module Type = struct
-  (* See http://alan.petitepomme.net/cwn/2015.03.24.html#1
-     In the stdlib since 5.1. *)
-
-  type ('a, 'b) eq = Equal : ('a, 'a) eq
-
-  module Id = struct
-    type _ id = ..
-    module type ID = sig
-      type t
-      type _ id += Id : t id
-    end
-
-    type 'a t = (module ID with type t = 'a)
-
-    let make (type a) () : a t =
-      (module struct type t = a type _ id += Id : t id end)
-
-    let provably_equal
-        (type a b) ((module A) : a t) ((module B) : b t) : (a, b) eq option
-      =
-      match A.Id with B.Id -> Some Equal | _ -> None
-
-    let uid (type a) ((module A) : a t) =
-      Obj.Extension_constructor.id (Obj.Extension_constructor.of_val A.Id)
-  end
-end
-
 module Char = B0__char
 module Fmt = B0__fmt
+module List = B0__list
 module Result = B0__result
+module Type = B0__type
 
 (* Strings *)
 
@@ -993,55 +965,6 @@ module String = struct
                 loop buf s (k + 1) (k + 1) max
     in
     loop buf s 0 0 max
-end
-
-module List = struct
-  include List
-
-  let classify
-      (type a) (type b)
-      ?(cmp_elts : a -> a -> int = Stdlib.compare)
-      ?(cmp_classes : b -> b -> int = Stdlib.compare)
-      ~classes:(classes : (a -> b list)) els
-    =
-    let module S = Set.Make (struct type t = a let compare = cmp_elts end) in
-    let module M = Map.Make (struct type t = b let compare = cmp_classes end) in
-    let add_classes acc p =
-      let add_class acc c = try M.add c (S.add p (M.find c acc)) acc with
-      | Not_found -> M.add c (S.singleton p) acc
-      in
-      List.fold_left add_class acc (classes p)
-    in
-    let classes = List.fold_left add_classes M.empty els in
-    List.rev (M.fold (fun c els acc -> (c, S.elements els) :: acc) classes [])
-
-  let distinct (type a) (compare : a -> a -> int) vs =
-    let module S = Set.Make (struct type t = a let compare = compare end) in
-    let rec loop seen acc = function
-    | [] -> List.rev acc
-    | v :: vs ->
-        if S.mem v seen then loop seen acc vs else
-        loop (S.add v seen) (v :: acc) vs
-    in
-    loop S.empty [] vs
-
-  let rec fold_stop_on_error f l acc = match l with
-  | [] -> Ok acc
-  | v :: vs ->
-      match f v acc with
-      | Ok acc -> fold_stop_on_error f vs acc
-      | Error _ as e -> e
-
-  let rec iter_stop_on_error f = function
-  | [] -> Ok ()
-  | v :: vs ->
-      match f v with Error _ as e -> e | Ok v -> iter_stop_on_error f vs
-
-  let rec iter_iter_on_error ~error f = function
-  | [] -> ()
-  | v :: vs ->
-      (match f v with Error _ as e -> error e | Ok _ -> ());
-      iter_iter_on_error ~error f vs
 end
 
 (* File paths *)

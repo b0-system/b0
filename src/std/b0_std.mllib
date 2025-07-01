@@ -1,6 +1,8 @@
 B0__result
 B0__char
 B0__fmt
+B0__list
+B0__type
 B0_base64
 B0_bincode
 B0_editor
