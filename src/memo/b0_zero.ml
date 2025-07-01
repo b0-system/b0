@@ -213,7 +213,7 @@ module File_cache = struct
   let key_meta_filename = "zm"
   let key_manifest_filename = "zmf"
   let key_dir c k = String.concat "" [c.dir; k; key_ext; Fpath.dir_sep]
-  let key_of_filename n = String.drop_right (String.length key_ext) n
+  let key_of_filename n = String.rdrop (String.length key_ext) n
   let key_dir_of_filename c n = String.concat "" [c.dir; n; Fpath.dir_sep]
   let filename_is_key_dir dir = String.ends_with ~suffix:key_ext dir
 

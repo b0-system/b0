@@ -133,12 +133,12 @@ module String = struct
 
   (* Breaking with magnitudes *)
 
-  let take_left n s = subrange ~last:(n - 1) s
-  let drop_left n s = subrange ~first:n s
-  let break_left n s = (take_left n s, drop_left n s)
-  let take_right n s = subrange ~first:(String.length s - n) s
-  let drop_right n s = subrange ~last:(String.length s - n - 1) s
-  let break_right n s = (drop_right n s, take_right n s)
+  let take n s = subrange ~last:(n - 1) s
+  let drop n s = subrange ~first:n s
+  let break n s = (take n s, drop n s)
+  let rtake n s = subrange ~first:(String.length s - n) s
+  let rdrop n s = subrange ~last:(String.length s - n - 1) s
+  let rbreak n s = (rdrop n s, rtake n s)
 
   (* Breaking with predicates *)
 

@@ -1890,7 +1890,7 @@ module Cobj = struct
   let file_prefix = "File "
   let parse_file_path (n, line) =
     let len = String.length file_prefix in
-    match Fpath.of_string (String.drop_left len line) with
+    match Fpath.of_string (String.drop len line) with
     | Ok file -> file
     | Error e -> Fmt.failwith_line n " %s" e
 

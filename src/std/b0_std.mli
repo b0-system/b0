@@ -19,8 +19,6 @@ module Type = B0__type
 (** Strings. *)
 module String : sig
 
-  (** {1:stdlib_string Stdlib [String]} *)
-
   include module type of String (** @closed *)
 
   (** {1:strings Strings} *)
@@ -85,27 +83,27 @@ module String : sig
 
   (** {2:break_mag Breaking with magnitudes} *)
 
-  val take_left : int -> string -> string
-  (** [take_left n s] are the first [n] bytes of [s]. This is [s] if
+  val take : int -> string -> string
+  (** [take n s] are the first [n] bytes of [s]. This is [s] if
       [n >= length s] and [""] if [n <= 0]. *)
 
-  val take_right : int -> string -> string
-  (** [take_right n s] are the last [n] bytes of [s].  This is [s] if
+  val rtake : int -> string -> string
+  (** [rtake n s] are the last [n] bytes of [s].  This is [s] if
       [n >= length s] and [""] if [n <= 0]. *)
 
-  val drop_left : int -> string -> string
-  (** [drop_left n s] is [s] without the first [n] bytes of [s]. This is [""]
+  val drop : int -> string -> string
+  (** [drop n s] is [s] without the first [n] bytes of [s]. This is [""]
       if [n >= length s] and [s] if [n <= 0]. *)
 
-  val drop_right : int -> string -> string
-  (** [drop_right n s] is [s] without the last [n] bytes of [s]. This is [""]
+  val rdrop : int -> string -> string
+  (** [rdrop n s] is [s] without the last [n] bytes of [s]. This is [""]
       if [n >= length s] and [s] if [n <= 0]. *)
 
-  val break_left : int -> string -> string * string
-  (** [break_left n v] is [(take_left n v, drop_left n v)]. *)
+  val break : int -> string -> string * string
+  (** [break n v] is [(take n v, drop n v)]. *)
 
-  val break_right : int -> string -> string * string
-  (** [break_right n v] is [(drop_left n v, take_right n v)]. *)
+  val rbreak : int -> string -> string * string
+  (** [rbreak n v] is [(rdrop n v, rtake n v)]. *)
 
   (** {2:break_pred Breaking with predicates} *)
 
