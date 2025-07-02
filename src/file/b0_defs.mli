@@ -23,7 +23,7 @@ module Build_def : sig
       must_build : b0_unit_set;
       may_build : b0_unit_set;
       mutable requested : b0_unit String.Map.t;
-      mutable waiting : b0_unit Random_queue.t; }
+      mutable waiting : b0_unit B0_random_queue.t; }
 end
 
 type b0_build = Build_def.t

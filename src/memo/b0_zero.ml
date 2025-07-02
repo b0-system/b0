@@ -1173,7 +1173,7 @@ module Exec = struct
       tmp_dir : Fpath.t;
       feedback : feedback -> unit;
       trash : Trash.t;
-      todo : Op.t Random_queue.t; (* Waiting for OS submission. *)
+      todo : Op.t B0_random_queue.t; (* Waiting for OS submission. *)
       collectable : Op.t Queue.t;
       to_spawn : Op.t Queue.t; (* [dequeued] from [todo] waiting to spawn. *)
       jobs : int; (* Max number of spawned processes *)
@@ -1184,7 +1184,7 @@ module Exec = struct
     let feedback = match feedback with None -> fun _ -> () | Some f -> f in
     let clock = match clock with None -> Os.Mtime.counter () | Some c -> c in
     let tmp_dir = match tmp with None -> Os.Dir.default_tmp () | Some t -> t in
-    let todo = Random_queue.empty ?rand () in
+    let todo = B0_random_queue.empty ?rand () in
     let collectable = Queue.create () in
     let to_spawn = Queue.create () in
     { clock; tmp_dir; feedback; trash; todo; collectable; to_spawn; jobs;
@@ -1360,11 +1360,11 @@ module Exec = struct
     | false -> ()
 
   let all_done e = (* [true] iff nothing left todo *)
-    Random_queue.length e.todo = 0 &&
+    B0_random_queue.length e.todo = 0 &&
     Queue.length e.to_spawn = 0 &&
     e.spawn_count = 0
 
-  let rec stir ~block e = match Random_queue.take e.todo with
+  let rec stir ~block e = match B0_random_queue.take e.todo with
   | Some o ->
       collect_spawns ~block:false e;
       submit e o;
@@ -1373,7 +1373,7 @@ module Exec = struct
   | None when all_done e -> ()
   | None -> submit_spawns e; collect_spawns ~block e
 
-  let schedule e o = Random_queue.add e.todo o; stir ~block:false e
+  let schedule e o = B0_random_queue.add e.todo o; stir ~block:false e
 
   let collect e ~block =
     stir ~block:false e; (* First stir a bit, it might submit/collect ops *)

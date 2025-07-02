@@ -59,6 +59,7 @@ and do not specifically depend on b0.
 {2:codecs Codecs}
 
 {!modules:
+B0_adhoc
 B0_base64
 B0_http
 B0_html
@@ -98,6 +99,7 @@ devise domain specific build systems – see for example the [brzo] or
 [odig] tools.
 
 {!modules:
+B0_random_queue
 B0_zero
 B0_zero_conv
 B0_memo

@@ -27,7 +27,7 @@ let require_unit b u =
   match B0_defs.Unit.Set.mem u b.b.may_build with
   | true ->
       b.b.requested <- String.Map.add (B0_defs.Unit.name u) u b.b.requested;
-      Random_queue.add b.b.waiting u
+      B0_random_queue.add b.b.waiting u
   | false ->
       B0_memo.fail b.u.m
         "@[<v>Unit %a requested %a which is not part of the build.@,\
@@ -88,8 +88,8 @@ let make ~root_dir ~b0_dir ~variant ~store m ~may_build ~must_build =
     B0_defs.Unit.Set.fold add_requested must_build String.Map.empty
   in
   let waiting =
-    let q = Random_queue.empty () in
-    B0_defs.Unit.Set.iter (Random_queue.add q) must_build; q
+    let q = B0_random_queue.empty () in
+    B0_defs.Unit.Set.iter (B0_random_queue.add q) must_build; q
   in
   let b =
     { root_dir; b0_dir; build_dir; shared_dir; store; must_build;
@@ -110,11 +110,11 @@ let run_unit b unit =
     (B0_defs.unit_build_proc unit) b
   end
 
-let rec run_units b = match Random_queue.take b.b.waiting with
+let rec run_units b = match B0_random_queue.take b.b.waiting with
 | Some u -> run_unit b u; run_units b
 | None ->
     B0_memo.stir ~block:true b.u.m;
-    if Random_queue.length b.b.waiting = 0 then () else run_units b
+    if B0_random_queue.length b.b.waiting = 0 then () else run_units b
 
 let log_file b = Fpath.(b.b.build_dir / "_log")
 let write_log_file ~log_file m =

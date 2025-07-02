@@ -17,7 +17,6 @@ module V000 = struct
   module Fut = B0_std.Fut
   module Os = B0_std.Os
   module Log = B0_std.Log
-  module Random_queue = B0_std.Random_queue
   module Bval = B0_std.Bval
   let ( ~/ ) = Fpath.v
   let ( ~~ ) = B0_meta.add

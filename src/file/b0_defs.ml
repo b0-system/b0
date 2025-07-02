@@ -19,7 +19,7 @@ module rec Build_def : sig
       must_build : Unit.Set.t;
       may_build : Unit.Set.t;
       mutable requested : Unit.t String.Map.t;
-      mutable waiting : Unit.t Random_queue.t; }
+      mutable waiting : Unit.t B0_random_queue.t; }
 end = struct
   type t = { u : build_ctx; b : build_state }
   and build_ctx = { current : Unit.t option; m : B0_memo.t; }
@@ -32,7 +32,7 @@ end = struct
       must_build : Unit.Set.t;
       may_build : Unit.Set.t;
       mutable requested : Unit.t String.Map.t;
-      mutable waiting : Unit.t Random_queue.t; }
+      mutable waiting : Unit.t B0_random_queue.t; }
 end
 
 (* B0_unit.t *)
