@@ -340,7 +340,7 @@ val make_zero :
   B0_zero.Guard.t -> B0_zero.Reviver.t -> B0_zero.Exec.t -> (t, string) result
 
 val make :
-  ?hash_fun:(module Hash.T) -> ?win_exe:bool -> ?tool_lookup:tool_lookup ->
+  ?hash_fun:(module B0_hash.T) -> ?win_exe:bool -> ?tool_lookup:tool_lookup ->
   ?env:Os.Env.t -> ?forced_env_vars:Tool.env_vars -> ?cwd:Fpath.t ->
   ?jobs:int -> ?feedback:([feedback | B0_zero.Exec.feedback] -> unit) ->
   cache_dir:Fpath.t -> trash_dir:Fpath.t -> unit -> (t, string) result
@@ -363,10 +363,10 @@ val with_feedback : t -> (feedback -> unit) -> t
 val delete_trash : block:bool -> t -> (unit, string) result
 (** [delete_trash ~block m] is {!B0_zero.Trash.delete}[ ~block (trash m)]. *)
 
-val hash_string : t -> string -> Hash.t
+val hash_string : t -> string -> B0_hash.t
 (** [hash_string m s] is {!B0_zero.Reviver.hash_string}[ (reviver m) s]. *)
 
-val hash_file : t -> Fpath.t -> (Hash.t, string) result
+val hash_file : t -> Fpath.t -> (B0_hash.t, string) result
 (** [hash_file m f] is {!B0_zero.Reviver.hash_file}[ (reviver m) f].
     Note that these file hashes operations are memoized. *)
 

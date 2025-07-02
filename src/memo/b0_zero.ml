@@ -513,7 +513,7 @@ module Op = struct
       mutable reads : Fpath.t list;
       mutable writes : Fpath.t list;
       mutable writes_manifest_root : Fpath.t option;
-      mutable hash : Hash.t;
+      mutable hash : B0_hash.t;
       mutable post_exec : (t -> unit) option;
       mutable k : (t -> unit) option;
       kind : kind }
@@ -531,7 +531,7 @@ module Op = struct
       kind
     =
     let time_started = Mtime.Span.max_span and duration = Mtime.Span.zero in
-    let revived = false and status = Waiting and hash = Hash.nil in
+    let revived = false and status = Waiting and hash = B0_hash.nil in
     { id; mark; time_created = created; time_started; duration; revived;
       status; reads; writes; writes_manifest_root; hash; post_exec; k; kind }
 
@@ -549,8 +549,8 @@ module Op = struct
   let writes o = o.writes
   let writes_manifest_root o = o.writes_manifest_root
   let hash o = o.hash
-  let supports_reviving o = not (Hash.is_nil o.hash)
-  let disable_reviving o = o.hash <- Hash.nil
+  let supports_reviving o = not (B0_hash.is_nil o.hash)
+  let disable_reviving o = o.hash <- B0_hash.nil
   let discard_k o = o.k <- None
   let invoke_k o = match o.k with None -> () | Some k -> discard_k o; k o
   let discard_post_exec o = o.post_exec <- None
@@ -576,7 +576,7 @@ module Op = struct
   let set_time_ended o t = o.duration <- Mtime.Span.abs_diff t o.time_started
   let set_revived o b = o.revived <- b
   let set_status o s = o.status <- s
-  let set_reads o fs = o.hash <- Hash.nil; o.reads <- fs
+  let set_reads o fs = o.hash <- B0_hash.nil; o.reads <- fs
   let set_writes o fs = o.writes <- fs
   let set_writes_manifest_root o m = o.writes_manifest_root <- m
   let set_hash o h = o.hash <- h
@@ -895,10 +895,10 @@ module Reviver = struct
 
   type t =
     { clock : Os.Mtime.counter;
-      hash_fun : (module Hash.T);
+      hash_fun : (module B0_hash.T);
       cache : File_cache.t;
       buffer : Buffer.t; (* buffer to encode metadata *)
-      mutable file_hashes : Hash.t Fpath.Map.t; (* file hash cache *)
+      mutable file_hashes : B0_hash.t Fpath.Map.t; (* file hash cache *)
       mutable file_hash_dur : Mtime.Span.t; (* total file hash duration *) }
 
   let make clock hash_fun cache =
@@ -915,13 +915,13 @@ module Reviver = struct
   (* Hashing *)
 
   let hash_string r s =
-    let module H = (val r.hash_fun : Hash.T) in
+    let module H = (val r.hash_fun : B0_hash.T) in
     H.string s
 
   let _hash_file r f = match Fpath.Map.find f r.file_hashes with
   | h -> h
   | exception Not_found ->
-      let module H = (val r.hash_fun : Hash.T) in
+      let module H = (val r.hash_fun : B0_hash.T) in
       let t = timestamp r in
       let h = H.file f in
       let dur = Mtime.Span.abs_diff (timestamp r) t in
@@ -933,15 +933,18 @@ module Reviver = struct
   let hash_file r f = try Ok (_hash_file r f) with Failure e -> Error e
 
   let hash_op_reads r o acc =
-    let add_file_hash acc f = Hash.to_binary_string (_hash_file r f) :: acc in
+    let add_file_hash acc f =
+      B0_hash.to_binary_string (_hash_file r f) :: acc
+    in
     List.fold_left add_file_hash acc (Op.reads o)
 
   let hash_spawn r o s =
     let stdin_stamp = function None -> "0" | Some _ -> "1" in
     let stdo_stamp = function `File _ -> "0" | `Tee _ -> "1" | `Ui -> "2" in
-    let module H = (val r.hash_fun : Hash.T) in
+    let module H = (val r.hash_fun : B0_hash.T) in
     let acc = [Op.Spawn.stamp s] in
-    let acc = (Hash.to_binary_string (_hash_file r (Op.Spawn.tool s))) :: acc in
+    let acc = (B0_hash.to_binary_string
+                 (_hash_file r (Op.Spawn.tool s))) :: acc in
     let acc = hash_op_reads r o acc in
     let acc = stdin_stamp (Op.Spawn.stdin s) :: acc in
     let acc = stdo_stamp (Op.Spawn.stdout s) :: acc in
@@ -952,13 +955,13 @@ module Reviver = struct
     H.string (String.concat "" acc)
 
   let hash_write r o w =
-    let module H = (val r.hash_fun : Hash.T) in
+    let module H = (val r.hash_fun : B0_hash.T) in
     let acc = string_of_int (Op.Write.mode w) :: [Op.Write.stamp w] in
     let acc = hash_op_reads r o acc in
     H.string (String.concat "" acc)
 
   let hash_copy r o c =
-    let module H = (val r.hash_fun : Hash.T) in
+    let module H = (val r.hash_fun : B0_hash.T) in
     let linenum_stamp = function None -> "n" | Some i -> string_of_int i in
     let acc = hash_op_reads r o [] in
     let acc = string_of_int (Op.Copy.mode c) :: acc in
@@ -972,7 +975,7 @@ module Reviver = struct
       | Op.Write w -> hash_write r o w
       | Op.Copy c -> hash_copy r o c
       | Op.Delete _ | Op.Read _ | Op.Notify _ | Op.Mkdir _ | Op.Wait_files _ ->
-          Hash.nil
+          B0_hash.nil
       end
     with Failure e -> Error e
 
@@ -1007,7 +1010,7 @@ module Reviver = struct
     B0_bincode.dec_eoi s next;
     (stdo_ui, status)
 
-  let file_cache_key o = Hash.to_hex (Op.hash o)
+  let file_cache_key o = B0_hash.to_hex (Op.hash o)
 
   let revive_spawn r o s =
     let key = file_cache_key o in

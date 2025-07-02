@@ -56,13 +56,16 @@ and do not specifically depend on b0.
 
 {!modules:
 B0_std
-B0_std_cli}
+B0_std_cli
+B0_hash
+}
 
 {2:codecs Codecs}
 
 {!modules:
 B0_adhoc
 B0_base64
+B0_bincode
 B0_http
 B0_html
 B0_json

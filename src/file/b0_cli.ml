@@ -89,9 +89,9 @@ module File_cache = struct
   let keys_of_success_ops ops =
     let add_op acc o =
       let h = B0_zero.Op.hash o in
-      match not (Hash.is_nil h) && B0_zero.Op.status o = B0_zero.Op.Success with
-      | true -> String.Set.add (Hash.to_hex h) acc
-      | false -> acc
+      if not (B0_hash.is_nil h) && B0_zero.Op.status o = B0_zero.Op.Success
+      then String.Set.add (B0_hash.to_hex h) acc
+      else acc
     in
     List.fold_left add_op String.Set.empty ops
 
@@ -240,14 +240,14 @@ module Op = struct
     let writes = Fpath.Set.of_list writes in
     let mem_writes f = Fpath.Set.mem f writes in
     let hashes =
-      String.Set.of_list (List.rev_map Hash.to_binary_string hashes)
+      String.Set.of_list (List.rev_map B0_hash.to_binary_string hashes)
     in
     let mem_hash h = String.Set.mem h hashes in
     let marks = String.Set.of_list marks in
     let mem_mark m = String.Set.mem m marks in
     fun o ->
       List.exists (( = ) (Op.id o)) ids ||
-      mem_hash (Hash.to_binary_string (Op.hash o)) ||
+      mem_hash (B0_hash.to_binary_string (Op.hash o)) ||
       List.exists mem_reads (Op.reads o) ||
       List.exists mem_writes (Op.writes o) ||
       mem_mark (Op.mark o)
@@ -311,9 +311,9 @@ module Op = struct
   let hash =
     let of_string s =
       let err _ = Fmt.str "Could not parse hash from %S" s in
-      Result.map_error err (Hash.of_hex s)
+      Result.map_error err (B0_hash.of_hex s)
     in
-    Arg.conv' ~docv:"HASH" (of_string, Hash.pp)
+    Arg.conv' ~docv:"HASH" (of_string, B0_hash.pp)
 
   let marks
       ?(opts = ["m"; "mark"]) ?docs
@@ -582,12 +582,12 @@ module Memo = struct
   (* Hash fun *)
 
   let hash_fun_assoc =
-    List.map (fun ((module H : Hash.T) as h) -> H.id, h) (Hash.funs ())
+    List.map (fun ((module H : B0_hash.T) as h) -> H.id, h) (B0_hash.funs ())
 
   let hash_fun_conv = Arg.enum ~docv:"HASHFUN" hash_fun_assoc
   let hash_fun_env = "B0_HASH_FUN"
   let hash_fun
-      ?(opts = ["hash-fun"]) ?docs ?doc ?(doc_none = Hash.Xxh3_64.id)
+      ?(opts = ["hash-fun"]) ?docs ?doc ?(doc_none = B0_hash.Xxh3_64.id)
       ?(env = Cmd.Env.info hash_fun_env) ()
     =
     let doc = match doc with
@@ -600,7 +600,7 @@ module Memo = struct
          info opts ~env ~doc ?docs)
 
   let get_hash_fun ~hash_fun = match hash_fun with
-  | None -> (module Hash.Xxh3_64 : Hash.T) | Some m -> m
+  | None -> (module B0_hash.Xxh3_64 : B0_hash.T) | Some m -> m
 
   (* Logs *)
 
@@ -705,17 +705,17 @@ module Memo = struct
     | `Long -> B0_zero_conv.Op.pp
 
     let pp_op_hash = function
-    | `Short | `Normal -> Fmt.using B0_zero.Op.hash Hash.pp
+    | `Short | `Normal -> Fmt.using B0_zero.Op.hash B0_hash.pp
     | `Long ->
         fun ppf o ->
           Fmt.int ppf (B0_zero.Op.id o); Fmt.sp ppf ();
-          Hash.pp ppf (B0_zero.Op.hash o)
+          B0_hash.pp ppf (B0_zero.Op.hash o)
 
     let pp_hashed_file = function
     | `Short -> Fmt.using fst Fpath.pp_unquoted
     | `Normal | `Long ->
         fun ppf (f, h) ->
-          Hash.pp ppf h; Fmt.char ppf ' '; Fpath.pp_unquoted ppf f
+          B0_hash.pp ppf h; Fmt.char ppf ' '; Fpath.pp_unquoted ppf f
 
     let out ppf format details query ~path l = match format with
     | `Path ->
@@ -733,7 +733,7 @@ module Memo = struct
         let t = B0_build_trace.Trace_event.of_ops ops in
         Fmt.pf ppf "@[%s@]@." (B0_json.Jsong.to_string t)
     | `Op_hashes ->
-        let has_hash o = not (Hash.is_nil (B0_zero.Op.hash o)) in
+        let has_hash o = not (B0_hash.is_nil (B0_zero.Op.hash o)) in
         let ops = List.filter has_hash (query (B0_memo_log.ops l)) in
         if ops = [] then () else
         Fmt.pf ppf "@[<v>%a@]@." (Fmt.list (pp_op_hash details)) ops

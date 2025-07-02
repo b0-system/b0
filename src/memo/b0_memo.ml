@@ -148,7 +148,7 @@ let make_zero
   Ok { c = { mark = "" }; m }
 
 let make
-    ?(hash_fun = (module Hash.Xxh3_64 : Hash.T)) ?win_exe ?tool_lookup
+    ?(hash_fun = (module B0_hash.Xxh3_64 : B0_hash.T)) ?win_exe ?tool_lookup
     ?env ?forced_env_vars ?cwd
     ?(jobs = Os.Cpu.logical_count ()) ?feedback ~cache_dir ~trash_dir ()
   =
@@ -254,7 +254,7 @@ let discontinue_op m o =
 let finish_op m o = match Op.status o with
 | Op.Success ->
     if Op.revived o then continue_op m o else
-    begin match Hash.equal (Op.hash o) Hash.nil with
+    begin match B0_hash.equal (Op.hash o) B0_hash.nil with
     | true ->
         begin match Op.did_not_write o with
         | [] -> continue_op m o

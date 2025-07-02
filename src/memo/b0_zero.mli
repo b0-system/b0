@@ -535,7 +535,7 @@ module Op : sig
     id -> mark:mark -> time_created:Mtime.Span.t -> time_started:Mtime.Span.t ->
     duration:Mtime.Span.t -> revived:bool -> status:status ->
     reads:Fpath.t list -> writes:Fpath.t list ->
-    writes_manifest_root:Fpath.t option -> hash:Hash.t ->
+    writes_manifest_root:Fpath.t option -> hash:B0_hash.t ->
     ?post_exec:(op -> unit) -> ?k:(op -> unit) -> kind -> t
   (** [make] constructs an operation. See the corresponding accessors
       for the semantics of various arguments. *)
@@ -592,7 +592,7 @@ module Op : sig
       using a manifest key. This means the {!writes} made relative to
       [root] are stored along-side the cache key. *)
 
-  val hash : t -> Hash.t
+  val hash : t -> B0_hash.t
   (** [hash o] is the operation's hash. This is {!B0_std.Hash.nil} before the
       operation hash has been effectively computed and set via
       {!set_hash}. This remains {!B0_std.Hash.nil} for operations that are
@@ -661,7 +661,7 @@ module Op : sig
   (** [set_writes_manifest_root t r] sets the writes manifest root
       to [r]. *)
 
-  val set_hash : t -> Hash.t -> unit
+  val set_hash : t -> B0_hash.t -> unit
   (** [set_hash o h] sets the operation hash to [h]. *)
 
   (** {1:set_map Operation sets and map} *)
@@ -766,7 +766,7 @@ module Reviver : sig
   type t
   (** The type for build operation revivers. *)
 
-  val make : Os.Mtime.counter -> (module Hash.T) -> File_cache.t -> t
+  val make : Os.Mtime.counter -> (module B0_hash.T) -> File_cache.t -> t
   (** [make clock hash_fun cache] is a reviver with
       {ul
       {- [clock] the clock used to {{!file_hash_dur}measure} file hashing
@@ -777,7 +777,7 @@ module Reviver : sig
   val clock : t -> Os.Mtime.counter
   (** [clock r] is [r]'s clock. *)
 
-  val hash_fun : t -> (module Hash.T)
+  val hash_fun : t -> (module B0_hash.T)
   (** [hash_fun r] is [r]'s hash function. *)
 
   val file_cache : t -> File_cache.t
@@ -785,19 +785,19 @@ module Reviver : sig
 
   (** {1:hashing Hashing} *)
 
-  val hash_string : t -> string -> Hash.t
+  val hash_string : t -> string -> B0_hash.t
   (** [hash_string r s] hashes [s] using [r]'s {!hash_fun}. *)
 
-  val hash_file : t -> Fpath.t -> (Hash.t, string) result
+  val hash_file : t -> Fpath.t -> (B0_hash.t, string) result
   (** [hash_file r f] hashes file [f] using [r]'s {!hash_fun}. Note
       that file hashes are {{!file_hashes}cached} by [r]. *)
 
-  val hash_op : t -> Op.t -> (Hash.t, string) result
+  val hash_op : t -> Op.t -> (B0_hash.t, string) result
   (** [hash_op r o] hashes the operation [o]. Errors if an input
       file of the build operation can't be hashed, this is most
       likely because an input file does not exist. *)
 
-  val file_hashes : t -> Hash.t Fpath.Map.t
+  val file_hashes : t -> B0_hash.t Fpath.Map.t
   (** [file_hashes r] is a map of the files that were hashed. *)
 
   val file_hash_dur : t -> Mtime.Span.t

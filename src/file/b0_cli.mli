@@ -122,7 +122,7 @@ module Op : sig
 
   val select :
     reads:Fpath.t list -> writes:Fpath.t list -> ids:B0_zero.Op.id list ->
-    hashes:Hash.t list -> marks:string list -> B0_zero.Op.t -> bool
+    hashes:B0_hash.t list -> marks:string list -> B0_zero.Op.t -> bool
   (** [select ~reads ~writes ~ids ~hashes ~marks o] is [true]
       iff [o] reads a file in [reads] or writes a file in [writes]
       or has its id in [ids], or has its hash in [hashes] or has
@@ -361,7 +361,8 @@ module Memo : sig
 
   val hash_fun :
     ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
-    ?env:Cmdliner.Cmd.Env.info -> unit -> (module Hash.T) option Cmdliner.Term.t
+    ?env:Cmdliner.Cmd.Env.info -> unit ->
+    (module B0_hash.T) option Cmdliner.Term.t
   (** [hash_fun] is a cli interface for specfiying hash function
       used for caching.
       {ul
@@ -374,7 +375,7 @@ module Memo : sig
       {- [env] is a variable that can be used to override the default
          value, defaults to {!hash_fun_env}.}} *)
 
-  val get_hash_fun : hash_fun:(module Hash.T) option -> (module Hash.T)
+  val get_hash_fun : hash_fun:(module B0_hash.T) option -> (module B0_hash.T)
   (** [get_hash_fun ~hash_fun] determines a hash function. If [hash_fun]
       is [None] then {!B0_std.Hash} is used. *)
 

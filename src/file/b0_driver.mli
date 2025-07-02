@@ -85,7 +85,7 @@ module Conf : sig
   val make :
     b0_dir:Fpath.t -> b0_file:Fpath.t option -> cache_dir:Fpath.t ->
     cwd:Fpath.t -> code:B0_ocaml.Code.t option -> env:Os.Env.t ->
-    hash_fun:(module Hash.T) -> jobs:int -> log_level:Log.level ->
+    hash_fun:(module B0_hash.T) -> jobs:int -> log_level:Log.level ->
     no_pager:bool -> fmt_styler:Fmt.styler -> unit -> t
   (** [make] constructs a configuration with given attributes. See the
       accessors for semantics. *)
@@ -108,7 +108,7 @@ module Conf : sig
   val env : t -> Os.Env.t
   (** [env] is the process environment of the driver. *)
 
-  val hash_fun : t -> (module Hash.T)
+  val hash_fun : t -> (module B0_hash.T)
   (** [hash_fun] is the hash function to use for build caching. *)
 
   val jobs : t -> int
@@ -136,7 +136,7 @@ module Conf : sig
   val setup_with_cli :
     b0_dir:Fpath.t option -> b0_file:Fpath.t option ->
     cache_dir:Fpath.t option -> code:B0_ocaml.Code.t option ->
-    hash_fun:(module Hash.T) option -> jobs:int option ->
+    hash_fun:(module B0_hash.T) option -> jobs:int option ->
     log_level:Log.level option -> no_pager:bool ->
     color:Fmt.styler option option -> unit -> (t, string) result
   (** [setup_with_cli] determines and setups a configuration with the

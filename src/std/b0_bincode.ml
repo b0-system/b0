@@ -243,8 +243,8 @@ let set s c = make (enc_set s c.enc) (dec_set s c.dec)
 
 (* Hash.t *)
 
-let enc_hash b h = enc_string b (Hash.to_binary_string h)
-let dec_hash s i = let i, h = dec_string s i in i, (Hash.of_binary_string h)
+let enc_hash b h = enc_string b (B0_hash.to_binary_string h)
+let dec_hash s i = let i, h = dec_string s i in i, (B0_hash.of_binary_string h)
 let hash = make enc_hash dec_hash
 
 (* Time.span *)

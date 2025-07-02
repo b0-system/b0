@@ -21,7 +21,7 @@ val of_memo : B0_memo.t -> t
 val hash_fun : t -> string
 (** [hash_fun] is the identifier of the hash function that was used. *)
 
-val file_hashes : t -> Hash.t Fpath.Map.t
+val file_hashes : t -> B0_hash.t Fpath.Map.t
 (** [file_hashes l] has all the files that were hashed through the memo. *)
 
 val hash_dur : t -> Mtime.Span.t

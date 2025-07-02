@@ -47,7 +47,7 @@ module Conf = struct
       cwd : Fpath.t;
       env : Os.Env.t;
       code : B0_ocaml.Code.t option;
-      hash_fun : (module Hash.T);
+      hash_fun : (module B0_hash.T);
       jobs : int;
       log_level : Log.level;
       no_pager : bool;

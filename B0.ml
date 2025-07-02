@@ -68,15 +68,15 @@ let tool_exe ?(requires = []) n ~doc file =
 
 let b0_cache_tool =
   let requires = [b0_memo; b0_file] in
-  tool_exe "b0-cache" "b0_cache.ml" ~doc:"Operate on b0 caches" ~requires
+  tool_exe "b0-cache" "b0_cache_tool.ml" ~doc:"Operate on b0 caches" ~requires
 
 let b0_hash_tool =
   let requires = [b0_file] (* for B0_cli *)  in
-  tool_exe "b0-hash" "b0_hash.ml" ~doc:"Hash like b0" ~requires
+  tool_exe "b0-hash" "b0_hash_tool.ml" ~doc:"Hash like b0" ~requires
 
 let b0_log_tool =
   let requires = [b0_memo; b0_file] in
-  tool_exe "b0-log" "b0_log.ml" ~doc:"Operate on b0 logs" ~requires
+  tool_exe "b0-log" "b0_log_tool.ml" ~doc:"Operate on b0 logs" ~requires
 
 let b0_sttyle =
   tool_exe "b0-sttyle" "b0_sttyle.ml" ~doc:"Show ANSI escape styles"
@@ -181,12 +181,12 @@ let default =
          "_build/src/tool/b0_main_run.byte:b0" {!ocaml:native}
          "_build/src/lowtools/show_url.native:show-url" {ocaml:native}
          "_build/src/lowtools/show_url.byte:show-url" {!ocaml:native}
-         "_build/src/lowtools/b0_cache.native:b0-cache" {ocaml:native}
-         "_build/src/lowtools/b0_cache.byte:b0-cache" {!ocaml:native}
-         "_build/src/lowtools/b0_hash.native:b0-hash" {ocaml:native}
-         "_build/src/lowtools/b0_hash.byte:b0-hash" {!ocaml:native}
-         "_build/src/lowtools/b0_log.native:b0-log" {ocaml:native}
-         "_build/src/lowtools/b0_log.byte:b0-log" {!ocaml:native}
+         "_build/src/lowtools/b0_cache_tool.native:b0-cache" {ocaml:native}
+         "_build/src/lowtools/b0_cache_tool.byte:b0-cache" {!ocaml:native}
+         "_build/src/lowtools/b0_hash_tool.native:b0-hash" {ocaml:native}
+         "_build/src/lowtools/b0_hash_tool.byte:b0-hash" {!ocaml:native}
+         "_build/src/lowtools/b0_log_tool.native:b0-log" {ocaml:native}
+         "_build/src/lowtools/b0_log_tool.byte:b0-log" {!ocaml:native}
          "_build/src/lowtools/b0_sttyle.native:b0-sttyle" {ocaml:native}
          "_build/src/lowtools/b0_sttyle.byte:b0-sttyle" {!ocaml:native}
          "%{prefix}%"]|}

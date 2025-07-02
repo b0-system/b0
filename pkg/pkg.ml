@@ -20,9 +20,9 @@ let () =
     Pkg.bin "src/tool/b0_main_run" ~dst:"b0";
 
     (* Tools *)
-    Pkg.bin "src/lowtools/b0_cache" ~dst:"b0-cache";
-    Pkg.bin "src/lowtools/b0_log" ~dst:"b0-log";
-    Pkg.bin "src/lowtools/b0_hash" ~dst:"b0-hash";
+    Pkg.bin "src/lowtools/b0_cache_tool" ~dst:"b0-cache";
+    Pkg.bin "src/lowtools/b0_log_tool" ~dst:"b0-log";
+    Pkg.bin "src/lowtools/b0_hash_tool" ~dst:"b0-hash";
     Pkg.bin "src/lowtools/b0_sttyle" ~dst:"b0-sttyle";
     Pkg.bin "src/lowtools/show_url" ~dst:"show-url";
 

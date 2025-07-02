@@ -216,13 +216,13 @@ val set :
 
 (** {2:hash [Hash.t]} *)
 
-val enc_hash : Hash.t enc
+val enc_hash : B0_hash.t enc
 (** [enc_hash] encodes a {!B0_std.Hash.t}. *)
 
-val dec_hash : Hash.t dec
+val dec_hash : B0_hash.t dec
 (** [dec_hash] decodes a {!B0_std.Hash.t}. *)
 
-val hash : Hash.t t
+val hash : B0_hash.t t
 (** [hash] is a codec for {!B0_std.Hash.t} *)
 
 (** {2:mtime_span [Mtime.Span.t]} *)

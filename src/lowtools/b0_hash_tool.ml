@@ -7,11 +7,12 @@ open B0_std
 open Result.Syntax
 
 let pp_hash = function
-| `Short -> Fmt.using snd Hash.pp
+| `Short -> Fmt.using snd B0_hash.pp
 | `Normal | `Long ->
-    fun ppf (f, h) -> Hash.pp ppf h; Fmt.char ppf ' '; Fpath.pp_unquoted ppf f
+    fun ppf (f, h) ->
+      B0_hash.pp ppf h; Fmt.char ppf ' '; Fpath.pp_unquoted ppf f
 
-let hash_file (module Hash : Hash.T) file  =
+let hash_file (module Hash : B0_hash.T) file  =
   let* hash =
     if Fpath.is_dash file
     then Result.map Hash.string (Os.File.read file)

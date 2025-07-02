@@ -48,7 +48,7 @@ module Op = struct
   let pp_file_read = pp_file
   let pp_file_write = Fmt.st' style_file_write pp_file
   let pp_file_delete = Fmt.st' style_file_delete pp_file
-  let pp_hash = Fmt.st' style_hash Hash.pp
+  let pp_hash = Fmt.st' style_hash B0_hash.pp
   let pp_subfield_label = Fmt.st style_subfield
   let pp_subfield s f pp = Fmt.field ~label:pp_subfield_label ~sep:Fmt.sp s f pp
   let pp_did_not_write ppf fs =
@@ -143,7 +143,7 @@ module Op = struct
     | true -> Fmt.st style_status_exec_revived ppf "r"
     in
     let pp_op_hash ppf o =
-      let h = Op.hash o in if Hash.is_nil h then () else
+      let h = Op.hash o in if B0_hash.is_nil h then () else
       (Fmt.sp ppf (); pp_revived ppf o; Fmt.char ppf ':'; pp_hash ppf h)
     in
     let pp_mark ppf o = match Op.mark o with

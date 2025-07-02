@@ -503,8 +503,8 @@ module Publish = struct
     match List.sort compare (List.map versioned_name is) with
     | [vname] -> Fmt.str "b0-publish-%s" vname
     | (vname :: _ as vnames) ->
-        let hash = Hash.Xxh3_64.string (String.concat " " vnames) in
-        Fmt.str "b0-publish-%s-etc-%s" vname (Hash.to_hex hash)
+        let hash = B0_hash.Xxh3_64.string (String.concat " " vnames) in
+        Fmt.str "b0-publish-%s-etc-%s" vname (B0_hash.to_hex hash)
     | [] -> assert false
 
   let link_issue_numbers pkg s =

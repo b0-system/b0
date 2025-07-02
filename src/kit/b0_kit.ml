@@ -11,7 +11,6 @@ module V000 = struct
   module String = B0_std.String
   module List = B0_std.List
   module Fpath = B0_std.Fpath
-  module Hash = B0_std.Hash
   module Mtime = B0_std.Mtime
   module Cmd = B0_std.Cmd
   module Fut = B0_std.Fut

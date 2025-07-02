@@ -85,7 +85,7 @@ module Trace_event = struct
     |> Jsong.mem "time-created" (span_us (Op.time_created o))
     |> kind_mems
     |> Jsong.mem "reads" (Jsong.(list fpath) (Op.reads o))
-    |> Jsong.mem "hash" (Jsong.string (Hash.to_hex (Op.hash o)))
+    |> Jsong.mem "hash" (Jsong.string (B0_hash.to_hex (Op.hash o)))
     |> Jsong.obj_end
 
   let op o =

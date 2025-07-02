@@ -38,12 +38,12 @@ install: [
   "_build/src/tool/b0_main_run.byte:b0" {!ocaml:native}
   "_build/src/lowtools/show_url.native:show-url" {ocaml:native}
   "_build/src/lowtools/show_url.byte:show-url" {!ocaml:native}
-  "_build/src/lowtools/b0_cache.native:b0-cache" {ocaml:native}
-  "_build/src/lowtools/b0_cache.byte:b0-cache" {!ocaml:native}
-  "_build/src/lowtools/b0_hash.native:b0-hash" {ocaml:native}
-  "_build/src/lowtools/b0_hash.byte:b0-hash" {!ocaml:native}
-  "_build/src/lowtools/b0_log.native:b0-log" {ocaml:native}
-  "_build/src/lowtools/b0_log.byte:b0-log" {!ocaml:native}
+  "_build/src/lowtools/b0_cache_tool.native:b0-cache" {ocaml:native}
+  "_build/src/lowtools/b0_cache_tool.byte:b0-cache" {!ocaml:native}
+  "_build/src/lowtools/b0_hash_tool.native:b0-hash" {ocaml:native}
+  "_build/src/lowtools/b0_hash_tool.byte:b0-hash" {!ocaml:native}
+  "_build/src/lowtools/b0_log_tool.native:b0-log" {ocaml:native}
+  "_build/src/lowtools/b0_log_tool.byte:b0-log" {!ocaml:native}
   "_build/src/lowtools/b0_sttyle.native:b0-sttyle" {ocaml:native}
   "_build/src/lowtools/b0_sttyle.byte:b0-sttyle" {!ocaml:native}
   "%{prefix}%"

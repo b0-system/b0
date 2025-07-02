@@ -14,7 +14,7 @@ open B0_std
 
 type t =
   { hash_fun : string;
-    file_hashes : Hash.t Fpath.Map.t;
+    file_hashes : B0_hash.t Fpath.Map.t;
     hash_dur : Mtime.Span.t;
     total_dur : Mtime.Span.t;
     cpu_dur : Os.Cpu.Time.Span.t;
