@@ -90,9 +90,6 @@ let test ?(requires = []) =
   let reqs = b0_std :: b0_memo :: b0_file :: b0_kit :: cmdliner :: requires in
   B0_ocaml.test ~requires:reqs
 
-let test_b0_std_fpath =
-  test ~/"test/test_b0_std_fpath.ml" ~doc:"Test B0_std.Fpath"
-
 let test_b0_std_cmd =
   test ~/"test/test_b0_std_cmd.ml" ~doc:"Test B0_std.Cmd"
 
@@ -262,6 +259,7 @@ let vendor_more_modules =
   let substs = ["More__", "B0__"; "More.", "B0_std."] in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__char" "b0__char" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__fmt" "b0__fmt" in
+  let* () = copy_module ~substs ~src_dir ~dst_dir "more__fpath" "b0__fpath" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__list" "b0__list" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__result" "b0__result" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__string" "b0__string" in

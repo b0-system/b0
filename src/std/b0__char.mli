@@ -3,7 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** Character operations.
+(** Characters.
 
     {b All additions available} since 5.4
 

@@ -3,7 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** Strings
+(** Strings.
 
     @canonical B0_std.String *)
 
