@@ -5,7 +5,7 @@
 
 (** Result values.
 
-    {b All additions available} since OCaml 5.4
+    {b All additions available} in OCaml 5.4
 
      @canonical B0_std.Result *)
 

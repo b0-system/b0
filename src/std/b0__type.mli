@@ -5,7 +5,7 @@
 
 (** Type introspection.
 
-    {b All additions available} since OCaml 5.1
+    {b All additions available} in OCaml 5.1
 
     @canonical B0_std.Type *)
 

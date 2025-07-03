@@ -5,7 +5,7 @@
 
 (** Characters.
 
-    {b All additions available} since 5.4
+    {b All additions available} in OCaml 5.4
 
     @canonical B0_std.Char *)
 
