@@ -7,6 +7,8 @@ open B0_std
 open Cmdliner
 open Cmdliner.Term.Syntax
 
+(* FIXME try to get rid of this in favour of More_cli. *)
+
 (* Exit *)
 
 module Exit = struct

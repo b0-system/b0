@@ -124,7 +124,7 @@ end
 
     {b Note.} Only use timestamps if you need inter-process time
     correlation, otherwise prefer {!B0_std.Os.Mtime.elapsed} and
-    {{!B0_std.B0_std.Os.Mtime.monotonic_counters}counters} to measure
+    {{!B0_std.Os.Mtime.monotonic_counters}counters} to measure
     time. *)
 
 type t

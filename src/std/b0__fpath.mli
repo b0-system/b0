@@ -110,7 +110,7 @@ val add_segment : t -> string -> (t, string) result
        segment is empty.}
     {- [p] with segment [seg] added, otherwise}}
 
-    This errors if {!is_segment seg} is [false]. {b FIXME} error
+    This errors if {!is_segment}[ seg] is [false]. {b FIXME} error
     format. *)
 
 val ( / ) : t -> string -> t

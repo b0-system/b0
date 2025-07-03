@@ -432,7 +432,7 @@ module Dir : sig
     B0__fpath.t list
   (** [path_list] is a {{!fold}folding} function to get a (reverse w.r.t.
       list of paths). Paths in the result that correspond to directories
-      satisfy {!Fpath.is_dir_path}. *)
+      satisfy {!Fpath.is_syntactic_dir}. *)
 
   (** {1:copy Copying} *)
 
@@ -627,7 +627,7 @@ module Socket : sig
     (** [of_string ~default_port s] parses a socket endpoint
         specification from [s]. The format is [ADDR[:PORT]] or [PATH] for
         a Unix domain socket (detected by the the presence of a
-        {{!Stdlib.Filename.dir_sep}directory separator}). [default_port]
+        {{!B0_std.Fpath.is_dir_sep_char}directory separator}). [default_port]
         port is used if no [PORT] is specified. *)
 
     val pp : Format.formatter -> t -> unit
@@ -691,7 +691,7 @@ module Env : sig
   val var' :
     empty_is_none:bool -> (var_name -> ('a, string) result) -> var_name ->
     ('a option, string) result
-  (** [var' ~empty_is_none parse name] is like {!var} but the value
+  (** [var' ~empty_is_none parse name] is like {!val-var} but the value
       is parsed with [parse]. If the latter errors with [Error e],
       [Error (Fmt.str "%s env: %s" name e)] is returned. *)
 
@@ -741,7 +741,7 @@ module Env : sig
 
   val of_assignments : ?init:t -> string list -> (t, string) result
   (** [of_assignments ~init ss] folds over strings in [ss],
-      {{!B0_std.String.cut_left}cuts} them at the leftmost ['='] character and
+      {{!B0_std.String.cut}cuts} them at the leftmost ['='] character and
       adds the resulting pair to [init] (defaults to {!empty}). If
       the same variable is bound more than once, the last one takes
       over. *)
@@ -761,7 +761,7 @@ module Cmd : sig
   val path_search :
     ?win_exe:bool -> ?path:B0__fpath.t list -> unit -> B0__cmd.tool_search
   (** [path_search ~win_exe ~path () cmd] searches the
-      {{!B0_std.B0__cmd.type-tool}tool} of [cmd] in the [path]
+      {{!B0_std.Cmd.type-tool}tool} of [cmd] in the [path]
       directories. If the tool:
 
       {ul
@@ -981,21 +981,20 @@ module Cmd : sig
 
   (** {1:exec Executing files}
 
-      {b Windows.} On Windows a program executing an [execv*]
-      function yields back control to the terminal as soon as the
-      child starts (vs. ends on POSIX). This entails all sorts of
-      unwanted behaviours. To workaround this, the following
-      function executes, on Windows, the file as a spawned child
-      process which is waited on for completion via
-      [waitpid(2)]. Once the child process has terminated the
-      calling process is immediately [exit]ed with the status of the
-      child. *)
+      {b Windows.} On Windows a program executing an [execv*] function
+      yields back control to the terminal as soon as the child starts
+      (vs. ends on POSIX). This entails all sorts of unwanted
+      behaviours. To workaround this, the following function executes,
+      on Windows, the file as a spawned child process which is waited
+      on for completion via [waitpid(2)]. Once the child process has
+      terminated the calling process is immediately [exit]ed with the
+      status of the child. *)
 
   val execv :
-    ?env:Env.assignments -> ?cwd:B0__fpath.t ->
-    ?argv0:string -> B0__cmd.t -> ('a, string) result
+    ?env:Env.assignments -> ?cwd:B0__fpath.t -> ?argv0:string ->
+    B0__cmd.t -> ('a, string) result
   (** [execv ~env ~cwd cmd] executes the realpath pointed by
-      {!B0__cmd.tool}[ cmd] as a new process in environment with [cmd] as
+      {!B0_std.Cmd.val-tool}[ cmd] as a new process in environment with [cmd] as
       the {!Sys.argv} of this process. The function only returns in
       case of error. [env] defaults to
       {!B0_std.Os.Env.current_assignments}[ ()], [cwd] to
@@ -1003,7 +1002,7 @@ module Cmd : sig
       it is used instead of [cmd]'s tool for Sys.argv.(0). *)
 
   type t = B0__cmd.t
-  (** {!Exit} needs that alias to refer to {!B0_std.B0__cmd.t}. *)
+  (** {!Exit} needs that alias to refer to {!B0_std.Cmd.t}. *)
 end
 
 (** Program exit.
@@ -1028,7 +1027,7 @@ module Exit : sig
 
   val get_code : t -> code
   (** [get_code e] is the exit code of [e]. Raises [Invalid_argument] if
-      [e] is {!Exec}. *)
+      [e] is {!Execv}. *)
 
   val exit : ?on_error:t -> t -> 'a
   (** [exit ~on_error e] exits according to [e]:

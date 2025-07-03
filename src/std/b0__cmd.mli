@@ -173,7 +173,7 @@ val pp_shell : t B0__fmt.t
 val pp_dump : t B0__fmt.t
 (** [pp_dump] formats raw data for debugging. *)
 
-(** {1:stamp Stamps}
+(** {1:stamps Stamps}
 
     Stamps are not useful unless you are interested in memoizing
     tool invocation.
@@ -183,10 +183,9 @@ val pp_dump : t B0__fmt.t
     Unstamped arguments have no special semantics as far as the
     command line is concerned they simply indicate that the argument
     value itself does not influence the outputs of the tool.
-
     Unstamped arguments do not appear in the command line
-    {{!Cmd.to_list_and_stamp}stamp} which is used to memoize tool
-    spawns.
+    {{!Cmd.to_list_and_stamp}stamp} which can be used as a key to
+    memoize tool spawns.
 
     A typical example of unstamped arguments are file paths to
     inputs: it's often the file contents not the actual file path that

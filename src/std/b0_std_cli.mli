@@ -131,7 +131,6 @@ val log_level :
        [Log.Warning]). [None] is returned if the value is not set on
        the cli or via the env var. *)
 
-
 val log_setup :
   ?spawns:Log.level -> ?absent:Log.level ->
   ?docs:Cmdliner.Manpage.section_name -> ?env:Cmdliner.Cmd.Env.info -> unit ->
