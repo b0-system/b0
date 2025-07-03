@@ -7,100 +7,11 @@ module Char = B0__char
 module Fmt = B0__fmt
 module Fpath = B0__fpath
 module List = B0__list
+module Mtime = B0__mtime
 module Result = B0__result
 module String = B0__string
 module Type = B0__type
 
-(* Monotonic time stamps and spans *)
-module Mtime = struct
-  type uint64 = int64
-
-  module Span = struct
-
-    (* Time spans
-
-       Represented by a nanosecond magnitude stored in an unsigned 64-bit
-       integer. Allows to represent spans for ~584.5 Julian years. *)
-
-    type t = uint64
-    let zero = 0L
-    let one = 1L
-    let max_span = -1L
-    let add = Int64.add
-    let abs_diff s0 s1 = match Int64.unsigned_compare s0 s1 < 0 with
-    | true ->  Int64.sub s1 s0
-    | false -> Int64.sub s0 s1
-
-    (* Predicates and comparisons *)
-
-    let equal = Int64.equal
-    let compare = Int64.unsigned_compare
-    let is_shorter s ~than = compare s than < 0
-    let is_longer s ~than = compare s than > 0
-
-    (* Durations *)
-
-    let ( * ) n s = Int64.mul (Int64.of_int n) s
-    let ns   =                      1L
-    let us   =                  1_000L
-    let ms   =              1_000_000L
-    let s    =          1_000_000_000L
-    let min  =         60_000_000_000L
-    let hour =       3600_000_000_000L
-    let day  =      86400_000_000_000L
-    let year = 31_557_600_000_000_000L
-
-    (* Conversions *)
-
-    let to_uint64_ns s = s
-    let of_uint64_ns ns = ns
-
-    let max_float_int = 9007199254740992. (* 2^53. *)
-    let int64_min_int_float = Int64.to_float Int64.min_int
-    let int64_max_int_float = Int64.to_float Int64.max_int
-
-    let of_float_ns sf =
-      if sf < 0. || sf >= max_float_int || not (Float.is_finite sf)
-      then None else Some (Int64.of_float sf)
-
-    let to_float_ns s =
-      if Int64.compare 0L s <= 0 then Int64.to_float s else
-      int64_max_int_float +. (-. int64_min_int_float +. Int64.to_float s)
-
-    let pp = Fmt.uint64_ns_span
-    let pp_ns ppf s = Fmt.pf ppf "%Luns" s
-  end
-
-  (* Timestamps *)
-
-  type t = uint64
-
-  let to_uint64_ns s = s
-  let of_uint64_ns ns = ns
-  let min_stamp = 0L
-  let max_stamp = -1L
-  let pp ppf s = Fmt.pf ppf "%Lu" s
-
-   (* Predicates *)
-
-  let equal = Int64.equal
-  let compare = Int64.unsigned_compare
-  let is_earlier t ~than = compare t than < 0
-  let is_later t ~than = compare t than > 0
-
-  (* Arithmetic *)
-
-  let span t0 t1 = match compare t0 t1 < 0 with
-  | true -> Int64.sub t1 t0
-  | false -> Int64.sub t0 t1
-
-  let add_span t s =
-    let sum = Int64.add t s in
-    if compare t sum <= 0 then Some sum else None
-
-  let sub_span t s =
-    if compare t s < 0 then None else Some (Int64.sub t s)
-end
 
 (* Command lines *)
 
@@ -359,19 +270,22 @@ module Os = struct
     (* Mtime is defined at the end of the module otherwise we get problems
        accessing ../Mtime. *)
 
-    external mtime_now_ns : unit -> Mtime.t = "ocaml_b0_monotonic_now_ns"
+    external mtime_now_ns : unit -> Int64.t = "ocaml_b0_monotonic_now_ns"
 
     (* Monotonic clock *)
 
     let origin = mtime_now_ns ()
-    let elapsed () = Int64.sub (mtime_now_ns ()) origin
-    let now = mtime_now_ns
+    let now () = Mtime.of_uint64_ns (mtime_now_ns ())
+    let elapsed () =
+      Mtime.Span.of_uint64_ns (Int64.sub (mtime_now_ns ()) origin)
 
     (* Monotonic time counter *)
 
     type counter = Mtime.t
-    let counter = mtime_now_ns
-    let count c = Int64.sub (mtime_now_ns ()) c
+    let counter () = Mtime.of_uint64_ns (mtime_now_ns ())
+    let count c =
+      Mtime.Span.of_uint64_ns
+        (Int64.sub (mtime_now_ns ()) (Mtime.to_uint64_ns c))
 
     (* Sleep *)
 
@@ -2086,19 +2000,22 @@ module Os = struct
 
       module Span = struct
         type t =
-          { utime : Mtime.Span.t; stime : Mtime.Span.t;
-            children_utime : Mtime.Span.t; children_stime : Mtime.Span.t; }
+          { utime : Int64.t; stime : Int64.t;
+            children_utime : Int64.t; children_stime : Int64.t; }
 
         let make ~utime ~stime ~children_utime ~children_stime =
-          { utime; stime; children_utime; children_stime }
+          { utime = Mtime.Span.to_uint64_ns utime;
+            stime = Mtime.Span.to_uint64_ns stime;
+            children_utime = Mtime.Span.to_uint64_ns children_utime;
+            children_stime = Mtime.Span.to_uint64_ns children_stime;  }
 
         let zero =
-          make ~utime:0L ~stime:0L ~children_utime:0L ~children_stime:0L
+          { utime = 0L; stime = 0L; children_utime = 0L; children_stime = 0L }
 
-        let utime c = c.utime
-        let stime c = c.stime
-        let children_utime c = c.children_utime
-        let children_stime c = c.children_stime
+        let utime c = Mtime.Span.of_uint64_ns c.utime
+        let stime c = Mtime.Span.of_uint64_ns c.stime
+        let children_utime c = Mtime.Span.of_uint64_ns c.children_utime
+        let children_stime c = Mtime.Span.of_uint64_ns c.children_stime
       end
 
       (* CPU counters *)
