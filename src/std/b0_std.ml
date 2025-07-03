@@ -831,7 +831,7 @@ module Os = struct
       | true -> tmp_from_env "TEMP" ~default:"./"
       | false -> tmp_from_env "TMPDIR" ~default:"/tmp/"
       in
-      ref (Fpath.add_dir_sep (Fpath.v dir))
+      ref (Fpath.ensure_trailing_dir_sep (Fpath.v dir))
 
     type name = (string -> string, unit, string) format
     let default_name = format_of_string "tmp-%s"
@@ -840,9 +840,10 @@ module Os = struct
     let rand_str () = Printf.sprintf "%06x" (rand_num ())
     let tmp_path dir name rand =
       let dir = Fpath.to_string dir in
-      match dir.[String.length dir - 1] = Fpath.dir_sep_char with
+      match dir.[String.length dir - 1] = Fpath.natural_dir_sep_char with
       | true -> Printf.sprintf ("%s" ^^ name) dir rand
-      | false -> Printf.sprintf ("%s%c" ^^ name) dir Fpath.dir_sep_char rand
+      | false ->
+          Printf.sprintf ("%s%c" ^^ name) dir Fpath.natural_dir_sep_char rand
 
     let err dir name rand e =
       Fmt.error "tmp file %s: %s" (tmp_path dir name rand) e
@@ -856,7 +857,7 @@ module Os = struct
         ?(mode = 0o600) ?(make_path = true) ?dir ?(name = default_name) ()
       =
       let dir = match dir with None -> !default_dir | Some d -> d in
-      let dir = Fpath.add_dir_sep dir in
+      let dir = Fpath.ensure_trailing_dir_sep dir in
       let rec loop n = match n with
       | 0 -> err_too_many dir name
       | n ->
@@ -1187,7 +1188,7 @@ module Os = struct
       | exception End_of_file -> acc
       | ".." | "." -> loop ~dotfiles dir dh acc
       | n when is_dot_file n && not dotfiles -> loop ~dotfiles dir dh acc
-      | n when Fpath.is_seg n -> loop ~dotfiles dir dh (n :: acc)
+      | n when Fpath.is_segment n -> loop ~dotfiles dir dh (n :: acc)
       | n -> ffail dir (Fmt.str "%S: Invalid file name" n)
       in
       let dh = Unix.opendir (Fpath.to_string dir) in
@@ -1296,7 +1297,7 @@ module Os = struct
         f dir acc
 
     let path_list stat _ f acc = match stat.Unix.st_kind with
-    | Unix.S_DIR -> Fpath.add_dir_sep f :: acc
+    | Unix.S_DIR -> Fpath.ensure_trailing_dir_sep f :: acc
     | _ -> f :: acc
 
     let prune_denied _ _ p _ =
@@ -1392,7 +1393,7 @@ module Os = struct
 
     (* Default temporary directory *)
 
-    let set_default_tmp p = Tmp.default_dir := Fpath.add_dir_sep p
+    let set_default_tmp p = Tmp.default_dir := Fpath.ensure_trailing_dir_sep p
     let default_tmp () = !Tmp.default_dir
 
     (* Temporary directories *)
@@ -1410,7 +1411,7 @@ module Os = struct
     let rec cwd () =
       let err e = Fmt.error "get cwd: %s" e in
       match Fpath.of_string (Unix.getcwd ()) with
-      | Ok dir when Fpath.is_abs dir -> Ok dir
+      | Ok dir when Fpath.is_absolute dir -> Ok dir
       | Ok dir -> err (Fmt.str "%a is relative" Fpath.pp dir)
       | Error e -> err e
       | exception Unix.Unix_error (Unix.EINTR, _, _) -> cwd ()
@@ -1577,10 +1578,10 @@ module Os = struct
 
     (* Tool search in PATH *)
 
-    let tool_is_path t = String.contains t Fpath.dir_sep_char
+    let tool_is_path t = String.exists Fpath.is_dir_sep_char t
     let tool_file ~dir tool = match dir.[String.length dir - 1] with
-    | c when Fpath.char_is_dir_sep c -> dir ^ tool
-    | _ -> String.concat Fpath.dir_sep [dir; tool]
+    | c when Fpath.is_dir_sep_char c -> dir ^ tool
+    | _ -> String.concat Fpath.natural_dir_sep [dir; tool]
 
     let search_in_path_env_var tool = match Unix.getenv "PATH" with
     | exception Not_found ->

@@ -31,7 +31,7 @@ module Tool = struct
     { name; vars; unstamped_vars; response_file }
 
   let by_name ?response_file ?unstamped_vars ?vars name =
-    match Fpath.is_seg name with
+    match Fpath.is_segment name with
     | false -> Fmt.invalid_arg "%S: tool is not a path segment" name
     | true -> make ?unstamped_vars ?vars (Fpath.v name)
 
@@ -412,7 +412,7 @@ let tool m tool =
         if not m.m.win_exe || String.ends_with ~suffix name then name else
         name ^ suffix
       in
-      Fpath.v name, String.contains name Fpath.dir_sep_char
+      Fpath.v name, String.exists Fpath.is_dir_sep_char name
     in
     let tool_file = match is_path with
     | true -> Fut.return (Ok name)

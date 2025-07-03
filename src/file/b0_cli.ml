@@ -160,7 +160,7 @@ module File_cache = struct
   (* Cli fragments *)
 
   let key_arg =
-    let of_string s = match Fpath.is_seg s with
+    let of_string s = match Fpath.is_segment s with
     | true -> Ok s | false -> Error ("Not a valid key (not a path segment)")
     in
     Arg.conv' (of_string, String.pp) ~docv:"KEY"
@@ -523,7 +523,7 @@ module Memo = struct
         | Error _ | Ok false -> loop (Fpath.parent p)
         | Ok true -> Some p
     in
-    if Fpath.is_rel start then None else (loop start)
+    if Fpath.is_relative start then None else (loop start)
 
   (* File cache directory *)
 

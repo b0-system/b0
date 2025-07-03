@@ -506,7 +506,7 @@ module Libname = struct
   let fpath_to_name ?(sep = '.') s =
     let b = Bytes.of_string (Fpath.to_string s) in
     for i = 0 to Bytes.length b - 1 do
-      if Bytes.get b i = Fpath.dir_sep_char then Bytes.set b i sep;
+      if Bytes.get b i = Fpath.natural_dir_sep_char then Bytes.set b i sep;
     done;
     Bytes.unsafe_to_string b
 
@@ -528,7 +528,9 @@ module Libname = struct
         begin match Bytes.get b i with
         | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '-' ->
             loop (i + 1) ~id_start:false
-        | '.' -> Bytes.set b i Fpath.dir_sep_char; loop (i + 1) ~id_start:true
+        | '.' ->
+            Bytes.set b i Fpath.natural_dir_sep_char;
+            loop (i + 1) ~id_start:true
         | c -> err s (Fmt.str "illegal character %C" c)
         end
     in
@@ -536,12 +538,12 @@ module Libname = struct
 
   let basename n =
     let n = Fpath.to_string n.name in
-    match String.rcut ~sep:Fpath.dir_sep n with
+    match String.rcut ~sep:Fpath.natural_dir_sep n with
     | None -> n | Some (_, n) -> n
 
   let root n =
     let n = Fpath.to_string n.name in
-    match String.cut ~sep:Fpath.dir_sep n with
+    match String.cut ~sep:Fpath.natural_dir_sep n with
     | None -> n | Some (n, _) -> n
 
   let segments n = Fpath.to_segments n.name

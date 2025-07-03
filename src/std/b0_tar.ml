@@ -16,7 +16,7 @@ let empty = []
            pax.html#tag_20_92_13_06  *)
 
 let to_unix_path_string =
-  if Fpath.dir_sep = "/" then Fpath.to_string else
+  if Fpath.natural_dir_sep = "/" then Fpath.to_string else
   fun path -> String.concat "/" (Fpath.to_segments path)
 
 let set_filename h path =

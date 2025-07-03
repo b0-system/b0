@@ -436,8 +436,7 @@ val text_string_literal : string t
 
 val styled_text_string_literal : string t
 (** [styled_text_string_literal] combines {!text_string_literal}
-    and {!ansi_styled_text_string}. *)
-
+    and {!styled_text_string}. *)
 
 (** {1:mag Magnitudes} *)
 
@@ -541,7 +540,7 @@ type styler =
 (** The kind of styler. *)
 
 val set_styler : styler -> unit
-(** [set_styler st] sets the global styler to [st]. See {!styler}. *)
+(** [set_styler st] sets the global styler to [st]. See {!val-styler}. *)
 
 val styler : unit -> styler
 (** [styler] is the global styler. The initial styler is only

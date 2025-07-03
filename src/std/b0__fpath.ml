@@ -57,14 +57,11 @@ module Windows = struct
 
   (* XXX the {of_string,path_start} needs reviewing/testing *)
 
-  let dir_sep_char = '\\'
-  let char_is_dir_sep c = c = '\\' || c = '/'
-  let dir_sep = "\\"
-  let has_dir_sep s =
-    String.exists (function '/' | '\\' -> true | _ -> false) s
-
-  let is_seg s =
-    let valid c = c <> dir_sep_char && c <> '/' && c <> '\x00' in
+  let natural_dir_sep_char = '\\'
+  let natural_dir_sep = "\\"
+  let is_dir_sep_char c = c = '\\' || c = '/'
+  let is_segment s =
+    let valid c = c <> natural_dir_sep_char && c <> '/' && c <> '\x00' in
     String.for_all valid s
 
   let is_unc_path p = String.starts_with ~prefix:"\\\\" p
@@ -77,7 +74,7 @@ module Windows = struct
     if not (is_unc_path p) then non_unc_path_start p else
     let plen = String.length p in
     if plen = 2 then raise Not_found else
-    let sep_from p from = String.index_from p from dir_sep_char in
+    let sep_from p from = String.index_from p from natural_dir_sep_char in
     let i = sep_from p 2 in
     let j = sep_from p (i + 1) in
     match p.[i - 1] with
@@ -90,15 +87,16 @@ module Windows = struct
         else sep_from p (j + 1)
     | _ -> sep_from p j
 
-  let last_non_empty_seg_start p = match String.rindex p dir_sep_char with
-  | exception Not_found -> path_start p
-  | k ->
-      match k = String.length p - 1 with
-      | false -> k + 1
-      | true ->
-          match String.rindex_from p (k - 1) dir_sep_char with
-          | exception Not_found -> path_start p
-          | k -> k + 1
+  let last_non_empty_seg_start p =
+    match String.rindex p natural_dir_sep_char with
+    | exception Not_found -> path_start p
+    | k ->
+        match k = String.length p - 1 with
+        | false -> k + 1
+        | true ->
+            match String.rindex_from p (k - 1) natural_dir_sep_char with
+            | exception Not_found -> path_start p
+            | k -> k + 1
 
   let chop_volume p = B0__string.subrange ~first:(path_start p) p
 
@@ -116,13 +114,15 @@ module Windows = struct
         let rec loop has_slash last_is_sep dbl_sep i max = match i > max with
         | true ->
             let s = if has_slash then backslashify s else s in
-            if dbl_sep > 0 then undouble_sep dir_sep_char dbl_sep s else s
+            if dbl_sep > 0
+            then undouble_sep natural_dir_sep_char dbl_sep s else s
         | false ->
             let c = String.unsafe_get s i in
             if Char.equal c '\x00' then raise Exit else
             let is_slash = Char.equal c '/' in
             let has_slash = has_slash || is_slash in
-            let c_is_sep = (is_slash || Char.equal c dir_sep_char) && i <> 0
+            let c_is_sep =
+              (is_slash || Char.equal c natural_dir_sep_char) && i <> 0
             in
             let is_dbl = last_is_sep && c_is_sep in
             let dbl_sep = if is_dbl then dbl_sep + 1 else dbl_sep in
@@ -134,23 +134,24 @@ module Windows = struct
       | exception Not_found -> err_start p
       | n ->
           let p = match n = String.length p with
-          | true -> (* add root if there's only a UNC volume *) p ^ dir_sep
+          | true ->
+              (* add root if there's only a UNC volume *) p ^ natural_dir_sep
           | false -> p
           in
           Ok p
     with Exit -> err_null s
 
   let append p0 p1 =
-    if is_unc_path p1 || has_drive p1 || p1.[0] = dir_sep_char
+    if is_unc_path p1 || has_drive p1 || p1.[0] = natural_dir_sep_char
     then (* with volume or absolute *) p1 else
-    let p0_last_is_sep = p0.[String.length p0 - 1] = dir_sep_char in
-    let sep = if p0_last_is_sep then "" else dir_sep in
+    let p0_last_is_sep = p0.[String.length p0 - 1] = natural_dir_sep_char in
+    let sep = if p0_last_is_sep then "" else natural_dir_sep in
     String.concat sep [p0; p1]
 
-  let is_rel p =
-    not (is_unc_path p) && p.[non_unc_path_start p] <> dir_sep_char
+  let is_relative p =
+    not (is_unc_path p) && p.[non_unc_path_start p] <> natural_dir_sep_char
 
-  let is_root p = p.[path_start p] = dir_sep_char
+  let is_root p = p.[path_start p] = natural_dir_sep_char
 
   let to_url_path ?(escape_space = true) p =
     let set_char b i = function
@@ -161,23 +162,25 @@ module Windows = struct
 end
 
 module Posix = struct
-  let dir_sep_char = '/'
-  let char_is_dir_sep c = Char.equal c '/'
-  let dir_sep = "/"
-  let has_dir_sep s = String.exists (function '/' -> true | _ -> false) s
-  let is_seg s = String.for_all (fun c -> c <> dir_sep_char && c <> '\x00') s
+  let natural_dir_sep_char = '/'
+  let natural_dir_sep = "/"
+  let is_dir_sep_char c = Char.equal c '/'
+  let is_segment s =
+    String.for_all (fun c -> c <> natural_dir_sep_char && c <> '\x00') s
+
   let of_string = function
   | "" as s -> err_empty s
   | s ->
       try
         let rec loop last_is_sep dbl_sep i max = match i > max with
         | true ->
-            if dbl_sep > 0 then Ok (undouble_sep dir_sep_char dbl_sep s) else
-            Ok s
+            if dbl_sep > 0
+            then Ok (undouble_sep natural_dir_sep_char dbl_sep s)
+            else Ok s
         | false ->
             let c = String.unsafe_get s i in
             if Char.equal c '\x00' then raise Exit else
-            let c_is_sep = Char.equal c dir_sep_char && i <> 0 in
+            let c_is_sep = Char.equal c natural_dir_sep_char && i <> 0 in
             let is_dbl = last_is_sep && c_is_sep in
             let dbl_sep = if is_dbl then dbl_sep + 1 else dbl_sep in
             loop c_is_sep dbl_sep (i + 1) max
@@ -186,26 +189,27 @@ module Posix = struct
       with
       | Exit -> err_null s
 
-  let last_non_empty_seg_start p = match String.rindex p dir_sep_char with
-  | exception Not_found -> 0
-  | k ->
-      match k = String.length p - 1 with
-      | false -> k + 1
-      | true ->
-          match String.rindex_from p (k - 1) dir_sep_char with
-          | exception Not_found -> 0
-          | k -> k + 1
+  let last_non_empty_seg_start p =
+    match String.rindex p natural_dir_sep_char with
+    | exception Not_found -> 0
+    | k ->
+        match k = String.length p - 1 with
+        | false -> k + 1
+        | true ->
+            match String.rindex_from p (k - 1) natural_dir_sep_char with
+            | exception Not_found -> 0
+            | k -> k + 1
 
   let path_start p = if String.equal p "//" then 1 else 0
   let chop_volume p = p
   let append p0 p1 =
-    if p1.[0] = dir_sep_char (* absolute *) then p1 else
-    let p0_last_is_sep = p0.[String.length p0 - 1] = dir_sep_char in
-    let sep = if p0_last_is_sep then "" else dir_sep in
+    if p1.[0] = natural_dir_sep_char (* absolute *) then p1 else
+    let p0_last_is_sep = p0.[String.length p0 - 1] = natural_dir_sep_char in
+    let sep = if p0_last_is_sep then "" else natural_dir_sep in
     String.concat sep [p0; p1]
 
-  let is_rel p = p.[0] <> dir_sep_char
-  let is_root p = String.equal p dir_sep || String.equal p "//"
+  let is_relative p = p.[0] <> natural_dir_sep_char
+  let is_root p = String.equal p natural_dir_sep || String.equal p "//"
 
   let to_url_path ?(escape_space = true) p =
     let esc_len = pct_esc_len ~escape_space in
@@ -217,22 +221,25 @@ let chop_volume = if Sys.win32 then Windows.chop_volume else Posix.chop_volume
 
 (* Separators and segments *)
 
-let dir_sep_char =
-  if Sys.win32 then Windows.dir_sep_char else Posix.dir_sep_char
+let natural_dir_sep_char =
+  if Sys.win32 then Windows.natural_dir_sep_char else Posix.natural_dir_sep_char
 
-let dir_sep = if Sys.win32 then Windows.dir_sep else Posix.dir_sep
-let char_is_dir_sep =
-  if Sys.win32 then Windows.char_is_dir_sep else Posix.char_is_dir_sep
+let natural_dir_sep =
+  if Sys.win32 then Windows.natural_dir_sep else Posix.natural_dir_sep
 
-let last_is_dir_sep p = Char.equal (p.[String.length p - 1]) dir_sep_char
+let is_dir_sep_char =
+  if Sys.win32 then Windows.is_dir_sep_char else Posix.is_dir_sep_char
 
-let has_dir_sep =
-  if Sys.win32 then Windows.has_dir_sep else Posix.has_dir_sep
+let is_dir_sep s = String.length s = 1 && is_dir_sep_char s.[0]
 
-let is_seg = if Sys.win32 then Windows.is_seg else Posix.is_seg
-let is_rel_seg = function "." | ".." -> true | _ -> false
 
-let last_seg_len p = match String.rindex p dir_sep_char with
+let last_is_sep p =
+  Char.equal (p.[String.length p - 1]) natural_dir_sep_char
+
+let is_segment = if Sys.win32 then Windows.is_segment else Posix.is_segment
+let is_segment_relative = function "." | ".." -> true | _ -> false
+
+let last_seg_len p = match String.rindex p natural_dir_sep_char with
 | exception Not_found -> String.length p
 | k -> String.length p - (k + 1)
 
@@ -248,11 +255,11 @@ let to_string p = p
 let v s = match of_string s with Ok p -> p | Error m -> invalid_arg m
 let fmt fmt = B0__fmt.kstr v fmt
 let add_seg' p seg =
-  if not (is_seg seg) then invalid_arg (err_invalid_seg seg) else
-  let sep = if last_is_dir_sep p then "" else dir_sep in
+  if not (is_segment seg) then invalid_arg (err_invalid_seg seg) else
+  let sep = if last_is_sep p then "" else natural_dir_sep in
   String.concat sep [p; seg]
 
-let add_seg p seg = try Ok (add_seg' p seg) with
+let add_segment p seg = try Ok (add_seg' p seg) with
 | Invalid_argument e -> Error e
 
 let append = if Sys.win32 then Windows.append else Posix.append
@@ -264,34 +271,34 @@ let dash = v "-"
 
 (* Directory paths *)
 
-let is_dir_path p = (* check is . .. or ends with / /. or /.. *)
+let is_syntactic_dir p = (* check is . .. or ends with / /. or /.. *)
   let k = String.length p - 1 in
   if k < 0 then (* should not happen *) false else
   match p.[k] with
-  | c when Char.equal c dir_sep_char -> true
+  | c when Char.equal c natural_dir_sep_char -> true
   | '.' ->
       let k = k - 1 in
       if k < 0 then true else
       begin match p.[k] with
-      | c when Char.equal c dir_sep_char -> true
+      | c when Char.equal c natural_dir_sep_char -> true
       | '.' ->
           let k = k - 1 in
-          k < 0 || Char.equal p.[k] dir_sep_char
+          k < 0 || Char.equal p.[k] natural_dir_sep_char
       | _ -> false
       end
   | _ -> false
 
-let add_dir_sep p = add_seg' p ""
+let ensure_trailing_dir_sep p = add_seg' p ""
 
-let strip_dir_sep p = match String.length p with
+let strip_trailing_dir_sep p = match String.length p with
 | 1 -> p
 | 2 ->
-    if p.[0] <> dir_sep_char && p.[1] = dir_sep_char
+    if p.[0] <> natural_dir_sep_char && p.[1] = natural_dir_sep_char
     then B0__string.of_char p.[0]
     else p
 | len ->
     let max = len - 1 in
-    if p.[max] <> dir_sep_char then p else
+    if p.[max] <> natural_dir_sep_char then p else
     B0__string.subrange p ~last:(max - 1)
 
 (* Strict prefixes *)
@@ -302,14 +309,16 @@ let is_prefix pre p =
   let p_len = String.length p in
   (* Check [prefix] and [p] are not equal modulo directoryness. *)
   if suff_start = p_len then false else
-  if suff_start = p_len - 1 && p.[suff_start] = dir_sep_char then false else
+  if suff_start = p_len - 1 && p.[suff_start] = natural_dir_sep_char
+  then false else
   (* Check the prefix is segment based *)
-  (pre.[suff_start - 1] = dir_sep_char || p.[suff_start] = dir_sep_char)
+  (pre.[suff_start - 1] = natural_dir_sep_char ||
+   p.[suff_start] = natural_dir_sep_char)
 
 let strip_prefix pre p =
   if not (is_prefix pre p) then None else
   let len = String.length pre in
-  let first = if p.[len] = dir_sep_char then len + 1 else len in
+  let first = if p.[len] = natural_dir_sep_char then len + 1 else len in
   Some (B0__string.subrange p ~first)
 
 let drop_prefixed dirs =
@@ -325,16 +334,16 @@ let reroot ~src_root ~dst_root src =
 
 let equal = String.equal
 let compare = String.compare
-let is_rel = if Sys.win32 then Windows.is_rel else Posix.is_rel
-let is_abs p = not (is_rel p)
+let is_relative = if Sys.win32 then Windows.is_relative else Posix.is_relative
+let is_absolute p = not (is_relative p)
 let is_root = if Sys.win32 then Windows.is_root else Posix.is_root
 let is_null p = equal p null
 let is_dash p = equal p dash
 
 (* FIXME this is wrong on windows. *)
-let current_dir_dir = "." ^ dir_sep
+let current_dir_dir = "." ^ natural_dir_sep
 let is_current_dir p = String.equal p "." || String.equal p current_dir_dir
-let parent_dir_dir = ".." ^ dir_sep
+let parent_dir_dir = ".." ^ natural_dir_sep
 let is_parent_dir p = String.equal p ".." || String.equal p parent_dir_dir
 
 (* File extensions *)
@@ -363,7 +372,7 @@ let rec ext_multi_range epos k p =
 let ext_range ?(multi = false) p =
   let plen = String.length p in
   let seg_start = last_non_empty_seg_start p in
-  let seg_stop = plen - (if last_is_dir_sep p then 2 else 1) in
+  let seg_stop = plen - (if last_is_sep p then 2 else 1) in
   if seg_start >= seg_stop then raise Not_found else
   if multi
   then ext_multi_range seg_stop (seg_start + 1) p
@@ -406,7 +415,7 @@ let mem_ext exts p = List.exists (fun ext -> has_ext ext p) exts
 
 let add_ext e p =
   let plen = String.length p in
-  match last_is_dir_sep p with
+  match last_is_sep p with
   | false -> p ^ e
   | true ->
       let elen = String.length e in
@@ -414,7 +423,7 @@ let add_ext e p =
       let n = Bytes.create nlen in
       Bytes.blit_string p 0 n 0 (plen - 1);
       Bytes.blit_string e 0 n (plen - 1) elen;
-      Bytes.set n (nlen - 1) dir_sep_char;
+      Bytes.set n (nlen - 1) natural_dir_sep_char;
       Bytes.unsafe_to_string n
 
 let _rem_ext efirst elast p =
@@ -426,7 +435,7 @@ let _rem_ext efirst elast p =
       let nlen = plen - elen in
       let n = Bytes.create nlen in
       Bytes.blit_string p 0 n 0 nlen;
-      Bytes.set n (nlen - 1) dir_sep_char;
+      Bytes.set n (nlen - 1) natural_dir_sep_char;
       Bytes.unsafe_to_string n
 
 let strip_ext ~multi p = match ext_range ~multi p with
@@ -446,12 +455,12 @@ let cut_ext ~multi p = match ext_range ~multi p with
 
 let basename ?(strip_exts = false) p =
   let max = String.length p - 1 in
-  let first, last = match String.rindex p dir_sep_char with
+  let first, last = match String.rindex p natural_dir_sep_char with
   | exception Not_found -> (* B *) path_start p, max
   | k when k <> max || k = 0 -> (* /B or .../B *) k + 1, max
   | k -> (* .../ *)
       let j = k - 1 in
-      match String.rindex_from p j dir_sep_char with
+      match String.rindex_from p j natural_dir_sep_char with
       | exception Not_found -> (* B/ *) path_start p, j
       | i -> (* .../B/ *) i + 1, j
   in
@@ -475,7 +484,7 @@ let rec parent p =
   let plen = String.length p in
   let path_start = path_start p in
   let seg_first = last_non_empty_seg_start p in
-  let seg_last = if last_is_dir_sep p then plen - 2 else plen - 1 in
+  let seg_last = if last_is_sep p then plen - 2 else plen - 1 in
   let seg_len = seg_last - seg_first + 1 in
   match seg_len with
   | 0 -> p
@@ -495,9 +504,10 @@ let relative ~to_dir p =
   (* FIXME this function needs to be rewritten *)
   (* XXX dirty, need a normalization function and/or a better parent
      to handle that. Also the results should be normalized again.  *)
-  if B0__string.includes ~affix:".." to_dir (* cmon that's obvi..ously wrong *)
+  if B0__string.includes
+      ~affix:".." to_dir (* cmon that's obvi..ously wrong *)
   then B0__fmt.invalid_arg "%s: no dotdot allowed" p;
-  let to_dir = add_dir_sep to_dir in
+  let to_dir = ensure_trailing_dir_sep to_dir in
   match strip_prefix to_dir p with
   | Some q -> q
   | None ->
@@ -518,7 +528,7 @@ let relative ~to_dir p =
 (* Converting *)
 
 let to_url_path = if Sys.win32 then Windows.to_url_path else Posix.to_url_path
-let to_segments p = String.split_on_char dir_sep_char (chop_volume p)
+let to_segments p = String.split_on_char natural_dir_sep_char (chop_volume p)
 
 let pp_quoted ppf p = B0__string.pp ppf (Filename.quote p)
 let pp_unquoted = B0__string.pp

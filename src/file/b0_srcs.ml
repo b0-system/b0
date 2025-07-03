@@ -72,7 +72,7 @@ let select_files_in_dirs m u xs (seen, by_ext as acc) ds =
   let rec loop m u xs (seen, by_ext as acc) = function
   | [] -> acc
   | (d, recurse) :: ds ->
-      let d = Fpath.strip_dir_sep d in
+      let d = Fpath.strip_trailing_dir_sep d in
       if Fpath.Set.mem d xs then loop m u xs acc ds else
       match Os.Dir.exists d |> fail_if_error m u with
       | false ->
@@ -97,7 +97,7 @@ let select b sels =
     | `Dir d :: ss -> loop fs ((abs d, false) :: ds) xs futs ss
     | `Dir_rec d :: ss -> loop fs ((abs d, true) :: ds) xs futs ss
     | `X x :: ss ->
-        let x = Fpath.strip_dir_sep (abs x) in
+        let x = Fpath.strip_trailing_dir_sep (abs x) in
         loop fs ds (Fpath.Set.add x xs) futs ss
     | `File f :: ss -> loop ((abs f) :: fs) ds xs futs ss
     | `Fut f :: ss -> loop fs ds xs (f b :: futs) ss

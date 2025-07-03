@@ -204,7 +204,7 @@ module File_cache = struct
 
   let make dir =
     let* _exists = Os.Dir.create ~make_path:true dir in
-    let dir = Fpath.add_dir_sep dir (* assumed e.g. by key_dir *) in
+    let dir = Fpath.ensure_trailing_dir_sep dir (* assumed e.g. by key_dir *) in
     Ok { dir = Fpath.to_string dir }
 
   (* Constructing file paths into the cache *)
@@ -212,9 +212,11 @@ module File_cache = struct
   let key_ext = ".k"
   let key_meta_filename = "zm"
   let key_manifest_filename = "zmf"
-  let key_dir c k = String.concat "" [c.dir; k; key_ext; Fpath.dir_sep]
+  let key_dir c k = String.concat "" [c.dir; k; key_ext; Fpath.natural_dir_sep]
   let key_of_filename n = String.rdrop (String.length key_ext) n
-  let key_dir_of_filename c n = String.concat "" [c.dir; n; Fpath.dir_sep]
+  let key_dir_of_filename c n =
+    String.concat "" [c.dir; n; Fpath.natural_dir_sep]
+
   let filename_is_key_dir dir = String.ends_with ~suffix:key_ext dir
 
   let to_hex_digit n = Char.unsafe_chr @@ n + if n < 10 then 0x30 else 0x61 - 10
@@ -233,16 +235,19 @@ module File_cache = struct
     loop hex i (filenum_width - 1)
 
   let key_meta_file c key =
-    String.concat "" [c.dir; key; key_ext; Fpath.dir_sep; key_meta_filename ]
+    String.concat ""
+      [c.dir; key; key_ext; Fpath.natural_dir_sep; key_meta_filename ]
 
   let key_manifest_file c key =
-    String.concat "" [c.dir; key; key_ext; Fpath.dir_sep; key_manifest_filename]
+    String.concat ""
+      [c.dir; key; key_ext; Fpath.natural_dir_sep; key_manifest_filename]
 
   let key_file c key ~filenum_width ~is_last i =
     (* XXX we could blit directly rather than constructing these lists *)
     let last = if is_last then "z" else "" in
     String.concat ""
-      [c.dir; key; key_ext; Fpath.dir_sep; last; filenum_str ~filenum_width i ]
+      [c.dir; key; key_ext; Fpath.natural_dir_sep; last;
+       filenum_str ~filenum_width i ]
 
   (* Manifest files *)
 
@@ -257,7 +262,7 @@ module File_cache = struct
   let key_manifest_of_string ~root s =
     let path root rel =
       let p = Fpath.of_string rel |> Result.error_to_failure in
-      if Fpath.is_rel p then Fpath.(root // p) else
+      if Fpath.is_relative p then Fpath.(root // p) else
       Fmt.failwith_notrace "%a: path is not relative" Fpath.pp p
     in
     List.rev_map (path root) (String.split_on_char '\n' s)

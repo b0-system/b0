@@ -14,7 +14,7 @@ let stdin_file_url ~tname =
   | None -> let* tmp = Os.Path.tmp ~name:"show-url-%s" () in Ok (tmp, false)
   | Some n ->
       let file = Os.Dir.default_tmp () in
-      let* tmp = Fpath.add_seg file n in Ok (tmp, true)
+      let* tmp = Fpath.add_segment file n in Ok (tmp, true)
   in
   let* data = Os.File.read Fpath.dash in
   let* () = Os.File.write ~force ~make_path:false tmp data in
@@ -23,7 +23,7 @@ let stdin_file_url ~tname =
 let file_url p =
   let* p = Fpath.of_string p in
   let* () = Os.Path.must_exist p in
-  if Fpath.is_abs p then Ok (file_url p) else
+  if Fpath.is_absolute p then Ok (file_url p) else
   let* cwd = Os.Dir.cwd () in
   Ok (file_url Fpath.(cwd // p))
 

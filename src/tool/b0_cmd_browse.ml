@@ -14,7 +14,7 @@ let urlify u =
   let* p = Fpath.of_string u in
   let* exists = Os.Path.exists p in
   if not exists then Ok u else
-  if Fpath.is_abs p then Ok (file_uri p) else
+  if Fpath.is_absolute p then Ok (file_uri p) else
   let* cwd = Os.Dir.cwd () in
   Ok (file_uri Fpath.(cwd // p))
 

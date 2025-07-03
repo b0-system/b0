@@ -29,7 +29,7 @@ val includes : affix:string -> string -> bool
 (** [includes ~affix s] is [true] iff there exists an index [j]
     such that for all indices [i] of [affix], [sub.[i] = s.[j+ 1]]. *)
 
-(** {1:find Finding indices} *)
+(** {1:find_indices Finding indices} *)
 
 val find_index : ?start:int -> (char -> bool) -> string -> int option
 (** [find_index ~start sat] is the index of the first character of
@@ -40,7 +40,7 @@ val rfind_index : ?start:int -> (char -> bool) -> string -> int option
     [s] that satisfies [sat] before or at [start] (defaults to
     [String.length s - 1]). *)
 
-(** {1:find Finding and replacing substrings} *)
+(** {1:find_subs Finding and replacing substrings} *)
 
 val find_sub : ?start:int -> sub:string -> string -> int option
 (** [find_sub ~start ~sub s] is the start position (if any) of the
@@ -169,7 +169,7 @@ val cut : sep:string -> string -> (string * string) option
     @raise Invalid_argument if [sep] is the empty string. *)
 
 val rcut : sep:string -> string -> (string * string) option
-(** [rcut ~sep s] is like {!cut_left} but matching starts
+(** [rcut ~sep s] is like {!cut} but matching starts
     on the right of [s]. *)
 
 val split : ?drop_empty:bool -> sep:string -> string -> string list

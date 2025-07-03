@@ -28,11 +28,11 @@ let find_dirname i n = match String.Map.find n i.dirs_by_name with
 | dirs -> dirs | exception Not_found -> []
 
 let dir_files i d =
-  match Fpath.Map.find (Fpath.add_dir_sep d) i.files_by_dir with
+  match Fpath.Map.find (Fpath.ensure_trailing_dir_sep d) i.files_by_dir with
   | files -> files | exception Not_found -> []
 
 let dir_dirs i d =
-  match Fpath.Map.find (Fpath.add_dir_sep d) i.dirs_by_dir with
+  match Fpath.Map.find (Fpath.ensure_trailing_dir_sep d) i.dirs_by_dir with
   | dirs -> dirs | exception Not_found -> []
 
 let files i = i.files
@@ -43,7 +43,7 @@ let of_dirs ?dotfiles ?follow_symlinks ?prune_dir root_dirs =
   let sort files =
     let rec loop ds ds_by_dir ds_by_name fs fs_by_dir fs_by_name = function
     | [] -> ds, ds_by_dir, ds_by_name, fs, fs_by_dir, fs_by_name
-    | d :: ps when Fpath.is_dir_path d ->
+    | d :: ps when Fpath.is_syntactic_dir d ->
         let ds = Fpath.Set.add d ds in
         let dir = Fpath.parent d in
         let ds_by_dir = Fpath.Map.add_to_list dir d ds_by_dir in

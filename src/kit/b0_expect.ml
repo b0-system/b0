@@ -13,7 +13,8 @@ let fpath_pp_high_suffix pre ppf p = match Fpath.strip_prefix pre p with
 | None -> (Fmt.code' Fpath.pp) ppf p
 | Some p ->
     Fpath.pp ppf pre;
-    (if not (Fpath.is_dir_path pre) then Fmt.char ppf Fpath.dir_sep_char);
+    (if not (Fpath.is_syntactic_dir pre)
+     then Fmt.char ppf Fpath.natural_dir_sep_char);
     (Fmt.code' Fpath.pp) ppf p
 
 (* Aborting *)
