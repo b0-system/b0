@@ -336,64 +336,6 @@ module Cmd = struct
   | Rseq _ -> false
 end
 
-(* Futures *)
-
-let relax () = try Unix.sleepf 0.0001 with Unix.Unix_error _ -> ()
-
-module Fut = struct
-  type 'a state = Det of 'a | Undet of { mutable awaits : ('a -> unit) list }
-  type 'a t = 'a state ref
-
-  let rec kontinue ks v =
-    let todo = ref ks in
-    while match !todo with [] -> false | _ -> true do
-      match !todo with k :: ks -> todo := ks; k v | [] -> ()
-    done
-
-  let set f v = match !f with
-  | Det _ -> invalid_arg "The future is already set"
-  | Undet u -> f := Det v; kontinue u.awaits v
-
-  let _make () = ref (Undet { awaits = [] })
-  let make () = let f = _make () in f, set f
-  let value f = match !f with Det v -> Some v | _ -> None
-  let await f k = match !f with
-  | Det v -> k v | Undet u -> u.awaits <- k :: u.awaits
-
-  let rec sync f = match !f with
-  | Det v -> v
-  | Undet _ -> relax (); sync f
-
-  let return v = ref (Det v)
-
-  let map fn f =
-    let r = _make () in
-    await f (fun v -> set r (fn v)); r
-
-  let bind f fn =
-    let r = _make () in
-    await f (fun v -> await (fn v) (set r)); r
-
-  let pair f0 f1 =
-    let r = _make () in
-    await f0 (fun v0 -> await f1 (fun v1 -> set r (v0, v1))); r
-
-  let of_list fs = match fs with
-  | [] -> return []
-  | fs ->
-      let r = _make () in
-      let rec loop acc = function
-      | [] -> set r (List.rev acc)
-      | f :: fs -> await f (fun v -> loop (v :: acc) fs)
-      in
-      loop [] fs; r
-
-  module Syntax = struct
-    let ( let* ) = bind
-    let ( and* ) = pair
-  end
-end
-
 (* Operating system interactions *)
 
 module Os = struct
@@ -2131,7 +2073,7 @@ module Os = struct
   (* Sleeping and timing *)
 
   let sleep = Os_mtime.sleep
-  let relax = relax
+  let relax () = try Unix.sleepf 0.0001 with Unix.Unix_error _ -> ()
 
   module Cpu = struct
     external logical_count : unit -> int = "ocaml_b0_cpu_logical_count"
@@ -2369,6 +2311,60 @@ module Log = struct
 
   let () =
     Os.Exit.log_error := (fun e -> err (fun m -> m "@[%a@]" Fmt.lines e))
+end
+
+module Fut = struct
+  type 'a state = Det of 'a | Undet of { mutable awaits : ('a -> unit) list }
+  type 'a t = 'a state ref
+
+  let rec kontinue ks v =
+    let todo = ref ks in
+    while match !todo with [] -> false | _ -> true do
+      match !todo with k :: ks -> todo := ks; k v | [] -> ()
+    done
+
+  let set f v = match !f with
+  | Det _ -> invalid_arg "The future is already set"
+  | Undet u -> f := Det v; kontinue u.awaits v
+
+  let _make () = ref (Undet { awaits = [] })
+  let make () = let f = _make () in f, set f
+  let value f = match !f with Det v -> Some v | _ -> None
+  let await f k = match !f with
+  | Det v -> k v | Undet u -> u.awaits <- k :: u.awaits
+
+  let rec sync f = match !f with
+  | Det v -> v
+  | Undet _ -> Os.relax (); sync f
+
+  let return v = ref (Det v)
+
+  let map fn f =
+    let r = _make () in
+    await f (fun v -> set r (fn v)); r
+
+  let bind f fn =
+    let r = _make () in
+    await f (fun v -> await (fn v) (set r)); r
+
+  let pair f0 f1 =
+    let r = _make () in
+    await f0 (fun v0 -> await f1 (fun v1 -> set r (v0, v1))); r
+
+  let of_list fs = match fs with
+  | [] -> return []
+  | fs ->
+      let r = _make () in
+      let rec loop acc = function
+      | [] -> set r (List.rev acc)
+      | f :: fs -> await f (fun v -> loop (v :: acc) fs)
+      in
+      loop [] fs; r
+
+  module Syntax = struct
+    let ( let* ) = bind
+    let ( and* ) = pair
+  end
 end
 
 module Bval = struct
