@@ -219,15 +219,12 @@ let bowl =
 
 (* Updating vendored code. *)
 
-let copy_module ?substs ~src_dir ~dst_dir src dst =
-  let mli base = Fmt.str "%s.mli" base and ml base = Fmt.str "%s.ml" base in
-  let src_mli = Fpath.(src_dir / mli src) in
-  let src_ml = Fpath.(src_dir / ml src) in
-  let dst_mli = Fpath.(dst_dir / mli dst) in
-  let dst_ml = Fpath.(dst_dir / ml dst)  in
-  Log.stdout (fun m -> m "Copying %s to %s in %a" src dst Fpath.pp dst_dir);
+let copy_file ?substs ~src_dir ~dst_dir src dst =
+  Log.stdout (fun m -> m "Copy %s to %s in %a" src dst Fpath.pp dst_dir);
+  let src = Fpath.(src_dir / src) in
+  let dst = Fpath.(dst_dir / dst) in
   let force = true and make_path = false in
-  let copy_file src ~dst = match substs with
+  match substs with
   | None -> Os.File.copy ~force ~make_path src ~dst:dst
   | Some substs ->
       let* src = Os.File.read src in
@@ -238,9 +235,11 @@ let copy_module ?substs ~src_dir ~dst_dir src dst =
         List.fold_left replace src substs
       in
       Os.File.write ~force ~make_path dst src
-  in
-  let* () = copy_file src_mli ~dst:dst_mli in
-  let* () = copy_file src_ml ~dst:dst_ml in
+
+let copy_module ?substs ~src_dir ~dst_dir src dst =
+  let mli base = Fmt.str "%s.mli" base and ml base = Fmt.str "%s.ml" base in
+  let* () = copy_file ?substs ~src_dir ~dst_dir (mli src) (mli dst) in
+  let* () = copy_file ?substs ~src_dir ~dst_dir (ml src) (ml dst) in
   Ok ()
 
 let with_cloned_repo_dir ~env ~repo f =
@@ -256,7 +255,9 @@ let vendor_more_modules =
   with_cloned_repo_dir ~env ~repo @@ fun dir ->
   let dst_dir = B0_env.in_scope_dir env ~/"src/std" in
   let src_dir = Fpath.(dir / "src") in
-  let substs = ["More__", "B0__"; "More.", "B0_std."] in
+  let substs =
+    ["More__", "B0__"; "More.", "B0_std."; "ocaml_more", "ocaml_b0"]
+  in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__char" "b0__char" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__cmd" "b0__cmd" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__fmt" "b0__fmt" in
@@ -268,6 +269,15 @@ let vendor_more_modules =
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__result" "b0__result" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__string" "b0__string" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__type" "b0__type" in
+  let substs =
+    ["MORE_", "B0_"; "more_", "b0_"; "more stubs", "b0 stubs";
+     "more library", "b0 library"]
+  in
+  let* () = copy_file ~substs ~src_dir ~dst_dir "more_stubs.h" "b0_stubs.h" in
+  let* () = copy_file ~substs ~src_dir ~dst_dir
+                      "more_stubs_cpu.c" "b0_stubs_cpu.c" in
+  let* () = copy_file ~substs ~src_dir ~dst_dir
+                      "more_stubs_time.c" "b0_stubs_time.c" in
   Ok ()
 
 let vendor_webs_modules =

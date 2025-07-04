@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------
-   Copyright (c) 2017 The b0 programmers. All rights reserved.
-   SPDX-License-Identifier: ISCe.
+   Copyright (c) 2025 The more programmers. All rights reserved.
+   SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*/
 
 #include <caml/mlvalues.h>
@@ -8,7 +8,7 @@
 #include <caml/memory.h>
 #include <caml/fail.h>
 
-#define OCAML_B0_RAISE_SYS_ERROR(ERR)                               \
+#define OCAML_B0_RAISE_SYS_ERROR(ERR)                             \
   do { caml_raise_sys_error (caml_copy_string("b0 stubs: " ERR)); } \
   while (0)
 

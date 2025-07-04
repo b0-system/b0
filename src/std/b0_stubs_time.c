@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------
-   Copyright (c) 2017 The b0 programmers. All rights reserved.
-   SPDX-License-Identifier: ISCe.
+   Copyright (c) 2025 The more programmers. All rights reserved.
+   SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*/
 
 #include "b0_stubs.h"
