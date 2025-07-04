@@ -324,7 +324,7 @@ module Modsrc = struct
             | Some src_root -> Fpath.(src_root // file)
             in
             let add_mod acc m = Modname.Set.add m acc in
-            let mods = String.split ~drop_empty:true ~sep:" " mods in
+            let mods = String.split ~drop:String.is_empty ~sep:" " mods in
             let start = Modname.Set.singleton "Stdlib" in
             let mods = List.fold_left add_mod start mods in
             Fpath.Map.add file mods acc
@@ -782,7 +782,7 @@ module Libresolver = struct
       let parse_dir dir = parse_field "library directory" Fpath.of_string dir
       let parse_js_stubs js_stubs =
         let to_path s = parse_field "js stubs" Fpath.of_string s in
-        let stubs = String.split ~drop_empty:true ~sep:"," js_stubs in
+        let stubs = String.split ~drop:String.is_empty ~sep:"," js_stubs in
         List.map to_path stubs
 
       let parse_warning = function "" -> None | w -> Some w

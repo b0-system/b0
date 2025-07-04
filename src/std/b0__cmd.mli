@@ -209,20 +209,21 @@ val to_list_and_stamp : t -> string list * string list
 (** {1:examples Examples}
 
 {[
-let ls p = Cmd.(atom "ls" % "-a" % path p)
-let tar archive dir =
-  Cmd.(atom "tar" % "-cvf" %% unstamp (path archive) %% path dir)
+let ls p = Cmd.(tool "ls" % "-a" % path p)
 
-let opam cmd = Cmd.(atom "opam" % cmd)
+let tar archive dir =
+  Cmd.(tool "tar" % "-cvf" %% unstamp (path archive) %% path dir)
+
+let opam cmd = Cmd.(tool "opam" % cmd)
 let opam_install pkgs = Cmd.(opam "install" %% list pkgs)
 
 let ocamlc ?(debug = false) file =
-  Cmd.(atom "ocamlc" % "-c" % if' debug (atom "-g") %% path file)
+  Cmd.(tool "ocamlc" % "-c" % if' debug (arg "-g") %% path file)
 
 let ocamlopt ?(profile = false) ?(debug = false) incs file =
-  let profile = Cmd.(if' profile (atom "-p")) in
-  let debug = Cmd.(if' debug (atom "-g")) in
+  let profile = Cmd.(if' profile (arg "-p")) in
+  let debug = Cmd.(if' debug (arg "-g")) in
   let incs = Cmd.(unstamp (paths ~slip:"-I" incs)) in
-  Cmd.(atom "ocamlopt" % "-c" %% debug %% profile %% incs %%
+  Cmd.(tool "ocamlopt" % "-c" %% debug %% profile %% incs %%
        unstamp (path file))
 ]} *)

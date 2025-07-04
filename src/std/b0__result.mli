@@ -7,7 +7,7 @@
 
     {b All additions available} in OCaml 5.4
 
-     @canonical B0_std.Result *)
+    @canonical B0_std.Result *)
 
 include module type of Stdlib.Result (** @closed *)
 

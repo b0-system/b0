@@ -47,7 +47,7 @@ val find_sub : ?start:int -> sub:string -> string -> int option
     first occurence of [sub] in [s] after or at position [start]
     (which includes index [start] if it exists, defaults to [0]).
     Note if you need to search for [sub] multiple times in [s] use
-    {!find_all_sub} it is more efficient.
+    {!find_sub_all} it is more efficient.
 
     @raise Invalid_argument if [start] is not a valid position of [s]. *)
 
@@ -58,22 +58,22 @@ val rfind_sub : ?start:int -> sub:string -> string -> int option
     [String.length s]).
 
     Note if you need to search for [sub] multiple times in [s] use
-    {!rfind_all_sub} it is more efficient.
+    {!rfind_sub_all} it is more efficient.
 
     @raise Invalid_argument if [start] is not a valid position of [s]. *)
 
-val find_all_sub :
+val find_sub_all :
   ?start:int -> (int -> 'acc -> 'acc) -> sub:string -> string -> 'acc -> 'acc
-(** [find_all_sub ~start f ~sub s acc], starting with [acc], folds [f] over
+(** [find_sub_all ~start f ~sub s acc], starting with [acc], folds [f] over
     all non-overlapping starting positions of [sub] in [s] after or at
     position [start] (which includes index [start] if it exists, defaults
     to [0]). This is [acc] if [sub] could not be found in [s].
 
     @raise Invalid_argument if [start] is not a valid position of [s]. *)
 
-val rfind_all_sub :
+val rfind_sub_all :
   ?start:int -> (int -> 'acc -> 'acc) -> sub:string -> string -> 'acc -> 'acc
-(** [rfind_all_sub ~start f ~sub s acc], starting with [acc], folds
+(** [rfind_sub_all ~start f ~sub s acc], starting with [acc], folds
     [f] over all non-overlapping starting positions of [sub] in [s]
     before or at position [start] (which includes index [start] if
     it exists, defaults to [String.length s]). This is [acc] if
@@ -159,55 +159,47 @@ val rspan_while : (char -> bool) -> string -> string * string
 (** {2:break_sep Breaking with separators} *)
 
 val cut : sep:string -> string -> (string * string) option
-(** [cut ~sep s] is either the pair [Some (l,r)] of the two
-    (possibly empty) substrings of [s] that are delimited by the
-    first match of the separator character [sep] or [None] if [sep]
-    can't be matched in [s]. Matching starts from the left of [s].
+(** [cut ~sep s] is the pair [Some (left, right)] made of the two
+    (possibly empty) substrings of [s] that are delimited by the first
+    match of the separator [sep] or [None] if [sep] can't be matched in
+    [s]. Matching starts at position [0] using {!find_sub}.
 
-    The invariant [l ^ sep ^ r = s] holds.
-
-    @raise Invalid_argument if [sep] is the empty string. *)
+    The invariant [concat sep [left; right] = s] holds. *)
 
 val rcut : sep:string -> string -> (string * string) option
-(** [rcut ~sep s] is like {!cut} but matching starts
-    on the right of [s]. *)
+(** [rcut ~sep s] is like {!cut} but matching starts at position
+    [length s] using {!rfind_sub}. *)
 
-val split : ?drop_empty:bool -> sep:string -> string -> string list
-(** [split sep s] is the list of all substrings of [s] that are
-    delimited by matches of the non empty separator string
-    [sep]. Empty substrings are omitted in the list if [drop_empty]
-    is [true] (defaults to [false]).
+val split : ?drop:(string -> bool) -> sep:string -> string -> string list
+(** [split ~sep s] is the list of all substrings of [s] that are
+    delimited by non-overlapping matches of the separator [sep].  If
+    [sep] can't be matched in [s], the list [[s]] is returned.
+    Matches starts at position [0] and are determined using
+    {!find_sub_all}.
 
-    Matching separators in [s] starts from the left of [s] ([rev] is
-    [false], default) or the end ([rev] is [true]). Once one is
-    found, the separator is skipped and matching starts again, that
-    is separator matches can't overlap. If there is no separator
-    match in [s], the list [[s]] is returned.
+    Substrings [sub] for which [drop sub] is [true] are not included
+    in the result. [drop] default to [Fun.const false].
 
-    The following invariants hold:
-    {ul
-    {- [concat ~sep (cuts ~drop_empty:false ~sep s) = s]}
-    {- [cuts ~drop_empty:false ~sep s <> []]}}
+    The invariant [concat sep (split ~sep s) = s] holds. *)
 
-    @raise Invalid_argument if [sep] is the empty string. *)
-
-val rsplit : ?drop_empty:bool -> sep:string -> string -> string list
-(** [rsplit sep s] is like {!split} but matching starts on the
-    right of [s]. *)
+val rsplit : ?drop:(string -> bool) -> sep:string -> string -> string list
+(** [rsplit ~sep s] is like {!split} but matching starts at position
+    [length s] using {!rfind_sub_all} *)
 
 (** {2:break_lines Breaking lines} *)
 
 val fold_ascii_lines :
   strip_newlines:bool -> (int -> 'a -> string -> 'a) -> 'a -> string -> 'a
-(** [fold_ascii_lines ~strip_newlines f acc s] folds over the lines of [s] by
-    calling [f linenum acc' line] with [linenum] the one-based line number
-    count, [acc'] the result of accumulating [acc] with [f] so far and [line]
-    the data of the line (without the newline found in the data if
-    [strip_newlines] is [true]).
+(** [fold_ascii_lines ~strip_newlines f acc s] folds over the lines of
+    [s] by calling [f linenum acc' line] with [linenum] the one-based
+    line number count, [acc'] the result of accumulating [acc] with
+    [f] so far and [line] the data of the line (without the newline
+    found in the data if [strip_newlines] is [true]).
 
     Lines are delimited by newline sequences which are either one of
-    ["\n"], ["\r\n"] or ["\r"]. More precisely the function determines lines
-    and line data as follows:
+    ["\n"], ["\r\n"] or ["\r"]. More precisely the function determines
+    lines and line data as follows:
+
     {ul
     {- If [s = ""], the function considers there are no lines in [s] and
        [acc] is returned without [f] being called.}
@@ -248,12 +240,14 @@ val distinct : string list -> string list
     preserved. *)
 
 val unique : ?limit:int -> exists:(string -> bool) -> string -> string
-(** [unique ~exist n] is [n] if [exists n] is [false] or [r = strf
+(** [unique ~limit ~exist n] is [n] if [exists n] is [false] or [r = strf
     "%s~%d" n d] with [d] the smallest integer such that exists [r]
-    if [false]. If no [d] in \[[1];[1e9]\] satisfies the condition
-    [Invalid_argument] is raised, [limit] defaults to [1e9]. *)
+    if [false]. If no [d] in \[[1];[limit]\] satisfies the condition
+    [Invalid_argument] is raised, [limit] defaults to [1e6]. *)
 
-(** {1:spellchecking Spellchecking} *)
+(** {1:spellchecking Spellchecking}
+
+    {b All additions available} in OCaml 5.4 *)
 
 val edit_distance : ?limit:int -> t -> t -> int
 (** [edit_distance s0 s1] is the number of single character edits
@@ -273,9 +267,7 @@ val edit_distance : ?limit:int -> t -> t -> int
 
     {b Note.} This implements the simpler Optimal String Alignement (OSA)
     distance, not the Damerau-Levenshtein distance. With this function
-    ["ca"] and ["abc"] have a distance of 3 not 2.
-
-    {b Available} in 5.4.  *)
+    ["ca"] and ["abc"] have a distance of 3 not 2. *)
 
 val spellcheck :
   ?max_dist:(string -> int) -> ((string -> unit) -> unit) -> string ->
@@ -295,9 +287,7 @@ val spellcheck :
     by [(fun yield -> List.iter yield l)].
 
     All strings are assumed to be UTF-8 encoded, decoding
-    errors are replaced by {!Uchar.rep} characters.
-
-    {b Available} in 5.4.  *)
+    errors are replaced by {!Uchar.rep} characters. *)
 
 (** {1:escunesc (Un)escaping bytes}
 

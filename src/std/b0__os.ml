@@ -19,10 +19,7 @@ let ffail file e = B0__fmt.failwith "%a: %s" B0__fpath.pp file e
 let ffail_notrace file e =
   B0__fmt.failwith_notrace "%a: %s" B0__fpath.pp file e
 
-module Os_mtime = struct
-  (* Mtime is defined at the end of the module otherwise we get problems
-     accessing ../Mtime. *)
-
+module Mtime = struct
   external mtime_now_ns : unit -> Int64.t = "ocaml_b0_monotonic_now_ns"
 
   (* Monotonic clock *)
@@ -196,7 +193,7 @@ module Socket = struct
 
     let wait_connectable ?(socket_type = Unix.SOCK_STREAM) ~timeout ep =
       let open B0__result.Syntax in
-      let relax = Os_mtime.sleep B0__mtime.Span.(1 * ms) in
+      let relax = Mtime.sleep B0__mtime.Span.(1 * ms) in
       Result.map_error (err_wait ep) @@
       let rec loop ~deadline dur =
         let* addr, fd, close = of_endpoint ep socket_type in
@@ -215,12 +212,12 @@ module Socket = struct
         match status with
         | `Ready -> Ok `Ready
         | `Retry ->
-            let count = Os_mtime.count dur in
+            let count = Mtime.count dur in
             if B0__mtime.Span.is_shorter count ~than:deadline
-            then (ignore (Os_mtime.sleep relax); loop ~deadline dur)
+            then (ignore (Mtime.sleep relax); loop ~deadline dur)
             else Ok `Timeout
       in
-      loop ~deadline:timeout (Os_mtime.counter ())
+      loop ~deadline:timeout (Mtime.counter ())
 
     let wait_connectable' ?socket_type ~timeout ep =
       match wait_connectable ?socket_type ~timeout ep with
@@ -1792,7 +1789,7 @@ end
 
 (* Sleeping and timing *)
 
-let sleep = Os_mtime.sleep
+let sleep = Mtime.sleep
 let relax () = try Unix.sleepf 0.0001 with Unix.Unix_error _ -> ()
 
 module Cpu = struct
@@ -1845,10 +1842,6 @@ module Cpu = struct
         children_stime =
           Int64.sub (sec_to_span now.Unix.tms_cstime) c.children_stime; }
   end
-end
-
-module Mtime = struct
-  include Os_mtime
 end
 
 let exn_don't_catch = function
