@@ -30,7 +30,7 @@ val def_list_get_list_or_hint :
 module Def : sig
 
   val list :
-    (module B0_def.S) -> B0_driver.Conf.t -> B0_std_cli.output_format ->
+    (module B0_def.S) -> B0_driver.Conf.t -> B0_std_cli.output_verbosity ->
     string list -> B0_std.Os.Exit.t
   (** [list (module Def) c details ns] lists definition [Def] named
       [ns] with details [details]. If [ns] is empty all definitions
@@ -44,20 +44,27 @@ module Def : sig
       definitions of kind [Def] are edited. *)
 
   val get_meta_key :
-    (module B0_def.S) -> B0_driver.Conf.t -> B0_std_cli.output_format ->
+    (module B0_def.S) -> B0_driver.Conf.t -> B0_std_cli.output_verbosity ->
     string -> string list -> B0_std.Os.Exit.t
   (** [get (module Def) k ns] gets key [k] in the metadata of
       definitions named [ns] with details [details]. If [ns] is empty
       all definitions are listed. *)
 end
 
+(** {1:cli Cli} *)
+
 module Cli : sig
   open Cmdliner
+
+
 
   val man_see_manual : Manpage.block
   val editor_envs : Cmd.Env.info list
 
-  val format : [ `Long | `Normal | `Short ] Term.t
+  val output_verbosity : [ `Long | `Normal | `Short ] Term.t
+  val log_format : B0_cli.Memo.Log.format Term.t
+  val op_query : B0_cli.Op.query Term.t
+
   val pos_key : string Term.t
 
   val no_pager : bool Term.t

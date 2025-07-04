@@ -48,19 +48,19 @@ val cmd : Cmd.t Cmdliner.Arg.conv
 
 (** {1:output_format Specifying output format} *)
 
-val s_output_format_options : string
+val s_output_verbosity_options : string
 (** [s_output_format_options] is a manual section called
-    ["OUTPUT FORMAT OPTIONS"] *)
+    ["OUTPUT VERBOSITY OPTIONS"] *)
 
-type output_format = [ `Normal | `Short | `Long ]
-(** The type for specifying output format. *)
+type output_verbosity = [ `Normal | `Short | `Long ]
+(** The type for specifying output verbosity. *)
 
-val output_format :
+val output_verbosity :
   ?docs:string -> ?short_opts:string list -> ?long_opts:string list ->
-  unit -> output_format Cmdliner.Term.t
-(** [output_format ~short_opts ~long_opts ()] are mutually
-    exclusive options to specify short and long output format,
-    without options this is [`Normal]. [short_opts] defaults to
+  unit -> output_verbosity Cmdliner.Term.t
+(** [output_verbosity ~short_opts ~long_opts ()] are mutually
+    exclusive options to specify output verbosity as short or long.
+    Without options this is [`Normal]. [short_opts] defaults to
     [["s"; "short"]] and [long_opts] default to [["l";
     "long"]]. [docs] is the manual section in which options are
     documented, defaults to {!s_output_format_options}. *)
@@ -121,29 +121,33 @@ val color :
 val log_level :
   ?none:Log.level -> ?docs:Cmdliner.Manpage.section_name ->
   ?env:Cmdliner.Cmd.Env.info -> unit -> Log.level option Cmdliner.Term.t
-  (** [log_level ~none ~docs ~env ()] is a cli interface for
-       specifiying a logging level with various options. [docs] is
-       where the options are documented (defaults to
-      {!Cmdliner.Manpage.s_common_options}). [env], if provided, is an
-       environment variable to set the value (use something like
-       ["MYPROGRAM_VERBOSITY"]). [none] is used to document the level
-       when the log level is unspecified (defaults to
-       [Log.Warning]). [None] is returned if the value is not set on
-       the cli or via the env var. *)
+(** [log_level ~none ~docs ~env ()] is a cli interface for
+    specifiying a logging level with various options. [docs] is
+    where the options are documented (defaults to
+    {!Cmdliner.Manpage.s_common_options}). [env], if provided, is an
+    environment variable to set the value (use something like
+    ["MYPROGRAM_VERBOSITY"]). [none] is used to document the level
+    when the log level is unspecified (defaults to
+    [Log.Warning]). [None] is returned if the value is not set on
+    the cli or via the env var. *)
 
-val log_setup :
-  ?spawns:Log.level -> ?absent:Log.level ->
-  ?docs:Cmdliner.Manpage.section_name -> ?env:Cmdliner.Cmd.Env.info -> unit ->
+val configure_log :
+  ?docs:Cmdliner.Manpage.section_name -> ?env:Cmdliner.Cmd.Env.info ->
+  ?spawns:Log.level Cmdliner.Term.t -> ?absent:Log.level -> unit ->
   unit Cmdliner.Term.t
 (** [log_setup] is a cli interface for specifying a logging level with
     various options and setting up {!B0_std.Log.set_level}
     and {!B0_std.Os.Cmd.spawn_tracer} with it.
 
-    The default value of [absent] is [Log.Warning] and the default value
-    of [spawns] is {!Log.Debug}. The default value of [env] is a
-    [LOG_LEVEL] environment variable.
+    The default value of [absent] is [Log.Warning] and the default
+    value of [spawns] is {!Log.Debug}. The default value of [env] is
+    {!log_level_var}.
 
     {b Warning.} If [level < log_spawn] but {!B0_std.Log.level} is
     increased after this call, the spawns won't be traced (most cli
     programs do not change after the initial setup). Do your own
     setup if that is a problem for you. *)
+
+val log_level_var : Cmdliner.Cmd.Env.info
+(** [log_level_var] describes the default environment variable
+    [LOG_LEVEL] of {!configure_log}. *)

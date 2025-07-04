@@ -695,7 +695,7 @@ module Memo = struct
          Fmt.field "stime" Fun.id pp_stime;
          Fmt.field "real" (fun _ -> total_dur) Mtime.Span.pp ]) ppf l
 
-    type out_format =
+    type format =
     [ `Hashed_files | `Op_hashes | `Ops | `Path | `Stats | `Root_hashed_files
     | `Trace_event | `Diagnosis ]
 
@@ -717,15 +717,17 @@ module Memo = struct
         fun ppf (f, h) ->
           B0_hash.pp ppf h; Fmt.char ppf ' '; Fpath.pp_unquoted ppf f
 
-    let out ppf format details query ~path l = match format with
+    let out ppf format output_verbosity query ~path l = match format with
     | `Path ->
         Fmt.pf ppf "@[%a@]@." Fpath.pp_unquoted path
     | `Ops ->
         let ops = query (B0_memo_log.ops l) in
         if ops = [] then () else
-        Fmt.pf ppf "@[<v>%a@]@." (Fmt.list (pp_op details)) ops
+        Fmt.pf ppf "@[<v>%a@]@." (Fmt.list (pp_op output_verbosity)) ops
     | `Stats ->
-        let hashed_size = details <> `Short (* do it by default for now *) in
+        let hashed_size =
+          output_verbosity <> `Short (* do it by default for now *)
+        in
         Fmt.pf ppf "@[%a@]@." (pp_stats ~hashed_size query) l
     | `Trace_event ->
         let ops = query (B0_memo_log.ops l) in
@@ -736,7 +738,7 @@ module Memo = struct
         let has_hash o = not (B0_hash.is_nil (B0_zero.Op.hash o)) in
         let ops = List.filter has_hash (query (B0_memo_log.ops l)) in
         if ops = [] then () else
-        Fmt.pf ppf "@[<v>%a@]@." (Fmt.list (pp_op_hash details)) ops
+        Fmt.pf ppf "@[<v>%a@]@." (Fmt.list (pp_op_hash output_verbosity)) ops
     | `Root_hashed_files ->
         let writes =
           let add_write acc f = Fpath.Set.add f acc in
@@ -751,10 +753,11 @@ module Memo = struct
         let file_hashes = B0_memo_log.file_hashes l in
         let roots = Fpath.Map.fold (add_file writes) file_hashes [] in
         if roots = [] then () else
-        Fmt.pf ppf "@[<v>%a@]@." (Fmt.list (pp_hashed_file details)) roots
+        Fmt.pf ppf "@[<v>%a@]@."
+          (Fmt.list (pp_hashed_file output_verbosity)) roots
     | `Hashed_files ->
         let pp_hashed_files =
-          Fmt.iter_bindings Fpath.Map.iter (pp_hashed_file details)
+          Fmt.iter_bindings Fpath.Map.iter (pp_hashed_file output_verbosity)
         in
         let file_hashes = B0_memo_log.file_hashes l in
         if Fpath.Map.is_empty file_hashes then () else
@@ -767,14 +770,15 @@ module Memo = struct
         | Ok () ->
             Fmt.pf ppf "@[%a found.@]@." (Fmt.st [`Fg `Green]) "No problem"
         | Error errs ->
-            let pp_op = pp_op details in
+            let pp_op = pp_op output_verbosity in
             let pp_err = B0_zero_conv.Op.pp_build_correctness_error ~pp_op in
             let count = List.length errs in
             let s = if count < 1 then "s" else "s" in
             Fmt.pf ppf "@[<v>%a Found %d problem%s@,%a@]" Fmt.puterr ()
               count s Fmt.(list pp_err) errs
 
-    let out_format_cli ?(docs = B0_std_cli.s_output_format_options) () =
+    let s_output_format_options = "OUTPUT FORMAT OPTIONS"
+    let format_cli ?(docs = s_output_format_options) () =
       let a opt doc = Arg.info [opt] ~doc ~docs in
       let fmts =
         [ `Hashed_files, a "hashed-files"

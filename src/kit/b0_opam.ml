@@ -813,7 +813,7 @@ let unit =
   in
   let list_cmd =
     let pkgs = pkgs ~doc:"Only list opam package $(docv) (repeatable)." () in
-    let format = B0_std_cli.output_format () in
+    let format = B0_std_cli.output_verbosity () in
     let doc = "List opam packages and their defining packs" in
     Cmd.make (Cmd.info "list" ~doc ~man) @@
     Term.(const list_cmd $ const env $ pkgs $ format)

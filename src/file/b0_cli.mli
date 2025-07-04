@@ -393,22 +393,25 @@ module Memo : sig
         is computed (this accesses the file system in a non-fatal way
         in case of errors). *)
 
-    type out_format =
+    type format =
     [ `Hashed_files | `Op_hashes | `Ops | `Path | `Stats | `Root_hashed_files
     | `Trace_event | `Diagnosis ]
     (** The type for output format. *)
 
     val out :
-      Format.formatter -> out_format -> B0_std_cli.output_format -> Op.query ->
+      Format.formatter -> format -> B0_std_cli.output_verbosity -> Op.query ->
       path:Fpath.t -> B0_memo_log.t -> unit
     (** [out] formats a log on the given formatter. [path] is used when
         [`Path] is requested. *)
 
     (** {1:cli Command line interface} *)
 
-    val out_format_cli : ?docs:string -> unit -> out_format Cmdliner.Term.t
+    val format_cli : ?docs:string -> unit -> format Cmdliner.Term.t
     (** [out_format_cli ~docs ()] are mutually exclusive options to specify
         alternate output formats. [docs] is the manual section in which
         options are documented, defaults to {!s_output_format_options} *)
+
+    val s_output_format_options : Cmdliner.Manpage.section_name
+    (** [s_output_format_options] is ["OUTPUT FORMAT OPTIONS"]. *)
   end
 end

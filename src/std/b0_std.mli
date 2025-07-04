@@ -23,7 +23,7 @@ module Result = B0__result
 module String = B0__string
 module Type = B0__type
 
-(** {1:concurency Concurency} *)
+(** {1:concurrency Concurrency} *)
 
 (** Future values.
 

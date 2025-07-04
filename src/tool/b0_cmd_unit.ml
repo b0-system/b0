@@ -6,37 +6,40 @@
 open B0_std
 open Result.Syntax
 
-let dir us c =
+let dir ~units conf =
   Log.if_error ~use:Os.Exit.no_such_name @@
   (* XXX Eventually we should use B0_env here. *)
-  let* us = B0_unit.get_list_or_hint ~all_if_empty:true us in
-  let b0_dir = B0_driver.Conf.b0_dir c in
+  let* units = B0_unit.get_list_or_hint ~all_if_empty:true units in
+  let b0_dir = B0_driver.Conf.b0_dir conf in
   let build_dir =
     B0_build.B0_dir.build_dir ~b0_dir ~variant:"user" (* FIXME *)
   in
-  let unit_dir u =
-    B0_build.B0_dir.unit_build_dir ~build_dir ~name:(B0_unit.name u)
+  let unit_dir unit =
+    B0_build.B0_dir.unit_build_dir ~build_dir ~name:(B0_unit.name unit)
   in
-  let dirs = List.map unit_dir us in
+  let dirs = List.map unit_dir units in
   Log.stdout (fun m -> m "@[<v>%a@]" (Fmt.list Fpath.pp) dirs);
   Ok Os.Exit.ok
 
-let edit us c =
-  B0_tool.Def.edit (module B0_unit) c us
+let edit ~units conf =
+  B0_tool.Def.edit (module B0_unit) conf units
 
-let get format k us c =
-  B0_tool.Def.get_meta_key (module B0_unit) c format k us
+let get ~output_verbosity ~key ~units conf =
+  B0_tool.Def.get_meta_key (module B0_unit) conf output_verbosity key units
 
-let list format us c =
-  B0_tool.Def.list (module B0_unit) c format us
+let list ~output_verbosity ~units conf =
+  B0_tool.Def.list (module B0_unit) conf output_verbosity units
 
-let show format us c =
-  let format = if format = `Normal then `Long else format in
-  B0_tool.Def.list (module B0_unit) c format us
+let show ~output_verbosity ~units conf =
+  let output_verbosity =
+    if output_verbosity = `Normal then `Long else output_verbosity
+  in
+  B0_tool.Def.list (module B0_unit) conf output_verbosity units
 
 (* Command line interface *)
 
 open Cmdliner
+open Cmdliner.Term.Syntax
 
 let units ~right:r =
   let doc = "The $(docv) to act on. All of them if unspecified." in
@@ -47,44 +50,53 @@ let units_all = units ~right:(-1)
 
 let build_dir =
   let doc = "Output build directories of units" in
-  let descr = `P "$(iname) outputs build directories of given build units. \
-                  The paths may not exist."
+  let descr =
+    `P "$(cmd) outputs build directories of given build units. The paths may \
+        not exist."
   in
   B0_tool.Cli.subcmd_with_b0_file "dir" ~doc ~descr @@
-  Term.(const dir $ units_all)
+  let+ units = units_all in
+  dir ~units
 
 let edit =
   let doc = "Edit build units" in
-  let descr = `P "$(iname) opens in your editor the b0 files in which given \
-                  build units are defined." in
+  let descr =
+    `P "$(cmd) opens in your editor the b0 files in which given build units \
+        are defined."
+  in
   B0_tool.Cli.subcmd_with_b0_file "edit" ~doc ~descr @@
-  Term.(const edit $ units_all)
+  let+ units = units_all in
+  edit ~units
 
 let get =
   let doc = "Get build unit metadata" in
-  let descr = `P "$(iname) outputs the value of metadata $(i,KEY) of given \
-                  build units."
+  let descr =
+    `P "$(cmd) outputs the value of metadata $(i,KEY) of given build units."
   in
   B0_tool.Cli.subcmd_with_b0_file "get" ~doc ~descr @@
-  Term.(const get $ B0_tool.Cli.format $ B0_tool.Cli.pos_key $
-        units_tail)
+  let+ output_verbosity = B0_tool.Cli.output_verbosity
+  and+ key = B0_tool.Cli.pos_key
+  and+ units = units_tail in
+  get ~output_verbosity ~key ~units
 
 let list =
   let doc = "List build units" in
-  let descr = `P "$(iname) lists given build units." in
+  let descr = `P "$(cmd) lists given build units." in
   B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
-  Term.(const list $ B0_tool.Cli.format $ units_all)
+  let+ output_verbosity = B0_tool.Cli.output_verbosity and+ units = units_all in
+  list ~output_verbosity ~units
 
 let show =
   let doc = "Show build unit metadata" in
   let descr =
-    `P "$(iname) is $(b,list -l), it outputs metadata of given build units."
+    `P "$(cmd) is $(b,list -l), it outputs metadata of given build units."
   in
   B0_tool.Cli.subcmd_with_b0_file "show" ~doc ~descr @@
-  Term.(const show $ B0_tool.Cli.format $ units_all)
+  let+ output_verbosity = B0_tool.Cli.output_verbosity and+ units = units_all in
+  show ~output_verbosity ~units
 
 let cmd =
   let doc = "Operate on build units" in
-  let descr = `P "$(iname) operates on build units." in
+  let descr = `P "$(cmd) operates on build units." in
   B0_tool.Cli.cmd_group "unit" ~doc ~descr @@
   [build_dir; edit; get; list; show]

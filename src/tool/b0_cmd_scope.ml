@@ -18,7 +18,7 @@ let warn_incl_excl n =
   m "@[Scope %a is both included and excluded. Excluding.@]"
     B0_scope.pp_name n
 
-let get_scopes c ~topmost ~includes ~excludes =
+let get_scopes _conf ~topmost ~includes ~excludes =
   let scopes = List.sort compare (B0_scope.name_list ()) in
   let scopes = List.map (fun (n, file) -> (n, Fpath.parent file)) scopes in
   let keep (name, _) =
@@ -32,7 +32,7 @@ let get_scopes c ~topmost ~includes ~excludes =
   in
   List.filter keep scopes
 
-let exec_when cond c topmost includes excludes keep_going cmd =
+let exec_when ~cond ~topmost ~includes ~excludes ~keep_going ~cmd conf =
   let err (_, dir) e =
     Log.err (fun m -> m "@[%a: %s@]" pp_dir dir e); Os.Exit.some_error
   in
@@ -49,26 +49,26 @@ let exec_when cond c topmost includes excludes keep_going cmd =
           | Error _
           | Ok () -> Log.stdout (fun m -> m ""); loop ss
   in
-  loop (get_scopes c ~topmost ~includes ~excludes)
+  loop (get_scopes conf ~topmost ~includes ~excludes)
 
-let exec topmost includes excludes keep_going tool tool_args c =
-  let cmd = tool :: tool_args in
-  let always = Fun.const (Ok true) in
-  exec_when always c topmost includes excludes keep_going (Cmd.list cmd)
+let exec ~topmost ~includes ~excludes ~keep_going ~tool ~tool_args conf =
+  let cmd = Cmd.list (tool :: tool_args) in
+  let cond = Fun.const (Ok true) in
+  exec_when ~cond ~topmost ~includes ~excludes ~keep_going ~cmd conf
 
-let list topmost includes excludes format path c =
+let list ~topmost ~includes ~excludes ~output_verbosity ~path conf =
   let pp_scope =
-    if path then pp_scope_dir else match format with
+    if path then pp_scope_dir else match output_verbosity with
     | `Short -> pp_scope_name | `Normal | `Long -> pp_scope_all
   in
   let pp_scopes = Fmt.(list pp_scope) in
-  let scopes = get_scopes c ~topmost ~includes ~excludes in
+  let scopes = get_scopes conf ~topmost ~includes ~excludes in
   if scopes <> [] then Log.stdout (fun m -> m "@[<v>%a@]" pp_scopes scopes);
   Os.Exit.ok
 
-let symlink topmost includes excludes dir rm c =
+let symlink ~topmost ~includes ~excludes ~dir ~rm conf =
   Log.if_error ~use:Os.Exit.some_error @@
-  let scopes = get_scopes c ~topmost ~includes ~excludes in
+  let scopes = get_scopes conf ~topmost ~includes ~excludes in
   let symlink_scope (scope, path) =
     if scope = "" (* root scope *) then Ok () else
     let err e = Fmt.str "Could not symlink scope %s: %s" scope e in
@@ -103,8 +103,8 @@ let symlink topmost includes excludes dir rm c =
   let* () = List.iter_stop_on_error op scopes in
   Ok Os.Exit.ok
 
-let vcs root includes excludes all keep_going vcs_kind vcs_args c =
-  let vcs_cmd = match vcs_kind with
+let vcs ~topmost ~includes ~excludes ~all ~keep_going ~vcs_kind ~vcs_args conf =
+  let cmd = match vcs_kind with
   | B0_vcs_repo.Git -> Cmd.(arg "git" %% list vcs_args)
   | B0_vcs_repo.Hg -> Cmd.(arg "hg" %% list vcs_args)
   in
@@ -113,11 +113,12 @@ let vcs root includes excludes all keep_going vcs_kind vcs_args c =
   | Ok (Some vcs) -> if all then Ok true else B0_vcs_repo.is_dirty vcs
   | Error _ as e -> e
   in
-  exec_when is_vcs_kind c root includes excludes keep_going vcs_cmd
+  exec_when ~cond:is_vcs_kind ~topmost ~includes ~excludes ~keep_going ~cmd conf
 
 (* Command line interface *)
 
 open Cmdliner
+open Cmdliner.Term.Syntax
 
 let topmost =
   let doc =
@@ -169,12 +170,12 @@ let vcs_subcmd =
 
 let tool_args =
   let doc = "Argument for the tool. Start with a $(b,--) \
-             token otherwise options get interpreted by $(mname)."
+             token otherwise options get interpreted by $(tool)."
   in
   Arg.(value & pos_right 0 (cli_arg ~docv:"ARG") [] & info [] ~doc)
 
 let vcs_syn =
-  "$(iname) [$(i,OPTION)]… $(b,--) $(i,SUBCMD) [$(i,ARG)]…"
+  "$(cmd) [$(i,OPTION)]… $(b,--) $(i,SUBCMD) [$(i,ARG)]…"
 
 let select_doc =
   `P "By default all scopes are considered and options $(b,--topmost) \
@@ -183,37 +184,38 @@ let select_doc =
 
 let exec =
   let doc = "Execute a tool in scope directories" in
-  let synopsis = `P "$(iname) [$(i,OPTION)]… $(b,--) $(i,TOOL) [$(i,ARG)]…" in
+  let synopsis = `P "$(cmd) [$(i,OPTION)]… $(b,--) $(i,TOOL) [$(i,ARG)]…" in
   let descr = `Blocks [
-    `P "$(iname) executes $(i,TOOL) with given arguments in the \
+    `P "$(cmd) executes $(i,TOOL) with given arguments in the \
         directory of each of the scopes. The process continues \
         if $(i,TOOL) returns with a non-zero exit code, \
         use the option $(b,--fail-stop) to prevent that.";
     select_doc ]
   in
   B0_tool.Cli.subcmd_with_b0_file "exec" ~doc ~synopsis ~descr @@
-  Term.(const exec $ topmost $ includes $ excludes $ keep_going $ tool $
-        tool_args)
+  let+ topmost and+ includes and+ excludes and+ keep_going and+ tool
+  and+ tool_args in
+  exec ~topmost ~includes ~excludes ~keep_going ~tool ~tool_args
 
 let list =
   let doc = "List scopes" in
   let descr = `Blocks [
-      `P "$(iname) lists scope names and their location. \
-          If $(b,--path) is specified only paths are listed.";
+      `P "$(cmd) lists scope names and their location. If $(b,--path) is \
+          specified only paths are listed.";
       select_doc ]
   in
-  let path =
+  B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
+  let+ path =
     let doc = "Only print the scope paths." in
     Arg.(value & flag & info ["path"] ~doc)
-  in
-  B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
-  Term.(const list $ topmost $ includes $ excludes $ B0_tool.Cli.format $
-        path)
+  and+ topmost and+ includes and+ excludes
+  and+ output_verbosity = B0_tool.Cli.output_verbosity in
+  list ~topmost ~includes ~excludes ~output_verbosity ~path
 
 let symlink =
   let doc = "Create symlinks to scope directories" in
   let descr = `Blocks [
-      `P "$(iname) symlinks scope names to their directory in the directory \
+      `P "$(cmd) symlinks scope names to their directory in the directory \
           specified with the $(b,--in-dir) option or the current working \
           directory if none is specified. If a symlink already exists it is \
           relinked, if a corresponding file or directory exists it is left
@@ -222,7 +224,8 @@ let symlink =
           would be created, only if they exist and are symlinks.";
       select_doc ]
   in
-  let dir =
+  B0_tool.Cli.subcmd_with_b0_file "symlink" ~doc ~descr @@
+  let+ dir =
     let doc =
       "Create symlinks in directory $(docv). The path to the directory is \
        created if it doesn't exist."
@@ -230,21 +233,19 @@ let symlink =
     let docv = "DIR" in
     Arg.(value & opt B0_std_cli.fpath (Fpath.v ".") &
          info ["d"; "in-dir"] ~doc ~docv)
-  in
-  let rm =
+  and+ rm =
     let doc =
       "Remove symlinks rather than create them. If they exist and are symlinks."
     in
     Arg.(value & flag & info ["rm"] ~doc)
-  in
-  B0_tool.Cli.subcmd_with_b0_file "symlink" ~doc ~descr @@
-  Term.(const symlink $ topmost $ includes $ excludes $ dir $ rm)
+  and+ topmost and+ includes and+ excludes in
+  symlink ~topmost ~includes ~excludes ~dir ~rm
 
 let vcs =
   let doc = "Execute a vcs in its managed and dirty scopes" in
-  let synopsis = `P "$(iname) [$(i,OPTION)]… $(b,--) $(i,VCS) [$(i,ARG)]…" in
+  let synopsis = `P "$(cmd) [$(i,OPTION)]… $(b,--) $(i,VCS) [$(i,ARG)]…" in
   let descr = `Blocks [
-      `P "$(iname) executes $(i,VCS) with given arguments in the directory \
+      `P "$(cmd) executes $(i,VCS) with given arguments in the directory \
           of each of the scopes which are found to be managed by $(i,VCS) \
           and dirty; or all of them if $(b,--all) is specified. It is a \
           specialized $(b,b0 scope exec) for version control systems.";
@@ -253,25 +254,26 @@ let vcs =
       `P "Error: ..."; `Noblank;
       `P "... # Fix errors"; `Noblank;
       `P "$(b,b0)"; `Noblank;
-      `P "$(iname) $(b,-- git status)"; `Noblank;
-      `P "$(iname) $(b,-- git add -p)"; `Noblank;
-      `P "$(iname) $(b,-- git commit -m 'Cope with changes!')"; `Noblank;
-      `P "$(iname) $(b,-a -- git push)";
+      `P "$(cmd) $(b,-- git status)"; `Noblank;
+      `P "$(cmd) $(b,-- git add -p)"; `Noblank;
+      `P "$(cmd) $(b,-- git commit -m 'Cope with changes!')"; `Noblank;
+      `P "$(cmd) $(b,-a -- git push)";
       `P "Or:";
-      `P "$(iname) $(b,-q -a -- git grep) $(i,PATTERN)";
+      `P "$(cmd) $(b,-q -a -- git grep) $(i,PATTERN)";
       `P "The process continues if $(i,VCS) returns with a non-zero exit \
           code, use the option $(b,--fail-stop) to prevent that.";
       select_doc;
     ]
   in
   B0_tool.Cli.subcmd_with_b0_file "vcs" ~doc ~synopsis ~descr @@
-  Term.(const vcs $ topmost $ includes $ excludes $ all $ keep_going $
-        vcs_kind $ tool_args)
+  let+ topmost and+ includes and+ excludes and+ all and+ keep_going
+  and+ vcs_kind and+ vcs_args = tool_args in
+  vcs ~topmost ~includes ~excludes ~all ~keep_going ~vcs_kind ~vcs_args
 
 let cmd =
   let doc = "Operate on scopes" in
   let descr =
-    `P "The command $(iname) operates on scopes. The $(b,b0 scope exec) \
+    `P "The command $(cmd) operates on scopes. The $(b,b0 scope exec) \
         command allows to fold over scope directories and invoke an \
         arbitary tool. Use the $(b,b0 vcs) command to invokes a vcs operation \
         on scope directories that are managed by it and dirty.";

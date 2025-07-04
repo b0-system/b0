@@ -77,4 +77,4 @@ val background :
 
 val man_best_effort_reload : Cmdliner.Manpage.block list
 (** [man_best_effort_reload] is a manual fragment explaining best-effort
-    reloading.y *)
+    reloading. *)

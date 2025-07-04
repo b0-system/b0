@@ -40,21 +40,21 @@ let fpath =
   let completion = Arg.Completion.make ~dirs:true ~files:true () in
   Arg.Conv.make ~docv:"PATH" ~parser ~pp ~completion ()
 
-(* Specifying output detail *)
+(* Specifying output verbosity *)
 
-let s_output_format_options = "OUTPUT FORMAT OPTIONS"
+type output_verbosity = [ `Normal | `Short | `Long ]
 
-type output_format = [ `Normal | `Short | `Long ]
-let output_format
-    ?(docs = s_output_format_options) ?(short_opts = ["s"; "short"])
+let s_output_verbosity_options = "OUTPUT VERBOSITY OPTIONS"
+let output_verbosity
+    ?(docs = s_output_verbosity_options) ?(short_opts = ["s"; "short"])
     ?(long_opts = ["l"; "long"]) ()
   =
   let short =
-    let doc = "Short output. Line based output with only relevant data." in
+    let doc = "Short output. Line based output with minimal details." in
     Arg.info short_opts ~doc ~docs
   in
   let long =
-    let doc = "Long output. Outputs as much information as possible." in
+    let doc = "Long output. Outputs as much details as possible." in
     Arg.info long_opts ~doc ~docs
   in
   Arg.(value & vflag `Normal [`Short, short; `Long, long])
@@ -99,7 +99,6 @@ let color ?(docs = Manpage.s_common_options) ?env () =
   Arg.(value & opt (some' ~none color) None &
        info ["color"] ?env ~doc ~docv ~docs)
 
-
 (* Logging *)
 
 let log_level_assoc =
@@ -111,7 +110,7 @@ let log_level_assoc =
     "info", Log.Info;
     "debug", Log.Debug ]
 
-let log_level = Arg.enum ~docv:"LEVEL" log_level_assoc
+let log_level_conv = Arg.enum ~docv:"LEVEL" log_level_assoc
 
 let vincr ~docs =
   let doc =
@@ -128,13 +127,12 @@ let vincr ~docs =
 let verbosity ?env ~docs ~none () =
   let doc_alts = Arg.doc_alts_enum log_level_assoc in
   let doc = Fmt.str "Set log verbosity to $(docv). Must be %s" doc_alts in
-  let level = Arg.some' ~none log_level in
+  let level = Arg.some' ~none log_level_conv in
   Arg.(value & opt level None & info ["verbosity"] ?env ~doc ~docs)
 
 let quiet ~docs =
   let doc = "Be quiet. Takes over $(b,-v) and $(b,--verbosity)." in
   Arg.(value & flag & info ["q"; "quiet"] ~doc ~docs)
-
 
 let log_level
     ?(none = Log.Warning) ?(docs = Manpage.s_common_options) ?env () =
@@ -147,11 +145,13 @@ let log_level
   Term.(const choose $ quiet ~docs $ verbosity ?env ~none ~docs () $
         vincr ~docs)
 
-let log_setup
-    ?(spawns = Log.Debug) ?(absent = Log.Warning)
-    ?(docs = Manpage.s_common_options) ?env ()
+let log_level_var = Cmd.Env.info "LOG_LEVEL"
+
+let configure_log
+    ?(docs = Manpage.s_common_options) ?env
+    ?(spawns = Cmdliner.Term.const Log.Debug) ?(absent = Log.Warning) ()
   =
-  let setup ~quiet ~verbosity ~vincr =
+  let setup ~spawns ~quiet ~verbosity ~vincr =
     let level =
       if quiet then Log.Quiet else
       match vincr with
@@ -164,10 +164,11 @@ let log_setup
     then Os.Cmd.set_spawn_tracer (Log.spawn_tracer spawns)
   in
   let env = match env with
-  | None -> Cmd.Env.info "LOG_LEVEL"
+  | None -> log_level_var
   | Some env -> env
   in
   let+ vincr = vincr ~docs
   and+ verbosity = verbosity ~env ~none:absent ~docs ()
-  and+ quiet = quiet ~docs in
-  setup ~quiet ~verbosity ~vincr
+  and+ quiet = quiet ~docs
+  and+ spawns in
+  setup ~spawns ~quiet ~verbosity ~vincr

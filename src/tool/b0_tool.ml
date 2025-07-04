@@ -131,6 +131,9 @@ end
 module Cli = struct
   open Cmdliner
 
+  let log_format = B0_cli.Memo.Log.format_cli ()
+  let op_query = B0_cli.Op.query_cli ()
+
   let s_scope_selection = "SCOPE SELECTION"
 
   let man_see_manual = `Blocks
@@ -144,7 +147,7 @@ module Cli = struct
         `S Manpage.s_commands;
         `S Manpage.s_arguments;
         `S Manpage.s_options;
-        `S B0_std_cli.s_output_format_options;
+        `S B0_std_cli.s_output_verbosity_options;
         `S s_scope_selection;
         `S Manpage.s_common_options;
        man_see_manual ]
@@ -155,7 +158,7 @@ module Cli = struct
 
   let editor_envs = B0_editor.Env.infos
   let pager_envs = B0_pager.Env.infos
-  let format = B0_std_cli.output_format ()
+  let output_verbosity = B0_std_cli.output_verbosity ()
   let no_pager = B0_driver.Cli.no_pager
   let pos_key =
     let doc = "The metadata key $(docv) to get." and docv = "KEY" in

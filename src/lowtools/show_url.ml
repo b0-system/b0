@@ -7,7 +7,6 @@ open B0_std
 open Result.Syntax
 
 let url_error = 1
-let file_url p = Fmt.str "file://%s" (Fpath.to_string p)
 
 let stdin_file_url ~tname =
   let* tmp, force = match tname with
@@ -18,29 +17,23 @@ let stdin_file_url ~tname =
   in
   let* data = Os.File.read Fpath.dash in
   let* () = Os.File.write ~force ~make_path:false tmp data in
-  Ok (file_url tmp)
-
-let file_url p =
-  let* p = Fpath.of_string p in
-  let* () = Os.Path.must_exist p in
-  if Fpath.is_absolute p then Ok (file_url p) else
-  let* cwd = Os.Dir.cwd () in
-  Ok (file_url Fpath.(cwd // p))
-
-let prepare_url ~tname = function
-| "-" -> stdin_file_url ~tname
-| u -> match B0_url.scheme u with Some _ -> Ok u | None -> file_url u
+  Ok (Fmt.str "file://%s" (Fpath.to_url_path tmp))
 
 let show_urls ~background ~prefix ~browser ~urls ~tname =
   let* browser = B0_web_browser.find ?cmd:browser () in
-  let open_url u = B0_web_browser.show ~background ~prefix browser u in
   Log.if_error' ~use:url_error @@
   let rec loop = function
   | [] -> Ok 0
-  | u :: us ->
-      let* u = prepare_url ~tname u in
-      let* () = open_url u in
-      loop us
+  | url :: urls ->
+      let* url = match url with
+      | "-" -> stdin_file_url ~tname
+      | url ->
+          let* cwd = Os.Dir.cwd () in
+          let root_path = Some (Fpath.to_url_path cwd) in
+          Ok (B0_url.to_absolute ~scheme:"file" ~root_path url)
+      in
+      let* () = B0_web_browser.show ~background ~prefix browser url in
+      loop urls
   in
   loop urls
 
@@ -71,12 +64,12 @@ let cmd =
     `Pre "$(b,echo 'Ho!' |) $(cmd) $(b,-t hey.txt) "; `Noblank;
     `Pre "$(b,dot -Tsvg graph.dot |) $(cmd) $(b,-t graph.svg)";
     `S Manpage.s_bugs;
-    `P "This program is distributed with the $(b,b0) system. See
+    `P "This program is distributed with the $(b,b0) system. See \
         $(i,https:/erratique.ch/software/b0) for contact information.";
   ]
   in
   Cmd.make (Cmd.info "show-url" ~version:"%%VERSION%%" ~doc ~exits ~man) @@
-  let+ () = B0_std_cli.log_setup ()
+  let+ () = B0_std_cli.configure_log ()
   and+ background = B0_web_browser.background ()
   and+ prefix = B0_web_browser.prefix ~default:false ()
   and+ browser = B0_web_browser.browser ()

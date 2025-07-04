@@ -6,14 +6,14 @@
 open B0_std
 open Result.Syntax
 
-let lock c =
+let lock conf =
   let warn () = Log.warn @@ fun m ->
     m "@[<v>Some variables unchanged. You may need to first issue:@,%a@]"
       Fmt.code "eval $(b0 root unlock)"
   in
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
-  let* b0_file = B0_driver.Conf.get_b0_file c in
-  let b0_dir = B0_driver.Conf.b0_dir c in
+  let* b0_file = B0_driver.Conf.get_b0_file conf in
+  let b0_dir = B0_driver.Conf.b0_dir conf in
   let bindings =
     [ B0_driver.Env.b0_file, b0_file;
       B0_driver.Env.b0_dir, b0_dir]
@@ -38,7 +38,7 @@ open Cmdliner
 let cmd =
   let doc = "Lock the root and b0 directory" in
   let descr = `Blocks
-    [ `P "$(iname) outputs environment variable bindings to lock $(mname) \
+    [ `P "$(cmd) outputs environment variable bindings to lock $(tool) \
           invocations on the currently inferred b0 file and directory. \
           The intended usage is:";
       `Pre "$(b,eval \\$(b0 lock\\))"; `Noblank;
@@ -48,4 +48,4 @@ let cmd =
       `Pre "$(b,eval \\$(b0 unlock\\))"; ]
   in
   B0_tool.Cli.subcmd_with_driver_conf "lock" ~doc ~descr @@
-  Term.(const lock)
+  Term.const lock

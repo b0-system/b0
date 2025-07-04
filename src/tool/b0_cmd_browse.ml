@@ -6,51 +6,47 @@
 open B0_std
 open Result.Syntax
 
-let urlify u =
-  (* XXX code dupe with show-uri *)
-  (* Detects if u is simply a file path and urlifies it *)
-  let file_uri p = Fmt.str "file://%s" (Fpath.to_string p) in
-  Result.value ~default:u @@
-  let* p = Fpath.of_string u in
-  let* exists = Os.Path.exists p in
-  if not exists then Ok u else
-  if Fpath.is_absolute p then Ok (file_uri p) else
+let process_url ~browser ~background ~prefix ~show_urls ~no_pager =
+  if show_urls then
+    let* pager = B0_pager.find ~don't:no_pager () in
+    let* () = B0_pager.page_stdout pager in
+    Result.ok @@ fun url ->
+    Ok (Log.stdout (fun m -> m "%s" url))
+  else
+  let* browser = B0_web_browser.find ?cmd:browser () in
+  Result.ok @@ fun url ->
   let* cwd = Os.Dir.cwd () in
-  Ok (file_uri Fpath.(cwd // p))
+  let root_path = Some (Fpath.to_url_path cwd) in
+  let url = B0_url.to_absolute ~scheme:"file" ~root_path url in
+  B0_web_browser.show ~background ~prefix browser url
 
-let process_url browser background prefix show_url no_pager =
-  match show_url with
-  | false ->
-      let* browser = B0_web_browser.find ?cmd:browser () in
-      Ok (fun u -> B0_web_browser.show ~background ~prefix browser (urlify u))
-  | true ->
-      let* pager = B0_pager.find ~don't:no_pager () in
-      let* () = B0_pager.page_stdout pager in
-      Ok (fun u -> Ok (Log.stdout (fun m -> m "%s" u)))
-
-let browse key packs browser background prefix show_url no_pager c =
+let browse ~key ~packs ~browser ~background ~prefix ~show_urls ~no_pager _conf =
   Log.if_error ~use:Os.Exit.no_such_name @@
   let* (V key) = B0_meta.Key.get_or_hint key in
   let no_lookup_error = packs = [] in
   let* packs = B0_pack.get_list_or_hint ~all_if_empty:true packs in
   Log.if_error' ~use:Os.Exit.some_error @@
-  let* process_url = process_url browser background prefix show_url no_pager in
+  let* process_url =
+    process_url ~browser ~background ~prefix ~show_urls ~no_pager
+  in
   let rec loop = function
   | [] -> Ok Os.Exit.ok
-  | p :: ps ->
-      match B0_pack.get_meta key p with
-      | Error _ when no_lookup_error -> loop ps
+  | pack :: packs ->
+      match B0_pack.get_meta key pack with
+      | Error _ when no_lookup_error -> loop packs
       | Error _ as e -> Log.if_error' ~use:Os.Exit.no_such_name e
       | Ok v ->
           let url = Fmt.str "%a" (B0_meta.Key.pp_value key) v in
           let* () = process_url url in
-          loop ps
+          loop packs
   in
   loop packs
 
-let browse_url urls browser background prefix show_url no_pager () =
+let browse_url ~urls ~browser ~background ~prefix ~show_urls ~no_pager () =
   Log.if_error ~use:Os.Exit.some_error @@
-  let* process_url = process_url browser background prefix show_url no_pager in
+  let* process_url =
+    process_url ~browser ~background ~prefix ~show_urls ~no_pager
+  in
   let rec loop = function
   | [] -> Ok Os.Exit.ok
   | url :: urls -> let* () = process_url url in loop urls
@@ -60,6 +56,7 @@ let browse_url urls browser background prefix show_url no_pager () =
 (* Command line interface *)
 
 open Cmdliner
+open Cmdliner.Term.Syntax
 
 let packs ~right:r =
   let doc =
@@ -74,57 +71,64 @@ let packs_all = packs ~right:(-1)
 let browser = B0_web_browser.browser ()
 let background = B0_web_browser.background ()
 let prefix = B0_web_browser.prefix ~default:false ()
-let show_url =
+let show_urls =
   let doc = "Output URLs rather than opening them." in
   Arg.(value & flag & info ["s"; "show-urls"] ~doc)
 
 let no_pager = B0_tool.Cli.no_pager
 
 let browse_conf term =
-  Term.(term $ browser $ background $ prefix $ show_url $ no_pager)
+  let+ term and+ browser and+ background and+ prefix and+ show_urls
+  and+ no_pager in
+  term ~browser ~background ~prefix ~show_urls ~no_pager
 
 let homepage =
   let doc = "Browse homepage" in
-  let descr = `P "$(iname) opens the $(b,B0_meta.homepage) URL." in
-  B0_tool.Cli.subcmd_with_b0_file "homepage" ~doc ~descr @@
-  browse_conf Term.(const browse $ const ".meta.homepage" $ packs_all)
+  let descr = `P "$(cmd) opens the $(b,B0_meta.homepage) URL." in
+  B0_tool.Cli.subcmd_with_b0_file "homepage" ~doc ~descr @@ browse_conf @@
+  let+ packs = packs_all in
+  browse ~key:".meta.homepage" ~packs
 
 let issues =
   let doc = "Browse issues" in
-  let descr = `P "$(iname) opens the $(b,B0_meta.issues) URL." in
-  B0_tool.Cli.subcmd_with_b0_file "issues" ~doc ~descr @@
-  browse_conf Term.(const browse $ const ".meta.issues" $ packs_all)
+  let descr = `P "$(cmd) opens the $(b,B0_meta.issues) URL." in
+  B0_tool.Cli.subcmd_with_b0_file "issues" ~doc ~descr @@ browse_conf @@
+  let+ packs = packs_all in
+  browse ~key:".meta.issues" ~packs
 
 let key =
   let doc = "Browse a metadata key value" in
-  let descr = `P "$(iname) opens the URL found in $(i,KEY)." in
-  B0_tool.Cli.subcmd_with_b0_file "key" ~doc ~descr @@
-  browse_conf Term.(const browse $ B0_tool.Cli.pos_key $ packs_tail)
+  let descr = `P "$(cmd) opens the URL found in $(i,KEY)." in
+  B0_tool.Cli.subcmd_with_b0_file "key" ~doc ~descr @@ browse_conf @@
+  let+ key = B0_tool.Cli.pos_key and+ packs = packs_tail in
+  browse ~key ~packs
 
 let online_doc =
   let doc = "Browse online documentation" in
-  let descr = `P "$(iname) opens the $(b,B0_meta.online_doc) URL." in
-  B0_tool.Cli.subcmd_with_b0_file "online-doc" ~doc ~descr @@
-  browse_conf Term.(const browse $ const ".meta.online-doc" $ packs_all)
+  let descr = `P "$(cmd) opens the $(b,B0_meta.online_doc) URL." in
+  B0_tool.Cli.subcmd_with_b0_file "online-doc" ~doc ~descr @@ browse_conf @@
+  let+ packs = packs_all in
+  browse ~key:".meta.online-doc" ~packs
 
 let url =
   let doc = "Browse URLs" in
   let descr =
     `Blocks
-      (`P "$(iname) opens the given URLs." ::
+      (`P "$(cmd) opens the given URLs." ::
        B0_web_browser.man_best_effort_reload)
   in
   let urls =
     let doc = "The $(docv) to open." in
-    Arg.(non_empty & pos_all string [] & info [] ~doc ~docv:"URL")
+    Arg.(non_empty & pos_all filepath [] & info [] ~doc ~docv:"URL")
   in
-  B0_tool.Cli.subcmd "url" ~doc ~descr @@
-  browse_conf Term.(const browse_url $ urls)
+  B0_tool.Cli.subcmd "url" ~doc ~descr @@ browse_conf @@
+  let+ urls in
+  browse_url ~urls
 
 let cmd =
   let doc = "Open pack metadata URLs in your browser" in
   let descr =
-    `P "$(iname) browses the URLs found in the metadata of packs. \
+    `P "$(cmd) browses the URLs found in the metadata of packs. \
         This gives quick access to package homepages, issues, online docs, etc."
   in
   B0_tool.Cli.cmd_group "browse" ~doc ~descr @@

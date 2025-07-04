@@ -49,14 +49,16 @@ let pp_report ppf (allow_long, test_count, total, dur, fails) =
         Test.Fmt.dur dur (Fmt.list (pp_fail ~allow_long)) fails
 
 let show_what
-    ~allow_long ~tests ~lock ~may_build ~must_build ~is_locked ~locked_packs c
+    ~allow_long ~tests ~lock ~may_build ~must_build ~is_locked ~locked_packs
+    conf
   =
   Log.if_error' ~use:Os.Exit.some_error @@
-  let don't = B0_driver.Conf.no_pager c in
+  let don't = B0_driver.Conf.no_pager conf in
   let* pager = B0_pager.find ~don't () in
   let* () = B0_pager.page_stdout pager in
   Log.stdout (fun m -> m "%a@." pp_run_tests tests);
-  B0_cmd_build.show_what ~lock ~may_build ~must_build ~is_locked ~locked_packs c
+  B0_cmd_build.show_what
+    ~lock ~may_build ~must_build ~is_locked ~locked_packs conf
 
 (* Test command *)
 
@@ -137,7 +139,8 @@ let show_tests_with_skips us =
     pp_skip_stats count (Fmt.iter B0_unit.Set.iter pp_skip) us pp_with_l ()
 
 let test
-    allow_long allow_empty seed correct units x_units packs x_packs what lock c
+    ~allow_long ~allow_empty ~seed ~correct ~units ~x_units ~packs ~x_packs
+    ~what ~lock conf
   =
   let total = Os.Mtime.counter () in
   Log.if_error ~use:Os.Exit.no_such_name @@
@@ -175,7 +178,7 @@ let test
   if what
   then
     show_what ~allow_long ~lock ~may_build ~must_build ~is_locked
-      ~locked_packs ~tests c
+      ~locked_packs ~tests conf
   else
   Log.if_error' ~use:B0_driver.Exit.build_error @@
   if B0_unit.Set.is_empty tests && not allow_empty
@@ -187,7 +190,7 @@ let test
     Ok exit_no_tests
   end else
   let store = [] in
-  let* build = B0_cmd_build.make_build c ~store ~may_build ~must_build in
+  let* build = B0_cmd_build.make_build conf ~store ~may_build ~must_build in
   match B0_build.run build with
   | Error () -> Ok B0_driver.Exit.build_error
   | Ok () ->
@@ -199,7 +202,7 @@ let test
       in
       let dur, rets =
         run_tests
-          ~long:allow_long ~seed ~correct c build Mtime.Span.zero [] tests
+          ~long:allow_long ~seed ~correct conf build Mtime.Span.zero [] tests
       in
       let fails, tests_with_skips =
         let rec loop fails skip_tests = function
@@ -222,22 +225,23 @@ let test
 (* Command line interface *)
 
 open Cmdliner
+open Cmdliner.Term.Syntax
 
 let s_test_options = "OPTIONS FOR RUNNING TESTS"
 
 let cmd =
   let doc = "Build and run tests" in
   let descr = `Blocks
-      [ `P "The $(iname) command builds and runs tests.";
-        `Pre "$(mname) $(b,list --tests)     # List all tests"; `Noblank;
-        `Pre "$(iname)             # Run all tests"; `Noblank;
-        `Pre "$(iname) $(b,-l)          # Run all tests including long ones";
+      [ `P "The $(cmd) command builds and runs tests.";
+        `Pre "$(tool) $(b,list --tests)     # List all tests"; `Noblank;
+        `Pre "$(cmd)             # Run all tests"; `Noblank;
+        `Pre "$(cmd) $(b,-l)          # Run all tests including long ones";
         `Noblank;
-        `Pre "$(iname) $(b,-u mytest)   # Only run test of unit $(b,mytest)";
+        `Pre "$(cmd) $(b,-u mytest)   # Only run test of unit $(b,mytest)";
         `Noblank;
-        `Pre "$(iname) $(b,--seed 123)  # Set env $(b,SEED=123) for running";
+        `Pre "$(cmd) $(b,--seed 123)  # Set env $(b,SEED=123) for running";
         `Noblank;
-        `Pre "$(iname) $(b,--correct)   # Set env $(b,CORRECT=true) for \
+        `Pre "$(cmd) $(b,--correct)   # Set env $(b,CORRECT=true) for \
               running";
         `P "A test is a unit tagged with both $(b,B0_meta.test) and \
             $(b,B0_meta.run). The command builds like \
@@ -265,41 +269,38 @@ let cmd =
       ]
   in
   let exits =
-    Cmdliner.Cmd.Exit.info
+    Cmd.Exit.info
       (Os.Exit.get_code exit_test_error) ~doc:"If a test did not succeed." ::
-    Cmdliner.Cmd.Exit.info
+    Cmd.Exit.info
       (Os.Exit.get_code exit_no_tests) ~doc:"If there are no tests to run." ::
     B0_driver.Exit.infos
   in
+  B0_tool.Cli.subcmd_with_b0_file "test" ~exits ~doc ~descr @@
   let docs = s_test_options in
-  let allow_empty =
+  let+ allow_empty =
     let doc = "Do not fail if there is no test to run in the build." in
     Arg.(value & flag & info ["e"; "allow-empty"] ~doc ~docs)
-  in
-  let long =
+  and+ allow_long =
     let doc =
       "Run long tests. By default tests tagged with $(b,B0_meta.long) are \
        not run. Also set environment variable $(b,LONG) to $(b,true) for \
        running tests."
     in
     Arg.(value & flag & info ["l";"long"] ~doc ~docs)
-  in
-  let rand_seed =
+  and+ seed =
     let doc =
       "Set environment variable $(b,SEED) to $(docv) for running tests."
     in
     let absent = "Randomly generated value" in
     let docv = "INT" in
     Arg.(value & opt (some int) None & info ["seed"] ~doc ~docv ~absent ~docs)
-  in
-  let correct =
+  and+ correct =
     let doc =
       "Set environment variable $(b,CORRECT) to $(b,true) for running tests."
     in
     Arg.(value & flag & info ["c"; "correct"] ~doc ~docs)
-  in
-  B0_tool.Cli.subcmd_with_b0_file "test" ~exits ~doc ~descr @@
-  Term.(const test $ long $ allow_empty $ rand_seed $ correct $
-        B0_cmd_build.units $
-        B0_cmd_build.x_units $ B0_cmd_build.packs $ B0_cmd_build.x_packs $
-        B0_cmd_build.what $ B0_cmd_build.lock)
+  and+ units = B0_cmd_build.units and+ x_units = B0_cmd_build.x_units
+  and+ packs = B0_cmd_build.packs and+ x_packs = B0_cmd_build.x_packs
+  and+ what = B0_cmd_build.what and+ lock = B0_cmd_build.lock in
+  test ~allow_long ~allow_empty ~seed ~correct ~units ~x_units ~packs ~x_packs
+    ~what ~lock

@@ -22,7 +22,7 @@ let find_copyright_holder ~cwd _meta = function
 
 (* B0.ml file init *)
 
-let b0_ml file force _conf =
+let b0_ml ~file ~force _conf =
   (* TODO this needs to be made much better. *)
   Log.if_error ~use:Os.Exit.some_error @@
   let b0_file =
@@ -46,7 +46,7 @@ let b0_ml file force _conf =
 
 (* Changes file init *)
 
-let changes file force _conf =
+let changes ~file ~force _conf =
   Log.if_error ~use:Os.Exit.some_error @@
   let* changes = B0_init.find_changes_generator file in
   let changes = changes () in
@@ -55,7 +55,7 @@ let changes file force _conf =
 
 (* [.gitignore] file init. *)
 
-let gitignore file force _conf =
+let gitignore ~file ~force _conf =
   Log.if_error ~use:Os.Exit.some_error @@
   let gitignore = "_b0\n_build\ntmp\n*.install\n" in
   let* () = Os.File.write ~force ~make_path:true file gitignore in
@@ -63,7 +63,7 @@ let gitignore file force _conf =
 
 (* License file init *)
 
-let license years holder license file force conf =
+let license ~years ~holder ~license ~file ~force conf =
   Log.if_error ~use:Os.Exit.some_error @@
   let cwd = B0_driver.Conf.cwd conf in
   let meta = B0_init.get_project_meta () in
@@ -89,7 +89,7 @@ let get_readme_project_name ~cwd = function
           "@[<v>Could not find a project name to use.@,\
            Use option %a to specify a project name.@]" Fmt.code "--name"
 
-let readme name synopsis file force conf =
+let readme ~name ~synopsis ~file ~force conf =
   Log.if_error ~use:Os.Exit.some_error @@
   let cwd = B0_driver.Conf.cwd conf in
   let meta = B0_init.get_project_meta () in
@@ -221,104 +221,101 @@ let lang =
 
 let b0_ml_cmd =
   let doc = "Generate a $(b,B0.ml) file" in
-  let descr =
-    `Blocks [
-      `P "The $(iname) command generates a $(b,B0.ml) file \
+  let descr = `Blocks [
+      `P "The $(cmd) command generates a $(b,B0.ml) file \
           for a software project. For example:";
-      `Pre "$(iname) $(b,> B0.ml)"; `Noblank;
-      `Pre "$(iname) $(b,B0.ml)";
+      `Pre "$(cmd) $(b,> B0.ml)"; `Noblank;
+      `Pre "$(cmd) $(b,B0.ml)";
       `P "TODO unsatisfactory for now."]
   in
   B0_tool.Cli.subcmd_with_b0_file_if_any "B0.ml" ~doc ~descr @@
-  Term.(const b0_ml $ file $ force)
+  let+ file and+ force in
+  b0_ml ~file ~force
 
 let changes_cmd =
   let doc = "Generate a $(b,CHANGES) file" in
-  let descr =
-    `Blocks [
-      `P "The $(iname) command generates a $(b,CHANGES) file \
+  let descr = `Blocks [
+      `P "The $(cmd) command generates a $(b,CHANGES) file \
           for a software project. For example:";
-      `Pre "$(iname) $(b,> CHANGES.md)"; `Noblank;
-      `Pre "$(iname) $(b,CHANGES.md)"; ]
+      `Pre "$(cmd) $(b,> CHANGES.md)"; `Noblank;
+      `Pre "$(cmd) $(b,CHANGES.md)"; ]
   in
   B0_tool.Cli.subcmd_with_b0_file_if_any "CHANGES" ~doc ~descr @@
-  Term.(const changes $ file $ force)
+  let+ file and+ force in
+  changes ~file ~force
 
 let gitignore_cmd =
   let doc = "Generate a $(b,.gitignore) file" in
-  let descr =
-    `Blocks [
-      `P "The $(iname) command generates $(b,.gitignore) file.
-          For example:";
-      `Pre "$(iname) $(b,> .gitignore)";
-      `Pre "$(iname) $(b,.gitignore)"; ]
+  let descr = `Blocks [
+      `P "The $(cmd) command generates $(b,.gitignore) file. For example:";
+      `Pre "$(cmd) $(b,> .gitignore)";
+      `Pre "$(cmd) $(b,.gitignore)"; ]
   in
   B0_tool.Cli.subcmd_with_b0_file_if_any ".gitignore" ~doc ~descr @@
-  Term.(const gitignore $ file $ force)
+  let+ file and+ force in
+  gitignore ~file ~force
 
 let license_cmd =
   let doc = "Generate a $(b,LICENSE) file" in
-  let descr =
-    `Blocks [
-      `P "The $(iname) command generates a $(b,LICENSE) file \
+  let descr = `Blocks [
+      `P "The $(cmd) command generates a $(b,LICENSE) file \
           for a software project. It downloads the license text \
           from the $(b,choosealicense.com) project data and substitutes \
           the years and copyright holder in it. For example:";
-      `Pre "$(iname) $(b,> LICENSE.md)"; `Noblank;
-      `Pre "$(iname) $(b,-l ISC > LICENSE.md)"; `Noblank;
-      `Pre "$(iname) $(b,-h holder -l ISC > LICENSE.md)"; `Noblank;
-      `Pre "$(iname) $(b,LICENSE.md)";
+      `Pre "$(cmd) $(b,> LICENSE.md)"; `Noblank;
+      `Pre "$(cmd) $(b,-l ISC > LICENSE.md)"; `Noblank;
+      `Pre "$(cmd) $(b,-h holder -l ISC > LICENSE.md)"; `Noblank;
+      `Pre "$(cmd) $(b,LICENSE.md)";
       `P "If a b0 file with a default pack is available a license \
           for the first license of the $(b,.meta.licenses) key is generated \
           if $(b,--license) is unspecified." ]
   in
   B0_tool.Cli.subcmd_with_b0_file_if_any "LICENSE" ~doc ~descr @@
-  Term.(const license $ years $ holder $ license_opt $ file $ force)
+  let+ years and+ holder and+ license_opt and+ file and+ force in
+  license ~years ~holder ~license:license_opt ~file ~force
 
 let readme_cmd =
   let doc = "Generate a $(b,README) file" in
-  let descr =
-    `Blocks [
-      `P "The $(iname) command generates a $(b,README.md) file \
+  let descr = `Blocks [
+      `P "The $(cmd) command generates a $(b,README.md) file \
           for a software project. For example:";
-      `Pre "$(iname) $(b,-s \"My project synopsis\" > README.md) "; `Noblank;
-      `Pre "$(iname) $(b,-n myproject README.md) ";
+      `Pre "$(cmd) $(b,-s \"My project synopsis\" > README.md) "; `Noblank;
+      `Pre "$(cmd) $(b,-n myproject README.md) ";
       `P "If a b0 file with a default pack is available it may use some of \
           its metadata to generate boilerplate. In particular if it \
           has the $(b,.opam.tag) key, OCaml specific instructions are \
           generated." ]
   in
-  let name' =
-    let doc = "$(docv) is the project name. If absent \
-               a $(b,project name) is derived by finding a project root \
-               directory (by detecting a VCS directory or a root build file)"
+  B0_tool.Cli.subcmd_with_b0_file_if_any "README" ~doc ~descr @@
+  let+ name =
+    let doc =
+      "$(docv) is the project name. If absent a $(b,project name) is derived \
+       by finding a project root directory (by detecting a VCS directory or \
+       a root build file)"
     in
     let absent = "Name of the root directory" in
     Arg.(value & opt (some string) None &
          info ["n"; "name"] ~doc ~docv:"PROJECT_NAME" ~absent)
-  in
-  let synopsis =
+  and+ synopsis =
     let doc = "$(docv) is a one line description for the project." in
     Arg.(value & opt (some string) None &
          info ["s"; "synopsis"] ~doc ~docv:"SYNOPSIS")
-  in
-  B0_tool.Cli.subcmd_with_b0_file_if_any "README" ~doc ~descr @@
-  Term.(const readme $ name' $ synopsis $ file $ force)
+  and+ file and+ force in
+  readme ~name ~synopsis ~file ~force
 
 let src_cmd =
   let doc = "Generate a copyrighted source file" in
-  let descr =
-    `Blocks [
-      `P "The $(iname) command generates copyrighted source file. The content \
+  let descr = `Blocks [
+      `P "The $(cmd) command generates copyrighted source file. The content \
           is empty unless the option $(b,-t) is specified. If you want \
           content without the copyright use $(b,b0 init snip). For example:";
-      `Pre "$(iname) $(b,> mysrc.ml)  # Defaults has OCaml syntax"; `Noblank;
-      `Pre "$(iname) $(b,-l c > mysrc.h)";`Noblank;
-      `Pre "$(iname) $(b,mysrc.h) $(b,mysrc.c)"; `Noblank;
-      `Pre "$(iname) $(b,-x) $(b,example.c)"; `Noblank;
-      `Pre "$(iname) $(b,-y 2038 mysrc.mli mysrc.ml) "; `Noblank;
-      `Pre "$(iname) $(b,-h Unknown > mysrc.ml)"; `Noblank;
-      `Pre "$(iname) $(b,-t cmdliner > tool.ml)";
+      `Pre "$(cmd) $(b,> mysrc.ml)  # Defaults has OCaml syntax"; `Noblank;
+      `Pre "$(cmd) $(b,-l c > mysrc.h)";`Noblank;
+      `Pre "$(cmd) $(b,mysrc.h) $(b,mysrc.c)"; `Noblank;
+      `Pre "$(cmd) $(b,-x) $(b,example.c)"; `Noblank;
+      `Pre "$(cmd) $(b,-y 2038 mysrc.mli mysrc.ml) "; `Noblank;
+      `Pre "$(cmd) $(b,-h Unknown > mysrc.ml)"; `Noblank;
+      `Pre "$(cmd) $(b,-t cmdliner > tool.ml)";
       `P "The command makes best-effort guesses to derive the file's language,
            the copyright year, the copyright holder and the SPDX license. \
           See the corresponding options for more details.";
@@ -329,8 +326,8 @@ let src_cmd =
   and+ lang
   and+ files =
     let doc = "Generate to file $(docv). Repeatable." in
-    let absent = "$(b,stdout)" in
-    Arg.(value & pos_all B0_std_cli.fpath [] & info [] ~doc ~docv:"PATH" ~absent)
+    Arg.(value & pos_all B0_std_cli.fpath [] &
+         info [] ~doc ~docv:"PATH" ~absent:"$(b,stdout)")
   and+ example =
     let doc =
       "Example source code. If $(b,--license) is unspecified, uses \
@@ -344,7 +341,7 @@ let snip_cmd =
   let doc = "Generate a snip of code" in
   let descr =
     `Blocks [
-      `P "The $(iname) command generates an snip of code. It's exactly like
+      `P "The $(cmd) command generates an snip of code. It's exactly like
           the $(b,src) command but without the copyright headers."; ]
   in
   B0_tool.Cli.subcmd_with_b0_file_if_any "snip" ~doc ~descr @@
@@ -366,12 +363,12 @@ let snip_cmd =
 let templates_cmd =
   let doc = "Operate on content templates" in
   let descr = `Blocks [
-      `P "The $(iname) command operates on content templates.";
+      `P "The $(cmd) command operates on content templates.";
       `P "Note that for now templates are hard-coded."; ]
   in
   let template_list_cmd =
     let doc = "List templates" in
-    let descr = `P "The $(iname) command lists available templates." in
+    let descr = `P "The $(cmd) command lists available templates." in
     B0_tool.Cli.subcmd_with_b0_file_if_any "list" ~doc ~descr @@
     let+ () = Term.const () in
     template_list ()
@@ -381,11 +378,10 @@ let templates_cmd =
 
 let cmd =
   let doc = "Generate files from templates" in
-  let descr = `P "The $(iname) command generates files from templates." in
+  let descr = `P "The $(cmd) command generates files from templates." in
   B0_tool.Cli.cmd_group "init" ~doc ~descr @@
   [b0_ml_cmd; changes_cmd; gitignore_cmd; license_cmd; readme_cmd;
    snip_cmd; src_cmd; templates_cmd;]
-
 
 (* Templates, TODO eventually get rid of this with a file system based
    lookup mechanism. *)

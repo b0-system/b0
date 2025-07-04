@@ -7,8 +7,8 @@ open B0_std
 open Result.Syntax
 
 let pp_tool ppf n = Fmt.st [`Fg `Green] ppf n
-let list format c =
-  let pp, sep = match format with
+let list ~output_verbosity c =
+  let pp, sep = match output_verbosity with
   | `Short ->
       let pp_tool ppf (n, _) = Fmt.code ppf n in
       pp_tool, Fmt.cut
@@ -41,17 +41,19 @@ let list format c =
 (* Command line interface *)
 
 open Cmdliner
+open Cmdliner.Term.Syntax
 
 let list =
   let doc = "List buildable tools" in
-  let descr = `P "$(iname) lists given buildable tools"; in
+  let descr = `P "$(cmd) lists given buildable tools"; in
   B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
-  Term.(const list $ B0_tool.Cli.format)
+  let+ output_verbosity = B0_tool.Cli.output_verbosity in
+  list ~output_verbosity
 
 let cmd =
   let doc = "Operate on buildable tools" in
   let descr = `Blocks [
-    `P "$(iname) operates on buildable tools.";
+    `P "$(cmd) operates on buildable tools.";
     `P "These are the public tools in the build and the non-public tools \
         in the root scope."; ]
   in

@@ -44,9 +44,9 @@ let log_units color ~kind us =
   m "@[<v>%a build:@,@[<v>%a@]@]"
     color kind Fmt.(list B0_unit.pp_synopsis) (B0_unit.Set.elements us)
 
-let show_what ~lock ~is_locked ~locked_packs ~must_build ~may_build c =
+let show_what ~lock ~is_locked ~locked_packs ~must_build ~may_build conf =
   Log.if_error' ~use:Os.Exit.some_error @@
-  let don't = B0_driver.Conf.no_pager c in
+  let don't = B0_driver.Conf.no_pager conf in
   let* pager = B0_pager.find ~don't () in
   let* () = B0_pager.page_stdout pager in
   if B0_unit.Set.is_empty must_build
@@ -165,7 +165,7 @@ let find_action_unit = function
           (* XXX show how to list available actions if there's no typo *)
           Fmt.error "@[%a@]" pp (name, suggs)
 
-let memo c ~may_build ~must_build =
+let memo conf ~may_build ~must_build =
   (* Look for tools in the build first. XXX cross *)
   let tool_lookup ~may_build ~must_build ~env =
     let lookup = B0_memo.tool_lookup_of_os_env env in
@@ -180,12 +180,12 @@ let memo c ~may_build ~must_build =
            we can access the store to get B0_build.t *)
         Fut.map Result.ok (B0_meta.get B0_unit.exe_file (B0_unit.meta u))
   in
-  let hash_fun = B0_driver.Conf.hash_fun c in
-  let cwd = B0_driver.Conf.cwd c in
-  let cache_dir = B0_driver.Conf.cache_dir c in
-  let b0_dir = B0_driver.Conf.b0_dir c in
+  let hash_fun = B0_driver.Conf.hash_fun conf in
+  let cwd = B0_driver.Conf.cwd conf in
+  let cache_dir = B0_driver.Conf.cache_dir conf in
+  let b0_dir = B0_driver.Conf.b0_dir conf in
   let trash_dir = Fpath.(b0_dir / B0_cli.Memo.trash_dir_name) in
-  let jobs = B0_driver.Conf.jobs c in
+  let jobs = B0_driver.Conf.jobs conf in
   let feedback =
     let op_howto ppf o = Fmt.pf ppf "b0 log --id %d" (B0_zero.Op.id o) in
     let show_op = Log.Info and show_ui = Log.Error and level = Log.level () in
@@ -197,13 +197,13 @@ let memo c ~may_build ~must_build =
   B0_memo.make
     ~hash_fun ~cwd ~tool_lookup ~env ~cache_dir ~trash_dir ~jobs ~feedback ()
 
-let make_build c ~store ~may_build ~must_build =
-  let* m = memo c ~may_build ~must_build in
+let make_build conf ~store ~may_build ~must_build =
+  let* m = memo conf ~may_build ~must_build in
   let build =
     let variant = "user" in
-    let b0_file = Option.get (B0_driver.Conf.b0_file c) in
+    let b0_file = Option.get (B0_driver.Conf.b0_file conf) in
     let root_dir = Fpath.parent b0_file in
-    let b0_dir = B0_driver.Conf.b0_dir c in
+    let b0_dir = B0_driver.Conf.b0_dir conf in
     B0_build.make ~root_dir ~b0_dir ~variant ~store m ~may_build ~must_build
   in
   Ok build
@@ -246,7 +246,8 @@ let do_action_exit c build action_unit ~args =
 (* Build command *)
 
 let build
-    units x_units packs x_packs what lock show_path build_only action args c
+    ~units ~x_units ~packs ~x_packs ~what ~lock ~show_path ~build_only ~action
+    ~args conf
   =
   Log.if_error ~use:Os.Exit.no_such_name @@
   let* action_unit = find_action_unit action in
@@ -269,7 +270,7 @@ let build
   let is_locked = is_locked ~lock ~locked_packs in
   let may_build, must_build = get_may_must ~is_locked ~units ~x_units in
   if what
-  then show_what ~lock ~is_locked ~locked_packs ~must_build ~may_build c else
+  then show_what ~lock ~is_locked ~locked_packs ~must_build ~may_build conf else
   (* Assert or warn a few things before starting the build. *)
   let* action_unit = match action_unit with
   | None when B0_unit.Set.is_empty must_build -> Fmt.error "%s" (err_nothing ())
@@ -278,7 +279,7 @@ let build
   | Some u when not (B0_unit.is_actionable u) -> warn_noexec u; Ok None
   | o -> Ok o
   in
-  let* build = make_build c ~store ~may_build ~must_build in
+  let* build = make_build conf ~store ~may_build ~must_build in
   let args = Cmd.of_list Fun.id args in
   match B0_build.run build with
   | Error () -> Ok B0_driver.Exit.build_error
@@ -287,11 +288,12 @@ let build
       | None -> Ok Os.Exit.ok
       | Some action_unit when show_path -> do_show_path action_unit ~args
       | Some action_unit when build_only -> Ok Os.Exit.ok
-      | Some action_unit -> do_action_exit c build action_unit ~args
+      | Some action_unit -> do_action_exit conf build action_unit ~args
 
 (* Command line interface *)
 
 open Cmdliner
+open Cmdliner.Term.Syntax
 
 let units = B0_cli.units ~doc:"Build unit $(docv). Repeatable." ()
 let x_units =
@@ -344,7 +346,6 @@ let action_arg =
       Option.map (fun n -> n, B0_unit.doc u) name
     in
     List.filter_map keep (B0_unit.list ())
-
   in
   let completion = Arg.Completion.make ~complete () in
   Arg.Conv.of_conv Arg.string ~completion ~docv ()
@@ -365,18 +366,20 @@ let args =
   Arg.(value & pos_right 0 aargs [] & info [] ~doc)
 
 let term =
-  Term.(const build $ units $ x_units $ packs $ x_packs $ what $ lock $
-        show_path $ build_only $ action $ args)
+  let+ units and+ x_units and+ packs and+ x_packs and+ what and+ lock
+  and+ show_path and+ build_only and+ action and+ args in
+  build ~units ~x_units ~packs ~x_packs ~what ~lock ~show_path ~build_only
+    ~action ~args
 
 let cmd =
   let doc = "Build and run actions (default command)" in
   let synopsis =
-    `P "$(iname) \
+    `P "$(cmd) \
         [$(b,-u) $(i,UNIT)]…  [$(b,-p) $(i,PACK)]… [$(i,OPTION)]… \
         $(b,--) [$(i,ACTION)] [$(i,ARG)]…";
   in
-  let descr =
-    [ `P "The $(iname) command builds units and runs actions, or \
+  let descr = `Blocks [
+      `P "The $(cmd) command builds units and runs actions, or \
           the tools they define.";
       `P "To build a unit use the $(b,-u) option. To build all the units of \
           a pack use the $(b,-p) option.";
@@ -400,5 +403,4 @@ let cmd =
       `P "More background information is available in the manuals, \
           see $(b,odig doc b0)."; ]
   in
-  let descr = `Blocks descr in
   B0_tool.Cli.subcmd_with_b0_file "build" ~doc ~descr ~synopsis term

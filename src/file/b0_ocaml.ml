@@ -2245,9 +2245,9 @@ let unit =
     let pager_don't = B0_pager.don't () in
     let envs = B0_pager.Env.infos in
     let exits = B0_std_cli.Exit.infos in
-    let format = B0_std_cli.output_format () in
+    let verbosity = B0_std_cli.output_verbosity () in
     Cmd.make (Cmd.info "libs" ~doc ~man ~exits ~envs) @@
-    Term.(const list $ format $ pager_don't)
+    Term.(const list $ verbosity $ pager_don't)
   in
   let meta =
     let doc = "Generate ocamlfind META files" in
