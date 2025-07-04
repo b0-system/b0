@@ -1312,9 +1312,8 @@ module Path = struct
 
   (* Resolving *)
 
-  external _realpath : string -> string = "ocaml_b0_realpath"
   let rec realpath p =
-    try B0__fpath.of_string (_realpath (B0__fpath.to_string p)) with
+    try B0__fpath.of_string (Unix.realpath (B0__fpath.to_string p)) with
     | Unix.Unix_error (Unix.EINTR, _, _) -> realpath p
     | Unix.Unix_error (Unix.ENOTDIR, _, _) -> ferr p err_seg_not_dir
     | Unix.Unix_error (e, _, _) -> ferr p (uerror e)
@@ -1723,7 +1722,7 @@ module Cmd = struct
     | file :: args as all ->
         let args = match argv0 with None -> all | Some n -> n :: args in
         try
-          let file = Path._realpath file in
+          let file = Unix.realpath file in
           let reset_cwd = match cwd with
           | None -> Fun.id
           | Some cwd ->
