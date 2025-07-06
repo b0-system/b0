@@ -325,6 +325,9 @@ val to_url_path : ?escape_space:bool -> t -> string
     (if [escape_space] is [true], default), and the US-ASCII
     {{!Char.Ascii.is_control}control characters}.
 
+    If {!Sys.win32} is [true] and [p] has a drive a '/' is prepended
+    to the result.
+
     {b Note.} In 2019, the standard definition of URLs is in a sorry
     state. Assuming [p] is UTF-8 encoded. It is {e believed} the
     above function should lead to an URL path component that can be
@@ -336,7 +339,7 @@ val to_segments : t -> string list
 (** [to_segments p] is [p]'s {e non-empty} list of segments. Absolute
     paths have an empty string added, this allows to recover the path's
     string with [String.concat dir_sep], note however that you may
-    have lost the {!volume} along the way. *)
+    have lost the volume along the way. *)
 
 (** {1:fmt Formatting} *)
 

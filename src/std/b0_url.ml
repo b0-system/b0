@@ -100,19 +100,19 @@ let fragment u =
 
 (* Kinds *)
 
-type relative_kind = [ `Scheme | `Abs_path | `Rel_path | `Empty ]
-type kind = [ `Abs | `Rel of relative_kind ]
+type relative_kind = [ `Scheme | `Absolute_path | `Relative_path | `Empty ]
+type kind = [ `Absolute | `Relative of relative_kind ]
 
 let relative_kind s =
   let len = String.length s in
   if len = 0 then `Empty else
   if s.[0] = '/'
-  then (if len > 1 && s.[1] = '/' then `Scheme else `Abs_path)
-  else `Rel_path
+  then (if len > 1 && s.[1] = '/' then `Scheme else `Absolute_path)
+  else `Relative_path
 
 let kind s = match find_scheme_colon s with
-| Some _ -> `Abs
-| None -> `Rel (relative_kind s)
+| Some _ -> `Absolute
+| None -> `Relative (relative_kind s)
 
 (* Operations *)
 
@@ -137,13 +137,13 @@ let drop_path_and_rest u = match path_first u with
 | None -> u | Some first -> string_subrange ~last:(first - 1) u
 
 let append root u = match kind u with
-| `Abs -> u
-| `Rel `Scheme ->
+| `Absolute -> u
+| `Relative `Scheme ->
     begin match scheme root with
     | None -> u | Some scheme -> String.concat ":" [scheme; u]
     end
-| `Rel `Abs_path -> String.concat "" [drop_path_and_rest root; u]
-| `Rel `Rel_path ->
+| `Relative `Absolute_path -> String.concat "" [drop_path_and_rest root; u]
+| `Relative `Relative_path ->
     if root <> "" && root.[String.length root - 1] = '/'
     then String.concat "" [root; u] else
     begin match String.rindex root '/' with
@@ -154,7 +154,22 @@ let append root u = match kind u with
         | Some j when j + 2 = i -> String.concat "/" [root; u]
         | Some _ -> String.concat "" [string_subrange ~last:i root; u]
     end
-| `Rel `Empty -> root
+| `Relative `Empty -> root
+
+let to_absolute ~scheme ~root_path u = match kind u with
+| `Absolute -> u
+| `Relative `Scheme -> String.concat ":" [scheme; u]
+| `Relative `Absolute_path -> String.concat "://" [scheme; u]
+| `Relative `Relative_path ->
+    let root = match root_path with
+    | Some "" | None -> ""
+    | Some root when root.[String.length root - 1] = '/' -> root
+    | Some root -> root ^ "/"
+    in
+    String.concat "" [scheme; "://"; root; u]
+| `Relative `Empty ->
+    let root = Option.value ~default:"" root_path in
+    String.concat "" [scheme; "://"; root]
 
 (* Authority *)
 
@@ -247,9 +262,11 @@ let list_of_text_scrape ?root s = (* See .mli to understand what it does *)
 
 let pp = Format.pp_print_string
 let pp_kind ppf k = Format.pp_print_string ppf @@ match k with
-| `Abs -> "abs" | `Rel `Scheme -> "rel-scheme"
-| `Rel `Abs_path -> "rel-abs-path" | `Rel `Rel_path -> "rel-rel-path"
-| `Rel `Empty -> "rel-empty"
+| `Absolute -> "abs"
+| `Relative `Scheme -> "rel-scheme"
+| `Relative `Absolute_path -> "rel-abs-path"
+| `Relative `Relative_path -> "rel-rel-path"
+| `Relative `Empty -> "rel-empty"
 
 (* Percent encoding *)
 

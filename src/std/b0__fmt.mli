@@ -379,7 +379,14 @@ val array : ?empty:unit t -> ?sep:unit t -> 'a t -> 'a array t
 (** {1:text_lines Text and lines} *)
 
 val text : string t
-(** [text] is {!Format.pp_print_text}. *)
+(** [text] is {!Format.pp_print_text}. {b FIXME.} replace this
+    by the behaviour of {!styled text}. *)
+
+val styled_text : string t
+(** [styled_text] formats ANSI escape sequences as zero width
+    characters, collapses multiple newlines and spaces to a single
+    {!Fmt.sp} and preserves blank lines and suppresses trailing space
+    and newlines.  *)
 
 val lines : string t
 (** [lines] formats lines by replacing newlines (['\n']) in the string
@@ -469,7 +476,7 @@ val uint64_ns_span : int64 t
     by the International Astronomical Union.
 
     Rounds towards positive infinity, i.e. over approximates, no
-    duration is formatter shorter than it is.
+    duration is formatted shorter than it is.
 
     The output is UTF-8 encoded, it uses U+03BC for [µs] (10{^-6}[s]). *)
 

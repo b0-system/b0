@@ -29,7 +29,10 @@ val includes : affix:string -> string -> bool
 (** [includes ~affix s] is [true] iff there exists an index [j]
     such that for all indices [i] of [affix], [sub.[i] = s.[j+ 1]]. *)
 
-(** {1:find_indices Finding indices} *)
+(** {1:find_indices Finding indices}
+
+    {b TODO.} Harmonize indexing errors with {!find_sub}. This
+    never raises. *)
 
 val find_index : ?start:int -> (char -> bool) -> string -> int option
 (** [find_index ~start sat] is the index of the first character of
@@ -40,7 +43,7 @@ val rfind_index : ?start:int -> (char -> bool) -> string -> int option
     [s] that satisfies [sat] before or at [start] (defaults to
     [String.length s - 1]). *)
 
-(** {1:find_subs Finding and replacing substrings} *)
+(** {1:find_subs Finding substrings} *)
 
 val find_sub : ?start:int -> sub:string -> string -> int option
 (** [find_sub ~start ~sub s] is the start position (if any) of the
@@ -64,10 +67,11 @@ val rfind_sub : ?start:int -> sub:string -> string -> int option
 
 val find_sub_all :
   ?start:int -> (int -> 'acc -> 'acc) -> sub:string -> string -> 'acc -> 'acc
-(** [find_sub_all ~start f ~sub s acc], starting with [acc], folds [f] over
-    all non-overlapping starting positions of [sub] in [s] after or at
-    position [start] (which includes index [start] if it exists, defaults
-    to [0]). This is [acc] if [sub] could not be found in [s].
+(** [find_sub_all ~start f ~sub s acc], starting with [acc], folds [f]
+    over all non-overlapping starting positions of [sub] in [s] after
+    or at position [start] (which includes index [start] if it exists,
+    defaults to [0]). This is [acc] if [sub] could not be found in
+    [s].
 
     @raise Invalid_argument if [start] is not a valid position of [s]. *)
 
@@ -75,22 +79,25 @@ val rfind_sub_all :
   ?start:int -> (int -> 'acc -> 'acc) -> sub:string -> string -> 'acc -> 'acc
 (** [rfind_sub_all ~start f ~sub s acc], starting with [acc], folds
     [f] over all non-overlapping starting positions of [sub] in [s]
-    before or at position [start] (which includes index [start] if
-    it exists, defaults to [String.length s]). This is [acc] if
-    [sub] could not be found in [s].
+    before or at position [start] (which includes index [start] if it
+    exists, defaults to [String.length s]). This is [acc] if [sub]
+    could not be found in [s].
 
     @raise Invalid_argument if [start] is not a valid position of [s]. *)
 
+(** {1:replacing Replacing substrings} *)
+
 val replace_first : ?start:int -> sub:string -> by:string -> string -> string
-(** [replace_first ~start ~sub ~by s] replaces in [s] the first occurence
-    of [sub] at or after position [start] (defaults to [0]) by [by].
+(** [replace_first ~start ~sub ~by s] replaces in [s] the first
+    occurence of [sub] at or after position [start] (defaults to [0])
+    by [by].
 
     @raise Invalid_argument if [start] is not a valid position of [s]. *)
 
 val replace_all : ?start:int -> sub:string -> by:string -> string -> string
-(** [replace_all ~start ~sub ~by] replaces in [s] all
-    non-overlapping occurences of [sub] at or after position [start]
-    (default to [0]) by [by].
+(** [replace_all ~start ~sub ~by] replaces in [s] all non-overlapping
+    occurences of [sub] at or after position [start] (default to [0])
+    by [by].
 
     @raise Invalid_argument if [start] is not a valid position of [s]. *)
 

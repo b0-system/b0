@@ -126,6 +126,31 @@ let record ?(sep = cut) pps = vbox (concat ~sep pps)
 
 let char = raw_char
 let text = Format.pp_print_text
+let styled_text ppf s =
+  let rec loop ppf s i max =
+    if i > max then () else
+    let ansi = s.[i] = '\x1B' && i + 1 < max && s.[i+1] = '[' in
+      if not ansi then match s.[i] with
+      | ' ' when i = max || s.[i+1] = ' ' || s.[i+1] = '\n' ->
+          loop ppf s (i + 1) max
+      | ' ' -> sp ppf (); loop ppf s (i + 1) max
+      | '\n' when i = max || s.[i+1] = ' ' -> loop ppf s (i + 1) max
+      | '\n' when s.[i+1] = '\n' ->
+          Format.pp_force_newline ppf ();
+          if i > 0 && s.[i-1] <> '\n' then Format.pp_force_newline ppf ();
+          loop ppf s (i + 1) max
+      | '\n' -> sp ppf (); loop ppf s (i + 1) max
+      | c -> char ppf s.[i]; loop ppf s (i + 1) max
+      else begin
+        let k = ref (i + 2) in
+        while (!k <= max && s.[!k] <> 'm') do incr k done;
+        let esc = String.sub s i (!k - i + 1) in
+        Format.pp_print_as ppf 0 esc;
+        loop ppf s (!k + 1) max
+      end
+  in
+  loop ppf s 0 (String.length s - 1)
+
 
 let lines ppf s =
   let rec stop_at sat ~start ~max s =

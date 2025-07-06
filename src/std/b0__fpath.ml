@@ -13,6 +13,7 @@ let err_start s =
 
 let err_null s =
   B0__fmt.error "%a: Not a path: has null bytes" B0__fmt.OCaml.string s
+
 let err_empty s =
   B0__fmt.error "%a: Not a path: is empty" B0__fmt.OCaml.string s
 
@@ -158,7 +159,8 @@ module Windows = struct
     | '\\' -> Bytes.set b i '/'; i + 1
     | c -> pct_esc_set_char ~escape_space b i c
     in
-    B0__string.byte_escaper (pct_esc_len ~escape_space) set_char p
+    let p = B0__string.byte_escaper (pct_esc_len ~escape_space) set_char p in
+    if has_drive p then "/" ^ p else p
 end
 
 module Posix = struct

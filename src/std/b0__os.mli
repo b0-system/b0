@@ -125,13 +125,13 @@ module Path : sig
 
   type tmp_name = (string -> string, unit, string) format
   (** The type for temporary file name patterns. The string format
-      is replaced by random hexadecimal US-ASCII characters. *)
+      is replaced by random hexadecimal ASCII characters. *)
 
   val tmp :
     ?make_path:bool -> ?dir:B0__fpath.t -> ?name:tmp_name -> unit ->
     (B0__fpath.t, string) result
   (** [tmp ~make_path ~dir name ()] is a file system path in [dir] that
-      did not exist when the name was found. It may exist once the function
+      did not exist when the name was devised. It may exist once the function
       returns though, prefer temporary {{!File.tmpfiles}files} and
       {{!Dir.tmpdirs}directories} creation functions to guarantee the
       creation of the temporary objects.
