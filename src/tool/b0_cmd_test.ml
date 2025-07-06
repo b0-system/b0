@@ -48,9 +48,6 @@ let pp_report ppf (allow_long, test_count, total, dur, fails) =
         (test_unit_msg test_count)
         Test.Fmt.dur dur (Fmt.list (pp_fail ~allow_long)) fails
 
-let is_test u = B0_unit.(has_tag B0_meta.run u && has_tag B0_meta.test u)
-let is_long = B0_unit.has_tag B0_meta.long
-
 let show_what
     ~allow_long ~tests ~lock ~may_build ~must_build ~is_locked ~locked_packs c
   =
@@ -146,12 +143,18 @@ let test
   Log.if_error ~use:Os.Exit.no_such_name @@
   let* units = B0_unit.get_list_or_hint ~all_if_empty:false units in
   let* packs = B0_pack.get_list_or_hint ~all_if_empty:false packs in
+  let only_runnable = units = [] && packs = [] in
   let units, packs =
-    if units = [] && packs = [] then B0_cmd_build.get_default_build () else
+    if only_runnable then B0_cmd_build.get_default_build () else
     units, packs
   in
   let* x_units = B0_cli.get_excluded_units ~x_units ~x_packs in
   let tests, skip_tests =
+    let is_test u =
+      B0_unit.has_tag B0_meta.test u &&
+      if only_runnable then B0_unit.has_tag B0_meta.run u else true
+    in
+    let is_long = B0_unit.has_tag B0_meta.long in
     let packs = B0_pack.Set.of_list packs in
     let us = B0_cmd_build.unit_set_of ~units ~packs in
     let us = B0_unit.Set.diff us x_units in
