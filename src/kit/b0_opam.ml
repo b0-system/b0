@@ -674,33 +674,32 @@ module Publish = struct
            fetch and FETCH_HEAD becomes defined *)
         get_updated_local_repo git ~pkgs_repo ~local_repo:dir
 
-  let commit opam ~local_repo:repo ~branch ~pkgs_dir is _incs =
+  let commit opam ~local_repo:repo ~branch ~pkgs_dir pkginfos incompats =
     let stdout, stderr = stdout_logging () in
     let fetch_head = Some "FETCH_HEAD" and force = true in
     Log.stdout (fun m -> m "Branching %s…" branch);
-    Result.join @@
-    B0_vcs_repo.Git.with_transient_checkout
+    Result.join @@ B0_vcs_repo.Git.with_transient_checkout
       ?stdout ?stderr repo ~force ~branch fetch_head
     @@ fun r ->
-    let rec add_pkgs ~base_dir acc = function
-    | [] -> Ok acc
-    | i :: is ->
-        let file =
-          Fpath.(base_dir / Pkg.name i.pkg / versioned_name i / "opam")
-        in
-        let* contents = File.to_string opam ~normalize:true i.file in
-        match Os.File.write ~force:true ~make_path:true file contents with
-        | Error _ as e -> e
-        | Ok () -> add_pkgs ~base_dir (file :: acc) is
+    Result.join @@ Os.Dir.with_cwd Fpath.(B0_vcs_repo.work_dir r) @@ fun () ->
+    let incompats = String.concat "," incompats in
+    let add_pkg ~base_dir pkg =
+      let file =
+        Fpath.(base_dir / Pkg.name pkg.pkg / versioned_name pkg / "opam")
+      in
+      let* contents = File.to_string opam ~normalize:true pkg.file in
+      let* () = Os.File.write ~force:true ~make_path:true file contents in
+      if incompats = "" then Ok () else
+      let upperbound = Fmt.str "%s<%s" (Pkg.name pkg.pkg) pkg.version in
+      let add_constraint = Cmd.(opam % "admin" % "add-constraint") in
+      Os.Cmd.run Cmd.(add_constraint % "--packages" % incompats % upperbound)
     in
     let base_dir = Fpath.(B0_vcs_repo.work_dir r / pkgs_dir) in
-    let* files = add_pkgs ~base_dir [] is in
-    (* XXX at that point once we get a usable opam admin add-constraint
-       use appropriately with _incs, see
-       https://github.com/ocaml/opam/issues/3077 *)
-    let msg = msg_title is in
-    let* () = B0_vcs_repo.Git.add ?stdout ?stderr r ~force:false files in
-    let* () = B0_vcs_repo.commit_files ?stdout ?stderr ~msg r files in
+    let* () = List.iter_stop_on_error (add_pkg ~base_dir) pkginfos in
+    let msg = msg_title pkginfos in
+    let pkgs_dir = Fpath.v pkgs_dir in
+    let* () = B0_vcs_repo.Git.add ?stdout ?stderr r ~force:false [pkgs_dir] in
+    let* () = B0_vcs_repo.Git.commit ?stdout ?stderr ~msg r in
     Ok ()
 
   let github_auth_env ~github_auth:a =

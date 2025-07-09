@@ -202,11 +202,26 @@ pull request.
 
 {2:incompatibilities Stating incompatibilities}
 
-{b FIXME.} We need {{:https://github.com/ocaml/opam/issues/3077}this}
-in [opam-admin] to make that a reality. For now the best way is to
-make a separate request manually to state the incompatibilities and
-have it merged before your pull request and/or manually tweak the
-automated pull request.
+Package incompatibilites can be stated with the repeatable [-i
+PKG[.version]] option of [.opam publish]. This adds a proper upper
+bound to [PKG] as needed.
+
+For example the following publishes a new [mypkg] and states that
+all versions of [otherpack] and the
+version 2.1.0 of [thispack] are incompatible with it – provided
+[mypkg] is in their dependencies:
+
+{v
+b0 -- .opam publish mypkg -i otherpack -i thispack.2.1.0
+v}
+
+If you discover the incompatibilites only once the pull request has
+been made, repeat the same [.opam publish] invocation with more [-i]
+options, this will update the pull request.
+
+If for some reason that does not work you can manually make a separate
+request to state the incompatibilites and have it merged before your
+pull request and/or manually tweak the automated pull request.
 
 For the latter the simplest is to clone your github opam-repository
 checkout the branch of publication and push changes on it.
@@ -218,22 +233,6 @@ checkout the branch of publication and push changes on it.
    git commit -m 'Handle first round of failures'
    git push # This will automatically update the PR.
 v}
-
-fails because of the new releases. You can state the incompatibility
-with the repeatable [-i PKG[.version]] option. This will add an upper
-bound on [PKG] as needed.
-
-For example the following publishes a new [mypkg] and states that all
-versions of [otherpack] and the version 2.1.0 of [thispack] are
-incompatible with it – provided [mypkg] is in their dependencies:
-
-{v
-b0 -- .opam publish mypkg -i otherpack -i thispack.2.1.0
-v}
-
-If you discover the incompatibilites only once the pull request has
-been made, repeat the same [.opam publish] invocation with more [-i]
-options, this will update the pull request.
 
 {2:problems Dealing with pull request issues}
 
