@@ -204,7 +204,7 @@ module Repo = struct
     | Some p ->
         match String.split_on_char '/' p with
         | ("" :: owner :: repo :: _ ) ->
-            let repo = match String.rcut ~sep:"." repo with
+            let repo = match String.split_last ~sep:"." repo with
             | Some (r, "git") -> r | _ -> repo
             in
             Ok (make ~owner repo)

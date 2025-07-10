@@ -450,7 +450,7 @@ module Publish = struct
       url : string; }
 
   let versioned_name i = Fmt.str "%s.%s" (Pkg.name i.pkg) i.version
-  let split_version p = match String.cut ~sep:"." p with
+  let split_version p = match String.split_first ~sep:"." p with
   | None -> (p, None) | Some (name, v) -> (name, Some v)
 
   let warn_miss_changes pkg changes_file changes_latest =
@@ -601,7 +601,7 @@ module Publish = struct
     let stdin = Os.Cmd.in_string s in
     let shasum = Cmd.(shasum % "-b" % "-a" % shasum_algo % "-") in
     let* csum = Os.Cmd.run_out ~trim:true ~stdin shasum in
-    match String.cut ~sep:" " csum with
+    match String.split_first ~sep:" " csum with
     | None -> Ok csum | Some (csum, _) -> Ok csum
 
   let add_url_checksums http shasum ~check_only is =

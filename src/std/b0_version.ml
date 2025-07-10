@@ -32,11 +32,11 @@ let of_string s =
     | Some i -> Some (String.subrange ~last:(i - 1) s,
                       String.subrange ~first:i s)
   in
-  try match String.cut ~sep:"." s with
+  try match String.split_first ~sep:"." s with
   | None -> None
   | Some (maj, rest) ->
       let maj = int_of_string (string_drop_initial_v maj) in
-      match String.cut ~sep:"." rest with
+      match String.split_first ~sep:"." rest with
       | None ->
           begin match cut_left_plus_or_tilde rest with
           | None -> Some (maj, int_of_string rest, 0, None)

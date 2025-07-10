@@ -42,7 +42,7 @@ let os_release =
   let parse_line i acc line = match String.length (String.trim line) with
   | 0 -> acc | _ when line.[0] = '#' -> acc
   | _ ->
-      match String.cut ~sep:"=" line with
+      match String.split_first ~sep:"=" line with
       | None ->
           Fmt.failwith_line
             i " Cannot find %a char in %S" Fmt.(code' char) '=' line
@@ -201,7 +201,7 @@ let linux_family s m =
   | None -> B0_store.get s distribution
   | Some v ->
       Fut.return @@
-      match String.cut ~sep:" " v with None -> v | Some (f, _) -> f
+      match String.split_first ~sep:" " v with None -> v | Some (f, _) -> f
 
 let family =
   let det s m = Fut.bind (B0_store.get s name) @@ function

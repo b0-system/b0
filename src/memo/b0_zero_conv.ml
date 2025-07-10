@@ -313,7 +313,7 @@ module Op = struct
 
   let pp_spawn_full =
     let stamped_vars s =
-      let add_var acc ass = match String.cut ~sep:"=" ass with
+      let add_var acc ass = match String.split_first ~sep:"=" ass with
       | None -> acc | Some (var, _) -> var :: acc
       in
       List.fold_left add_var [] (Op.Spawn.stamped_env s)

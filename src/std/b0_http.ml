@@ -49,24 +49,24 @@ module Http = struct
 
     let status_of_status_line l =
       let err i = Fmt.error "%S: could not parse HTTP status code" i in
-      match String.split ~sep:" " l with
+      match String.split_all ~sep:" " l with
       | (_ :: code :: _) ->
           (try Ok (int_of_string code) with | Failure _ -> err code)
       | _ -> err l
 
     let headers_and_body_of_string s =
-      let rec loop acc s = match String.cut ~sep:"\r\n" s with
+      let rec loop acc s = match String.split_first ~sep:"\r\n" s with
       | None -> Fmt.failwith "%S: could not find CRLF" s
       | Some ("", body) -> Ok (List.rev acc, body)
       | Some (h, rest) ->
-          match String.cut ~sep:":" h with
+          match String.split_first ~sep:":" h with
           | None -> Fmt.failwith "%S: could not parse HTTP header" h
           | Some (k, v) ->
               loop ((String.lowercase_ascii k, String.trim v) :: acc) rest
       in
       try loop [] s with Failure e -> Error e
 
-    let of_string resp = match String.cut ~sep:"\r\n" resp with
+    let of_string resp = match String.split_first ~sep:"\r\n" resp with
     | None -> Fmt.error "%S: could not parse status line" resp
     | Some (status_line, rest) ->
         let* status = status_of_status_line status_line in

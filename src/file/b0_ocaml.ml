@@ -157,7 +157,7 @@ module Conf = struct
   (* IO *)
 
   let of_string ?(file = Fpath.dash) s =
-    let parse_line _ acc l = match String.cut ~sep:":" l with
+    let parse_line _ acc l = match String.split_first ~sep:":" l with
     | None -> acc (* XXX report an error *)
     | Some (k, v) -> String.Map.add (String.trim k) (String.trim v) acc
     in
@@ -213,7 +213,7 @@ module Modname = struct
   (* Filename mangling *)
 
   let mangle_filename s =
-    let rem_ocaml_ext s = match String.rcut ~sep:"." s with
+    let rem_ocaml_ext s = match String.split_last ~sep:"." s with
     | None -> s | Some (s, ("ml" | ".mli")) -> s | Some _ -> s
     in
     let mangle s =
@@ -315,7 +315,7 @@ module Modsrc = struct
       in
       let parse_line ~src_root n acc line =
         if line = "" then acc else
-        match String.rcut (* reverse, windows drives *) ~sep:":" line with
+        match String.split_last (* last, windows drives *) ~sep:":" line with
         | None -> Fmt.failwith_line n " cannot parse line: %S" line
         | Some (file, mods) ->
             let file = parse_path n file in
@@ -324,7 +324,7 @@ module Modsrc = struct
             | Some src_root -> Fpath.(src_root // file)
             in
             let add_mod acc m = Modname.Set.add m acc in
-            let mods = String.split ~drop:String.is_empty ~sep:" " mods in
+            let mods = String.split_all ~drop:String.is_empty ~sep:" " mods in
             let start = Modname.Set.singleton "Stdlib" in
             let mods = List.fold_left add_mod start mods in
             Fpath.Map.add file mods acc
@@ -538,12 +538,12 @@ module Libname = struct
 
   let basename n =
     let n = Fpath.to_string n.name in
-    match String.rcut ~sep:Fpath.natural_dir_sep n with
+    match String.split_last ~sep:Fpath.natural_dir_sep n with
     | None -> n | Some (_, n) -> n
 
   let root n =
     let n = Fpath.to_string n.name in
-    match String.cut ~sep:Fpath.natural_dir_sep n with
+    match String.split_first ~sep:Fpath.natural_dir_sep n with
     | None -> n | Some (n, _) -> n
 
   let segments n = Fpath.to_segments n.name
@@ -763,7 +763,7 @@ module Libresolver = struct
           let to_libname = parse_field "required library" Libname.of_string in
           (* ocamlfind does not normalize *)
           let skip_ws = String.drop_while Char.Ascii.is_white in
-          let get_tok = String.span_while (Fun.negate Char.Ascii.is_white) in
+          let get_tok = String.cut_while (Fun.negate Char.Ascii.is_white) in
           let rec rev_toks acc s =
             let s = skip_ws s in
             match get_tok s with
@@ -776,18 +776,18 @@ module Libresolver = struct
       let parse_archive = function
       | "" -> None
       | a ->
-          match String.rcut ~sep:"." a with
+          match String.split_last ~sep:"." a with
           | None -> Some a | Some (a, _ext) -> Some a
 
       let parse_dir dir = parse_field "library directory" Fpath.of_string dir
       let parse_js_stubs js_stubs =
         let to_path s = parse_field "js stubs" Fpath.of_string s in
-        let stubs = String.split ~drop:String.is_empty ~sep:"," js_stubs in
+        let stubs = String.split_all ~drop:String.is_empty ~sep:"," js_stubs in
         List.map to_path stubs
 
       let parse_warning = function "" -> None | w -> Some w
 
-      let get_meta_file data = match String.cut ~sep:":" data with
+      let get_meta_file data = match String.split_first ~sep:":" data with
       | None -> None
       | Some (m, _) -> Result.to_option (Fpath.of_string m)
 
@@ -1899,7 +1899,7 @@ module Cobj = struct
   let rec parse_ldeps acc file defs deps ldeps name = function
   | [] -> make_cobj file defs deps ldeps :: acc
   | ((n, l) :: ls) as data ->
-      match String.rcut ~sep:"\t" l with
+      match String.split_last ~sep:"\t" l with
       | None -> parse_file acc file defs deps ldeps data
       | Some (_, ldep) ->
           let ldeps = String.Set.add (String.trim ldep) ldeps in
@@ -1908,7 +1908,7 @@ module Cobj = struct
   and parse_deps acc file defs deps ldeps name = function
   | [] -> make_cobj file defs deps ldeps :: acc
   | ((n, l) :: ls) as data ->
-      match String.rcut ~sep:"\t" l with
+      match String.split_last ~sep:"\t" l with
       | None ->
           begin match l with
           | l
@@ -1945,7 +1945,7 @@ module Cobj = struct
   | [] -> make_cobj file defs deps ldeps :: acc
   | (n, l) :: ls when String.starts_with ~prefix:"Unit name" l ||
                       String.starts_with ~prefix:"Name" l ->
-      begin match String.cut ~sep:":" l with
+      begin match String.split_first ~sep:":" l with
       | None -> assert false
       | Some (_, name) ->
           parse_unit acc file defs deps ldeps (String.trim name) ls

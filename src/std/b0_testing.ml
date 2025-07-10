@@ -725,7 +725,7 @@ module Test = struct
          This breaks on '\n', escapes with a slash and newline and indents. *)
       let white_start l = if l = "" then false else Char.Ascii.is_white l.[0] in
       let escape_start l = if white_start l then "\\" ^ l else " " ^ l in
-      let lines = String.split ~sep:{|\n|} s in
+      let lines = String.split_all ~sep:{|\n|} s in
       let lines = match List.rev lines with
       | "\"" :: prevs -> (* Last empty line, dont add a line for that *)
           begin match prevs with
@@ -758,12 +758,12 @@ module Test = struct
             line_start + last - 1 (* last is a position in the String sense  *)
           in
           let loc_of = "__POS_OF__" in
-          match String.find_sub ~start ~sub:loc_of s with
+          match String.find_first ~start ~sub:loc_of s with
           | None -> Fmt.failwith "%s:%d: no __POS_OF__ found" fname lnum
           | Some start ->
               let start = start + String.length loc_of in
               let is_value_start = Fun.negate Char.Ascii.is_white in
-              match String.find_index ~start is_value_start s with
+              match String.find_first_index ~start is_value_start s with
               | None -> Fmt.failwith "%s:%d: no value found" fname lnum
               | Some vstart -> vstart, last
 

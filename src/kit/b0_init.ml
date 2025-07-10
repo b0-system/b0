@@ -70,7 +70,7 @@ type spdxid = string
 let download_license_template ?httpc ~strip_meta id =
   let strip_meta_block text =
     let marker = "\n---\n" in
-    match String.find_sub ~sub:marker text with
+    match String.find_first ~sub:marker text with
     | None -> Fmt.error "Could not strip meta block from license template"
     | Some i ->
         let text = String.subrange ~first:(i + String.length marker) text in
@@ -92,7 +92,7 @@ let download_license_template ?httpc ~strip_meta id =
   | st -> Fmt.error "[%d] Could not download a license template for %s" st id
 
 let substitute_var ~var ~value text =
-  let rec loop acc text = match String.find_sub ~sub:var text with
+  let rec loop acc text = match String.find_first ~sub:var text with
   | None when acc = [] -> None
   | None -> Some (String.concat "" (List.rev (text :: acc)))
   | Some i ->

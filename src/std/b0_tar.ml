@@ -24,7 +24,7 @@ let set_filename h path =
   match String.length s with
   | n when n <= 100 -> Bytes.blit_string s 0 h 0 n
   | n ->
-      try match String.rcut ~sep:"/" s with
+      try match String.split_last ~sep:"/" s with
       | None -> raise Exit
       | Some (prefix, name) ->
           (* This could be made more clever by trying to find
