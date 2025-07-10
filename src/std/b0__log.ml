@@ -169,6 +169,12 @@ let time ?(level = Info) m f =
        let header = Format.asprintf "%a" B0__mtime.Span.pp span in
        m v (w ~header))
 
+(* Values *)
+
+let value ?(level = Stderr) ?id pp v = match id with
+| None -> kmsg (fun _ -> v) level (fun m -> m "%a" pp v)
+| Some id -> kmsg (fun _ -> v) level (fun m -> m "id: @[%a@]" pp v)
+
 (* Spawn logging *)
 
 let spawn_tracer level =

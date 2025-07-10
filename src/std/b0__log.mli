@@ -15,6 +15,8 @@
 ]}
     See also the {{!page-cookbook.logging}cookbook} on logging.
 
+    {b TODO.} Think about implicit locations.
+
     @canonical B0_std.Log *)
 
 (** {1:levels Reporting levels} *)
@@ -147,6 +149,12 @@ val time :
     {b Note.} The reporting {!level} is determined after [f] has been
     called. This means [f] can change it to affect the report.
     See for example {!page-cookbook.logging_main} *)
+
+(** {2:log Logging values} *)
+
+val value : ?level:level -> ?id:string -> 'a B0__fmt.t -> 'a -> 'a
+(** [value pp v] reports [v] on [level] (defaults to {!Stderr}) with
+    [pp] if [id] is specified this is of the form "%s: %a" and returns [v] *)
 
 (** {2:spawns Logging spawns} *)
 

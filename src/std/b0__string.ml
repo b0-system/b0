@@ -20,13 +20,13 @@ let is_empty s = equal empty s
 
 (* FIXME make indices work like find_sub *)
 
-let find_index ?(start = 0) sat s =
+let find_first_index ?(start = 0) sat s =
   let max = length s - 1 in
   let i = ref start in
   while (!i <= max && not (sat s.[!i])) do incr i done;
   if !i > max then None else Some !i
 
-let rfind_index ?start sat s =
+let find_last_index ?start sat s =
   let start = match start with None -> length s - 1 | Some s -> s in
   let i = ref start in
   while (0 <= !i && not (sat s.[!i])) do decr i done;
@@ -167,12 +167,12 @@ let includes ~affix:sub s =
   let sub_lp = find_maximal_suffix_and_period ~sub in
   primitive_find_sub ~start:0 ~sub ~sub_lp s <> -1
 
-let find_sub ?(start = 0) ~sub s =
+let find_first ?(start = 0) ~sub s =
   let sub_lp = find_maximal_suffix_and_period ~sub in
   match primitive_find_sub ~start ~sub_lp ~sub s with
   | -1 -> None | i -> Some i
 
-let rfind_sub ?start ~sub s =
+let find_last ?start ~sub s =
   let start = match start with None -> length s | Some s -> s in
   (* Once reverse two way works
   let sub_lp = find_maximal_suffix_and_period ~sub in
@@ -181,7 +181,7 @@ let rfind_sub ?start ~sub s =
   *)
   match primitive_rfind_sub ~start ~sub s with -1 -> None | i -> Some i
 
-let find_sub_all ?(start = 0) f ~sub s acc =
+let find_all ?(start = 0) f ~sub s acc =
   let rec loop f acc sub sub_lp s ~start ~slen =
     if start > slen then acc else
     match primitive_find_sub ~start ~sub ~sub_lp s with
@@ -197,7 +197,7 @@ let find_sub_all ?(start = 0) f ~sub s acc =
   let sub_lp = find_maximal_suffix_and_period ~sub in
   loop f acc sub sub_lp s ~start ~slen
 
-let rfind_sub_all ?start f ~sub s acc =
+let rfind_all ?start f ~sub s acc =
   (* Once reverse two way works
   let rec loop f acc sub sub_lp s ~start ~slen =
     if start < 0 then acc else
@@ -234,13 +234,22 @@ let replace_first ?(start = 0) ~sub:needle ~by s =
       let rest_len = length s - i - length needle in
       concat by [sub s 0 i; sub s rest_first rest_len]
 
+let replace_last ?start ~sub:needle ~by s =
+  let start = match start with None -> length s | Some s -> s in
+  match primitive_rfind_sub ~start ~sub:needle s with
+  | -1 -> s
+  | i ->
+      let rest_first = i + length needle in
+      let rest_len = length s - i - length needle in
+      concat by [sub s 0 i; sub s rest_first rest_len]
+
 let replace_all ?start ~sub:needle ~by s =
   let chunk_first = ref 0 in
   let add_chunk i acc =
     let acc = sub s !chunk_first (i - !chunk_first) :: acc in
     chunk_first := i + length needle; acc
   in
-  match find_sub_all ?start add_chunk ~sub:needle s [] with
+  match find_all ?start add_chunk ~sub:needle s [] with
   | [] -> s
   | chunks ->
       let chunks = sub s !chunk_first (length s - !chunk_first) :: chunks in
@@ -259,10 +268,10 @@ let subrange ?(first = 0) ?last s =
 
 let take n s = subrange ~last:(n - 1) s
 let drop n s = subrange ~first:n s
-let span n s = (take n s, drop n s)
+let cut n s = (take n s, drop n s)
 let rtake n s = subrange ~first:(length s - n) s
 let rdrop n s = subrange ~last:(length s - n - 1) s
-let rspan n s = (rdrop n s, rtake n s)
+let rcut n s = (rdrop n s, rtake n s)
 
 (* Breaking with predicates *)
 
@@ -276,7 +285,7 @@ let drop_while sat s =
   while !i < len && sat (unsafe_get s !i) do incr i done;
   if !i = 0 then s else sub s !i (len - !i)
 
-let span_while sat s =
+let cut_while sat s =
   let len = length s and i = ref 0 in
   while !i < len && sat (unsafe_get s !i) do incr i done;
   if !i = len then s, "" else
@@ -295,7 +304,7 @@ let rdrop_while sat s =
   while !i >= 0 && sat (unsafe_get s !i) do decr i done;
   if !i < 0 then "" else sub s 0 (!i + 1)
 
-let rspan_while sat s =
+let rcut_while sat s =
   let len = length s in
   let i = ref (len - 1) in
   while !i >= 0 && sat s.[!i] do decr i done;
@@ -306,33 +315,33 @@ let rspan_while sat s =
 
 (* Breaking with separators *)
 
-let cut ~sep s = match find_sub ~sub:sep s with
+let split_first ~sep s = match find_first ~sub:sep s with
 | None -> None
 | Some i -> Some (subrange ~last:(i - 1) s, subrange ~first:(i + length sep) s)
 
-let rcut ~sep s = match rfind_sub ~sub:sep s with
+let split_last ~sep s = match find_last ~sub:sep s with
 | None -> None
 | Some i -> Some (subrange ~last:(i - 1) s, subrange ~first:(i + length sep) s)
 
-let split ?(drop = Fun.const false) ~sep s =
+let split_all ?(drop = Fun.const false) ~sep s =
   let first = ref 0 in
   let add_token i acc =
     let token = subrange ~first:!first ~last:(i - 1) s in
     first := i + length sep;
     if drop token then acc else token :: acc
   in
-  let tokens = find_sub_all add_token ~sub:sep s [] in
+  let tokens = find_all add_token ~sub:sep s [] in
   let last = subrange ~first:!first s in
   List.rev (if drop last then tokens else last :: tokens)
 
-let rsplit ?(drop = Fun.const false) ~sep s =
+let rsplit_all ?(drop = Fun.const false) ~sep s =
   let last = ref (length s - 1) in
   let add_token i acc =
     let token = subrange ~first:(i + length sep) ~last:!last s in
     last := i - 1;
     if drop token then acc else token :: acc
   in
-  let tokens = rfind_sub_all add_token ~sub:sep s [] in
+  let tokens = rfind_all add_token ~sub:sep s [] in
   let last = subrange ~last:!last s in
   if drop last then tokens else (last :: tokens)
 

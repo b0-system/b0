@@ -34,19 +34,19 @@ val includes : affix:string -> string -> bool
     {b TODO.} Harmonize indexing errors with {!find_sub}. This
     never raises. *)
 
-val find_index : ?start:int -> (char -> bool) -> string -> int option
-(** [find_index ~start sat] is the index of the first character of
+val find_first_index : ?start:int -> (char -> bool) -> string -> int option
+(** [find_first_index ~start sat] is the index of the first character of
     [s] that satisfies [sat] before or at [start] (defaults to [0]). *)
 
-val rfind_index : ?start:int -> (char -> bool) -> string -> int option
-(** [rfind_index ~start sat] is the index of the first character of
+val find_last_index : ?start:int -> (char -> bool) -> string -> int option
+(** [find_last_index ~start sat] is the index of the last character of
     [s] that satisfies [sat] before or at [start] (defaults to
     [String.length s - 1]). *)
 
 (** {1:find_subs Finding substrings} *)
 
-val find_sub : ?start:int -> sub:string -> string -> int option
-(** [find_sub ~start ~sub s] is the start position (if any) of the
+val find_first : ?start:int -> sub:string -> string -> int option
+(** [find_first ~start ~sub s] is the start position (if any) of the
     first occurence of [sub] in [s] after or at position [start]
     (which includes index [start] if it exists, defaults to [0]).
     Note if you need to search for [sub] multiple times in [s] use
@@ -54,9 +54,9 @@ val find_sub : ?start:int -> sub:string -> string -> int option
 
     @raise Invalid_argument if [start] is not a valid position of [s]. *)
 
-val rfind_sub : ?start:int -> sub:string -> string -> int option
-(** [rfind_sub ~start ~sub s] is the start position (if any) of the
-    first occurences of [sub] in [s] before or at position [start]
+val find_last : ?start:int -> sub:string -> string -> int option
+(** [find_last ~start ~sub s] is the start position (if any) of the
+    last occurences of [sub] in [s] before or at position [start]
     (which includes index [start] if it exists, defaults to
     [String.length s]).
 
@@ -65,9 +65,9 @@ val rfind_sub : ?start:int -> sub:string -> string -> int option
 
     @raise Invalid_argument if [start] is not a valid position of [s]. *)
 
-val find_sub_all :
+val find_all :
   ?start:int -> (int -> 'acc -> 'acc) -> sub:string -> string -> 'acc -> 'acc
-(** [find_sub_all ~start f ~sub s acc], starting with [acc], folds [f]
+(** [find_all ~start f ~sub s acc], starting with [acc], folds [f]
     over all non-overlapping starting positions of [sub] in [s] after
     or at position [start] (which includes index [start] if it exists,
     defaults to [0]). This is [acc] if [sub] could not be found in
@@ -75,9 +75,9 @@ val find_sub_all :
 
     @raise Invalid_argument if [start] is not a valid position of [s]. *)
 
-val rfind_sub_all :
+val rfind_all :
   ?start:int -> (int -> 'acc -> 'acc) -> sub:string -> string -> 'acc -> 'acc
-(** [rfind_sub_all ~start f ~sub s acc], starting with [acc], folds
+(** [rfind_all ~start f ~sub s acc], starting with [acc], folds
     [f] over all non-overlapping starting positions of [sub] in [s]
     before or at position [start] (which includes index [start] if it
     exists, defaults to [String.length s]). This is [acc] if [sub]
@@ -88,9 +88,17 @@ val rfind_sub_all :
 (** {1:replacing Replacing substrings} *)
 
 val replace_first : ?start:int -> sub:string -> by:string -> string -> string
-(** [replace_first ~start ~sub ~by s] replaces in [s] the first
-    occurence of [sub] at or after position [start] (defaults to [0])
-    by [by].
+(** [replace_first ~start ~sub ~by s] replaces by [by] in [s] the first
+    occurence of [sub] at or after position [start] (which includes index
+    [start] if it exists, defaults to [0]) by [by].
+
+    @raise Invalid_argument if [start] is not a valid position of [s]. *)
+
+val replace_last : ?start:int -> sub:string -> by:string -> string -> string
+(** [replace_last ~start ~sub ~by s] replaces by [by] in [s] the last
+    occurence of [sub] at or before position [start]
+    (which includes index [start] if it exists, defaults to
+    [String.length s]).
 
     @raise Invalid_argument if [start] is not a valid position of [s]. *)
 
@@ -133,11 +141,11 @@ val rdrop : int -> string -> string
 (** [rdrop n s] is [s] without the last [n] bytes of [s]. This is [""]
     if [n >= length s] and [s] if [n <= 0]. *)
 
-val span : int -> string -> string * string
-(** [span n v] is [(take n v, drop n v)]. *)
+val cut : int -> string -> string * string
+(** [cut n v] is [(take n v, drop n v)]. *)
 
-val rspan : int -> string -> string * string
-(** [rspan n v] is [(rdrop n v, rtake n v)]. *)
+val rcut : int -> string -> string * string
+(** [rcut n v] is [(rdrop n v, rtake n v)]. *)
 
 (** {2:break_pred Breaking with predicates} *)
 
@@ -157,41 +165,40 @@ val rdrop_while : (char -> bool) -> string -> string
 (** [rdrop_while sat s] is [s] without the last consecutive [sat]
     satisfying bytes of [s]. *)
 
-val span_while : (char -> bool) -> string -> string * string
-(** [span_while sat s] is [(take_while sat s, drop_while sat s)]. *)
+val cut_while : (char -> bool) -> string -> string * string
+(** [cut_while sat s] is [(take_while sat s, drop_while sat s)]. *)
 
-val rspan_while : (char -> bool) -> string -> string * string
+val rcut_while : (char -> bool) -> string -> string * string
 (** [rspan_while sat s] is [(rdrop_while sat s, rtake_while sat s)]. *)
 
 (** {2:break_sep Breaking with separators} *)
 
-val cut : sep:string -> string -> (string * string) option
-(** [cut ~sep s] is the pair [Some (left, right)] made of the two
+val split_first : sep:string -> string -> (string * string) option
+(** [split_first ~sep s] is the pair [Some (left, right)] made of the two
     (possibly empty) substrings of [s] that are delimited by the first
     match of the separator [sep] or [None] if [sep] can't be matched in
-    [s]. Matching starts at position [0] using {!find_sub}.
+    [s]. Matching starts at position [0] using {!find_first}.
 
     The invariant [concat sep [left; right] = s] holds. *)
 
-val rcut : sep:string -> string -> (string * string) option
-(** [rcut ~sep s] is like {!cut} but matching starts at position
-    [length s] using {!rfind_sub}. *)
+val split_last : sep:string -> string -> (string * string) option
+(** [split_last ~sep s] is like {!split_first} but matching starts at position
+    [length s] using {!find_last}. *)
 
-val split : ?drop:(string -> bool) -> sep:string -> string -> string list
-(** [split ~sep s] is the list of all substrings of [s] that are
+val split_all : ?drop:(string -> bool) -> sep:string -> string -> string list
+(** [split_all ~sep s] is the list of all substrings of [s] that are
     delimited by non-overlapping matches of the separator [sep].  If
     [sep] can't be matched in [s], the list [[s]] is returned.
-    Matches starts at position [0] and are determined using
-    {!find_sub_all}.
+    Matches starts at position [0] and are determined using {!find_all}.
 
     Substrings [sub] for which [drop sub] is [true] are not included
     in the result. [drop] default to [Fun.const false].
 
     The invariant [concat sep (split ~sep s) = s] holds. *)
 
-val rsplit : ?drop:(string -> bool) -> sep:string -> string -> string list
-(** [rsplit ~sep s] is like {!split} but matching starts at position
-    [length s] using {!rfind_sub_all} *)
+val rsplit_all : ?drop:(string -> bool) -> sep:string -> string -> string list
+(** [rsplit_all ~sep s] is like {!split_all} but matching starts at position
+    [length s] using {!rfind_all} *)
 
 (** {2:break_lines Breaking lines} *)
 

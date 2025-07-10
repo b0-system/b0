@@ -293,7 +293,7 @@ module Env = struct
 
   let parse_assignments ?(init = B0__string.Map.empty) fold v =
     try
-      let add acc assign = match B0__string.cut ~sep:"=" assign with
+      let add acc assign = match B0__string.split_first ~sep:"=" assign with
       | Some (var, value) -> add var value acc
       | None ->
           B0__fmt.failwith_notrace
@@ -1390,7 +1390,8 @@ module Cmd = struct
           Error (`Dirs (String.split_on_char B0__fpath.search_path_sep.[0] p))
       | p ->
           let dir, p =
-            match B0__string.cut ~sep:B0__fpath.search_path_sep p with
+            let sep = B0__fpath.search_path_sep in
+            match B0__string.split_first ~sep p with
             | None -> p, ""
             | Some (dir, p) -> dir, p
           in

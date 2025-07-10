@@ -578,7 +578,7 @@ let list_of_search_path ?(sep = search_path_sep) path =
   let rec loop acc = function
   | ""  -> Ok (List.rev acc)
   | rest ->
-      let dir, rest = match B0__string.cut ~sep rest with
+      let dir, rest = match B0__string.split_first ~sep rest with
       | None -> rest, ""
       | Some (dir, rest) -> dir, rest
       in
