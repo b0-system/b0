@@ -105,7 +105,7 @@ let exits =
   Cmd.Exit.info err_no_log_file ~doc:"no log file found." ::
   Cmd.Exit.defaults
 
-let configure_log = B0_std_cli.configure_log ()
+let set_log_level = B0_std_cli.set_log_level ()
 let b0_dir = B0_cli.Memo.b0_dir ()
 let cache_dir = B0_cli.Memo.cache_dir ()
 let log_file =
@@ -115,7 +115,7 @@ let log_file =
     Cmdliner.Cmd.Env.info ~doc B0_cli.Memo.log_file_env
   in
   let absent = "Default $(b,_log) in b0 directory" in
-  Arg.(value & pos 0 (some B0_std_cli.fpath) None &
+  Arg.(value & pos 0 (some B0_std_cli.filepath) None &
        info [] ~absent ~env ~doc ~docv)
 
 (* Commands *)
@@ -124,7 +124,7 @@ let delete =
   let doc = "Delete cache or given keys" in
   let man = man [] in
   Cmd.make (Cmd.info "delete" ~doc ~exits ~man) @@
-  let+ configure_log and+ b0_dir and+ cache_dir
+  let+ set_log_level and+ b0_dir and+ cache_dir
   and+ keys = B0_cli.File_cache.keys_none_is_all ~pos_right:(-1) () in
   delete ~b0_dir ~cache_dir ~keys
 
@@ -132,21 +132,21 @@ let gc =
   let doc = "Only keep keys used by the build described by $(i,LOG_FILE)" in
   let man = man [] in
   Cmd.make (Cmd.info "gc" ~doc ~exits ~man) @@
-  let+ configure_log and+ b0_dir and+ cache_dir and+ log_file in
+  let+ set_log_level and+ b0_dir and+ cache_dir and+ log_file in
   gc ~b0_dir ~cache_dir ~log_file
 
 let keys =
   let doc = "List cache keys" in
   let man = man [] in
   Cmd.make (Cmd.info "keys" ~doc ~exits ~man) @@
-  let+ configure_log and+ b0_dir and+ cache_dir in
+  let+ set_log_level and+ b0_dir and+ cache_dir in
   keys ~b0_dir ~cache_dir
 
 let path =
   let doc = "Output cache directory path (may not exist)" in
   let man = man [] in
   Cmd.make (Cmd.info "path" ~doc ~exits ~man) @@
-  let+ configure_log and+ b0_dir and+ cache_dir in
+  let+ set_log_level and+ b0_dir and+ cache_dir in
   path ~b0_dir ~cache_dir
 
 let stats, stats_term =
@@ -157,7 +157,7 @@ let stats, stats_term =
             to determine used keys." ]
   in
   let term =
-    let+ configure_log and+ b0_dir and+ cache_dir and+ log_file in
+    let+ set_log_level and+ b0_dir and+ cache_dir and+ log_file in
     stats ~b0_dir ~cache_dir ~log_file
   in
   Cmd.make (Cmd.info "stats" ~doc ~exits ~man) term, term
@@ -172,7 +172,7 @@ let trim =
             preserved if possible."; ]
   in
   Cmd.make (Cmd.info "trim" ~doc ~exits ~man) @@
-  let+ configure_log and+ b0_dir and+ cache_dir and+ log_file
+  let+ set_log_level and+ b0_dir and+ cache_dir and+ log_file
   and+ trim_spec = B0_cli.File_cache.trim_cli () in
   trim ~b0_dir ~cache_dir ~log_file ~trim_spec
 

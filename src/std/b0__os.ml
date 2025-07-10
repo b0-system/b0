@@ -46,6 +46,20 @@ module Mtime = struct
     count measure
 end
 
+(* Handle the recursive dep with Log *)
+
+let time ?(level = B0__log.Info) m f =
+  let time = Mtime.counter () in
+  let v = f () in
+  let span = Mtime.count time in
+  B0__log.kmsg (fun () -> v) level
+    (fun w ->
+       let header = Format.asprintf "%a" B0__mtime.Span.pp span in
+       m v (w ~header))
+
+let () = B0__log.set_time_func { time = time }
+
+
 module Fd = struct
   let unix_buffer_size = 65536 (* UNIX_BUFFER_SIZE 4.0.0 *)
 
@@ -1547,9 +1561,23 @@ module Cmd = struct
     B0__cmd.t -> unit
 
   let spawn_tracer_nop _ _ ~cwd:_ _ = ()
-  let _spawn_tracer = ref spawn_tracer_nop
-  let spawn_tracer () = !_spawn_tracer
-  let set_spawn_tracer t = _spawn_tracer := t
+  let spawn_tracer_log level =
+    if level = B0__log.Quiet then spawn_tracer_nop else
+    let header = function
+    | None -> "EXECV" | Some pid -> "EXEC:" ^ string_of_int pid
+    in
+    let pp_env ppf = function
+    | None -> ()
+    | Some env ->
+        B0__fmt.pf ppf "%a@," (B0__fmt.list B0__fmt.OCaml.string) env
+    in
+    fun pid env ~cwd cmd ->
+      B0__log.msg level (fun m ->
+          m ~header:(header pid) "@[<v>%a%a@]" pp_env env B0__cmd.pp_dump cmd)
+
+  let spawn_tracer' = Atomic.make (spawn_tracer_log Debug)
+  let spawn_tracer () = Atomic.get spawn_tracer'
+  let set_spawn_tracer tracer = Atomic.set spawn_tracer' tracer
 
   let rec getcwd () = try Unix.getcwd () with
   | Unix.Unix_error (Unix.EINTR, _, _) -> getcwd ()
@@ -1589,7 +1617,7 @@ module Cmd = struct
           in
           if change_cwd then chdir old_cwd; (* XXX pid zombie on fail. *)
           Fd.Set.close_all fds;
-          !_spawn_tracer (Some pid) env ~cwd cmd;
+          (Atomic.get spawn_tracer') (Some pid) env ~cwd cmd;
           pid
         with
         | e ->
@@ -1732,7 +1760,7 @@ module Cmd = struct
             fun () -> try chdir old_cwd with Failure _ -> ()
           in
           Fun.protect ~finally:reset_cwd @@ fun () ->
-          !_spawn_tracer None env ~cwd cmd;
+          (Atomic.get spawn_tracer') None env ~cwd cmd;
           _execv ~env file (Array.of_list args)
         with
         | Failure e -> err_execv file e
@@ -1742,8 +1770,7 @@ module Cmd = struct
 end
 
 module Exit = struct
-  (* Very ugly, but Log depends on a bunch of stuff in Os *)
-  let log_error : (string -> unit) ref = ref (fun _ -> assert false)
+  let log_error e = B0__log.err (fun m -> m "@[%a@]" B0__fmt.lines e)
 
   type code = int
   type execv =
@@ -1764,7 +1791,7 @@ module Exit = struct
   let cli_error = Code 124
   let internal_error = Code 125
 
-  let exit_some_error e = !log_error e; some_error
+  let exit_some_error e = log_error e; some_error
   let of_result = function Ok () -> ok | Error e -> exit_some_error e
   let of_result' = function Ok e -> e | Error e -> exit_some_error e
 
@@ -1778,7 +1805,7 @@ module Exit = struct
   | Execv { env; cwd; argv0; cmd } ->
       match Cmd.execv ?env ?cwd ?argv0 cmd with
       | Ok _ -> assert false
-      | Error e -> !log_error e; exit on_error
+      | Error e -> log_error e; exit on_error
 
   let on_sigint ~hook f =
     let hook _ = hook (); Stdlib.exit 130 (* as if SIGINT signaled *) in

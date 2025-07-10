@@ -200,7 +200,9 @@ let dyn_units ~args =
   then server_mode_unit args
   else unit_mode_units args
 
-let show_url env browser background prefix timeout dry_run no_exec args =
+let show_url
+    ~env ~browser ~background ~prefix ~timeout ~dry_run ~no_exec ~args
+  =
   let secs timeout = Mtime.Span.(timeout * s) in
   Log.if_error ~use:Os.Exit.some_error @@
   let search = B0_env.get_cmd env in
@@ -241,6 +243,7 @@ let unit =
   let doc = "Show URLs of files or servers in browsers" in
   B0_unit.of_cmdliner_cmd "" ~dyn_units ~doc @@ fun env u ->
   let open Cmdliner in
+  let open Cmdliner.Term.Syntax in
   let man =
     [ `S Manpage.s_synopsis;
       `P "$(iname) [$(i,OPTION)]… $(i,UNIT[:PATH])…";
@@ -274,7 +277,8 @@ let unit =
       `P "Consult $(b,odig doc b0) for the $(b,B0_show_url) \
           module documentation."]
   in
-  let args =
+  Cmd.make (Cmd.info (B0_unit.name u) ~doc ~man) @@
+  let+ args =
     let doc =
       "This is either a list of $(i,UNIT[:PATH]) arguments or an $(i,URL) \
        followed by a tool invocation. The mode of operation is \
@@ -282,30 +286,26 @@ let unit =
        in the first argument to catch an URL."
     in
     Arg.(non_empty & pos_all string [] & info [] ~doc ~docv:"ARGS")
-  in
-  let timeout =
+  and+ timeout =
     let doc = "Maximal number of seconds to wait for the port to \
                become connectable. Default is defined by \
                $(b,b0 get .show-url.timeout) $(i,TOOL)."
     in
     let docv = "SECS" in
     Arg.(value & opt (some int) None & info ["t"; "timeout"] ~doc ~docv)
-  in
-  let dry_run =
+  and+ dry_run =
     let doc =
       "Build but do not show the URLs. Print them or print the tool \
        invocation."
     in
     Arg.(value & flag & info ["dry-run"] ~doc)
-  in
-  let no_exec =
+  and+ no_exec =
     let doc = "Show URL but do not invoke a tool." in
     Arg.(value & flag & info ["n"; "no-exec"] ~doc)
-  in
-  Cmd.make (Cmd.info (B0_unit.name u) ~doc ~man) @@
-  Term.(const show_url $ const env $ B0_web_browser.browser () $
-        B0_web_browser.background () $ B0_web_browser.prefix ~default:true () $
-        timeout $ dry_run $ no_exec $ args)
+  and+ browser = B0_web_browser.browser ()
+  and+ background = B0_web_browser.background ()
+  and+ prefix = B0_web_browser.prefix ~default:true () in
+  show_url ~env ~browser ~background ~prefix ~timeout ~dry_run ~no_exec ~args
 
 (* Unit action *)
 

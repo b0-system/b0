@@ -3,7 +3,6 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-
 module Cmd = B0__cmd
 module Fmt = B0__fmt
 module Fpath = B0__fpath
@@ -11,11 +10,15 @@ module Log = B0__log
 module Mtime = B0__mtime
 module Os = B0__os
 
+(* Stdlib extensions *)
+
 module Char = B0__char
 module List = B0__list
 module Result = B0__result
 module String = B0__string
 module Type = B0__type
+
+(* Concurrency *)
 
 module Fut = struct
   type 'a state = Det of 'a | Undet of { mutable awaits : ('a -> unit) list }

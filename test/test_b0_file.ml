@@ -18,8 +18,7 @@ let main () =
   let cmd =
     let path =
       let doc = "$(docv) is the b0 file to read" in
-      Arg.(required & pos 0 (some B0_std_cli.fpath) None &
-           info [] ~doc ~docv:"PATH")
+      Arg.(required & pos 0 (some B0_std_cli.filepath) None & info [] ~doc)
     in
     Cmd.make (Cmd.info "test-b0-file" ~sdocs:Manpage.s_common_options) @@
     Term.(const b0_file_read $ path)

@@ -6,7 +6,7 @@
 open B0_std
 open Result.Syntax
 
-let log ~output_verbosity ~log_format ~op_query c =
+let log ~output_details ~log_format ~op_query c =
   Log.if_error ~use:Os.Exit.some_error @@
   let don't = B0_driver.Conf.no_pager c || log_format = `Trace_event in
   let b0_dir = B0_driver.Conf.b0_dir c in
@@ -17,7 +17,7 @@ let log ~output_verbosity ~log_format ~op_query c =
   let* () = B0_pager.page_stdout pager in
   let* l = B0_memo_log.read log_file in
   B0_cli.Memo.Log.out
-    Fmt.stdout log_format output_verbosity op_query ~path:log_file l;
+    Fmt.stdout log_format output_details op_query ~path:log_file l;
   Ok Os.Exit.ok
 
 (* Command line interface *)
@@ -30,12 +30,12 @@ let cmd =
   let descr = `Blocks [
       `P "The $(cmd) command shows build information and operations in \
           various formats.";
-      `S B0_std_cli.s_output_verbosity_options;
+      `S B0_std_cli.s_output_details_options;
       `S B0_cli.Op.s_selection_options;
       `Blocks B0_cli.Op.query_man ]
   in
   B0_tool.Cli.subcmd_with_driver_conf "log" ~doc ~descr @@
-  let+ output_verbosity = B0_tool.Cli.output_verbosity
+  let+ output_details = B0_tool.Cli.output_details
   and+ log_format = B0_tool.Cli.log_format
   and+ op_query = B0_tool.Cli.op_query in
-  log ~output_verbosity ~log_format ~op_query
+  log ~output_details ~log_format ~op_query

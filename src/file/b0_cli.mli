@@ -399,7 +399,7 @@ module Memo : sig
     (** The type for output format. *)
 
     val out :
-      Format.formatter -> format -> B0_std_cli.output_verbosity -> Op.query ->
+      Format.formatter -> format -> B0_std_cli.output_details -> Op.query ->
       path:Fpath.t -> B0_memo_log.t -> unit
     (** [out] formats a log on the given formatter. [path] is used when
         [`Path] is requested. *)

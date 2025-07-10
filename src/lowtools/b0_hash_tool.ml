@@ -20,8 +20,8 @@ let hash_file (module Hash : B0_hash.T) file  =
   in
   Ok (file, hash)
 
-let hash ~output_verbosity ~hash_fun ~files =
-  let pp_hash = pp_hash output_verbosity in
+let hash ~output_details ~hash_fun ~files =
+  let pp_hash = pp_hash output_details in
   let hash_fun = B0_cli.Memo.get_hash_fun ~hash_fun in
   let do_hash file =
     let* h = hash_file hash_fun file in
@@ -41,21 +41,21 @@ let tool =
     `S Manpage.s_description;
     `P "The $(tname) command hashes files like b0 does.";
     `S Manpage.s_options;
-    `S B0_std_cli.s_output_verbosity_options;
+    `S B0_std_cli.s_output_details_options;
     `S Manpage.s_bugs;
     `P "This program is distributed with the $(b,b0) system. See
         $(i,https:/erratique.ch/software/b0) for contact information.";]
   in
   Cmd.make (Cmd.info "b0-hash" ~version:"%%VERSION%%" ~doc ~man ~man_xrefs) @@
-  let+ () = B0_std_cli.configure_log ()
-  and+ output_verbosity = B0_std_cli.output_verbosity ()
+  let+ () = B0_std_cli.set_log_level ()
+  and+ output_details = B0_std_cli.output_details ()
   and+ hash_fun =
     B0_cli.Memo.hash_fun ~opts:["H"; "hash-fun"] ~docs:Manpage.s_options ()
   and+ files =
     let doc = "File to hash. Use $(b,-) for stdin." in
-    Arg.(value & pos_all B0_std_cli.fpath [] & info [] ~doc ~docv:"FILE")
+    Arg.(value & pos_all B0_std_cli.filepath [] & info [] ~doc)
   in
-  hash ~output_verbosity ~hash_fun ~files
+  hash ~output_details ~hash_fun ~files
 
 let main () = Cmd.eval_result tool
 let () = if !Sys.interactive then () else exit (main ())

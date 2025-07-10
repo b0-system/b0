@@ -130,8 +130,8 @@ let gather
   let* () = Os.File.write ~force ~make_path:false b0_file incs in
   Ok Os.Exit.ok
 
-let includes ~root ~output_verbosity conf =
-  let pp_inc = match output_verbosity with
+let includes ~root ~output_details conf =
+  let pp_inc = match output_details with
   | `Short -> fun ppf (_, (p, _)) -> Fpath.pp_unquoted ppf p
   | `Normal | `Long ->
       fun ppf ((n, _), (p, _)) ->
@@ -146,7 +146,7 @@ let includes ~root ~output_verbosity conf =
   if incs <> [] then Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list pp_inc) incs);
   Ok Os.Exit.ok
 
-let log ~output_verbosity ~log_format ~op_query conf =
+let log ~output_details ~log_format ~op_query conf =
   Log.if_error ~use:Os.Exit.some_error @@
   let don't = B0_driver.Conf.no_pager conf || log_format = `Trace_event in
   let log_file = B0_driver.Compile.build_log conf ~driver:B0_tool.driver in
@@ -154,7 +154,7 @@ let log ~output_verbosity ~log_format ~op_query conf =
   let* () = B0_pager.page_stdout pager in
   let* l = B0_memo_log.read log_file in
   B0_cli.Memo.Log.out
-    Fmt.stdout log_format output_verbosity op_query ~path:log_file l;
+    Fmt.stdout log_format output_details op_query ~path:log_file l;
   Ok Os.Exit.ok
 
 let path conf =
@@ -246,12 +246,10 @@ let gather =
     let doc = "Directory in which the $(b,B0.ml) is written. If unspecified \
                the file is written on $(b,stdout)."
     in
-    let docv = "DIR" in
-    Arg.(value & opt (some B0_std_cli.fpath) None &
-         info ["d"; "dest"] ~doc ~docv)
+    Arg.(value & opt (some B0_std_cli.dirpath) None & info ["d"; "dest"] ~doc)
   and+ dirs =
     let doc = "Gather the $(docv)$(b,/B0.ml) file." in
-    Arg.(non_empty & pos_all B0_std_cli.fpath [] & info [] ~doc ~docv:"DIR")
+    Arg.(non_empty & pos_all B0_std_cli.dirpath [] & info [] ~doc)
   and+ force =
     let doc = "Write the $(b,B0.ml) file even if it exists in the \
                destination directory of $(b,--dest) and force symlinks \
@@ -287,8 +285,8 @@ let includes =
         $(b,--root) is specified only shows the includes of the root b0 file."
   in
   B0_tool.Cli.subcmd_with_driver_conf "includes" ~doc ~descr @@
-  let+ root and+ output_verbosity = B0_tool.Cli.output_verbosity in
-  includes ~root ~output_verbosity
+  let+ root and+ output_details = B0_tool.Cli.output_details in
+  includes ~root ~output_details
 
 let log =
   let doc = "Show driver compilation log" in
@@ -296,15 +294,15 @@ let log =
       `P "$(cmd) shows the driver compilation operations in various formats. \
           If $(b,--path) is specified, shows the path to the log.";
       `S Manpage.s_options;
-      `S B0_std_cli.s_output_verbosity_options;
+      `S B0_std_cli.s_output_details_options;
       `S B0_cli.Op.s_selection_options;
       `Blocks B0_cli.Op.query_man; ]
   in
   B0_tool.Cli.subcmd_with_driver_conf "log" ~doc ~descr @@
-  let+ output_verbosity = B0_tool.Cli.output_verbosity
+  let+ output_details = B0_tool.Cli.output_details
   and+ log_format = B0_tool.Cli.log_format
   and+ op_query = B0_tool.Cli.op_query in
-  log ~output_verbosity ~log_format ~op_query
+  log ~output_details ~log_format ~op_query
 
 let path =
   let doc = "Output the b0 file path (default command)" in

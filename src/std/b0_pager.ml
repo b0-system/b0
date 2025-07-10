@@ -19,7 +19,7 @@ module Env = struct
       ~doc:"The pager used to display content. This is a command invocation \
             given to execvp(3)." ::
     Cmd.Env.info term
-      ~doc:"See options $(b,--color) and $(b,--no-pager)." :: []
+      ~doc:"See option $(b,--no-pager)." :: []
 end
 
 (* Paging *)

@@ -31,12 +31,12 @@ val includes : affix:string -> string -> bool
 
 (** {1:find_indices Finding indices}
 
-    {b TODO.} Harmonize indexing errors with {!find_sub}. This
+    {b TODO.} Harmonize indexing errors with {!find_first}. This
     never raises. *)
 
 val find_first_index : ?start:int -> (char -> bool) -> string -> int option
 (** [find_first_index ~start sat] is the index of the first character of
-    [s] that satisfies [sat] before or at [start] (defaults to [0]). *)
+    [s] that satisfies [sat] after or at [start] (defaults to [0]). *)
 
 val find_last_index : ?start:int -> (char -> bool) -> string -> int option
 (** [find_last_index ~start sat] is the index of the last character of
@@ -194,11 +194,11 @@ val split_all : ?drop:(string -> bool) -> sep:string -> string -> string list
     Substrings [sub] for which [drop sub] is [true] are not included
     in the result. [drop] default to [Fun.const false].
 
-    The invariant [concat sep (split ~sep s) = s] holds. *)
+    The invariant [concat sep (split_all ~sep s) = s] holds. *)
 
 val rsplit_all : ?drop:(string -> bool) -> sep:string -> string -> string list
 (** [rsplit_all ~sep s] is like {!split_all} but matching starts at position
-    [length s] using {!rfind_all} *)
+    [length s] using {!rfind_all}. *)
 
 (** {2:break_lines Breaking lines} *)
 

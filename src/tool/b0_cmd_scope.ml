@@ -56,9 +56,9 @@ let exec ~topmost ~includes ~excludes ~keep_going ~tool ~tool_args conf =
   let cond = Fun.const (Ok true) in
   exec_when ~cond ~topmost ~includes ~excludes ~keep_going ~cmd conf
 
-let list ~topmost ~includes ~excludes ~output_verbosity ~path conf =
+let list ~topmost ~includes ~excludes ~output_details ~path conf =
   let pp_scope =
-    if path then pp_scope_dir else match output_verbosity with
+    if path then pp_scope_dir else match output_details with
     | `Short -> pp_scope_name | `Normal | `Long -> pp_scope_all
   in
   let pp_scopes = Fmt.(list pp_scope) in
@@ -209,8 +209,8 @@ let list =
     let doc = "Only print the scope paths." in
     Arg.(value & flag & info ["path"] ~doc)
   and+ topmost and+ includes and+ excludes
-  and+ output_verbosity = B0_tool.Cli.output_verbosity in
-  list ~topmost ~includes ~excludes ~output_verbosity ~path
+  and+ output_details = B0_tool.Cli.output_details in
+  list ~topmost ~includes ~excludes ~output_details ~path
 
 let symlink =
   let doc = "Create symlinks to scope directories" in
@@ -231,7 +231,7 @@ let symlink =
        created if it doesn't exist."
     in
     let docv = "DIR" in
-    Arg.(value & opt B0_std_cli.fpath (Fpath.v ".") &
+    Arg.(value & opt B0_std_cli.dirpath (Fpath.v ".") &
          info ["d"; "in-dir"] ~doc ~docv)
   and+ rm =
     let doc =

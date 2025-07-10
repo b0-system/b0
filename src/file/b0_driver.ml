@@ -34,7 +34,7 @@ module Env = struct
   let code = "B0_DRIVER_CODE"
   let hash_fun = B0_cli.Memo.hash_fun_env
   let jobs = B0_cli.Memo.jobs_env
-  let verbosity = "B0_VERBOSITY"
+  let verbosity = Cmdliner.Cmd.Env.info_var B0_std_cli.log_level_var
 end
 
 module Conf = struct
@@ -49,10 +49,8 @@ module Conf = struct
       code : B0_ocaml.Code.t option;
       hash_fun : (module B0_hash.T);
       jobs : int;
-      log_level : Log.level;
       no_pager : bool;
-      memo : (B0_memo.t, string) result Lazy.t;
-      fmt_styler : Fmt.styler; }
+      memo : (B0_memo.t, string) result Lazy.t }
 
   let memo ~hash_fun ~cwd ~env ~cache_dir ~trash_dir ~jobs =
     let feedback =
@@ -65,12 +63,12 @@ module Conf = struct
 
   let make
       ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~env ~hash_fun ~jobs
-      ~log_level ~no_pager ~fmt_styler ()
+      ~no_pager ()
     =
     let trash_dir = Fpath.(b0_dir / B0_cli.Memo.trash_dir_name) in
     let memo = lazy (memo ~hash_fun ~cwd ~env ~cache_dir ~trash_dir ~jobs) in
     { b0_dir; b0_file; cache_dir; cwd; code; env; hash_fun; jobs;
-      memo; log_level; no_pager; fmt_styler }
+      memo; no_pager; }
 
   let b0_dir c = c.b0_dir
   let b0_file c = c.b0_file
@@ -80,10 +78,8 @@ module Conf = struct
   let env c = c.env
   let hash_fun c = c.hash_fun
   let jobs c = c.jobs
-  let log_level c = c.log_level
   let memo c = Lazy.force c.memo
   let no_pager c = c.no_pager
-  let fmt_styler c = c.fmt_styler
 
   let get_b0_file c = match c.b0_file with
   | Some file -> Ok file
@@ -109,13 +105,15 @@ module Conf = struct
       in
       loop cwd
 
+  let set_no_color_and_log_level ~no_color ~log_level =
+    if no_color then Fmt.set_styler Plain;
+    Log.set_level log_level
+
   let setup_with_cli
-      ~b0_dir ~b0_file ~cache_dir ~code ~hash_fun ~jobs
-      ~log_level ~no_pager ~color ()
+      ~b0_dir ~b0_file ~cache_dir ~code ~hash_fun ~jobs ~no_color ~log_level
+      ~no_pager ()
     =
-    let color = B0_std_cli.get_styler color in
-    let log_level = B0_std_cli.get_log_level log_level in
-    B0_std_cli.setup color log_level ~log_spawns:Log.Debug;
+    set_no_color_and_log_level ~no_color ~log_level;
     let* cwd = Os.Dir.cwd () in
     let* env = Os.Env.current () in
     let b0_file = find_b0_file ~cwd ~b0_file in
@@ -124,12 +122,13 @@ module Conf = struct
     let cache_dir = B0_cli.Memo.get_cache_dir ~cwd ~b0_dir ~cache_dir in
     let hash_fun = B0_cli.Memo.get_hash_fun ~hash_fun in
     let jobs = B0_cli.Memo.get_jobs ~jobs in
-    Ok (make ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~env ~hash_fun
-          ~jobs ~log_level ~no_pager ~fmt_styler:color ())
+    Ok (make ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~env ~hash_fun ~jobs
+          ~no_pager ())
 end
 
 module Cli = struct
   open Cmdliner
+  open Cmdliner.Term.Syntax
 
   let docs = Manpage.s_common_options
   let b0_dir = B0_cli.Memo.b0_dir ~docs ()
@@ -137,7 +136,7 @@ module Cli = struct
     let env = Cmd.Env.info Env.b0_file in
     let doc = "Use $(docv) as the b0 file." and docv = "PATH" in
     let absent = "$(b,B0.ml) file in cwd or first upwards" in
-    Arg.(value & opt (Arg.some B0_std_cli.fpath) None &
+    Arg.(value & opt (Arg.some B0_std_cli.filepath) None &
          info ["b0-file"] ~absent ~doc ~docv ~docs ~env)
 
   let cache_dir = B0_cli.Memo.cache_dir ~docs ()
@@ -152,25 +151,21 @@ module Cli = struct
     in
     Arg.(value & opt code None & info ["driver-code"] ~doc ~docv ~docs ~env)
 
-  let hash_fun = B0_cli.Memo.hash_fun ~docs ()
-  let jobs = B0_cli.Memo.jobs ~docs ()
-  let log_level =
-    B0_std_cli.log_level ~docs ~env:(Cmd.Env.info Env.verbosity) ()
-
-  let color = B0_std_cli.color ~docs ~env:(Cmd.Env.info Env.color) ()
-  let no_pager = B0_pager.don't ~docs ()
+  let no_color = B0_std_cli.no_color ()
+  let log_level = B0_std_cli.log_level ()
+  let no_pager = B0_pager.don't ()
   let conf =
-    let conf
-        b0_dir b0_file cache_dir code hash_fun jobs log_level no_pager color
-      =
-      Result.map_error (fun s -> `Msg s) @@
-      Conf.setup_with_cli
-        ~b0_dir ~b0_file ~cache_dir ~code ~hash_fun ~jobs ~log_level
-        ~no_pager ~color ()
-    in
-    Term.term_result @@
-    Term.(const conf $ b0_dir $ b0_file $ cache_dir $ code $
-          hash_fun $ jobs $ log_level $ no_pager $ color)
+    Term.term_result' @@
+    let+ b0_dir and+ b0_file and+ cache_dir and+ code
+    and+ hash_fun = B0_cli.Memo.hash_fun ~docs ()
+    and+ jobs = B0_cli.Memo.jobs ~docs ()
+    and+ no_color and+ log_level and+ no_pager in
+    Conf.setup_with_cli ~b0_dir ~b0_file ~cache_dir ~code ~hash_fun ~jobs
+      ~no_color ~log_level ~no_pager ()
+
+  let set_no_color_and_log_level =
+    let+ no_color and+ log_level in
+    Conf.set_no_color_and_log_level ~no_color ~log_level
 end
 
 (* Drivers *)

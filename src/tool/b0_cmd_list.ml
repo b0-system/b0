@@ -45,14 +45,14 @@ let edit ~names ~only_tests conf =
       | `Exited 0 -> Ok Os.Exit.ok
       | _ -> Ok Os.Exit.some_error
 
-let list ~output_verbosity ~names ~all ~only_tests conf =
-  let pp_v ppf (B0_def.V ((module Def), v)) = match output_verbosity with
+let list ~output_details ~names ~all ~only_tests conf =
+  let pp_v ppf (B0_def.V ((module Def), v)) = match output_details with
   | `Short -> Def.pp_name ppf v
   | `Normal -> Def.pp_synopsis ppf v
   | `Long -> Def.pp ppf v
   in
   let list conf vs =
-    let sep = match output_verbosity with
+    let sep = match output_details with
     | `Short | `Normal -> Fmt.cut | `Long -> Fmt.(cut ++ cut)
     in
     let don't = B0_driver.Conf.no_pager conf in
@@ -67,11 +67,11 @@ let list ~output_verbosity ~names ~all ~only_tests conf =
   let* () = list conf vs in
   Ok Os.Exit.ok
 
-let show ~output_verbosity ~names ~all ~only_tests conf =
-  let output_verbosity =
-    if output_verbosity = `Normal then `Long else output_verbosity
+let show ~output_details ~names ~all ~only_tests conf =
+  let output_details =
+    if output_details = `Normal then `Long else output_details
   in
-  list ~output_verbosity ~names ~all ~only_tests conf
+  list ~output_details ~names ~all ~only_tests conf
 
 (* Command line interface *)
 
@@ -102,9 +102,9 @@ let cmd =
         definitions are not listed, invoke with $(b,--all) include them."
   in
   B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
-  let+ output_verbosity = B0_tool.Cli.output_verbosity
+  let+ output_details = B0_tool.Cli.output_details
   and+ names and+ all and+ only_tests in
-  list ~output_verbosity ~names ~all ~only_tests
+  list ~output_details ~names ~all ~only_tests
 
 
 let cmd_show =
@@ -115,9 +115,9 @@ let cmd_show =
         not listed, invoke with $(b,--all) include them."
   in
   B0_tool.Cli.subcmd_with_b0_file "show" ~doc ~descr @@
-  let+ output_verbosity = B0_tool.Cli.output_verbosity
+  let+ output_details = B0_tool.Cli.output_details
   and+ names and+ all and+ only_tests in
-  show ~output_verbosity ~names ~all ~only_tests
+  show ~output_details ~names ~all ~only_tests
 
 let cmd_edit =
   let doc = "Edit definitions" in

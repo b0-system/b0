@@ -969,12 +969,16 @@ module Cmd : sig
       the program's one and the actual command. *)
 
   val spawn_tracer_nop : spawn_tracer
-  (** [spawn_tracer_nop] is a spawn tracer that does nothing.
-      This is the initial spawn tracer. *)
+  (** [spawn_tracer_nop] is a spawn tracer that does nothing. *)
+
+  val spawn_tracer_log : B0__log.level -> spawn_tracer
+  (** [spawn_tracer_log level] is a spawn tracer
+      that logs with level [level]. If [level] is {!Log.Quiet} this is
+      {!spawn_tracer_nop}. *)
 
   val spawn_tracer : unit -> spawn_tracer
   (** [tracer ()] is the current spawn tracer. Initially this is
-      {!spawn_tracer_nop}. *)
+      [spawn_tracer_log Log.Debug]. *)
 
   val set_spawn_tracer : spawn_tracer -> unit
   (** [set_tracer t] sets the current spawn tracer to [t]. *)
@@ -1113,11 +1117,6 @@ module Exit : sig
       {b Note.} Since {!Stdlib.exit} is called {!Stdlib.at_exit}
       functions are called if a [SIGINT] occurs during the call to
       [f]. This is not the case on an unhandled [SIGINT]. *)
-
-  (**/**)
-
-  (* FIXME try to get rid of that *)
-  val log_error : (string -> unit) ref
 end
 
 (** {1:sleeping_and_timing Sleeping and timing} *)

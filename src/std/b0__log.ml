@@ -160,37 +160,24 @@ let if_error_pp' pp ?(level = Error) ?header ~use = function
 
 (* Logging timings *)
 
-let time ?(level = Info) m f =
-  let time = B0__os.Mtime.counter () in
-  let v = f () in
-  let span = B0__os.Mtime.count time in
-  kmsg (fun () -> v) level
-    (fun w ->
-       let header = Format.asprintf "%a" B0__mtime.Span.pp span in
-       m v (w ~header))
+(* The churn here is because we have a recursive dep on Os.Mtime *)
+
+type time_func =
+  { time :
+      'a 'b. ?level:level ->
+      ('a -> (('b, Format.formatter, unit, 'a) format4 -> 'b) -> 'a) ->
+      (unit -> 'a) -> 'a }
+
+let time_func_init = { time = fun ?(level = Info) m f -> assert false }
+let time_func = Atomic.make time_func_init
+let set_time_func time = Atomic.set time_func time
+let time ?level fmt f = (Atomic.get time_func).time ?level fmt f
 
 (* Values *)
 
 let value ?(level = Stderr) ?id pp v = match id with
 | None -> kmsg (fun _ -> v) level (fun m -> m "%a" pp v)
 | Some id -> kmsg (fun _ -> v) level (fun m -> m "id: @[%a@]" pp v)
-
-(* Spawn logging *)
-
-let spawn_tracer level =
-  if level = Quiet then B0__os.Cmd.spawn_tracer_nop else
-  let header = function
-  | None -> "EXECV"
-  | Some pid -> "EXEC:" ^ string_of_int (B0__os.Cmd.pid_to_int pid)
-  in
-  let pp_env ppf = function
-  | None -> () |
-    Some env ->
-      B0__fmt.pf ppf "%a@," (B0__fmt.list B0__fmt.OCaml.string) env
-  in
-  fun pid env ~cwd cmd ->
-    msg level (fun m ->
-        m ~header:(header pid) "@[<v>%a%a@]" pp_env env B0__cmd.pp_dump cmd)
 
 (* Module reporter *)
 
@@ -203,9 +190,3 @@ module Reporter = struct
   let get () = Atomic.get reporter
   let set r = Atomic.set reporter r
 end
-
-(* Exit logging *)
-
-let () =
-  B0__os.Exit.log_error :=
-    (fun e -> err (fun m -> m "@[%a@]" B0__fmt.lines e))

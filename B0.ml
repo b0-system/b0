@@ -256,8 +256,12 @@ let vendor_more_modules =
   let dst_dir = B0_env.in_scope_dir env ~/"src/std" in
   let src_dir = Fpath.(dir / "src") in
   let substs =
-    ["More__", "B0__"; "More.", "B0_std."; "ocaml_more", "ocaml_b0"]
+    ["More__", "B0__"; "More.", "B0_std."; "{!More}", "{!B0_std}";
+     "ocaml_more", "ocaml_b0"; "open More", "open B0_std";
+     "page-cookbook", "page-b0_std_cookbook";
+    ]
   in
+  (* more library *)
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__char" "b0__char" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__cmd" "b0__cmd" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__fmt" "b0__fmt" in
@@ -269,6 +273,18 @@ let vendor_more_modules =
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__result" "b0__result" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__string" "b0__string" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__type" "b0__type" in
+  (* more.clit library *)
+  let* () =
+    let src_dir = Fpath.(src_dir / "cli") in
+    copy_module ~substs ~src_dir ~dst_dir "more_cli" "b0_std_cli"
+  in
+  (* docs *)
+  let* () =
+    let src_dir = Fpath.(dir / "doc") in
+    let dst_dir = B0_env.in_scope_dir env ~/"doc" in
+    copy_file ~substs ~src_dir ~dst_dir "cookbook.mld" "b0_std_cookbook.mld"
+  in
+  (* C stubs *)
   let substs =
     ["MORE_", "B0_"; "more_", "b0_"; "more stubs", "b0 stubs";
      "more library", "b0 library"]
@@ -277,7 +293,7 @@ let vendor_more_modules =
   let* () = copy_file ~substs ~src_dir ~dst_dir
                       "more_stubs_cpu.c" "b0_stubs_cpu.c" in
   let* () = copy_file ~substs ~src_dir ~dst_dir
-                      "more_stubs_time.c" "b0_stubs_time.c" in
+      "more_stubs_time.c" "b0_stubs_time.c" in
   Ok ()
 
 let vendor_webs_modules =

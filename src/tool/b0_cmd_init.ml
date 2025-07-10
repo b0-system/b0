@@ -135,7 +135,6 @@ let get_lang ~file ~lang = match lang with
 
 let src ~years ~holder ~license ~lang ~files ~example ~force ~template conf =
   Log.if_error ~use:Os.Exit.some_error @@
-  let files = match files with [] -> [Fpath.dash] | files -> files in
   let cwd = B0_driver.Conf.cwd conf in
   let meta = B0_init.get_project_meta () in
   let years = B0_init.get_copyright_years years in
@@ -156,7 +155,6 @@ let src ~years ~holder ~license ~lang ~files ~example ~force ~template conf =
 
 let snip ~files ~force ~template conf =
   Log.if_error ~use:Os.Exit.some_error @@
-  let files = match files with [] -> [Fpath.dash] | files -> files in
   let write_file file =
     let* content = src_template template in
     Os.File.write ~force ~make_path:true file content
@@ -172,10 +170,8 @@ let force =
   Arg.(value & flag & info ["f"; "force"] ~doc)
 
 let file =
-  let doc = "Generate to file $(docv)." in
-  let absent = "$(b,stdout)" in
-  Arg.(value & pos 0 B0_std_cli.fpath Fpath.dash &
-       info [] ~doc ~docv:"PATH" ~absent)
+  let doc = "Generate to file $(docv). Use $(b,-) for stdout." in
+  Arg.(value & pos 0 B0_std_cli.filepath Fpath.dash & info [] ~doc)
 
 let license_opt =
   let doc =
@@ -325,9 +321,11 @@ let src_cmd =
   let+ years and+ holder and+ license = license_opt and+ force and+ template
   and+ lang
   and+ files =
-    let doc = "Generate to file $(docv). Repeatable." in
-    Arg.(value & pos_all B0_std_cli.fpath [] &
-         info [] ~doc ~docv:"PATH" ~absent:"$(b,stdout)")
+    let doc =
+      "Generate to file $(docv). Use $(b,-) for $(b,stdout). Repeatable."
+    in
+    Arg.(value & pos_all B0_std_cli.filepath [Fpath.dash] &
+         info [] ~doc ~absent:"$(b,-)")
   and+ example =
     let doc =
       "Example source code. If $(b,--license) is unspecified, uses \
@@ -347,10 +345,12 @@ let snip_cmd =
   B0_tool.Cli.subcmd_with_b0_file_if_any "snip" ~doc ~descr @@
   let+ force
   and+ files =
-    let doc = "Generate to file $(docv). Repeatable." in
-    let absent = "$(b,stdout)" in
-    Arg.(value & pos_right 0 B0_std_cli.fpath [] &
-         info [] ~doc ~docv:"PATH" ~absent)
+    let doc =
+      "Generate to file $(docv). Use $(b,-) for $(b,stdout). Repeatable."
+    in
+    let absent = "$(b,-)" in
+    Arg.(value & pos_right 0 B0_std_cli.filepath [Fpath.dash] &
+         info [] ~doc ~absent)
   and+ template =
     let doc =
       "$(docv) is the content template. \

@@ -13,7 +13,7 @@
     Log.time (fun v m -> m "Purged, %d items remaining" (List.length v)) @@
     (fun () -> purge items)
 ]}
-    See also the {{!page-cookbook.logging}cookbook} on logging.
+    See also the {{!page-b0_std_cookbook.logging}cookbook} on logging.
 
     {b TODO.} Think about implicit locations.
 
@@ -45,7 +45,9 @@ val level : unit -> level
     {!Warning}. *)
 
 val set_level : level -> unit
-(** [set_level l] sets the reporting level to [l]. *)
+(** [set_level l] sets the reporting level to [l].
+
+    Use {!More_cli.set_log_level} to set this from the command line. *)
 
 val level_to_string : level -> string
 (** [level_to_string l] converts [l] to a string representation. *)
@@ -148,20 +150,13 @@ val time :
 
     {b Note.} The reporting {!level} is determined after [f] has been
     called. This means [f] can change it to affect the report.
-    See for example {!page-cookbook.logging_main} *)
+    See for example {!page-b0_std_cookbook.logging_main} *)
 
 (** {2:log Logging values} *)
 
 val value : ?level:level -> ?id:string -> 'a B0__fmt.t -> 'a -> 'a
 (** [value pp v] reports [v] on [level] (defaults to {!Stderr}) with
     [pp] if [id] is specified this is of the form "%s: %a" and returns [v] *)
-
-(** {2:spawns Logging spawns} *)
-
-val spawn_tracer : level -> B0__os.Cmd.spawn_tracer
-(** [spawn_tracer level] is a {{!B0_std.Os.Cmd.tracing}spawn tracer}
-    that logs with level [level]. If [level] is {!Log.Quiet} this is
-    {!B0_std.Os.Cmd.spawn_tracer_nop}. *)
 
 (** {1:monitoring Monitoring} *)
 
@@ -180,8 +175,7 @@ module Reporter : sig
 
   type t = { kmsg : 'a 'b. (unit -> 'b) -> level -> ('a, 'b) msgf -> 'b }
   (** The type for log message reporters. [kmsg] is never invoked with
-      a level of [Quiet] or with a level smaller than the reporting
-      {!level}. *)
+      a level of [Quiet] or with a level smaller than the reporting {!level}. *)
 
   val nop : t
   (** [nop] is a logger that reports nothing. *)
@@ -196,3 +190,16 @@ module Reporter : sig
   val set : t -> unit
   (** [set r] sets the reporter to [r]. *)
 end
+
+
+(**/**)
+
+(* A bit dirty but we have a recurive dep *)
+
+type time_func =
+  { time :
+      'a 'b. ?level:level ->
+      ('a -> (('b, Format.formatter, unit, 'a) format4 -> 'b) -> 'a) ->
+      (unit -> 'a) -> 'a }
+
+val set_time_func : time_func -> unit

@@ -327,13 +327,13 @@ module Op = struct
   let select_cli ?docs ?(marks = marks () ?docs) () =
     let reads =
       let doc = "Select operations that read file $(docv). Repeatable." in
-      Arg.(value & opt_all B0_std_cli.fpath [] &
-           info ["r"; "read"] ~doc ?docs ~docv:"FILE")
+      Arg.(value & opt_all B0_std_cli.filepath [] &
+           info ["r"; "read"] ~doc ?docs)
     in
     let writes =
       let doc = "Select operations that wrote file $(docv). Repeatable." in
-      Arg.(value & opt_all B0_std_cli.fpath [] &
-           info ["w"; "write"] ~doc ?docs ~docv:"FILE")
+      Arg.(value & opt_all B0_std_cli.filepath [] &
+           info ["w"; "write"] ~doc ?docs)
     in
     let ids =
       let doc = "Select operation with identifier $(docv). Repeatable." in
@@ -504,8 +504,8 @@ module Memo = struct
       ?doc_none:(absent = "$(b,_b0) in root directory")
       ?(env = Cmd.Env.info b0_dir_env) ()
     =
-    Arg.(value & opt (some B0_std_cli.fpath) None &
-         info opts ~env ~absent ~doc ~docs ~docv:"DIR")
+    Arg.(value & opt (some B0_std_cli.dirpath) None &
+         info opts ~env ~absent ~doc ~docs)
 
   let get_b0_dir ~cwd ~root ~b0_dir = match b0_dir with
   | None -> Fpath.(root / b0_dir_name)
@@ -536,8 +536,8 @@ module Memo = struct
       ?doc_none:(absent = "$(b,.cache) in b0 directory")
       ?(env = Cmd.Env.info cache_dir_env) ()
     =
-    Arg.(value & opt (some B0_std_cli.fpath) None &
-         info opts ~env ~absent ~doc ~docs ~docv:"DIR")
+    Arg.(value & opt (some B0_std_cli.dirpath) None &
+         info opts ~env ~absent ~doc ~docs)
 
   let get_cache_dir ~cwd ~b0_dir ~cache_dir =
     get_b0_dir_path ~cwd ~b0_dir cache_dir_name cache_dir
@@ -558,7 +558,7 @@ module Memo = struct
       ?doc_none:(absent = "$(b,.log) in b0 directory")
       ?(env = Cmd.Env.info log_file_env) ()
     =
-    Arg.(value & opt (some B0_std_cli.fpath) None &
+    Arg.(value & opt (some B0_std_cli.filepath) None &
          info opts ~absent ~env ~doc ?docs ~docv:"LOG_FILE")
 
   let get_log_file ~cwd ~b0_dir ~log_file =

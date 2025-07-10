@@ -130,6 +130,7 @@ end
 
 module Cli = struct
   open Cmdliner
+  open Cmdliner.Term.Syntax
 
   let log_format = B0_cli.Memo.Log.format_cli ()
   let op_query = B0_cli.Op.query_cli ()
@@ -147,7 +148,7 @@ module Cli = struct
         `S Manpage.s_commands;
         `S Manpage.s_arguments;
         `S Manpage.s_options;
-        `S B0_std_cli.s_output_verbosity_options;
+        `S B0_std_cli.s_output_details_options;
         `S s_scope_selection;
         `S Manpage.s_common_options;
        man_see_manual ]
@@ -158,25 +159,17 @@ module Cli = struct
 
   let editor_envs = B0_editor.Env.infos
   let pager_envs = B0_pager.Env.infos
-  let output_verbosity = B0_std_cli.output_verbosity ()
+  let output_details = B0_std_cli.output_details ()
   let no_pager = B0_driver.Cli.no_pager
   let pos_key =
     let doc = "The metadata key $(docv) to get." and docv = "KEY" in
     Arg.(required & pos 0 (some string) None & info [] ~doc ~docv)
 
-  let minimal_setup =
-    let minimal_setup_with_cli log_level color =
-      let styler = B0_std_cli.get_styler color in
-      let log_level = B0_std_cli.get_log_level log_level in
-      B0_std_cli.setup styler log_level ~log_spawns:Log.Debug;
-    in
-    Term.(const minimal_setup_with_cli $ B0_driver.Cli.log_level $
-          B0_driver.Cli.color)
-
   let subcmd ?exits ?(envs = []) ?synopsis name ~doc ~descr term =
     let man = man_with_descr ?synopsis descr in
-    let term = Term.(term $ minimal_setup) in
-    Cmd.make (Cmd.info name ~doc ?exits ~envs ~man) term
+    Cmd.make (Cmd.info name ~doc ?exits ~envs ~man) @@
+    let+ () = B0_driver.Cli.set_no_color_and_log_level
+    and+ term in term ()
 
   let subcmd_with_driver_conf
       ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr

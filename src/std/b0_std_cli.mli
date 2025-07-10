@@ -1,15 +1,17 @@
 (*---------------------------------------------------------------------------
-   Copyright (c) 2024 The b0 programmers. All rights reserved.
+   Copyright (c) 2025 The more programmers. All rights reserved.
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** Cmdliner support for {!B0_std}. *)
+(** Cmdliner support for [more] programs.
+
+    The {{!page-b0_std_cookbook.blueprints}cookbook blueprints} has some examples. *)
 
 open B0_std
 
-(** {1:exit Exits} *)
-
 (** Program exits.
+
+    {b FIXME} review that.
 
     Support for {!B0_std.Os.Exit} exits which are more evolved
     than those provided by cmdliner. *)
@@ -19,7 +21,7 @@ module Exit : sig
 
   val infos : Cmdliner.Cmd.Exit.info list
   (** [infos] has the infos of {!Cmdliner.Term.default_exits},
-      {!no_such_name}, {!some_error} and those above.  *)
+      [no_such_name], [some_error] and those above.  *)
 
   (** {1:cmdliner Evaluating and exiting} *)
 
@@ -30,124 +32,109 @@ module Exit : sig
   (** [of_eval_result ~term_error r] is:
       {ul
       {- [e] if [r] is [Ok (`Ok e)]}
-      {- {!ok} if [r] is [Ok _]}
+      {- [ok] if [r] is [Ok _]}
       {- [Os.Exit.Code Cmdliner.Exit.cli_error] if [r] is [Error `Parse].}
       {- [Os.Exit.Code Cmdliner.Exit.internal_error] if [r] is [Error `Exn].}
       {- [Os.Exit.code term_error] if [r] is [Error `Term]. [term_error]
          (defaults to [Os.Exit.Code Cmdliner.Exit.cli_error]).}} *)
 end
 
-(** {1:conv Argument converters} *)
+(** {1:conv Miscellaneous argument converters} *)
 
-val fpath : Fpath.t Cmdliner.Arg.conv
-(** [fpath] is a converter for file paths. No existence checks are
-        performed on the path. *)
+val path : Fpath.t Cmdliner.Arg.conv
+(** [path] is a converter for file system paths. No existence checks
+    are performed on the path. Completes files and directories. *)
+
+val filepath : Fpath.t Cmdliner.Arg.conv
+(** [filepath] is a converter for file paths. No existence checks are
+    performed on the path. Completes files. *)
+
+val dirpath : Fpath.t Cmdliner.Arg.conv
+(** [dirpath] is a converter for directory paths. No existence checks
+    are performed on the path. Completes directories. *)
 
 val cmd : Cmd.t Cmdliner.Arg.conv
-(** [cmd] is a converter for commands. *)
+(** [cmd] is a converter for commands which are parsed using
+    {!B0_std.Cmd.of_string}. Completes files. *)
 
-(** {1:output_format Specifying output format} *)
+(** {1:styling ANSI text styling} *)
 
-val s_output_verbosity_options : string
-(** [s_output_format_options] is a manual section called
-    ["OUTPUT VERBOSITY OPTIONS"] *)
-
-type output_verbosity = [ `Normal | `Short | `Long ]
-(** The type for specifying output verbosity. *)
-
-val output_verbosity :
-  ?docs:string -> ?short_opts:string list -> ?long_opts:string list ->
-  unit -> output_verbosity Cmdliner.Term.t
-(** [output_verbosity ~short_opts ~long_opts ()] are mutually
-    exclusive options to specify output verbosity as short or long.
-    Without options this is [`Normal]. [short_opts] defaults to
-    [["s"; "short"]] and [long_opts] default to [["l";
-    "long"]]. [docs] is the manual section in which options are
-    documented, defaults to {!s_output_format_options}. *)
-
-(** Fragments for setting up {!B0_std}.
-
-    TODO maybe we should just side effect in the options, it would be simpler
-    to setup. There is now {!log_setup} that does so. Also I think the color
-    madness stuff should go. *)
-
-(** {1:setup Setup}
-
-    Configure {{!B0_std.Fmt.styled}styled output} and
-    {{!B0_std.Log.set_level}log verbosity} and the
-    {!B0_std.Os.Cmd.spawn_tracer}. *)
-
-val get_styler : Fmt.styler option option -> Fmt.styler
-(** [get_styler styler] determines [styler] by falling back to
-    {!Fmt.styler}. *)
-
-val get_log_level : Log.level option -> Log.level
-(** [get_log_level level] determines [level] with {!B0_std.Log.Warning} if
-    [level] is [None]. *)
-
-val setup : Fmt.styler -> Log.level -> log_spawns:Log.level -> unit
-(** [setup styler log_level ~log_spawns] sets:
+val no_color :
+  ?docs:string -> ?env:Cmdliner.Cmd.Env.info option -> unit ->
+  bool Cmdliner.Term.t
+(** [no_color ~docs ~env ()] is a [--no-color] command line flag.
     {ul
-    {- {!B0_std.Fmt.set_styler} with [styler].}
-    {- {!B0_std.Log.set_level} with [log_level].}
-    {- {!B0_std.Os.Cmd.set_spawn_tracer} with
-      {!B0_std.Log.spawn_tracer}[ log_spawns]
-         iff [level >= log_spawn].}}
-      {b Warning.} If [level < log_spawn] but {!B0_std.Log.level} is
-      increased after this call, the spawns won't be traced (most cli
-      programs do not change after the initial setup). Do your own
-      setup if that is a problem for you. *)
+    {- [docs] is the manual section in which the option is documented
+       (defaults to {!Cmdliner.Manpage.s_common_options})}
+    {- [env] is an environment variable to define the default value. It
+       defaults to {!no_color_var} which is [NO_COLOR]. The
+       environment variable lookup performed by cmdliner for flags is tweaked
+       to match what is requested by {:https://no-color.org}.}} *)
 
-(** {1:cli Cli arguments} *)
+val set_no_color :
+  ?docs:Cmdliner.Manpage.section_name -> ?env:Cmdliner.Cmd.Env.info option ->
+  unit -> unit Cmdliner.Term.t
+(** [set_no_color ()] behaves like {!no_color} and sets
+    {!B0_std.Fmt.styler} to [Plain] when it's [true]. See
+    {{!page-b0_std_cookbook.blueprint_color_log}an example}. *)
 
-val styler_of_string : string -> (Fmt.styler option, string) result
-(** [styler_of_string v] parses:
-    {ul
-    {- [""], ["auto"] into [None]}
-    {- ["always"] into [Some `Ansi]}
-    {- ["never"] into [Some `None]}} *)
+val no_color_var : Cmdliner.Cmd.Env.info
+(** [no_color_var] describes the default environment variable [NO_COLOR]
+    of {!no_color} and {!set_no_color}. *)
 
-val color :
-  ?docs:string -> ?env:Cmdliner.Cmd.Env.info -> unit ->
-  Fmt.styler option option Cmdliner.Term.t
-(** [color ~docs ~env ()] is a cli interface for specifying
-    formatting styling with a [--color] option. [docs] is where
-    the options are documented (defaults to
-    {!Cmdliner.Manpage.s_common_options}). [env], if provided, is an
-    environment variable to set the value (use something like
-    ["MYPROGRAM_COLOR"]). [None] is returned if the value is not set
-    on the cli or via the env var. *)
+(** {1:log_level Log level} *)
 
 val log_level :
-  ?none:Log.level -> ?docs:Cmdliner.Manpage.section_name ->
-  ?env:Cmdliner.Cmd.Env.info -> unit -> Log.level option Cmdliner.Term.t
-(** [log_level ~none ~docs ~env ()] is a cli interface for
-    specifiying a logging level with various options. [docs] is
-    where the options are documented (defaults to
-    {!Cmdliner.Manpage.s_common_options}). [env], if provided, is an
-    environment variable to set the value (use something like
-    ["MYPROGRAM_VERBOSITY"]). [none] is used to document the level
-    when the log level is unspecified (defaults to
-    [Log.Warning]). [None] is returned if the value is not set on
-    the cli or via the env var. *)
+  ?docs:Cmdliner.Manpage.section_name -> ?absent:Log.level ->
+  ?env:Cmdliner.Cmd.Env.info option -> unit -> Log.level Cmdliner.Term.t
+(** [log_level ~docs ~abset ~env ()] is a command line interface for
+    specifying a log level with these options:
+    {ul
+    {- The [--log-level=LEVEL] option to specify the level directly.}
+    {- The repeatable [-v] and [--verbose] flags specify the level as
+       [Info] (one occurence) or [Debug] (two occurences).}
+    {- The [-q] and [--quiet] flags take over all options and specify
+       the level as [Quiet].}}
+    The other arguments are:
+    {ul
+    {- [docs] is the manual section in which the options are documented
+       (defaults to {!Cmdliner.Manpage.s_common_options})}
+    {- [absent] is the level when none is specified it defaults to
+       {!B0_std.Log.Warning}}
+    {- [env] is an environment variable to define the default
+       level value. It defaults to {!log_level_var} which is [LOG_LEVEL].}} *)
 
-val configure_log :
-  ?docs:Cmdliner.Manpage.section_name -> ?env:Cmdliner.Cmd.Env.info ->
-  ?spawns:Log.level Cmdliner.Term.t -> ?absent:Log.level -> unit ->
-  unit Cmdliner.Term.t
-(** [log_setup] is a cli interface for specifying a logging level with
-    various options and setting up {!B0_std.Log.set_level}
-    and {!B0_std.Os.Cmd.spawn_tracer} with it.
-
-    The default value of [absent] is [Log.Warning] and the default
-    value of [spawns] is {!Log.Debug}. The default value of [env] is
-    {!log_level_var}.
-
-    {b Warning.} If [level < log_spawn] but {!B0_std.Log.level} is
-    increased after this call, the spawns won't be traced (most cli
-    programs do not change after the initial setup). Do your own
-    setup if that is a problem for you. *)
+val set_log_level :
+  ?docs:Cmdliner.Manpage.section_name -> ?absent:Log.level ->
+  ?env:Cmdliner.Cmd.Env.info option -> unit -> unit Cmdliner.Term.t
+(** [set_log_level] behaves like {!val-log_level} and sets the log level.
+    See {{!page-b0_std_cookbook.blueprint_color_log}an example}. *)
 
 val log_level_var : Cmdliner.Cmd.Env.info
 (** [log_level_var] describes the default environment variable
-    [LOG_LEVEL] of {!configure_log}. *)
+    [LOG_LEVEL] of {!val-log_level} and {!val-set_log_level}. *)
+
+val log_level_conv : Log.level Cmdliner.Arg.Conv.t
+(** [log_level_conv] is a converter for log level. *)
+
+(** {1:output_details Specifying output level of details} *)
+
+val s_output_details_options : string
+(** [s_output_format_options] is a manual section called
+    ["OUTPUT DETAILS OPTIONS"] *)
+
+type output_details =
+[ `Short (** Short lined-based output with essential details. *)
+| `Normal (** Normal output. *)
+| `Long (** Long output with as much details as possible. *) ]
+(** The type for specifying output level of details. *)
+
+val output_details : ?docs:string -> unit -> output_details Cmdliner.Term.t
+(** [output_details ()] are mutually exclusive options to specify an output
+    level of detail as [`Short], [`Normal] or [`Long].
+    {ul
+    {- Without options this is [`Normal].}
+    {- Options [-s] or [--short] specify [`Short].}
+    {- Options [-l] or [--long] specify [`Long].}}
+    [docs] is the manual section in which options are documented, defaults to
+    {!s_output_details_options}. *)

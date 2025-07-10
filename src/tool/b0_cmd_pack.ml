@@ -9,14 +9,14 @@ open Result.Syntax
 let edit ~packs conf =
   B0_tool.Def.edit (module B0_pack) conf packs
 
-let get ~output_verbosity ~key ~packs conf =
-  B0_tool.Def.get_meta_key (module B0_pack) conf output_verbosity key packs
+let get ~output_details ~key ~packs conf =
+  B0_tool.Def.get_meta_key (module B0_pack) conf output_details key packs
 
-let list ~output_verbosity ~packs conf =
-  B0_tool.Def.list (module B0_pack) conf output_verbosity packs
+let list ~output_details ~packs conf =
+  B0_tool.Def.list (module B0_pack) conf output_details packs
 
-let show ~output_verbosity ~packs conf =
-  let format = if output_verbosity = `Normal then `Long else output_verbosity in
+let show ~output_details ~packs conf =
+  let format = if output_details = `Normal then `Long else output_details in
   B0_tool.Def.list (module B0_pack) conf format packs
 
 (* Command line interface *)
@@ -48,17 +48,17 @@ let get =
     `P "$(cmd) outputs the value of metadata $(i,KEY) of given build packs."
   in
   B0_tool.Cli.subcmd_with_b0_file "get" ~doc ~descr @@
-  let+ output_verbosity = B0_tool.Cli.output_verbosity
+  let+ output_details = B0_tool.Cli.output_details
   and+ key = B0_tool.Cli.pos_key
   and+ packs = packs_tail in
-  get ~output_verbosity ~key ~packs
+  get ~output_details ~key ~packs
 
 let list =
   let doc = "List build packs" in
   let descr = `P "$(cmd) lists given build packs." in
   B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
-  let+ output_verbosity = B0_tool.Cli.output_verbosity and+ packs = packs_all in
-  list ~output_verbosity ~packs
+  let+ output_details = B0_tool.Cli.output_details and+ packs = packs_all in
+  list ~output_details ~packs
 
 let show =
   let doc = "Show build pack metadata" in
@@ -66,9 +66,9 @@ let show =
     `P "$(cmd) is $(b,list -l), it outputs metadata of given build packs."
   in
   B0_tool.Cli.subcmd_with_b0_file "show" ~doc ~descr @@
-  let+ output_verbosity = B0_tool.Cli.output_verbosity
+  let+ output_details = B0_tool.Cli.output_details
   and+ packs = packs_all in
-  show ~output_verbosity ~packs
+  show ~output_details ~packs
 
 let cmd =
   let doc = "Operate on build packs" in

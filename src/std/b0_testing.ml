@@ -1067,8 +1067,8 @@ module Test = struct
       let doc = "$(docv) is prependend to relative snapshot source file \
                  locations to look them up for patching."
       in
-      Arg.(value & opt (some' B0_std_cli.fpath) None &
-           info ["src-root"] ~doc ~docv:"PATH" ~docs)
+      Arg.(value & opt (some' B0_std_cli.dirpath) None &
+           info ["src-root"] ~doc ~docs)
 
     let seed =
       let doc =

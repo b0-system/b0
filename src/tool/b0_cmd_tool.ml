@@ -7,8 +7,8 @@ open B0_std
 open Result.Syntax
 
 let pp_tool ppf n = Fmt.st [`Fg `Green] ppf n
-let list ~output_verbosity c =
-  let pp, sep = match output_verbosity with
+let list ~output_details c =
+  let pp, sep = match output_details with
   | `Short ->
       let pp_tool ppf (n, _) = Fmt.code ppf n in
       pp_tool, Fmt.cut
@@ -47,8 +47,8 @@ let list =
   let doc = "List buildable tools" in
   let descr = `P "$(cmd) lists given buildable tools"; in
   B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
-  let+ output_verbosity = B0_tool.Cli.output_verbosity in
-  list ~output_verbosity
+  let+ output_details = B0_tool.Cli.output_details in
+  list ~output_details
 
 let cmd =
   let doc = "Operate on buildable tools" in

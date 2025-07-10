@@ -624,15 +624,17 @@ let ordinal =
 
 type styler = Ansi | Plain
 
-let styler' =
-  ref begin match Sys.getenv_opt "TERM" with
-  | None when Sys.backend_type = Other "js_of_ocaml" -> Ansi
-  | None | Some "dumb" -> Plain
-  | _ -> Ansi
-  end
+let styler' = Atomic.make @@
+  match Sys.getenv_opt "NO_COLOR" with
+  | Some s when s <> "" -> Plain
+  | _ ->
+      match Sys.getenv_opt "TERM" with
+      | Some "dumb" -> Plain
+      | None when Sys.backend_type <> Other "js_of_ocaml" -> Plain
+      | _ -> Ansi
 
-let set_styler styler = styler' := styler
-let styler () = !styler'
+let set_styler styler = Atomic.set styler' styler
+let styler () = Atomic.get styler'
 
 let strip_styles ppf =
   (* Note: this code makes the assumption that out_string is always
@@ -702,7 +704,7 @@ let sgrs_of_styles styles = String.concat ";" (List.map sgr_of_style styles)
 let ansi_esc = "\x1B["
 let sgr_reset = "\x1B[m"
 
-let st' styles pp_v ppf v = match !styler' with
+let st' styles pp_v ppf v = match Atomic.get styler' with
 | Plain -> pp_v ppf v
 | Ansi ->
     (* This doesn't compose well, we should get the current state
@@ -713,7 +715,7 @@ let st' styles pp_v ppf v = match !styler' with
     pp_v ppf v;
     Format.pp_print_as ppf 0 sgr_reset
 
-let st styles ppf s = match !styler' with
+let st styles ppf s = match Atomic.get styler' with
 | Plain -> raw_string ppf s
 | Ansi ->
     let sgrs = String.concat "" [ansi_esc; sgrs_of_styles styles; "m"] in

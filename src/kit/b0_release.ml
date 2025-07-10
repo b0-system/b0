@@ -275,7 +275,7 @@ module Archive = struct
          B0_vcs_repo.pp_dirty () (Fmt.code' Fpath.pp) scope_dir);
     Ok ()
 
-  let cmd env commit_ish packs x_packs =
+  let cmd ~env ~commit_ish ~packs ~x_packs =
     Log.if_error ~use:Os.Exit.no_such_name @@
     let* packs = select_packs packs x_packs in
     Log.if_error' ~use:Os.Exit.some_error @@
@@ -353,7 +353,9 @@ module Tag = struct
     with
     | Failure e -> Error e
 
-  let cmd version commit_ish msg sign force delete dry_run packs x_packs =
+  let cmd
+      ~version ~commit_ish ~msg ~sign ~force ~delete ~dry_run ~packs ~x_packs
+    =
     Log.if_error ~use:Os.Exit.no_such_name @@
     let* packs = select_packs packs x_packs in
     Log.if_error' ~use:Os.Exit.some_error @@
@@ -414,7 +416,7 @@ module Status = struct
   let pp_commit ppf (id, log) =
     Fmt.pf ppf "%a %s" B0_vcs_repo.pp_commit id log
 
-  let cmd after last packs x_packs pager_don't =
+  let cmd ~after ~last ~packs ~x_packs ~pager_don't =
     Log.if_error ~use:Os.Exit.no_such_name @@
     let* packs = select_packs packs x_packs in
     Log.if_error' ~use:Os.Exit.some_error @@
@@ -439,6 +441,7 @@ module Status = struct
 end
 
 open Cmdliner
+open Cmdliner.Term.Syntax
 
 let unit =
   let doc = "Source software release support" in
@@ -478,12 +481,13 @@ let unit =
             $(b,--skip-lint) and $(b,--skip-build) options.";
         `Blocks man ]
     in
-    let commit =
+    Cmd.make (Cmd.info "archive" ~doc ~man) @@
+    let+ packs and+ x_packs
+    and+ commit_ish =
       let doc = "Commit-ish $(docv) to checkout for the release." in
       Arg.(value & opt string "HEAD" & info ["commit"] ~doc ~docv:"COMMIT-ISH")
     in
-    Cmd.make (Cmd.info "archive" ~doc ~man) @@
-    Term.(const Archive.cmd $ const env $ commit $ packs $ x_packs)
+    Archive.cmd ~env ~commit_ish ~packs ~x_packs
   in
   let tag =
     let doc = "Tag VCS repositories with versions" in
@@ -500,35 +504,32 @@ let unit =
             and operations that would be performed.";
         `Blocks man ]
     in
-    let commit =
+    let exits = B0_std_cli.Exit.infos in
+    Cmd.make (Cmd.info "tag" ~doc ~exits ~man) @@
+    let+ packs and+ x_packs
+    and+ commit_ish =
       let doc = "Commit-ish $(docv) to tag." in
       Arg.(value & opt string "HEAD" & info ["commit"] ~doc ~docv:"COMMIT-ISH")
-    in
-    let msg =
+    and+ msg =
       let doc =
         "Commit message for the tag. If absent, the message \
          'Release $(i,VERSION)' is used."
       in
       Arg.(value & opt (some string) None &
            info ["m"; "message"] ~doc ~docv:"MSG")
-    in
-    let sign =
+    and+ sign =
       let doc = "Sign the tag using the VCS's default signing key." in
       Arg.(value & flag & info ["s"; "sign"] ~doc)
-    in
-    let force =
+    and+ force =
       let doc = "If the tag exists, replace it rather than fail." in
       Arg.(value & flag & info ["f"; "force"] ~doc)
-    in
-    let delete =
+    and+ delete =
       let doc = "Delete the specified tag rather than create it." in
       Arg.(value & flag & info ["d"; "delete"] ~doc)
-    in
-    let dry_run =
+    and+ dry_run =
       let doc = "Do not perform any action, just print them." in
       Arg.(value & flag & info ["dry-run"] ~doc)
-    in
-    let version =
+    and+ version =
       let doc =
         "The version tag to use. If absent, automatically extracted \
          from the changes file of a pack: the first token of the first
@@ -538,10 +539,8 @@ let unit =
       in
       Arg.(value & pos 0 (some string) None & info [] ~doc ~docv:"VERSION")
     in
-    let exits = B0_std_cli.Exit.infos in
-    Cmd.make (Cmd.info "tag" ~doc ~exits ~man) @@
-    Term.(const Tag.cmd $ version $ commit $ msg $ sign $ force $ delete $
-          dry_run $ packs $ x_packs)
+    Tag.cmd ~version ~commit_ish ~msg ~sign ~force ~delete ~dry_run ~packs
+      ~x_packs
   in
   let status =
     let doc = "List commits for the next release" in
@@ -553,7 +552,15 @@ let unit =
             the greatest release tag in the repository.";
         `Blocks man ]
     in
-    let after =
+    let exits =
+      Cmd.Exit.info 0 ~doc:"when changes have been detected." ::
+      Cmd.Exit.info 1 ~doc:"when no changes have been detected." ::
+      B0_std_cli.Exit.infos
+    in
+    let envs = B0_pager.Env.infos in
+    Cmd.make (Cmd.info "status" ~doc ~man ~exits ~envs) @@
+    let+ packs and+ x_packs
+    and+ after =
       let doc =
         "Commit-ish $(docv) after which commits are considered. \
          Defaults to the latest VCS tag of the form \
@@ -562,21 +569,12 @@ let unit =
       in
       let docv = "COMMIT-ISH" in
       Arg.(value & opt (some string) None & info ["after"] ~doc ~docv)
-    in
-    let last =
+    and+ last =
       let doc = "Last commit-ish $(docv) considered." in
       let docv = "COMMIT-ISH" in
       Arg.(value & opt string B0_vcs_repo.head & info ["last"] ~doc ~docv)
-    in
-    let exits =
-      (Cmd.Exit.info 0 ~doc:"when changes have been detected.") ::
-      (Cmd.Exit.info 1 ~doc:"when no changes have been detected.") ::
-      B0_std_cli.Exit.infos
-    in
-    let pager_don't = B0_pager.don't () in
-    let envs = B0_pager.Env.infos in
-    Cmd.make (Cmd.info "status" ~doc ~man ~exits ~envs) @@
-    Term.(const Status.cmd $ after $ last $ packs $ x_packs $ pager_don't)
+    and+ pager_don't = B0_pager.don't () in
+    Status.cmd ~after ~last ~packs ~x_packs ~pager_don't
   in
   let man =
     [ `S Cmdliner.Manpage.s_description;
@@ -585,6 +583,7 @@ let unit =
       `Blocks man ]
   in
   let name = B0_unit.name u in
-  Cmd.group (Cmd.info name ~doc ~man) @@ [ archive; tag; status ]
+  Cmd.group (Cmd.info name ~doc ~man) @@
+  [ archive; tag; status ]
 
 let () = B0_scope.close ()

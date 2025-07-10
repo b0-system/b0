@@ -20,8 +20,8 @@ let main () =
     in
     let path =
       let doc = "$(docv) is file path to delete" in
-      Arg.(required & pos 0 (some B0_std_cli.fpath) None &
-           info [] ~doc ~docv:"PATH")
+      Arg.(required & pos 0 (some B0_std_cli.filepath) None &
+           info [] ~doc)
     in
     Cmd.make (Cmd.info "test-rm" ~sdocs:Manpage.s_common_options) @@
     Term.(const rm_cmd $ recurse $ path)

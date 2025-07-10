@@ -47,9 +47,6 @@ module Env : sig
   val cache_dir : string
   (** [cache_dir] is the variable used to specify the b0 cache directory. *)
 
-  val color : string
-  (** [color] is the variable used to specify tty styling. *)
-
   val code : string
   (** [code] is the variable used to specify the code to which the driver
       compiles to. *)
@@ -59,9 +56,6 @@ module Env : sig
 
   val jobs : string
   (** [jobs] is the variable used to specify the maximal number of spawns. *)
-
-  val verbosity : string
-  (** [verbosity] is the variable used to specify log verbosity. *)
 end
 
 
@@ -85,8 +79,7 @@ module Conf : sig
   val make :
     b0_dir:Fpath.t -> b0_file:Fpath.t option -> cache_dir:Fpath.t ->
     cwd:Fpath.t -> code:B0_ocaml.Code.t option -> env:Os.Env.t ->
-    hash_fun:(module B0_hash.T) -> jobs:int -> log_level:Log.level ->
-    no_pager:bool -> fmt_styler:Fmt.styler -> unit -> t
+    hash_fun:(module B0_hash.T) -> jobs:int -> no_pager:bool -> unit -> t
   (** [make] constructs a configuration with given attributes. See the
       accessors for semantics. *)
 
@@ -114,17 +107,11 @@ module Conf : sig
   val jobs : t -> int
   (** [jobs] is the maximal number of spawns allowed. *)
 
-  val log_level : t -> Log.level
-  (** [log_level] is the desired log level. *)
-
   val memo : t -> (B0_memo.t, string) result
   (** [memo] is the memoizer for the configuration. *)
 
   val no_pager : t -> bool
   (** [no_pager] indicates no paging is desired on stdout. *)
-
-  val fmt_styler : t -> Fmt.styler
-  (** [fmt_styler] is the styler to assume for outputs. *)
 
   (** {1:derived Derived data} *)
 
@@ -137,8 +124,8 @@ module Conf : sig
     b0_dir:Fpath.t option -> b0_file:Fpath.t option ->
     cache_dir:Fpath.t option -> code:B0_ocaml.Code.t option ->
     hash_fun:(module B0_hash.T) option -> jobs:int option ->
-    log_level:Log.level option -> no_pager:bool ->
-    color:Fmt.styler option option -> unit -> (t, string) result
+    no_color:bool -> log_level:Log.level -> no_pager:bool -> unit ->
+    (t, string) result
   (** [setup_with_cli] determines and setups a configuration with the
       given values. These are expected to have been determined by
       environment variables and command line arugments. *)
@@ -146,10 +133,9 @@ end
 
 (** Cli interaction. *)
 module Cli : sig
-  val log_level : B0_std.Log.level option Cmdliner.Term.t
-  val color : B0_std.Fmt.styler option option Cmdliner.Term.t
   val no_pager : bool Cmdliner.Term.t
   val conf : Conf.t Cmdliner.Term.t
+  val set_no_color_and_log_level : unit Cmdliner.Term.t
 end
 
 (** {1:driver Drivers} *)

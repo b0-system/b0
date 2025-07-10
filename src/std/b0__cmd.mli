@@ -77,12 +77,14 @@ type tool = B0__fpath.t
 (** The type for command line tools.
 
     A command line tool is represented by a file path according to
-    the POSIX convention for [exec(3)]. If it is made of a single
-    segment, for example [Fpath.v "ocaml"], it represents a program
-    name to be looked up via a search procedure; for example in the
-    [PATH] environment variable. If it is a file path with multiple
-    segments (POSIX would say if they contain a slash characters)
-    the program is the file itself.
+    the POSIX convention for [exec(3)]:
+
+    {ul
+    {- If it is made of a single segment, for example [Fpath.v "ocaml"], it
+       represents a program name to be looked up via a search procedure;
+       for example in the [PATH] environment variable.}
+    {- If it is a file path with multiple segments (POSIX would say if they
+       contain a slash character) the program is the file itself.}}
 
     {b Note.} For portability one should not use the [.exe] suffix on
     Windows on tools. This should be handled transparently by
@@ -176,22 +178,24 @@ val pp_dump : t B0__fmt.t
 (** {1:stamps Stamps}
 
     Stamps are not useful unless you are interested in memoizing
-    tool invocation.
+    tool invocations. A command stamp represents the part of
+    the command line that influences a tool's output. By default
+    arguments are part of the stamp however they can be selectively
+    {!Cmd.unstamp}ed to remove them from the stamp.
 
-    This module allows to {!Cmd.unstamp} command arguments.
-
-    Unstamped arguments have no special semantics as far as the
+    Unstamped arguments have no special semantics. As far as the
     command line is concerned they simply indicate that the argument
     value itself does not influence the outputs of the tool.
     Unstamped arguments do not appear in the command line
     {{!Cmd.to_list_and_stamp}stamp} which can be used as a key to
     memoize tool spawns.
 
-    A typical example of unstamped arguments are file paths to
-    inputs: it's often the file contents not the actual file path that
+    A typical example of unstamped arguments are file paths to inputs:
+    it's often the file contents not the actual file path that
     determines the tool output; beware though that some tool use both
-    the file path contents and the actual file path in their
-    outputs. See {{!examples}examples}. *)
+    the file path contents and the actual file path in their outputs
+    (typically compilers which track source locations). See
+    {{!examples}examples}. *)
 
 val unstamp : t -> t
 (** [unstamp cmd] indicates that arguments [cmd] do not influence the

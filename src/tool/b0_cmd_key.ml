@@ -6,8 +6,8 @@
 open B0_std
 open Result.Syntax
 
-let list ~output_verbosity conf =
-  let pp, sep = match output_verbosity with
+let list ~output_details conf =
+  let pp, sep = match output_details with
   | `Short ->
       let pp_key ppf k = B0_meta.Key.pp ppf k in
       pp_key, Fmt.cut
@@ -37,8 +37,8 @@ let list =
   let doc = "List keys" in
   let descr = `P "$(cmd) lists keys." in
   B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
-  let+ output_verbosity = B0_tool.Cli.output_verbosity in
-  list ~output_verbosity
+  let+ output_details = B0_tool.Cli.output_details in
+  list ~output_details
 
 let cmd =
   let doc = "Operate on keys" in

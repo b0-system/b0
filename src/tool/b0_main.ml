@@ -5,29 +5,6 @@
 
 open Cmdliner
 
-let cmds =
-  [ B0_cmd_browse.cmd;
-    B0_cmd_build.cmd;
-    B0_cmd_delete.cmd;
-    B0_cmd_edit.cmd;
-    B0_cmd_file.cmd;
-    B0_cmd_init.cmd;
-    B0_cmd_key.cmd;
-    B0_cmd_list.cmd;
-    B0_cmd_lock.cmd;
-    B0_cmd_log.cmd;
-    B0_cmd_pack.cmd;
-    B0_cmd_root.cmd;
-    B0_cmd_scope.cmd;
-    B0_cmd_show.cmd;
-    B0_cmd_tool.cmd;
-    B0_cmd_test.cmd;
-    B0_cmd_unit.cmd;
-    B0_cmd_unlock.cmd;
-    B0_cmd_vcs.cmd; ]
-
-let default = B0_driver.with_b0_file ~driver:B0_tool.driver B0_cmd_build.term
-
 let cmd =
   let doc = "Software construction and deployment kit" in
   let exits = B0_driver.Exit.infos in
@@ -50,11 +27,33 @@ let cmd =
     `P "More information is available in the manuals, see $(b,odig doc b0).";
     B0_tool.Cli.man_see_manual;
     `S Manpage.s_bugs;
-    `P "Report them, see $(i,%%PKG_HOMEPAGE%%) for contact information."; ]
+    `P "Report them, see $(i,https://erratique.ch/software/b0) for contact \
+        information."; ]
   in
   let version = "%%VERSION%%" in
-  Cmd.group (Cmd.info "b0" ~version ~doc ~exits ~man) ~default cmds
-
+  let default =
+    B0_driver.with_b0_file ~driver:B0_tool.driver B0_cmd_build.term
+  in
+  Cmd.group (Cmd.info "b0" ~version ~doc ~exits ~man) ~default @@
+  [ B0_cmd_browse.cmd;
+    B0_cmd_build.cmd;
+    B0_cmd_delete.cmd;
+    B0_cmd_edit.cmd;
+    B0_cmd_file.cmd;
+    B0_cmd_init.cmd;
+    B0_cmd_key.cmd;
+    B0_cmd_list.cmd;
+    B0_cmd_lock.cmd;
+    B0_cmd_log.cmd;
+    B0_cmd_pack.cmd;
+    B0_cmd_root.cmd;
+    B0_cmd_scope.cmd;
+    B0_cmd_show.cmd;
+    B0_cmd_tool.cmd;
+    B0_cmd_test.cmd;
+    B0_cmd_unit.cmd;
+    B0_cmd_unlock.cmd;
+    B0_cmd_vcs.cmd; ]
 
 (* N.B. our driver scheme is not super compatible with cmdliner
    completion because the b0 file compilation logic is done in the
@@ -75,7 +74,8 @@ let try_exec_with_b0_file () =
     (* FIXME of course that doesn't reflect the state of the cli *)
     B0_driver.Conf.setup_with_cli
       ~b0_dir:None ~b0_file:None ~cache_dir:None ~code:None
-      ~hash_fun:None ~jobs:None ~log_level:None ~no_pager:true ~color:None ()
+      ~hash_fun:None ~jobs:None ~no_color:false ~log_level:Log.Warning
+      ~no_pager:true ()
   in
   match B0_driver.Conf.b0_file conf with
   | None -> Ok ()
@@ -102,6 +102,5 @@ let main () =
   if is_completion_request () && not (B0_driver.has_b0_file ())
   then try_exec_with_b0_file ();
   Cmd.eval_value cmd
-
 
 let () = B0_driver.set ~driver:B0_tool.driver ~main

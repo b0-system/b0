@@ -59,11 +59,11 @@ let ocaml_libs_by_scope us =
   in
   List.fold_left add_by_scope_dir Fpath.Map.empty us
 
-let file env us dry_run =
+let file ~env ~units ~dry_run =
   let dry_run = true in
   Log.if_error ~use:Os.Exit.no_such_name @@
-  let* us = B0_unit.get_list_or_hint ~all_if_empty:true us in
-  let ocaml_libs = Fpath.Map.bindings (ocaml_libs_by_scope us) in
+  let* units = B0_unit.get_list_or_hint ~all_if_empty:true units in
+  let ocaml_libs = Fpath.Map.bindings (ocaml_libs_by_scope units) in
   let root_dir = B0_env.root_dir env (* Do one dune file per scope dirs ? *) in
   let root_project = Fpath.(root_dir / "dune-project") in
   let* () = write_file ~dry_run root_project (dune_project ()) in
@@ -73,6 +73,7 @@ let file env us dry_run =
 (* .dune action command line interface  *)
 
 open Cmdliner
+open Cmdliner.Term.Syntax
 
 let units ~right:r =
   let doc = "The $(docv) to act on. All of them if unspecified." in
@@ -95,13 +96,13 @@ let dune_cmd env u =
           and their contents.";
       `Blocks man ]
     in
-    let units_all = units ~right:(-1) in
-    let dry_run =
+    Cmd.make (Cmd.info "file" ~doc ~man) @@
+    let+ units = units ~right:(-1)
+    and+ dry_run =
       let doc = "Do not write the files action, just print them." in
       Arg.(value & flag & info ["dry-run"] ~doc)
     in
-    Cmd.make (Cmd.info "file" ~doc ~man) @@
-    Term.(const file $ const env $ units_all $ dry_run)
+    file ~env ~units ~dry_run
   in
   let man =
     [ `S Cmdliner.Manpage.s_description;

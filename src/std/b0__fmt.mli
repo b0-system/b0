@@ -536,10 +536,9 @@ val ordinal :
 (** {1:styling Text styling}
 
     Text styling control happens via ANSI escape sequences and is
-    handled globally. If you want to make sure no escape sequences
-    are produced disable them with {!set_styler}. Otherwise they can
-    be selectively stripped on strings or formatters with the
-    {!B0_std.String.strip_ansi_escapes} and {!strip_styles} functions. *)
+    handled globally. See the
+    {{!page-b0_std_cookbook.fmt_disable_ansi_styling}cookbook} for more
+    information. *)
 
 type styler =
 | Ansi (** Style with ANSI escapes. *)
@@ -547,13 +546,21 @@ type styler =
 (** The kind of styler. *)
 
 val set_styler : styler -> unit
-(** [set_styler st] sets the global styler to [st]. See {!val-styler}. *)
+(** [set_styler styler] sets the {{!val-styler}global styler} to [styler].
+
+    Use {!More_cli.set_no_color} to set this from the command line. *)
 
 val styler : unit -> styler
-(** [styler] is the global styler. The initial styler is only
-    set to [Plain] if the value of the [TERM] environment variable is
-    set to [dumb] or if it undefined and the {!Sys.backend_type}
-    is not [js_of_ocaml] (browser consoles support ANSI escapes). *)
+(** [styler] is the global styler. The initial value is [Ansi]
+    or [Plain] if one of the following conditions is satisified:
+    {ul
+    {- The [NO_COLOR] environment variable is set and different
+       from the empty string. Yes, even if you have [NO_COLOR=0], that's
+       what the dumb {:https://no-color.org} standard says.}
+    {- The [TERM] environment variable is [dumb].}
+    {- The [TERM] environment variable is unset and {!Sys.backend_type} is
+       not [Other "js_of_ocaml"] (browser consoles support
+       ANSI escapes).}} *)
 
 val strip_styles : Format.formatter -> unit
 (** [strip_styles ppf], this overrides the formatter's [out_string]

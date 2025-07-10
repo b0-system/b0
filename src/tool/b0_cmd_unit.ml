@@ -24,17 +24,17 @@ let dir ~units conf =
 let edit ~units conf =
   B0_tool.Def.edit (module B0_unit) conf units
 
-let get ~output_verbosity ~key ~units conf =
-  B0_tool.Def.get_meta_key (module B0_unit) conf output_verbosity key units
+let get ~output_details ~key ~units conf =
+  B0_tool.Def.get_meta_key (module B0_unit) conf output_details key units
 
-let list ~output_verbosity ~units conf =
-  B0_tool.Def.list (module B0_unit) conf output_verbosity units
+let list ~output_details ~units conf =
+  B0_tool.Def.list (module B0_unit) conf output_details units
 
-let show ~output_verbosity ~units conf =
-  let output_verbosity =
-    if output_verbosity = `Normal then `Long else output_verbosity
+let show ~output_details ~units conf =
+  let output_details =
+    if output_details = `Normal then `Long else output_details
   in
-  B0_tool.Def.list (module B0_unit) conf output_verbosity units
+  B0_tool.Def.list (module B0_unit) conf output_details units
 
 (* Command line interface *)
 
@@ -74,17 +74,17 @@ let get =
     `P "$(cmd) outputs the value of metadata $(i,KEY) of given build units."
   in
   B0_tool.Cli.subcmd_with_b0_file "get" ~doc ~descr @@
-  let+ output_verbosity = B0_tool.Cli.output_verbosity
+  let+ output_details = B0_tool.Cli.output_details
   and+ key = B0_tool.Cli.pos_key
   and+ units = units_tail in
-  get ~output_verbosity ~key ~units
+  get ~output_details ~key ~units
 
 let list =
   let doc = "List build units" in
   let descr = `P "$(cmd) lists given build units." in
   B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
-  let+ output_verbosity = B0_tool.Cli.output_verbosity and+ units = units_all in
-  list ~output_verbosity ~units
+  let+ output_details = B0_tool.Cli.output_details and+ units = units_all in
+  list ~output_details ~units
 
 let show =
   let doc = "Show build unit metadata" in
@@ -92,8 +92,8 @@ let show =
     `P "$(cmd) is $(b,list -l), it outputs metadata of given build units."
   in
   B0_tool.Cli.subcmd_with_b0_file "show" ~doc ~descr @@
-  let+ output_verbosity = B0_tool.Cli.output_verbosity and+ units = units_all in
-  show ~output_verbosity ~units
+  let+ output_details = B0_tool.Cli.output_details and+ units = units_all in
+  show ~output_details ~units
 
 let cmd =
   let doc = "Operate on build units" in

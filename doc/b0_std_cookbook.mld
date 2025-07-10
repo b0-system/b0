@@ -1,0 +1,123 @@
+{0 More cookbook}
+
+A few recipes and starting {{!blueprints}blueprints} for using {!B0_std}.
+
+{b Note.} Some of the code snippets here assume they are done after:
+
+{[
+open B0_std
+]}
+
+{1:processes Process control}
+
+{2:spawn_trace How can I trace process spawns?}
+
+You can use the {{!B0_std.Os.Cmd.section-tracing}spawn tracing}
+facility. At initialization time a tracer that logs spawns on level
+[Debug] is installed. So {{!logging_set_level}setting your
+level} to [Debug] will trace the process spawns on [stderr].
+
+If you want them to be traced at another level use
+{!B0_std.Os.Cmd.spawn_tracer_log}. For example this traces process spawns
+at the {!B0_std.Log.Stderr} level:
+{[
+let main () =
+  Os.Cmd.set_spawn_tracer (Os.Cmd.spawn_tracer_log Stderr);
+  …
+]}
+
+{1:fmt Formatting}
+
+{2:fmt_disable_ansi_styling How do I disable ANSI text styling?}
+
+ANSI text styling is controlled globally on all formatters by the
+{!B0_std.Fmt.set_styler} function. The initial value depends on a bunch
+of conditions which are documented {{!B0_std.Fmt.val-styler}here}. Text
+styling can be selectively stripped on strings and formatters with the
+{!B0_std.String.strip_ansi_escapes} and {!B0_std.Fmt.strip_styles}
+functions.
+
+If you are using {!Cmdliner} the recommended way to let users control
+ANSI text styling is to use the {!More_cli.set_no_color} term which
+sets the styler by side side effect. The term allows to set the styler
+to [Plain] with the [--no-color] command line flag or the [NO_COLOR]
+environment variable (which also happens at {{!B0_std.Fmt.val-styler}
+initialization time}). See {!More_cli.no_color} for more information
+and {{!blueprint_color_log}this blueprint} for an example.
+
+We advise against changing the styler according to
+{!Unix.isatty}. Think about your outputs as being styled text rather
+than plain text. Users often pipe styled text and and expect it to
+survive. For example when they page your outputs or redirect messages
+to a log file. This doesn't mean that you should not support a
+[--no-color] option; only that {!Unix.isatty} should not be used as
+signifier for plain text.
+
+{1:logging Logging}
+
+{2:logging_set_level How do I set the log level?}
+
+The log level is controlled by the {!B0_std.Log.set_level} function.
+The initial value is {!B0_std.Log.Warning}.
+
+If you are using {!Cmdliner} the recommended way to let users control
+the log level is to use the {!More_cli.set_log_level} term which
+sets the log level by side effect. The term allows to set the log
+level with the [--log-level] command line option and a few other flags or
+the [LOG_LEVEL] environment variable. See {!More_cli.val-log_level} for more
+information and {{!blueprint_color_log}this blueprint} for an example.
+
+{2:logging_main How do I log the time taken by my program ?}
+
+Simply wrap the body of your [main] function by a call to
+{!B0_std.Log.val-time}. The call respects the reporting level even if
+changed in the wrapped function itself. See this
+{{!blueprint_color_log}this blueprint} for an example.
+
+{2:logging_stdo Should I print or log to stdout/stderr ?}
+
+It depends.
+
+The {!B0_std.Log} module has two specific levels before [Quiet] that
+allow to directly output to [stdout] and [stderr] by using
+{!B0_std.Log.stdout} and {!B0_std.Log.stderr}.
+
+Using these functions is useful to flush newline ended messages on
+standard outputs without them being prefixed by the executable name or
+a log level header and retain the ability to suppress these messages when
+the reporting level is set to {!B0_std.Log.Quiet}.
+
+For example if you are writing data on your standard output, you
+should likely not use {!B0_std.Log.stdout} for that unless you want to
+prevent it from being output when {!B0_std.Log.Quiet} is set.
+
+{1:blueprints Blueprints}
+
+{2:blueprint_color_log Color and log setup}
+
+This blueprint setups ANSI text styling and the log level
+by side effect. It also reports the total time taken
+by the tool when the log level is set to [Info].
+
+{[
+open B0_std
+
+let tool () =
+  Log.stdout (fun m -> m "Invoke with %a to silence me" Fmt.code "--quiet");
+  Cmdliner.Cmd.Exit.ok
+
+open Cmdliner
+open Cmdliner.Term.Syntax
+
+let tool_cmd =
+  Cmd.make (Cmd.info "TODO" ~version:"%%VERSION%%") @@
+  let+ () = More_cli.set_no_color () in
+  let+ () = More_cli.set_log_level () in
+  tool ()
+
+let main () =
+  Log.time (fun _ m -> m "total time %%VERSION%%") @@ fun () ->
+  Cmd.eval' tool_cmd
+
+let () = if !Sys.interactive then () else exit (main ())
+]}

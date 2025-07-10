@@ -69,7 +69,7 @@ let cmd =
   ]
   in
   Cmd.make (Cmd.info "show-url" ~version:"%%VERSION%%" ~doc ~exits ~man) @@
-  let+ () = B0_std_cli.configure_log ()
+  let+ () = B0_std_cli.set_log_level ()
   and+ background = B0_web_browser.background ()
   and+ prefix = B0_web_browser.prefix ~default:false ()
   and+ browser = B0_web_browser.browser ()
