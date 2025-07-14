@@ -67,7 +67,7 @@ let list ~output_details ~names ~all ~only_tests conf =
   let* () = list conf vs in
   Ok Os.Exit.ok
 
-let show ~output_details ~names ~all ~only_tests conf =
+let info ~output_details ~names ~all ~only_tests conf =
   let output_details =
     if output_details = `Normal then `Long else output_details
   in
@@ -107,17 +107,17 @@ let cmd =
   list ~output_details ~names ~all ~only_tests
 
 
-let cmd_show =
-  let doc = "Show definition metadata" in
+let cmd_info =
+  let doc = "Display information about definitions" in
   let descr =
-    `P "$(cmd) is $(tool) $(b,list -l), it outputs metadata of given
+    `P "$(cmd) is $(tool) $(b,list -l). It outputs metadata of given
         definitions. By default library definitions are \
         not listed, invoke with $(b,--all) include them."
   in
-  B0_tool.Cli.subcmd_with_b0_file "show" ~doc ~descr @@
+  B0_tool.Cli.subcmd_with_b0_file "info" ~doc ~descr @@
   let+ output_details = B0_tool.Cli.output_details
   and+ names and+ all and+ only_tests in
-  show ~output_details ~names ~all ~only_tests
+  info ~output_details ~names ~all ~only_tests
 
 let cmd_edit =
   let doc = "Edit definitions" in

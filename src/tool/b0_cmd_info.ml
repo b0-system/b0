@@ -3,4 +3,4 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-let cmd = B0_cmd_list.cmd_show
+let cmd = B0_cmd_list.cmd_info

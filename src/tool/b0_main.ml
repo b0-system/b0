@@ -40,6 +40,7 @@ let cmd =
     B0_cmd_delete.cmd;
     B0_cmd_edit.cmd;
     B0_cmd_file.cmd;
+    B0_cmd_info.cmd;
     B0_cmd_init.cmd;
     B0_cmd_key.cmd;
     B0_cmd_list.cmd;
@@ -48,7 +49,6 @@ let cmd =
     B0_cmd_pack.cmd;
     B0_cmd_root.cmd;
     B0_cmd_scope.cmd;
-    B0_cmd_show.cmd;
     B0_cmd_tool.cmd;
     B0_cmd_test.cmd;
     B0_cmd_unit.cmd;

@@ -2,6 +2,12 @@
 
 The quick hints if you need to use the [b0] tool occasionally.
 
+In [b0] the build is organized into named {e units}. Lists of units
+can be gathered into named {e packs}. A unit can be in more than one
+pack. In general the repeatable options [-u] and [-p] allow to select
+units and packs and [-x] and [-X] to substract from this
+selection.
+
 {1:basic Basic}
 
 {2:build How do I build ?}
@@ -45,10 +51,11 @@ b0 -- this_test --help
 {2:run How do I run build artefacts ?}
 
 {@sh[
-b0 list       # Spot the unit name u you are interested in
-b0 -- u …     # Build u and run with arguments.
-b0 -b -- u …  # Back to build only
-b0 -- lib     # If lib is a library gets you in a REPL
+b0 list         # Spot the name of the unit you are interested in
+b0 -- mytool …  # Build mytool and run with arguments.
+b0 -- mylib     # If mylib is a library gets you in a REPL
+b0 -- mymedia   # May be configured to render the media
+b0 -b -- mytool …   # Back to build only
 ]}
 
 {2:bench How do I benchmark an executable ?}
@@ -57,30 +64,31 @@ The following forms can be used in order to have up-to-date artefacts
 but avoiding timing the build.
 
 {@sh[
-time $(b0 --path -- u) …
-hyperfine "$(b0 --path -- u) …"
+time $(b0 --path -- mytool) …
+hyperfine "$(b0 --path -- mytool) …"
 ]}
 
 {2:browser How do I open build artefacts in a browser ?}
 
 {@sh[
-b0 -- .show-url u
-b0 -- .show-url --help   # See the different modes of operation
+b0 -- .show-url mywebsite
+b0 -- .show-url --help     # See the different modes of operation
+b0 -- mywebsite            # May be configured to open in your browser
 ]}
 
-{2:show How do I get information about a unit ?}
+{2:show How do I get information about a unit or pack ?}
 
 {@sh[
-b0 show u
+b0 info mytool
+b0 info mypack
 ]}
-
 
 {2:lock How can I use the build anywhere ?}
 
 {@sh[
 eval $(b0 lock)
 cd /any/where/
-b0 -- u …
+b0 -- mytool …
 ]}
 
 {2:adding_src How can I add a new source to the project ?}
@@ -98,7 +106,8 @@ b0 init src --help
 
 {@sh[
 b0 list            # Spot units names or packs you are interested in
-b0 -u lib -p pack  # Build unit 'lib' and pack 'pack'
+b0 -u mylib -p mypack  # Build unit mylib and units in mypack
+b0 -p mypack -x mytool # Build units in mypack without mytool (if applicable)
 ]}
 
 {2:delete How do I clear the build ?}
