@@ -312,6 +312,7 @@ let unit =
 let action =
   B0_unit.Action.func ~doc:"show-url" @@ fun env u ~args ->
   let* url = get_url env u in
+  let args = if Cmd.is_empty args then Cmd.arg "--prefix" else args in
   Ok (Os.Exit.execv Cmd.(tool "show-url" % url %% args))
 
 let () = B0_scope.close ()

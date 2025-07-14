@@ -43,7 +43,8 @@ val timeout_s : int B0_meta.key
 
 val action : B0_unit.Action.t
 (** [action] is a unit action that invokes the [show-url] tool on
-    the unit's {!val-url}. *)
+    the unit's {!val-url}. If no command line arguments are specified on
+    invocation [--prefix] is added. *)
 
 (** {1:unit [.show-url] unit} *)
 
