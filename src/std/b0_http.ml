@@ -149,7 +149,7 @@ module Http_client = struct
     let cmd = Arg.conv' ~docv:"CMD" (B0_std.Cmd.of_string, B0_std.Cmd.pp_dump)in
     Arg.(value & opt cmd default & info ["curl"] ~doc ?docs ?env ~docv:"CMD")
 
-  let curl_fetch_args ?(args = Cmd.empty) ?(progress = true) url file =
+  let curl_fetch_args ?(args = Cmd.empty) ~progress url file =
     let progress = if progress then Cmd.arg "-#" else Cmd.arg "--silent" in
     let outf = Cmd.(arg "-o" %% path file) in
     Cmd.(arg "--fail" % "--show-error" %% progress % "-L" %% outf %% args % url)
