@@ -280,6 +280,12 @@ val copy_to_dir :
     [Fpath.reroot ~src_root ~dst_root:dst src] and [src_root] defaulting
     to [Fpath.parent src]. The function returns the destination file. *)
 
+val ready_and_copy_to_dir :
+  t -> ?mode:int -> ?linenum:int ->
+  ?src_root:Fpath.t -> Fpath.t -> dir:Fpath.t -> Fpath.t
+(** [ready_and_copy_to_dir] is like {!copy_to_dir} but calls {!ready_file}
+    on the copied file. *)
+
 val ready_and_copy_dir :
   ?rel:bool -> ?follow_symlinks:bool ->
   ?prune:(Unix.stats -> string -> Fpath.t -> bool) ->

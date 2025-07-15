@@ -361,6 +361,9 @@ let copy_to_dir m ?mode ?linenum ?src_root src ~dir =
   in
   copy m ?mode ?linenum src ~dst; dst
 
+let ready_and_copy_to_dir m ?mode ?linenum ?src_root src ~dir =
+  ready_file m src; copy_to_dir m ?mode ?linenum ?src_root src ~dir
+
 let ready_and_copy_dir
     ?(rel = false) ?follow_symlinks ?(prune = fun _ _ _ -> false) m
     ~recurse src_root ~dst:dst_root
