@@ -280,6 +280,15 @@ val copy_to_dir :
     [Fpath.reroot ~src_root ~dst_root:dst src] and [src_root] defaulting
     to [Fpath.parent src]. The function returns the destination file. *)
 
+val ready_and_copy_dir :
+  ?rel:bool -> ?follow_symlinks:bool ->
+  ?prune:(Unix.stats -> string -> Fpath.t -> bool) ->
+  t -> recurse:bool -> Fpath.t -> dst:Fpath.t -> Fpath.t list
+(** [ready_and_copy_dir m ~recurse ~src dst] is the moral equivalent
+    of {!B0_std.Os.Dir.val-copy}. It makes ready and copies the contents
+    of [src] to [dst] using the same conventions. The function returns
+    the copied files. *)
+
 val mkdir : t -> ?mode:int -> Fpath.t -> unit Fut.t
 (** [mkdir m dir p] is a future that determines with [()] when the
     directory path [p] has been created with mode [mode] (defaults

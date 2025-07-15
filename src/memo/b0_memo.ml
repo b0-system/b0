@@ -361,6 +361,26 @@ let copy_to_dir m ?mode ?linenum ?src_root src ~dir =
   in
   copy m ?mode ?linenum src ~dst; dst
 
+let ready_and_copy_dir
+    ?(rel = false) ?follow_symlinks ?(prune = fun _ _ _ -> false) m
+    ~recurse src_root ~dst:dst_root
+  =
+  let copy_file st name src acc =
+    if prune st name src then acc else
+    let dst = match rel with
+    | true -> Fpath.(dst_root // src)
+    | false -> Fpath.reroot ~src_root ~dst_root src
+    in
+    ready_file m src;
+    copy m ~mode:st.Unix.st_perm src ~dst;
+    dst :: acc
+  in
+  fail_if_error m @@
+  let* () = Os.Dir.must_exist src_root in
+  let prune_dir st name dir _ = prune st name dir and dotfiles = true in
+  Os.Dir.fold_files
+    ~rel ~dotfiles ?follow_symlinks ~prune_dir ~recurse copy_file src_root []
+
 let mkdir m ?(mode = 0o755) dir =
   let id = new_op_id m and mark = m.c.mark and created = timestamp m in
   let r, set = Fut.make () in
