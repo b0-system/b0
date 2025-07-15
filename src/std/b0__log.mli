@@ -47,7 +47,7 @@ val level : unit -> level
 val set_level : level -> unit
 (** [set_level l] sets the reporting level to [l].
 
-    Use {!More_cli.set_log_level} to set this from the command line. *)
+    Use {!B0_std_cli.set_log_level} to set this from the command line. *)
 
 val level_to_string : level -> string
 (** [level_to_string l] converts [l] to a string representation. *)

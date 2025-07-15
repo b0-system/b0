@@ -9,6 +9,11 @@
 
 include module type of List (** @closed *)
 
+(** {1:adding_elts Adding elements} *)
+
+val cons_if : bool -> 'a -> 'a list -> 'a list
+(** [cons_if true v vs] is [(v :: vs)] and [cons_if false v vs] is [vs]. *)
+
 (** {1:comparing Comparing and sorting} *)
 
 val distinct : ('a -> 'a -> int) -> 'a list -> 'a list

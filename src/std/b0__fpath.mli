@@ -151,6 +151,11 @@ val basename : ?strip_exts:bool -> t -> string
     segment}. If [strip_exts] is [true] (default to [false]) the basename's
     {{!file_exts}multiple extension}, if any, is removed from the segment. *)
 
+val basepath : ?strip_exts:bool -> t -> t
+(** [basepath] is like {!basename} but returns a file path with the
+    result or ["."] if the result is empty which can be detected
+    by {!is_current_dir}. *)
+
 val parent : t -> t
 (** [parent p] is a {{!is_syntactic_dir}directory path} that contains
     [p]. If [p] is a {{!is_root}root path} this is [p] itself.
@@ -269,10 +274,8 @@ val get_ext : multi:bool -> t -> ext
     if [multi] is [true] of the {!basename} of [p].
 
     The empty string is returned if there is no extension. By definition
-    this works on the directory name of directory paths.
-
-    {b TODO} Is returning the empty string rather than an option really a
-    good idea ? I vaguely remember option was an annoyance though. *)
+    this operates on the directory name of directory paths, not on the
+    final empty segment. *)
 
 val has_ext : ext -> t -> bool
 (** [has_ext ext p] is [true] iff [String.equal (get_ext n multi:false p) e ||
@@ -281,23 +284,28 @@ val has_ext : ext -> t -> bool
 val mem_ext : ext list -> t -> bool
 (** [mem_ext exts p] is [List.exists (fun e -> has_ext e p) exts] *)
 
-val add_ext : ext -> t -> t
+val add_ext : string -> t -> t
 (** [add_ext ext p] is [p] with [ext] concatenated to [p]'s
-    {{!basename}basename}. *)
+    {{!basename}basename}.
+
+    @raise Invalid_argument if [ext <> "" && not (]{!is_segment}[ ext)]
+
+    {b Note.} [ext] is not required to start with a [.] it can be
+    used for arbitrary basename extension. *)
 
 val strip_ext : multi:bool -> t -> t
 (** [strip_ext multi p] is [p] with the extension of [p]'s
     {{!basename}basename} removed. If [multi] is [true] (defaults to
     [false]), the multiple file extension is removed. *)
 
-val set_ext : multi:bool -> ext -> t -> t
-(** [set_ext ~multi p] is [add_ext ext (strip_ext ~multi p)]. *)
+val set_ext : multi:bool -> string -> t -> t
+(** [set_ext ~multi ext p] is {!add_ext}[ ext (strip_ext ~multi p)]. *)
 
 val cut_ext : multi:bool -> t -> t * ext
 (** [cut_ext ~multi p] is [(strip_ext ~multi p, get_ext ~multi p)]. *)
 
 val ( + ) : t -> ext -> t
-(** [p + ext] is [add_ext p ext]. Left associative. *)
+(** [p + ext] is {!add_ext}[ p ext]. Left associative. *)
 
 val ( -+ ) : t -> ext -> t
 (** [p -+ ext] is [set_ext ~multi:false p ext]. Left associative. *)

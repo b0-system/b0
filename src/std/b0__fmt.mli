@@ -548,7 +548,7 @@ type styler =
 val set_styler : styler -> unit
 (** [set_styler styler] sets the {{!val-styler}global styler} to [styler].
 
-    Use {!More_cli.set_no_color} to set this from the command line. *)
+    Use {!B0_std_cli.set_no_color} to set this from the command line. *)
 
 val styler : unit -> styler
 (** [styler] is the global styler. The initial value is [Ansi]

@@ -38,11 +38,11 @@ styling can be selectively stripped on strings and formatters with the
 functions.
 
 If you are using {!Cmdliner} the recommended way to let users control
-ANSI text styling is to use the {!More_cli.set_no_color} term which
+ANSI text styling is to use the {!B0_std_cli.set_no_color} term which
 sets the styler by side side effect. The term allows to set the styler
 to [Plain] with the [--no-color] command line flag or the [NO_COLOR]
 environment variable (which also happens at {{!B0_std.Fmt.val-styler}
-initialization time}). See {!More_cli.no_color} for more information
+initialization time}). See {!B0_std_cli.no_color} for more information
 and {{!blueprint_color_log}this blueprint} for an example.
 
 We advise against changing the styler according to
@@ -61,10 +61,10 @@ The log level is controlled by the {!B0_std.Log.set_level} function.
 The initial value is {!B0_std.Log.Warning}.
 
 If you are using {!Cmdliner} the recommended way to let users control
-the log level is to use the {!More_cli.set_log_level} term which
+the log level is to use the {!B0_std_cli.set_log_level} term which
 sets the log level by side effect. The term allows to set the log
 level with the [--log-level] command line option and a few other flags or
-the [LOG_LEVEL] environment variable. See {!More_cli.val-log_level} for more
+the [LOG_LEVEL] environment variable. See {!B0_std_cli.val-log_level} for more
 information and {{!blueprint_color_log}this blueprint} for an example.
 
 {2:logging_main How do I log the time taken by my program ?}
@@ -87,9 +87,10 @@ standard outputs without them being prefixed by the executable name or
 a log level header and retain the ability to suppress these messages when
 the reporting level is set to {!B0_std.Log.Quiet}.
 
-For example if you are writing data on your standard output, you
-should likely not use {!B0_std.Log.stdout} for that unless you want to
-prevent it from being output when {!B0_std.Log.Quiet} is set.
+Now if you are writing data on your standard output, you should likely
+not use {!B0_std.Log.stdout}. This will prevent it from being output
+when {!B0_std.Log.Quiet} is set which the user may request to silence other
+diagnostics message.
 
 {1:blueprints Blueprints}
 
@@ -111,8 +112,8 @@ open Cmdliner.Term.Syntax
 
 let tool_cmd =
   Cmd.make (Cmd.info "TODO" ~version:"%%VERSION%%") @@
-  let+ () = More_cli.set_no_color () in
-  let+ () = More_cli.set_log_level () in
+  let+ () = B0_std_cli.set_no_color () in
+  let+ () = B0_std_cli.set_log_level () in
   tool ()
 
 let main () =

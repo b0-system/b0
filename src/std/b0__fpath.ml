@@ -416,6 +416,7 @@ let has_ext e p = match ext_range ~multi:true p with
 let mem_ext exts p = List.exists (fun ext -> has_ext ext p) exts
 
 let add_ext e p =
+  if e <> "" && not (is_segment e) then invalid_arg (err_invalid_seg e);
   let plen = String.length p in
   match last_is_sep p with
   | false -> p ^ e
@@ -481,6 +482,9 @@ let basename ?(strip_exts = false) p =
               B0__string.subrange ~first ~last:(i - 1) p
       in
       loop first last (first + 1)
+
+let basepath ?strip_exts p = match basename ?strip_exts p with
+| "" -> "." | p -> p
 
 let rec parent p =
   let plen = String.length p in

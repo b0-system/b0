@@ -5,6 +5,8 @@
 
 include List
 
+let cons_if b v vs = if b then v :: vs else vs
+
 let classify
     (type a) (type b)
     ?(cmp_elts : a -> a -> int = Stdlib.compare)
