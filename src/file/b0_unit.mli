@@ -47,6 +47,9 @@ val exe_file : Fpath.t Fut.t B0_meta.key
 val outcomes : Fpath.t list Bval.t B0_meta.key
 (** [outcomes] is the set of public file outcomes. *)
 
+val copy_outcomes : B0_memo.t -> t -> dir:Fpath.t -> unit
+(** [copy_outcomes m u ~dir] copies the outcome of [u] to [dir]. *)
+
 val is_public : t -> bool
 (** [is_public u] is [true] iff [u]'s meta has {!B0_meta.public}
     set to [true]. *)
