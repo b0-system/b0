@@ -108,7 +108,7 @@ let cmd =
 
 
 let cmd_info =
-  let doc = "Display information about definitions" in
+  let doc = "Output information about definitions" in
   let descr =
     `P "$(cmd) is $(tool) $(b,list -l). It outputs metadata of given
         definitions. By default library definitions are \

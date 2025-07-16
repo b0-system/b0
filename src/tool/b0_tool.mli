@@ -56,21 +56,35 @@ end
 module Cli : sig
   open Cmdliner
 
+  (** {1:env Environment variables} *)
 
-
-  val man_see_manual : Manpage.block
   val editor_envs : Cmd.Env.info list
+
+  (** {1:ui User interface fragments} *)
 
   val output_details : [ `Long | `Normal | `Short ] Term.t
   val log_format : B0_cli.Memo.Log.format Term.t
   val op_query : B0_cli.Op.query Term.t
 
-  val pos_key : string Term.t
+  val required_key_pos0 : string Term.t
 
   val no_pager : bool Term.t
-  (** N.B. only useful for {!subcmd}, it's already in the driver conf. *)
+  (** {b Note} only useful for {!subcmd}, it's already in the driver conf. *)
 
-  val s_scope_selection : string
+
+  val units_posn :
+    ?doc:string -> first:int -> unit -> string list Cmdliner.Term.t
+
+  val units_pos0 : string list Cmdliner.Term.t
+  val units_pos1 : string list Cmdliner.Term.t
+
+  (** {1:manpage Manpage fragments} *)
+
+  val s_scope_selection : Manpage.section_name
+
+  val man_see_manual : Manpage.block
+
+  (** {1:cmds Defining commands} *)
 
   val subcmd :
     ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->

@@ -100,7 +100,7 @@ let key =
   let doc = "Browse a metadata key value" in
   let descr = `P "$(cmd) opens the URL found in $(i,KEY)." in
   B0_tool.Cli.subcmd_with_b0_file "key" ~doc ~descr @@ browse_conf @@
-  let+ key = B0_tool.Cli.pos_key and+ packs = packs_tail in
+  let+ key = B0_tool.Cli.required_key_pos0 and+ packs = packs_tail in
   browse ~key ~packs
 
 let online_doc =

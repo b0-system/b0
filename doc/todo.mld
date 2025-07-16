@@ -336,3 +336,5 @@ v}
 - Profile stuff
   {v xcrun xctrace record --template='Time Profiler' --launch -- \
   $(b0 --path -- zipc unzip -t tmp/ebook.epub) v}
+
+- Decide a terminology strategy on show/print/output.

@@ -1,11 +1,9 @@
 (*---------------------------------------------------------------------------
-   Copyright (c) 2020 The b0 programmers. All rights reserved.
+   Copyright (c) 2025 The b0 programmers. All rights reserved.
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** b0 [unit] command. *)
-
-val output_dirs : units:string list -> B0_driver.Conf.t -> B0_std.Os.Exit.t
+(** b0 [dir] command. *)
 
 val cmd : B0_std.Os.Exit.t Cmdliner.Cmd.t
-(** [cmd] is the command line for [unit]. *)
+(** [cmd] is the command line for [dir]. *)

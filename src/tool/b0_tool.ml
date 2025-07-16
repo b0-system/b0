@@ -132,8 +132,30 @@ module Cli = struct
   open Cmdliner
   open Cmdliner.Term.Syntax
 
+  (* User interface fragments *)
+
   let log_format = B0_cli.Memo.Log.format_cli ()
   let op_query = B0_cli.Op.query_cli ()
+
+
+  let editor_envs = B0_editor.Env.infos
+  let pager_envs = B0_pager.Env.infos
+  let output_details = B0_std_cli.output_details ()
+  let no_pager = B0_driver.Cli.no_pager
+  let required_key_pos0 =
+    let doc = "The metadata key $(docv) to get." and docv = "KEY" in
+    Arg.(required & pos 0 (some string) None & info [] ~doc ~docv)
+
+  let units_posn
+      ?(doc = "The $(docv) to act on. All of them if unspecified.")
+      ~first ()
+    =
+    Arg.(value & pos_right (first - 1) string [] & info [] ~doc ~docv:"UNIT")
+
+  let units_pos1 = units_posn ~first:1 ()
+  let units_pos0 = units_posn ~first:0 ()
+
+  (* Manual fragments *)
 
   let s_scope_selection = "SCOPE SELECTION"
 
@@ -157,13 +179,7 @@ module Cli = struct
     | None -> man
     | Some syn -> `S Manpage.s_synopsis :: syn :: man
 
-  let editor_envs = B0_editor.Env.infos
-  let pager_envs = B0_pager.Env.infos
-  let output_details = B0_std_cli.output_details ()
-  let no_pager = B0_driver.Cli.no_pager
-  let pos_key =
-    let doc = "The metadata key $(docv) to get." and docv = "KEY" in
-    Arg.(required & pos 0 (some string) None & info [] ~doc ~docv)
+  (* Commands *)
 
   let subcmd ?exits ?(envs = []) ?synopsis name ~doc ~descr term =
     let man = man_with_descr ?synopsis descr in
@@ -201,32 +217,4 @@ module Cli = struct
   let cmd_group ?exits ?(envs = []) ?synopsis name ~doc ~descr ?default subs =
     let man = man_with_descr ?synopsis descr in
     Cmd.group (Cmd.info name ~doc ?exits ~envs ~man) ?default subs
-
-  (*
-
-   Let's keep that here for now
-
-  let cmd_group_with_b0_file
-      ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
-      ?default subs
-    =
-    let man = man_with_descr ?synopsis descr in
-    let default = match default with
-    | None -> None
-    | Some cmd -> Some (B0_driver.with_b0_file ~driver cmd)
-    in
-    Cmd.group (Cmd.info name ~doc ~exits ~envs ~man) ?default subs
-
-  let cmd_group_with_driver_conf
-      ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
-      ?default subs
-    =
-    let man = man_with_descr ?synopsis descr in
-    let default = match default with
-    | Some default -> Some (Term.(default $ B0_driver.Cli.conf))
-    | None -> None
-    in
-    Cmd.group (Cmd.info name ~doc ~exits ~envs ~man) ?default subs
-  *)
-
 end

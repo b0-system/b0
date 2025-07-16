@@ -49,7 +49,7 @@ let get =
   in
   B0_tool.Cli.subcmd_with_b0_file "get" ~doc ~descr @@
   let+ output_details = B0_tool.Cli.output_details
-  and+ key = B0_tool.Cli.pos_key
+  and+ key = B0_tool.Cli.required_key_pos0
   and+ packs = packs_tail in
   get ~output_details ~key ~packs
 

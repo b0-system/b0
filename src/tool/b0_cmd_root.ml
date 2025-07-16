@@ -6,11 +6,11 @@
 open B0_std
 open Result.Syntax
 
-let path conf =
+let output_dir conf =
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
   let* b0_file = B0_driver.Conf.get_b0_file conf in
   let root = Fpath.parent b0_file in
-  Log.stdout (fun m -> m "%a" Fpath.pp root);
+  Fmt.pr "@[%a@]@." Fpath.pp (Fpath.strip_trailing_dir_sep root);
   Ok Os.Exit.ok
 
 (* Command line interface *)
@@ -18,7 +18,7 @@ let path conf =
 open Cmdliner
 
 let cmd =
-  let doc = "Show the root directory" in
+  let doc = "Output the root directory" in
   let descr = `P "$(cmd) outputs the b0 root directory." in
   B0_tool.Cli.subcmd_with_driver_conf "root" ~doc ~descr @@
-  Term.const path
+  Term.const output_dir

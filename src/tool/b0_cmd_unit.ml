@@ -6,7 +6,7 @@
 open B0_std
 open Result.Syntax
 
-let dir ~units conf =
+let output_dirs ~units conf =
   Log.if_error ~use:Os.Exit.no_such_name @@
   (* XXX Eventually we should use B0_env here. *)
   let* units = B0_unit.get_list_or_hint ~all_if_empty:true units in
@@ -15,10 +15,11 @@ let dir ~units conf =
     B0_build.B0_dir.build_dir ~b0_dir ~variant:"user" (* FIXME *)
   in
   let unit_dir unit =
+    Fpath.strip_trailing_dir_sep @@
     B0_build.B0_dir.unit_build_dir ~build_dir ~name:(B0_unit.name unit)
   in
   let dirs = List.map unit_dir units in
-  Log.stdout (fun m -> m "@[<v>%a@]" (Fmt.list Fpath.pp) dirs);
+  Fmt.pr "@[<v>%a@]@." (Fmt.list Fpath.pp) dirs;
   Ok Os.Exit.ok
 
 let edit ~units conf =
@@ -41,22 +42,15 @@ let show ~output_details ~units conf =
 open Cmdliner
 open Cmdliner.Term.Syntax
 
-let units ~right:r =
-  let doc = "The $(docv) to act on. All of them if unspecified." in
-  Arg.(value & pos_right r string [] & info [] ~doc ~docv:"UNIT")
-
-let units_tail = units ~right:0
-let units_all = units ~right:(-1)
-
 let build_dir =
   let doc = "Output build directories of units" in
   let descr =
     `P "$(cmd) outputs build directories of given build units. The paths may \
-        not exist."
+        not exist. See also $(tool) $(b,dir)."
   in
   B0_tool.Cli.subcmd_with_b0_file "dir" ~doc ~descr @@
-  let+ units = units_all in
-  dir ~units
+  let+ units = B0_tool.Cli.units_pos0 in
+  output_dirs ~units
 
 let edit =
   let doc = "Edit build units" in
@@ -65,7 +59,7 @@ let edit =
         are defined."
   in
   B0_tool.Cli.subcmd_with_b0_file "edit" ~doc ~descr @@
-  let+ units = units_all in
+  let+ units = B0_tool.Cli.units_pos0 in
   edit ~units
 
 let get =
@@ -75,15 +69,16 @@ let get =
   in
   B0_tool.Cli.subcmd_with_b0_file "get" ~doc ~descr @@
   let+ output_details = B0_tool.Cli.output_details
-  and+ key = B0_tool.Cli.pos_key
-  and+ units = units_tail in
+  and+ key = B0_tool.Cli.required_key_pos0
+  and+ units = B0_tool.Cli.units_pos1 in
   get ~output_details ~key ~units
 
 let list =
   let doc = "List build units" in
   let descr = `P "$(cmd) lists given build units." in
   B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
-  let+ output_details = B0_tool.Cli.output_details and+ units = units_all in
+  let+ output_details = B0_tool.Cli.output_details
+  and+ units = B0_tool.Cli.units_pos0 in
   list ~output_details ~units
 
 let show =
@@ -92,7 +87,8 @@ let show =
     `P "$(cmd) is $(b,list -l), it outputs metadata of given build units."
   in
   B0_tool.Cli.subcmd_with_b0_file "show" ~doc ~descr @@
-  let+ output_details = B0_tool.Cli.output_details and+ units = units_all in
+  let+ output_details = B0_tool.Cli.output_details
+  and+ units = B0_tool.Cli.units_pos0 in
   show ~output_details ~units
 
 let cmd =
