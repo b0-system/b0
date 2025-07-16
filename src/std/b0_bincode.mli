@@ -214,16 +214,16 @@ val set :
 (** [set (module S) c] is a codec for [S.t] sets using [c] for its
     elements. *)
 
-(** {2:hash [Hash.t]} *)
+(** {2:hash [B0_hash.t]} *)
 
 val enc_hash : B0_hash.t enc
-(** [enc_hash] encodes a {!B0_std.Hash.t}. *)
+(** [enc_hash] encodes a {!B0_hash.t}. *)
 
 val dec_hash : B0_hash.t dec
-(** [dec_hash] decodes a {!B0_std.Hash.t}. *)
+(** [dec_hash] decodes a {!B0_hash.t}. *)
 
 val hash : B0_hash.t t
-(** [hash] is a codec for {!B0_std.Hash.t} *)
+(** [hash] is a codec for {!B0_hash.t} *)
 
 (** {2:mtime_span [Mtime.Span.t]} *)
 

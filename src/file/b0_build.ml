@@ -3,8 +3,6 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-
-
 open B0_std
 open B0_std.Fut.Syntax
 
@@ -43,6 +41,8 @@ let current_meta b = B0_defs.Unit.meta (current b)
 
 module B0_dir = struct
   let build_dir ~b0_dir ~variant = Fpath.(b0_dir / "b" / variant)
+  let build_dir_log_file ~build_dir =
+    Fpath.(build_dir / B0_memo_cli.Log.filename)
   let shared_build_dir ~build_dir = Fpath.(build_dir / "_shared")
   let store_dir ~build_dir = Fpath.(build_dir / "_store")
   let unit_build_dir ~build_dir ~name = Fpath.(build_dir / name)
@@ -116,7 +116,6 @@ let rec run_units b = match B0_random_queue.take b.b.waiting with
     B0_memo.stir ~block:true b.u.m;
     if B0_random_queue.length b.b.waiting = 0 then () else run_units b
 
-let log_file b = Fpath.(b.b.build_dir / "_log")
 let write_log_file ~log_file m =
   Log.if_error ~use:() @@ B0_memo_log.(write log_file (of_memo m))
 
@@ -132,7 +131,7 @@ let run b =
   let log_file =
     (* FIXME we likely want to surface that at the API level. Either
          at create or run *)
-    log_file b
+    B0_dir.build_dir_log_file ~build_dir:b.b.build_dir
   in
   let hook () = write_log_file ~log_file b.u.m in
   Os.Exit.on_sigint ~hook @@ fun () ->

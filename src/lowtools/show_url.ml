@@ -43,25 +43,25 @@ open Cmdliner
 open Cmdliner.Term.Syntax
 
 let cmd =
-  let doc = "Show URL, files and stdin in web browsers" in
+  let doc = "Open and reload URLs, files and stdin in web browsers" in
   let exits =
     Cmd.Exit.info url_error ~doc:"if the URL failed to load in some way" ::
     Cmd.Exit.defaults
   in
   let man = [
     `S Manpage.s_description;
-    `P "The $(iname) command shows URLs specified on the command line.";
+    `P "$(cmd) opens or reloads URLs specified on the command line.";
     `Blocks B0_web_browser.man_best_effort_reload;
     `P "For example:";
     `Pre "$(cmd) $(b,https://example.org)"; `Noblank;
     `Pre "$(cmd) $(b,index.html) $(b,doc.pdf)";
     `P "It can also directly read $(b,stdin) by writing it to a temporary \
         file. Certain browser do not recognize certain file types without \
-        an extension use $(b,-t) to specify a file name; it allows \
+        an extension use $(b,-f) to specify a file name; it allows \
         reloads while keeping the file in a temporary directory.";
     `Pre "$(b,echo 'Hey' |) $(cmd)"; `Noblank;
-    `Pre "$(b,echo 'Hey' |) $(cmd) $(b,-t hey.txt) "; `Noblank;
-    `Pre "$(b,echo 'Ho!' |) $(cmd) $(b,-t hey.txt) "; `Noblank;
+    `Pre "$(b,echo 'Hey' |) $(cmd) $(b,-f hey.txt) "; `Noblank;
+    `Pre "$(b,echo 'Ho!' |) $(cmd) $(b,-f hey.txt) "; `Noblank;
     `Pre "$(b,dot -Tsvg graph.dot |) $(cmd) $(b,-t graph.svg)";
     `S Manpage.s_bugs;
     `P "This program is distributed with the $(b,b0) system. See \
@@ -75,17 +75,18 @@ let cmd =
   and+ browser = B0_web_browser.browser ()
   and+ tname =
     let doc =
-      "Use $(docv) as a file in the temporary directory when reading \
+      "Use $(docv) as a filename in the temporary directory when reading \
        from $(b,stdin). This enables reloads and allows to specify a \
        proper file suffix which your browser might need."
     in
     let docv = "FILENAME" in
-    Arg.(value & opt (some string) None & info ["t"; "tmp-filename"] ~doc ~docv)
+    Arg.(value & opt (some Arg.filepath) None & info ["f"; "stdin-filename"]
+           ~doc ~docv)
   and+ urls =
     let doc =
-      "Show $(docv). If $(docv) is an existing file path a corresponding \
-       file://$(docv) is shown. If $(docv) is $(b,-), data from $(b,stdin) \
-       is read and written to a temporary file which is shown."
+      "Open or reload $(docv). If $(docv) is an existing file path a \
+       corresponding file://$(docv) is shown. If $(docv) is $(b,-), data \
+       from $(b,stdin) is read and written to a temporary file which is shown."
     in
     Arg.(value & pos_all Arg.filepath ["-"] & info [] ~doc ~docv:"URL")
   in

@@ -253,7 +253,7 @@ let run =
 let sample = Key.make_tag "sample" ~doc:"Demonstration entity."
 
 let warning =
-  string_key "warning" ~doc:"A warning shown when the entity is used"
+  string_key "warning" ~doc:"A warning output when the entity is used"
 
 
 let exe_file =

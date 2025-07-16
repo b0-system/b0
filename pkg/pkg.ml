@@ -17,7 +17,7 @@ let () =
 
     (* b0 tool *)
     Pkg.mllib "src/tool/b0_tool.mllib" ~dst_dir:"tool";
-    Pkg.bin "src/tool/b0_main_run" ~dst:"b0";
+    Pkg.bin "src/tool/b0_tool_main_run" ~dst:"b0";
 
     (* Tools *)
     Pkg.bin "src/lowtools/b0_cache_tool" ~dst:"b0-cache";

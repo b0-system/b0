@@ -136,6 +136,8 @@ module B0_dir : sig
   (** [build_dir ~b0_dir ~variant] is the designated directory
       for the build variant [variant] in [b0_dir]. *)
 
+  val build_dir_log_file : build_dir:Fpath.t -> Fpath.t
+
   val shared_build_dir : build_dir:Fpath.t -> Fpath.t
   (** [shared_build_dir ~build_dir] is the shared directory of [build_dir]
       obtained via {!build_dir}. *)

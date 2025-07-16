@@ -224,7 +224,7 @@ let b0_ml_cmd =
       `Pre "$(cmd) $(b,B0.ml)";
       `P "TODO unsatisfactory for now."]
   in
-  B0_tool.Cli.subcmd_with_b0_file_if_any "B0.ml" ~doc ~descr @@
+  B0_tool_cli.cmd_with_b0_file_if_any "B0.ml" ~doc ~descr @@
   let+ file and+ force in
   b0_ml ~file ~force
 
@@ -236,7 +236,7 @@ let changes_cmd =
       `Pre "$(cmd) $(b,> CHANGES.md)"; `Noblank;
       `Pre "$(cmd) $(b,CHANGES.md)"; ]
   in
-  B0_tool.Cli.subcmd_with_b0_file_if_any "CHANGES" ~doc ~descr @@
+  B0_tool_cli.cmd_with_b0_file_if_any "CHANGES" ~doc ~descr @@
   let+ file and+ force in
   changes ~file ~force
 
@@ -247,7 +247,7 @@ let gitignore_cmd =
       `Pre "$(cmd) $(b,> .gitignore)";
       `Pre "$(cmd) $(b,.gitignore)"; ]
   in
-  B0_tool.Cli.subcmd_with_b0_file_if_any ".gitignore" ~doc ~descr @@
+  B0_tool_cli.cmd_with_b0_file_if_any ".gitignore" ~doc ~descr @@
   let+ file and+ force in
   gitignore ~file ~force
 
@@ -266,7 +266,7 @@ let license_cmd =
           for the first license of the $(b,.meta.licenses) key is generated \
           if $(b,--license) is unspecified." ]
   in
-  B0_tool.Cli.subcmd_with_b0_file_if_any "LICENSE" ~doc ~descr @@
+  B0_tool_cli.cmd_with_b0_file_if_any "LICENSE" ~doc ~descr @@
   let+ years and+ holder and+ license_opt and+ file and+ force in
   license ~years ~holder ~license:license_opt ~file ~force
 
@@ -282,7 +282,7 @@ let readme_cmd =
           has the $(b,.opam.tag) key, OCaml specific instructions are \
           generated." ]
   in
-  B0_tool.Cli.subcmd_with_b0_file_if_any "README" ~doc ~descr @@
+  B0_tool_cli.cmd_with_b0_file_if_any "README" ~doc ~descr @@
   let+ name =
     let doc =
       "$(docv) is the project name. If absent a $(b,project name) is derived \
@@ -317,7 +317,7 @@ let src_cmd =
           See the corresponding options for more details.";
       `P "The copyright header format is fixed, it cannot be tweaked." ]
   in
-  B0_tool.Cli.subcmd_with_b0_file_if_any "src" ~doc ~descr @@
+  B0_tool_cli.cmd_with_b0_file_if_any "src" ~doc ~descr @@
   let+ years and+ holder and+ license = license_opt and+ force and+ template
   and+ lang
   and+ files =
@@ -342,7 +342,7 @@ let snip_cmd =
       `P "The $(cmd) command generates an snip of code. It's exactly like
           the $(b,src) command but without the copyright headers."; ]
   in
-  B0_tool.Cli.subcmd_with_b0_file_if_any "snip" ~doc ~descr @@
+  B0_tool_cli.cmd_with_b0_file_if_any "snip" ~doc ~descr @@
   let+ force
   and+ files =
     let doc =
@@ -369,17 +369,17 @@ let templates_cmd =
   let template_list_cmd =
     let doc = "List templates" in
     let descr = `P "The $(cmd) command lists available templates." in
-    B0_tool.Cli.subcmd_with_b0_file_if_any "list" ~doc ~descr @@
+    B0_tool_cli.cmd_with_b0_file_if_any "list" ~doc ~descr @@
     let+ () = Term.const () in
     template_list ()
   in
-  B0_tool.Cli.cmd_group "template" ~doc ~descr @@
+  B0_tool_cli.cmd_group "template" ~doc ~descr @@
   [template_list_cmd]
 
 let cmd =
   let doc = "Generate files from templates" in
   let descr = `P "The $(cmd) command generates files from templates." in
-  B0_tool.Cli.cmd_group "init" ~doc ~descr @@
+  B0_tool_cli.cmd_group "init" ~doc ~descr @@
   [b0_ml_cmd; changes_cmd; gitignore_cmd; license_cmd; readme_cmd;
    snip_cmd; src_cmd; templates_cmd;]
 

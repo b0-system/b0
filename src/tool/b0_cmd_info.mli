@@ -4,4 +4,4 @@
   ---------------------------------------------------------------------------*)
 
 val cmd : B0_std.Os.Exit.t Cmdliner.Cmd.t
-(** [cmd] is the command line for [show]. *)
+(** [cmd] is the command line for [info]. *)

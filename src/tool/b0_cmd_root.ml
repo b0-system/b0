@@ -20,5 +20,5 @@ open Cmdliner
 let cmd =
   let doc = "Output the root directory" in
   let descr = `P "$(cmd) outputs the b0 root directory." in
-  B0_tool.Cli.subcmd_with_driver_conf "root" ~doc ~descr @@
+  B0_tool_cli.cmd_with_driver_conf "root" ~doc ~descr @@
   Term.const output_dir

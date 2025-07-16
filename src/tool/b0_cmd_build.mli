@@ -26,17 +26,13 @@ val make_build :
   may_build:B0_unit.Set.t ->
   must_build:B0_unit.Set.t -> (B0_build.t, string) result
 
-val show_what :
+val output_what :
   lock:bool option -> is_locked:bool -> locked_packs:B0_pack.Set.t ->
   must_build:B0_unit.Set.t -> may_build:B0_unit.Set.t -> B0_driver.Conf.t ->
   (B0_std.Os.Exit.t, 'a) result
 
 val env_for_unit : B0_driver.Conf.t -> B0_build.t -> B0_unit.t -> B0_env.t
 
-val units : string list Cmdliner.Term.t
-val x_units : string list Cmdliner.Term.t
-val packs : string list Cmdliner.Term.t
-val x_packs : string list Cmdliner.Term.t
 val lock : bool option Cmdliner.Term.t
 val what : bool Cmdliner.Term.t
 

@@ -27,14 +27,14 @@ module Exit = struct
 end
 
 module Env = struct
-  let b0_dir = B0_cli.Memo.b0_dir_env
+  (* FIXME is this module useful ? *)
+
+  let b0_dir = Cmdliner.Cmd.Env.info_var B0_cli.b0_dir_var
   let b0_file = "B0_FILE"
-  let cache_dir = B0_cli.Memo.cache_dir_env
-  let color = "B0_COLOR"
+  let cache_dir = Cmdliner.Cmd.Env.info_var B0_memo_cli.File_cache.dir_var
   let code = "B0_DRIVER_CODE"
-  let hash_fun = B0_cli.Memo.hash_fun_env
-  let jobs = B0_cli.Memo.jobs_env
-  let verbosity = Cmdliner.Cmd.Env.info_var B0_std_cli.log_level_var
+  let hash_fun = Cmdliner.Cmd.Env.info_var B0_memo_cli.Hash.hash_fun_var
+  let jobs = Cmdliner.Cmd.Env.info_var B0_memo_cli.jobs_var
 end
 
 module Conf = struct
@@ -55,9 +55,10 @@ module Conf = struct
   let memo ~hash_fun ~cwd ~env ~cache_dir ~trash_dir ~jobs =
     let feedback =
       let op_howto ppf o = Fmt.pf ppf "b0 file log --id %d" (B0_zero.Op.id o) in
-      let show_op = Log.Info and show_ui = Log.Error and level = Log.level () in
-      B0_cli.Memo.pp_leveled_feedback ~op_howto ~show_op ~show_ui ~level
-        Fmt.stderr
+      let output_op_level = Log.Info and output_ui_level = Log.Error in
+      let level = Log.level () in
+      B0_memo_cli.pp_leveled_feedback
+        ~op_howto ~output_op_level ~output_ui_level ~level Fmt.stderr
     in
     B0_memo.make ~hash_fun ~cwd ~env ~cache_dir ~trash_dir ~jobs ~feedback ()
 
@@ -65,7 +66,7 @@ module Conf = struct
       ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~env ~hash_fun ~jobs
       ~no_pager ()
     =
-    let trash_dir = Fpath.(b0_dir / B0_cli.Memo.trash_dir_name) in
+    let trash_dir = Fpath.(b0_dir / B0_memo_cli.trash_dirname) in
     let memo = lazy (memo ~hash_fun ~cwd ~env ~cache_dir ~trash_dir ~jobs) in
     { b0_dir; b0_file; cache_dir; cwd; code; env; hash_fun; jobs;
       memo; no_pager; }
@@ -118,10 +119,10 @@ module Conf = struct
     let* env = Os.Env.current () in
     let b0_file = find_b0_file ~cwd ~b0_file in
     let root = match b0_file with Some f -> Fpath.parent f | None -> cwd  in
-    let b0_dir = B0_cli.Memo.get_b0_dir ~cwd ~root ~b0_dir in
-    let cache_dir = B0_cli.Memo.get_cache_dir ~cwd ~b0_dir ~cache_dir in
-    let hash_fun = B0_cli.Memo.get_hash_fun ~hash_fun in
-    let jobs = B0_cli.Memo.get_jobs ~jobs in
+    let b0_dir = B0_cli.get_b0_dir ~cwd ~root ~b0_dir in
+    let cache_dir = B0_cli.get_cache_dir ~cwd ~b0_dir ~cache_dir in
+    let hash_fun = B0_memo_cli.Hash.get_hash_fun ~hash_fun in
+    let jobs = B0_memo_cli.get_jobs ~jobs in
     Ok (make ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~env ~hash_fun ~jobs
           ~no_pager ())
 end
@@ -131,7 +132,7 @@ module Cli = struct
   open Cmdliner.Term.Syntax
 
   let docs = Manpage.s_common_options
-  let b0_dir = B0_cli.Memo.b0_dir ~docs ()
+  let b0_dir = B0_cli.b0_dir ()
   let b0_file =
     let env = Cmd.Env.info Env.b0_file in
     let doc = "Use $(docv) as the b0 file." and docv = "PATH" in
@@ -139,7 +140,7 @@ module Cli = struct
     Arg.(value & opt (Arg.some B0_std_cli.filepath) None &
          info ["b0-file"] ~absent ~doc ~docv ~docs ~env)
 
-  let cache_dir = B0_cli.Memo.cache_dir ~docs ()
+  let cache_dir = B0_memo_cli.File_cache.dir ()
   let code =
     let env = Cmd.Env.info Env.code in
     let code_enum = ["byte", Some `Byte; "native", Some `Native; "auto", None]in
@@ -153,13 +154,12 @@ module Cli = struct
 
   let no_color = B0_std_cli.no_color ()
   let log_level = B0_std_cli.log_level ()
-  let no_pager = B0_pager.don't ()
   let conf =
     Term.term_result' @@
     let+ b0_dir and+ b0_file and+ cache_dir and+ code
-    and+ hash_fun = B0_cli.Memo.hash_fun ~docs ()
-    and+ jobs = B0_cli.Memo.jobs ~docs ()
-    and+ no_color and+ log_level and+ no_pager in
+    and+ hash_fun = B0_memo_cli.Hash.hash_fun ()
+    and+ jobs = B0_memo_cli.jobs ()
+    and+ no_color and+ log_level and+ no_pager = B0_cli.no_pager in
     Conf.setup_with_cli ~b0_dir ~b0_file ~cache_dir ~code ~hash_fun ~jobs
       ~no_color ~log_level ~no_pager ()
 

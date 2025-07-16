@@ -33,7 +33,7 @@ let cmd =
         also gets rid of the build cache. See $(tool) $(b,cache) for finer \
           control over build cache deletions." ]
   in
-  B0_tool.Cli.subcmd_with_driver_conf "delete" ~doc ~descr @@
+  B0_tool_cli.cmd_with_driver_conf "delete" ~doc ~descr @@
   let+ clean =
     let doc = "Delete the $(b,_b0) directory." in
     Arg.(value & flag & info ["c"; "clean"] ~doc)

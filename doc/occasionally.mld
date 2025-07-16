@@ -34,7 +34,7 @@ b0 list
 b0 list --tests  # List tests
 b0 test          # Run all tests
 b0 test -l       # Run all tests, including the long ones
-b0 test --what   # Show what will run
+b0 test --what   # Report what would build and run
 b0 test -u this -u that  # Only run the 'this' and 'that' tests
 b0 test --seed 123 # Run random tests with seed 123
 b0 test --correct  # Correct failed snapshot tests

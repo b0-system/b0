@@ -87,7 +87,7 @@ let dune_cmd env u =
   let export =
     let doc = "Best-effort dune file generation" in
     let man = [
-      `P "$(iname) tries to derive dune files for OCaml \
+      `P "$(cmd) tries to derive dune files for OCaml \
           libraries defined in the project. This is a best-effort \
           procedure the files may need tweaking and since $(b,b0)'s build \
           model is more dynamic this may fail. But it should work well \
@@ -106,7 +106,7 @@ let dune_cmd env u =
   in
   let man =
     [ `S Cmdliner.Manpage.s_description;
-      `P "$(iname) helps with $(b,dune) \
+      `P "$(cmd) helps with $(b,dune) \
           see the b0 dune manual in $(b,odig doc b0) and \
           invoke the subcommands with $(b,--help) for more \
           information.";

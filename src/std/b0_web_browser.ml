@@ -229,6 +229,6 @@ let background ?docs ?(opts = ["g"; "background"]) () =
   Arg.(value & flag & info opts ~doc ?docs)
 
 let man_best_effort_reload =
-  [ `P "Up to severe platform and browser limitation, $(iname) tries to limit \
+  [ `P "Up to severe platform and browser limitation, $(cmd) tries to limit \
         the creation of new tabs by reloading existing ones which have the \
         same URL or are prefixed by the URL (see $(b,--prefix))." ]

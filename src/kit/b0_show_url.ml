@@ -240,17 +240,17 @@ let show_url
 (* .show-url unit  *)
 
 let unit =
-  let doc = "Show URLs of files or servers in browsers" in
-  B0_unit.of_cmdliner_cmd "" ~dyn_units ~doc @@ fun env u ->
+  let doc = "Open and reload file or server URLs in browsers" in
+  B0_unit.of_cmdliner_cmd "" ~dyn_units ~doc @@ fun env unit ->
   let open Cmdliner in
   let open Cmdliner.Term.Syntax in
   let man =
     [ `S Manpage.s_synopsis;
-      `P "$(iname) [$(i,OPTION)]… $(i,UNIT[:PATH])…";
+      `P "$(cmd) [$(i,OPTION)]… $(i,UNIT[:PATH])…";
       `Noblank;
-      `P "$(iname) [$(i,OPTION)]… $(i,URL) $(b,--) $(i,ENTITY) [$(i,ARG)]…";
+      `P "$(cmd) [$(i,OPTION)]… $(i,URL) $(b,--) $(i,ENTITY) [$(i,ARG)]…";
       `S Manpage.s_description;
-      `P "$(iname) shows URLs of files in units or requested from \
+      `P "$(cmd) opens or reloads URLs of files in units or requested from \
           built servers.";
       `P "In the first mode of operation for each of the given \
           $(i,UNIT[:PATH]) argument, the $(i,UNIT) is built, $(i,PATH) \
@@ -268,7 +268,7 @@ let unit =
           in $(i,ENTITY)'s $(b,B0_show_url.listen_args) key. These argument \
           are added after $(i,ARG)… or before a $(b,--) present in them. \
           The tool is then executed with the arguments, and the environment
-          $(b,B0_unit.exec_env) and $(iname) \
+          $(b,B0_unit.exec_env) and $(cmd) \
           waits for the port to become connectable \
           (this may result in churn in your tool logs) before finally \
           showing the given $(i,URL) in your browser.";
@@ -277,7 +277,7 @@ let unit =
       `P "Consult $(b,odig doc b0) for the $(b,B0_show_url) \
           module documentation."]
   in
-  Cmd.make (Cmd.info (B0_unit.name u) ~doc ~man) @@
+  Cmd.make (Cmd.info (B0_unit.name unit) ~doc ~man) @@
   let+ args =
     let doc =
       "This is either a list of $(i,UNIT[:PATH]) arguments or an $(i,URL) \
@@ -300,7 +300,7 @@ let unit =
     in
     Arg.(value & flag & info ["dry-run"] ~doc)
   and+ no_exec =
-    let doc = "Show URL but do not invoke a tool." in
+    let doc = "Do not invoke a tool, output the URL on $(b,stdout)." in
     Arg.(value & flag & info ["n"; "no-exec"] ~doc)
   and+ browser = B0_web_browser.browser ()
   and+ background = B0_web_browser.background ()
@@ -310,8 +310,8 @@ let unit =
 (* Unit action *)
 
 let action =
-  B0_unit.Action.func ~doc:"show-url" @@ fun env u ~args ->
-  let* url = get_url env u in
+  B0_unit.Action.func ~doc:"show-url" @@ fun env unit ~args ->
+  let* url = get_url env unit in
   let args = if Cmd.is_empty args then Cmd.arg "--prefix" else args in
   Ok (Os.Exit.execv Cmd.(tool "show-url" % url %% args))
 

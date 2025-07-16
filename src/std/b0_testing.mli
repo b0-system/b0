@@ -393,7 +393,7 @@ module Test : sig
     (** The type for differs of value of type ['a]. *)
 
     val make : ('a T.t -> fnd:'a -> exp:'a -> unit Fmt.t) -> 'a t
-    (** [make show] reports diff by calling [show].
+    (** [make render] reports diff by calling [render].
         When called [fnd] and [exp] are expected to be different as per
         tester equality, no need to retest them. *)
 

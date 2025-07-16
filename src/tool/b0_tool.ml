@@ -71,8 +71,8 @@ module Def = struct
     Log.if_error ~use:Os.Exit.no_such_name @@
     let* ds = Def.get_list_or_hint ~all_if_empty:true ds in
     Log.if_error' ~use:Os.Exit.some_error @@
-    let don't = B0_driver.Conf.no_pager c in
-    let* pager = B0_pager.find ~don't () in
+    let no_pager = B0_driver.Conf.no_pager c in
+    let* pager = B0_pager.find ~no_pager () in
     let* () = B0_pager.page_stdout pager in
     if ds <> [] then Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp) ds);
     Ok Os.Exit.ok
@@ -126,95 +126,4 @@ module Def = struct
         Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list pp_bindings) bs)
     end;
     Ok Os.Exit.ok
-end
-
-module Cli = struct
-  open Cmdliner
-  open Cmdliner.Term.Syntax
-
-  (* User interface fragments *)
-
-  let log_format = B0_cli.Memo.Log.format_cli ()
-  let op_query = B0_cli.Op.query_cli ()
-
-
-  let editor_envs = B0_editor.Env.infos
-  let pager_envs = B0_pager.Env.infos
-  let output_details = B0_std_cli.output_details ()
-  let no_pager = B0_driver.Cli.no_pager
-  let required_key_pos0 =
-    let doc = "The metadata key $(docv) to get." and docv = "KEY" in
-    Arg.(required & pos 0 (some string) None & info [] ~doc ~docv)
-
-  let units_posn
-      ?(doc = "The $(docv) to act on. All of them if unspecified.")
-      ~first ()
-    =
-    Arg.(value & pos_right (first - 1) string [] & info [] ~doc ~docv:"UNIT")
-
-  let units_pos1 = units_posn ~first:1 ()
-  let units_pos0 = units_posn ~first:0 ()
-
-  (* Manual fragments *)
-
-  let s_scope_selection = "SCOPE SELECTION"
-
-  let man_see_manual = `Blocks
-      [ `S Manpage.s_see_also;
-        `P "Consult $(b,odig doc b0) for manuals and more details."]
-
-  let man_with_descr ?synopsis descr =
-    let man =
-      [ `S Manpage.s_description;
-        descr;
-        `S Manpage.s_commands;
-        `S Manpage.s_arguments;
-        `S Manpage.s_options;
-        `S B0_std_cli.s_output_details_options;
-        `S s_scope_selection;
-        `S Manpage.s_common_options;
-       man_see_manual ]
-    in
-    match synopsis with
-    | None -> man
-    | Some syn -> `S Manpage.s_synopsis :: syn :: man
-
-  (* Commands *)
-
-  let subcmd ?exits ?(envs = []) ?synopsis name ~doc ~descr term =
-    let man = man_with_descr ?synopsis descr in
-    Cmd.make (Cmd.info name ~doc ?exits ~envs ~man) @@
-    let+ () = B0_driver.Cli.set_no_color_and_log_level
-    and+ term in term ()
-
-  let subcmd_with_driver_conf
-      ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
-      term
-    =
-    let man = man_with_descr ?synopsis descr in
-    let envs = List.rev_append envs pager_envs (* driver conf has no-pager *)in
-    let term = Term.(term $ B0_driver.Cli.conf) in
-    Cmd.make (Cmd.info name ~doc ~exits ~envs ~man) term
-
-  let subcmd_with_b0_file_if_any
-      ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
-      term
-    =
-    let man = man_with_descr ?synopsis descr in
-    let envs = List.rev_append envs pager_envs (* driver conf has no-pager *)in
-    let term = B0_driver.with_b0_file_if_any ~driver term in
-    Cmd.make (Cmd.info name ~doc ~exits ~envs ~man) term
-
-  let subcmd_with_b0_file
-      ?(exits = B0_driver.Exit.infos) ?(envs = []) ?synopsis name ~doc ~descr
-      term
-    =
-    let man = man_with_descr ?synopsis descr in
-    let envs = List.rev_append envs pager_envs (* driver conf has no-pager *)in
-    let term = B0_driver.with_b0_file ~driver term in
-    Cmd.make (Cmd.info name ~doc ~exits ~envs ~man) term
-
-  let cmd_group ?exits ?(envs = []) ?synopsis name ~doc ~descr ?default subs =
-    let man = man_with_descr ?synopsis descr in
-    Cmd.group (Cmd.info name ~doc ?exits ~envs ~man) ?default subs
 end

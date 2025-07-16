@@ -31,7 +31,7 @@ let get ~output_details ~key ~units conf =
 let list ~output_details ~units conf =
   B0_tool.Def.list (module B0_unit) conf output_details units
 
-let show ~output_details ~units conf =
+let info ~output_details ~units conf =
   let output_details =
     if output_details = `Normal then `Long else output_details
   in
@@ -42,57 +42,57 @@ let show ~output_details ~units conf =
 open Cmdliner
 open Cmdliner.Term.Syntax
 
-let build_dir =
+let build_dir_cmd =
   let doc = "Output build directories of units" in
   let descr =
     `P "$(cmd) outputs build directories of given build units. The paths may \
         not exist. See also $(tool) $(b,dir)."
   in
-  B0_tool.Cli.subcmd_with_b0_file "dir" ~doc ~descr @@
-  let+ units = B0_tool.Cli.units_pos0 in
+  B0_tool_cli.cmd_with_b0_file "dir" ~doc ~descr @@
+  let+ units = B0_cli.act_on_units_pos0 in
   output_dirs ~units
 
-let edit =
+let edit_cmd =
   let doc = "Edit build units" in
   let descr =
     `P "$(cmd) opens in your editor the b0 files in which given build units \
         are defined."
   in
-  B0_tool.Cli.subcmd_with_b0_file "edit" ~doc ~descr @@
-  let+ units = B0_tool.Cli.units_pos0 in
+  B0_tool_cli.cmd_with_b0_file "edit" ~doc ~descr @@
+  let+ units = B0_cli.act_on_units_pos0 in
   edit ~units
 
-let get =
+let get_cmd =
   let doc = "Get build unit metadata" in
   let descr =
     `P "$(cmd) outputs the value of metadata $(i,KEY) of given build units."
   in
-  B0_tool.Cli.subcmd_with_b0_file "get" ~doc ~descr @@
-  let+ output_details = B0_tool.Cli.output_details
-  and+ key = B0_tool.Cli.required_key_pos0
-  and+ units = B0_tool.Cli.units_pos1 in
+  B0_tool_cli.cmd_with_b0_file "get" ~doc ~descr @@
+  let+ output_details = B0_cli.output_details
+  and+ key = B0_cli.required_metadata_key_pos0
+  and+ units = B0_cli.act_on_units_pos1 in
   get ~output_details ~key ~units
 
-let list =
+let list_cmd =
   let doc = "List build units" in
   let descr = `P "$(cmd) lists given build units." in
-  B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
-  let+ output_details = B0_tool.Cli.output_details
-  and+ units = B0_tool.Cli.units_pos0 in
+  B0_tool_cli.cmd_with_b0_file "list" ~doc ~descr @@
+  let+ output_details = B0_cli.output_details
+  and+ units = B0_cli.act_on_units_pos0 in
   list ~output_details ~units
 
-let show =
-  let doc = "Show build unit metadata" in
+let info_cmd =
+  let doc = "Output build unit metadata" in
   let descr =
     `P "$(cmd) is $(b,list -l), it outputs metadata of given build units."
   in
-  B0_tool.Cli.subcmd_with_b0_file "show" ~doc ~descr @@
-  let+ output_details = B0_tool.Cli.output_details
-  and+ units = B0_tool.Cli.units_pos0 in
-  show ~output_details ~units
+  B0_tool_cli.cmd_with_b0_file "info" ~doc ~descr @@
+  let+ output_details = B0_cli.output_details
+  and+ units = B0_cli.act_on_units_pos1 in
+  info ~output_details ~units
 
 let cmd =
   let doc = "Operate on build units" in
   let descr = `P "$(cmd) operates on build units." in
-  B0_tool.Cli.cmd_group "unit" ~doc ~descr @@
-  [build_dir; edit; get; list; show]
+  B0_tool_cli.cmd_group "unit" ~doc ~descr @@
+  [build_dir_cmd; edit_cmd; get_cmd; list_cmd; info_cmd]

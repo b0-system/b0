@@ -5,10 +5,10 @@
 
 (** Web browser interaction.
 
-    [B0_web_browser] shows URLs in the user's browsers. Up to severe
-    platform and browser application limitations it tries to limit the
-    creation of new tabs, reloading existing one which have the same
-    URL or are, if requested, prefixed by the URL. *)
+    [B0_web_browser] opens and reloads URLs in the user's browsers. Up
+    to severe platform and browser application limitations it tries to
+    limit the creation of new tabs, reloading existing one which have
+    the same URL or are, if requested, prefixed by the URL. *)
 
 open B0_std
 
@@ -20,7 +20,7 @@ module Env : sig
   (** [browser] is [BROWSER].*)
 end
 
-(** {1:show Show URLs} *)
+(** {1:show Open and reload URLs} *)
 
 type t
 (** The type for browsers. *)
@@ -32,7 +32,7 @@ val find :
 
 val show :
   background:bool -> prefix:bool -> t -> string -> (unit, string) result
-(** [show ~background ~prefix browser url] shows URL using browser
+(** [show ~background ~prefix browser url] shows [url] using browser
     [browser]. If [background] is [true] tries to
     keep the browser application in the background, if [false]
     brings it in user focus.

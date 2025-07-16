@@ -406,7 +406,7 @@ module Test = struct
 
   module Diff = struct
     type 'a t = 'a T.t -> fnd:'a -> exp:'a -> unit Fmt.t
-    let make show = show
+    let make render = render
 
     open Result.Syntax
 
@@ -903,7 +903,7 @@ module Test = struct
     let set_output_list o = output_list := o
     let output_list () = !output_list
 
-    let show_list () =
+    let print_list () =
       let defs = List.filter (fun def -> Name.selected def.name) !list in
       let defs = List.sort (fun d0 d1 -> String.compare d0.name d1.name) defs in
       let output def = Fmt.pr "%s@." def.name in
@@ -1106,7 +1106,7 @@ module Test = struct
 
   let main' ?(man = Cli.default_man) ?doc ?name args f =
     let run () args =
-      if Def.output_list () then (Def.show_list (); 0) else
+      if Def.output_list () then (Def.print_list (); 0) else
       let () = Printexc.record_backtrace true in
       let dur = Os.Mtime.counter () in
       let exit_main dur = match Atomic.get main_exit with

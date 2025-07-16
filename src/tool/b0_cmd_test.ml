@@ -48,16 +48,16 @@ let pp_report ppf (allow_long, test_count, total, dur, fails) =
         (test_unit_msg test_count)
         Test.Fmt.dur dur (Fmt.list (pp_fail ~allow_long)) fails
 
-let show_what
+let output_what
     ~allow_long ~tests ~lock ~may_build ~must_build ~is_locked ~locked_packs
     conf
   =
   Log.if_error' ~use:Os.Exit.some_error @@
-  let don't = B0_driver.Conf.no_pager conf in
-  let* pager = B0_pager.find ~don't () in
+  let no_pager = B0_driver.Conf.no_pager conf in
+  let* pager = B0_pager.find ~no_pager () in
   let* () = B0_pager.page_stdout pager in
   Log.stdout (fun m -> m "%a@." pp_run_tests tests);
-  B0_cmd_build.show_what
+  B0_cmd_build.output_what
     ~lock ~may_build ~must_build ~is_locked ~locked_packs conf
 
 (* Test command *)
@@ -73,7 +73,6 @@ let run_test ~long ~seed ~correct c build u =
       if correct then Os.Env.add "CORRECT" (string_of_bool correct) env else env
     in
     if long then Os.Env.add "LONG" (string_of_bool long) env else env
-
   in
   let dur = Os.Mtime.counter () in
   let* st = B0_unit.Action.run ~env b0_env u ~args:Cmd.empty action in
@@ -95,7 +94,7 @@ let rec run_tests ~long ~seed ~correct c build dur rets = function
         log_sep ();
         run_tests ~long ~seed ~correct c build dur ((u, Some st) :: rets) us
 
-let show_skip_tests us =
+let output_skip_tests us =
   let pp_skipped ppf skipped =
     if skipped = 0 then () else
     Fmt.pf ppf "%s %a long %s %a. Run with %a to execute."
@@ -111,7 +110,7 @@ let show_skip_tests us =
   Log.stdout @@ fun m ->
   m "@[<v>%a@,%a@,@]" (Fmt.iter B0_unit.Set.iter pp_skip) us pp_skipped count
 
-let show_tests_with_skips us =
+let output_tests_with_skips us =
   if B0_unit.Set.is_empty us then () else
   let count = B0_unit.Set.cardinal us in
   let pp_skip ppf u =
@@ -175,15 +174,14 @@ let test
   let may_build, must_build =
     B0_cmd_build.get_may_must ~is_locked ~units ~x_units
   in
-  if what
-  then
-    show_what ~allow_long ~lock ~may_build ~must_build ~is_locked
+  if what then
+    output_what ~allow_long ~lock ~may_build ~must_build ~is_locked
       ~locked_packs ~tests conf
   else
   Log.if_error' ~use:B0_driver.Exit.build_error @@
   if B0_unit.Set.is_empty tests && not allow_empty
   then begin
-    let () = show_skip_tests skip_tests in
+    let () = output_skip_tests skip_tests in
     Log.err (fun m ->
         m "@[<v>%a.@,Use option %a to succeed anyways.@]" pp_no_tests ()
           Fmt.code "-e");
@@ -215,8 +213,8 @@ let test
         in
         loop [] skip_tests rets
       in
-      let () = show_tests_with_skips tests_with_skips in
-      let () = show_skip_tests skip_tests in
+      let () = output_tests_with_skips tests_with_skips in
+      let () = output_skip_tests skip_tests in
       Log.stdout (fun m ->
           m "%a" pp_report (allow_long,
                             test_count, Os.Mtime.count total, dur, fails));
@@ -275,7 +273,7 @@ let cmd =
       (Os.Exit.get_code exit_no_tests) ~doc:"If there are no tests to run." ::
     B0_driver.Exit.infos
   in
-  B0_tool.Cli.subcmd_with_b0_file "test" ~exits ~doc ~descr @@
+  B0_tool_cli.cmd_with_b0_file "test" ~exits ~doc ~descr @@
   let docs = s_test_options in
   let+ allow_empty =
     let doc = "Do not fail if there is no test to run in the build." in
@@ -299,8 +297,8 @@ let cmd =
       "Set environment variable $(b,CORRECT) to $(b,true) for running tests."
     in
     Arg.(value & flag & info ["c"; "correct"] ~doc ~docs)
-  and+ units = B0_cmd_build.units and+ x_units = B0_cmd_build.x_units
-  and+ packs = B0_cmd_build.packs and+ x_packs = B0_cmd_build.x_packs
+  and+ units = B0_cli.build_units and+ x_units = B0_cli.build_x_units
+  and+ packs = B0_cli.build_packs and+ x_packs = B0_cli.build_x_packs
   and+ what = B0_cmd_build.what and+ lock = B0_cmd_build.lock in
   test ~allow_long ~allow_empty ~seed ~correct ~units ~x_units ~packs ~x_packs
     ~what ~lock

@@ -16,12 +16,12 @@ val does_page : t -> bool
 (** [does_page p] is [true] iff [p] actually pages. *)
 
 val find :
-  ?search:Cmd.tool_search -> ?cmd:Cmd.t -> don't:bool -> unit ->
+  ?search:Cmd.tool_search -> ?cmd:Cmd.t -> no_pager:bool -> unit ->
   (t, string) result
 (** [find ~search ~don't] finds a suitable pager.
     This is (in order):
     {ol
-    {- [Ok p] if [don't] is [true] or if the [TERM] environment variable
+    {- [Ok p] if [no_pager] is [true] or if the [TERM] environment variable
        is [dumb] or undefined and [cmd] is unspecified. In this case
        [does_page p] is [false].}
     {- [Ok p] or [Error _] if [cmd] is specified and according to whether
@@ -70,11 +70,11 @@ module Env : sig
 
   val infos : Cmdliner.Cmd.Env.info list
   (** [infos] describe the [PAGER] and [TERM] environment variable for
-      cmdliner. *)
+      cmdliner. This is used by {!B0_pager.don't}. *)
 end
 
-val don't : ?docs:string -> unit -> bool Cmdliner.Term.t
-(** [don't ~docs ()] is a [--no-pager] command line option to
+val no_pager : ?docs:string -> unit -> bool Cmdliner.Term.t
+(** [no_pager ~docs ()] is a [--no-pager] command line option to
     unconditionally request not to use a pager. [docs] is the manual
     section where the option is documented, defaults to
     {!Cmdliner.Manpage.s_common_options}. *)

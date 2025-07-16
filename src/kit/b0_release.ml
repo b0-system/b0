@@ -416,12 +416,12 @@ module Status = struct
   let pp_commit ppf (id, log) =
     Fmt.pf ppf "%a %s" B0_vcs_repo.pp_commit id log
 
-  let cmd ~after ~last ~packs ~x_packs ~pager_don't =
+  let cmd ~after ~last ~packs ~x_packs ~no_pager =
     Log.if_error ~use:Os.Exit.no_such_name @@
     let* packs = select_packs packs x_packs in
     Log.if_error' ~use:Os.Exit.some_error @@
     let* () = if packs <> [] then Ok () else err_no_pack () in
-    let* pager = B0_pager.find ~don't:pager_don't () in
+    let* pager = B0_pager.find ~no_pager () in
     let* () = B0_pager.page_stdout pager in
     let* repos = gather_repos packs in
     if repos = []
@@ -457,18 +457,18 @@ let unit =
        pack, all the $(b,default) packs in the next scope level (i.e.
        existing packs $(b,\\$SCOPE.default))."
     in
-    B0_cli.packs ~doc ()
+    B0_cli.use_packs ~doc ()
   in
   let x_packs =
     let doc = "Packs to exclude from selection. Repeatable. \
                Takes over inclusion." in
-    B0_cli.x_packs ~doc ()
+    B0_cli.use_x_packs ~doc ()
   in
   let archive =
     let doc = "Create release archives" in
     let man =
       [ `S Cmdliner.Manpage.s_description;
-        `P "$(iname) creates an archive file for a release's pack. The \
+        `P "$(cmd) creates an archive file for a release's pack. The \
             generated archive should be bit-wise reproducible. There \
             are a few caveats, see b0 release manual in $(b,odig doc b0).";
         `P "Once the archive is created it is unpacked in the build \
@@ -493,7 +493,7 @@ let unit =
     let doc = "Tag VCS repositories with versions" in
     let man =
       [ `S Cmdliner.Manpage.s_description;
-        `P "$(iname) looks up the VCS repositories in the scope directories \
+        `P "$(cmd) looks up the VCS repositories in the scope directories \
             of given packs and for each of them tags the HEAD commit \
             with a version.";
         `P "If the version is not specified on the command line it \
@@ -546,7 +546,7 @@ let unit =
     let doc = "List commits for the next release" in
     let man =
       [ `S Cmdliner.Manpage.s_description;
-        `P "$(iname) looks up the VCS repositories in the scope directories \
+        `P "$(cmd) looks up the VCS repositories in the scope directories \
             of given packs and for each of them outputs the list of commits \
             that would get in the next release. This is any commit after \
             the greatest release tag in the repository.";
@@ -557,8 +557,7 @@ let unit =
       Cmd.Exit.info 1 ~doc:"when no changes have been detected." ::
       B0_std_cli.Exit.infos
     in
-    let envs = B0_pager.Env.infos in
-    Cmd.make (Cmd.info "status" ~doc ~man ~exits ~envs) @@
+    Cmd.make (Cmd.info "status" ~doc ~man ~exits) @@
     let+ packs and+ x_packs
     and+ after =
       let doc =
@@ -573,12 +572,12 @@ let unit =
       let doc = "Last commit-ish $(docv) considered." in
       let docv = "COMMIT-ISH" in
       Arg.(value & opt string B0_vcs_repo.head & info ["last"] ~doc ~docv)
-    and+ pager_don't = B0_pager.don't () in
-    Status.cmd ~after ~last ~packs ~x_packs ~pager_don't
+    and+ no_pager = B0_pager.no_pager () in
+    Status.cmd ~after ~last ~packs ~x_packs ~no_pager
   in
   let man =
     [ `S Cmdliner.Manpage.s_description;
-      `P "$(iname) helps to release your software. For now these tools are \
+      `P "$(cmd) helps to release your software. For now these tools are \
           mostly useful for releasing software as sources.";
       `Blocks man ]
   in

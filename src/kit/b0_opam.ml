@@ -16,13 +16,6 @@ let collect_results rs =
   in
   loop [] [] rs
 
-let list_iter_stop_on_error f vs =
-  let rec loop f = function
-  | [] -> Ok ()
-  | v :: vs -> match f v with Error _ as e -> e | Ok () -> loop f vs
-  in
-  loop f vs
-
 (* opam tool *)
 
 type t = Cmd.t
@@ -410,7 +403,7 @@ let gen_files pkgs ~normalize ~with_name ~dst =
         Pkg.write_opam_file opam ~normalize pkg ~version:None file ~dir
   in
   let gen = gen_file ~normalize ~with_name ~dst in
-  let* () = list_iter_stop_on_error gen pkgs in
+  let* () = List.iter_stop_on_error gen pkgs in
   Ok Os.Exit.ok
 
 let file_cmd env constraints pkgs lint raw dst in_scope no_name =
@@ -808,11 +801,11 @@ let unit =
       "If an opam package is defined by more than one pack use the \
        definition by pack $(docv)."
     in
-    B0_cli.packs ~doc ()
+    B0_cli.use_packs ~doc ()
   in
   let list_cmd =
     let pkgs = pkgs ~doc:"Only list opam package $(docv) (repeatable)." () in
-    let output_details = B0_std_cli.output_details () in
+    let output_details = B0_cli.output_details in
     let doc = "List opam packages and their defining packs" in
     Cmd.make (Cmd.info "list" ~doc ~man) @@
     Term.(const list_cmd $ const env $ pkgs $ output_details)
@@ -882,7 +875,7 @@ let unit =
       pkgs ~docv:"PKG[.VERSION]" ~doc ()
     in
     let check_only =
-      let doc = "Do not publish. Show various bits that are being \
+      let doc = "Do not publish. Report various bits that are being \
                  inferred and perform basic checks."
       in
       Arg.(value & flag & info ["c"; "check-only"] ~doc)
@@ -903,7 +896,7 @@ let unit =
     let doc = "Publish opam packages on GitHub" in
     let envs = B0_github.Auth.envs in
     let man = [ `S Cmdliner.Manpage.s_description;
-                `P "$(iname) publishes opam package on GitHub.";
+                `P "$(cmd) publishes opam package on GitHub.";
                 `P "If you want to inspect the $(b,opam) file before \
                     use $(b,b0 --) $(b,.opam file) $(i,PKG)….";
                 `Blocks man]
@@ -914,7 +907,7 @@ let unit =
           pkgs $ incompats $ check_only $ no_pr)
   in
   let man = [ `S Cmdliner.Manpage.s_description;
-              `P "$(iname) helps with $(b,opam) \
+              `P "$(cmd) helps with $(b,opam) \
                   see the b0 opam manual in $(b,odig doc b0) and \
                   invoke the subcommands with $(b,--help) for more \
                   information.";

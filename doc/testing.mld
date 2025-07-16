@@ -46,7 +46,7 @@ eventually exits with [1].
 Adding option [--what] to a [b0 test] invocation reports what is build and which
 tests are executed.
 {@sh[
-b0 test --what  # Show what builds and runs
+b0 test --what  # Report what would builds and runs
 ]}
 
 For [b0] the testing granularity is the executable unit. You can easily

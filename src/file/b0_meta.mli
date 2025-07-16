@@ -311,4 +311,4 @@ val sample : bool key
 (** [sample] tags entities that exist for demonstration purposes. *)
 
 val warning : string key
-(** [warning] is a warning shown on entity usage. *)
+(** [warning] is a warning output on entity usage. *)

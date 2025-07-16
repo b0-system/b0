@@ -15,17 +15,17 @@ let cmd =
     `S Manpage.s_description;
     `P "b0 describes software construction and deployments using modular and \
         customizable definitions written in OCaml.";
-    `Pre "Use $(cmd) $(b,unit --list) to see what can be built."; `Noblank;
-    `Pre "Use $(cmd) $(b,--what) to see what gets built."; `Noblank;
-    `Pre "Use $(cmd) to build."; `Noblank;
-    `Pre "Use $(cmd) $(b,--) [$(i,ACTION)] [$(i,ARG)]… to build and run an \
+    `Pre "$(cmd) $(b,list) # See what can be built"; `Noblank;
+    `Pre "$(cmd) $(b,--what) # See what gets built"; `Noblank;
+    `Pre "$(cmd) # Build"; `Noblank;
+    `Pre "$(cmd) $(b,--) [$(i,ACTION)] [$(i,ARG)]… # Build and run an \
           action or unit."; `Noblank;
-    `Pre "Use $(cmd) $(b,-u) $(i,UNIT) to build $(i,UNIT)."; `Noblank;
-    `Pre "Use $(cmd) $(b,-p) $(i,PACK) to build pack $(i,PACK).";
+    `Pre "$(cmd) $(b,-u) $(i,UNIT) # Build $(i,UNIT)"; `Noblank;
+    `Pre "$(cmd) $(b,-p) $(i,PACK) # Build pack $(i,PACK).";
     `Pre "Use $(cmd) [$(i,COMMAND)]… $(b,--help) for help about any \
           command.";
     `P "More information is available in the manuals, see $(b,odig doc b0).";
-    B0_tool.Cli.man_see_manual;
+    B0_tool_cli.man_see_manual;
     `S Manpage.s_bugs;
     `P "Report them, see $(i,https://erratique.ch/software/b0) for contact \
         information."; ]

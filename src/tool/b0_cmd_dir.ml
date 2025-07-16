@@ -63,7 +63,7 @@ let units =
     "The $(docv) to act on. If $(b,--unit) is specified, this is \
      all of them if unspecified."
   in
-  B0_tool.Cli.units_posn ~doc ~first:0 ()
+  B0_cli.act_on_units_posn ~doc ~first:0 ()
 
 let cmd =
   let doc = "Output the path to b0 directories" in
@@ -80,6 +80,6 @@ let cmd =
     `Noblank;
   ]
   in
-  B0_tool.Cli.subcmd_with_b0_file "dir" ~doc ~descr @@
+  B0_tool_cli.cmd_with_b0_file "dir" ~doc ~descr @@
   let+ kind and+ units in
   output_dirs ~kind ~units

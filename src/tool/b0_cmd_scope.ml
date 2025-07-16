@@ -125,17 +125,17 @@ let topmost =
     "Only consider topmost scopes included by the root b0 file. Those \
      recursively included by these are excluded."
   in
-  let docs = B0_tool.Cli.s_scope_selection in
+  let docs = B0_tool_cli.s_scope_selection in
   Arg.(value & flag & info ["topmost"] ~doc ~docs)
 
 let excludes =
   let doc = "Exclude scope $(docv) from the request. Repeatable." in
-  let docs = B0_tool.Cli.s_scope_selection and docv = "SCOPE" in
+  let docs = B0_tool_cli.s_scope_selection and docv = "SCOPE" in
   Arg.(value & opt_all string [] & info ["x"; "exclude"] ~doc ~docv ~docs)
 
 let includes =
   let doc = "Include scope $(docv) in the request. Repeatable." in
-  let docs = B0_tool.Cli.s_scope_selection and docv = "SCOPE" in
+  let docs = B0_tool_cli.s_scope_selection and docv = "SCOPE" in
   Arg.(value & opt_all string [] & info ["i"; "include"] ~doc ~docv ~docs)
 
 let keep_going =
@@ -192,7 +192,7 @@ let exec =
         use the option $(b,--fail-stop) to prevent that.";
     select_doc ]
   in
-  B0_tool.Cli.subcmd_with_b0_file "exec" ~doc ~synopsis ~descr @@
+  B0_tool_cli.cmd_with_b0_file "exec" ~doc ~synopsis ~descr @@
   let+ topmost and+ includes and+ excludes and+ keep_going and+ tool
   and+ tool_args in
   exec ~topmost ~includes ~excludes ~keep_going ~tool ~tool_args
@@ -204,12 +204,12 @@ let list =
           specified only paths are listed.";
       select_doc ]
   in
-  B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
+  B0_tool_cli.cmd_with_b0_file "list" ~doc ~descr @@
   let+ path =
     let doc = "Only print the scope paths." in
     Arg.(value & flag & info ["path"] ~doc)
   and+ topmost and+ includes and+ excludes
-  and+ output_details = B0_tool.Cli.output_details in
+  and+ output_details = B0_cli.output_details in
   list ~topmost ~includes ~excludes ~output_details ~path
 
 let symlink =
@@ -224,7 +224,7 @@ let symlink =
           would be created, only if they exist and are symlinks.";
       select_doc ]
   in
-  B0_tool.Cli.subcmd_with_b0_file "symlink" ~doc ~descr @@
+  B0_tool_cli.cmd_with_b0_file "symlink" ~doc ~descr @@
   let+ dir =
     let doc =
       "Create symlinks in directory $(docv). The path to the directory is \
@@ -265,7 +265,7 @@ let vcs =
       select_doc;
     ]
   in
-  B0_tool.Cli.subcmd_with_b0_file "vcs" ~doc ~synopsis ~descr @@
+  B0_tool_cli.cmd_with_b0_file "vcs" ~doc ~synopsis ~descr @@
   let+ topmost and+ includes and+ excludes and+ all and+ keep_going
   and+ vcs_kind and+ vcs_args = tool_args in
   vcs ~topmost ~includes ~excludes ~all ~keep_going ~vcs_kind ~vcs_args
@@ -278,5 +278,5 @@ let cmd =
         arbitary tool. Use the $(b,b0 vcs) command to invokes a vcs operation \
         on scope directories that are managed by it and dirty.";
   in
-  B0_tool.Cli.cmd_group "scope" ~doc ~descr @@
+  B0_tool_cli.cmd_group "scope" ~doc ~descr @@
   [exec; list; symlink (* vcs *) ]

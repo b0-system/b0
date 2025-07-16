@@ -55,8 +55,8 @@ let list ~output_details ~names ~all ~only_tests conf =
     let sep = match output_details with
     | `Short | `Normal -> Fmt.cut | `Long -> Fmt.(cut ++ cut)
     in
-    let don't = B0_driver.Conf.no_pager conf in
-    let* pager = B0_pager.find ~don't () in
+    let no_pager = B0_driver.Conf.no_pager conf in
+    let* pager = B0_pager.find ~no_pager () in
     let* () = B0_pager.page_stdout pager in
     if vs <> []
     then Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp_v) vs);
@@ -101,8 +101,8 @@ let cmd =
     `P "$(cmd) list all or given b0 definitions. By default library \
         definitions are not listed, invoke with $(b,--all) include them."
   in
-  B0_tool.Cli.subcmd_with_b0_file "list" ~doc ~descr @@
-  let+ output_details = B0_tool.Cli.output_details
+  B0_tool_cli.cmd_with_b0_file "list" ~doc ~descr @@
+  let+ output_details = B0_cli.output_details
   and+ names and+ all and+ only_tests in
   list ~output_details ~names ~all ~only_tests
 
@@ -114,8 +114,8 @@ let cmd_info =
         definitions. By default library definitions are \
         not listed, invoke with $(b,--all) include them."
   in
-  B0_tool.Cli.subcmd_with_b0_file "info" ~doc ~descr @@
-  let+ output_details = B0_tool.Cli.output_details
+  B0_tool_cli.cmd_with_b0_file "info" ~doc ~descr @@
+  let+ output_details = B0_cli.output_details
   and+ names and+ all and+ only_tests in
   info ~output_details ~names ~all ~only_tests
 
@@ -125,7 +125,7 @@ let cmd_edit =
     `P "$(cmd) opens in your editor the b0 files where given definitions are \
         defined."
   in
-  let envs = B0_tool.Cli.editor_envs in
-  B0_tool.Cli.subcmd_with_b0_file "edit" ~doc ~descr ~envs @@
+  let envs = B0_editor.Env.infos in
+  B0_tool_cli.cmd_with_b0_file "edit" ~doc ~descr ~envs @@
   let+ names and+ only_tests in
   edit ~names ~only_tests

@@ -22,7 +22,7 @@ let hash_file (module Hash : B0_hash.T) file  =
 
 let hash ~output_details ~hash_fun ~files =
   let pp_hash = pp_hash output_details in
-  let hash_fun = B0_cli.Memo.get_hash_fun ~hash_fun in
+  let hash_fun = B0_memo_cli.Hash.get_hash_fun ~hash_fun in
   let do_hash file =
     let* h = hash_file hash_fun file in
     Ok (Log.stdout (fun m -> m "%a" pp_hash h))
@@ -36,7 +36,7 @@ open Cmdliner.Term.Syntax
 
 let tool =
   let doc = "Hash like b0" in
-  let man_xrefs = [`Tool "b0"; `Tool "b0-cache"; `Tool "b0-log"] in
+  let man_xrefs = [`Tool "b0"] in
   let man = [
     `S Manpage.s_description;
     `P "The $(tname) command hashes files like b0 does.";
@@ -50,7 +50,7 @@ let tool =
   let+ () = B0_std_cli.set_log_level ()
   and+ output_details = B0_std_cli.output_details ()
   and+ hash_fun =
-    B0_cli.Memo.hash_fun ~opts:["H"; "hash-fun"] ~docs:Manpage.s_options ()
+    B0_memo_cli.Hash.hash_fun ~opts:["H"; "hash-fun"] ~docs:Manpage.s_options ()
   and+ files =
     let doc = "File to hash. Use $(b,-) for stdin." in
     Arg.(value & pos_all B0_std_cli.filepath [] & info [] ~doc)

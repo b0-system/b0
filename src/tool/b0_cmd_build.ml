@@ -44,10 +44,10 @@ let log_units color ~kind us =
   m "@[<v>%a build:@,@[<v>%a@]@]"
     color kind Fmt.(list B0_unit.pp_synopsis) (B0_unit.Set.elements us)
 
-let show_what ~lock ~is_locked ~locked_packs ~must_build ~may_build conf =
+let output_what ~lock ~is_locked ~locked_packs ~must_build ~may_build conf =
   Log.if_error' ~use:Os.Exit.some_error @@
-  let don't = B0_driver.Conf.no_pager conf in
-  let* pager = B0_pager.find ~don't () in
+  let no_pager = B0_driver.Conf.no_pager conf in
+  let* pager = B0_pager.find ~no_pager () in
   let* () = B0_pager.page_stdout pager in
   if B0_unit.Set.is_empty must_build
   then (Log.stdout (fun m -> m "%s" (err_nothing ())); Ok Os.Exit.ok)
@@ -162,7 +162,7 @@ let find_action_unit = function
           | [] -> nothing_to ppf v
           | hints -> Fmt.pf ppf "%a@ %a" nothing_to v (hint Fmt.code) hints
           in
-          (* XXX show how to list available actions if there's no typo *)
+          (* XXX instruct how to list available actions if there's no typo *)
           Fmt.error "@[%a@]" pp (name, suggs)
 
 let memo conf ~may_build ~must_build =
@@ -184,13 +184,14 @@ let memo conf ~may_build ~must_build =
   let cwd = B0_driver.Conf.cwd conf in
   let cache_dir = B0_driver.Conf.cache_dir conf in
   let b0_dir = B0_driver.Conf.b0_dir conf in
-  let trash_dir = Fpath.(b0_dir / B0_cli.Memo.trash_dir_name) in
+  let trash_dir = Fpath.(b0_dir / B0_memo_cli.trash_dirname) in
   let jobs = B0_driver.Conf.jobs conf in
   let feedback =
     let op_howto ppf o = Fmt.pf ppf "b0 log --id %d" (B0_zero.Op.id o) in
-    let show_op = Log.Info and show_ui = Log.Error and level = Log.level () in
-    B0_cli.Memo.pp_leveled_feedback
-      ~op_howto ~show_op ~show_ui ~level Fmt.stderr
+    let output_op_level = Log.Info and output_ui_level = Log.Error in
+    let level = Log.level () in
+    B0_memo_cli.pp_leveled_feedback
+      ~op_howto ~output_op_level ~output_ui_level ~level Fmt.stderr
   in
   let* env = Os.Env.current () in
   let tool_lookup = tool_lookup ~may_build ~must_build ~env in
@@ -220,7 +221,7 @@ let error_no_path action_unit =
   Fmt.error "%a: No path to executable file found (no %a key)"
     B0_unit.pp_name action_unit B0_meta.Key.pp_name B0_unit.exe_file
 
-let do_show_path action_unit ~args =
+let do_output_path action_unit ~args =
   let* path = B0_unit.get_meta B0_unit.exe_file action_unit in
   let p = Fut.sync path in
   (* Is there a way of quoting to make the shell notation $() work if args
@@ -246,7 +247,7 @@ let do_action_exit c build action_unit ~args =
 (* Build command *)
 
 let build
-    ~units ~x_units ~packs ~x_packs ~what ~lock ~show_path ~build_only ~action
+    ~units ~x_units ~packs ~x_packs ~what ~lock ~output_path ~build_only ~action
     ~args conf
   =
   Log.if_error ~use:Os.Exit.no_such_name @@
@@ -270,11 +271,12 @@ let build
   let is_locked = is_locked ~lock ~locked_packs in
   let may_build, must_build = get_may_must ~is_locked ~units ~x_units in
   if what
-  then show_what ~lock ~is_locked ~locked_packs ~must_build ~may_build conf else
+  then output_what ~lock ~is_locked ~locked_packs ~must_build ~may_build conf
+  else
   (* Assert or warn a few things before starting the build. *)
   let* action_unit = match action_unit with
   | None when B0_unit.Set.is_empty must_build -> Fmt.error "%s" (err_nothing ())
-  | Some u when not (B0_unit.mem_meta B0_unit.exe_file u) && show_path ->
+  | Some u when not (B0_unit.mem_meta B0_unit.exe_file u) && output_path ->
       error_no_path u
   | Some u when not (B0_unit.is_actionable u) -> warn_noexec u; Ok None
   | o -> Ok o
@@ -286,7 +288,7 @@ let build
   | Ok () ->
       match action_unit with
       | None -> Ok Os.Exit.ok
-      | Some action_unit when show_path -> do_show_path action_unit ~args
+      | Some action_unit when output_path -> do_output_path action_unit ~args
       | Some action_unit when build_only -> Ok Os.Exit.ok
       | Some action_unit -> do_action_exit conf build action_unit ~args
 
@@ -295,18 +297,8 @@ let build
 open Cmdliner
 open Cmdliner.Term.Syntax
 
-let units = B0_cli.units ~doc:"Build unit $(docv). Repeatable." ()
-let x_units =
-  B0_cli.x_units ()
-    ~doc:"Exclude unit $(docv) from the build. Takes over inclusion."
-
-let packs = B0_cli.packs ~doc:"Build pack $(docv). Repeteable." ()
-let x_packs =
-  B0_cli.x_packs ()
-    ~doc:"Exclude units in pack $(docv) from the build. Takes over inclusion."
-
 let what =
-  let doc = "Do not run the build, show units that must and may build." in
+  let doc = "Do not run the build, output units that must and may build." in
   Arg.(value & flag & info ["what"] ~doc)
 
 let lock =
@@ -320,10 +312,11 @@ let lock =
   in
   Arg.(value & vflag None [lock; unlock])
 
-let show_path =
-  let doc = "Rather than perform action print invocation on $(b,stdout). For \
-             simple actions this prints the path to the build executable and \
-             is useful if you want to time it without timing the build."
+let output_path =
+  let doc =
+    "Rather than perform action output invocation on $(b,stdout). For simple \
+     actions this prints the path to the build executable and is useful if \
+     you want to time it without timing the build."
   in
   Arg.(value & flag & info ["path"] ~doc)
 
@@ -366,9 +359,10 @@ let args =
   Arg.(value & pos_right 0 aargs [] & info [] ~doc)
 
 let term =
-  let+ units and+ x_units and+ packs and+ x_packs and+ what and+ lock
-  and+ show_path and+ build_only and+ action and+ args in
-  build ~units ~x_units ~packs ~x_packs ~what ~lock ~show_path ~build_only
+  let+ units = B0_cli.build_units and+ x_units = B0_cli.build_x_units
+  and+ packs = B0_cli.build_packs and+ x_packs = B0_cli.build_x_packs
+  and+ what and+ lock and+ output_path and+ build_only and+ action and+ args in
+  build ~units ~x_units ~packs ~x_packs ~what ~lock ~output_path ~build_only
     ~action ~args
 
 let cmd =
@@ -399,8 +393,8 @@ let cmd =
           If you request a pack that has the $(b,B0_meta.locked) tag, \
           the build locks automatically unless $(b,--unlock) is specified.";
       `P "If you add the $(b,--what) option, the build doesn't run but what \
-          must and may build is shown.";
+          must and may build is output.";
       `P "More background information is available in the manuals, \
           see $(b,odig doc b0)."; ]
   in
-  B0_tool.Cli.subcmd_with_b0_file "build" ~doc ~descr ~synopsis term
+  B0_tool_cli.cmd_with_b0_file "build" ~doc ~descr ~synopsis term

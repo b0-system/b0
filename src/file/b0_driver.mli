@@ -133,7 +133,6 @@ end
 
 (** Cli interaction. *)
 module Cli : sig
-  val no_pager : bool Cmdliner.Term.t
   val conf : Conf.t Cmdliner.Term.t
   val set_no_color_and_log_level : unit Cmdliner.Term.t
 end

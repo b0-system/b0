@@ -29,25 +29,32 @@ depends: [
 ]
 build: ["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]
 install: [
-  "cmdliner"
-  "install"
-  "tool-support"
-  "--mandir=%{man}%"
-  "--sharedir=%{share}%"
-  "_build/src/tool/b0_main_run.native:b0" {ocaml:native}
-  "_build/src/tool/b0_main_run.byte:b0" {!ocaml:native}
-  "_build/src/lowtools/show_url.native:show-url" {ocaml:native}
-  "_build/src/lowtools/show_url.byte:show-url" {!ocaml:native}
-  "_build/src/lowtools/b0_cache_tool.native:b0-cache" {ocaml:native}
-  "_build/src/lowtools/b0_cache_tool.byte:b0-cache" {!ocaml:native}
-  "_build/src/lowtools/b0_hash_tool.native:b0-hash" {ocaml:native}
-  "_build/src/lowtools/b0_hash_tool.byte:b0-hash" {!ocaml:native}
-  "_build/src/lowtools/b0_log_tool.native:b0-log" {ocaml:native}
-  "_build/src/lowtools/b0_log_tool.byte:b0-log" {!ocaml:native}
-  "_build/src/lowtools/b0_sttyle.native:b0-sttyle" {ocaml:native}
-  "_build/src/lowtools/b0_sttyle.byte:b0-sttyle" {!ocaml:native}
-  "%{prefix}%"
+  [
+    "cp"
+    "_build/src/std/dllb0_stubs.so" {os != "win32"}
+    "_build/src/std/dllb0_stubs.dll" {os = "win32"}
+    "."
+  ] {!ocaml:native}
+  [
+    "cmdliner"
+    "install"
+    "tool-support"
+    "--mandir=%{man}%"
+    "--sharedir=%{share}%"
+    "_build/src/tool/b0_tool_main_run.native:b0" {ocaml:native}
+    "_build/src/tool/b0_tool_main_run.byte:b0" {!ocaml:native}
+    "_build/src/lowtools/show_url.native:show-url" {ocaml:native}
+    "_build/src/lowtools/show_url.byte:show-url" {!ocaml:native}
+    "_build/src/lowtools/b0_cache_tool.native:b0-cache" {ocaml:native}
+    "_build/src/lowtools/b0_cache_tool.byte:b0-cache" {!ocaml:native}
+    "_build/src/lowtools/b0_hash_tool.native:b0-hash" {ocaml:native}
+    "_build/src/lowtools/b0_hash_tool.byte:b0-hash" {!ocaml:native}
+    "_build/src/lowtools/b0_log_tool.native:b0-log" {ocaml:native}
+    "_build/src/lowtools/b0_log_tool.byte:b0-log" {!ocaml:native}
+    "_build/src/lowtools/b0_sttyle.native:b0-sttyle" {ocaml:native}
+    "_build/src/lowtools/b0_sttyle.byte:b0-sttyle" {!ocaml:native}
+    "%{prefix}%"
+  ]
 ]
-build-env: CAML_LD_LIBRARY_PATH += "_build/src/std"
 dev-repo: "git+https://erratique.ch/repos/b0.git"
 x-maintenance-intent: ["(latest)"]

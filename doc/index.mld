@@ -109,6 +109,9 @@ B0_random_queue
 B0_zero
 B0_zero_conv
 B0_memo
+B0_memo_log
+B0_memo_cli
+B0_build_trace
 B0_memo_kit
 }
 
@@ -118,7 +121,6 @@ This library has the the system for describing software construction
 and deployments via {{!page-manual.b0_file}b0 files}.
 
 {!modules:
-B0_build_trace
 B0_cli
 B0_file_exts
 B0_srcs

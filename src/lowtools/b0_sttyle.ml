@@ -64,12 +64,12 @@ open Cmdliner
 open Cmdliner.Term.Syntax
 
 let cmd =
-  let doc = "Show ANSI style matrix" in
+  let doc = "Output ANSI text styling matrix" in
   let man =
     [ `S Manpage.s_description;
-      `P "The $(cmd) tool outputs the various ANSI styles that \
+      `P "The $(cmd) tool renders the various ANSI styles that \
           can be devised using $(b,B0_std.Fmt.style) specifications. \
-          It shows a basic color matrix (which does not fit on 80 columns) \
+          It output a basic color matrix (which does not fit on 80 columns) \
           and options can add more styling.";
       `Pre "$(cmd)"; `Noblank;
       `Pre "$(cmd) $(b,--bold)"; `Noblank;

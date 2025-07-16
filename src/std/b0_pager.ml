@@ -27,8 +27,8 @@ end
 type t = Cmd.t option
 let does_page = Option.is_some
 
-let find ?search ?cmd ~don't () =
-  if don't then Ok None else
+let find ?search ?cmd ~no_pager () =
+  if no_pager then Ok None else
   match cmd with
   | Some cmd -> Ok (Os.Cmd.find ?search cmd)
   | None ->
@@ -110,10 +110,10 @@ let page_files pager files = match pager with
 
 (* Cli interaction *)
 
-let don't ?(docs = Cmdliner.Manpage.s_common_options) () =
+let no_pager ?(docs = Cmdliner.Manpage.s_common_options) () =
   let open Cmdliner in
   let doc =
     "Do not display the output in a pager. This automatically happens \
      if the $(b,TERM) environment variable is $(b,dumb) or undefined."
   in
-  Arg.(value & flag & info ["no-pager"] ~docs ~doc)
+  Arg.(value & flag & info ["no-pager"] ~docs ~doc_envs:Env.infos ~doc)

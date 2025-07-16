@@ -6,8 +6,10 @@
 open B0_std
 
 let feedback =
-  let show_ui = Log.Error and show_op = Log.Info and level = Log.level () in
-  B0_cli.Memo.pp_leveled_feedback ~show_op ~show_ui ~level Fmt.stderr
+  let output_op_level = Log.Info and output_ui_level = Log.Error in
+  let level = Log.level () in
+  B0_memo_cli.pp_leveled_feedback
+    ~output_op_level ~output_ui_level ~level Fmt.stderr
 
 let with_memo ?jobs f =
   Result.error_to_failure @@

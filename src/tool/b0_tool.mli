@@ -3,9 +3,7 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** [b0] driver common definitions.
-
-    FIXME cleanup and move to [B0_cli], cmdlets may be interested. *)
+(** [b0] driver common definitions. *)
 
 open B0_std
 
@@ -49,76 +47,4 @@ module Def : sig
   (** [get (module Def) k ns] gets key [k] in the metadata of
       definitions named [ns] with details [details]. If [ns] is empty
       all definitions are listed. *)
-end
-
-(** {1:cli Cli} *)
-
-module Cli : sig
-  open Cmdliner
-
-  (** {1:env Environment variables} *)
-
-  val editor_envs : Cmd.Env.info list
-
-  (** {1:ui User interface fragments} *)
-
-  val output_details : [ `Long | `Normal | `Short ] Term.t
-  val log_format : B0_cli.Memo.Log.format Term.t
-  val op_query : B0_cli.Op.query Term.t
-
-  val required_key_pos0 : string Term.t
-
-  val no_pager : bool Term.t
-  (** {b Note} only useful for {!subcmd}, it's already in the driver conf. *)
-
-
-  val units_posn :
-    ?doc:string -> first:int -> unit -> string list Cmdliner.Term.t
-
-  val units_pos0 : string list Cmdliner.Term.t
-  val units_pos1 : string list Cmdliner.Term.t
-
-  (** {1:manpage Manpage fragments} *)
-
-  val s_scope_selection : Manpage.section_name
-
-  val man_see_manual : Manpage.block
-
-  (** {1:cmds Defining commands} *)
-
-  val subcmd :
-    ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
-    ?synopsis:Manpage.block -> string -> doc:string -> descr:Manpage.block ->
-    (unit -> Os.Exit.t) Term.t -> Os.Exit.t Cmd.t
-  (** [subcmd] does not require driver configuration options or a b0 file
-      it justs setups logging and the tty stuff. *)
-
-  val subcmd_with_driver_conf :
-    ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
-    ?synopsis:Manpage.block -> string -> doc:string -> descr:Manpage.block ->
-    (B0_driver.Conf.t -> Os.Exit.t) Term.t -> Os.Exit.t Cmd.t
-  (** [subcmd_with_driver_conf] gives the options for a driver
-      configuration value. *)
-
-  val subcmd_with_b0_file_if_any :
-    ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
-    ?synopsis:Manpage.block -> string -> doc:string -> descr:Manpage.block ->
-    (B0_driver.Conf.t -> Os.Exit.t) Term.t -> Os.Exit.t Cmd.t
-  (** [subcmd_with_b0_if_any] will have a b0 file if it exists and can
-      be compiled. It will still execute if non of this is true.
-      The command can check {!B0_driver.has_b0_file} and
-      {!B0_driver.has_failed_b0_file} to understand the status at runtime.
-      If the compilation fails a warning is automatically logged. *)
-
-  val subcmd_with_b0_file :
-    ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
-    ?synopsis:Manpage.block -> string -> doc:string -> descr:Manpage.block ->
-    (B0_driver.Conf.t -> Os.Exit.t) Term.t -> Os.Exit.t Cmd.t
-  (** [subcmd_with_b0_file] requires a functioning b0 file. *)
-
-  val cmd_group :
-    ?exits:Cmd.Exit.info list -> ?envs:Cmd.Env.info list ->
-    ?synopsis:Manpage.block -> string -> doc:string -> descr:Manpage.block ->
-    ?default:Os.Exit.t Term.t -> Os.Exit.t Cmd.t list -> Os.Exit.t Cmd.t
-  (** [cmd_group] just groups without requiring anything particular. *)
 end

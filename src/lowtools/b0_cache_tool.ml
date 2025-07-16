@@ -25,7 +25,12 @@ let with_cache_dir cache_dir k =
 
 let find_used_keys ~err ~cwd ~b0_dir ~log_file k =
   let implicit_file = log_file = None in
-  let file = B0_cli.Memo.get_log_file ~cwd ~b0_dir ~log_file in
+  let variant = "user" (* FIXME *) in
+  let build_dir = B0_build.B0_dir.build_dir ~b0_dir ~variant in
+  let file = match log_file with
+  | Some file -> Fpath.(cwd // file)
+  | None -> B0_build.B0_dir.build_dir_log_file ~build_dir
+  in
   let* exists = Os.File.exists file in
   match exists with
   | false when implicit_file && err ->
@@ -39,14 +44,14 @@ let find_used_keys ~err ~cwd ~b0_dir ~log_file k =
       Log.if_error' ~use:err_no_log_file @@
       Result.map_error (Fmt.str "Cannot determine used keys: %s") @@
       let* l = B0_memo_log.read file in
-      k (B0_cli.File_cache.keys_of_success_ops (B0_memo_log.ops l))
+      k (B0_memo_cli.File_cache.keys_of_success_ops (B0_memo_log.ops l))
 
 let find_dirs ~b0_dir ~cache_dir =
   let* cwd = Os.Dir.cwd () in
-  let root = B0_cli.Memo.find_dir_with_b0_dir ~start:cwd in
+  let root = B0_cli.find_dir_with_b0_dir ~start:cwd in
   let root = Option.value root ~default:cwd in
-  let b0_dir = B0_cli.Memo.get_b0_dir ~cwd ~root ~b0_dir in
-  let cache_dir = B0_cli.Memo.get_cache_dir ~cwd ~b0_dir ~cache_dir in
+  let b0_dir = B0_cli.get_b0_dir ~cwd ~root ~b0_dir in
+  let cache_dir = B0_cli.get_cache_dir ~cwd ~b0_dir ~cache_dir in
   Ok (cwd, b0_dir, cache_dir)
 
 (* Commands *)
@@ -54,20 +59,20 @@ let find_dirs ~b0_dir ~cache_dir =
 let delete ~b0_dir ~cache_dir ~keys =
   let* (_cwd, _b0_dir, cache_dir) = find_dirs ~b0_dir ~cache_dir in
   with_cache_dir cache_dir @@ fun dir ->
-  let* _ = B0_cli.File_cache.delete ~dir keys in
+  let* _ = B0_memo_cli.File_cache.delete ~dir keys in
   Ok 0
 
 let gc ~b0_dir ~cache_dir ~log_file =
   let* (cwd, b0_dir, cache_dir) = find_dirs ~b0_dir ~cache_dir in
   with_cache_dir cache_dir @@ fun dir ->
   find_used_keys ~err:true ~cwd ~b0_dir ~log_file @@ fun used ->
-  let* _ = B0_cli.File_cache.gc ~dir ~used in
+  let* _exists = B0_memo_cli.File_cache.gc ~dir ~used in
   Ok 0
 
 let keys ~b0_dir ~cache_dir =
   let* (_cwd, _b0_dir, cache_dir) = find_dirs ~b0_dir ~cache_dir in
   with_cache_dir cache_dir @@ fun dir ->
-  let* _ = B0_cli.File_cache.keys ~dir in
+  let* _exists = B0_memo_cli.File_cache.keys ~dir in
   Ok 0
 
 let path ~b0_dir ~cache_dir =
@@ -79,14 +84,14 @@ let stats ~b0_dir ~cache_dir ~log_file  =
   let* (cwd, b0_dir, cache_dir) = find_dirs ~b0_dir ~cache_dir in
   with_cache_dir cache_dir @@ fun dir ->
   find_used_keys ~err:false ~cwd ~b0_dir ~log_file @@ fun used ->
-  let* _ = B0_cli.File_cache.stats ~dir ~used in
+  let* _exists = B0_memo_cli.File_cache.stats ~dir ~used in
   Ok 0
 
 let trim ~b0_dir ~cache_dir ~log_file ~trim_spec:(max_byte_size, pct) =
   let* (cwd, b0_dir, cache_dir) = find_dirs ~b0_dir ~cache_dir in
   with_cache_dir cache_dir @@ fun dir ->
   find_used_keys ~err:false ~cwd ~b0_dir ~log_file @@ fun used ->
-  let* _ = B0_cli.File_cache.trim ~dir ~used ~max_byte_size ~pct in
+  let* _exists = B0_memo_cli.File_cache.trim ~dir ~used ~max_byte_size ~pct in
   Ok 0
 
 (* Command line interface *)
@@ -106,14 +111,11 @@ let exits =
   Cmd.Exit.defaults
 
 let set_log_level = B0_std_cli.set_log_level ()
-let b0_dir = B0_cli.Memo.b0_dir ()
-let cache_dir = B0_cli.Memo.cache_dir ()
+let b0_dir = B0_cli.b0_dir ()
+let cache_dir = B0_memo_cli.File_cache.dir ()
 let log_file =
   let doc = "Use $(docv) for the build log file." and docv = "LOG_FILE" in
-  let env =
-    let doc = "See argument $(docv)." in
-    Cmdliner.Cmd.Env.info ~doc B0_cli.Memo.log_file_env
-  in
+  let env = B0_memo_cli.Log.file_var in
   let absent = "Default $(b,_log) in b0 directory" in
   Arg.(value & pos 0 (some B0_std_cli.filepath) None &
        info [] ~absent ~env ~doc ~docv)
@@ -125,7 +127,7 @@ let delete =
   let man = man [] in
   Cmd.make (Cmd.info "delete" ~doc ~exits ~man) @@
   let+ set_log_level and+ b0_dir and+ cache_dir
-  and+ keys = B0_cli.File_cache.keys_none_is_all ~pos_right:(-1) () in
+  and+ keys = B0_memo_cli.File_cache.keys_none_is_all () in
   delete ~b0_dir ~cache_dir ~keys
 
 let gc =
@@ -163,6 +165,7 @@ let stats, stats_term =
   Cmd.make (Cmd.info "stats" ~doc ~exits ~man) term, term
 
 let trim =
+  (* FIXME add --fit-build or mention gc *)
   let doc = "Trim the cache to the minimal budget specified" in
   let man = man
       [ `S Manpage.s_description;
@@ -173,7 +176,7 @@ let trim =
   in
   Cmd.make (Cmd.info "trim" ~doc ~exits ~man) @@
   let+ set_log_level and+ b0_dir and+ cache_dir and+ log_file
-  and+ trim_spec = B0_cli.File_cache.trim_cli () in
+  and+ trim_spec = B0_memo_cli.File_cache.trim_cli () in
   trim ~b0_dir ~cache_dir ~log_file ~trim_spec
 
 let tool =

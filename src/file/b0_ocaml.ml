@@ -1718,17 +1718,17 @@ let run_ocaml_term func env =
   let open Cmdliner in
   let open Cmdliner.Term.Syntax in
   let+ dry_run =
-    let doc = "Show $(b,ocaml) invocation rather than executing it." in
+    let doc = "Output $(b,ocaml) invocation rather than executing it." in
     Arg.(value & flag & info ["dry-run"] ~doc)
   and+ use_utop =
     let doc = "Use $(b,utop) rather than $(b,ocaml)." in
     Arg.(value & flag & info ["utop"] ~doc)
   and+ x_units =
     let doc = "Exclude objects of $(docv) from loading." in
-    B0_cli.x_units ~doc ()
+    B0_cli.use_x_units ~doc ()
   and+ x_packs =
     let doc = "Exclude objects of units of $(docv) from loading." in
-    B0_cli.x_packs ~doc ()
+    B0_cli.use_x_packs ~doc ()
   and+ args =
     let doc =
       "Arguments for the $(b,ocaml) executable. Specify them after $(b,--)."
@@ -2241,20 +2241,19 @@ let unit =
     let doc = "List buildable OCaml libraries" in
     let man =
       [ `S Manpage.s_description;
-        `P "$(iname) lists buildable OCaml libraries." ]
+        `P "$(cmd) lists buildable OCaml libraries." ]
     in
-    let pager_don't = B0_pager.don't () in
-    let envs = B0_pager.Env.infos in
+    let no_pager = B0_pager.no_pager () in
     let exits = B0_std_cli.Exit.infos in
-    let details = B0_std_cli.output_details () in
-    Cmd.make (Cmd.info "libs" ~doc ~man ~exits ~envs) @@
-    Term.(const list $ details $ pager_don't)
+    let details = B0_cli.output_details in
+    Cmd.make (Cmd.info "libs" ~doc ~man ~exits) @@
+    Term.(const list $ details $ no_pager)
   in
   let meta =
     let doc = "Generate ocamlfind META files" in
     let man =
       [ `S Manpage.s_description;
-        `P "$(iname) generates OCaml META files for a given pack. This \
+        `P "$(cmd) generates OCaml META files for a given pack. This \
             generates a META file assuming an install with one library \
             per directory." ]
     in
@@ -2270,7 +2269,7 @@ let unit =
   in
   let man =
     [ `S Manpage.s_description;
-      `P "$(iname) has a few tools for OCaml";
+      `P "$(cmd) has a few tools for OCaml";
       `Blocks man ]
   in
   let name = B0_unit.name u in
@@ -2300,7 +2299,7 @@ let ocaml_ocaml_cmd env u =
       `P "$(b,b0) [$(b,-p) $(i,PACK)]… [$(b,-u) $(i,UNIT)]… \
           -- .ocaml.ocaml [$(i,OPTION)]… -- $(i,ARG)…";
       `S Cmdliner.Manpage.s_description;
-      `P "$(iname) loads the build you specify for the action \
+      `P "$(cmd) loads the build you specify for the action \
           in the $(b,ocaml) interactive toplevel. This also \
           gives access to modules that may end up being private \
           at install time.";

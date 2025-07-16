@@ -66,7 +66,7 @@ allows to find out which root b0 file is determined by [b0] and
 provides a few actions on it:
 
 {v
-b0 file path    # Show the absolute path to the root b0 file
+b0 file path    # Output the absolute path to the root b0 file
 b0 file edit    # Edit the root b0 file.
 b0 file --help  # See all actions available on the b0 file
 v}
@@ -74,11 +74,11 @@ v}
 {2:root_dir Root directory}
 
 The b0 {e root (directory)} is the directory in which the
-{{!root_b0_file}root b0 file} is found. The [b0 root] command shows
+{{!root_b0_file}root b0 file} is found. The [b0 root] command outputs
 that directly:
 
 {v
-b0 root  # Show the absolute path to the root directory
+b0 root  # Output the absolute path to the root directory
          # Effectively this is dirname $(b0 file path)
 v}
 

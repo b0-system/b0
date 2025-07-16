@@ -16,22 +16,22 @@ let b0_tool = B0_ocaml.libname "b0.tool"
 let b0_std_lib =
   let srcs = [ `Dir_rec ~/"src/std"; `X ~/"src/std/b0_std_top_init.ml" ] in
   let requires = [unix; cmdliner] in
-  B0_ocaml.lib b0_std ~doc:"b0 standard library" ~srcs ~requires
+  B0_ocaml.lib b0_std ~srcs ~requires
 
 let b0_memo_lib =
   let srcs = [`Dir ~/"src/memo"] in
   let requires = [unix; cmdliner; b0_std] in
-  B0_ocaml.lib b0_memo ~doc:"b0 build library" ~srcs ~requires
+  B0_ocaml.lib b0_memo ~srcs ~requires
 
 let b0_file_lib =
   let srcs = [`Dir ~/"src/file"] in
   let requires = [unix; cmdliner; b0_std; b0_memo] in
-  B0_ocaml.lib b0_file ~doc:"b0 build file library" ~srcs ~requires
+  B0_ocaml.lib b0_file ~srcs ~requires
 
 let b0_kit_lib =
   let srcs = [`Dir ~/"src/kit"] in
   let requires = [unix; cmdliner; b0_std; b0_memo; b0_file] in
-  B0_ocaml.lib b0_kit ~doc:"b0 toolkit library" ~srcs ~requires
+  B0_ocaml.lib b0_kit ~srcs ~requires
 
 (* The b0 tool *)
 
@@ -48,41 +48,30 @@ let bootstrap_env env unit =
   |> Result.ok
 
 let b0_tool_lib =
-  let srcs = [ `Dir ~/"src/tool"; `X ~/"src/tool/b0_main_run.ml"] in
+  let srcs = [ `Dir ~/"src/tool"; `X ~/"src/tool/b0_tool_main_run.ml"] in
   let requires = [unix; cmdliner; b0_std; b0_memo; b0_file; b0_kit] in
   B0_ocaml.lib b0_tool ~doc:"b0 tool driver library" ~srcs ~requires
 
 let b0 =
-  let srcs = [`File ~/"src/tool/b0_main_run.ml"] in
+  let srcs = [`File ~/"src/tool/b0_tool_main_run.ml"] in
   let requires = [b0_file; b0_tool] in
   let exec_env = `Fun ("Bootstrap env on the b0 build", bootstrap_env) in
   let meta = B0_meta.empty |> ~~ B0_unit.Action.env exec_env in
   B0_ocaml.exe "b0" ~public:true ~doc:"The b0 tool" ~srcs ~requires ~meta
 
-(* Low-level b0 tools *)
+(* Low-level b0 memo tools *)
 
-let tool_exe ?(requires = []) n ~doc file =
-  let requires = (cmdliner :: b0_std :: requires) in
-  let srcs = [`File Fpath.(~/"src/lowtools" / file)] in
-  B0_ocaml.exe n ~public:true ~doc ~srcs ~requires
+let tool_exe ?(requires = []) tool src =
+  let requires = cmdliner :: b0_std :: requires in
+  let srcs = [`File Fpath.(v "src/lowtools" / src)] in
+  B0_ocaml.exe tool ~public:true ~srcs ~requires
 
+let show_url_tool = tool_exe "show-url" "show_url.ml"
+let b0_sttyle = tool_exe "b0-sttyle" "b0_sttyle.ml"
+let b0_hash_tool = tool_exe "b0-hash" "b0_hash_tool.ml" ~requires:[b0_memo]
+let b0_log_tool = tool_exe "b0-log" "b0_log_tool.ml" ~requires:[b0_memo]
 let b0_cache_tool =
-  let requires = [b0_memo; b0_file] in
-  tool_exe "b0-cache" "b0_cache_tool.ml" ~doc:"Operate on b0 caches" ~requires
-
-let b0_hash_tool =
-  let requires = [b0_file] (* for B0_cli *)  in
-  tool_exe "b0-hash" "b0_hash_tool.ml" ~doc:"Hash like b0" ~requires
-
-let b0_log_tool =
-  let requires = [b0_memo; b0_file] in
-  tool_exe "b0-log" "b0_log_tool.ml" ~doc:"Operate on b0 logs" ~requires
-
-let b0_sttyle =
-  tool_exe "b0-sttyle" "b0_sttyle.ml" ~doc:"Show ANSI escape styles"
-
-let show_url_tool =
-  tool_exe "show-url" "show_url.ml" ~doc:"Show URLs in web browsers"
+  tool_exe "b0-cache" "b0_cache_tool.ml" ~requires:[b0_memo; b0_file]
 
 (* Tests *)
 
@@ -167,18 +156,25 @@ let default =
       ["dev"; "org:erratique"; "org:b0-system"; "build"]
     |> ~~ B0_opam.build
       {|[["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]]|}
+   (*
     |> ~~ B0_opam.build_env
       (* This doesn't seem to work see
          https://github.com/ocaml/opam/issues/6574
          this means the install: step is currently broken
          in bytecode only switches. *)
-      {| [[CAML_LD_LIBRARY_PATH += "_build/src/std"]]|}
+      {| [[CAML_LD_LIBRARY_PATH += "_build/src/std"]]|} *)
     |> ~~ B0_opam.install
-      {|["cmdliner" "install" "tool-support"
+      {|
+        [
+         # See https://github.com/ocaml/opam/issues/6574
+         ["cp" "_build/src/std/dllb0_stubs.so"  {os != "win32"}
+               "_build/src/std/dllb0_stubs.dll" {os = "win32"}
+               "."] {!ocaml:native}
+         ["cmdliner" "install" "tool-support"
          "--mandir=%{man}%"
          "--sharedir=%{share}%"
-         "_build/src/tool/b0_main_run.native:b0" {ocaml:native}
-         "_build/src/tool/b0_main_run.byte:b0" {!ocaml:native}
+         "_build/src/tool/b0_tool_main_run.native:b0" {ocaml:native}
+         "_build/src/tool/b0_tool_main_run.byte:b0" {!ocaml:native}
          "_build/src/lowtools/show_url.native:show-url" {ocaml:native}
          "_build/src/lowtools/show_url.byte:show-url" {!ocaml:native}
          "_build/src/lowtools/b0_cache_tool.native:b0-cache" {ocaml:native}
@@ -189,7 +185,7 @@ let default =
          "_build/src/lowtools/b0_log_tool.byte:b0-log" {!ocaml:native}
          "_build/src/lowtools/b0_sttyle.native:b0-sttyle" {ocaml:native}
          "_build/src/lowtools/b0_sttyle.byte:b0-sttyle" {!ocaml:native}
-         "%{prefix}%"]|}
+         "%{prefix}%"]] |}
     |> ~~ B0_opam.depends [
       "ocaml", {|>= "4.14.0"|};
       "ocamlfind", {|build|};
@@ -204,8 +200,8 @@ let default =
 
 (* Actions *)
 
-let strap =
-  B0_unit.of_action' "strap" ~doc:"Run boot/strap" @@
+let bootstrap =
+  B0_unit.of_action' "boostrap" ~doc:"Run boot/strap" @@
   B0_unit.Action.scope_exec (Cmd.tool "boot/strap")
 
 let bowl =
@@ -250,7 +246,7 @@ let with_cloned_repo_dir ~env ~repo f =
 
 let vendor_more_modules =
   let doc = "Update vendored More modules" in
-  B0_unit.of_action "vendor-more" ~doc @@ fun env _ ~args ->
+  B0_unit.of_action "update-more" ~doc @@ fun env _ ~args ->
   let repo = "https://erratique.ch/repos/more.git" in
   with_cloned_repo_dir ~env ~repo @@ fun dir ->
   let dst_dir = B0_env.in_scope_dir env ~/"src/std" in
@@ -259,7 +255,7 @@ let vendor_more_modules =
     ["More__", "B0__"; "More.", "B0_std."; "{!More}", "{!B0_std}";
      "ocaml_more", "ocaml_b0"; "open More", "open B0_std";
      "page-cookbook", "page-b0_std_cookbook";
-    ]
+     "More_cli.", "B0_std_cli." ]
   in
   (* more library *)
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__char" "b0__char" in
@@ -296,9 +292,9 @@ let vendor_more_modules =
       "more_stubs_time.c" "b0_stubs_time.c" in
   Ok ()
 
-let vendor_webs_modules =
+let update_webs_modules =
   let doc = "Update vendored Webs modules" in
-  B0_unit.of_action "vendor-webs" ~doc @@ fun env _ ~args ->
+  B0_unit.of_action "udpate-webs" ~doc @@ fun env _ ~args ->
   let repo = "https://erratique.ch/repos/webs.git" in
   with_cloned_repo_dir ~env ~repo @@ fun dir ->
   let dst_dir = B0_env.in_scope_dir env ~/"src/std" in
@@ -308,9 +304,9 @@ let vendor_webs_modules =
   let* () = copy_module ~src_dir ~dst_dir "webs__url" "b0_url" in
   Ok ()
 
-let vendor_htmlit =
+let update_htmlit =
   let doc = "Update vendored Htmlit" in
-  B0_unit.of_action "vendor-htmlit" ~doc @@ fun env _ ~args ->
+  B0_unit.of_action "update-htmlit" ~doc @@ fun env _ ~args ->
   let repo = "https://erratique.ch/repos/htmlit.git" in
   with_cloned_repo_dir ~env ~repo @@ fun dir ->
   let dst_dir = B0_env.in_scope_dir env ~/"src/std" in
