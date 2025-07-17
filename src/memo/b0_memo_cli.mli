@@ -48,51 +48,51 @@ module File_cache : sig
       it via {!B0_zero.File_cache.make} if it doesn't exists and return
       [Ok false] in that case. *)
 
-  val keys_of_success_ops : B0_zero.Op.t list -> String.Set.t
-  (** [keys_of_success_ops ops] are the non-nil hashes of the operations of
-      [ops] that are {!B0_zero.Op.Success}. *)
+  type keyset = String.Set.t
+  (** The type for sets of {!B0_zero.Filecache.key}. *)
+
+  type key_kind = [ `Any | `Used | `Unused ]
+  (** The type for key kinds. *)
+
+  val keys_of_success_ops : ?init:keyset -> B0_zero.Op.t list -> keyset
+  (** [keys_of_success_ops ~init ops] adds to [init] the non-nil hashes of
+      the operations of [ops] that are {!B0_zero.Op.Success}. [init]
+      defaults to {!String.Set.empty}. *)
 
   val delete :
-    dir:Fpath.t -> [ `All | `Keys of B0_zero.File_cache.key list ] ->
-    (bool, string) result
-  (** [delete dir keys] deletes [keys] in [dirs] if an explicit key
-      does not exist in [dir] a {!Log.warn} is issued. If [`All] is
+    dir:Fpath.t -> used:keyset -> kind:key_kind ->
+    [ `All | `Keys of B0_zero.File_cache.key list ] -> (bool, string) result
+  (** [delete ~dir ~used ~kind keys] deletes [keys] in [dir] if an
+      explicit key does not exist in [dir] or [unused] (depending on
+      [kind]) a {!Log.warn} is issued. If [`All] and [`Any] is
       specified [dir] is deleted and recreated. *)
 
-  val gc : dir:Fpath.t -> used:String.Set.t -> (bool, string) result
-  (** [gc ~dir ~used] deletes keys that are not in [used]. *)
+  val gc : dry_run:bool -> dir:Fpath.t -> used:keyset -> (bool, string) result
+  (** [gc ~dry_run ~dir ~used] deletes keys that are not in [used].
+      If [dry_run] is [true] outputs deltions on [stdout] rather than
+      performing them. *)
 
-  val keys : dir:Fpath.t -> (bool, string) result
-  (** [keys dir] lists the file cache keys on stdout. *)
+  val keys :
+    dir:Fpath.t -> used:keyset -> kind:key_kind -> (bool, string) result
+  (** [keys ~dir ~used ~kind] lists the file cache keys on [stdout] using
+      keyed againt [used] in the [`Used] and [`Unused] case. The argument is
+      ignored on [`All]. *)
 
-  val stats : dir:Fpath.t -> used:String.Set.t -> (bool, string) result
-  (** [status ~dir ~used] outputs statistics about the file cache on stdout.
+  val stats : dir:Fpath.t -> used:keyset -> (bool, string) result
+  (** [status ~dir ~used] outputs statistics about the file cache on [stdout].
       [used] determines keys that are in use. *)
 
   val trim :
-    dir:Fpath.t -> used:String.Set.t -> max_byte_size:int -> pct:int ->
-    (bool, string) result
+    dry_run:bool -> dir:Fpath.t -> used:keyset -> max_byte_size:int ->
+    pct:int -> (bool, string) result
   (** [trim dir ~used ~max_byte_size ~pct] trims the cache using
       {!B0_zero.File_cache.trim_size}. [used] determines keys that
-      are assumed to be used. *)
+      are assumed to be used. If [dry_run] is [true] outputs deletions
+      on [stdout] rather than performing them. *)
 
   (** {1:cli Cli fragments} *)
 
-  val key_arg : B0_zero.File_cache.key Cmdliner.Arg.conv
-  (** [key_arg] is an argument converter for cache keys. *)
-
-  val keys_none_is_all :
-    ?first:int -> unit ->
-    [ `All | `Keys of B0_zero.File_cache.key list ] Cmdliner.Term.t
-  (** [keys_none_is_all ~first ()] are the keys string at position [first]
-      (defaults is [0]). If none is specified this is [`All]. *)
-
-  val trim_cli :
-    ?mb_opts:string list ->
-    ?pct_opts:string list ->
-    ?docs:Cmdliner.Manpage.section_name -> unit -> (int * int) Cmdliner.Term.t
-  (** [trim_cli ~docs ()] are command line options to specify a maximal
-      byte size and percentage to give to {!trim}. *)
+  (** {2:directory File cache directoy} *)
 
   val dir :
     ?opts:string list -> ?docs:Cmdliner.Manpage.section_name -> ?doc:string ->
@@ -116,6 +116,33 @@ module File_cache : sig
 
   val dirname : string
   (** [dirname] is [".cache"], a sugggested cache directory name. *)
+
+  (** {2:ops File cache operations} *)
+
+  val key_arg : B0_zero.File_cache.key Cmdliner.Arg.conv
+  (** [key_arg] is an argument converter for cache keys. *)
+
+  val keys_none_is_all :
+    ?first:int -> unit ->
+    [ `All | `Keys of B0_zero.File_cache.key list ] Cmdliner.Term.t
+  (** [keys_none_is_all ~first ()] are the keys string at position [first]
+      (defaults is [0]). If none is specified this is [`All]. *)
+
+  val trim_cli :
+    ?mb_opts:string list ->
+    ?pct_opts:string list ->
+    ?docs:Cmdliner.Manpage.section_name -> unit -> (int * int) Cmdliner.Term.t
+  (** [trim_cli ~docs ()] are options to specify a maximal
+      byte size and percentage to give to {!trim}. *)
+
+  val key_kind_cli :
+    ?docs:Cmdliner.Manpage.section_name -> unit -> key_kind Cmdliner.Term.t
+  (** [key_kind_cli ()] are options to specify kinds of keys. *)
+
+  val dry_run :
+    ?docs:Cmdliner.Manpage.section_name -> unit -> bool Cmdliner.Term.t
+  (** [dry_run ()] is a [--dry-run] option of {!trim} and {!gc}. *)
+
 end
 
 (** {!B0_zero.Op} interaction. *)

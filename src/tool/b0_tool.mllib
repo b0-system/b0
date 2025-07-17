@@ -2,6 +2,7 @@ B0_tool
 B0_tool_cli
 B0_cmd_browse
 B0_cmd_build
+B0_cmd_cache
 B0_cmd_delete
 B0_cmd_dir
 B0_cmd_edit

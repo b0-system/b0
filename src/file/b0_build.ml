@@ -41,8 +41,15 @@ let current_meta b = B0_defs.Unit.meta (current b)
 
 module B0_dir = struct
   let build_dir ~b0_dir ~variant = Fpath.(b0_dir / "b" / variant)
-  let build_dir_log_file ~build_dir =
+
+  let default_build_dir ~b0_dir =
+    (* FIXME this is hardcoded. In the future we likely want to
+       read it from a file or symlink *)
+    Ok (build_dir ~b0_dir ~variant:"user")
+
+  let log_file ~build_dir =
     Fpath.(build_dir / B0_memo_cli.Log.filename)
+
   let shared_build_dir ~build_dir = Fpath.(build_dir / "_shared")
   let store_dir ~build_dir = Fpath.(build_dir / "_store")
   let unit_build_dir ~build_dir ~name = Fpath.(build_dir / name)
@@ -131,7 +138,7 @@ let run b =
   let log_file =
     (* FIXME we likely want to surface that at the API level. Either
          at create or run *)
-    B0_dir.build_dir_log_file ~build_dir:b.b.build_dir
+    B0_dir.log_file ~build_dir:b.b.build_dir
   in
   let hook () = write_log_file ~log_file b.u.m in
   Os.Exit.on_sigint ~hook @@ fun () ->

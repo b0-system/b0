@@ -37,6 +37,9 @@ end
 
 module File_cache = struct
 
+  type keyset = String.Set.t
+  type key_kind = [ `Any | `Used | `Unused ]
+
   (* Cache stats *)
 
   type key_stats =
@@ -88,60 +91,84 @@ module File_cache = struct
     with
     | Failure e -> Error (Fmt.str "cache stats: %s" e)
 
-  (* High-level commands *)
+  (* Other tools *)
 
-  let keys_of_success_ops ops =
+  let delete_key ~warn cache key =
+    Log.if_error ~use:() @@
+    let* existed = B0_zero.File_cache.rem cache key in
+    if not existed && warn then
+      Log.warn begin fun m ->
+        m "No key %a in cache, ignored." Fmt.code key
+      end;
+    Ok ()
+
+  let keys_of_success_ops ?(init = String.Set.empty) ops =
     let add_op acc o =
       let h = B0_zero.Op.hash o in
       if not (B0_hash.is_nil h) && B0_zero.Op.status o = B0_zero.Op.Success
       then String.Set.add (B0_hash.to_hex h) acc
       else acc
     in
-    List.fold_left add_op String.Set.empty ops
+    List.fold_left add_op init ops
 
-  let delete ~dir keys =
+  (* High-level commands *)
+
+  let delete ~dir ~used ~kind keys =
     let* exists = Os.Dir.exists dir in
     if not exists then Ok false else
-    match keys with
-    | `All ->
+    let* () = match kind, keys with
+    | `Any, `All ->
         (* Delete and recreate dir *)
         let _existed = Os.Path.delete ~recurse:true dir in
         let _existed = Os.Dir.create ~make_path:true dir in
-        Ok true
-    | `Keys keys ->
+        Ok ()
+    | (`Used | `Unused as kind), `All ->
         let* cache = B0_zero.File_cache.make dir in
-        let delete cache key =
-          Log.if_error ~use:() @@
-          let* existed = B0_zero.File_cache.rem cache key in
-          if existed then Ok () else
-          (Log.warn begin fun m ->
-              m "No key %a in cache, ignored." Fmt.code key
-            end;
-           Ok ())
+        let* keys = B0_zero.File_cache.keys cache in
+        let used k = String.Set.mem k used in
+        let keys = match kind with
+        | `Used -> List.filter used keys
+        | `Unused -> List.filter (Fun.negate used) keys
         in
-        List.iter (delete cache) keys; Ok true
-
-  let gc ~dir ~used =
-    let* exists = Os.Dir.exists dir in
-    if not exists then Ok false else
-    let* conf = B0_zero.File_cache.make dir in
-    let* keys = B0_zero.File_cache.keys conf in
-    let unused k = not (String.Set.mem k used) in
-    let unused = List.filter unused keys in
-    let delete conf k =
-      Log.if_error ~use:() @@
-      let* _existed = B0_zero.File_cache.rem conf k in
-      Ok ()
+        Ok (List.iter (delete_key ~warn:false cache) keys)
+    | kind, `Keys keys ->
+        let* cache = B0_zero.File_cache.make dir in
+        let used k = String.Set.mem k used in
+        let keys = match kind with
+        | `Any -> keys
+        | `Used -> List.filter used keys
+        | `Unused -> List.filter (Fun.negate used) keys
+        in
+        Ok (List.iter (delete_key ~warn:true cache) keys)
     in
-    List.iter (delete conf) unused;
     Ok true
 
-  let keys ~dir =
+  let output_keys keys = Fmt.pr "@[<v>%a@]@." Fmt.(list string) keys
+
+  let gc ~dry_run ~dir ~used =
     let* exists = Os.Dir.exists dir in
     if not exists then Ok false else
     let* cache = B0_zero.File_cache.make dir in
     let* keys = B0_zero.File_cache.keys cache in
-    Fmt.pr "@[<v>%a@]@." Fmt.(list string) keys;
+    let unused k = not (String.Set.mem k used) in
+    let unused = List.filter unused keys in
+    (if dry_run
+     then output_keys unused
+     else List.iter (delete_key ~warn:false cache) unused);
+    Ok true
+
+  let keys ~dir ~used ~kind =
+    let* exists = Os.Dir.exists dir in
+    if not exists then Ok false else
+    let* cache = B0_zero.File_cache.make dir in
+    let* keys = B0_zero.File_cache.keys cache in
+    let used k = String.Set.mem k used in
+    let keys = match kind with
+    | `Any -> keys
+    | `Used -> List.filter used keys
+    | `Unused -> List.filter (Fun.negate used) keys
+    in
+    output_keys keys;
     Ok true
 
   let stats ~dir ~used =
@@ -152,18 +179,42 @@ module File_cache = struct
     Fmt.pr "@[<v>%a@]@." pp_stats stats;
     Ok true
 
-  let trim ~dir ~used ~max_byte_size ~pct =
+  let trim ~dry_run ~dir ~used ~max_byte_size ~pct =
     let* exists = Os.Dir.exists dir in
     if not exists then Ok false else
     let is_unused k = not (String.Set.mem k used) in
-    let* c = B0_zero.File_cache.make dir in
-    let* () = B0_zero.File_cache.trim_size c ~is_unused ~max_byte_size ~pct in
+    let* cache = B0_zero.File_cache.make dir in
+    let* () =
+      if not dry_run
+      then B0_zero.File_cache.trim_size cache ~is_unused ~max_byte_size ~pct
+      else
+      let* keys =
+        let add_key acc _size key = key :: acc in
+        B0_zero.File_cache.fold_keys_to_trim cache
+          ~is_unused ~max_byte_size ~pct add_key []
+      in
+      Ok (output_keys (List.rev keys))
+    in
     Ok true
 
   (* Cli fragments *)
 
   open Cmdliner
   open Cmdliner.Term.Syntax
+
+  (* Cache directory *)
+
+  let dir_var = Cmd.Env.info "B0_CACHE_DIR"
+  let dirname = ".cache"
+  let dir
+      ?(opts = ["b0-cache-dir"])
+      ?(docs = Manpage.s_common_options)
+      ?(doc = "Use $(docv) for the build cache directory.")
+      ?doc_absent:(absent = "$(b,.cache) in b0 directory")
+      ?(env = dir_var) ()
+    =
+    Arg.(value & opt (some B0_std_cli.dirpath) None &
+         info opts ~env ~absent ~doc ~docs)
 
   let key_arg =
     let parser s =
@@ -176,7 +227,8 @@ module File_cache = struct
   let keys_none_is_all ?(first = 0) () =
     let+ keys =
       let doc =
-        "Select $(docv) (repeatable). If unspecified selects all keys."
+        "Select $(docv) (repeatable). If unspecified selects all keys. \
+         Warns if $(docv) is selected and does not exist in the cache."
       in
       Arg.(value & pos_right (first - 1) key_arg [] & info [] ~doc)
     in
@@ -199,17 +251,20 @@ module File_cache = struct
     | Some mb, None -> mb * 1000 * 1000, 100
     | Some mb, Some pct -> mb * 1000 * 1000, pct
 
-  let dir_var = Cmd.Env.info "B0_CACHE_DIR"
-  let dirname = ".cache"
-  let dir
-      ?(opts = ["b0-cache-dir"])
-      ?(docs = Manpage.s_common_options)
-      ?(doc = "Use $(docv) for the build cache directory.")
-      ?doc_absent:(absent = "$(b,.cache) in b0 directory")
-      ?(env = dir_var) ()
-    =
-    Arg.(value & opt (some B0_std_cli.dirpath) None &
-         info opts ~env ~absent ~doc ~docs)
+  let key_kind_cli ?docs () =
+    let used =
+      let doc = "Select only used keys." in
+      `Used, Arg.info ["used"] ~doc ?docs
+    in
+    let unused =
+      let doc = "Select only unused keys." in
+      `Unused, Arg.info ["unused"] ~doc ?docs
+    in
+    Arg.(value & vflag `Any [used; unused])
+
+  let dry_run ?docs () =
+    let doc = "Do not delete keys. Output keys to delete on $(b,stdout)." in
+    Arg.(value & flag & info ["dry-run"] ~doc ?docs)
 end
 
 module Op = struct

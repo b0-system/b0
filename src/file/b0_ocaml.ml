@@ -818,7 +818,8 @@ module Libresolver = struct
           begin match Option.get (B0_zero.Op.Spawn.exit spawn) with
           | `Exited 0 ->
               begin match B0_zero.Op.Spawn.stdo_ui spawn with
-              | None | Some Error _ -> B0_zero.Op.disable_reviving op
+              | None | Some Error _ ->
+                  B0_zero.Op.disable_reviving op
               | Some Ok data ->
                   match get_meta_file data with
                   | None ->
@@ -1343,6 +1344,7 @@ let unit_code b m meta =
   let* built_code = B0_build.get b Code.built in
   let _supported_code = B0_meta.find Code.supported meta in
   let _needs_code = B0_meta.find Code.needs meta in
+  Log.debug (fun m -> m "%a" Code.pp_built built_code);
   (* TODO *)
   Fut.return built_code
 

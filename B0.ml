@@ -71,7 +71,8 @@ let b0_sttyle = tool_exe "b0-sttyle" "b0_sttyle.ml"
 let b0_hash_tool = tool_exe "b0-hash" "b0_hash_tool.ml" ~requires:[b0_memo]
 let b0_log_tool = tool_exe "b0-log" "b0_log_tool.ml" ~requires:[b0_memo]
 let b0_cache_tool =
-  tool_exe "b0-cache" "b0_cache_tool.ml" ~requires:[b0_memo; b0_file]
+  let requires = [b0_memo; b0_file (* for b0_dir lookup *) ] in
+  tool_exe "b0-cache" "b0_cache_tool.ml" ~requires
 
 (* Tests *)
 

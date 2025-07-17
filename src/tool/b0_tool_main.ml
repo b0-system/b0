@@ -38,6 +38,7 @@ let cmd =
   [ B0_cmd_browse.cmd;
     B0_cmd_build.cmd;
     B0_cmd_delete.cmd;
+    B0_cmd_cache.cmd;
     B0_cmd_dir.cmd;
     B0_cmd_edit.cmd;
     B0_cmd_file.cmd;

@@ -130,13 +130,19 @@ module B0_dir : sig
 
     {b FIXME.} Try to get rid of this. *)
 
-  (** {1:build Builds} *)
+  (** {1:build Build directories} *)
+
+  val default_build_dir : b0_dir:Fpath.t -> (Fpath.t, string) result
+  (** [default_build_dir ~b0_dir] is the build directory affected
+      by the cli by default. *)
 
   val build_dir : b0_dir:Fpath.t -> variant:string -> Fpath.t
   (** [build_dir ~b0_dir ~variant] is the designated directory
       for the build variant [variant] in [b0_dir]. *)
 
-  val build_dir_log_file : build_dir:Fpath.t -> Fpath.t
+  (** {1:build Build directory structure} *)
+
+  val log_file : build_dir:Fpath.t -> Fpath.t
 
   val shared_build_dir : build_dir:Fpath.t -> Fpath.t
   (** [shared_build_dir ~build_dir] is the shared directory of [build_dir]

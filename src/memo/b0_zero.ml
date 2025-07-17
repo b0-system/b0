@@ -217,10 +217,9 @@ module File_cache = struct
   let key_dir_of_filename c n =
     String.concat "" [c.dir; n; Fpath.natural_dir_sep]
 
-  let key_dir_to_filename kdir =
-    String.rtake_while (Fun.negate Fpath.is_dir_sep_char) kdir
-
-  let key_dir_to_key kdir = key_of_filename (key_dir_to_filename kdir)
+  let key_dir_to_key kdir =
+    String.rtake_while (Fun.negate Fpath.is_dir_sep_char) @@
+    String.rdrop (String.length key_ext + 1 (* final dir sep *)) kdir
 
   let filename_is_key_dir dir = String.ends_with ~suffix:key_ext dir
 
@@ -451,7 +450,7 @@ module File_cache = struct
     fold_trim_size' ?is_unused c ~max_byte_size ~pct delete ()
 
   let fold_keys_to_trim ?is_unused c ~max_byte_size ~pct f acc =
-    let f acc size kdir = f acc size (key_dir_to_filename kdir) in
+    let f acc size kdir = f acc size (key_dir_to_key kdir) in
     fold_trim_size' ?is_unused c ~max_byte_size ~pct f acc
 end
 
