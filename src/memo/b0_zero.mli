@@ -605,8 +605,12 @@ module Op : sig
 
   val disable_reviving : t -> unit
   (** [disable_reviving o] disables the ability to revive operation
-      [o]. This only works after the hash been effectively computed
-      and set via {!set_hash}, for example in post execution call backs. *)
+      [o]. If [o] has been revived this is a nop. This only works
+      after the hash been effectively computed and set via
+      {!set_hash}, for example in post execution call backs.
+
+      {b FIXME.} This function is dodgy.
+  *)
 
   (** {1:upd Updating the build operation} *)
 

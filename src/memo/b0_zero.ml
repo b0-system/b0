@@ -555,7 +555,8 @@ module Op = struct
   let writes_manifest_root o = o.writes_manifest_root
   let hash o = o.hash
   let supports_reviving o = not (B0_hash.is_nil o.hash)
-  let disable_reviving o = o.hash <- B0_hash.nil
+  let disable_reviving o = if not o.revived then o.hash <- B0_hash.nil
+
   let discard_k o = o.k <- None
   let invoke_k o = match o.k with None -> () | Some k -> discard_k o; k o
   let discard_post_exec o = o.post_exec <- None

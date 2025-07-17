@@ -843,7 +843,9 @@ module Libresolver = struct
         (* FIXME better [name] not found error
            FIXME need to solve the META file read.
            FIXME post exec is still super messy, check if we can make it
-           to use Memo.t *)
+           to use Memo.t
+           FIXME why this mess ?
+        *)
         let ocamlfind = B0_memo.tool m tool in
         let fname, lib, predicates = match Libname.to_string name with
         | "ocaml.threads" | "threads" | "threads.posix" ->

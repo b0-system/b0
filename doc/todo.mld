@@ -2,7 +2,20 @@
 
 - [git grep] [XXX], [TODO] and [FIXME].
 
+
 {1:next Next}
+
+{1:bugs Bugs}
+
+- The ocamlfind library resolver is doing strange stuff on post-execution.
+  Using {!B0_zero.Op.disable_reviving} has now no effect on a revived
+  operation, otherwise we'd get no hashes in the log. If we really
+  wanted to have the real effect we'd need to prune the cache. In
+  any case this would give us logs without hashes for these operations
+  which would needlessly delete stuff on [b0 cache gc]. Note it's
+  a bit unclear whether there's not a problem in reviving `Tee which
+  is used here as a hack as we would end up in the disabling cases.
+  It should be investigated.
 
 {1:b0_std [b0.std] library}
 
