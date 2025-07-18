@@ -217,6 +217,11 @@ module File_cache = struct
   let key_dir_of_filename c n =
     String.concat "" [c.dir; n; Fpath.natural_dir_sep]
 
+  let key_dir_to_filename kdir =
+    String.rtake_while (Fun.negate Fpath.is_dir_sep_char) kdir
+
+  let key_dir_to_key kdir = key_of_filename (key_dir_to_filename kdir)
+
   let filename_is_key_dir dir = String.ends_with ~suffix:key_ext dir
 
   let to_hex_digit n = Char.unsafe_chr @@ n + if n < 10 then 0x30 else 0x61 - 10
@@ -410,34 +415,44 @@ module File_cache = struct
     with
     | Failure e -> Error (err_key "manifest_revive" k e)
 
-  let trim_size ?(is_unused = fun _ -> false) c ~max_byte_size ~pct =
-    try
-      let order ((u0, a0, s0), _) ((u1, a1, s1), _) = match u0, u1 with
+  let fold_trim_size'
+      ?(is_unused = fun _ -> false) c ~max_byte_size ~pct f acc
+    =
+    let rec fold_keys f acc ~current ~budget = function
+    | [] -> acc
+    | _ when current <= budget -> acc
+    | ((_, _, size), kdir) :: kdirs ->
+        fold_keys f (f acc size kdir) ~current:(current - size) ~budget kdirs
+    in
+    let order ((unused0, atime0, size0), _) ((unused1, atime1, size1), _) =
+      match unused0, unused1 with
       | true, false -> -1 (* unused first *)
       | false, true -> 1
       | _ ->
-          match compare (a0 : float) (a1 : float) with (* smaller atime *)
-          | 0 -> compare (s1 : int) (s0 : int) (* greater size *)
+          match Float.compare atime0 atime1 with (* smaller atime *)
+          | 0 -> Int.compare size1 size0 (* greater size *)
           | cmp -> cmp
-      in
+    in
+    try
       let add_key (total_size, ks) fname =
         let key = key_of_filename fname in
         let kdir = key_dir_of_filename c fname in
-        let _, ksize, atime = key_dir_stats kdir in
+        let _file_count, ksize, atime = key_dir_stats kdir in
         (total_size + ksize), ((is_unused key, atime, ksize), kdir) :: ks
       in
       let total_size, ks = fold_key_dir_names c add_key (0, []) in
       let pct_size = truncate @@ (float total_size /. 100.) *. float pct in
-      let budget = (min : int -> int -> int) max_byte_size pct_size in
-      let rec delete_keys current budget = function
-      | [] -> ()
-      | _ when current <= budget -> ()
-      | ((_, _, size), kdir) :: kdirs ->
-          ignore (Fs.dir_delete kdir);
-          delete_keys (current - size) budget kdirs
-      in
-      Ok (delete_keys total_size budget @@ List.sort order ks)
+      let budget = Int.min max_byte_size pct_size in
+      Ok (fold_keys f acc ~current:total_size ~budget @@ List.sort order ks)
     with Failure e -> Error (err "trim size" e)
+
+  let trim_size ?is_unused c ~max_byte_size ~pct =
+    let delete () _size kdir = ignore (Fs.dir_delete kdir); in
+    fold_trim_size' ?is_unused c ~max_byte_size ~pct delete ()
+
+  let fold_keys_to_trim ?is_unused c ~max_byte_size ~pct f acc =
+    let f acc size kdir = f acc size (key_dir_to_filename kdir) in
+    fold_trim_size' ?is_unused c ~max_byte_size ~pct f acc
 end
 
 module Op = struct

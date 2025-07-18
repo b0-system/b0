@@ -161,6 +161,12 @@ module File_cache : sig
       function deletes by order of increasing key access time (see
       {!key_stats}) but unused keys determined by [is_unused] are deleted
       first (defaults to [fun _ -> false]). *)
+
+  val fold_keys_to_trim :
+    ?is_unused:(key -> bool) -> t -> max_byte_size:int -> pct:int ->
+    ('acc -> int -> key -> 'acc) -> 'acc -> ('acc, string) result
+    (** [fold_keys_to_trim] is like {!trim_size} but does not perform
+        deletions, folds over the keys to delete with their byte size. *)
 end
 
 (** Build operations.
