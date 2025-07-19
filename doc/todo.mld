@@ -203,6 +203,12 @@ the build variant level.
 - In the library resolver implement a mecanism that allows
   to specify public/private (scope), deprecation and block policies.
 - [.ocaml findmod MOD], some stuff of `omod` could be integrated.
+- Try to have a better solution for the htmlact-examples. By default
+  on Auto B0_ocaml.wanted we get Native but this also dynamically
+  needs Byte. For now we simply play on Auto's behaviour to get byte
+  aswell but it's unsatisfactory. Static requires and/or build
+  scheme level restrictions should be added. *)
+
 
 {2:b0_srcs [B0_srcs]}
 

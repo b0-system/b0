@@ -9,7 +9,6 @@
 
 open B0_std
 
-
 (** {1:opam [opam]} *)
 
 type t

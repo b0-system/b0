@@ -143,7 +143,8 @@ module Cli = struct
   let cache_dir = B0_memo_cli.File_cache.dir ()
   let code =
     let env = Cmd.Env.info Env.code in
-    let code_enum = ["byte", Some `Byte; "native", Some `Native; "auto", None]in
+    let code_enum =
+      ["byte", Some B0_ocaml.Code.Byte; "native", Some Native; "auto", None]in
     let code = Arg.enum code_enum in
     let docv = "CODE" in
     let doc =
@@ -295,13 +296,14 @@ module Compile = struct
     Fut.return (b0_file_lib, all_libs, seen_libs)
 
   let find_compiler c m = match Conf.code c with
-  | Some (`Byte as c) -> Fut.return (B0_ocaml.Tool.ocamlc, c)
-  | Some (`Native as c) -> Fut.return (B0_ocaml.Tool.ocamlopt, c)
+  | Some (Byte as c) -> Fut.return (B0_ocaml.Tool.ocamlc, c)
+  | Some (Native as c) -> Fut.return (B0_ocaml.Tool.ocamlopt, c)
+  | Some Wasm -> assert false
   | None ->
       let* ocamlopt = B0_memo.tool_opt m B0_ocaml.Tool.ocamlopt in
       match ocamlopt with
-      | None -> Fut.return (B0_ocaml.Tool.ocamlc, `Byte)
-      | Some comp -> Fut.return (B0_ocaml.Tool.ocamlopt, `Native)
+      | None -> Fut.return (B0_ocaml.Tool.ocamlc, B0_ocaml.Code.Byte)
+      | Some comp -> Fut.return (B0_ocaml.Tool.ocamlopt, B0_ocaml.Code.Native)
 
   let compile_src m c ~driver ~build_dir src ~exe =
     let ocaml_conf = Fpath.(build_dir / "ocaml.conf") in
@@ -317,23 +319,26 @@ module Compile = struct
     in
     let src_file = Fpath.(build_dir / "src.ml") in
     let file_api_stamp = match code with (* archive changes when API does *)
-    | `Byte -> Option.to_list (B0_ocaml.Lib.cma b0_file_lib)
-    | `Native -> Option.to_list (B0_ocaml.Lib.cmxa b0_file_lib)
+    | B0_ocaml.Code.Byte -> Option.to_list (B0_ocaml.Lib.cma b0_file_lib)
+    | B0_ocaml.Code.Native -> Option.to_list (B0_ocaml.Lib.cmxa b0_file_lib)
+    | B0_ocaml.Code.Wasm -> assert false
     in
     write_src m c expanded_src ~file_api_stamp ~src_file;
     let writes =
       let base = Fpath.strip_ext ~multi:false src_file in
       let base ext = Fpath.(base + ext) in
       match code with
-      | `Byte -> [base ".cmo"; exe ]
-      | `Native -> [base ".cmx"; base obj_ext; exe ]
+      | B0_ocaml.Code.Byte -> [base ".cmo"; exe ]
+      | B0_ocaml.Code.Native -> [base ".cmx"; base obj_ext; exe ]
+      | B0_ocaml.Code.Wasm -> assert false
     in
     let dirs = List.map B0_ocaml.Lib.dir seen_libs in
     let incs = Cmd.unstamp @@ Cmd.paths ~slip:"-I" dirs in
     let archives =
       let ar = match code with
-      | `Native -> B0_ocaml.Lib.cmxa
-      | `Byte -> B0_ocaml.Lib.cma
+      | B0_ocaml.Code.Native -> B0_ocaml.Lib.cmxa
+      | B0_ocaml.Code.Byte -> B0_ocaml.Lib.cma
+      | B0_ocaml.Code.Wasm -> assert false
       in
       List.filter_map ar all_libs
     in

@@ -116,7 +116,7 @@ let get_link_objs m ~code ~resolver ~requires ~modsrcs =
   Fut.return (lib_objs, mod_objs, lib_jss)
 
 let compile_byte m ~opts ~resolver ~requires ~modsrcs =
-  let code = `Byte in
+  let code = B0_ocaml.Code.Byte in
   let comp = B0_ocaml.Tool.ocamlc in
   let* requires =
     B0_ocaml.Libresolver.get_list_and_exports m resolver requires
@@ -128,7 +128,7 @@ let compile_byte m ~opts ~resolver ~requires ~modsrcs =
   Fut.return ()
 
 let link_byte m ~conf ~opts ~resolver ~requires ~modsrcs ~o =
-  let code = `Byte in
+  let code = B0_ocaml.Code.Byte in
   let* lib_objs, mod_objs, lib_jss =
     get_link_objs m ~code ~resolver ~requires ~modsrcs
   in
@@ -171,7 +171,7 @@ let js_of_byte_objs ~jss ~modsrcs ~o b =
   let global_opts = Cmd.(arg "-g") (* TODO *) in
   let opts = global_opts in
   let* () = compile_byte m ~opts ~resolver ~requires ~modsrcs in
-  let code = `Byte in
+  let code = B0_ocaml.Code.Byte in
   let* lib_objs, mod_objs, lib_jss =
     get_link_objs m ~code ~resolver ~requires ~modsrcs
   in
@@ -262,11 +262,12 @@ let build_setup ~srcs b = (* return a record maybe ? *)
 
 (* Build js executables *)
 
-let exe_proc set_exe_path set_modsrcs srcs b =
-  let* _srcs, modsrcs, jss, js, _html = build_setup ~srcs b in
+let exe_proc set_exe_path set_modsrcs srcs build =
+  let* () = B0_ocaml.Code.check_any ~supported:B0_ocaml.Code.byte ~by:build in
+  let* _srcs, modsrcs, jss, js, _html = build_setup ~srcs build in
   set_modsrcs modsrcs;
   set_exe_path js;
-  js_exe ~modsrcs ~jss ~o:js b
+  js_exe ~modsrcs ~jss ~o:js build
 
 (*
 let node_action build u ~args =
@@ -283,6 +284,12 @@ let node_action build u ~args =
           B0_unit.Action.exec_file build u node_exe cmd
    *)
 
+let restrict =
+  "To bytecode", fun built ->
+    if B0_ocaml.Code.Set.mem Byte built
+    then B0_ocaml.Code.byte
+    else B0_ocaml.Code.none
+
 let meta_base
     ~name ~modsrcs ~tool_name ~public ~requires ~assets_root:ar ~exe_path
   =
@@ -293,8 +300,7 @@ let meta_base
   |> B0_meta.tag B0_ocaml.tag
   |> B0_meta.add_some_or_default B0_ocaml.requires requires
   |> B0_meta.add B0_ocaml.modsrcs modsrcs
-  |> B0_meta.add B0_ocaml.Code.supported `Byte
-  |> B0_meta.add B0_ocaml.Code.needs `Byte
+  |> B0_meta.add B0_ocaml.Code.restrict restrict
   |> B0_meta.tag B0_meta.exe
   |> B0_meta.add B0_unit.tool_name tool_name
   |> B0_meta.add B0_unit.exe_file exe_path
@@ -346,6 +352,7 @@ let copy_html_page_assets ~srcs b =
   copy_assets (B0_build.memo b) srcs ~exts ~assets_root ~dst:build_dir
 
 let html_page_proc ~html_file ~js_file set_modsrcs srcs b =
+  let* () = B0_ocaml.Code.check_any ~supported:B0_ocaml.Code.byte ~by:b in
   let html_file = B0_build.in_current_dir b html_file in
   let js_file = B0_build.in_current_dir b js_file in
   let* srcs = B0_srcs.(Fut.map by_ext @@ select b srcs) in
@@ -386,8 +393,7 @@ let html_page
     |> B0_meta.add_some assets_root aroot
     |> B0_meta.add_some_or_default B0_ocaml.requires requires
     |> B0_meta.add B0_ocaml.modsrcs modsrcs
-    |> B0_meta.add B0_ocaml.Code.supported `Byte
-    |> B0_meta.add B0_ocaml.Code.needs `Byte
+    |> B0_meta.add B0_ocaml.Code.restrict restrict
     |> B0_meta.add B0_show_url.url (`In (`Unit_dir, html_file))
     |> B0_meta.add B0_unit.Action.key B0_show_url.action
   in

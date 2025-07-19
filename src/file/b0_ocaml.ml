@@ -5,10 +5,10 @@
 
 let () = B0_scope.open_lib ~module':__MODULE__ "ocaml"
 
+let ocaml_tag = B0_meta.Key.make_tag "tag" ~doc:"OCaml related entity"
+
 open B0_std
 open Fut.Syntax
-
-let add_if c v l = if c then v :: l else l
 
 module Tool = struct
 
@@ -49,56 +49,119 @@ module Tool = struct
 end
 
 module Code = struct
-  type t = [ `Byte | `Native ]
-  type built = [ `Byte | `Native | `All ]
-
+  type t = Byte | Native | Wasm
   let pp ppf = function
-  | `Byte -> Fmt.string ppf "byte"
-  | `Native -> Fmt.string ppf "native"
+  | Byte -> Fmt.code ppf "byte"
+  | Native -> Fmt.code ppf "native"
+  | Wasm -> Fmt.code ppf "wasm"
 
-  let pp_built ppf = function #t as v -> pp ppf v | `All -> Fmt.string ppf "all"
+  module T = struct type nonrec t = t let compare = Stdlib.compare end
+  module Set = struct
+    include Set.Make (T)
 
-  let needs =
-    let doc = "Needed built code" in
-    let pp_value = pp_built in
-    B0_meta.Key.make "code-needed" ~doc ~pp_value
+    let set_iter = iter
+    let pp_human ppf set = match cardinal set with
+    | 0 -> Fmt.string ppf "no code"
+    | n ->
+        let code = Fmt.cardinal ~one:(Fmt.any "code") () in
+        Fmt.pf ppf "@[%a@ %a@]"
+          code n Fmt.(iter ~sep:comma set_iter pp) set
 
-  let supported =
-    let doc = "Supported built code" in
-    let pp_value = pp_built in
-    B0_meta.Key.make "code-supported" ~default:`All ~doc ~pp_value
+    let pp = Fmt.(box ~indent:1 @@ braces (iter ~sep:comma set_iter pp))
 
-  let needed store memo =
-    let find_need u acc =
-      let need = B0_unit.find_meta needs u in
-      match acc, need with
-      | need, None | None, need -> need
-      | Some `Byte, Some `Byte -> acc (* jsoo use case *)
-      | Some `All, _ -> acc | _, Some `All -> acc
-      | Some `Byte, Some `Native -> Some `All
-      | Some `Native, Some `Native -> acc
-      | Some `Native, Some `Byte -> Some `All
+  end
+  let none = Set.empty
+  let byte = Set.singleton Byte
+  let native = Set.singleton Native
+  let wasm = Set.singleton Wasm
+  let traditional = Set.of_list [Byte; Native]
+  let all = Set.of_list [Byte; Native; Wasm]
+
+
+
+  type wanted = Auto | Wanted of t list
+  let pp_wanted ppf = function
+  | Auto -> Fmt.string ppf "auto"
+  | Wanted wanted -> Set.pp ppf (Set.of_list wanted)
+
+  type restrict = string * (Set.t -> Set.t)
+
+  let restrict =
+    let doc = "Built codes restrictions" in
+    let pp_value = Fmt.(using fst string) in
+    let default = "No restriction", Fun.id in
+    B0_meta.Key.make "code-restrict" ~default ~doc ~pp_value
+
+  let unique_favour_native =
+    "Unique code and favour native",
+    fun built ->
+      if Set.mem Native built then native else
+      (* This will be Byte if it's in the set. *)
+      Set.singleton (Set.min_elt built)
+
+  (* Store keys *)
+
+  let get_restrictions available store memo =
+    let find_restrictions u acc =
+      if not (B0_unit.(has_tag ocaml_tag u && has_tag B0_meta.exe u))
+      then acc else
+      let _doc, restrict = B0_unit.find_or_default_meta restrict u in
+      Set.union acc (restrict available)
     in
     let* build = B0_store.get store B0_build.self in
-    Fut.return (B0_unit.Set.fold find_need (B0_build.may_build build) None)
+    let must = B0_build.must_build build in
+    let built = B0_unit.Set.fold find_restrictions must Set.empty in
+    if Set.is_empty built (* no exe *)
+    then Fut.return available
+    else Fut.return built
 
-  let wanted = B0_store.key (fun _ _ -> Fut.return `Auto)
+  let get_available store memo =
+    (* FIXME we should rely on Conf.t, however it's a bit unclear whether
+       we want to rely on the output of -config or probe executables. *)
+    let* ocamlopt = B0_memo.tool_opt memo Tool.ocamlopt in
+    let set = Set.singleton Byte (* Really always available ? *) in
+    Fut.return (if Option.is_some ocamlopt then Set.add Native set else set)
+
+  let wanted = B0_store.key (fun _ _ -> Fut.return Auto)
   let built =
-    let of_wanted_code s m = function
-    | #built as v -> Fut.return v
-    | `Auto ->
-        let* need = needed s m in
-        match need with
-        | Some need -> Fut.return need
-        | None ->
-            let* ocamlopt = B0_memo.tool_opt m Tool.ocamlopt in
-            Fut.return @@ if Option.is_some ocamlopt then `Native else `Byte
-    in
     let det store memo =
       let* wanted = B0_store.get store wanted in
-      of_wanted_code store memo wanted
+      let* available = get_available store memo in
+      match wanted with
+      | Auto -> get_restrictions available store memo
+      | Wanted codes ->
+          let codes = Set.of_list codes in
+          let unavailable = Set.diff codes available in
+          if Set.is_empty unavailable then Fut.return codes else
+          B0_memo.fail memo
+            "OCaml %a requested but not available."
+            Set.pp_human unavailable
     in
     B0_store.key det
+
+  let check_any ~supported ~by:build =
+    let* built = B0_build.get build built in
+    if not (Set.is_empty (Set.inter supported built)) then Fut.return () else
+    let memo = B0_build.memo build in
+    B0_memo.fail memo
+      "@[<v>@[Not@ buildable.@ The@ build@ procedure@ supports@ %a@ \
+       but@ the@ build@ has@ %a.@ \
+       @[Try@ to@ add@ %a %a@ to@ the@ build.@]@]"
+      Set.pp_human supported Set.pp_human built
+      Fmt.code "-u" Fmt.code (B0_unit.name (B0_build.current build))
+
+  let check_all ~supported ~by:build =
+    let* built = B0_build.get build built in
+    if not (Set.subset supported built) then Fut.return () else
+    let memo = B0_build.memo build in
+    (* FIXME the error advice here may not be sufficient but we don't have
+       the ui for that yet. *)
+    B0_memo.fail memo
+      "@[<v>@[Not@ buildable.@ The@ build@ procedure@ requires@ %a@ \
+       but@ the@ build@ has@ %a.@ \
+       @[Try@ to@ add@ %a %a@ to@ the@ build.@]@]"
+      Set.pp_human supported Set.pp_human built
+      Fmt.code "-u" Fmt.code (B0_unit.name (B0_build.current build));
 end
 
 module Conf = struct
@@ -123,6 +186,7 @@ module Conf = struct
   let obj_ext c = c.obj_ext
   let has_dynlink c = c.has_dynlink
   let to_string_map c = c.fields
+
   let of_string_map fields = try
     let err = Fmt.failwith in
     let err_key k = err "key %a not found." Fmt.code k in
@@ -180,8 +244,8 @@ module Conf = struct
 
   let key : t B0_store.key =
     let conf_comp s m =
-      let of_built_code = function
-      | `Native | `All -> Tool.ocamlopt | `Byte -> Tool.ocamlc
+      let of_built_code built =
+        if Code.Set.mem Native built then Tool.ocamlopt else Tool.ocamlc
       in
       Fut.map of_built_code (B0_store.get s Code.built)
     in
@@ -398,18 +462,22 @@ module Modsrc = struct
         field "ml-deps" ml_deps deps;
         field "build-dir" build_dir Fpath.pp_unquoted ]
 
-  let impl_file ~code m =
-    let file = match code with `Byte -> cmo_file | `Native -> cmx_file in
-    file m
+  let impl_file ~code m = match code with
+  | Code.Byte -> cmo_file m
+  | Code.Native -> cmx_file m
+  | Code.Wasm -> assert false
+
 
   let as_intf_dep_files ?(init = []) m = cmi_file m :: init
   let as_impl_dep_files ?(init = []) ~code m = match code with
-  | `Byte -> cmi_file m :: init
-  | `Native ->
-      match ml m with
+  | Code.Byte -> cmi_file m :: init
+  | Code.Native ->
+      begin match ml m with
       | None -> cmi_file m :: init
       | Some _ when m.opaque -> cmi_file m :: init
       | Some _ -> cmi_file m :: Option.get (cmx_file m) :: init
+      end
+  | Code.Wasm -> assert false
 
   let modname_map m ~kind files =
     let add acc f =
@@ -570,7 +638,7 @@ let libname = Libname.v
 
 (* Metadata *)
 
-let tag = B0_meta.Key.make_tag "tag" ~doc:"OCaml related entity"
+let tag = ocaml_tag
 
 let c_requires =
   let doc = "Required C libraries" in
@@ -1067,8 +1135,8 @@ module Compile = struct
     let stamp = Fpath.basename base (* output depends on mod name *) in
     let reads = ml :: reads in
     let writes =
-      o :: (add_if and_cmt Fpath.(base + ".cmt") @@
-            add_if (not has_cmi) Fpath.(base + ".cmi") [])
+      o :: (List.cons_if and_cmt Fpath.(base + ".cmt") @@
+            List.cons_if (not has_cmi) Fpath.(base + ".cmi") [])
     in
     let incs = incs_of_files reads in
     let bin_annot = Cmd.if' and_cmt (Cmd.arg "-bin-annot") in
@@ -1084,8 +1152,8 @@ module Compile = struct
     let reads = ml :: reads in
     let writes =
       o :: Fpath.(base + ".o") ::
-      (add_if and_cmt Fpath.(base + ".cmt") @@
-       add_if (not has_cmi) Fpath.(base + ".cmi") [])
+      (List.cons_if and_cmt Fpath.(base + ".cmt") @@
+       List.cons_if (not has_cmi) Fpath.(base + ".cmi") [])
     in
     let incs = incs_of_files reads in
     let bin_annot = Cmd.if' and_cmt (Cmd.arg "-bin-annot") in
@@ -1095,7 +1163,10 @@ module Compile = struct
     writes
 
   let ml_to_impl ?post_exec ?k m ~code ~opts ~reads ~has_cmi ~ml ~o ~and_cmt =
-    let ml_to_obj = match code with `Byte -> ml_to_cmo | `Native -> ml_to_cmx in
+    let ml_to_obj = match code with
+    | Code.Byte -> ml_to_cmo | Code.Native -> ml_to_cmx
+    | Code.Wasm -> assert false
+    in
     ml_to_obj ?post_exec ?k m ~opts ~reads ~has_cmi ~ml ~o ~and_cmt
 
   (* Modsrc convenience *)
@@ -1131,11 +1202,13 @@ module Compile = struct
         let src_deps_objs = List.fold_left add_src_dep_objs [] src_deps in
         let ext_objs =
           let add_lib acc l = match code with
-          | `Native ->
+          | Code.Native ->
               List.rev_append (Lib.cmxs l) @@
               List.rev_append (Lib.cmis l) acc
-          | `Byte ->
+          | Code.Byte ->
               List.rev_append (Lib.cmis l) acc
+          | Code.Wasm ->
+              assert false
           in
           List.fold_left add_lib [] requires
         in
@@ -1172,7 +1245,8 @@ module Archive = struct
     let o = Fpath.(odir / cstubs_name oname) in
     let writes =
       Fpath.(odir / cstubs_clib oname lib_ext) ::
-      add_if (Conf.has_dynlink conf) Fpath.(odir / cstubs_dll oname dll_ext) []
+      List.cons_if
+        (Conf.has_dynlink conf) Fpath.(odir / cstubs_dll oname dll_ext) []
     in
     B0_memo.spawn ?post_exec ?k m ~reads:c_objs ~writes @@
     ocamlmklib
@@ -1217,7 +1291,9 @@ module Archive = struct
     writes
 
   let code ?post_exec ?k m ~conf ~opts ~code ~has_cstubs ~cobjs ~odir ~oname =
-    let archive = match code with `Byte -> byte | `Native -> native in
+    let archive = match code with
+    | Code.Byte -> byte | Code.Native -> native | Code.Wasm -> assert false
+    in
     archive ?post_exec ?k m ~conf ~opts ~has_cstubs ~cobjs ~odir ~oname
 
   let native_dynlink ?post_exec ?k m ~conf ~opts ~has_cstubs ~cmxa ~o =
@@ -1310,7 +1386,9 @@ module Link = struct
                   unstamp (incs %% paths c_objs %% paths cobjs))
 
   let code ?post_exec ?k m ~conf ~opts ~code ~c_objs ~cobjs ~o =
-    let linker = match code with `Byte -> byte | `Native -> native in
+    let linker = match code with
+    | Code.Byte -> byte | Code.Native -> native | Code.Wasm -> assert false
+    in
     linker ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~o
 end
 
@@ -1341,14 +1419,12 @@ let compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs =
   Fut.return os
 
 let unit_code b m meta =
-  let* built_code = B0_build.get b Code.built in
-  let _supported_code = B0_meta.find Code.supported meta in
-  let _needs_code = B0_meta.find Code.needs meta in
-  Log.debug (fun m -> m "%a" Code.pp_built built_code);
-  (* TODO *)
-  Fut.return built_code
+  let* built = B0_build.get b Code.built in
+  let _doc, restrict = B0_meta.find_or_default Code.restrict meta in
+  Fut.return (restrict built)
 
 let exe_proc set_exe_path set_modsrcs srcs b =
+  let* () = Code.check_any ~supported:Code.traditional ~by:b in
   let m = B0_build.memo b in
   let build_dir = B0_build.current_dir b in
   let src_root = B0_build.scope_dir b in
@@ -1366,18 +1442,19 @@ let exe_proc set_exe_path set_modsrcs srcs b =
   let opts = Cmd.(arg "-g") (* TODO *) in
   let o = Fpath.(build_dir / (tool_name ^ exe_ext)) in
   set_exe_path o;  (* FIXME introduce a general mecanism for that *)
-  let code = match unit_code with `All | `Native -> `Native |`Byte -> `Byte in
-  let all_code = match unit_code with `All -> true | _ -> false in
-  let comp = match unit_code with
-  | `Native | `All -> Tool.ocamlopt | `Byte -> Tool.ocamlc
+  (* FIXME this can likely be streamlined  *)
+  let code =
+    if Code.Set.mem Native unit_code then Code.Native else Code.Byte
   in
+  let all_code = code = Code.Native && Code.Set.mem Code.Byte unit_code in
+  let comp = if code = Code.Native then Tool.ocamlopt else Tool.ocamlc in
   ignore @@
   Compile.intfs ~and_cmti:true m ~comp ~opts ~requires:comp_requires ~modsrcs;
   ignore @@
   Compile.impls ~and_cmt:true m ~code ~opts ~requires:comp_requires ~modsrcs;
   if all_code then begin
     ignore @@ Compile.impls
-      ~and_cmt:false m ~code:`Byte ~opts ~requires:comp_requires ~modsrcs;
+      ~and_cmt:false m ~code:Byte ~opts ~requires:comp_requires ~modsrcs;
   end;
   let* c_objs = compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs in
   let modsrcs =
@@ -1385,7 +1462,7 @@ let exe_proc set_exe_path set_modsrcs srcs b =
   in
   let* link_requires = Libresolver.get_list_and_deps m resolver requires in
   let archive ~code lib = match code with
-  | `Byte ->
+  | Code.Byte ->
       let c_stubs =
         (* Note we only get something with Libraries from
            the build, the ocamlfind resolver doesn't give us the dlls here
@@ -1393,12 +1470,14 @@ let exe_proc set_exe_path set_modsrcs srcs b =
         List.find_all (Fpath.has_ext (Conf.dll_ext conf)) (Lib.c_stubs lib)
       in
       (match Lib.cma lib with None -> c_stubs | Some cma -> cma :: c_stubs)
-  | `Native ->
+  | Code.Native ->
       let add v l = match v with None -> l | Some v -> v :: l in
       let c_stubs =
         List.find_all (Fpath.has_ext (Conf.lib_ext conf)) (Lib.c_stubs lib)
       in
       add (Lib.cmxa lib) (add (Lib.c_archive lib) c_stubs)
+  | Code.Wasm ->
+      assert false
   in
   let lib_objs = List.concat_map (archive ~code) link_requires in
   let cobjs = List.filter_map (Modsrc.impl_file ~code) modsrcs in
@@ -1409,9 +1488,9 @@ let exe_proc set_exe_path set_modsrcs srcs b =
   Link.code m ~conf ~code ~opts ~c_objs ~cobjs:(lib_objs @ cobjs) ~o;
   if all_code then begin
     let o = Fpath.(build_dir / (tool_name ^ ".byte" ^ exe_ext)) in
-    let lib_objs = List.concat_map (archive ~code:`Byte) link_requires in
-    let cobjs = List.filter_map (Modsrc.impl_file ~code:`Byte) modsrcs in
-    Link.code m ~conf ~code:`Byte ~opts ~c_objs ~cobjs:(lib_objs @ cobjs) ~o
+    let lib_objs = List.concat_map (archive ~code:Byte) link_requires in
+    let cobjs = List.filter_map (Modsrc.impl_file ~code:Byte) modsrcs in
+    Link.code m ~conf ~code:Byte ~opts ~c_objs ~cobjs:(lib_objs @ cobjs) ~o
   end;
   Fut.return ()
 
@@ -1441,6 +1520,7 @@ let script_proc set_exe_path file b =
   Fut.return ()
 
 let lib_proc set_modsrcs set_lib srcs b =
+  let* () = Code.check_any ~supported:Code.traditional ~by:b in
   (* XXX we are still missing cmxs here
      XXX not sure the Archive.code makes the logic easier to understand.
   *)
@@ -1455,21 +1535,22 @@ let lib_proc set_modsrcs set_lib srcs b =
   let libname = B0_meta.get library meta in
   let archive_name = Libname.to_archive_name libname in
   let opts = Cmd.(arg "-g") (* TODO *) in
-  let* built_code = B0_build.get b Code.built in
+  let* unit_code = unit_code b m meta in
   let* conf = B0_build.get b Conf.key in
   let* resolver = B0_build.get b Libresolver.key in
   let* requires = Libresolver.get_list_and_exports m resolver librequires in
-  let code = match built_code with `All | `Native -> `Native |`Byte -> `Byte in
-  let all_code = match built_code with `All -> true | _ -> false in
-  let comp = match built_code with
-  | `Native | `All -> Tool.ocamlopt | `Byte -> Tool.ocamlc
+  (* FIXME this can likely be streamlined  *)
+  let code =
+    if Code.Set.mem Native unit_code then Code.Native else Code.Byte
   in
+  let all_code = code = Code.Native && Code.Set.mem Code.Byte unit_code in
+  let comp = if code = Code.Native then Tool.ocamlopt else Tool.ocamlc in
   let intfs = Compile.intfs ~and_cmti:true m ~comp ~opts ~requires ~modsrcs in
   let impls = Compile.impls ~and_cmt:true m ~code ~opts ~requires ~modsrcs in
   let impls =
     if not all_code then impls else
     let bimpls =
-      Compile.impls ~and_cmt:true m ~code:`Byte ~opts ~requires ~modsrcs
+      Compile.impls ~and_cmt:true m ~code:Byte ~opts ~requires ~modsrcs
     in
     List.rev_append bimpls impls
   in
@@ -1494,9 +1575,9 @@ let lib_proc set_modsrcs set_lib srcs b =
   let ars = Archive.code m ~conf ~code ~opts ~has_cstubs ~cobjs ~odir ~oname in
   let ars =
     if not all_code then ars else
-    let cobjs = List.filter_map (Modsrc.impl_file ~code:`Byte) modsrcs in
+    let cobjs = List.filter_map (Modsrc.impl_file ~code:Byte) modsrcs in
     let bars =
-      Archive.code m ~conf ~code:`Byte ~opts ~has_cstubs ~cobjs ~odir ~oname
+      Archive.code m ~conf ~code:Byte ~opts ~has_cstubs ~cobjs ~odir ~oname
     in
     List.rev_append ars bars
   in
@@ -1539,6 +1620,7 @@ let exe
     |> B0_meta.add_some_or_default requires reqs
     |> B0_meta.add modsrcs fut_modsrcs
     |> B0_meta.add B0_unit.exe_file exe_path
+    |> B0_meta.add Code.restrict Code.unique_favour_native
   in
   let meta = B0_meta.override base ~by:meta in
   let proc = wrap (exe_proc set_exe_path set_modsrcs srcs) in
@@ -1774,7 +1856,7 @@ let lib
     |> B0_meta.add B0_unit.Action.store
        (* XXX the store should be able to depend on the action's
           args so that we can add a `--nat` option. *)
-      B0_store.[B (Code.built, Fut.return `Byte)]
+      B0_store.[B (Code.built, Fut.return (Code.Set.singleton Code.Byte))]
   in
   let meta = B0_meta.override base ~by:meta in
   let proc = wrap (lib_proc set_modsrcs set_lib srcs) in
@@ -1821,8 +1903,11 @@ let deprecated_lib
 (* Compiled object information *)
 
 module Cobj = struct
-  let archive_ext_of_code = function `Byte -> ".cma" | `Native -> ".cmxa"
-  let object_ext_of_code = function `Byte -> ".cmo" | `Native -> ".cmx"
+  let archive_ext_of_code = function
+  | Code.Byte -> ".cma" | Code.Native -> ".cmxa" | Code.Wasm -> assert false
+
+  let object_ext_of_code = function
+  | Code.Byte -> ".cmo" | Code.Native -> ".cmx" | Code.Wasm -> assert false
 
   type t =
     { file : Fpath.t;
@@ -2314,7 +2399,7 @@ let ocaml_ocaml_cmd env u =
 
 let unit_repl =
   let doc = "Load your build in the ocaml REPL" in
-  let store = B0_store.[B (Code.built, Fut.return `Byte)] in
+  let store = B0_store.[B (Code.built, Fut.return (Code.Set.singleton Byte))] in
   B0_unit.of_cmdliner_cmd ~store "repl" ocaml_ocaml_cmd ~doc
 
 let () = B0_scope.close ()
