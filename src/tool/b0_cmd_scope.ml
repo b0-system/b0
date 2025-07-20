@@ -32,7 +32,9 @@ let get_scopes _conf ~topmost ~includes ~excludes =
   in
   List.filter keep scopes
 
-let exec_when ~cond ~topmost ~includes ~excludes ~keep_going ~cmd conf =
+let exec_when
+    ~prefix_mode ~cond ~topmost ~includes ~excludes ~keep_going ~cmd conf
+  =
   let err (_, dir) e =
     Log.err (fun m -> m "@[%a: %s@]" pp_dir dir e); Os.Exit.some_error
   in
@@ -43,18 +45,38 @@ let exec_when ~cond ~topmost ~includes ~excludes ~keep_going ~cmd conf =
       | Error e -> err s e
       | Ok false -> loop ss
       | Ok true ->
-          Log.stdout (fun m -> m "@[%a: %a@]" pp_name name pp_dir dir);
-          match Os.Cmd.run ~cwd:dir cmd with
-          | Error e when not keep_going -> err s e
-          | Error _
-          | Ok () -> Log.stdout (fun m -> m ""); loop ss
+          if not prefix_mode then begin
+            Log.stdout (fun m -> m "@[%a: %a@]" pp_name name pp_dir dir);
+            match Os.Cmd.run ~cwd:dir cmd with
+            | Error e when not keep_going -> err s e
+            | Error _
+            | Ok () -> Log.stdout (fun m -> m ""); loop ss
+          end else begin
+            match Os.Cmd.run_out ~trim:false ~cwd:dir cmd with
+            | Error e when not keep_going -> err s e
+            | Error _ -> loop ss
+            | Ok out ->
+                let dir = Fpath.ensure_trailing_dir_sep dir in
+                let dir = Fmt.str "%a" Fpath.pp_unquoted dir in
+                let print_line _ () l =
+                  if l = "" then
+                    (* No line here according POSIX's text file convention. *)
+                    ()
+                  else (print_string dir; print_string l)
+                in
+                String.fold_ascii_lines ~strip_newlines:false print_line () out;
+                loop ss
+          end
   in
   loop (get_scopes conf ~topmost ~includes ~excludes)
 
-let exec ~topmost ~includes ~excludes ~keep_going ~tool ~tool_args conf =
+let exec
+    ~prefix_mode ~topmost ~includes ~excludes ~keep_going ~tool ~tool_args conf
+  =
   let cmd = Cmd.list (tool :: tool_args) in
   let cond = Fun.const (Ok true) in
-  exec_when ~cond ~topmost ~includes ~excludes ~keep_going ~cmd conf
+  exec_when
+    ~prefix_mode ~cond ~topmost ~includes ~excludes ~keep_going ~cmd conf
 
 let list ~topmost ~includes ~excludes ~output_details ~path conf =
   let pp_scope =
@@ -103,7 +125,10 @@ let symlink ~topmost ~includes ~excludes ~dir ~rm conf =
   let* () = List.iter_stop_on_error op scopes in
   Ok Os.Exit.ok
 
-let vcs ~topmost ~includes ~excludes ~all ~keep_going ~vcs_kind ~vcs_args conf =
+let vcs
+    ~prefix_mode ~topmost ~includes ~excludes ~all ~keep_going ~vcs_kind
+    ~vcs_args conf
+  =
   let cmd = match vcs_kind with
   | B0_vcs_repo.Git -> Cmd.(arg "git" %% list vcs_args)
   | B0_vcs_repo.Hg -> Cmd.(arg "hg" %% list vcs_args)
@@ -113,7 +138,9 @@ let vcs ~topmost ~includes ~excludes ~all ~keep_going ~vcs_kind ~vcs_args conf =
   | Ok (Some vcs) -> if all then Ok true else B0_vcs_repo.is_dirty vcs
   | Error _ as e -> e
   in
-  exec_when ~cond:is_vcs_kind ~topmost ~includes ~excludes ~keep_going ~cmd conf
+  exec_when
+    ~prefix_mode ~cond:is_vcs_kind ~topmost ~includes ~excludes ~keep_going
+    ~cmd conf
 
 (* Command line interface *)
 
@@ -157,6 +184,14 @@ let all =
   let doc = "Apply command to all VCS scopes, not only those that are dirty." in
   Arg.(value & flag & info ["a"; "all"] ~doc)
 
+let prefix_mode =
+  let doc =
+    "Rewrite standard output of invocation by prefixing the scope directory on \
+     each line. Useful for $(b,git grep) which doesn't seem to \
+     have an option to print absolute paths."
+  in
+  Arg.(value & flag & info ["p"; "prefix-scope-dir"] ~doc)
+
 let vcs_kind =
   let vcss = ["git", B0_vcs_repo.Git; "hg", B0_vcs_repo.Hg] in
   let doc =
@@ -193,9 +228,9 @@ let exec =
     select_doc ]
   in
   B0_tool_cli.cmd_with_b0_file "exec" ~doc ~synopsis ~descr @@
-  let+ topmost and+ includes and+ excludes and+ keep_going and+ tool
-  and+ tool_args in
-  exec ~topmost ~includes ~excludes ~keep_going ~tool ~tool_args
+  let+ prefix_mode and+ topmost and+ includes and+ excludes and+ keep_going
+  and+ tool and+ tool_args in
+  exec ~prefix_mode ~topmost ~includes ~excludes ~keep_going ~tool ~tool_args
 
 let list =
   let doc = "List scopes" in
@@ -259,16 +294,17 @@ let vcs =
       `P "$(cmd) $(b,-- git commit -m 'Cope with changes!')"; `Noblank;
       `P "$(cmd) $(b,-a -- git push)";
       `P "Or:";
-      `P "$(cmd) $(b,-q -a -- git grep) $(i,PATTERN)";
+      `P "$(cmd) $(b,-a -p -- git grep --color) $(i,PATTERN)";
       `P "The process continues if $(i,VCS) returns with a non-zero exit \
           code, use the option $(b,--fail-stop) to prevent that.";
       select_doc;
     ]
   in
   B0_tool_cli.cmd_with_b0_file "vcs" ~doc ~synopsis ~descr @@
-  let+ topmost and+ includes and+ excludes and+ all and+ keep_going
-  and+ vcs_kind and+ vcs_args = tool_args in
-  vcs ~topmost ~includes ~excludes ~all ~keep_going ~vcs_kind ~vcs_args
+  let+ prefix_mode and+ topmost and+ includes and+ excludes and+ all
+  and+ keep_going and+ vcs_kind and+ vcs_args = tool_args in
+  vcs ~prefix_mode ~topmost ~includes ~excludes ~all ~keep_going ~vcs_kind
+    ~vcs_args
 
 let cmd =
   let doc = "Operate on scopes" in
