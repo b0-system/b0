@@ -1185,9 +1185,9 @@ val unit : B0_unit.t
 
     See [b0 -- .ocaml --help] for more information. *)
 
-val unit_ocaml : B0_unit.t
-(** [unit_ocaml] is the [.ocaml.ocaml] action. The action of this unit
+val unit_repl : B0_unit.t
+(** [unit_repl] is the [.ocaml.repl] action. The action of this unit
     forces a byte code build and loads the resulting build in the
     [ocaml] toplevel.
 
-    See [b0 -- .ocaml.ocaml --help] for more information. *)
+    See [b0 -- .ocaml.repl --help] for more information. *)

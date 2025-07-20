@@ -129,7 +129,7 @@ the [wrap] parameter to units.
   group command. E.g. it would be nice to have everything for [ocaml]
   under [.ocaml] but `.ocaml ocaml` will want a byte code build and
   `.ocaml ocamlnat` will want a native code build. So for now we have
-  `.ocaml.ocaml`.
+  `.ocaml.repl`.
 
 - Access control. Maybe actions accessing the full builds opens a can
   of worms (or not) we could try to enforce more access control via

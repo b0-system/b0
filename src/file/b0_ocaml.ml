@@ -2299,7 +2299,7 @@ let ocaml_ocaml_cmd env u =
   let man =
     [ `S Cmdliner.Manpage.s_synopsis;
       `P "$(b,b0) [$(b,-p) $(i,PACK)]… [$(b,-u) $(i,UNIT)]… \
-          -- .ocaml.ocaml [$(i,OPTION)]… -- $(i,ARG)…";
+          -- .ocaml.repl [$(i,OPTION)]… -- $(i,ARG)…";
       `S Cmdliner.Manpage.s_description;
       `P "$(cmd) loads the build you specify for the action \
           in the $(b,ocaml) interactive toplevel. This also \
@@ -2312,9 +2312,9 @@ let ocaml_ocaml_cmd env u =
   Cmd.make (Cmd.info name ~doc ~man) @@
   run_ocaml_term ocaml env
 
-let unit_ocaml =
+let unit_repl =
   let doc = "Load your build in the ocaml REPL" in
   let store = B0_store.[B (Code.built, Fut.return `Byte)] in
-  B0_unit.of_cmdliner_cmd ~store "ocaml" ocaml_ocaml_cmd ~doc
+  B0_unit.of_cmdliner_cmd ~store "repl" ocaml_ocaml_cmd ~doc
 
 let () = B0_scope.close ()
