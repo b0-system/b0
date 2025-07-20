@@ -27,20 +27,13 @@ depends: [
   "topkg" {build & >= "1.0.3"}
   "cmdliner" {>= "1.3.0"}
 ]
-build: ["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]
-install: [
-  [
-    "cp"
-    "_build/src/std/dllb0_stubs.so" {os != "win32"}
-    "_build/src/std/dllb0_stubs.dll" {os = "win32"}
-    "."
-  ] {!ocaml:native}
+build: [
+  ["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]
   [
     "cmdliner"
     "install"
     "tool-support"
-    "--mandir=%{man}%"
-    "--sharedir=%{share}%"
+    "--update-opam-install=%{_:name}%.install"
     "_build/src/tool/b0_tool_main_run.native:b0" {ocaml:native}
     "_build/src/tool/b0_tool_main_run.byte:b0" {!ocaml:native}
     "_build/src/lowtools/show_url.native:show-url" {ocaml:native}
@@ -53,7 +46,7 @@ install: [
     "_build/src/lowtools/b0_log_tool.byte:b0-log" {!ocaml:native}
     "_build/src/lowtools/b0_sttyle.native:b0-sttyle" {ocaml:native}
     "_build/src/lowtools/b0_sttyle.byte:b0-sttyle" {!ocaml:native}
-    "%{prefix}%"
+    "_build/cmdliner-install"
   ]
 ]
 dev-repo: "git+https://erratique.ch/repos/b0.git"

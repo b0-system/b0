@@ -156,37 +156,22 @@ let default =
     |> ~~ B0_meta.description_tags
       ["dev"; "org:erratique"; "org:b0-system"; "build"]
     |> ~~ B0_opam.build
-      {|[["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]]|}
-   (*
-    |> ~~ B0_opam.build_env
-      (* This doesn't seem to work see
-         https://github.com/ocaml/opam/issues/6574
-         this means the install: step is currently broken
-         in bytecode only switches. *)
-      {| [[CAML_LD_LIBRARY_PATH += "_build/src/std"]]|} *)
-    |> ~~ B0_opam.install
-      {|
-        [
-         # See https://github.com/ocaml/opam/issues/6574
-         ["cp" "_build/src/std/dllb0_stubs.so"  {os != "win32"}
-               "_build/src/std/dllb0_stubs.dll" {os = "win32"}
-               "."] {!ocaml:native}
-         ["cmdliner" "install" "tool-support"
-         "--mandir=%{man}%"
-         "--sharedir=%{share}%"
-         "_build/src/tool/b0_tool_main_run.native:b0" {ocaml:native}
-         "_build/src/tool/b0_tool_main_run.byte:b0" {!ocaml:native}
-         "_build/src/lowtools/show_url.native:show-url" {ocaml:native}
-         "_build/src/lowtools/show_url.byte:show-url" {!ocaml:native}
-         "_build/src/lowtools/b0_cache_tool.native:b0-cache" {ocaml:native}
-         "_build/src/lowtools/b0_cache_tool.byte:b0-cache" {!ocaml:native}
-         "_build/src/lowtools/b0_hash_tool.native:b0-hash" {ocaml:native}
-         "_build/src/lowtools/b0_hash_tool.byte:b0-hash" {!ocaml:native}
-         "_build/src/lowtools/b0_log_tool.native:b0-log" {ocaml:native}
-         "_build/src/lowtools/b0_log_tool.byte:b0-log" {!ocaml:native}
-         "_build/src/lowtools/b0_sttyle.native:b0-sttyle" {ocaml:native}
-         "_build/src/lowtools/b0_sttyle.byte:b0-sttyle" {!ocaml:native}
-         "%{prefix}%"]] |}
+      {|[["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]
+         [ "cmdliner" "install" "tool-support"
+           "--update-opam-install=%{_:name}%.install"
+           "_build/src/tool/b0_tool_main_run.native:b0" {ocaml:native}
+           "_build/src/tool/b0_tool_main_run.byte:b0" {!ocaml:native}
+           "_build/src/lowtools/show_url.native:show-url" {ocaml:native}
+           "_build/src/lowtools/show_url.byte:show-url" {!ocaml:native}
+           "_build/src/lowtools/b0_cache_tool.native:b0-cache" {ocaml:native}
+           "_build/src/lowtools/b0_cache_tool.byte:b0-cache" {!ocaml:native}
+           "_build/src/lowtools/b0_hash_tool.native:b0-hash" {ocaml:native}
+           "_build/src/lowtools/b0_hash_tool.byte:b0-hash" {!ocaml:native}
+           "_build/src/lowtools/b0_log_tool.native:b0-log" {ocaml:native}
+           "_build/src/lowtools/b0_log_tool.byte:b0-log" {!ocaml:native}
+           "_build/src/lowtools/b0_sttyle.native:b0-sttyle" {ocaml:native}
+           "_build/src/lowtools/b0_sttyle.byte:b0-sttyle" {!ocaml:native}
+           "_build/cmdliner-install" ]]|}
     |> ~~ B0_opam.depends [
       "ocaml", {|>= "4.14.0"|};
       "ocamlfind", {|build|};
