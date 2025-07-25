@@ -752,7 +752,7 @@ module Op = struct
       | Sys.Break as e -> raise e
       | e ->
           let bt = Printexc.get_raw_backtrace () in
-          Fmt.error "[@<v>Write function raised:@,%a@]"
+          Fmt.error "@[<v>Write function raised:@,%a@]"
             Fmt.exn_backtrace (e, bt)
 
     let make_op
