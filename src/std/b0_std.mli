@@ -82,7 +82,9 @@ end
 (** Blocking values.
 
     {b Note.} In direct style the {!Fut.t} values would go away.
-    For now be bundled lazy blocking values in the same structure. *)
+    For now be bundled lazy blocking values in the same structure.
+
+    {b Note.} This is an IVar. *)
 module Bval : sig
 
   type 'a setter

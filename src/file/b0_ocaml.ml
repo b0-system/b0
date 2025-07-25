@@ -77,8 +77,6 @@ module Code = struct
   let traditional = Set.of_list [Byte; Native]
   let all = Set.of_list [Byte; Native; Wasm]
 
-
-
   type wanted = Auto | Wanted of t list
   let pp_wanted ppf = function
   | Auto -> Fmt.string ppf "auto"

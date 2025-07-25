@@ -130,6 +130,7 @@ B0_srcs
 
 {!modules:
 B0_build
+B0_build_kit
 B0_def
 B0_env
 B0_meta

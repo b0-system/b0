@@ -190,11 +190,25 @@ the [wrap] parameter to units.
 
 It's a bit unclear whether we don't want to merge [B0_meta]
 and [B0_store] perhaps at the expense of more complex
-[B0_meta.Key].
+[B0_meta.Key]. Another take is to merge [B0_store] into
+memo.
 
 Also for now only actions can mandate store bindings (e.g. to request
 a bytecode build). This should of course be user definable, likely at
 the build variant level.
+
+- The B0_store is also useful for storing stuff that multiple
+
+- The {!B0_build.self} hack is a bit dangerous some of the
+  function on the build value depend on current unit. But the build
+  value has (rightly) no current unit.
+- It seem we often wish to depend on the build. But we need to
+  be careful the store is global so e.g. if we want to store
+  the VCS describe of a scope we cannot store it as a single
+  key. Should store keys be scoped ? (Think local thread storage).
+- Another thing is to sort out the relation ship to {!B0_std.Bval}.
+  For consumers the keys in [B0_store] act like a {!B0_std.Bval},
+  it's just that access triggers its computation.
 
 {2:b0_ocaml [B0_ocaml]}
 
