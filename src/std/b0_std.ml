@@ -106,6 +106,19 @@ module Bval = struct
       (match Fut.value fut with None -> set v; true | Some _ -> false)
   | _ -> assert false
 
+  let try_set' s f = match s with
+  | Fut (fut, set) ->
+      begin match Fut.value fut with
+      | Some _ -> false
+      | None ->
+          let v = f () in
+          match Fut.value fut with
+          | Some _ -> false
+          | None -> set v; true
+      end
+  | _ -> assert false
+
+
   (* Getting *)
 
   let get = function

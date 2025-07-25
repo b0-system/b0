@@ -122,6 +122,11 @@ module Bval : sig
   (** [try_set s v] is [true] if [iv] was set to [v] and [false]
       if [iv] was already set. *)
 
+  val try_set' : 'a setter -> (unit -> 'a) -> bool
+  (** [try_set' s f] is [true] if [iv] was set to [f ()] and [false]
+      if [iv] was already set, in the latter case [f] may be or may
+      not have been called. *)
+
   (** {1:getting Getting} *)
 
   val get : 'a t -> 'a Fut.t
