@@ -266,45 +266,45 @@ let subrange ?(first = 0) ?last s =
 
 (* Breaking with magnitudes *)
 
-let take n s = subrange ~last:(n - 1) s
-let drop n s = subrange ~first:n s
-let cut n s = (take n s, drop n s)
-let rtake n s = subrange ~first:(length s - n) s
-let rdrop n s = subrange ~last:(length s - n - 1) s
-let rcut n s = (rdrop n s, rtake n s)
+let take_first n s = subrange ~last:(n - 1) s
+let drop_first n s = subrange ~first:n s
+let cut_first n s = (take_first n s, drop_first n s)
+let take_last n s = subrange ~first:(length s - n) s
+let drop_last n s = subrange ~last:(length s - n - 1) s
+let cut_last n s = (drop_last n s, take_last n s)
 
 (* Breaking with predicates *)
 
-let take_while sat s =
+let take_first_while sat s =
   let len = length s and i = ref 0 in
   while !i < len && sat (unsafe_get s !i) do incr i done;
   if !i = len then s else sub s 0 !i
 
-let drop_while sat s =
+let drop_first_while sat s =
   let len = length s and i = ref 0 in
   while !i < len && sat (unsafe_get s !i) do incr i done;
   if !i = 0 then s else sub s !i (len - !i)
 
-let cut_while sat s =
+let cut_first_while sat s =
   let len = length s and i = ref 0 in
   while !i < len && sat (unsafe_get s !i) do incr i done;
   if !i = len then s, "" else
   if !i = 0 then "", s else
   sub s 0 !i, sub s !i (len - !i)
 
-let rtake_while sat s =
+let take_last_while sat s =
   let len = length s in
   let i = ref (len - 1) in
   while !i >= 0 && sat (unsafe_get s !i) do decr i done;
   if !i < 0 then s else sub s (!i + 1) (len - (!i + 1))
 
-let rdrop_while sat s =
+let drop_last_while sat s =
   let len = length s in
   let i = ref (len - 1) in
   while !i >= 0 && sat (unsafe_get s !i) do decr i done;
   if !i < 0 then "" else sub s 0 (!i + 1)
 
-let rcut_while sat s =
+let cut_last_while sat s =
   let len = length s in
   let i = ref (len - 1) in
   while !i >= 0 && sat s.[!i] do decr i done;

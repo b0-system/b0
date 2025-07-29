@@ -125,51 +125,53 @@ val subrange : ?first:int -> ?last:int -> string -> string
 
 (** {2:break_mag Breaking with magnitudes} *)
 
-val take : int -> string -> string
-(** [take n s] are the first [n] bytes of [s]. This is [s] if
+val take_first : int -> string -> string
+(** [take_first n s] are the first [n] bytes of [s]. This is [s] if
     [n >= length s] and [""] if [n <= 0]. *)
 
-val rtake : int -> string -> string
-(** [rtake n s] are the last [n] bytes of [s].  This is [s] if
+val take_last : int -> string -> string
+(** [take_last n s] are the last [n] bytes of [s].  This is [s] if
     [n >= length s] and [""] if [n <= 0]. *)
 
-val drop : int -> string -> string
-(** [drop n s] is [s] without the first [n] bytes of [s]. This is [""]
+val drop_first : int -> string -> string
+(** [drop_first n s] is [s] without the first [n] bytes of [s]. This is [""]
     if [n >= length s] and [s] if [n <= 0]. *)
 
-val rdrop : int -> string -> string
-(** [rdrop n s] is [s] without the last [n] bytes of [s]. This is [""]
+val drop_last : int -> string -> string
+(** [drop_last n s] is [s] without the last [n] bytes of [s]. This is [""]
     if [n >= length s] and [s] if [n <= 0]. *)
 
-val cut : int -> string -> string * string
-(** [cut n v] is [(take n v, drop n v)]. *)
+val cut_first : int -> string -> string * string
+(** [cut_first n v] is [(take_first n v, drop_first n v)]. *)
 
-val rcut : int -> string -> string * string
-(** [rcut n v] is [(rdrop n v, rtake n v)]. *)
+val cut_last : int -> string -> string * string
+(** [cut_last n v] is [(drop_last n v, take_last n v)]. *)
 
 (** {2:break_pred Breaking with predicates} *)
 
-val take_while : (char -> bool) -> string -> string
-(** [take_while sat s] are the first consecutive [sat] statisfying
+val take_first_while : (char -> bool) -> string -> string
+(** [take_first_while sat s] are the first consecutive [sat] statisfying
     bytes of [s]. *)
 
-val rtake_while : (char -> bool) -> string -> string
-(** [keep_right sat s] are the last consecutive [sat] satisfying
+val take_last_while : (char -> bool) -> string -> string
+(** [take_last_while sat s] are the last consecutive [sat] satisfying
     bytes of [s]. *)
 
-val drop_while : (char -> bool) -> string -> string
-(** [drop_while sat s] is [s] without the first consecutive [sat]
+val drop_first_while : (char -> bool) -> string -> string
+(** [drop_first_while sat s] is [s] without the first consecutive [sat]
     satisfying bytes of [s]. *)
 
-val rdrop_while : (char -> bool) -> string -> string
-(** [rdrop_while sat s] is [s] without the last consecutive [sat]
+val drop_last_while : (char -> bool) -> string -> string
+(** [drop_last_while sat s] is [s] without the last consecutive [sat]
     satisfying bytes of [s]. *)
 
-val cut_while : (char -> bool) -> string -> string * string
-(** [cut_while sat s] is [(take_while sat s, drop_while sat s)]. *)
+val cut_first_while : (char -> bool) -> string -> string * string
+(** [cut_first_while sat s] is
+    [(take_first_while sat s, drop_first_while sat s)]. *)
 
-val rcut_while : (char -> bool) -> string -> string * string
-(** [rspan_while sat s] is [(rdrop_while sat s, rtake_while sat s)]. *)
+val cut_last_while : (char -> bool) -> string -> string * string
+(** [cut_last_while sat s] is
+    [(drop_last_while sat s, take_last_while sat s)]. *)
 
 (** {2:break_sep Breaking with separators} *)
 

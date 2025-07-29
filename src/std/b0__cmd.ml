@@ -87,20 +87,22 @@ let of_string s =
     let err_unclosed kind _ =
       B0__fmt.failwith "unclosed %s quote delimited string" kind
     in
-    let skip_white s = B0__string.drop_while B0__char.Ascii.is_white s in
+    let skip_white s =
+      B0__string.drop_first_while B0__char.Ascii.is_white s
+    in
     let tok_sep c = c = '\'' || c = '\"' || B0__char.Ascii.is_white c in
     let tok_char c = not (tok_sep c) in
     let not_squote c = c <> '\'' in
     let tail s = (* Yikes *) B0__string.subrange ~first:1 s in
     let parse_squoted s =
-      let tok, rem = B0__string.cut_while not_squote (tail s) in
+      let tok, rem = B0__string.cut_first_while not_squote (tail s) in
       if not (String.equal rem "") then tok, tail rem else
       err_unclosed "single" s
     in
     let parse_dquoted acc s =
     let is_data = function '\\' | '"' -> false | _ -> true in
     let rec loop acc s =
-      let data, rem = B0__string.cut_while is_data s in
+      let data, rem = B0__string.cut_first_while is_data s in
       match B0__string.head rem with
       | Some '"' -> (data :: acc), (tail rem)
       | Some '\\' ->
@@ -132,7 +134,8 @@ let of_string s =
           let acc, rem = parse_dquoted acc s in loop acc rem
       | Some c ->
           let sat = tok_char in
-          let tok, rem = B0__string.cut_while sat s in loop (tok :: acc) rem
+          let tok, rem = B0__string.cut_first_while sat s in
+          loop (tok :: acc) rem
       in
       loop [] s
     in
