@@ -828,8 +828,10 @@ module Libresolver = struct
       | requires ->
           let to_libname = parse_field "required library" Libname.of_string in
           (* ocamlfind does not normalize *)
-          let skip_ws = String.drop_while Char.Ascii.is_white in
-          let get_tok = String.cut_while (Fun.negate Char.Ascii.is_white) in
+          let skip_ws = String.drop_first_while Char.Ascii.is_white in
+          let get_tok =
+            String.cut_first_while (Fun.negate Char.Ascii.is_white)
+          in
           let rec rev_toks acc s =
             let s = skip_ws s in
             match get_tok s with
@@ -1979,7 +1981,7 @@ module Cobj = struct
   let file_prefix = "File "
   let parse_file_path (n, line) =
     let len = String.length file_prefix in
-    match Fpath.of_string (String.drop len line) with
+    match Fpath.of_string (String.drop_first len line) with
     | Ok file -> file
     | Error e -> Fmt.failwith_line n " %s" e
 

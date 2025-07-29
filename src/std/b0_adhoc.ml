@@ -10,7 +10,7 @@ open B0_std
 let commonmark_first_section ~preamble md =
   let atx_heading s (* trimmed *) =
     (* approximate https://spec.commonmark.org/0.29/#atx-headings *)
-    let num, title = String.cut_while (Char.equal '#') s in
+    let num, title = String.cut_first_while (Char.equal '#') s in
     let num = String.length num and tlen = String.length title in
     if num = 0 || num > 6 then None else
     if tlen = 0 then Some (num, "") else

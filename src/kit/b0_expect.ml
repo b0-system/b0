@@ -206,7 +206,7 @@ let outcome_of_file ?(diff = true) ctx file =
       let git = B0_vcs_repo.repo_cmd ctx.vcs_repo in
       let cmd = Cmd.(git % "status" % "--porcelain" %% path file) in
       let status = Os.Cmd.run_out ~trim:false cmd |> result_to_abort in
-      let status = match String.take 2 status with
+      let status = match String.take_first 2 status with
       | "" -> `Expected
       | "M " | "A " -> `Corrected
       | "??" -> `New
