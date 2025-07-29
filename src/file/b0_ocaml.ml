@@ -59,6 +59,7 @@ module Code = struct
   module Set = struct
     include Set.Make (T)
 
+    let to_list = elements (* only in >= 5.1 *)
     let set_iter = iter
     let pp_human ppf set = match cardinal set with
     | 0 -> Fmt.string ppf "no code"
