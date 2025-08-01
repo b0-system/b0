@@ -66,6 +66,7 @@ B0_hash
 B0_adhoc
 B0_base64
 B0_bincode
+B0_dot
 B0_http
 B0_html
 B0_json

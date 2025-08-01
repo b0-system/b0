@@ -366,6 +366,7 @@ v}
 - Profile stuff
   {v xcrun xctrace record --template='Time Profiler' --launch -- \
   $(b0 --path -- zipc unzip -t tmp/ebook.epub) v}
+  Also checkout the CPU profiler.
 
 - Add [b0 cache], for trim support [--fit-build] as an alias to [gc]
   or mention [gc] in the docs. In [b0-cache] we need multiple log
