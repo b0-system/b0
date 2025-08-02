@@ -51,6 +51,10 @@ val atts : [`Graph | `Node | `Edge] -> att seq -> st seq
 val att : string -> string -> att seq
 (** [att k v] is attribute [k] with value [v]. *)
 
+val att_html : string -> string -> att seq
+(** [att_html k v] is an {{:https://graphviz.org/doc/info/shapes.html#html}
+    HTML-like} label [v] for [k]. *)
+
 val label : string -> att seq
 (** [label l] is label attribute [l]. *)
 

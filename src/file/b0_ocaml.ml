@@ -608,6 +608,8 @@ module Libname = struct
     match String.split_last ~sep:Fpath.natural_dir_sep n with
     | None -> n | Some (_, n) -> n
 
+  let name n = fpath_to_name n.name
+
   let root n =
     let n = Fpath.to_string n.name in
     match String.split_first ~sep:Fpath.natural_dir_sep n with
@@ -2061,11 +2063,13 @@ module Cobj = struct
     try Ok (parse_files [] (List.rev rev_lines)) with
     | Failure e -> Fpath.error file "%s" e
 
+  let ocamlobjinfo_args = Cmd.(arg "-no-approx" % "-no-code")
+
   let write m ~cobjs ~o =
     (* FIXME add [src_root] so that we can properly unstamp. *)
     let ocamlobjinfo = B0_memo.tool m Tool.ocamlobjinfo in
     B0_memo.spawn m ~reads:cobjs ~writes:[o] ~stdout:(`File o) @@
-    ocamlobjinfo Cmd.(arg "-no-approx" % "-no-code" %% paths cobjs)
+    ocamlobjinfo Cmd.(ocamlobjinfo_args %% paths cobjs)
 
   let read m file =
     let* s = B0_memo.read m file in
@@ -2138,6 +2142,330 @@ let list format pager_don't =
   in
   Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list ~sep pp_lib) us);
   Os.Exit.ok
+
+module Digest_dag = struct
+  (* Maps digest to the digests of their dependencies. *)
+  type t = String.Set.t String.Map.t
+
+  let transitive_reduction graph =
+    (* For each vertex [v] of [graph], walk the direct successors of
+       [v] and remove the visited elements from the successors of [v]. *)
+    let rec prune_reachable graph ~seen ~to_prune ~todo =
+      match String.Set.choose_opt todo with
+      | None -> seen, to_prune
+      | Some u ->
+          let todo = String.Set.remove u todo in
+          let to_prune = String.Set.remove u to_prune in
+          if String.Set.mem u seen
+          then prune_reachable graph ~seen ~to_prune ~todo else
+            let seen = String.Set.add u seen in
+            match String.Map.find_opt u graph with
+            | None -> prune_reachable graph ~seen ~to_prune ~todo
+            | Some u_succs ->
+                let add_succ succ todo =
+                  if String.Set.mem succ seen then todo else
+                  String.Set.add succ todo
+                in
+                let todo = String.Set.fold add_succ u_succs todo in
+                prune_reachable graph ~seen ~to_prune ~todo
+    in
+    let rec walk_direct_succs graph ~seen ~to_prune ~todo =
+      match String.Set.choose_opt todo with
+      | None -> to_prune
+      | Some u ->
+          let todo = String.Set.remove u todo in
+          if String.Set.mem u seen
+          then walk_direct_succs graph ~seen ~to_prune ~todo else
+          let seen = String.Set.add u seen in
+          match String.Map.find_opt u graph with
+          | None -> walk_direct_succs graph ~seen ~to_prune ~todo
+          | Some u_succs ->
+              let seen, to_prune =
+                prune_reachable graph ~seen ~to_prune ~todo:u_succs
+              in
+              walk_direct_succs graph ~seen ~to_prune ~todo
+    in
+    let reduce_vertex v succs graph =
+      let seen = String.Set.empty and to_prune = succs and todo = succs in
+      let pruned = walk_direct_succs graph ~seen ~to_prune ~todo in
+      String.Map.add v pruned graph
+    in
+    String.Map.fold reduce_vertex graph graph
+end
+
+module Cobj_index = struct
+  let ocamlobjinfo = Cmd.(tool "ocamlobjinfo" %% Cobj.ocamlobjinfo_args)
+  let cobjs_of_file ocamlobjinfo file =
+    let* data = Os.Cmd.run_out ~trim:true Cmd.(ocamlobjinfo %% path file) in
+    Cobj.of_string data
+
+  type t =
+    { by_entity : ([`Unit of B0_unit.t | `Lib of Lib.t] * Cobj.t list) list;
+      by_digest : Cobj.t list String.Map.t; }
+
+  let by_entity i = i.by_entity
+  let by_digest i = i.by_digest
+  let empty = { by_entity = []; by_digest = String.Map.empty }
+
+  let find_env_libnames env ~x_libs ocaml_units =
+    let add_requires u (in_build, acc) =
+      let in_build = match B0_unit.find_meta library u with
+      | None -> in_build | Some l -> Libname.Set.add l in_build
+      in
+      let acc = match B0_unit.find_meta requires u with
+      | None -> acc
+      | Some libs -> List.fold_left (Fun.flip Libname.Set.add) acc libs
+      in
+      (in_build, acc)
+    in
+    let in_build, acc =
+      B0_unit.Set.fold add_requires ocaml_units Libname.Set.(empty, empty)
+    in
+    let exclude = Libname.Set.union x_libs in_build in
+    Libname.Set.diff acc exclude
+
+  let lookup_env_libs env libnames =
+    let build = B0_env.build env in
+    let store = B0_build.store build in
+    let memo = B0_build.memo build in
+    let resolver = Fut.sync (B0_store.get store Libresolver.key) in
+    let libnames = Libname.Set.elements libnames in
+    Fut.sync (Libresolver.get_list_and_exports memo resolver libnames)
+
+  let find_built_ocaml_units ~x_units ~x_packs ~x_libs env =
+    let units = B0_build.did_build (B0_env.build env) in
+    let* x_units = B0_cli.get_excluded_units ~x_units ~x_packs in
+    let keep u =
+      B0_unit.has_tag ocaml_tag u &&
+      match B0_unit.find_meta library u with
+      | None -> true | Some n -> not (Libname.Set.mem n x_libs)
+    in
+    let ocaml_units = B0_unit.Set.filter keep units in
+    if B0_unit.Set.cardinal units = 1 (* .ocaml action *) then begin
+      Log.warn (fun m ->
+          m "The build is empty.@ Use@ option %a@ or %a to@ specify@ what@ to@ \
+             build." Fmt.code "-u" Fmt.code "-p");
+      Ok B0_unit.Set.empty
+    end else if B0_unit.Set.is_empty ocaml_units then begin
+      Log.warn (fun m ->
+          m "No units@ with %a found@ in@ the@ build." Fmt.code ".ocaml.tag");
+      Ok B0_unit.Set.empty
+    end else begin
+      let ocaml_units = B0_unit.Set.diff ocaml_units x_units in
+      if B0_unit.Set.is_empty ocaml_units then begin
+        Log.warn @@ fun m ->
+        m "All %a tagged units were excluded." Fmt.code ".ocaml.tag"
+      end;
+      Ok ocaml_units
+    end
+
+  let of_build ~kind ~x_units ~x_packs ~env_libs ~x_libs env =
+    let* ocamlobjinfo = B0_env.get_cmd env ocamlobjinfo in
+    let add_dig cobj m d = String.Map.add_to_list (Modref.digest m) cobj d in
+    let add_cobj d cobj = Modref.Set.fold (add_dig cobj) (Cobj.defs cobj) d in
+    let add_cobj_file (entity_cobjs, by_digest) file  =
+      let cobjs = cobjs_of_file ocamlobjinfo file |> Result.error_to_failure in
+      let entity_cobjs = List.rev_append cobjs entity_cobjs in
+      let by_digest = List.fold_left add_cobj by_digest cobjs in
+      entity_cobjs, by_digest
+    in
+    let add_unit_cobjs u index =
+      let add_unit_file _stat _fname file acc =
+        if not (Fpath.has_ext kind file) then acc else add_cobj_file acc file
+      in
+      let dir = B0_build.unit_dir (B0_env.build env) u in
+      let entity_cobjs, by_digest =
+        Os.Dir.fold_files ~recurse:true add_unit_file dir ([], index.by_digest)
+        |> Result.error_to_failure
+      in
+      let by_entity = (`Unit u, entity_cobjs) :: index.by_entity in
+      { by_entity; by_digest }
+    in
+    let add_lib_cobjs index lib =
+      let entity_cobjs, by_digest =
+        assert (kind = ".cmx"); (* Needs to be adapted *)
+        let cmxs = Lib.cmxs lib in
+        List.fold_left add_cobj_file ([], index.by_digest) cmxs
+      in
+      let by_entity = (`Lib lib, entity_cobjs) :: index.by_entity in
+      { by_entity; by_digest }
+    in
+    let x_libs = Libname.Set.of_list (List.map Libname.v x_libs) in
+    let* ocaml_units = find_built_ocaml_units ~x_units ~x_packs ~x_libs env in
+    try
+      let index = B0_unit.Set.fold add_unit_cobjs ocaml_units empty in
+      if not env_libs then Ok index else
+      let libnames = find_env_libnames env ~x_libs ocaml_units in
+      let libs = lookup_env_libs env libnames in
+      Ok (List.fold_left add_lib_cobjs index libs)
+    with Failure e -> Error e
+
+  let to_digest_dag index : Digest_dag.t =
+    let rec loop seen acc todo = match String.Map.choose_opt todo with
+    | None -> acc
+    | Some (digest, cobjs) ->
+        (* Just pick one we only about the module name *)
+        let cobj = List.hd cobjs in
+        (* XXX if one day we want to use this on archives the link_deps
+           here is to coarse grained, every modref defined by the archive
+           gets the same deps *)
+        let cobj_deps = Cobj.link_deps cobj in
+        let dep_digests =
+          let inside_index digest = String.Map.mem digest index.by_digest in
+          let add_digest m acc =
+            let digest = Modref.digest m in
+            if inside_index digest then digest :: acc else acc
+          in
+          Modref.Set.fold add_digest cobj_deps []
+        in
+        let add_modref_deps modref acc =
+          if String.Set.mem digest seen then acc else
+          let add_dep acc dep_digest =
+            String.Map.add_to_set (module String.Set) digest dep_digest acc
+          in
+          List.fold_left add_dep acc dep_digests
+        in
+        let acc = Modref.Set.fold add_modref_deps (Cobj.defs cobj) acc in
+        let todo = String.Map.remove digest todo in
+        let seen = String.Set.add digest seen in
+        loop seen acc todo
+    in
+    loop String.Set.empty String.Map.empty index.by_digest
+end
+
+module Module_deps = struct
+  let show_url env ~filename:fname data =
+    let* show_url = B0_env.get_cmd env Cmd.(tool "show-url" % "-f" % fname) in
+    let stdin = Os.Cmd.in_string data in
+    Os.Cmd.run ~stdin show_url
+
+  let dot_to_svg env dot_graph =
+    let* dot = B0_env.get_cmd env Cmd.(tool "dot" % "-Tsvg") in
+    let stdin = Os.Cmd.in_string dot_graph in
+    Os.Cmd.run_out ~stdin ~trim:false dot
+
+  let dot_edges graph =
+    let add_edge digest deps acc =
+      let digest = Digest.to_hex digest in
+      let add_dep dep acc = B0_dot.(acc ++ edge digest (Digest.to_hex dep)) in
+      String.Set.fold add_dep deps acc
+    in
+    String.Map.fold add_edge graph B0_dot.empty
+
+  let dot_nodes index =
+    let add_entity acc (entity, cobjs) =
+      let add_node modref acc =
+        let name = Modref.name modref in
+        let id = Digest.to_hex (Modref.digest modref) in
+        B0_dot.(acc ++ node ~atts:(label name) id)
+      in
+      let add_nodes acc cobj =
+        Modref.Set.fold add_node (Cobj.defs cobj) acc
+      in
+      let nodes = List.fold_left add_nodes B0_dot.empty cobjs in
+      let name = match entity with
+      | `Unit u -> String.concat "" ["<b>"; B0_unit.name u; "</b>"]
+      | `Lib l -> String.concat "" ["<i>"; Libname.name (Lib.libname l); "</i>"]
+      in
+      let gatts =
+        B0_dot.(atts `Graph @@
+                att_html "label" name ++
+                att "style" "dotted" ++
+                att "fontsize" "20.0" ++
+                att "labeljust" "l")
+      in
+      B0_dot.(acc ++ subgraph ~id:("cluster_" ^ name) (gatts ++ nodes))
+    in
+    List.fold_left add_entity B0_dot.empty (Cobj_index.by_entity index)
+
+  let dot_graph ~rankdir ~deps index =
+    let rankdir = match rankdir with `LR -> "LR" | `TB -> "TB" in
+    let font = B0_dot.att "fontname" "monospace" in
+    let graph_atts = B0_dot.(atts `Graph @@ att "rankdir" rankdir ++ font) in
+    let edge_atts =
+      B0_dot.(atts `Edge @@ att "color" "#777777" ++ att "arrowsize" "0.75")
+    in
+    let node_atts =
+      let box_color = "#dadada" in
+      B0_dot.(atts `Node @@
+              font ++
+              att "shape" "rectangle" ++
+              att "style" "filled" ++
+              att "color" box_color ++
+              att "fillcolor" box_color)
+    in
+    let edges = dot_edges deps in
+    let nodes = dot_nodes index in
+    let g = B0_dot.(graph_atts ++ edge_atts ++ node_atts ++ edges ++ nodes) in
+    B0_dot.(graph ~id:"module_deps" `Digraph g)
+
+  let json ~deps index =
+    let open B0_json in
+    let json_digest digest = Jsong.string (Digest.to_hex digest) in
+    let json_node (name, digest, entity_name, entity_kind, deps) =
+      Jsong.obj
+      |> Jsong.mem "name" (Jsong.string name)
+      |> Jsong.mem "digest" (json_digest digest)
+      |> Jsong.mem "entity-name" (Jsong.string entity_name)
+      |> Jsong.mem "entity-kind" (Jsong.string entity_kind)
+      |> Jsong.mem "deps" (Jsong.list json_digest deps)
+      |> Jsong.obj_end
+    in
+    let add_entity acc (entity, cobjs) =
+      let entity_name, entity_kind = match entity with
+      | `Unit u -> B0_unit.name u, "unit"
+      | `Lib l -> Libname.name (Lib.libname l), "lib"
+      in
+      let add_modref modref acc =
+        let name = Modref.name modref in
+        let digest = Modref.digest modref in
+        let deps = match String.Map.find_opt digest deps with
+        | None -> []
+        | Some deps -> String.Set.elements deps
+        in
+        (name, digest, entity_name, entity_kind, deps) :: acc
+      in
+      let add_cobj acc cobj =
+        Modref.Set.fold add_modref (Cobj.defs cobj) acc
+      in
+      List.fold_left add_cobj acc cobjs
+    in
+    let nodes = List.fold_left add_entity [] (Cobj_index.by_entity index) in
+    Jsong.to_string (Jsong.list json_node nodes)
+
+  let of_build env
+      ~format ~reduce_deps:reduce ~x_units ~x_packs ~env_libs ~x_libs ~show
+    =
+    Log.if_error ~use:Os.Exit.some_error @@
+    let* index =
+      let kind =
+        (* If we want to change this to lookup archives we need to review
+           Cobj_index.to_digest_dag and Cobj which lumps individual archive
+           member dependencies into a single set *)
+        ".cmx"
+      in
+      Cobj_index.of_build ~kind env ~x_units ~x_packs ~env_libs ~x_libs
+    in
+    let deps = Cobj_index.to_digest_dag index in
+    let deps = if reduce then Digest_dag.transitive_reduction deps else deps in
+    let* () = match format with
+    | `Dot rankdir ->
+        let g = B0_dot.to_string (dot_graph ~rankdir ~deps index) in
+        begin match show with
+        | None -> Fmt.pr "%s@." g; Ok ()
+        | Some filename ->
+            let* svg = dot_to_svg env g in
+            show_url env ~filename svg
+        end
+    | `Json ->
+        let data = json ~deps index in
+        begin match show with
+        | None -> Fmt.pr "%s@." data; Ok ()
+        | Some filename -> show_url env ~filename data
+        end
+    in
+    Ok Os.Exit.ok
+end
 
 (* OCamlfind META files (for generation) *)
 
@@ -2304,13 +2632,14 @@ let meta env pack =
 open Cmdliner
 
 let unit =
+  let open Cmdliner.Term.Syntax in
   let doc = "OCaml support" in
   B0_unit.of_cmdliner_cmd "" ~doc @@ fun env u ->
   let man =
     [ `S Manpage.s_see_also;
       `P "Consult $(b,odig doc b0) for the b0 OCaml manual." ]
   in
-  let crunch =
+  let crunch_cmd =
     let doc = "Crunch bytes into an OCaml string" in
     let exits = B0_std_cli.Exit.infos in
     let infile =
@@ -2325,7 +2654,7 @@ let unit =
     Cmd.make (Cmd.info "crunch" ~doc ~man ~exits) @@
     Term.(const crunch $ id $ infile)
   in
-  let list =
+  let list_cmd =
     let doc = "List buildable OCaml libraries" in
     let man =
       [ `S Manpage.s_description;
@@ -2337,11 +2666,11 @@ let unit =
     Cmd.make (Cmd.info "libs" ~doc ~man ~exits) @@
     Term.(const list $ details $ no_pager)
   in
-  let meta =
-    let doc = "Generate ocamlfind META files" in
+  let meta_cmd =
+    let doc = "Output ocamlfind META files" in
     let man =
       [ `S Manpage.s_description;
-        `P "$(cmd) generates OCaml META files for a given pack. This \
+        `P "$(cmd) outputs OCaml META files for a given pack. This \
             generates a META file assuming an install with one library \
             per directory." ]
     in
@@ -2355,13 +2684,82 @@ let unit =
     Cmd.make (Cmd.info "META" ~doc ~man) @@
     Term.(const meta $ const env $ pack)
   in
+  let module_deps_cmd =
+    let doc = "Output module dependency graphs" in
+    let man =
+      [ `S Cmdliner.Manpage.s_synopsis;
+        `P "$(b,b0) [$(b,-p) $(i,PACK)]… [$(b,-u) $(i,UNIT)]… \
+            -- $(cmd) [$(i,OPTION)]…";
+        `S Manpage.s_description;
+        `P "$(cmd) outputs the dependency graph of built or used OCaml \
+            modules. A pack or unit must be explicitely specified otherwise \
+            the build is empty.";
+        `Pre "$(b,b0 -p default --) \
+              $(cmd) $(b,| dot -Tsvg | show-url -f graph.svg)"; `Noblank;
+        `Pre "$(b,b0 -p default --) $(cmd) $(b,--show graph.svg)";
+        `S "WARNING TODO";
+        `P "For now $(cmd) is a bit simplistic, it only performs analysis on \
+            $(b,.cmx) files. This needs to be extended to handle byte code \
+            and mixed native and byte code builds."
+      ]
+    in
+    Cmd.make (Cmd.info "module-deps" ~doc ~man) @@
+    let+ format =
+      let formats =
+        [ "dot-lr", `Dot `LR; "dot-tb", `Dot `TB; "json", `Json ]
+      in
+      let doc = Printf.sprintf
+          "Output format. $(docv) Must be %s. $(b,dot-*) are for dot \
+           graphs with given rank directions; pipe to $(b,dot -Tsvg) to \
+           generate an SVG file. See also option $(b,--show)."
+          (Arg.doc_alts_enum formats)
+      in
+      let docv = "FMT" in
+      Arg.(value & opt (enum formats) (`Dot `LR) &
+           info ["f"; "format"] ~doc ~docv)
+    and+ reduce_deps =
+      let doc = "$(docv) indicates if transitive reduction of dependencies \
+                 is performed."
+      in
+      Arg.(value & opt bool true & info ["reduce-deps"] ~doc)
+    and+ x_units =
+      let doc = "Exclude modules of unit $(docv)." in
+      B0_cli.use_x_units ~doc ()
+    and+ x_packs =
+      let doc = "Exclude modules of units of $(docv)." in
+      B0_cli.use_x_packs ~doc ()
+    and+ x_libs =
+      let doc =
+        "Exclude modules of library $(docv). Whether in the build, or in \
+         the environment."
+      in
+      let docv = "LIB" in
+      Arg.(value & opt_all string [] & info ["x-lib"] ~doc ~docv)
+    and+ show =
+      let doc =
+        "Open output in a viewer. $(docv) is a temporary \
+         file name which must have a correct file extension ($(b,.svg) for \
+         dot). It allows reloads accross invocations. For dot \
+         output using this option is equivalent to pipe to \
+         $(b,dot -Tsvg | show-url -f) $(docv)."
+      in
+      let docv = "FILENAME" in
+      Arg.(value & opt (some string) None & info ["s"; "show"] ~doc ~docv)
+    and+ env_libs =
+      let doc = "Include library dependencies from the environment." in
+      Arg.(value & flag & info ["e"; "env-libs"] ~doc)
+    in
+    Module_deps.of_build env
+      ~format ~reduce_deps ~x_units ~x_packs ~env_libs ~x_libs ~show
+  in
   let man =
     [ `S Manpage.s_description;
       `P "$(cmd) has a few tools for OCaml";
       `Blocks man ]
   in
   let name = B0_unit.name u in
-  Cmd.group (Cmd.info name ~doc ~man) @@ [ crunch; list; meta ]
+  Cmd.group (Cmd.info name ~doc ~man) @@
+  [ crunch_cmd; list_cmd; meta_cmd; module_deps_cmd]
 
 let ocaml env use_utop dry_run x_units x_packs args =
   Log.if_error ~use:Os.Exit.some_error @@

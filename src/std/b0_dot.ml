@@ -1,5 +1,5 @@
 (*---------------------------------------------------------------------------
-   Copyright (c) 2025 The b0 programmers. All rights reserved.
+   Copyright (c) 2016 The b0 programmers. All rights reserved.
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
@@ -23,6 +23,8 @@ let adds_id s g = (* escape quotes *)
     | c -> loop start (i + 1)
   in
   addc '"' g; loop 0 0; addc '"' g
+
+let adds_html s g = addc '<' g; adds s g; addc '>' g
 
 (* Generation sequences. *)
 
@@ -53,6 +55,8 @@ let atts k atts g =
   adds kind g; alist (Some atts) g; adds ";\n" g
 
 let att a v g = adds_id a g; addc '=' g; adds_id v g
+let att_html a v g = adds_id a g; addc '=' g; adds_html v g
+
 let label = att "label"
 let color = att "color"
 let subgraph ?id sts g =

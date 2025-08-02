@@ -657,6 +657,9 @@ module Libname : sig
   (** [v s] is a library for [n]. Raises [Invalid_argument] if [s] is
       not a valid library name. *)
 
+  val name : t -> string
+  (** [name n] is the name of [s] as specified in [v]. *)
+
   val root : t -> string
   (** [root n] is the root name of [n], that is the leftmost one. *)
 
