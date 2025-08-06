@@ -173,7 +173,7 @@ let keep_going =
   Arg.(value & vflag true [keep_going; fail_stop])
 
 let cli_arg ~docv =
-  let completion = Arg.Completion.make ~restart:true () in
+  let completion = Arg.Completion.complete_restart in
   Arg.Conv.of_conv ~docv Arg.string ~completion ()
 
 let tool =

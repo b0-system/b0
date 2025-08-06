@@ -326,21 +326,23 @@ let build_only =
 
 let action_arg =
   let docv = "ACTION" in
-  let complete pre =
-    let keep u =
-      if not (B0_unit.is_actionable u) then None else
-      let name = match B0_unit.find_meta B0_unit.tool_name u with
-      | Some name when String.starts_with ~prefix:pre name -> Some name
-      | _ ->
-          match B0_unit.name u with
-          | name when String.starts_with ~prefix:pre name -> Some name
-          | _ -> None
+  let completion =
+    let func _ctx ~token =
+      let keep u =
+        if not (B0_unit.is_actionable u) then None else
+        let name = match B0_unit.find_meta B0_unit.tool_name u with
+        | Some name when String.starts_with ~prefix:token name -> Some name
+        | _ ->
+            match B0_unit.name u with
+            | name when String.starts_with ~prefix:token name -> Some name
+            | _ -> None
+        in
+        Option.map (fun n -> Arg.Completion.string n ~doc:(B0_unit.doc u)) name
       in
-      Option.map (fun n -> n, B0_unit.doc u) name
+      Ok (List.filter_map keep (B0_unit.list ()))
     in
-    List.filter_map keep (B0_unit.list ())
+    Arg.Completion.make func
   in
-  let completion = Arg.Completion.make ~complete () in
   Arg.Conv.of_conv Arg.string ~completion ~docv ()
 
 let action =
@@ -353,7 +355,7 @@ let action =
 let args =
   let doc = "Arguments given as is to the action." in
   let aargs =
-    let completion = Arg.Completion.make ~restart:true () in
+    let completion = Arg.Completion.complete_restart in
     Arg.Conv.of_conv ~docv:"ARG" ~completion Arg.string ()
   in
   Arg.(value & pos_right 0 aargs [] & info [] ~doc)

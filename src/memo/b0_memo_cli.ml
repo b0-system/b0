@@ -221,7 +221,7 @@ module File_cache = struct
       if Fpath.is_segment s then Ok s else
       Error ("Not a valid key (not a path segment)")
     in
-    let completion = Arg.Completion.make ~files:true () in
+    let completion = Arg.Completion.complete_files in
     Arg.Conv.make ~completion ~parser ~pp:String.pp ~docv:"KEY" ()
 
   let keys_none_is_all ?(first = 0) () =
