@@ -22,23 +22,40 @@ let get_excluded_units ~x_units ~x_packs =
   let packs = B0_pack.Set.of_list packs in
   Ok (B0_pack.Set.fold add_pack_units packs (B0_unit.Set.of_list units))
 
+let def_conv (module Def : B0_def.S) =
+  let complete_defs _ctx ~token =
+    let complete_def u =
+      let name = Def.name u in
+      if not (String.starts_with ~prefix:token name) then None else
+      Some (Arg.Completion.string name ~doc:(Def.doc u))
+    in
+    Ok (List.filter_map complete_def (Def.list ()))
+  in
+  let completion = Arg.Completion.make complete_defs in
+  Arg.Conv.of_conv Arg.string ~completion ()
+
+let unit_conv = def_conv (module B0_unit)
+let pack_conv = def_conv (module B0_pack)
+
 let use_units ?docs ?(doc = "Use unit $(docv).") () =
-  Arg.(value & opt_all string [] & info ["u"; "unit"] ?docs ~doc ~docv:"UNIT")
+  Arg.(value & opt_all unit_conv [] &
+       info ["u"; "unit"] ?docs ~doc ~docv:"UNIT")
 
 let use_x_units
     ?docs ?(doc = "Exclude unit $(docv). Takes over inclusion.") ()
   =
   let docv = "UNIT" in
-  Arg.(value & opt_all string [] & info ["x"; "x-unit"] ?docs ~doc ~docv)
+  Arg.(value & opt_all unit_conv [] & info ["x"; "x-unit"] ?docs ~doc ~docv)
 
 let use_packs ?docs ?(doc = "Use pack $(docv).") () =
-  Arg.(value & opt_all string [] & info ["p"; "pack"] ?docs ~doc ~docv:"PACK")
+  Arg.(value & opt_all pack_conv [] &
+       info ["p"; "pack"] ?docs ~doc ~docv:"PACK")
 
 let use_x_packs
     ?docs ?(doc = "Exclude pack $(docv). Takes over inclusion.") ()
   =
   let docv = "PACK" in
-  Arg.(value & opt_all string [] & info ["X"; "x-pack"] ?docs ~doc ~docv)
+  Arg.(value & opt_all pack_conv [] & info ["X"; "x-pack"] ?docs ~doc ~docv)
 
 let build_units =
   use_units ~doc:"Build unit $(docv). Repeatable." ()
@@ -60,7 +77,7 @@ let act_on_units_posn
     ?(doc = "The $(docv) to act on. All of them if unspecified.")
     ~first ()
   =
-  Arg.(value & pos_right (first - 1) string [] & info [] ~doc ~docv:"UNIT")
+  Arg.(value & pos_right (first - 1) unit_conv [] & info [] ~doc ~docv:"UNIT")
 
 let act_on_units_pos0 = act_on_units_posn ~first:0 ()
 let act_on_units_pos1 = act_on_units_posn ~first:1 ()
@@ -69,7 +86,7 @@ let act_on_packs_posn
     ?(doc = "The $(docv) to act on. All of them if unspecified.")
     ~first ()
   =
-  Arg.(value & pos_right (first - 1) string [] & info [] ~doc ~docv:"PACK")
+  Arg.(value & pos_right (first - 1)  pack_conv [] & info [] ~doc ~docv:"PACK")
 
 let act_on_packs_pos0 = act_on_packs_posn ~first:0 ()
 let act_on_packs_pos1 = act_on_packs_posn ~first:1 ()

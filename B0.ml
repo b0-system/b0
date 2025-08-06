@@ -289,7 +289,7 @@ let vendor_more_modules =
 
 let update_webs_modules =
   let doc = "Update vendored Webs modules" in
-  B0_unit.of_action "udpate-webs" ~doc @@ fun env _ ~args ->
+  B0_unit.of_action "update-webs" ~doc @@ fun env _ ~args ->
   let repo = "https://erratique.ch/repos/webs.git" in
   with_cloned_repo_dir ~env ~repo @@ fun dir ->
   let dst_dir = B0_env.in_scope_dir env ~/"src/std" in
