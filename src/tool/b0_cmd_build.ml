@@ -343,7 +343,7 @@ let action_arg =
     in
     Arg.Completion.make func
   in
-  Arg.Conv.of_conv Arg.string ~completion ~docv ()
+  Arg.Conv.of_conv Arg.string ~completion ~docv
 
 let action =
   let doc = "Action or tool to run. Specify it after a $(b,--) otherwise \
@@ -356,7 +356,7 @@ let args =
   let doc = "Arguments given as is to the action." in
   let aargs =
     let completion = Arg.Completion.complete_restart in
-    Arg.Conv.of_conv ~docv:"ARG" ~completion Arg.string ()
+    Arg.Conv.of_conv Arg.string ~docv:"ARG" ~completion
   in
   Arg.(value & pos_right 0 aargs [] & info [] ~doc)
 

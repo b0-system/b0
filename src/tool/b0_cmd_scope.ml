@@ -174,7 +174,7 @@ let keep_going =
 
 let cli_arg ~docv =
   let completion = Arg.Completion.complete_restart in
-  Arg.Conv.of_conv ~docv Arg.string ~completion ()
+  Arg.Conv.of_conv ~docv Arg.string ~completion
 
 let tool =
   let doc = "Invoke tool $(docv)." in

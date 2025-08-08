@@ -32,7 +32,7 @@ let def_conv (module Def : B0_def.S) =
     Ok (List.filter_map complete_def (Def.list ()))
   in
   let completion = Arg.Completion.make complete_defs in
-  Arg.Conv.of_conv Arg.string ~completion ()
+  Arg.Conv.of_conv Arg.string ~completion
 
 let unit_conv = def_conv (module B0_unit)
 let pack_conv = def_conv (module B0_pack)
