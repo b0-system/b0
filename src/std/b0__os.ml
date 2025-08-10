@@ -1556,15 +1556,16 @@ module Cmd = struct
 
   (* Low-level command spawn *)
 
+  type pid = { pid : int; cmd : B0__cmd.t }
   type spawn_tracer =
-    int option -> Env.assignments option -> cwd:B0__fpath.t option ->
+    pid option -> Env.assignments option -> cwd:B0__fpath.t option ->
     B0__cmd.t -> unit
 
   let spawn_tracer_nop _ _ ~cwd:_ _ = ()
   let spawn_tracer_log level =
     if level = B0__log.Quiet then spawn_tracer_nop else
     let header = function
-    | None -> "EXECV" | Some pid -> "EXEC:" ^ string_of_int pid
+    | None -> "EXECV" | Some pid -> "EXEC:" ^ string_of_int pid.pid
     in
     let pp_env ppf = function
     | None -> ()
@@ -1613,7 +1614,9 @@ module Cmd = struct
           let old_cwd = getcwd () in
           let change_cwd = not @@ String.equal old_cwd cwd' in
           if change_cwd then chdir cwd';
-          let pid = Unix.create_process_env exe line env' stdin stdout stderr
+          let pid =
+            { pid = Unix.create_process_env exe line env' stdin stdout stderr;
+              cmd }
           in
           if change_cwd then chdir old_cwd; (* XXX pid zombie on fail. *)
           Fd.Set.close_all fds;
@@ -1631,11 +1634,11 @@ module Cmd = struct
 
   (* Blocking command execution *)
 
-  let rec run_collect pid = match Unix.waitpid [] pid with
+  let rec run_collect pid = match Unix.waitpid [] pid.pid with
   | _, status -> status_of_unix_status status
   | exception Unix.Unix_error (Unix.EINTR, _, _) -> run_collect pid
   | exception Unix.Unix_error (e, _, _) ->
-      B0__fmt.failwith_notrace "waitpid [%d]: %s" pid (uerror e)
+      B0__fmt.failwith_notrace "waitpid [%d]: %s" pid.pid (uerror e)
 
   let run_status
       ?env ?cwd ?(stdin = in_stdin) ?(stdout = out_stdout)
@@ -1686,8 +1689,8 @@ module Cmd = struct
 
   (* Non-blocking command *)
 
-  type pid = int
-  let pid_to_int pid = pid
+  let pid_cmd pid = pid.cmd
+  let pid_to_int pid = pid.pid
 
   let spawn
       ?env ?cwd ?(stdin = in_stdin) ?(stdout = out_stdout)
@@ -1699,23 +1702,29 @@ module Cmd = struct
     | Unix.Unix_error (e, _, _) ->
         Fd.Set.close_all fds; spawn_err cmd (uerror e)
 
-  let rec spawn_poll_status pid = match Unix.waitpid Unix.[WNOHANG] pid with
+  let rec spawn_poll_status pid = match Unix.waitpid Unix.[WNOHANG] pid.pid with
   | 0, _ -> Ok None
   | _, status -> Ok (Some (status_of_unix_status status))
   | exception Unix.Unix_error (Unix.EINTR, _, _) -> spawn_poll_status pid
   | exception Unix.Unix_error (e, _, _) ->
-      B0__fmt.error "poll_status: waitpid %d: %s" pid (uerror e)
+      B0__fmt.error "poll_status: waitpid [%d]: %s" pid.pid (uerror e)
 
-  let rec spawn_wait_status pid = match Unix.waitpid [] pid with
+  let rec spawn_wait_status pid = match Unix.waitpid [] pid.pid with
   | _, status -> Ok (status_of_unix_status status)
   | exception Unix.Unix_error (Unix.EINTR, _, _) -> spawn_wait_status pid
   | exception Unix.Unix_error (e, _, _) ->
-      B0__fmt.error "wait_status: waitpid %d: %s" pid (uerror e)
+      B0__fmt.error "waitpid [%d]: %s" pid.pid (uerror e)
 
-  let kill pid sg = match Unix.kill pid sg with
+  let spawn_wait pid = match spawn_wait_status pid with
+  | Ok (`Exited 0) -> Ok ()
+  | Ok st ->
+      B0__fmt.error "@[waitpid [%d]: %a@]" pid.pid pp_cmd_status (pid.cmd, st)
+  | Error _ as e -> e
+
+  let kill pid sg = match Unix.kill pid.pid sg with
   | () -> Ok ()
   | exception Unix.Unix_error (e, _, _) ->
-      B0__fmt.error "kill %d with %a: %s" pid B0__fmt.sys_signal sg
+      B0__fmt.error "kill %d with %a: %s" pid.pid B0__fmt.sys_signal sg
         (uerror e)
 
   (* execv

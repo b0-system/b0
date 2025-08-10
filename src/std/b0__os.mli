@@ -928,6 +928,9 @@ module Cmd : sig
   type pid
   (** The type for process identifiers. *)
 
+  val pid_cmd : pid -> B0__cmd.t
+  (** [pid_cmd pid] is the command that was given to launch [pid]. *)
+
   val pid_to_int : pid -> int
   (** [pid_to_int pid] is the system identifier for process
       identifier [pid]. *)
@@ -950,6 +953,10 @@ module Cmd : sig
   val spawn_wait_status : pid -> (status, string) result
   (** [spawn_wait_status] blocks and waits for [pid]'s termination status to
       become available. *)
+
+  val spawn_wait : pid -> (unit, string) result
+  (** [spawn_wait] is like {!spawn_wait_status} but with non-[`Exited 0]
+      statuses turned into errors with {!pp_cmd_status} *)
 
   val kill : pid -> int -> (unit, string) result
   (** [kill pid signal] sends signal [signal] to the process [pid].
