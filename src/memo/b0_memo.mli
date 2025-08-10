@@ -274,26 +274,34 @@ val copy :
 ]} *)
 
 val copy_to_dir :
-  t -> ?mode:int -> ?linenum:int ->
-  ?src_root:Fpath.t -> Fpath.t -> dir:Fpath.t -> Fpath.t
-(** [copy_to_dir src dir] is [copy src ~dst] with [dst] as
-    [Fpath.reroot ~src_root ~dst_root:dst src] and [src_root] defaulting
-    to [Fpath.parent src]. The function returns the destination file. *)
+  t -> ?mode:int -> ?linenum:int -> ?src_root:Fpath.t -> Fpath.t ->
+  dst_dir:Fpath.t -> Fpath.t
+(** [copy_to_dir ~src_root src dir] is [copy src ~dst_dir] with [dst] defined
+    as {!B0_std.Fpath.reroot}[ ~src_root ~dst_root:dst_dir src]
+
+    Otherwise said, [src] gets copied in a subpath of [dst] defined by
+    {!Fpath.strip_prefix}[ src_root src]. [src_root] defaults to
+    [Fpath.parent src] which means that [src] gets copied at the root of
+    [dst]. *)
 
 val ready_and_copy_to_dir :
   t -> ?mode:int -> ?linenum:int ->
-  ?src_root:Fpath.t -> Fpath.t -> dir:Fpath.t -> Fpath.t
+  ?src_root:Fpath.t -> Fpath.t -> dst_dir:Fpath.t -> Fpath.t
 (** [ready_and_copy_to_dir] is like {!copy_to_dir} but calls {!ready_file}
     on the copied file. *)
 
 val ready_and_copy_dir :
   ?rel:bool -> ?follow_symlinks:bool ->
   ?prune:(Unix.stats -> string -> Fpath.t -> bool) ->
-  t -> recurse:bool -> Fpath.t -> dst:Fpath.t -> Fpath.t list
-(** [ready_and_copy_dir m ~recurse ~src dst] is the moral equivalent
-    of {!B0_std.Os.Dir.val-copy}. It makes ready and copies the contents
-    of [src] to [dst] using the same conventions. The function returns
-    the copied files. *)
+  t -> ?mode:int -> ?linenum:int->
+  recurse:bool -> ?src_root:Fpath.t -> Fpath.t -> dst:Fpath.t ->
+  Fpath.t list
+(** [ready_and_copy_dir m ~recurse src ~dst] lists files of [src]
+    and applies {!ready_and_copy_to_dir} with the corresponding
+    arguments.
+
+    [src_root] defaults to [src] which is the {!B0_std.Fpath.parent} of the
+    copied files. So elements of [src] are rooted at [dst] by default. *)
 
 val mkdir : t -> ?mode:int -> Fpath.t -> unit Fut.t
 (** [mkdir m dir p] is a future that determines with [()] when the

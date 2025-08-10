@@ -354,20 +354,21 @@ let copy m ?(mode = 0o644) ?linenum src ~dst =
   let o = Op.Copy.make_op ~id ~mark ~created ~mode ~linenum src ~dst in
   add_op_and_stir m o
 
-let copy_to_dir m ?mode ?linenum ?src_root src ~dir =
+let copy_to_dir m ?mode ?linenum ?src_root src ~dst_dir =
   let dst = match src_root with
-  | None -> Fpath.(dir / Fpath.basename src)
-  | Some src_root -> Fpath.reroot ~src_root ~dst_root:dir src
+  | None -> Fpath.(dst_dir / Fpath.basename src)
+  | Some src_root -> Fpath.reroot ~src_root ~dst_root:dst_dir src
   in
   copy m ?mode ?linenum src ~dst; dst
 
-let ready_and_copy_to_dir m ?mode ?linenum ?src_root src ~dir =
-  ready_file m src; copy_to_dir m ?mode ?linenum ?src_root src ~dir
+let ready_and_copy_to_dir m ?mode ?linenum ?src_root src ~dst_dir =
+  ready_file m src; copy_to_dir m ?mode ?linenum ?src_root src ~dst_dir
 
 let ready_and_copy_dir
     ?(rel = false) ?follow_symlinks ?(prune = fun _ _ _ -> false) m
-    ~recurse src_root ~dst:dst_root
+    ?mode ?linenum ~recurse ?src_root src ~dst:dst_root
   =
+  let src_root = Option.value ~default:src src_root in
   let copy_file st name src acc =
     if prune st name src then acc else
     let dst = match rel with
@@ -375,14 +376,14 @@ let ready_and_copy_dir
     | false -> Fpath.reroot ~src_root ~dst_root src
     in
     ready_file m src;
-    copy m ~mode:st.Unix.st_perm src ~dst;
+    copy m ?mode ?linenum src ~dst;
     dst :: acc
   in
   fail_if_error m @@
-  let* () = Os.Dir.must_exist src_root in
+  let* () = Os.Dir.must_exist src in
   let prune_dir st name dir _ = prune st name dir and dotfiles = true in
   Os.Dir.fold_files
-    ~rel ~dotfiles ?follow_symlinks ~prune_dir ~recurse copy_file src_root []
+    ~rel ~dotfiles ?follow_symlinks ~prune_dir ~recurse copy_file src []
 
 let mkdir m ?(mode = 0o755) dir =
   let id = new_op_id m and mark = m.c.mark and created = timestamp m in

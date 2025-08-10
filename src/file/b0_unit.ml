@@ -29,12 +29,12 @@ let outcomes =
   let pp_value = Bval.pp (Fmt.vbox (Fmt.list Fpath.pp)) in
   B0_meta.Key.make "outcomes" ~doc ~pp_value
 
-let copy_outcomes memo unit ~dir =
+let copy_outcomes_to_dir memo unit ~dst_dir =
   B0_memo.run_proc memo @@ fun () ->
   let files = get_meta outcomes unit in
   let files = B0_memo.fail_if_error memo files in
   Fut.bind (Bval.get files) @@ fun files ->
-  let copy src = ignore (B0_memo.copy_to_dir memo src ~dir) in
+  let copy src = ignore (B0_memo.copy_to_dir memo src ~dst_dir) in
   List.iter copy files;
   Fut.return ()
 
