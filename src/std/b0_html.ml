@@ -285,7 +285,7 @@ module El = struct
       ?(lang = "") ?(generator = "") ?(styles = []) ?(scripts = [])
       ?(more_head = void) ~title:t body
     =
-    let viewport = "width=device-width, initial-scale=1.0" in
+    let viewport = "width=device-width, initial-scale=1.0, viewport-fit=cover" in
     let generator = match generator with
     | "" -> void | g -> meta ~at:At.[name "generator"; content g] ()
     in

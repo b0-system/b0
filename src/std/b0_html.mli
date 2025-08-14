@@ -385,7 +385,8 @@ module El : sig
       {- An {!El.meta} generator with value [generator], if specified and
          non-empty.}
       {- An {!El.meta} viewport with value
-         [width=device-width, initial-scale=1], unconditional.}
+         [width=device-width, initial-scale=1, viewport-fit=cover],
+         unconditional.}
       {- For each non-empty element [href] of [styles] (defaults to [[]]), an
          {!El.link} with {!At.type'} [text/css] and {!At.href} value [href].
          In order.}
