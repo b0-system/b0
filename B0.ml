@@ -172,15 +172,6 @@ let default =
            "_build/src/lowtools/b0_sttyle.native:b0-sttyle" {ocaml:native}
            "_build/src/lowtools/b0_sttyle.byte:b0-sttyle" {!ocaml:native}
            "_build/cmdliner-install" ]]|}
-      (*
-      # This doesn't work because the generic script doesn't know
-      # it needs to prefix 'b0 --' to invoke the protocol. Not necessarily
-      # unfixable but not now.
-      #   [ "cmdliner" "install" "tool-completion"
-      #     "--update-opam-install=%{_:name}%.install"
-      #     ".ocaml" ".ocaml.repl" ".opam" ".show-url" ".release"
-      #     "_build/cmdliner-install"]
-           ] *)
     |> ~~ B0_opam.depends [
       "ocaml", {|>= "4.14.0"|};
       "ocamlfind", {|build|};

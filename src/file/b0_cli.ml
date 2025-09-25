@@ -12,16 +12,6 @@ let log_format = B0_memo_cli.Log.format_cli ()
 let memo_op_query = B0_memo_cli.Op.query_cli ()
 let no_pager = B0_pager.no_pager ()
 
-(* Specifying units and packs *)
-
-let get_excluded_units ~x_units ~x_packs =
-  let* units = B0_unit.get_list_or_hint ~all_if_empty:false x_units in
-  let* packs = B0_pack.get_list_or_hint ~all_if_empty:false x_packs in
-  let add_unit acc u = B0_unit.Set.add u acc in
-  let add_pack_units p acc = List.fold_left add_unit acc (B0_pack.units p) in
-  let packs = B0_pack.Set.of_list packs in
-  Ok (B0_pack.Set.fold add_pack_units packs (B0_unit.Set.of_list units))
-
 let def_conv (module Def : B0_def.S) =
   let complete_defs _ctx ~token =
     let complete_def u =
@@ -33,6 +23,16 @@ let def_conv (module Def : B0_def.S) =
   in
   let completion = Arg.Completion.make complete_defs in
   Arg.Conv.of_conv Arg.string ~completion
+
+(* Specifying units and packs *)
+
+let get_excluded_units ~x_units ~x_packs =
+  let* units = B0_unit.get_list_or_hint ~all_if_empty:false x_units in
+  let* packs = B0_pack.get_list_or_hint ~all_if_empty:false x_packs in
+  let add_unit acc u = B0_unit.Set.add u acc in
+  let add_pack_units p acc = List.fold_left add_unit acc (B0_pack.units p) in
+  let packs = B0_pack.Set.of_list packs in
+  Ok (B0_pack.Set.fold add_pack_units packs (B0_unit.Set.of_list units))
 
 let unit_conv = def_conv (module B0_unit)
 let pack_conv = def_conv (module B0_pack)
@@ -90,8 +90,6 @@ let act_on_packs_posn
 
 let act_on_packs_pos0 = act_on_packs_posn ~first:0 ()
 let act_on_packs_pos1 = act_on_packs_posn ~first:1 ()
-
-
 
 (* Metadata keys *)
 

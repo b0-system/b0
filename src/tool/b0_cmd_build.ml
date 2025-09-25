@@ -229,12 +229,12 @@ let do_output_path action_unit ~args =
   Log.stdout (fun m -> m "%a" Cmd.pp Cmd.(path p %% args));
   Ok Os.Exit.ok
 
-let env_for_unit c build u =
-  let cwd = B0_driver.Conf.cwd c in
-  let root_dir = Fpath.parent @@ Option.get @@ B0_driver.Conf.b0_file c in
+let env_for_unit conf build u =
+  let cwd = B0_driver.Conf.cwd conf in
+  let root_dir = Fpath.parent @@ Option.get @@ B0_driver.Conf.b0_file conf in
   let scope_dir = Option.value (B0_unit.scope_dir u) ~default:root_dir in
-  let b0_dir = B0_driver.Conf.b0_dir c in
-  let driver_env = B0_driver.Conf.env c in
+  let b0_dir = B0_driver.Conf.b0_dir conf in
+  let driver_env = B0_driver.Conf.env conf in
   B0_env.make ~cwd ~scope_dir ~root_dir ~b0_dir ~build ~driver_env
 
 let do_action_exit c build action_unit ~args =
@@ -352,11 +352,41 @@ let action =
   in
   Arg.(value & pos 0 (some action_arg) None & info [] ~doc)
 
+let action_args_completion =
+  let func action ~token = match action with
+  | None | Some None -> Ok []
+  | Some (Some _action) ->
+      (* We try to forward the completion request to the action, note that
+         this may run the build. If the action does not abide by the cmdliner
+         completion protocol this will likely exit with non-zero and
+         we just ignore. We could be a bit smarter in detecting whether
+         action supports cmdliner by looking up the action unit and reasoning
+         on its metadata. *)
+      try
+        let cmd =
+          let rec loop acc = function
+          | "--__complete" :: args -> (* drop the request on b0 *) loop acc args
+          | "--" :: act :: args ->
+              (* add the request on the action invocation *)
+              List.rev_append ("--__complete" :: act :: "--" :: acc) args
+          | arg :: todo -> loop (arg :: acc) todo
+          | [] -> raise Exit
+          in
+          B0_std.Cmd.list (loop [] (Array.to_list Sys.argv))
+        in
+        let stdin = Os.Cmd.in_null and stderr = `Stdo Os.Cmd.out_null in
+        match Os.Cmd.run_out ~stdin ~stderr ~trim:false cmd with
+        | Ok raw -> Ok [Arg.Completion.raw raw]
+        | Error e -> raise Exit
+      with
+      | Exit -> Ok [Arg.Completion.restart]
+  in
+  Arg.Completion.make ~context:action func
+
 let args =
   let doc = "Arguments given as is to the action." in
   let aargs =
-    let completion = Arg.Completion.complete_restart in
-    Arg.Conv.of_conv Arg.string ~docv:"ARG" ~completion
+    Arg.Conv.of_conv Arg.string ~docv:"ARG" ~completion:action_args_completion
   in
   Arg.(value & pos_right 0 aargs [] & info [] ~doc)
 

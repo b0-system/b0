@@ -8,6 +8,14 @@
 open B0_std
 open Cmdliner
 
+(** {1:conv Converters} *)
+
+val def_conv : (module B0_def.S) -> string Cmdliner.Arg.Conv.t
+(** [def_conv d] is a converter for definitions of type [d] which knows
+    how to complete them. *)
+
+(** {1:predef Predefined} *)
+
 val output_details : B0_std_cli.output_details Term.t
 (** [output_details] is an invocation of {!B0_std_cli.val-output_details}. *)
 
