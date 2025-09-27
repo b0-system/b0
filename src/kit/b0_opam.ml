@@ -208,7 +208,6 @@ let pkg_name_of_pack p =
       | None -> "unknown" (* unlikely, libraries should not do this. *)
       | Some d -> Fpath.basename d
 
-
 type pkg_spec = string * string
 let available = File.available_field
 let build = File.build_field
@@ -353,7 +352,7 @@ end
 
 (* .opam list command *)
 
-let list_cmd env pkgs format =
+let list_cmd ~env ~pkgs ~output_details =
   Log.if_error ~use:Os.Exit.no_such_name @@
   let* pkg_packs = Pkg.get_list_or_hints pkgs in
   match pkg_packs with
@@ -362,7 +361,7 @@ let list_cmd env pkgs format =
       let pp_normal ppf pkg =
         Fmt.pf ppf "@[<h>%a %s@]" Pkg.pp_name pkg (B0_pack.name (Pkg.pack pkg))
       in
-      let pp_pkg = match format with
+      let pp_pkg = match output_details with
       | `Short -> Pkg.pp_name | `Normal | `Long -> pp_normal
       in
       Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list pp_pkg) ps);
@@ -406,7 +405,7 @@ let gen_files pkgs ~normalize ~with_name ~dst =
   let* () = List.iter_stop_on_error gen pkgs in
   Ok Os.Exit.ok
 
-let file_cmd env constraints pkgs lint raw dst in_scope no_name =
+let file_cmd ~env ~constraints ~pkgs ~lint ~raw ~dst ~in_scope ~no_name =
   Log.if_error ~use:Os.Exit.no_such_name @@
   let action =
     if lint then `Lint else
@@ -597,13 +596,13 @@ module Publish = struct
     match String.split_first ~sep:" " csum with
     | None -> Ok csum | Some (csum, _) -> Ok csum
 
-  let add_url_checksums http shasum ~check_only is =
+  let add_url_checksums http shasum ~dry_run is =
     let open B0_http in
     let add csum i = add_url_csum (Fmt.str "sha%s=%s" shasum_algo csum) i in
     let add_url (acc, is) i = match String.Map.find_opt i.url acc with
     | Some csum -> acc, add csum i :: is
     | None ->
-        let meth = if check_only then `HEAD else `GET in
+        let meth = if dry_run then `HEAD else `GET in
         let request = Http.Request.make ~url:i.url meth in
         let csum =
           Result.error_to_failure @@
@@ -719,21 +718,17 @@ module Publish = struct
 
   let publish_pkgs
       ~pkgs_dir ~pkgs_repo ~fork_repo ~local_repo ~github_auth pkgs incompats
-      check_only no_pr
+      ~dry_run no_pr
     =
-    if incompats <> [] then begin Log.warn @@ fun m ->
-       m "@[<v>Incompatibility statements unsupported for now. Ignored.@,\
-          See https://github.com/ocaml/opam/issues/3077@]"
-    end;
     let* opam = get () in
     let* httpc = B0_http.Http_client.make () in
     let* shasum = Os.Cmd.get (Cmd.tool "shasum") in
     let* git = B0_vcs_repo.Git.get_cmd () in
     let* is = collect_results (List.map (info_of_pkg opam) pkgs) in
     let title, msg = msg_for_publish is incompats in
-    log_start is incompats check_only;
-    let* is = add_url_checksums httpc shasum ~check_only is in
-    if check_only then (log_check_success (); Ok ()) else
+    log_start is incompats dry_run;
+    let* is = add_url_checksums httpc shasum ~dry_run is in
+    if dry_run then (log_check_success (); Ok ()) else
     let* local_repo = get_updated_local_repo git ~pkgs_repo ~local_repo in
     let branch = branch_name_of_pkgs is in
     let* () = commit opam ~local_repo ~branch ~pkgs_dir is incompats in
@@ -749,8 +744,8 @@ module Publish = struct
     Ok ()
 
   let cmd
-      env pkgs_dir pkgs_repo fork_repo local_repo github_auth
-      constraints pkgs incompats check_only no_pr
+      ~env ~pkgs_dir ~pkgs_repo ~fork_repo ~local_repo ~github_auth
+      ~constraints ~pkgs ~incompats ~dry_run ~no_pr
     =
     Log.if_error ~use:Os.Exit.no_such_name @@
     let pkgs = List.map split_version pkgs in
@@ -778,17 +773,18 @@ module Publish = struct
         in
         let* () =
           publish_pkgs ~pkgs_dir ~pkgs_repo ~fork_repo ~local_repo ~github_auth
-            pkgs incompats check_only no_pr
+            pkgs incompats ~dry_run no_pr
         in
         Ok Os.Exit.ok
 end
 
-(* .opam unit  command line interface  *)
+(* .opam command line interface  *)
 
 let unit =
   let doc = "opam support" in
   B0_unit.of_cmdliner_cmd "" ~doc @@ fun env u ->
   let open Cmdliner in
+  let open Cmdliner.Term.Syntax in
   let man =
     [ `S Manpage.s_see_also;
       `P "Consult $(b,odig doc b0) for the b0 opam manual."]
@@ -804,114 +800,110 @@ let unit =
     B0_cli.use_packs ~doc ()
   in
   let list_cmd =
-    let pkgs = pkgs ~doc:"Only list opam package $(docv) (repeatable)." () in
-    let output_details = B0_cli.output_details in
     let doc = "List opam packages and their defining packs" in
     Cmd.make (Cmd.info "list" ~doc ~man) @@
-    Term.(const list_cmd $ const env $ pkgs $ output_details)
+    let+ pkgs = pkgs ~doc:"Only list opam package $(docv) (repeatable)." ()
+    and+ output_details = B0_cli.output_details in
+    list_cmd ~env ~pkgs ~output_details
   in
   let file_cmd =
-    let pkgs =
+    let doc = "Generate opam files" in
+    Cmd.make (Cmd.info "file" ~doc ~man) @@
+    let+ pkgs =
       let doc = "Only generate file for opam package $(docv) (repeatable)." in
       pkgs ~doc ()
-    in
-    let dst =
+    and+ dst =
       let doc = "Write files in directory $(docv)." in
       Arg.(value & opt (some ~none:"stdout" B0_std_cli.dirpath) None &
            info ["d"; "dir"] ~doc)
-    in
-    let in_scope =
+    and+ in_scope =
       let doc =
         "Write file(s) in an $(b,opam) directory in the scope directories of \
          their defining pack."
       in
       Arg.(value & flag & info ["s"; "in-scope-dir"] ~doc)
-    in
-    let lint =
+    and+ lint =
       let doc = "Do not write files, lint them with $(b,opam lint)." in
       Arg.(value & flag & info ["lint"] ~doc)
-    in
-    let raw =
+    and+ raw =
       let doc = "Do not normalize files on file generation." in
       Arg.(value & flag & info ["raw"] ~doc)
-    in
-    let no_name =
+    and+ no_name =
       let doc = "On stdout, do not add the $(b,name:) field." in
       Arg.(value & flag & info ["no-name"] ~doc)
-    in
-    let doc = "Generate opam files" in
-    Cmd.make (Cmd.info "file" ~doc ~man) @@
-    Term.(const file_cmd $ const env $ constraints $ pkgs $ lint $
-          raw $ dst $ in_scope $ no_name)
+    and+ constraints in
+    file_cmd ~env ~constraints ~pkgs ~lint ~raw ~dst ~in_scope ~no_name
   in
   let publish_cmd =
-    let pkgs_dir =
+    let doc = "Publish opam packages on GitHub" in
+    let envs = B0_github.Auth.envs in
+    let man = [
+      `S Cmdliner.Manpage.s_description;
+      `P "$(cmd) publishes opam package on GitHub.";
+      `P "If you want to inspect the $(b,opam) file before use \
+          $(b,b0 --) $(b,.opam file) $(i,PKG)….";
+      `Blocks man ]
+    in
+    Cmd.make (Cmd.info "publish" ~doc ~envs ~man) @@
+    let+ pkgs_dir =
       let doc = "The directory with the opam files in the package repository."in
       Arg.(value & opt string "packages" & info ["pkgs-dir"] ~doc ~docv:"DIR")
-    in
-    let pkgs_repo =
+    and+ pkgs_repo =
       let doc = "The GitHub URL of the package repository."in
       Arg.(value & opt string "https://github.com/ocaml/opam-repository.git" &
            info ["pkgs-repo"] ~doc ~docv:"URL")
-    in
-    let fork_repo =
-      let doc = "The GitHub URL of the user fork of the package repository. \
-                 See $(b,--github-user) option." in
+    and+ fork_repo =
+      let doc =
+        "The GitHub URL of the user fork of the package repository. \
+         See $(b,--github-user) option."
+      in
       let none = "https://github.com/USER/opam-repository.git" in
       Arg.(value & opt (some ~none string) None &
            info ["fork-repo"] ~doc ~docv:"URL")
-    in
-    let local_repo =
-      let doc = "The directory to the local (shallow and bare) clone of \
-                 the package repository." in
+    and+ local_repo =
+      let doc =
+        "The directory to the local (shallow and bare) clone of \
+         the package repository."
+      in
       let none = "XDG_CACHE_HOME/opam-repository.git" in
       Arg.(value & opt (some ~none B0_std_cli.dirpath) None &
            info ["local-repo"] ~doc)
-    in
-    let github_auth = B0_github.Auth.cli () in
-    let pkgs =
-      let doc = "Only publish opam package $(docv) at version $(i,VERSION)
-                 (repeatable)." in
-      pkgs ~docv:"PKG[.VERSION]" ~doc ()
-    in
-    let check_only =
-      let doc = "Do not publish. Report various bits that are being \
-                 inferred and perform basic checks."
+    and+ github_auth = B0_github.Auth.cli ()
+    and+ pkgs =
+      let doc =
+        "Only publish opam package $(docv) at version $(i,VERSION) \
+         (repeatable)."
       in
-      Arg.(value & flag & info ["c"; "check-only"] ~doc)
-    in
-    let incompats =
-      let doc = "Declare $(docv) to be incompatible with the opam packages \
-                 being published (for those which are in their dependencies)."
+      pkgs ~docv:"PKG[.VERSION]" ~doc ()
+    and+ dry_run =
+      let doc =
+        "Do not publish. Report various bits that are being inferred and \
+         perform basic checks. Stop before updating the opam repository."
+      in
+      Arg.(value & flag & info ["dry-run"] ~doc)
+    and+ incompats =
+      let doc =
+        "Declare $(docv) to be incompatible with the opam packages \
+         being published (for those which are in their dependencies)."
       in
       let docv = "PKG[.VERSION]" in
       Arg.(value & opt_all string [] & info ["i"; "incompatible"] ~doc ~docv)
-    in
-    let no_pr =
-      let doc = "Do not open (or update) the pull request. All the other \
-                 steps, including pushing on the fork repo are done."
+    and+ no_pr =
+      let doc =
+        "Do not open (or update) the pull request. All the other \
+         steps, including pushing on the fork repo are done."
       in
       Arg.(value & flag & info ["no-pr"; "no-pull-request"] ~doc)
-    in
-    let doc = "Publish opam packages on GitHub" in
-    let envs = B0_github.Auth.envs in
-    let man = [ `S Cmdliner.Manpage.s_description;
-                `P "$(cmd) publishes opam package on GitHub.";
-                `P "If you want to inspect the $(b,opam) file before \
-                    use $(b,b0 --) $(b,.opam file) $(i,PKG)….";
-                `Blocks man]
-    in
-    Cmd.make (Cmd.info "publish" ~doc ~envs ~man) @@
-    Term.(const Publish.cmd $ const env $ pkgs_dir $ pkgs_repo $
-          fork_repo $ local_repo $ github_auth $ constraints $
-          pkgs $ incompats $ check_only $ no_pr)
+    and+ constraints in
+    Publish.cmd ~env ~pkgs_dir ~pkgs_repo ~fork_repo ~local_repo ~github_auth
+      ~constraints ~pkgs ~incompats ~dry_run ~no_pr
   in
-  let man = [ `S Cmdliner.Manpage.s_description;
-              `P "$(cmd) helps with $(b,opam) \
-                  see the b0 opam manual in $(b,odig doc b0) and \
-                  invoke the subcommands with $(b,--help) for more \
-                  information.";
-              `Blocks man]
+  let man = [
+    `S Cmdliner.Manpage.s_description;
+    `P "$(cmd) helps with $(b,opam) see the b0 opam manual in \
+        $(b,odig doc b0) and invoke the subcommands with $(b,--help) for \
+        more information.";
+    `Blocks man]
   in
   let name = B0_unit.name u in
   Cmd.group (Cmd.info name ~doc ~man) [file_cmd; list_cmd; publish_cmd]

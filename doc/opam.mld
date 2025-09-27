@@ -46,10 +46,10 @@ let mypkg =
 The [opam] packages defined in a b0 root along with the pack in which
 they are defined can be listed with the [.opam list] command:
 
-{v
+{@shell[
 b0 -- .opam list           # List opam packages in the b0 root
 b0 -- .opam list --help    # See more options
-v}
+]}
 
 {1:file_generation Package file generation}
 
@@ -58,13 +58,13 @@ The [opam] file for a package is generated from its pack metadata via
 
 The [.opam file] command outputs the generated files in various ways.
 
-{v
+{@shell[
 b0 -- .opam file mypkg             # opam file for mypkg on stdout
 b0 -- .opam file                   # All packages, on stdout
 b0 -- .opam file -d /tmp/opam/     # Write them to /tmp/opam
 b0 -- .opam file --in-scope-dir    # Write them in their scopes
 b0 -- .opam file --help            # See more options
-v}
+]}
 
 Note that the generation differs slightly when [opam] files are
 written to stdout, the [name:] field is added; use option [--no-name]
@@ -73,27 +73,8 @@ to prevent that.
 {1:publish Package publication}
 
 The [.opam publish] command publishes packages on [opam] by making a
-pull request on the OCaml [opam] package repository on GitHub.
-
-{2:github GitHub setup}
-
-In order to be able to make a pull request on the OCaml [opam]
-package repository in the name of your GitHub [$USER] you need
-to:
-
-{ol
-{- Create a personal access token for [$USER] with [repo] permission
-   by following {{:https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token}these instructions}. Paste
-   the token in the file [~/.config/b0/github/$USER.token] and:
-   {v
-    chmod 600 ~/.config/b0/github/$USER.token
-   v}
-   Alternatively you can specify the user and the token
-   in the [B0_GITHUB_{USER,TOKEN}] environment variables.
-   }
-{- Fork the
-   {{:https://github.com/ocaml/opam-repository}OCaml opam repository} so
-   that it becomes available from [https://github.com/$USER/opam-repository].}}
+pull request on the OCaml [opam] package repository on GitHub. In
+order to do so you must have the {{!github}GitHub setup} in place.
 
 {2:basic Basics}
 
@@ -101,8 +82,8 @@ to:
 has been released on the web. To get help for releasing your software
 with b0 see the {{!page-release}b0 release manual}.
 
-The publication process depends on the current work tree of the VCSes
-that are in your b0 root as follows:
+The opam publication process depends on the current work tree of the
+VCSes that are in your b0 root as follows:
 
 {ul
 {- The current metadata of the packs defining [opam] packages is used
@@ -116,15 +97,19 @@ that are in your b0 root as follows:
 Multiple package releases and incompatibilites with existing packages
 can be stated via a single pull request. For example:
 
-{v
+{@shell[
 b0 -- .opam publish p1 p2 p3.2.0.1 -i otherpackage
-v}
+]}
 
-publishes the [opam] packages [p1] and [p2] at a version determined by
-the VCSes in charge of the packs that define them, [p3] at version
-[2.0.1] and states that all versions of [otherpackage] are
-incompatible with these new versions – for those that exist in its
-dependencies.
+has this meaning:
+
+{ul
+{- Add the [opam] packages [p1] and [p2] at a version determined by
+   the VCSes in charge of the packs that define them.}
+{- Add the [opam] package [p3] at version [2.0.1]}
+{- Update constraints of all versions of [otherpackage] to
+   state that they are incompatible with these new versions – for those
+   that exist in its dependencies.}}
 
 Effectively it does the following. For each [opam] package [p]
 given on the command line it:
@@ -151,9 +136,111 @@ If everything worked well it continues with:
 {- Opens a pull request for the branch on the OCaml [opam]
    repository on GitHub.}}
 
-Invoking the action with [--check-only] outputs on stdout the various
-bits that are being derived and performs various checks; e.g. it lints
-[opam] files and HTTP HEADs archives to checks that they are not 404.
+{2:testing Testing}
+
+Invoking [.opam publish] with [--dry-run] outputs on stdout the
+various bits that are being derived and performs various checks.  For
+example it lints [opam] files and HTTP HEADs archives to check that
+they are not 404. It stops the process before updating the fork of the
+git opam repository and creating the pull request. Invoking with
+[--no-pr] the fork is updated but the PR is not created.
+
+{2:handling_build_failures Handling build failures}
+
+Once the opam repository continuous integration has reported the
+disastrous effects of your publication on dependent packages, you may
+need to state constraints on other packages. There are a few different
+ways to do this.
+
+{3:onthepr On the publication PR}
+
+Package incompatibilites can be stated with the repeatable [-i
+PKG[.version]] option of [.opam publish]. This adds a proper upper
+bound to [PKG] as needed.
+
+You can do this at publication time or afterwards. If you repeat the
+same [.opam publish] invocation (which can be found in the message of
+the PR) with more [-i] options, this simply updates the existing pull
+request.
+
+For example the following publishes a new [mypkg] and states that all
+versions of [otherpack] and the version 2.1.0 of [thispack] are
+incompatible with it – provided [mypkg] is in their dependencies:
+
+{@shell[
+b0 -- .opam publish mypkg -i otherpack -i thispack.2.1.0
+]}
+
+It is also possible to directly tweak the publication PR made by
+[.opam publish] by cloning your github opam-repository and checking
+out the branch of publication and push changes on it.
+
+{@shell[
+git clone git@github.com:$(GHUSER)/opam-repository.git
+git checkout $B0-PUBLISH-BRANCH
+… # Edit
+git commit -m 'Handle first round of failures'
+git push # This will automatically update the PR.
+]}
+
+{3:separate With a separate PR merged before}
+
+If for some reason using [-i] is not suitable you can manually make a
+separate request to state the incompatibilites and have it merged by
+the opam repository maintainers before the publication pull
+request. Once this is done you can re-run your [.opam] invocation
+(which can be found in the message of the PR), it will rebase the pull
+request.
+
+For long lists of packages this can be more convenient. For example
+suppose you have a text file [failures.txt] with one PACKAGE.VERSION
+per line followed by an error message, [opam admin] is your friend:
+
+{v
+   cd opam-repository   # Your opam-repository checkout
+   git fetch upstream
+   git checkout -b p.X.Y.Z-failures upstream/master
+   opam admin add-constraints 'p<X.Z.Z' \
+        --packages $(cat failures.txt | cut -d' ' -f 1  | tr '\n' ',')
+   git commit -m 'Constrain p.X.Y.Z failures'
+   git push origin  # Go make a pull request with it
+v}
+
+
+{2:meta_problems Handling metadata issues}
+
+If opam repository maintainers complain about your [opam] files you
+can adjust them and invoke again the same [.opam publish] command
+(which can be found in the message of the PR). As long as the same set
+of [opam] packages with the same version end-up being published this
+updates the existing pull request.
+
+{2:starting_over Starting over}
+
+If for some reason you find it preferable to start over the whole
+process. Close the PR manually. The next time you invoke [.opam
+publish] a new pull request will be opened.
+
+{1:publish_details Package publication details}
+
+{2:github GitHub setup}
+
+To be able to make a pull request on the OCaml [opam] package
+repository in the name of your GitHub [$USER] you need to:
+
+{ol
+{- Create a personal access token for [$USER] with [repo] permission
+   by following {{:https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token}these instructions}. Paste
+   the token in the file [~/.config/b0/github/$USER.token] and:
+   {v
+    chmod 600 ~/.config/b0/github/$USER.token
+   v}
+   Alternatively you can specify the user and the token
+   in the [B0_GITHUB_{USER,TOKEN}] environment variables.
+   }
+{- Fork the
+   {{:https://github.com/ocaml/opam-repository}OCaml opam repository} so
+   that it becomes available from [https://github.com/$USER/opam-repository].}}
 
 {2:det_version Version determination}
 
@@ -200,81 +287,7 @@ the first section. See {!B0_release.changes_file_of_pack} and
 Packages sharing the same release notes are aggregated in the
 pull request.
 
-{2:incompatibilities Stating incompatibilities}
-
-Package incompatibilites can be stated with the repeatable [-i
-PKG[.version]] option of [.opam publish]. This adds a proper upper
-bound to [PKG] as needed.
-
-For example the following publishes a new [mypkg] and states that
-all versions of [otherpack] and the
-version 2.1.0 of [thispack] are incompatible with it – provided
-[mypkg] is in their dependencies:
-
-{v
-b0 -- .opam publish mypkg -i otherpack -i thispack.2.1.0
-v}
-
-If you discover the incompatibilites only once the pull request has
-been made, repeat the same [.opam publish] invocation with more [-i]
-options, this will update the pull request.
-
-If for some reason that does not work you can manually make a separate
-request to state the incompatibilites and have it merged before your
-pull request and/or manually tweak the automated pull request.
-
-For the latter the simplest is to clone your github opam-repository
-checkout the branch of publication and push changes on it.
-
-{v
-   git clone git@github.com:$(GHUSER)/opam-repository.git
-   git checkout $B0-PUBLISH-BRANCH
-   … # Edit
-   git commit -m 'Handle first round of failures'
-   git push # This will automatically update the PR.
-v}
-
-{2:problems Dealing with pull request issues}
-
-If there are issues with the pull request you can adjust your metadata
-and invoke again the same [.opam publish] command. As long as the same
-set of [opam] packages with the same version end-up being published
-this updates the existing pull request.
-
-In particular gradually {{!incompatibilities}stating incompatibilites}
-will update the pull request.
-
-{2:opam_publish opam submission build failure}
-
-
-{b TODO.} Review.
-
-If the build failure is due to a missing constraint, follow the
-instruction of the next item to correct the opam file. If the
-failure is due to a defect in the distribution archive, call it a
-day and start over with a patch version release that corrects the
-problem. Do not try to reuse the version string of the failed
-release, other systems may already have picked up the broken
-archive.
-
-{2:opam_complaints opam repository maintainer and robot complaints}
-
-{b TODO.} Review.
-
-These pesky but loved maintainers and robots... If they complain about
-certain aspects of your opam submission, you can either try to correct
-it manually from the opam package description found in the build
-directory and reinvoke topkg opam submit or edit the opam file of the
-source repository and regenerate the opam Package description with
-topkg opam pkg and the --pkg-opam option. Note that if the VCS moved
-meanwhile you may have to use the various command line options of
-topkg-opam(1) to make sure you point to the right package version and
-distribution archive. In either case you should be aware that there
-will be a mismatch between the opam file in the distribution archive
-and the one you submitted to the opam repository. If this happens to
-be a problem, start over with a new patch version release.
-
-{1:cookbook Cookbook}
+{1:tips Tips}
 
 {2:multiple_packages Multiple packages from the same source archive}
 
