@@ -155,6 +155,12 @@ let default =
     |> ~~ B0_meta.issues "https://github.com/b0-system/b0/issues"
     |> ~~ B0_meta.description_tags
       ["dev"; "org:erratique"; "org:b0-system"; "build"]
+    (** Next line can be dropped once
+        https://github.com/ocaml/opam/issues/6574 is fixed *)
+    |> ~~ B0_opam.conflicts
+      ["ocaml-option-bytecode-only", ""]
+    |> ~~ B0_opam.build_env
+      {|CAML_LD_LIBRARY_PATH += "_build/src/std"|}
     |> ~~ B0_opam.build
       {|[["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]
          [ "cmdliner" "install" "tool-support"

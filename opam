@@ -27,6 +27,7 @@ depends: [
   "topkg" {build & >= "1.1.0"}
   "cmdliner" {>= "2.0.0"}
 ]
+conflicts: ["ocaml-option-bytecode-only"]
 build: [
   ["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]
   [
@@ -49,5 +50,6 @@ build: [
     "_build/cmdliner-install"
   ]
 ]
+build-env: CAML_LD_LIBRARY_PATH += "_build/src/std"
 dev-repo: "git+https://erratique.ch/repos/b0.git"
 x-maintenance-intent: ["(latest)"]
