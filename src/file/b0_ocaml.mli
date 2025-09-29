@@ -44,6 +44,18 @@ module Tool : sig
 
   val ocamlnat : B0_memo.Tool.t
   (** [ocamlnat] is the [ocamlnat] tool. *)
+
+  (** {1:gen Lexer and Parser Generators} *)
+  
+  val ocamllex : B0_memo.Tool.t
+  (** [ocamllex] is the [ocamllex] tool. *)
+  
+  val ocamlyacc : B0_memo.Tool.t
+  (** [ocamlyacc] is the [ocamlyacc] tool. *)
+  
+  val menhir : B0_memo.Tool.t
+  (** [menhir] is the [menhir] tool. *)
+  
 end
 
 (** OCaml compiler code generation specification.
@@ -1060,6 +1072,17 @@ val requires : Libname.t list B0_meta.key
 val exports : Libname.t list B0_meta.key
 (** [exports] on a library build unit specifies that the library
     exports these libraries. *)
+
+(** {1:source Source Transformations} *)
+
+val ocamllex : B0_srcs.sels -> B0_srcs.sel
+(** [ocamllex srcs] runs [ocamllex] on each [mll] file in [srcs] *)
+
+val ocamlyacc : B0_srcs.sels -> B0_srcs.sel
+(** [ocamlyacc srcs] runs [ocamlyacc] on each [mly] file in [srcs] *)
+
+val menhir : B0_srcs.sels -> B0_srcs.sel
+(** [menhir srcs] runs [menhir] on each [mly] file in [srcs] *)
 
 (** {1:frag Build fragments}
 
