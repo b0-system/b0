@@ -177,7 +177,7 @@ let default =
       "ocamlfind", {|build|};
       "ocamlbuild", {|build|};
       "topkg", {|build & >= "1.1.0"|};
-      "cmdliner", {|>= "1.3.0"|}; ]
+      "cmdliner", {|>= "2.0.0"|}; ]
     |> B0_meta.tag B0_opam.tag
     |> B0_meta.tag B0_release.tag
   in

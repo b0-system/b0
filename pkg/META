@@ -4,7 +4,7 @@ requires = ""
 
 package "file" (
   directory = "file"
-  description = "b0 build file library"
+  description = "The b0.file library"
   version = "%%VERSION_NUM%%"
   requires = "unix cmdliner b0.std b0.memo"
   archive(byte) = "b0_file.cma"
@@ -16,7 +16,7 @@ package "file" (
 
 package "kit" (
   directory = "kit"
-  description = "b0 toolkit library"
+  description = "The b0.kit library"
   version = "%%VERSION_NUM%%"
   requires = "unix cmdliner b0.std b0.memo b0.file"
   archive(byte) = "b0_kit.cma"
@@ -28,7 +28,7 @@ package "kit" (
 
 package "memo" (
   directory = "memo"
-  description = "b0 build library"
+  description = "The b0.memo library"
   version = "%%VERSION_NUM%%"
   requires = "unix cmdliner b0.std"
   archive(byte) = "b0_memo.cma"
@@ -40,7 +40,7 @@ package "memo" (
 
 package "std" (
   directory = "std"
-  description = "b0 standard library"
+  description = "The b0.std library"
   version = "%%VERSION_NUM%%"
   requires = "unix cmdliner"
   archive(byte) = "b0_std.cma"
