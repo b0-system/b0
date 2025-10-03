@@ -80,11 +80,14 @@ module Http_client : sig
   (** The type for HTTP clients. *)
 
   val make :
-    ?insecure:bool -> ?search:Cmd.tool_search -> ?cmd:Cmd.t -> unit ->
+    ?insecure:bool -> ?progress:bool -> ?search:Cmd.tool_search ->
+    ?cmd:Cmd.t -> unit ->
     (t, string) result
   (** [make ~search ~cmd ()] looks for [cmd] (defaults to [Cmd.tool "curl"])
       in [search] (defaults to [Os.Cmd.get ~search]). If [insecure] is
-      [true] (defaults to [false]) TLS server certificates are not checked. *)
+      [true] (defaults to [false]) TLS server certificates are not checked.
+      If [progress] is [true] some form of progress is shown on
+      [stdout] on {!request}. *)
 
   val request :
     t -> follow:bool -> Http.Request.t -> (Http.Response.t, string) result

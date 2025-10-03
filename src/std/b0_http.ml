@@ -78,9 +78,10 @@ end
 module Http_client = struct
   type t = Cmd.t
   let default = Cmd.tool "curl"
-  let make ?(insecure = false) ?search ?(cmd = default) () =
+  let make ?(insecure = false) ?(progress = false) ?search ?(cmd = default) () =
     let* curl = Os.Cmd.get ?search cmd in
-    Ok (Cmd.(curl %% if' insecure (arg "--insecure")))
+    let progress = if progress then "-#" else "-s" (* silent *) in
+    Ok (Cmd.(curl %% if' insecure (arg "--insecure") %% arg progress))
 
   let find_location request response =
     match List.assoc_opt "location" (Http.Response.headers response) with
@@ -131,7 +132,7 @@ module Http_client = struct
       let stdin = if has_body then Os.Cmd.in_string body else Os.Cmd.in_stdin in
       let body = Cmd.(if' has_body (arg "--data-binary" % "@-")) in
       let url = Http.Request.url request in
-      let base = Cmd.(arg "-s" (* silent *) % "-i" (* resp. headers *)) in
+      let base = Cmd.(arg "-i" (* resp. headers *)) in
       let args = Cmd.(base %% method' %% headers %% body % url) in
       let* out = Os.Cmd.run_out ~trim:false ~stdin Cmd.(curl %% args) in
       let* response = Http.Response.of_string out in
