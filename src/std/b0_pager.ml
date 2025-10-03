@@ -69,7 +69,8 @@ let page_stdout = function
         | (pager_read, parent_write) ->
             let stdin = Os.Cmd.in_fd ~close:true pager_read in
             Unix.set_close_on_exec parent_write;
-            Os.Fd.apply ~close:Unix.close parent_write @@ fun parent_write ->
+            let finally () = Os.Fd.close_noerr parent_write in
+            Fun.protect ~finally @@ fun () ->
             let* pid = Os.Cmd.spawn ?env ~stdin pager in
             let* () = dup2 parent_write Unix.stdout in
             let parent_pid = Unix.getpid () in

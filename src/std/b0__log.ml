@@ -86,9 +86,13 @@ let default_kmsg k level msgf =
       end
   | Some header ->
       if header = "" then Format.pp_open_box ppf 0 else begin
-        (* "%s: @[[%s] " *)
-        B0__fmt.string ppf exec;
-        B0__fmt.string ppf ": ";
+        begin match level with
+        | Stderr | Stdout -> ()
+        | _ ->
+            (* "%s: @[[%s] " *)
+            B0__fmt.string ppf exec;
+            B0__fmt.string ppf ": ";
+        end;
         Format.pp_open_box ppf 0;
         B0__fmt.char ppf '[';
         pp_level_header level ppf header;

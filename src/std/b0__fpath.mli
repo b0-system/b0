@@ -163,43 +163,51 @@ val parent : t -> t
 
 (** {1:prefix Strict prefixes and roots} *)
 
-val is_prefix : t -> t -> bool
-(** [is_prefix prefix p] is [true] iff [prefix] is a strict prefix
-    of [p] that respects path segments. More formally iff the following
+val strictly_starts_with : prefix:t -> t -> bool
+(** [strictly_start_with ~prefix p] is [true] iff [p] starts with [prefix]
+    but is not [prefix] itself regardless of directoryness. Otherwise said
+    if [prefix] is a strict prefix of [p] that respects path segments.
+
+    More formally the invocation returns [true] iff the following
     two conditions hold:
+
     {ol
     {- [not Fpath.(equal (to_dir_path prefix) (to_dir_path p))]}
-    {- [Fpath.(String.is_prefix (to_string (to_dir_path prefix)
+    {- [Fpath.(String.starts_with ~prefix:(to_string (to_dir_path prefix)
        (to_string p)))] is [true]}}
 
-    {b Warning.} By definition [is_prefix p p] is [false]. Note
-    also that the prefix relation does not entail directory
-    containement; for example [is_prefix (v "..")  (v "../..")]  holds. *)
+    {b Warning.} By definition [stricty_starts_with ~prefix:p p] is [false].
+    Note also that the prefix relation does not entail directory
+    containement; for example
+    [stricly_starts_with ~prefix:(v "..")  (v "../..")] holds.
+    It holds however if you {!Os.Path.realpath} the paths. *)
 
-val strip_prefix : t -> t -> t option
-(** [strip_prefix prefix p] is:
+val drop_strict_prefix : prefix:t -> t -> t option
+(** [drop_strict_prefix prefix p] is:
     {ul
-    {- [None] if {!is_prefix}[ prefix p] is [false].}
+    {- [None] if {!strictly_starts_with}[ ~prefix p] is [false].}
     {- [Some q] otherwise where [q] is [p] without the string prefix
        [Fpath.to_dir_path prefix]. This means that [q] is always
        relative, that it preserves [p]'s
        {{!is_syntactic_dir}syntactic directoryness} and
        that [Fpath.(equal (prefix // q) p)] holds.}}
 
-    {b Warning.} By definition [strip_prefix p p] is [None]. *)
+    {b Warning.} By definition [strip_strict_prefix p p] is [None]. *)
 
-val drop_prefixed : t list -> t list
-(** [drop_prefixed ps] is [ps] without elements that have a
-    {{!is_prefix}strict prefixes} in [ps]. The list order is
-    preserved. Duplicates are not removed use {!distinct} for
-    this. *)
+val remove_strictly_prefixed : t list -> t list
+(** [remove_strictly_prefixed ps] is [ps] without elements that have a
+    {{!strictly_starts_with}strict prefixes} in [ps]. Basically if a
+    path [p] strictly prefixes another in [ps], only [p] is kept. The
+    list order is preserved. Duplicates are not removed, use
+    {!distinct} for this. *)
 
 val reroot : src_root:t -> dst_root:t -> t -> t
-(** [reroot ~src_root ~dst_root p] assumes [src_root] {{!is_prefix}prefixes}
-    [p] removes the prefix and prepends [dst_root] to the result.
+(** [reroot ~src_root ~dst_root p] assumes [src_root]
+    {{!strictly_starts_with}strictly prefixes} [p] removes the prefix and
+    prepends [dst_root] to the result.
 
-    Raises [Invalid_argument] if [dst_root] is not a prefix of [src].
-    In particular note that [p] cannot be [src_root]. *)
+    Raises [Invalid_argument] if [dst_root] is not a strict prefix of
+    [src].  In particular note that [p] cannot be [src_root]. *)
 
 val relative : to_dir:t -> t -> t
 (** [relative ~to_dir p] is [q] such that [to_dir // q] represents
@@ -345,9 +353,17 @@ val to_url_path : ?escape_space:bool -> t -> string
 
 val to_segments : t -> string list
 (** [to_segments p] is [p]'s {e non-empty} list of segments. Absolute
-    paths have an empty string added, this allows to recover the path's
-    string with [String.concat dir_sep], note however that you may
-    have lost the volume along the way. *)
+    paths have an empty string in the front, this allows to recover
+    the path's string with [String.concat natural_dir_sep], note however
+    that you may have lost the volume along the way. *)
+
+val of_segments : string list -> t
+(** [of_segments segs] is a path from the given list of segments. Absolute
+    paths are represented with an empty string in the front, see
+    {!to_segments}.
+
+    @raise Invalid_argument if [segs] is the empty list or if
+    [not (List.for_all is_segement segs)]. *)
 
 (** {1:fmt Formatting} *)
 
@@ -367,7 +383,7 @@ val pp_dump : t B0__fmt.t
 
 val error :
   t -> ('b, Format.formatter , unit, ('a, string) result) format4 -> 'b
-(** [error p fmt …] is [Fmt.error ("%a:" ^^ fmt) pp_unquoted p … ]. *)
+(** [error p fmt …] is [Fmt.error ("%a: " ^^ fmt) pp_unquoted p … ]. *)
 
 val prefix_msg : t -> string -> string
 (** [prefix_msg p msg] is [Fmt.str "%a: %s" pp_unquoted msg]. *)

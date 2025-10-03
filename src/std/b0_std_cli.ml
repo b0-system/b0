@@ -130,3 +130,23 @@ let output_details ?(docs = s_output_details_options) () =
     Arg.info ["l"; "long"] ~doc ~docs
   in
   Arg.(value & vflag `Normal [`Short, short; `Long, long])
+
+(* Networking options *)
+
+let socket_endpoint_conv ~default_port =
+  let parse s = Os.Socket.Endpoint.of_string ~default_port s in
+  Arg.conv' (parse, Os.Socket.Endpoint.pp)
+
+let socket_endpoint_listener
+    ?(opts = ["l"; "listen"]) ?docs ~default_port
+    ?(default_endpoint = `Host ("localhost", default_port)) () =
+  let doc =
+    Printf.sprintf
+      "Listen for connections on address $(i,ADDR) and port $(i,PORT) \
+       (defaults to $(b,%d), if $(b,0) is specified one is chosen by \
+       the OS) or the Unix domain socket $(i,PATH)."
+      default_port
+  in
+  let docv = "ADDR[:PORT]|PATH" in
+  let lconv = socket_endpoint_conv ~default_port in
+  Arg.(value & opt lconv default_endpoint & info opts ?docs ~doc ~docv)

@@ -13,6 +13,8 @@ let doing_exist_test = "Existence test:"
 let err_seg_not_dir = "A segment of the path is not a directory"
 
 let uerror = Unix.error_message
+
+let err_op_path op path e = B0__fmt.str "%s %a: %s" op B0__fmt.code path e
 let err_doing doing e = B0__fmt.str "%s: %s" doing e
 let ferr file e = B0__fmt.error "%a: %s" B0__fpath.pp file e
 let ffail file e = B0__fmt.failwith "%a: %s" B0__fpath.pp file e
@@ -59,17 +61,33 @@ let time ?(level = B0__log.Info) m f =
 
 let () = B0__log.set_time_func { time = time }
 
+module Signal = struct
+  let set_behaviour sg sg_behaviour = try Ok (Sys.signal sg sg_behaviour) with
+  | Sys_error e -> Error e
+
+  let set_behaviour_noerr sg sg_behaviour =
+    try Sys.set_signal sg sg_behaviour with
+    | Sys_error _ -> ()
+
+  let with_behaviour sg b f = match set_behaviour sg b with
+  | Error _ as e -> e
+  | Ok prev ->
+      let finally () = set_behaviour_noerr sg prev in
+      Ok (Fun.protect ~finally f)
+end
 
 module Fd = struct
   let unix_buffer_size = 65536 (* UNIX_BUFFER_SIZE 4.0.0 *)
 
   let rec openfile fn mode perm = try Unix.openfile fn mode perm with
-  | Unix.Unix_error (Unix.EINTR, _, _) -> openfile fn mode perm
+  | Unix.Unix_error (EINTR, _, _) -> openfile fn mode perm
 
   let rec close fd = try Unix.close fd with
-  | Unix.Unix_error (Unix.EINTR, _, _) -> close fd
+  | Unix.Unix_error (EINTR, _, _) -> close fd
 
-  let close_no_unix_exn fd = try close fd with Unix.Unix_error _ -> ()
+  let rec close_noerr fd = try Unix.close fd with
+  | Unix.Unix_error (EINTR, _, _) -> close_noerr fd
+  | Unix.Unix_error (_, _, _) -> ()
 
   let apply ~close fd f =
     let close fd = try close fd with Unix.Unix_error _ -> () in
@@ -144,38 +162,135 @@ module Fd = struct
     let empty () = ref S.empty
     let rem fd s = s := S.remove fd !s
     let add fd s = s := S.add fd !s
-    let close_all s = S.iter close_no_unix_exn !s; s := S.empty
+    let close_all s = S.iter close_noerr !s; s := S.empty
     let close fd s =
-      if S.mem fd !s then (close_no_unix_exn fd; s := S.remove fd !s)
+      if S.mem fd !s then (close_noerr fd; s := S.remove fd !s)
   end
 end
 
 module Socket = struct
-  let close_noerr fd = try Unix.close fd with Unix.Unix_error _ -> ()
-
   let pp_name_port ppf (n, p) = B0__fmt.pf ppf "%s:%d" n p
   let pp_sockaddr ppf = function
   | Unix.ADDR_UNIX s -> B0__fmt.string ppf s
   | Unix.ADDR_INET (a, p) -> pp_name_port ppf (Unix.string_of_inet_addr a, p)
 
-  let rec of_endpoint ep stype = match ep with
-  | `Fd fd -> Ok (None, fd, false)
+  let rec set_nonblock ~nonblock fd =
+    try if nonblock then Unix.set_nonblock fd else Unix.clear_nonblock fd with
+    | Unix.Unix_error (EINTR, _, _) -> set_nonblock ~nonblock fd
+
+  let rec connect fd addr = match Unix.connect fd addr with
+  | () -> Ok ()
+  | exception Unix.Unix_error (EINTR, _, _) -> connect fd addr
+  | exception Unix.Unix_error (e, _, _) ->
+      B0__fmt.error "connect to %a: %s" pp_sockaddr addr (uerror e)
+
+  let rec bind fd addr =
+    try
+      Unix.setsockopt fd Unix.SO_REUSEADDR true;
+      Unix.bind fd addr;
+      Ok ()
+    with
+    | Unix.Unix_error (EINTR, _, _) -> bind fd addr
+    | Unix.Unix_error (e, _, _) ->
+        B0__fmt.error "bind %a: %s" pp_sockaddr addr (uerror e)
+
+  let rec listen ?(backlog = 128) fd = try Ok (Unix.listen fd backlog) with
+  | Unix.Unix_error (EINTR, _, _) -> listen fd ~backlog
+  | Unix.Unix_error (e, _, _) -> B0__fmt.error "listen: %s" (uerror e)
+
+  let rec accept ~cloexec fd = try Ok (Unix.accept ~cloexec fd) with
+  | Unix.Unix_error (EINTR, _, _) -> accept ~cloexec fd
+  | Unix.Unix_error (e, _, _) -> B0__fmt.error "accept: %s" (uerror e)
+
+  let rec for_endpoint ?(nonblock = false) ep stype = match ep with
+  | `Fd fd ->
+      begin match set_nonblock ~nonblock fd with
+      | exception Unix.Unix_error (e, _, _) -> Error (uerror e)
+      | () -> Ok (fd, false, None)
+      end
   | `Host (name, port) ->
       begin match Unix.gethostbyname name with
       | exception Not_found -> B0__fmt.error "%s: host not found" name
       | h ->
           let c = `Sockaddr (Unix.ADDR_INET (h.h_addr_list.(0), port)) in
-          of_endpoint c stype
+          for_endpoint c stype
       end
   | `Sockaddr addr ->
       let domain = Unix.domain_of_sockaddr addr in
       match Unix.socket ~cloexec:true domain stype 0 with
       | exception Unix.Unix_error (e, _, _) -> Error (uerror e)
       | fd ->
-          match Unix.set_nonblock fd with
+          match set_nonblock ~nonblock fd with
           | exception Unix.Unix_error (e, _, _) ->
-              close_noerr fd; Error (uerror e)
-          | () -> Ok (Some addr, fd, true)
+              Fd.close_noerr fd; Error (uerror e)
+          | () -> Ok (fd, true, Some addr)
+
+  let connect_endpoint ?nonblock ep stype =
+    Result.map_error (fun e -> B0__fmt.str "connect endpoint: %s" e) @@
+    match for_endpoint ?nonblock ep stype with
+    | Error _ as e -> e
+    | Ok (fd, true, (Some addr)) ->
+        begin match connect fd addr with
+        | Ok () -> Ok (fd, true, addr)
+        | Error _ as e -> Fd.close_noerr fd; e
+        end;
+    | Ok (fd, false, None) -> (* [ep] was (`Fd fd) check it is connected *)
+        begin match Unix.getpeername fd with
+        | addr -> Ok (fd, false, addr)
+        | exception Unix.Unix_error (ENOTCONN, _, _) ->
+            Error "provided file descriptor is not connected"
+        | exception Unix.Unix_error (e, _, _) ->
+            Error (uerror e)
+        end
+    | _ -> assert false
+
+  let with_connected_endpoint ?nonblock ep stype f =
+    Result.join @@ Signal.with_behaviour Sys.sigpipe Signal_ignore @@ fun () ->
+    match connect_endpoint ?nonblock ep stype with
+    | Error _ as err -> err
+    | Ok (fd, close, addr) ->
+        let finally () = if close then Fd.close_noerr fd in
+        Ok (Fun.protect ~finally (fun () -> f fd addr))
+
+  let listen_endpoint ?nonblock ?backlog ep stype =
+    let maybe_listen ?backlog stype fd close addr = match stype with
+    | Unix.SOCK_STREAM ->
+        begin match listen ?backlog fd with
+        | Error _ as e -> if close then Fd.close_noerr fd; e
+        | Ok () -> Ok (fd, close, addr)
+        end
+    | _ -> Ok (fd, close, addr)
+    in
+    Result.map_error (fun e -> B0__fmt.str "listen endpoint: %s" e) @@
+    match for_endpoint ?nonblock ep stype with
+    | Error _ as e -> e
+    | Ok (fd, true, (Some addr)) ->
+        begin match bind fd addr with
+        | Ok () ->
+            (* In case [addr]'s port was 0 we get a dynamically allocated
+               port. This retrieves the concrete address. *)
+            begin match Unix.getsockname fd with
+            | addr -> maybe_listen ?backlog stype fd true addr
+            | exception Unix.Unix_error (e, _, _) ->
+                Fd.close_noerr fd; Error (uerror e)
+            end
+        | Error _ as e -> e
+        end;
+    | Ok (fd, false, None) -> (* [ep] was (`Fd fd) check it is bound *)
+        begin match Unix.getsockname fd with
+        | ADDR_INET (_, 0) -> Error "provided file descriptor is not bound"
+        | addr -> maybe_listen ?backlog stype fd false addr
+        | exception Unix.Unix_error (e, _, _) -> Error (uerror e)
+        end
+    | _ -> assert false
+
+  let with_listening_endpoint ?nonblock ?backlog ep stype f =
+    Result.join @@ Signal.with_behaviour Sys.sigpipe Signal_ignore @@ fun () ->
+    match listen_endpoint ?nonblock ?backlog ep stype with
+    | Error _ as err -> err
+    | Ok (fd, close, addr) ->
+        let finally () = if close then Fd.close_noerr fd in
+        Ok (Fun.protect ~finally (fun () -> f fd addr))
 
   module Endpoint = struct
     type t =
@@ -198,6 +313,14 @@ module Socket = struct
               | None -> B0__fmt.error "port %S not an integer" p
               | Some p -> Ok (`Host (h, p))
 
+    let with_port_of_sockaddr sockaddr ep = match sockaddr with
+    | Unix.ADDR_UNIX _ -> ep
+    | Unix.ADDR_INET (_, port) ->
+        match ep with
+        | `Host (n, _) -> `Host (n, port)
+        | `Sockaddr (Unix.ADDR_INET (a, _)) -> `Sockaddr (ADDR_INET (a, port))
+        | ep -> ep
+
     let pp ppf = function
     | `Host (n, p) -> pp_name_port ppf (n, p)
     | `Fd _fd -> B0__fmt.pf ppf "<fd>"
@@ -210,9 +333,8 @@ module Socket = struct
       let relax = Mtime.sleep B0__mtime.Span.(1 * ms) in
       Result.map_error (err_wait ep) @@
       let rec loop ~deadline dur =
-        let* addr, fd, close = of_endpoint ep socket_type in
-        let () = Unix.clear_nonblock fd in
-        let finally () = if close then close_noerr fd in
+        let* fd, close, addr = for_endpoint ~nonblock:false ep socket_type in
+        let finally () = if close then Fd.close_noerr fd in
         let* status = Fun.protect ~finally @@ fun () ->
           match addr with
           | None -> Error "no address to connect to"
@@ -342,23 +464,17 @@ module Fs_base = struct
   let rec unlink p = try Unix.unlink p with
   | Unix.Unix_error (Unix.EINTR,_, _) -> unlink p
 
-  let rec file_delete p =
-    try Ok (Unix.unlink (B0__fpath.to_string p); true) with
-    | Unix.Unix_error (Unix.ENOENT, _, _) -> Ok false
-    | Unix.Unix_error (Unix.EINTR, _, _) -> file_delete p
-    | Unix.Unix_error (e, _, _) -> ferr p (err_doing "Deleting" (uerror e))
-
   (* Directory operations. *)
 
   let dir_create ?(mode = 0o755) ~make_path dir =
-    let create_op = "Creating" in
+    let create_op = "create directory" in
     let mkdir dir mode = Unix.mkdir (B0__fpath.to_string dir) mode in
     try
       let pmode = 0o755 in
       try Ok (mkdir dir mode; true) with
       | Unix.Unix_error (Unix.EEXIST, _, _) ->
           if is_dir (B0__fpath.to_string dir) then Ok false else
-          ferr dir (err_doing create_op "Path exists but not a directory")
+          ferr dir (err_doing create_op "Exists but not a directory")
       | Unix.Unix_error (Unix.ENOENT, _, _) when make_path ->
           let rec down = function
           | [] -> assert false
@@ -385,7 +501,7 @@ module Fs_base = struct
             ferr dir (err_doing create_op perr)
 
   let dir_delete ~recurse dir =
-    let delete_op = "Deleting" in
+    let delete_op = "Delete directory" in
     let err e = B0__fmt.failwith_notrace "%a: %s" B0__fpath.pp dir e in
     let rec delete_symlink p =
       if is_symlink p then (unlink p; true) else false
@@ -556,9 +672,11 @@ module Fs_base = struct
       Ok (Unix.symlink (B0__fpath.to_string src) (B0__fpath.to_string p))
     with
     | Unix.Unix_error (Unix.EEXIST, _, _) when force ->
-        begin match file_delete p with
-        | Error e -> err e
-        | Ok _ -> symlink ~force ~make_path ~src p
+        begin match unlink (B0__fpath.to_string p) with
+        | exception Unix.Unix_error (ENOENT, _, _) ->
+            symlink ~force ~make_path ~src p
+        | () -> symlink ~force ~make_path ~src p
+        | exception Unix.Unix_error (e, _, _) -> err (uerror e)
         end
     | Unix.Unix_error ((Unix.ENOENT | Unix.ENOTDIR as e), _, _)
       when make_path ->
@@ -592,7 +710,9 @@ module Fs_base = struct
 end
 
 module Tmp = struct
-  let delete_file file = ignore (Fs_base.file_delete file)
+  let delete_file file = try Fs_base.unlink (B0__fpath.to_string file) with
+  | Unix.Unix_error (e, _, _) -> ()
+
   let files = ref B0__fpath.Set.empty
   let add_file file = files := B0__fpath.Set.add file !files
   let rem_file file =
@@ -713,6 +833,9 @@ module Tmp = struct
 end
 
 module File = struct
+  let err_not_file = "Not a regular file"
+  let err_no_such_file = "No such file"
+
   let channel_apply ~close c f =
     let close c = try close c with Sys_error _ -> () in
     match f c with v -> close c; v | exception e -> close c; raise e
@@ -737,12 +860,10 @@ module File = struct
   let rec must_exist file =
     match (Unix.stat (B0__fpath.to_string file)).Unix.st_kind with
     | Unix.S_REG -> Ok ()
-    | _ -> ferr file "Path exists but not a regular file"
-    | exception Unix.Unix_error (Unix.ENOENT, _,_) ->
-        ferr file "No such file"
-    | exception Unix.Unix_error (Unix.ENOTDIR, _, _) ->
-        ferr file err_seg_not_dir
-    | exception Unix.Unix_error (Unix.EINTR, _, _) -> must_exist file
+    | _ -> ferr file err_not_file
+    | exception Unix.Unix_error (ENOENT, _,_) -> ferr file err_no_such_file
+    | exception Unix.Unix_error (ENOTDIR, _, _) -> ferr file err_seg_not_dir
+    | exception Unix.Unix_error (EINTR, _, _) -> must_exist file
     | exception Unix.Unix_error (e, _, _) ->
         ferr file (err_doing doing_exist_test (uerror e))
 
@@ -754,7 +875,31 @@ module File = struct
 
   (* Deleting and truncating *)
 
-  let delete = Fs_base.file_delete
+  let rec delete path =
+    let op = "Delete file" in
+    let unlink p = match Unix.unlink p with
+    | () -> Ok true
+    | exception Unix.Unix_error (EINTR, _, _) -> delete path
+    | exception Unix.Unix_error (ENOENT, _, _) -> (* could race *) Ok false
+    | exception Unix.Unix_error (e, _, _) -> Error (err_op_path op p (uerror e))
+    in
+    let p = B0__fpath.to_string path in
+    match (Unix.lstat p).Unix.st_kind with
+    | Unix.S_REG -> (* file *) unlink p
+    | Unix.S_LNK ->
+        begin match (Unix.stat p).Unix.st_kind with
+        | Unix.S_REG -> (* link to a file *) unlink p
+        | _ -> Error (err_op_path op p err_not_file)
+        | exception Unix.Unix_error (EINTR, _, _) -> delete path
+        | exception Unix.Unix_error (ENOENT, _, _) -> (* dangling *) unlink p
+        | exception Unix.Unix_error (e, _, _) ->
+            Error (err_op_path op p (uerror e))
+        end
+    | _ -> Error (err_op_path op p err_not_file)
+    | exception Unix.Unix_error (EINTR, _, _) -> delete path
+    | exception Unix.Unix_error (ENOENT, _, _) -> Ok false
+    | exception Unix.Unix_error (e, _, _) -> Error (err_op_path op p (uerror e))
+
   let rec truncate file size =
     try Ok (Unix.truncate (B0__fpath.to_string file) size) with
     | Unix.Unix_error (Unix.EINTR, _, _) -> truncate file size
@@ -772,9 +917,11 @@ module File = struct
       Ok (Unix.link (B0__fpath.to_string src) (B0__fpath.to_string file))
     with
     | Unix.Unix_error (Unix.EEXIST, _, _) when force ->
-        begin match delete file with
-        | Error e -> err e
-        | Ok _ -> link ~force ~make_path ~src file
+        begin match Fs_base.unlink (B0__fpath.to_string file) with
+        | exception Unix.Unix_error (ENOENT, _, _) ->
+            link ~force ~make_path ~src file
+        | () -> link ~force ~make_path ~src file
+        | exception Unix.Unix_error (e, _, _) -> err (uerror e)
         end
     | Unix.Unix_error ((Unix.ENOENT | Unix.ENOTDIR as e), _, _)
       when make_path ->
@@ -954,37 +1101,8 @@ end
 
 module Dir = struct
 
-  (* Existence *)
-
-  let rec exists dir =
-    match (Unix.stat @@ B0__fpath.to_string dir).Unix.st_kind with
-    | Unix.S_DIR -> Ok true
-    | _ -> Ok false
-    | exception Unix.Unix_error (Unix.ENOENT, _, _) -> Ok false
-    | exception Unix.Unix_error (Unix.ENOTDIR, _, _) ->
-        ferr dir err_seg_not_dir
-    | exception Unix.Unix_error (Unix.EINTR, _, _) -> exists dir
-    | exception Unix.Unix_error (e, _, _) ->
-        ferr dir (err_doing doing_exist_test (uerror e))
-
-  let rec must_exist dir =
-    match (Unix.stat @@ B0__fpath.to_string dir).Unix.st_kind with
-    | Unix.S_DIR -> Ok ()
-    | _ ->
-        ferr dir "Path exists but not a directory"
-    | exception Unix.Unix_error (Unix.ENOENT, _, _) ->
-        ferr dir "No such directory"
-    | exception Unix.Unix_error (Unix.ENOTDIR, _, _) ->
-        ferr dir err_seg_not_dir
-    | exception Unix.Unix_error (Unix.EINTR, _, _) -> must_exist dir
-    | exception Unix.Unix_error (e, _, _) ->
-        ferr dir (err_doing doing_exist_test (uerror e))
-
-  (* Creating, deleting and renaming. *)
-
-  let create = Fs_base.dir_create
-
-  (* Contents *)
+  let err_not_dir = "Not a directory"
+  let err_no_such_dir = "No such directory"
 
   let rec readdir ~dotfiles dir =
     let is_dot_file s = String.length s <> 0 && s.[0] = '.' in
@@ -1001,6 +1119,87 @@ module Dir = struct
     | exception e ->
         (try Unix.closedir dh with Unix.Unix_error (_, _, _) -> ());
         raise e
+
+  (* Existence *)
+
+  let rec exists dir =
+    match (Unix.stat @@ B0__fpath.to_string dir).Unix.st_kind with
+    | Unix.S_DIR -> Ok true
+    | _ -> Ok false
+    | exception Unix.Unix_error (ENOENT, _, _) -> Ok false
+    | exception Unix.Unix_error (ENOTDIR, _, _) ->
+        ferr dir err_seg_not_dir
+    | exception Unix.Unix_error (EINTR, _, _) -> exists dir
+    | exception Unix.Unix_error (e, _, _) ->
+        ferr dir (err_doing doing_exist_test (uerror e))
+
+  let rec must_exist dir =
+    match (Unix.stat @@ B0__fpath.to_string dir).Unix.st_kind with
+    | Unix.S_DIR -> Ok ()
+    | _ -> ferr dir err_not_dir
+    | exception Unix.Unix_error (ENOENT, _, _) -> ferr dir err_no_such_dir
+    | exception Unix.Unix_error (ENOTDIR, _, _) -> ferr dir err_seg_not_dir
+    | exception Unix.Unix_error (EINTR, _, _) -> must_exist dir
+    | exception Unix.Unix_error (e, _, _) ->
+        ferr dir (err_doing doing_exist_test (uerror e))
+
+  (* Creating *)
+
+  let create = Fs_base.dir_create
+
+  (* Deleting *)
+
+  let rec delete ~recurse dir =
+    let op = "Delete directory" in
+    let unlink p = match Unix.unlink p with
+    | () -> Ok true
+    | exception Unix.Unix_error (EINTR, _, _) -> delete ~recurse dir
+    | exception Unix.Unix_error (ENOENT, _, _) -> (* could race *) Ok false
+    | exception Unix.Unix_error (e, _, _) -> Error (err_op_path op p (uerror e))
+    in
+    let p = B0__fpath.to_string dir in
+    match (Unix.lstat p).Unix.st_kind with
+    | Unix.S_DIR -> (* dir *) Fs_base.dir_delete ~recurse dir
+    | Unix.S_LNK ->
+        begin match (Unix.stat p).Unix.st_kind with
+        | Unix.S_DIR -> (* link to a dir *) unlink p
+        | _ -> Error (err_op_path op p err_not_dir)
+        | exception Unix.Unix_error (EINTR, _, _) -> delete ~recurse dir
+        | exception Unix.Unix_error (ENOENT, _, _) -> (* dangling *) unlink p
+        | exception Unix.Unix_error (e, _, _) ->
+            Error (err_op_path op p (uerror e))
+        end
+    | _ -> Error (err_op_path op p err_not_dir)
+    | exception Unix.Unix_error (EINTR, _, _) -> delete ~recurse dir
+    | exception Unix.Unix_error (ENOENT, _, _) -> Ok false
+    | exception Unix.Unix_error (e, _, _) -> Error (err_op_path op p (uerror e))
+
+  let rec delete_contents dir =
+    let op = "Delete contents of" in
+    let p = B0__fpath.to_string dir in
+    match (Unix.stat p).Unix.st_kind with
+    | Unix.S_DIR ->
+        begin match readdir ~dotfiles:true dir with
+        | exception Failure e -> Error (err_op_path op p e)
+        | [] -> Ok false
+        | els ->
+            let delete el =
+              Result.map ignore @@
+              Fs_base.path_delete ~recurse:true B0__fpath.(dir / el)
+            in
+            match B0__list.iter_stop_on_error delete els with
+            | Error e -> Error (err_op_path op p e)
+            | Ok () -> Ok true
+        end
+    | _ -> Error (err_op_path op p err_not_dir)
+    | exception Unix.Unix_error (EINTR, _, _) ->
+        delete_contents dir
+    | exception Unix.Unix_error (ENOENT, _, _) ->
+        Error (err_op_path op p err_no_such_dir)
+    | exception Unix.Unix_error (e, _, _) ->
+        Error (err_op_path op p (uerror e))
+
+  (* Contents *)
 
   let rec stat p = try (Unix.stat @@ B0__fpath.to_string p) with
   | Unix.Unix_error (Unix.EINTR, _, _) -> stat p
@@ -1108,6 +1307,15 @@ module Dir = struct
     try (Unix.access (B0__fpath.to_string p) Unix.[R_OK; X_OK]; false) with
     | Unix.Unix_error ((EACCES | EPERM (* may happen *)), _, _) -> true
 
+  let contents
+      ?(kind = `All) ?rel ?dotfiles ?follow_symlinks ?prune_dir ~recurse dir
+    =
+    let filter = match kind with
+    | `All -> `Any | `Files -> `Non_dir | `Dirs -> `Dir
+    in
+    _fold ~filter ?rel ?dotfiles ?follow_symlinks ?prune_dir ~recurse
+      path_list dir []
+
   (* copy *)
 
   let copy
@@ -1115,7 +1323,9 @@ module Dir = struct
       ?(prune = fun _ _ _ -> false) ~make_path ~recurse src ~dst
     =
     let err e =
-      B0__fmt.str "copy %a to %a: %s" B0__fpath.pp src B0__fpath.pp dst e
+      B0__fmt.str "copy %a to %a: %s"
+        (B0__fmt.code' B0__fpath.pp) src
+        (B0__fmt.code' B0__fpath.pp) dst e
     in
     let prune = match rel with (* we invoke [_fold] with [rel:true] *)
     | true -> fun st name p _ -> prune st name p
@@ -1265,7 +1475,16 @@ module Dir = struct
     in
     (* if Sys.win32 then home_env home_win32_var else *)
     match
-      B0__fpath.of_string (Unix.getpwuid (Unix.getuid ())).Unix.pw_dir
+      (* When a tool is invoked via sudo one gets root even in getuid.
+         The original user id can be found in the SUDO_UID en var *)
+      let uid = match Env.var ~empty_is_none:true "SUDO_UID" with
+      | None -> Unix.getuid ()
+      | Some id ->
+          match int_of_string_opt id with
+          | None -> Unix.getuid ()
+          | Some id -> id
+      in
+      B0__fpath.of_string (Unix.getpwuid uid).Unix.pw_dir
     with
     | Ok _ as v -> v
     | Error _ -> home_env home_var
@@ -1298,11 +1517,18 @@ module Dir = struct
     base_dir cache_dir cache_var cache_var_alt cache_fallback
 
   let runtime_dir = "runtime"
-  let runtime_var = "XDG_RUNTIME_HOME"
+  let runtime_var = "XDG_RUNTIME_DIR"
   let runtime_var_alt = None
   let runtime_fallback () = Ok (default_tmp ())
   let runtime () =
     base_dir runtime_dir runtime_var runtime_var_alt runtime_fallback
+
+  let state_dir = "state"
+  let state_var = "XDG_STATE_DIR"
+  let state_var_alt = None
+  let state_fallback () = home_fallback state_dir (B0__fpath.v ".local/state")
+  let state () =
+    base_dir state_dir state_var state_var_alt state_fallback
 end
 
 module Path = struct

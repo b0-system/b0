@@ -23,7 +23,9 @@ module Exit : sig
   (** [infos] has the infos of {!Cmdliner.Term.default_exits},
       [no_such_name], [some_error] and those above.  *)
 
-  (** {1:cmdliner Evaluating and exiting} *)
+  (** {1:cmdliner Evaluating and exiting}
+
+      {b FIXME I think this can be removed}. *)
 
   val of_eval_result :
     ?term_error:Os.Exit.t ->
@@ -138,3 +140,24 @@ val output_details : ?docs:string -> unit -> output_details Cmdliner.Term.t
     {- Options [-l] or [--long] specify [`Long].}}
     [docs] is the manual section in which options are documented, defaults to
     {!s_output_details_options}. *)
+
+(** {1:net Networking} *)
+
+val socket_endpoint_conv :
+  default_port:int -> Os.Socket.Endpoint.t Cmdliner.Arg.conv
+(** [socket_endpoint_conv] is a convert for socket endpoints using
+    {!default_port} as the default port. It parses strings with
+    {!B0_std.Os.Socket.Endpoint.of_string}. *)
+
+val socket_endpoint_listener :
+  ?opts:string list -> ?docs:string -> default_port:int ->
+  ?default_endpoint:Os.Socket.Endpoint.t -> unit ->
+  Os.Socket.Endpoint.t Cmdliner.Term.t
+(** [socket_endpoint_listener] is an option for specifying a network endpoint
+    to listen on.
+    {ul
+    {- [default_port] is the default port when unspecified.}
+    {- [default_endpoint] is the default endpoint when unspecified.
+       Defaults to [`Host ("localhost", default_port)]}
+    {- [docs] is the manual section where the options are documented}
+    {- [opts] are the options to use (defaults to ["l"; "listen"]).}} *)

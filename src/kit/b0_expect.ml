@@ -9,13 +9,14 @@ open Result.Syntax
 (* FIXME potentially add these things to Fmt/fpath *)
 
 let pp_cli_arg fmt = Fmt.st' [`Underline] fmt
-let fpath_pp_high_suffix pre ppf p = match Fpath.strip_prefix pre p with
-| None -> (Fmt.code' Fpath.pp) ppf p
-| Some p ->
-    Fpath.pp ppf pre;
-    (if not (Fpath.is_syntactic_dir pre)
-     then Fmt.char ppf Fpath.natural_dir_sep_char);
-    (Fmt.code' Fpath.pp) ppf p
+let fpath_pp_high_suffix pre ppf p =
+  match Fpath.drop_strict_prefix ~prefix:pre p with
+  | None -> (Fmt.code' Fpath.pp) ppf p
+  | Some p ->
+      Fpath.pp ppf pre;
+      (if not (Fpath.is_syntactic_dir pre)
+       then Fmt.char ppf Fpath.natural_dir_sep_char);
+      (Fmt.code' Fpath.pp) ppf p
 
 (* Aborting *)
 

@@ -230,7 +230,7 @@ module Conf = struct
         String.fold_ascii_lines ~strip_newlines parse_line String.Map.empty s
       in
       Ok (of_string_map fields |> Result.error_to_failure)
-    with Failure e -> Fpath.error file " OCaml config: %s" e
+    with Failure e -> Fpath.error file "OCaml config: %s" e
 
   let write m ~comp ~o =
     let comp = B0_memo.tool m comp in

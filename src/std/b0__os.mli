@@ -20,26 +20,35 @@ module Path : sig
 
   val exists : B0__fpath.t -> (bool, string) result
   (** [exists p] is [Ok true] if [p] exists in the file system
-      and [Ok false] otherwise. Symbolic links are followed. *)
+      and [Ok false] otherwise. Symbolic links are followed.
+
+      See also {!File.exists}, {!Dir.exists}. *)
 
   val must_exist : B0__fpath.t -> (unit, string) result
   (** [must_exist p] is [Ok ()] if [p] exists in the file system
-      and an error otherwise. Symbolic links are followed. *)
+      and an error otherwise. Symbolic links are followed.
+
+      See also {!File.must_exist}, {!Dir.must_exist}. *)
 
   (** {1:renaming Deleting and renaming} *)
 
   val delete : recurse:bool -> B0__fpath.t -> (bool, string) result
-  (** [delete ~recurse p] deletes [p] from the file system. If [p]
-      is a symbolic link this only deletes the link, not the linked
-      object. If [recurse] is [true] and [p] is a non-empty
-      directory, no error occurs, its contents is recursively
-      deleted.  The result is:
+  (** [delete ~recurse p] deletes path [p] from the file system. If:
+      {ul
+      {- [p] is a file, the file is deleted.}
+      {- [p] is an empty directory, the directory is deleted.}
+      {- [p] is a non-empty directory and [recurse] is [true], the directory
+         and all its contents is deleted.}
+      {- [p] is a symbolic link, the link is deleted, not the linked object.}
+      {- [p] is a dangling symbolic link, the link is deleted.}
+      {- Otherwise the function errors.}}
+      The result is:
       {ul
       {- [Ok true], if [p] existed and was deleted.}
       {- [Ok false], if the path [p] did not exist on the file system.}
-      {- [Error _ ] in case of error, in particular if [p] is a non-empty
+      {- [Error _ ] in case of error. In particular if [p] is a non-empty
          directory and [recurse] is [false].}}
-      See also {!File.delete}. *)
+      See also {!File.delete}, {!Dir.delete} and {!Dir.delete_contents}. *)
 
   val rename :
     force:bool -> make_path:bool -> B0__fpath.t -> dst:B0__fpath.t ->
@@ -156,12 +165,16 @@ module File : sig
   val exists : B0__fpath.t -> (bool, string) result
   (** [exists file] is [Ok true] if [file] is a regular file in the
       file system and [Ok false] otherwise. Symbolic links are
-      followed. *)
+      followed.
+
+      See also {!Path.exists}, {!Dir.exists}. *)
 
   val must_exist : B0__fpath.t -> (unit, string) result
   (** [must_exist file] is [Ok ()] if [file] is a regular file in
       the file system and an error otherwise. Symbolic links are
-      followed. *)
+      followed.
+
+      See also {!Path.must_exist}, {!Dir.must_exist}. *)
 
   val is_executable : B0__fpath.t -> bool
   (** [is_executable file] is [true] iff [file] exists and is executable. *)
@@ -170,14 +183,18 @@ module File : sig
 
   val delete : B0__fpath.t -> (bool, string) result
   (** [delete file] deletes file [file] from the file system. If
-      [file] is a symbolic link this only deletes the link, not the
-      linked file. The result is:
       {ul
-      {- [Ok true], if [file] existed and was deleted.}
+      {- [file] is a file, the file is deleted.}
+      {- [file] is a symbolic link to a file, the link is deleted,
+         not the linked file.}
+      {- [file] is a dangling symbolic link, the link is deleted.}
+      {- Otherwise the function errors.}}
+      The result is:
+      {ul
+      {- [Ok true], if the path [file] existed and was deleted.}
       {- [Ok false], if the path [file] did not exist on the file system.}
-      {- [Error _] in case of error and in particular if [file] is a
-         directory.}}
-      See also {!Path.delete}. *)
+      {- [Error _] in case of error. In particular if [file] is a directory.}}
+      See also {!Path.delete}, {!Dir.delete}. *)
 
   val truncate : B0__fpath.t -> int -> (unit, string) result
   (** [trunacte file size] truncates [file] to [size]. *)
@@ -345,7 +362,7 @@ module Dir : sig
   (** [must_exist dir] is [Ok ()] if [dir] is a directory in the file system
       and an error otherwise. Symbolic links are followed. *)
 
-  (** {1:create_delete Creating} *)
+  (** {1:create Creating} *)
 
   val create :
     ?mode:int -> make_path:bool -> B0__fpath.t -> (bool, string) result
@@ -366,6 +383,44 @@ module Dir : sig
          directory is kept unchanged.}
       {- [Error _] otherwise and in particular if [dir] exists as a
          non-directory.}} *)
+
+  (** {1:delete Deleting} *)
+
+  val delete : recurse:bool -> B0__fpath.t -> (bool, string) result
+   (** [delete ~recurse dir] delete the directory [dir] from the file
+       system. If:
+      {ul
+      {- [dir] is an empty directory, the directory is deleted.}
+      {- [dir] is a non-empty directory and [recurse] is [true], the directory
+         and all its contents is deleted.}
+      {- [dir] is a symbolic link to a directory, the link is deleted, not
+        the linked directory.}
+      {- [dir] is a dangling symbolic link, the link is deleted.}
+      {- Otherwise the function errors.}}
+      The result is:
+      {ul
+      {- [Ok true], if [dir] existed and was deleted.}
+      {- [Ok false], if the path [dir] did not exist on the file system.}
+      {- [Error _ ] in case of error. In particular if [dir] is a non-empty
+         directory and [recurse] is [false] or if [dir] is a file or a symlink
+         to a file.}}
+       See also {!Dir.delete_contents}, {!Path.delete}, {!File.delete}. *)
+
+  val delete_contents : B0__fpath.t -> (bool, string) result
+  (** [delete_contents ~dotfiles dir] deletes the contents of the existing
+      directory [dir]. If:
+      {ul
+      {- [dir] is a directory, all its content is deleted.}
+      {- [dir] is a symbolic link to a directory, all the contents
+         of the linked directory is deleted.}
+      {- Otherwise the function errors}}
+      The result is:
+      {ul
+      {- [Ok true], if [dir] was non empty.}
+      {- [Ok false], if [dir] was empty.}
+      {- [Error _] in case of error. In particular if [dir] does not
+         exist or points to a file.}}
+      See also {!Dir.delete}, {!Path.delete}, {!File.delete}. *)
 
   (** {1:content Contents} *)
 
@@ -433,6 +488,18 @@ module Dir : sig
   (** [path_list] is a {{!fold}folding} function to get a (reverse w.r.t.
       list of paths). Paths in the result that correspond to directories
       satisfy {!Fpath.is_syntactic_dir}. *)
+
+  val contents :
+    ?kind:[`All | `Dirs | `Files ] ->
+    ?rel:bool -> ?dotfiles:bool -> ?follow_symlinks:bool ->
+    ?prune_dir:(Unix.stats -> string ->
+                B0__fpath.t -> B0__fpath.t list -> bool) ->
+    recurse:bool -> B0__fpath.t -> (B0__fpath.t list, string) result
+  (** [contents] uses {!path_list} with:
+      {ul
+      {- {!fold} if [kind] is [`All] (default)}
+      {- {!fold_files} if [kind] is [`Files].}
+      {- {!fold_dirs} if [kind] is [`Dirs]}} *)
 
   (** {1:copy Copying} *)
 
@@ -542,10 +609,10 @@ module Dir : sig
 
   val user : unit -> (B0__fpath.t, string) result
   (** [user ()] is the home directory of the user executing the
-      process.  Determined by consulting [passwd] database with the
-      user if of the process. If this fails falls back to parse
-      a path from the [HOME] environment variables. On Windows
-      no special fallback is implemented. *)
+      process. Determined by consulting [passwd] database with the
+      user id of the [SUDO_UID] env var or of the process. If this
+      fails falls back to parse a path from the [HOME] environment
+      variables. On Windows no special fallback is implemented. *)
 
   val config : unit -> (B0__fpath.t, string) result
   (** [config ()] is the directory used to store user-specific program
@@ -575,8 +642,15 @@ module Dir : sig
   (** [runtime ()] is the directory used to store user-specific runtime
       files. This is in order:
       {ol
-      {- If set the value of [XDG_RUNTIME_HOME].}
+      {- If set the value of [XDG_RUNTIME_DIR].}
       {- The value of {!default_tmp}.}} *)
+
+  val state : unit -> (B0__fpath.t, string) result
+  (** [state ()] is the directory used to store user-specific state data
+      files. This is in order:
+      {ol
+      {- If set the value of [XDG_STATE_DIR].}
+      {- If [user ()] is [Ok home], [Fpath.(home / ".local" / "state")]}} *)
 end
 
 (** {1:fd File descriptors and sockets} *)
@@ -586,14 +660,14 @@ module Fd : sig
 
   val unix_buffer_size : int
   (** [unix_buffer_size] is the value of the OCaml runtime
-      system buffer size for I/O operations. *)
+      system buffer size for I/O operations.
 
-  val apply :
-    close:(Unix.file_descr -> unit) -> Unix.file_descr ->
-    (Unix.file_descr -> 'a) -> 'a
-  (** [apply ~close fd f] calls [f fd] and ensure [close fd] is
-      is called whenever the function returns. Any {!Unix.Unix_error}
-      raised by [close fd] is ignored. *)
+      {b Available} in 5.4 as {!Sys.io_buffer_size}. *)
+
+  val close_noerr : Unix.file_descr -> unit
+  (** [close_noerr fd] uses {!Unix.close} on [fd], retries on [EINTR]
+      and silently catches any error it may raise. Typically used with
+      {!Fun.protect}. *)
 
   val copy : ?buf:Bytes.t -> Unix.file_descr -> dst:Unix.file_descr -> unit
   (** [copy ~buf src ~dst] reads [src] and writes it to [dst] using
@@ -611,8 +685,10 @@ module Fd : sig
       with an error message that mentions [fn]. *)
 end
 
-  (** Socket operations. *)
+(** Socket operations. *)
 module Socket : sig
+
+  (** {1:socket_endpoint Sockets} *)
 
   (** Endpoints. *)
   module Endpoint : sig
@@ -629,6 +705,13 @@ module Socket : sig
         a Unix domain socket (detected by the the presence of a
         {{!B0_std.Fpath.is_dir_sep_char}directory separator}). [default_port]
         port is used if no [PORT] is specified. *)
+
+    val with_port_of_sockaddr : Unix.sockaddr -> t -> t
+    (** [with_port_of_sockaddr saddr ep] makes [ep]'s port coinincde with
+        the port of [saddr] iff both have a port. Otherwise this is
+        [ep] itself. This is mostly useful to adjust an endpoint whose
+        port number was specified as [0] in order to get one allocated
+        by [bind]. *)
 
     val pp : Format.formatter -> t -> unit
     (** [pp] formats endpoints. *)
@@ -649,18 +732,107 @@ module Socket : sig
           message on timeout. *)
   end
 
-  val of_endpoint :
-    Endpoint.t -> Unix.socket_type ->
-    (Unix.sockaddr option * Unix.file_descr * bool, string) result
-  (** [socket_of_endpoint e st] is [Ok (addr, fd, close)] with:
+  val for_endpoint :
+    ?nonblock:bool -> Endpoint.t -> Unix.socket_type ->
+    (Unix.file_descr * bool * Unix.sockaddr option, string) result
+  (** [for_endpoint ?nonblock e st] is [Ok (fd, close, addr)] with:
       {ul
-      {- [addr], the address for the socket, if any.}
-      {- [fd], the file descriptor for the socket. If [c] is [`Fd fd]
-         this is [fd] untouched. Otherwise [fd] is a new file descriptor
-         set to {{!Unix.set_nonblock}non-blocking mode} and has
-         {{!Unix.set_close_on_exec}close on exec} set to [true].}
+      {- [fd], a file descriptor for the socket. If [c] is [`Fd fd]
+         this is [fd] untouched except for setting or clearing [nonblock].
+         Otherwise [fd] is a new file descriptor set according to
+         [nonblock] and has
+         {{!Unix.set_close_on_exec}close on exec} set to [true]. The socket
+         is not connected, use either {!connect} or {!bind} on it. Alternatively
+         directly use {!connect_endpoint}.}
       {- [close] is [true] if the caller is in charge of closing it. This
-         is [false] iff [c] is [`Fd _].}} *)
+         is [false] iff [c] is [`Fd _].}
+      {- [addr], the socket peer address for the endpoint, if any.}}
+
+      [nonblock] defaults to [false]. See also {!connect_endpoint}. *)
+
+  (** {1:connect Connecting} *)
+
+  val connect_endpoint :
+    ?nonblock:bool -> Endpoint.t -> Unix.socket_type ->
+    (Unix.file_descr * bool * Unix.sockaddr, string) result
+  (** [connect_endpoint ep st] is [Ok (fd, close, addr)] with:
+      {ul
+      {- [fd], a file descriptor for the socket {{!connect}connected} to the
+          endpoint. If [c] is [`Fd fd] this is [fd] untouched except for
+          setting or clearing [nonblock], it also checks that the [fd] is
+          connected and errors otherwise.}
+      {- [close] is [true] if the caller is in charge of closing it. This
+         is [false] iff [ep] is [`Fd _].}
+      {- [addr] the socket peer address for the endpoint.}}
+
+      See also {!with_connected_endpoint}. *)
+
+  val with_connected_endpoint :
+    ?nonblock:bool -> Endpoint.t -> Unix.socket_type ->
+    (Unix.file_descr -> Unix.sockaddr -> 'a) -> ('a, string) result
+  (** [with_connected_endpoint ep st f] uses {!connect_endpoint} and
+      calls [f] with the resulting file descriptor and peer address
+      ensuring, even if [f] raises, that:
+      {ul
+      {- If needed (see {!connect_endpoint}) the file descriptor ressource is
+         closed after [f] returns.}
+      {- The {!Sys.sigpipe} signal is ignored during the call to [f].}} *)
+
+  val connect : Unix.file_descr -> Unix.sockaddr -> (unit, string) result
+  (** [connect fd addr] associates the peer [addr] to the file descriptor
+      [fd]. Writes on [fd] send data to [addr] and reads on [fd] receive
+      data from [addr]. See also {!connect_endpoint}. *)
+
+  (** {1:listening Listening} *)
+
+  val listen_endpoint :
+    ?nonblock:bool -> ?backlog:int -> Endpoint.t -> Unix.socket_type ->
+    (Unix.file_descr * bool * Unix.sockaddr, string) result
+  (** [listen_endpoint ep st] is [Ok (fd, close, addr)] with:
+      {ul
+      {- [fd], a file descriptor for the socket listening on the
+          endpoint. If [ep] is [`Fd fd] this is [fd] untouched except for
+          setting or clearing [nonblock], it also checks that the [fd] is
+          {{!bind}bound} and errors otherwise.}
+      {- [close] is [true] if the caller is in charge of closing it. This
+         is [false] iff [ep] is [`Fd _].}
+      {- [addr] the listening address for the endpoint.}}
+
+      If [st] is [SOCK_STREAM] listen is called on the resulting [fd]
+      with [backlog] (see {!listen} for default.
+
+      See also {!with_listening_endpoint}. *)
+
+  val with_listening_endpoint :
+    ?nonblock:bool -> ?backlog:int -> Endpoint.t -> Unix.socket_type ->
+    (Unix.file_descr -> Unix.sockaddr -> 'a) -> ('a, string) result
+  (** [with_listening_endpoint ep st f] uses {!listen_endpoint} and
+      calls [f] with the resulting file descriptor and listening address
+      ensuring, even if [f] raises that:
+      {ul
+      {- If needed (see {!listen_endpoint}) the file descriptor ressource is
+         closed after [f] returns.}
+      {- The {!Sys.sigpipe} signal is ignored during the call to [f].}} *)
+
+  val accept :
+    cloexec:bool -> Unix.file_descr ->
+    (Unix.file_descr * Unix.sockaddr, string) result
+  (** [accept ~cloexec fd] calls {!Unix.accept}. *)
+
+  val bind : Unix.file_descr -> Unix.sockaddr -> (unit, string) result
+  (** [bind fd addr] binds the [fd] to the address [addr]. *)
+
+  val listen : ?backlog:int -> Unix.file_descr ->  (unit, string) result
+  (** [listen ~backlog fd] indicates that [fd] can be used to accept
+      incoming connections on the address it is {{!bind}bound} to.
+
+      [backlog] is the maximum length for the queue of pending
+      incoming connections before they start to be rejected if they
+      are not accepted. It defaults to [128] (FIXME get a hand on
+      SOMAXCONN). *)
+
+
+  (** {1:fmt Formatters} *)
 
   val pp_sockaddr : Format.formatter -> Unix.sockaddr -> unit
   (** [pp_sockaddr] formats a socket address. *)

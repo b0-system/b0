@@ -329,6 +329,10 @@ val binary_string : string t
 val bytes : bytes t
 (** [bytes] formats bytes as ASCII hex. See also {!text_lines}. *)
 
+val bigbytes : (int, Stdlib.Bigarray.int8_unsigned_elt,
+                Stdlib.Bigarray.c_layout) Stdlib.Bigarray.Array1.t t
+(** [bigbytes] formats bytes as ASCII hex. *)
+
 val sys_signal : int t
 (** [sys_signal] formats an OCaml {{!Sys.sigabrt}signal number} as
     a C POSIX {{:http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/signal.h.html}constant}

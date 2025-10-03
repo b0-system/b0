@@ -336,6 +336,9 @@ module Test = struct
       make ~equal:String.equal ~pp:Fmt.styled_text_string_literal ()
 
     let bytes : bytes t = make ~equal:Bytes.equal ~pp:Fmt.bytes  ()
+
+    let bigbytes = make ~equal:( = ) ~pp:Fmt.bigbytes ()
+
     let option (type a) (module Some : T with type t = a) : a option t =
       make ~equal:(Option.equal Some.equal) ~pp:(Fmt.OCaml.option Some.pp) ()
 

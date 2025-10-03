@@ -65,7 +65,8 @@ module File_cache = struct
     let read_file file =
       try
         let fd = Unix.openfile file read_flags 0 in
-        Os.Fd.apply ~close:Unix.close fd (Os.Fd.read_file file)
+        let finally () = Os.Fd.close_noerr fd in
+        Fun.protect ~finally (fun () -> Os.Fd.read_file file fd)
       with
       | Unix.Unix_error (e, _, _) ->
           Fmt.failwith_notrace "%s: %s" file (uerror e)
@@ -76,8 +77,9 @@ module File_cache = struct
     let write_file file s =
       try
         let fd = Unix.openfile file write_flags 0o644 in
-        let write fd = ignore (Unix.write_substring fd s 0 (String.length s)) in
-        Os.Fd.apply ~close:Unix.close fd write
+        let finally () = Os.Fd.close_noerr fd in
+        Fun.protect ~finally @@ fun () ->
+        ignore (Unix.write_substring fd s 0 (String.length s))
       with
       | Unix.Unix_error (e, _, _) ->
           unlink_noerr file; Fmt.failwith_notrace "%s: %s" file (uerror e)
@@ -90,10 +92,12 @@ module File_cache = struct
       | exception Unix.Unix_error (Unix.EINTR, _, _) -> copy_file src dst
       | mode ->
           let fdi = Unix.openfile src read_flags 0 in
-          Os.Fd.apply ~close:Unix.close fdi @@ fun fdi ->
+          let finally () = Os.Fd.close_noerr fdi in
+          Fun.protect ~finally @@ fun () ->
           let fdo = Unix.openfile dst write_flags mode in
           try
-            Os.Fd.apply ~close:Unix.close fdo @@ fun fdo ->
+            let finally () = Os.Fd.close_noerr fdo in
+            Fun.protect ~finally @@ fun () ->
             Os.Fd.copy fdi ~dst:fdo;
           with
           | e -> unlink_noerr dst; raise e
@@ -256,7 +260,7 @@ module File_cache = struct
   (* Manifest files *)
 
   let key_manifest_to_string ~root fs =
-    let rel root f = match Fpath.strip_prefix root f with
+    let rel root f = match Fpath.drop_strict_prefix ~prefix:root f with
     | Some rel -> Fpath.to_string rel
     | None ->
         Fmt.failwith_notrace "%a: not a prefix of %a" Fpath.pp f Fpath.pp root

@@ -325,6 +325,11 @@ module Test : sig
     (** [bytes] tests bytes and prints them with
         {!B0_std.Fmt.bytes}. *)
 
+    val bigbytes : (int, Stdlib.Bigarray.int8_unsigned_elt,
+                    Stdlib.Bigarray.c_layout) Stdlib.Bigarray.Array1.t t
+    (** [bigbytes] tests bigbytes and prints them with
+        {!B0_std.Fmt.bigbytes} *)
+
     (** {2:parametric Parametric types} *)
 
     val option : 'a t -> 'a option t

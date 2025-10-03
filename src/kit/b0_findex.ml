@@ -72,7 +72,9 @@ let of_dirs ?dotfiles ?follow_symlinks ?prune_dir root_dirs =
       ?dotfiles ?follow_symlinks ?prune_dir ~recurse Os.Dir.path_list dir acc
   in
   try
-    let root_root_dirs = Fpath.drop_prefixed (Fpath.distinct root_dirs) in
+    let root_root_dirs =
+      Fpath.remove_strictly_prefixed (Fpath.distinct root_dirs)
+    in
     let files = List.fold_left dir_paths [] root_root_dirs in
     let dirs, dirs_by_dir, dirs_by_name, files, files_by_dir, files_by_name =
       sort files

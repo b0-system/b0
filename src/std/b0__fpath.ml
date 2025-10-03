@@ -305,7 +305,7 @@ let strip_trailing_dir_sep p = match String.length p with
 
 (* Strict prefixes *)
 
-let is_prefix pre p =
+let strictly_starts_with ~prefix:pre p =
   String.starts_with ~prefix:pre p &&
   let suff_start = String.length pre in
   let p_len = String.length p in
@@ -317,19 +317,21 @@ let is_prefix pre p =
   (pre.[suff_start - 1] = natural_dir_sep_char ||
    p.[suff_start] = natural_dir_sep_char)
 
-let strip_prefix pre p =
-  if not (is_prefix pre p) then None else
+let drop_strict_prefix ~prefix:pre p =
+  if not (strictly_starts_with ~prefix:pre p) then None else
   let len = String.length pre in
   let first = if p.[len] = natural_dir_sep_char then len + 1 else len in
   Some (B0__string.subrange p ~first)
 
-let drop_prefixed dirs =
-  let is_prefixed d by = is_prefix by d in
-  let not_prefixed ~by:dirs d = not (List.exists (is_prefixed d) dirs) in
+let remove_strictly_prefixed dirs =
+  let is_strictly_prefixed d by = strictly_starts_with ~prefix:by d in
+  let not_prefixed ~by:dirs d =
+    not (List.exists (is_strictly_prefixed d) dirs)
+  in
   List.filter (not_prefixed ~by:dirs) dirs
 
 let reroot ~src_root ~dst_root src =
-  let rel_file = Option.get (strip_prefix src_root src) in
+  let rel_file = Option.get (drop_strict_prefix ~prefix:src_root src) in
   append dst_root rel_file
 
 (* Predicates and comparisons *)
@@ -514,18 +516,18 @@ let relative ~to_dir p =
       ~affix:".." to_dir (* cmon that's obvi..ously wrong *)
   then B0__fmt.invalid_arg "%s: no dotdot allowed" p;
   let to_dir = ensure_trailing_dir_sep to_dir in
-  match strip_prefix to_dir p with
+  match drop_strict_prefix ~prefix:to_dir p with
   | Some q -> q
   | None ->
       let rec loop loc dir =
         if is_current_dir dir then p else
         if is_root dir then
-          begin match strip_prefix "/" p with
+          begin match drop_strict_prefix ~prefix:"/" p with
           | None -> p
           | Some rel_root -> append loc rel_root
           end
         else
-        match strip_prefix dir p with
+        match drop_strict_prefix ~prefix:dir p with
         | Some q -> append loc q
         | None -> loop (add_seg' loc "..") (parent dir)
       in
@@ -535,6 +537,7 @@ let relative ~to_dir p =
 
 let to_url_path = if Sys.win32 then Windows.to_url_path else Posix.to_url_path
 let to_segments p = String.split_on_char natural_dir_sep_char (chop_volume p)
+let of_segments segs = v (String.concat natural_dir_sep segs)
 
 let pp_quoted ppf p = B0__string.pp ppf (Filename.quote p)
 let pp_unquoted = B0__string.pp
@@ -545,7 +548,7 @@ let pp ppf p =
 
 let pp_dump = B0__fmt.OCaml.string
 
-let error p fmt = B0__fmt.error ("%a:" ^^ fmt) pp_unquoted p
+let error p fmt = B0__fmt.error ("%a: " ^^ fmt) pp_unquoted p
 let prefix_msg p msg = B0__fmt.str "%a: %s" pp_unquoted p msg
 
 (* Uniqueness *)

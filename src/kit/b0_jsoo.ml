@@ -254,7 +254,7 @@ let build_setup ~srcs b = (* return a record maybe ? *)
           | None -> List.hd htmls
       in
       match B0_meta.find assets_root (B0_build.current_meta b) with
-      | Some r when Fpath.is_prefix r file ->
+      | Some r when Fpath.strictly_starts_with ~prefix:r file ->
           Fpath.reroot ~src_root:r ~dst_root:build_dir file
       | _ -> Fpath.(build_dir / Fpath.basename file)
   in
@@ -331,7 +331,7 @@ let copy_assets m srcs ~exts ~assets_root ~dst =
   let assets = B0_file_exts.find_files exts srcs in
   let copy acc src =
     let dst = match assets_root with
-    | Some r when Fpath.is_prefix r src ->
+    | Some r when Fpath.strictly_starts_with ~prefix:r src ->
         Fpath.reroot ~src_root:r ~dst_root:dst src
     | _ -> Fpath.(dst / Fpath.basename src)
     in
@@ -367,7 +367,8 @@ let html_page_proc ~html_file ~js_file set_modsrcs srcs b =
   let styles =
     let build_dir = B0_build.current_dir b in
     let base f =
-      Fpath.to_string (Option.get (Fpath.strip_prefix build_dir f))
+      Fpath.to_string
+        (Option.get (Fpath.drop_strict_prefix ~prefix:build_dir f))
     in
     List.map base (Fpath.Set.elements css)
   in

@@ -74,7 +74,9 @@ let semi ppf _ = Format.pp_print_string ppf ";"; sp ppf ()
 
 let suffix_lines ~suffix pp ppf v =
   let b = Buffer.create 255 in
-  let () = box pp (Format.formatter_of_buffer b) v in
+  let bppf = Format.formatter_of_buffer b in
+  let () = box pp bppf v in
+  let () = Format.pp_print_flush bppf () in
   let lines = Buffer.contents b in
   let lines = String.split_on_char '\n' lines in
   let last = List.length lines - 1 in
@@ -295,6 +297,20 @@ let binary_string =
   iter String.iter pp_byte
 
 let bytes ppf v = binary_string ppf (Bytes.unsafe_to_string v)
+let bigbytes ppf v =
+  let max = Bigarray.Array1.dim v - 1 in
+  if max < 0 then () else
+  begin
+    let byte = Bigarray.Array1.get v 0 in
+    char ppf (B0__char.Ascii.lower_hex_digit_of_int (byte lsr 4));
+    char ppf (B0__char.Ascii.lower_hex_digit_of_int byte);
+    for i = 1 to max do
+      let byte = Bigarray.Array1.get v i in
+      cut ppf ();
+      char ppf (B0__char.Ascii.lower_hex_digit_of_int (byte lsr 4));
+      char ppf (B0__char.Ascii.lower_hex_digit_of_int byte);
+    done
+  end
 
 let sys_signal ppf snum =
   let sigs = [
