@@ -90,9 +90,15 @@ module Http_client : sig
     t -> follow:bool -> Http.Request.t -> (Http.Response.t, string) result
   (** [request httpc ~follow r] performs request [r] via [httpr].  If [follow]
       is [true] HTTP redirects for GET and HEAD requests that return
-      301, 302, 303, 305 or 307 are automatically followed.
+      301, 302, 303, 305 or 307 are automatically followed. In this
+      case the response has an {!x_follow_location} header with the final
+      requested URL.
 
       The response's {!Http.Response.headers} are lowercased. *)
+
+  val x_follow_location : string
+  (** [x_follow_location] is ["x-follow-location"] the location
+      that was finally requested on {!request} with [~follow:true]. *)
 
   (** {1:cli Command line interface} *)
 

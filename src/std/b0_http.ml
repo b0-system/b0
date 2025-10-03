@@ -115,6 +115,8 @@ module Http_client = struct
         Ok (Some { request with url })
     | _ -> Ok None
 
+  let x_follow_location = "x-follow-location"
+
   let request curl ~follow request =
     let rec loop follow visited request =
       let method' = Http.Request.method' request in
@@ -136,8 +138,11 @@ module Http_client = struct
       if not follow then Ok response else
       let* redirect = redirect_response visited request response in
       match redirect with
-      | None -> Ok response
       | Some request -> loop follow (url :: visited) request
+      | None ->
+          if visited = [] (* no redirections *) then Ok response else
+          let headers = (x_follow_location, request.url) :: response.headers in
+          Ok ({response with headers })
     in
     loop follow [] request
 
