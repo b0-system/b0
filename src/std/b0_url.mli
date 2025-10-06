@@ -47,6 +47,13 @@ val query : t -> query option
 val fragment : t -> fragment option
 (** [fragment u] is the {!type-fragment} of [u], if any. *)
 
+(** {1:derived Derived components *)
+
+val target : t -> string option
+(** [target u] is the contenation of {!path}, {!query} and {!fragment},
+    that is everything that comes after the {!scheme} and {!authority} in
+    an URL. *)
+
 (** {1:kinds Kinds} *)
 
 type relative_kind = [ `Scheme | `Absolute_path | `Relative_path | `Empty ]

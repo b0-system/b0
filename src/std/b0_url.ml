@@ -98,6 +98,15 @@ let fragment u =
   while (!i <= max && u.[!i] <> '#') do incr i done;
   if !i > max then None else Some (string_subrange ~first:(!i + 1) u)
 
+(* Derived components. *)
+
+let target u =
+  let p = match path u with None -> "" | Some p -> p in
+  let q = match query u with None -> "" | Some q -> "?" ^ q in
+  let f = match fragment u with None -> "" | Some f -> "#" ^ f in
+  let t = String.concat "" [p; q; f] in
+  if t = "" then None else Some t
+
 (* Kinds *)
 
 type relative_kind = [ `Scheme | `Absolute_path | `Relative_path | `Empty ]
