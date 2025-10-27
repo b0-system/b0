@@ -144,14 +144,16 @@ module Test : sig
       itself. *)
 
   val block :
+    ?pass:(?__POS__:loc -> int -> unit) ->
     ?fail:(?__POS__:loc -> int -> assertions:int -> unit) -> ?__POS__:loc ->
     (unit -> unit) -> unit
   (** [block ~fail f] runs [f ()], if that results in [n > 0] failed
       assertions, [fail n ~assertions] is called afterwards with
-      [assertoins] the total number of assertions that were performed.
+      [assertions] the total number of assertions that were performed.
       If [f] peforms a {!failstop} the block is stopped but not the
       test. It is possible to fail stop the test by stoppping in
-      [fail].
+      [fail]. If no assertion fails [pass] is called with the number of
+      assertions (defaults does nothing).
 
       {b TODO.} Should we simply make blocks nested {!test}s ? *)
 

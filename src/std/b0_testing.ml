@@ -211,13 +211,15 @@ module Test = struct
 
   (* Blocks and loops *)
 
-  let block ?fail ?__POS__ f =
+  let block ?pass ?fail ?__POS__ f =
     let before_pass_count = Atomic.get Pass.count in
     let before_fail_count = Atomic.get Fail.count in
     let finish () =
       let fail_diff = Atomic.get Fail.count - before_fail_count in
-      if fail_diff = 0 then () else
       let assertions = Atomic.get Pass.count - before_pass_count + fail_diff in
+      if fail_diff = 0 then begin
+        match pass with None -> () | Some pass -> pass ?__POS__ assertions
+      end else
       match fail with
       | Some fail -> fail ?__POS__ fail_diff ~assertions
       | None ->
