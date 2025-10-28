@@ -137,6 +137,11 @@ module Test : sig
   val failstop : ?__POS__:loc -> ('a, Format.formatter, unit, 'b) format4 -> 'a
   (** [failf fmt …] is like {!fail} but also {!stop}s the test. *)
 
+  val error_to_failstop : ?__POS__:loc -> ('a, string) result -> 'a
+  (** [error_to_failstop (Error e)] is [failstop "%s" e].
+      [error_to_failstop (Ok v)] is [v]. *)
+
+
   (** {2:blocks Blocks and loops}
 
       Blocks and loops can be used as larger sub units of {!test}

@@ -209,6 +209,9 @@ module Test = struct
   let failstop ?__POS__ fmt =
     Fail.incr (); klog_fail ?__POS__ (fun _ -> stop ()) fmt
 
+  let error_to_failstop ?__POS__ = function
+  | Error e -> failstop "%s" e | Ok v -> v
+
   (* Blocks and loops *)
 
   let block ?pass ?fail ?__POS__ f =
