@@ -169,11 +169,6 @@ module Fd = struct
 end
 
 module Socket = struct
-  let pp_name_port ppf (n, p) = B0__fmt.pf ppf "%s:%d" n p
-  let pp_sockaddr ppf = function
-  | Unix.ADDR_UNIX s -> B0__fmt.string ppf s
-  | Unix.ADDR_INET (a, p) -> pp_name_port ppf (Unix.string_of_inet_addr a, p)
-
   let rec set_nonblock ~nonblock fd =
     try if nonblock then Unix.set_nonblock fd else Unix.clear_nonblock fd with
     | Unix.Unix_error (EINTR, _, _) -> set_nonblock ~nonblock fd
@@ -182,7 +177,7 @@ module Socket = struct
   | () -> Ok ()
   | exception Unix.Unix_error (EINTR, _, _) -> connect fd addr
   | exception Unix.Unix_error (e, _, _) ->
-      B0__fmt.error "connect to %a: %s" pp_sockaddr addr (uerror e)
+      B0__fmt.error "connect to %a: %s" B0__fmt.sockaddr addr (uerror e)
 
   let rec bind fd addr =
     try
@@ -192,7 +187,7 @@ module Socket = struct
     with
     | Unix.Unix_error (EINTR, _, _) -> bind fd addr
     | Unix.Unix_error (e, _, _) ->
-        B0__fmt.error "bind %a: %s" pp_sockaddr addr (uerror e)
+        B0__fmt.error "bind %a: %s" B0__fmt.sockaddr addr (uerror e)
 
   let rec listen ?(backlog = 128) fd = try Ok (Unix.listen fd backlog) with
   | Unix.Unix_error (EINTR, _, _) -> listen fd ~backlog
@@ -292,79 +287,48 @@ module Socket = struct
         let finally () = if close then Fd.close_noerr fd in
         Ok (Fun.protect ~finally (fun () -> f fd addr))
 
-  module Endpoint = struct
-    type t =
-      [ `Host of string * int
-      | `Sockaddr of Unix.sockaddr
-      | `Fd of Unix.file_descr ]
+  (* TODO we would like to have that in endpoint but it requires flying
+     code around
+     of code restruction. *)
 
-    let of_string ~default_port s =
-      if String.contains s Filename.dir_sep.[0]
-      then Ok (`Sockaddr (Unix.ADDR_UNIX s)) else
-      match String.rindex_opt s ':' with
-      | None -> Ok (`Host (s, default_port))
-      | Some i ->
-          match String.index_from_opt s i ']' with (* beware IPv6 *)
-          | Some _ -> Ok (`Host (s, default_port))
-          | None ->
-              let h = B0__string.subrange ~last:(i - 1) s in
-              let p = B0__string.subrange ~first:(i + 1) s in
-              match int_of_string_opt p with
-              | None -> B0__fmt.error "port %S not an integer" p
-              | Some p -> Ok (`Host (h, p))
-
-    let with_port_of_sockaddr sockaddr ep = match sockaddr with
-    | Unix.ADDR_UNIX _ -> ep
-    | Unix.ADDR_INET (_, port) ->
-        match ep with
-        | `Host (n, _) -> `Host (n, port)
-        | `Sockaddr (Unix.ADDR_INET (a, _)) -> `Sockaddr (ADDR_INET (a, port))
-        | ep -> ep
-
-    let pp ppf = function
-    | `Host (n, p) -> pp_name_port ppf (n, p)
-    | `Fd _fd -> B0__fmt.pf ppf "<fd>"
-    | `Sockaddr addr -> pp_sockaddr ppf addr
-
-    let err_wait ep e = B0__fmt.str "Wait on %a: %s" pp ep e
-
-    let wait_connectable ?(socket_type = Unix.SOCK_STREAM) ~timeout ep =
-      let open B0__result.Syntax in
-      let relax = Mtime.sleep B0__mtime.Span.(1 * ms) in
-      Result.map_error (err_wait ep) @@
-      let rec loop ~deadline dur =
-        let* fd, close, addr = for_endpoint ~nonblock:false ep socket_type in
-        let finally () = if close then Fd.close_noerr fd in
-        let* status = Fun.protect ~finally @@ fun () ->
-          match addr with
-          | None -> Error "no address to connect to"
-          | Some addr ->
-              match Unix.connect fd addr with
-              | () -> Ok `Ready
-              | exception Unix.(Unix_error (ECONNREFUSED, _, _)) -> Ok `Retry
-              | exception Unix.Unix_error (e, _, _) ->
-                  Error (Unix.error_message e)
-        in
-        match status with
-        | `Ready -> Ok `Ready
-        | `Retry ->
-            let count = Mtime.count dur in
-            if B0__mtime.Span.is_shorter count ~than:deadline
-            then (ignore (Mtime.sleep relax); loop ~deadline dur)
-            else Ok `Timeout
+  let err_wait ep e = B0__fmt.str "Wait on %a: %s" B0__net.Endpoint.pp ep e
+  let endpoint_wait_connectable ?(socket_type = Unix.SOCK_STREAM) ~timeout ep =
+    let open B0__result.Syntax in
+    let relax = Mtime.sleep B0__mtime.Span.(1 * ms) in
+    Result.map_error (err_wait ep) @@
+    let rec loop ~deadline dur =
+      let* fd, close, addr = for_endpoint ~nonblock:false ep socket_type in
+      let finally () = if close then Fd.close_noerr fd in
+      let* status = Fun.protect ~finally @@ fun () ->
+        match addr with
+        | None -> Error "no address to connect to"
+        | Some addr ->
+            match Unix.connect fd addr with
+            | () -> Ok `Ready
+            | exception Unix.(Unix_error (ECONNREFUSED, _, _)) -> Ok `Retry
+            | exception Unix.Unix_error (e, _, _) ->
+                Error (Unix.error_message e)
       in
-      loop ~deadline:timeout (Mtime.counter ())
+      match status with
+      | `Ready -> Ok `Ready
+      | `Retry ->
+          let count = Mtime.count dur in
+          if B0__mtime.Span.is_shorter count ~than:deadline
+          then (ignore (Mtime.sleep relax); loop ~deadline dur)
+          else Ok `Timeout
+    in
+    loop ~deadline:timeout (Mtime.counter ())
 
-    let wait_connectable' ?socket_type ~timeout ep =
-      match wait_connectable ?socket_type ~timeout ep with
-      | Error _ as e -> e
-      | Ok `Ready -> Ok ()
-      | Ok `Timeout ->
-          let err =
-            B0__fmt.str "timed out after %a" B0__mtime.Span.pp timeout
-          in
-          Error (err_wait ep err)
-  end
+  let endpoint_wait_connectable' ?socket_type ~timeout ep =
+    match endpoint_wait_connectable ?socket_type ~timeout ep with
+    | Error _ as e -> e
+    | Ok `Ready -> Ok ()
+    | Ok `Timeout ->
+        let err =
+          B0__fmt.str "timed out after %a" B0__mtime.Span.pp timeout
+        in
+        Error (err_wait ep err)
+
 end
 
 module Env = struct
@@ -1891,7 +1855,7 @@ module Cmd = struct
       let pid = _spawn fds ?env ?cwd ~stdin ~stdout ~stderr cmd in
       let status = run_collect pid in
       let out = Fd.read_file (B0__fpath.to_string tmpf) fd in
-      Tmp.rem_file tmpf;
+      Tmp.rem_file tmpf; Fd.close_noerr fd;
       Ok (status, if trim then String.trim out else out)
     with
     | Failure e -> Fd.Set.close_all fds; spawn_err cmd e
@@ -2105,6 +2069,267 @@ module Cpu = struct
           Int64.sub (sec_to_span now.Unix.tms_cstime) c.children_stime; }
   end
 end
+
+(* uname(2) bindings *)
+
+external uname_machine : unit -> string = "ocaml_b0_uname_machine"
+external uname_sysname : unit -> string = "ocaml_b0_uname_sysname"
+
+(* OS name, version and architecture *)
+
+module Name = struct
+  type id = string
+  let id_unknown = "unknown"
+  type t =
+  | Bsd of id
+  | Darwin of id
+  | Linux of id
+  | Windows of id
+  | Other of id
+
+  let id = function
+  | Bsd id -> id | Darwin id -> id | Linux id -> id | Windows id -> id
+  | Other id ->id
+
+  let of_string ?family s =
+    let id = B0__string.Ascii.lowercase s in
+    let id = if id = "" then id_unknown else id in
+    match family with
+    | None ->
+        begin match id with
+        | "bsd" | "freebsd" |  "netbsd" | "openbsd" -> Bsd id
+        | "darwin" | "macos" | "ios" -> Darwin id
+        | "linux" | "alpine" | "arch" | "centos" | "debian" | "fedora"
+        | "gentoo" | "opensuse" | "rhel" | "suse" | "ubuntu" -> Linux id
+        | "windows" | "cygwin" -> Windows id
+        | id -> Other id
+        end
+    | Some Bsd _ -> Bsd id | Some Darwin _ -> Darwin id
+    | Some Linux _ -> Linux id | Some Windows _ -> Windows id
+    | Some Other _ -> Other id
+
+  let bsd = Bsd "bsd"
+  let darwin = Darwin "darwin"
+  let linux = Linux "linux"
+  let windows = Windows "windows"
+  let unknown = Other id_unknown
+
+  let equal a0 a1 = match a0, a1 with
+  | Bsd _, Bsd _ -> true | Darwin _, Darwin _ -> true
+  | Linux _, Linux _ -> true | Windows _, Windows _ -> true
+  | Other id0, Other id1 when String.equal id0 id1 -> true
+  | _ -> false
+
+  let compare n0 n1 = match n0, n1 with
+  | Bsd _, Bsd _ -> 0 | Darwin _, Darwin _ -> 0
+  | Linux _, Linux _ -> 0 | Windows _, Windows _ -> 0
+  | Other n0, Other n1 when String.equal n0 n1 -> 0
+  | n0, n1 -> Stdlib.compare n0 n1
+
+  let pp ppf a = B0__fmt.string ppf @@ match a with
+  | Bsd _ -> "bsd" | Darwin _ -> "darwin"
+  | Linux _ -> "linux" | Windows _ -> "windows"
+  | Other id -> id
+
+  let pp_id = B0__fmt.using id B0__fmt.string
+
+  (* Determining the values, so much code… *)
+
+  let init = Other "" (* stub value, never returned *)
+  let name = Atomic.make init
+  let like = Atomic.make init
+  let version = Atomic.make "" (* stub value, never returned *)
+
+  let darwin_info uname_sysname =
+    let get_plist_key key xml = (* Easy to thwart… *)
+      let find ~start ~sub s = match B0__string.find_first ~start ~sub s with
+      | None -> raise Exit | Some i -> i
+      in
+      let open_tag = "<string>" and close_tag = "</string>" in
+      let k = find ~start:0 ~sub:key xml in
+      let i = find ~start:k ~sub:open_tag xml in
+      let j = find ~start:i ~sub:close_tag xml in
+      let first = i + String.length open_tag and last = j - 1 in
+      B0__string.subrange ~first ~last xml
+    in
+    let plist = "/System/Library/CoreServices/SystemVersion.plist" in
+    let default = uname_sysname, id_unknown in
+    match File.read (B0__fpath.v plist) with
+    | Error e -> (* iOS will end up here, let's not link more stuff for now *)
+        B0__log.debug (fun m -> m "%s" e); default
+    | Ok plist_xml ->
+        try
+          let name = get_plist_key "ProductName" plist_xml in
+          let version = get_plist_key "ProductVersion" plist_xml in
+          B0__string.Ascii.lowercase name, version
+        with
+        | Exit ->
+            B0__log.debug (fun m -> m "Failed to parse %s" plist); default
+
+  let etc_os_release_info uname_sysname =
+    let unquote s =
+      let s = String.trim s in
+      if String.length s >= 2 && s.[0] = '"'
+      then String.sub s 1 (String.length s - 2)
+      else s
+    in
+    let info = "/etc/os-release" in
+    match File.read (B0__fpath.v info) with
+    | Error e ->
+        B0__log.debug (fun m -> m "%s" e);
+        uname_sysname, uname_sysname, id_unknown
+    | Ok data ->
+        let rec loop id id_like version = function
+        | [] ->
+            let id = if id = "" then uname_sysname else id in
+            let id_like = Option.value ~default:id id_like in
+            let id_like = if id_like = "" then id else id_like in
+            let version = if version = "" then id_unknown else version in
+            id, id_like, version
+        | l :: ls ->
+            match B0__string.split_first ~sep:"=" (String.trim l) with
+            | None -> loop id id_like version ls
+            | Some ("ID", id) -> loop (unquote id) id_like version ls
+            | Some ("ID_LIKE", ids) ->
+                let ids = String.split_on_char ' ' (unquote ids) in
+                let id_like = Some (List.hd ids) in
+                loop id id_like version ls
+            | Some ("VERSION_ID", vers) -> loop id id_like (unquote vers) ls
+            | _ -> loop id id_like version ls
+        in
+        loop "" None "" (String.split_on_char '\n' data)
+
+  external caml_win32_version : unit -> int * int * int * int =
+    "ocaml_b0_caml_win32_version"
+
+  let windows_info uname_sysname =
+    let maj, min, build, rev = caml_win32_version () in
+    uname_sysname, Printf.sprintf "%d.%d.%d.%d" maj min build rev
+
+  let init_info () =
+    let sysname = B0__string.Ascii.lowercase (uname_sysname ()) in
+    let n, name_like, vers = match sysname with
+    | "darwin" ->
+        let id, version = darwin_info sysname in
+        (Darwin id), (Darwin id), version
+    | "linux" ->
+        let id, id_like, version = etc_os_release_info sysname in
+        (Linux id), (Linux id_like), version
+    | "freebsd" ->
+        let id, id_like, version = etc_os_release_info sysname in
+        (Bsd id), (Bsd id_like), version
+    | "openbsd" ->
+        (Bsd sysname), (Bsd sysname), id_unknown
+    | "netbsd" ->
+        (Bsd sysname), (Bsd sysname), id_unknown
+    | "windows" ->
+        let id, version = windows_info sysname in
+        (Windows id), (Windows id), id_unknown
+    | sysname when String.starts_with ~prefix:"cygwin_nt" sysname ->
+        let id, version = windows_info sysname in
+        (Windows id), (Windows id), version
+    | id ->
+        (Other id), (Other id), id_unknown
+    in
+    Atomic.set name n; Atomic.set like name_like; Atomic.set version vers
+end
+
+let name ?(id_like = false) () =
+  let name = if id_like then Name.like else Name.name in
+  match Atomic.get name with
+  | Name.Other "" -> Name.init_info (); Atomic.get name
+  | v -> v
+
+let version () = match Atomic.get Name.version with
+| "" -> Name.init_info (); Atomic.get Name.version | v -> v
+
+module Arch = struct
+  type id = string
+  let id_unknown = "unknown"
+  type t =
+  | Arm32 of id | Arm64 of id | Ppc32 of id | Ppc64 of id
+  | Riscv32 of id | Riscv64 of id | X86_32 of id | X86_64 of id
+  | Other of id
+
+  let of_string ?family s =
+    let id = B0__string.Ascii.lowercase s in
+    let id = String.map (function '-' -> '_' | c -> c) id in
+    let id = if id = "" then id_unknown else id in
+    match family with
+    | None ->
+        begin match id with
+        | "arm32" | "armv8b" | "armv8l" as id -> Arm32 id
+        | "arm64" | "aarch64_be" | "aarch64" as id -> Arm64 id
+        | "ppc32" | "powerpc" | "ppc" | "ppcle" as id -> Ppc32 id
+        | "ppc64" | "ppc64le" as id -> Ppc64 id
+        | "riscv32" as id -> Riscv32 id
+        | "riscv64" as id -> Riscv64 id
+        | "x86_32" | "x86" | "i386" | "i586" | "i686" as id -> X86_32 id
+        | "x86_64" | "amd64" as id -> X86_64 id
+        | id when
+            String.(starts_with ~prefix:"armv5" id ||
+                    starts_with ~prefix:"armv6" id ||
+                    starts_with ~prefix:"earmv6" id ||
+                    starts_with ~prefix:"armv7" id ||
+                    starts_with ~prefix:"earmv7" id) -> Arm32 id
+        | id -> Other id
+        end
+    | Some Arm32 _ -> Arm32 id | Some Arm64 _ -> Arm64 id
+    | Some Ppc32 _ -> Ppc32 id | Some Ppc64 _ -> Ppc64 id
+    | Some Riscv32 _ -> Riscv32 id | Some Riscv64 _ -> Riscv64 id
+    | Some X86_32 _ -> X86_32 id | Some X86_64 _ -> X86_64 id
+    | Some Other _ -> Other id
+
+
+  let id = function
+  | Arm32 id | Arm64 id | Ppc32 id | Ppc64 id | Riscv32 id | Riscv64 id
+  | X86_32 id | X86_64 id | Other id -> id
+
+  let bits = function
+  | Arm32 _ | Ppc32 _ | Riscv32 _ | X86_32 _ -> Some 32
+  | Arm64 _ | Ppc64 _ | Riscv64 _ | X86_64 _ -> Some 64
+  | Other _ -> None
+
+  let arm32 = Arm32 "arm32"
+  let arm64 = Arm64 "arm64"
+  let ppc32 = Ppc32 "ppc32"
+  let ppc64 = Ppc64 "ppc64"
+  let riscv32 = Riscv32 "riscv32"
+  let riscv64 = Riscv64 "riscv64"
+  let x86_32 = X86_32 "x86_32"
+  let x86_64 = X86_64 "x86_64"
+  let unknown = Other id_unknown
+
+  let equal a0 a1 = match a0, a1 with
+  | Arm32 _, Arm32 _ -> true | Arm64 _, Arm64 _ -> true
+  | Ppc32 _, Ppc32 _ -> true | Ppc64 _, Ppc64 _ -> true
+  | Riscv32 _, Riscv32 _ -> true | Riscv64 _, Riscv64 _ -> true
+  | X86_32 _, X86_32 _ -> true | X86_64 _, X86_64 _ -> true
+  | Other id0, Other id1 when String.equal id0 id1 -> true
+  | _ -> false
+
+  let compare a0 a1 = match a0, a1 with
+  | Arm32 _, Arm32 _ -> 0 | Arm64 _, Arm64 _ -> 0
+  | Ppc32 _, Ppc32 _ -> 0 | Ppc64 _, Ppc64 _ -> 0
+  | Riscv32 _, Riscv32 _ -> 0 | Riscv64 _, Riscv64 _ -> 0
+  | X86_32 _, X86_32 _ -> 0 | X86_64 _, X86_64 _ -> 0
+  | a0, a1 -> Stdlib.compare a0 a1
+
+  let pp ppf a = B0__fmt.string ppf @@ match a with
+  | Arm32 _ -> "arm32" | Arm64 _ -> "arm64"
+  | Ppc32 _ -> "ppc32" | Ppc64 _ -> "ppc64"
+  | Riscv32 _ -> "riscv32" | Riscv64 _ -> "riscv64"
+  | X86_32 _ -> "x86_32" | X86_64 _ -> "x86_64"
+  | Other id -> id
+
+  let pp_id = B0__fmt.using id B0__fmt.string
+  let pp_bits =
+    B0__fmt.using bits B0__fmt.(option int ~none:(any "<unknown>"))
+end
+
+let arch () = Arch.of_string (uname_machine ())
+
+(* Bazaar *)
 
 let exn_don't_catch = function
 | Stack_overflow | Out_of_memory | Sys.Break -> true

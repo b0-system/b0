@@ -6,8 +6,6 @@
 #include "b0_stubs.h"
 #include <stdint.h>
 
-/* Darwin */
-
 #if defined(OCAML_B0_DARWIN)
 
 #include <mach/mach_time.h>
@@ -29,8 +27,6 @@ CAMLprim value ocaml_b0_monotonic_now_ns (value unit)
   return caml_copy_int64 ((now * scale.numer) / scale.denom);
 }
 
-/* POSIX */
-
 #elif defined(OCAML_B0_POSIX)
 
 #include <time.h>
@@ -46,8 +42,6 @@ CAMLprim value ocaml_b0_monotonic_now_ns (value unit)
                           (uint64_t)1000000000 +
                           (uint64_t)(now.tv_nsec));
 }
-
-/* Windows */
 
 #elif defined(OCAML_B0_WINDOWS)
 
@@ -71,15 +65,11 @@ CAMLprim value ocaml_b0_monotonic_now_ns (value unit)
   return caml_copy_int64 ((uint64_t)(now.QuadPart * freq));
 }
 
-/* Unsupported */
+#else /* Unknown platform */
 
-#else
-y
-#warning OCaml b0 library: unsupported platform, monotonic timings will be wrong
+#warning OCaml b0 library: unknown platform, monotonic timings will be wrong
 
 CAMLprim value ocaml_b0_monotonic_now_ns (value unit)
-{
-  return caml_copy_int64 ((uint64_t)0);
-}
+{ return caml_copy_int64 ((uint64_t)0); }
 
 #endif

@@ -688,52 +688,32 @@ end
 (** Socket operations. *)
 module Socket : sig
 
+  (** {1:endpoints Endpoint}
+
+      {b TODO.} We'd like to have this in {!B0_std.Net.Endpoint} but
+      we need to restructure the sources. *)
+
+  val endpoint_wait_connectable :
+    ?socket_type:Unix.socket_type -> timeout:B0__mtime.Span.t ->
+    B0__net.Endpoint.t ->
+    ([`Ready | `Timeout], string) result
+  (** [endpoint_wait_connectable ~timeout ep st] blocks until [ep] becomes
+      connectable
+      or duration [timeout] elapses.
+
+      [socket_type] defines the kind of socket connection, it defaults to
+      {!Unix.SOCK_STREAM}. *)
+
+  val endpoint_wait_connectable' :
+    ?socket_type:Unix.socket_type -> timeout:B0__mtime.Span.t ->
+    B0__net.Endpoint.t -> (unit, string) result
+    (** [wait_connectable'] is like {!wait_connectable} but errors with a
+        message on timeout. *)
+
   (** {1:socket_endpoint Sockets} *)
 
-  (** Endpoints. *)
-  module Endpoint : sig
-    type t =
-    [ `Host of string * int (** Hostname and port. *)
-    | `Sockaddr of Unix.sockaddr (** Given socket address. *)
-    | `Fd of Unix.file_descr (** Direct file descriptor. *) ]
-    (** The type for specifying a socket endpoint to connect or to listen
-        to on. *)
-
-    val of_string : default_port:int -> string -> (t, string) result
-    (** [of_string ~default_port s] parses a socket endpoint
-        specification from [s]. The format is [ADDR[:PORT]] or [PATH] for
-        a Unix domain socket (detected by the the presence of a
-        {{!B0_std.Fpath.is_dir_sep_char}directory separator}). [default_port]
-        port is used if no [PORT] is specified. *)
-
-    val with_port_of_sockaddr : Unix.sockaddr -> t -> t
-    (** [with_port_of_sockaddr saddr ep] makes [ep]'s port coinincde with
-        the port of [saddr] iff both have a port. Otherwise this is
-        [ep] itself. This is mostly useful to adjust an endpoint whose
-        port number was specified as [0] in order to get one allocated
-        by [bind]. *)
-
-    val pp : Format.formatter -> t -> unit
-    (** [pp] formats endpoints. *)
-
-    val wait_connectable :
-      ?socket_type:Unix.socket_type -> timeout:B0__mtime.Span.t -> t ->
-      ([`Ready | `Timeout], string) result
-    (** [wait_connectable ~timeout ep st] blocks until [fd]
-        becomes connectable or duration [timeout] elapses.
-
-        [socket_type] defines the kind of socket, it defaults to
-        {!Unix.SOCK_STREAM}. *)
-
-    val wait_connectable' :
-      ?socket_type:Unix.socket_type -> timeout:B0__mtime.Span.t -> t ->
-      (unit, string) result
-      (** [wait_connectable'] is like {!wait_connectable} but errors with a
-          message on timeout. *)
-  end
-
   val for_endpoint :
-    ?nonblock:bool -> Endpoint.t -> Unix.socket_type ->
+    ?nonblock:bool -> B0__net.Endpoint.t -> Unix.socket_type ->
     (Unix.file_descr * bool * Unix.sockaddr option, string) result
   (** [for_endpoint ?nonblock e st] is [Ok (fd, close, addr)] with:
       {ul
@@ -753,7 +733,7 @@ module Socket : sig
   (** {1:connect Connecting} *)
 
   val connect_endpoint :
-    ?nonblock:bool -> Endpoint.t -> Unix.socket_type ->
+    ?nonblock:bool -> B0__net.Endpoint.t -> Unix.socket_type ->
     (Unix.file_descr * bool * Unix.sockaddr, string) result
   (** [connect_endpoint ep st] is [Ok (fd, close, addr)] with:
       {ul
@@ -768,7 +748,7 @@ module Socket : sig
       See also {!with_connected_endpoint}. *)
 
   val with_connected_endpoint :
-    ?nonblock:bool -> Endpoint.t -> Unix.socket_type ->
+    ?nonblock:bool -> B0__net.Endpoint.t -> Unix.socket_type ->
     (Unix.file_descr -> Unix.sockaddr -> 'a) -> ('a, string) result
   (** [with_connected_endpoint ep st f] uses {!connect_endpoint} and
       calls [f] with the resulting file descriptor and peer address
@@ -786,8 +766,8 @@ module Socket : sig
   (** {1:listening Listening} *)
 
   val listen_endpoint :
-    ?nonblock:bool -> ?backlog:int -> Endpoint.t -> Unix.socket_type ->
-    (Unix.file_descr * bool * Unix.sockaddr, string) result
+    ?nonblock:bool -> ?backlog:int -> B0__net.Endpoint.t ->
+    Unix.socket_type -> (Unix.file_descr * bool * Unix.sockaddr, string) result
   (** [listen_endpoint ep st] is [Ok (fd, close, addr)] with:
       {ul
       {- [fd], a file descriptor for the socket listening on the
@@ -804,8 +784,9 @@ module Socket : sig
       See also {!with_listening_endpoint}. *)
 
   val with_listening_endpoint :
-    ?nonblock:bool -> ?backlog:int -> Endpoint.t -> Unix.socket_type ->
-    (Unix.file_descr -> Unix.sockaddr -> 'a) -> ('a, string) result
+    ?nonblock:bool -> ?backlog:int -> B0__net.Endpoint.t ->
+    Unix.socket_type -> (Unix.file_descr -> Unix.sockaddr -> 'a) ->
+    ('a, string) result
   (** [with_listening_endpoint ep st f] uses {!listen_endpoint} and
       calls [f] with the resulting file descriptor and listening address
       ensuring, even if [f] raises that:
@@ -830,12 +811,6 @@ module Socket : sig
       incoming connections before they start to be rejected if they
       are not accepted. It defaults to [128] (FIXME get a hand on
       SOMAXCONN). *)
-
-
-  (** {1:fmt Formatters} *)
-
-  val pp_sockaddr : Format.formatter -> Unix.sockaddr -> unit
-  (** [pp_sockaddr] formats a socket address. *)
 end
 
 (** {1:process Processes} *)
@@ -1412,6 +1387,250 @@ module Mtime : sig
       {- Windows uses
       {{:https://msdn.microsoft.com/en-us/library/windows/desktop/aa373083%28v=vs.85%29.aspx}Performance counters}.}} *)
 end
+
+(** {1:info Name, version and architecture} *)
+
+(** OS names. *)
+module Name : sig
+  type id = string
+  (** The type for OS identifiers. Unless you create them
+      yourself these strings are normalized: non-empty and lowercase
+      ASCII. *)
+
+  type t =
+  | Bsd of id
+  | Darwin of id
+  | Linux of id
+  | Windows of id
+  | Other of id (** *)
+  (** The type for OS names.
+
+      Names are sorted into families. The datum of each family has the
+      concrete OS identifier.
+
+      {b Warning.} Minor versions of the library may add new family
+      enumerants or attach a family to an identifier previously
+      classified as [Other] (moving between families {e should not} happen,
+      except to fix the odd bug). As such:
+      {ul
+      {- Pattern matching on [Other "…"] constants is not recommended.
+         If you need to select such an identifier start by pattern matching
+         on {!id} before dropping to pattern matching on this type.}
+      {- Unless you want your code to be informed by the introduction
+         of a new family, end your pattern match with a catch all
+         branch [_] rather than [Other _].}} *)
+
+  val id : t -> id
+  (** [id n] is the identifier of [n]. *)
+
+  val of_string : ?family:t -> string -> t
+  (** [of_string s] dermines an OS from [s] normalized by ASCII
+      lowercasing.  Unrecognized OS identifiers end up as [Other] with
+      the normalized [s]. Strings printed by {!pp} are guaranteed to
+      parse (with the family as the identifier).
+
+      Identifiers returned by {!Os.name} and classified into a proper
+      family may be classified as [Other _] by this function, as the
+      contextual information provided by [uname(2)] is not available.
+      However if [family] is provided, [s] is simply normalized and the
+      family of [family] is used in the result. *)
+
+  (** {1:family Family constants}
+
+      These constants can be used as family representatives. *)
+
+  val bsd : t
+  (** [bsd] is [Bsd "bsd"]. *)
+
+  val darwin : t
+  (** [darwin] is [Darwin "darwin"]. *)
+
+  val linux : t
+  (** [linux] is [Linux "linux"]. *)
+
+  val windows : t
+  (** [windows] is [Windows "windows"]. *)
+
+  val unknown : t
+  (** [unknown] is [Other "unknown"]. *)
+
+  (** {1:preds Predicates and comparisons} *)
+
+  val equal : t -> t -> bool
+  (** [equal] asserts equality by family, except for [Other id] values
+      which are each their own distinct family. *)
+
+  val compare : t -> t -> int
+  (** [compare] is a total order compatible with {!equal}. *)
+
+  (** {1:fmt Formatting} *)
+
+  val pp : t B0__fmt.t
+  (** [pp] formats families for inspection. The concrete
+      identifier is not printed. *)
+
+  val pp_id : t B0__fmt.t
+  (** [pp_id ppf n] formats the {!id} of [n]. *)
+end
+
+val name : ?id_like:bool -> unit -> Name.t
+(** [name ()] is the name of the operating system running the process.
+    If [id_like] is [true] returns a possible parent name instead (e.g.
+    ["debian"] instead of "ubuntu"), defaults to [false]. This is
+    determined, along with {!version} as follows:
+    {ul
+    {- On POSIX environments it depends on the lowercased [sysname] field
+       returned by
+       {{:https://pubs.opengroup.org/onlinepubs/009604599/basedefs/sys/utsname.h.html}[uname(2)]}:
+       {ul
+       {- ["linux"], the file
+          {{:https://www.freedesktop.org/software/systemd/man/latest/os-release.html}/etc/os-release}
+          is consulted. The lowercased [ID] or first element of [ID_LIKE]
+          if [id_like] is [true] determines [id] and [Name.Linux id]
+          is returned. The field [VERSION_ID] is used to determine {!version}.
+          If the file can't be found [id] is [sysname] and {!version}
+          ["unknown"].}
+       {- ["freebsd"], behaves like the Linux case but [Bsd id] is returned.}
+       {- ["darwin"], the file
+          [/System/Library/CoreServices/SystemVersion.plist] is consulted.
+          The lowercased [ProductName] key determines [id] and [Name.Darwin id]
+          is returned. The [ProductVersion] key determines {!version}. If
+          the file can't be found [id] is [sysname] and {!version}
+          ["unknown"].}
+        {- ["netbsd"] and ["openbsd"] then [Name.Bsd sysname] is returned
+           and {!version} is ["unknown"].}
+        {- Starts with ["cygwin_nt"], then [Name.Windows "cygwin"] and
+           {!version} is determined like windows (see below).}
+        {- Otherwise it returns [Other sysname] and {!version} is ["unknown"]}}}
+    {- On Windows this returns [Windows "windows"] and {!version} uses the
+       the [caml_win32_*]
+       variables of the OCaml runtime system to format a version number}
+    {- Otherwise it uses [Name.Other "unknown"] and {!version} is
+       ["unknown"]}} *)
+
+val version : unit -> string
+(** [version ()] is a version string for the operating system. The format
+    and determination depends on {!name}, read there. If no version
+    can be determined this is ["unknown"]. *)
+
+(** OS architectures. *)
+module Arch : sig
+
+  type id = string
+  (** The type for architecture identifiers. Unless you create them
+      yourself these strings are normalized: non-empty, lowercase ASCII, with
+      original ['-'] characters mapped to ['_']. *)
+
+  type t =
+  | Arm32 of id
+  | Arm64 of id
+  | Ppc32 of id
+  | Ppc64 of id
+  | Riscv32 of id
+  | Riscv64 of id
+  | X86_32 of id
+  | X86_64 of id
+  | Other of id (** *)
+  (** The type for OS machine architectures.
+
+      Architectures are sorted into families. The datum of each
+      family has the concrete architecture identifier.
+
+      {b Warning.} Minor versions of the library may add new family
+      enumerants or attach a family to an identifier previously
+      classified as [Other] (moving between families {e should not} happen,
+      except to fix the odd bug). As such:
+      {ul
+      {- Pattern matching on [Other "…"] constants is not recommended.
+         If you need to select such an identifier start by pattern matching
+         on {!id} before dropping to pattern matching on this type.}
+      {- Unless you want your code to be informed by the introduction
+         of a new family, end your pattern match with a catch all
+         branch [_] rather than [Other _].}} *)
+
+  val of_string : ?family:t -> string -> t
+  (** [of_string s] is an architecture determined by [s] normalized by
+      ASCII lowercasing it and mapping ['-'] to ['_'].  Unrecognized
+      architectures end up as [Other] with the normalized [s]. Strings
+      printed by {!pp} are guaranteed to parse (with the family as the
+      identifier).
+
+      If [family] is provided, [s] is simply normalized and the family
+      of [family] is used in the result. *)
+
+  val id : t -> id
+  (** [id arch] is the identifier of [arch]. *)
+
+  val bits : t -> int option
+  (** [bits arch] determines the bitness of [arch] usually [Some 32]
+      or [Some 64] or [None] if unknown. *)
+
+  (** {1:constants Family constants}
+
+      These constants can be used as family representatives. *)
+
+  val arm32 : t
+  (** [arm32] is [Arm32 "arm32"]. *)
+
+  val arm64 : t
+  (** [arm64] is [Arm64 "arm64"]. *)
+
+  val ppc32 : t
+  (** [ppc32] is [Ppc32 "ppc32"]. *)
+
+  val ppc64 : t
+  (** [ppc64] is [Ppc64 "ppc64"]. *)
+
+  val riscv32 : t
+  (** [riscv32] is [Riscv32 "riscv32"]. *)
+
+  val riscv64 : t
+  (** [riscv64] is [Riscv64 "riscv64"]. *)
+
+  val x86_32 : t
+  (** [x86_32] is [X86_32 "x86_32"]. *)
+
+  val x86_64 : t
+  (** [x86_64] is [X86_32 "x86_64"]. *)
+
+  val unknown : t
+  (** [unknown] is [Other "unknown"]. *)
+
+  (** {1:preds Predicates and comparisons} *)
+
+  val equal : t -> t -> bool
+  (** [equal] asserts equality by family, except for [Other id] values
+      which are each their own distinct family. *)
+
+  val compare : t -> t -> int
+  (** [compare] is a total order compatible with {!equal}. *)
+
+  (** {1:fmt Formatting} *)
+
+  val pp : t B0__fmt.t
+  (** [pp] formats architecture families for inspection. The concrete
+      identifier is not printed. *)
+
+  val pp_id : t B0__fmt.t
+  (** [pp_id ppf arch] formats the {!id} of [arch]. *)
+
+  val pp_bits : t B0__fmt.t
+  (** [pp_bits ppf arch] formats the integer {!bits} of [arch] or ["<unknown>"]
+      if [None]. *)
+end
+
+val arch : unit -> Arch.t
+(** [arch ()] is the architecture of the operating system running the
+    process (it may differ from your CPU). It is determined by calling
+    {!Arch.of_string} with a string obtained as follows.
+    {ul
+    {- On POSIX environments it uses the [machine] field returned
+       by {{:https://pubs.opengroup.org/onlinepubs/009604599/basedefs/sys/utsname.h.html}[uname(2)]}.}
+    {- On Windows it uses the {{:https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getnativesysteminfo}[GetNativeSystemInfo]}
+       function and munges the [wProcessorArchitecture] field into a string.}
+    {- Otherwise it uses ["unknown"].}} *)
+
+(** {1:bazaar Bazaar} *)
 
 val exn_don't_catch : exn -> bool
 (** [exn_don't_cath exn] is [true] iff [exn] is [Stack_overflow],

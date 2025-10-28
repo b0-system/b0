@@ -143,17 +143,17 @@ val output_details : ?docs:string -> unit -> output_details Cmdliner.Term.t
 
 (** {1:net Networking} *)
 
-val socket_endpoint_conv :
-  default_port:int -> Os.Socket.Endpoint.t Cmdliner.Arg.conv
-(** [socket_endpoint_conv] is a convert for socket endpoints using
+val net_endpoint_conv :
+  default_port:int -> Net.Endpoint.t Cmdliner.Arg.conv
+(** [net_endpoint_conv] is a convert for socket endpoints using
     {!default_port} as the default port. It parses strings with
-    {!B0_std.Os.Socket.Endpoint.of_string}. *)
+    {!Net.Endpoint.of_string}. *)
 
-val socket_endpoint_listener :
+val net_endpoint_listener :
   ?opts:string list -> ?docs:string -> default_port:int ->
-  ?default_endpoint:Os.Socket.Endpoint.t -> unit ->
-  Os.Socket.Endpoint.t Cmdliner.Term.t
-(** [socket_endpoint_listener] is an option for specifying a network endpoint
+  ?default_endpoint:Net.Endpoint.t -> unit ->
+  Net.Endpoint.t Cmdliner.Term.t
+(** [net_endpoint_listener] is an option for specifying a network endpoint
     to listen on.
     {ul
     {- [default_port] is the default port when unspecified.}

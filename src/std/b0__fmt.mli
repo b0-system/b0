@@ -521,7 +521,9 @@ val cardinal : ?zero:int t -> one:int t -> ?other:int t -> unit -> int t
     {- [zero], if [n = 0]. Defaults to [other] (as per
     {{:https://www.unicode.org/cldr/charts/47/supplemental/language_plural_rules.html#en}english rules}).}
     {- [one], if [n = 1].}
-    {- [other], otherwise. Defaults to [one] followed by a ['s'] character.}} *)
+    {- [other], otherwise. Defaults to [one] followed by a ['s'] character.}}
+
+    See also {{!page-b0_std_cookbook.fmt_plural}the cookbook}. *)
 
 val ordinal :
   ?zero:int t -> ?one:int t -> ?two:int t -> ?three:int t -> ?other:int t ->
@@ -536,6 +538,14 @@ val ordinal :
     {- [two], if [n mod 10 = 2 && n mod 100 <> 12]. Defaults to ["%dnd"].}
     {- [three], if [n mod 10 = 3 && n mod 100 <> 13]. Defaults to ["%drd"].}
     {- [other] otherwise. Defaults to ["%dth"].}} *)
+
+(** {1:net Networking} *)
+
+val host_and_port : (string * int) t
+(** [host_and_port] formats a host and port using [host:port] notation. *)
+
+val sockaddr : Unix.sockaddr t
+(** [sockaddr] formats socket addresses. *)
 
 (** {1:styling Text styling}
 

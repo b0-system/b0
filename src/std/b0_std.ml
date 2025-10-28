@@ -8,6 +8,7 @@ module Fmt = B0__fmt
 module Fpath = B0__fpath
 module Log = B0__log
 module Mtime = B0__mtime
+module Net = B0__net
 module Os = B0__os
 
 (* Stdlib extensions *)

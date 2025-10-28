@@ -133,11 +133,11 @@ let output_details ?(docs = s_output_details_options) () =
 
 (* Networking options *)
 
-let socket_endpoint_conv ~default_port =
-  let parse s = Os.Socket.Endpoint.of_string ~default_port s in
-  Arg.conv' (parse, Os.Socket.Endpoint.pp)
+let net_endpoint_conv ~default_port =
+  let parse s = Net.Endpoint.of_string ~default_port s in
+  Arg.conv' (parse, Net.Endpoint.pp)
 
-let socket_endpoint_listener
+let net_endpoint_listener
     ?(opts = ["l"; "listen"]) ?docs ~default_port
     ?(default_endpoint = `Host ("localhost", default_port)) () =
   let doc =
@@ -148,5 +148,5 @@ let socket_endpoint_listener
       default_port
   in
   let docv = "ADDR[:PORT]|PATH" in
-  let lconv = socket_endpoint_conv ~default_port in
+  let lconv = net_endpoint_conv ~default_port in
   Arg.(value & opt lconv default_endpoint & info opts ?docs ~doc ~docv)

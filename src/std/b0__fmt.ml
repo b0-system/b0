@@ -751,3 +751,10 @@ let field ?(label = st [`Fg `Yellow]) ?(sep = any ":@ ") l prj pp_v ppf v =
 
 let field ?(label = st [`Fg `Yellow]) ?(sep = any ":@ ") l prj pp_v ppf v =
   pf ppf "@[<1>%a%a%a@]" label l sep () pp_v (prj v)
+
+(* Networking *)
+
+let host_and_port ppf (n, p) = pf ppf "%s:%d" n p
+let sockaddr ppf = function
+| Unix.ADDR_UNIX s -> string ppf s
+| Unix.ADDR_INET (a, p) -> host_and_port ppf (Unix.string_of_inet_addr a, p)

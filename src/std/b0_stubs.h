@@ -16,15 +16,20 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
   #define OCAML_B0_DARWIN
+#endif
 
-#elif defined(__unix__) || defined(__unix)
- #include <unistd.h>
- #if defined(_POSIX_VERSION)
-   #define OCAML_B0_POSIX
- #endif
+#if defined(__unix__) || defined(__unix)
+  #include <unistd.h>
+  #if defined(_POSIX_VERSION)
+    #define OCAML_B0_POSIX
+  #endif
+#endif
 
-#elif defined (_WIN32)
-#define OCAML_B0_WINDOWS
-#define WIN32_LEAN_AND_MEAN
+#if defined (__CYGWIN__)
+  #define OCAML_B0_CYGWIN
+#endif
 
+#if defined (_WIN32)
+  #define OCAML_B0_WINDOWS
+  #define WIN32_LEAN_AND_MEAN
 #endif

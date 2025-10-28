@@ -70,12 +70,12 @@ let make_server_cmd cmd args ~listen_args =
 
 let endpoint_of_url_and_authority url authority = match B0_url.scheme url with
 | None -> Fmt.error "URL %s: no scheme found" url
-| Some "http" -> Os.Socket.Endpoint.of_string ~default_port:80 authority
-| Some "https" -> Os.Socket.Endpoint.of_string ~default_port:443 authority
+| Some "http" -> Net.Endpoint.of_string ~default_port:80 authority
+| Some "https" -> Net.Endpoint.of_string ~default_port:443 authority
 | Some scheme ->
     (Log.warn @@ fun m ->
      m "Unknown scheme %a using 80 as the default port" Fmt.code scheme);
-    Os.Socket.Endpoint.of_string ~default_port:80 authority
+    Net.Endpoint.of_string ~default_port:80 authority
 
 let find_server_mode_unit = function
 | [] -> Ok None
@@ -214,7 +214,7 @@ let show_url
       if dry_run
       then (Log.stdout (fun m -> m "%s" url); Ok Os.Exit.ok) else
       let timeout = secs timeout in
-      let* () = Os.Socket.Endpoint.wait_connectable' ~timeout endpoint in
+      let* () = Os.Socket.endpoint_wait_connectable' ~timeout endpoint in
       let* () = show url in
       Ok Os.Exit.ok
   | `Show_url_server (endpoint, timeout, url, cmd, cwd, env) ->
@@ -223,7 +223,7 @@ let show_url
       let* server = Os.Cmd.spawn ~cwd ~env cmd in
       let* () =
         let timeout = secs timeout in
-        Os.Socket.Endpoint.wait_connectable' ~timeout endpoint
+        Os.Socket.endpoint_wait_connectable' ~timeout endpoint
       in
       let* () = show url in
       let* st = Os.Cmd.spawn_wait_status server in

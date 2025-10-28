@@ -152,16 +152,28 @@ let of_string s =
   with Failure err ->
     B0__fmt.error "command line %a: %s" B0__fmt.OCaml.string s err
 
-let to_string l = String.concat " " (List.map Filename.quote @@ to_list l)
+let must_quote s =
+  (* See https://pubs.opengroup.org/onlinepubs/9699919799/utilities/\
+     V3_chap02.html#tag_18_02 *)
+  let posix_shell_meta = function
+  | ' ' | '\n' | '\t'
+  | '|' | '&' | ';' | '<' | '>' | '(' | ')' | '$' | '`' | '\\' | '"' | '\''
+  | '*' | '?' | '[' | '#' | '~' | '=' | '%' -> true
+  | _ -> false
+  in
+  String.exists posix_shell_meta s
+
+let maybe_quote a = if must_quote a then Filename.quote a else a
+let to_string l = String.concat " " (List.map maybe_quote @@ to_list l)
+
 let pp ppf l =
   B0__fmt.pf ppf "@[%a@]" B0__fmt.(list ~sep:sp string) (to_list l)
 
+let pp_arg ppf a = B0__string.pp ppf (maybe_quote a)
 let pp_dump ppf l =
-  let pp_arg ppf a = B0__fmt.string ppf (Filename.quote a) in
   B0__fmt.pf ppf "@[<h>%a@]" B0__fmt.(list ~sep:sp pp_arg) (to_list l)
 
 let pp_shell =
-  let pp_arg ppf a = B0__fmt.string ppf (Filename.quote a) in
   let pp_cmd ppf l =
     let is_opt s = String.length s > 1 && s.[0] = '-' in
     match (to_list l) with

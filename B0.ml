@@ -257,6 +257,8 @@ let vendor_more_modules =
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__list" "b0__list" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__log" "b0__log" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__mtime" "b0__mtime" in
+  let* () = copy_module ~substs ~src_dir ~dst_dir "more__url" "b0__url" in
+  let* () = copy_module ~substs ~src_dir ~dst_dir "more__net" "b0__net" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__os" "b0__os" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__result" "b0__result" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__string" "b0__string" in
@@ -279,9 +281,11 @@ let vendor_more_modules =
   in
   let* () = copy_file ~substs ~src_dir ~dst_dir "more_stubs.h" "b0_stubs.h" in
   let* () = copy_file ~substs ~src_dir ~dst_dir
-                      "more_stubs_cpu.c" "b0_stubs_cpu.c" in
+      "more_stubs_cpu.c" "b0_stubs_cpu.c" in
   let* () = copy_file ~substs ~src_dir ~dst_dir
       "more_stubs_time.c" "b0_stubs_time.c" in
+  let* () = copy_file ~substs ~src_dir ~dst_dir
+      "more_stubs_uname.c" "b0_stubs_uname.c" in
   Ok ()
 
 let update_webs_modules =

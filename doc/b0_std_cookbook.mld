@@ -53,6 +53,19 @@ to a log file. This doesn't mean that you should not support a
 [--no-color] option; only that {!Unix.isatty} should not be used as
 signifier for plain text.
 
+{2:fmt_plural English pluralization}
+
+Use {!B0_std.Fmt.cardinal}.
+
+{[
+let example : int Fmt.t = Fmt.cardinal ~one:(Fmt.any "example") ()
+let woman_count : int Fmt.t  =
+  let zero = Fmt.any "no woman" in
+  let one = Fmt.any "one woman" in
+  let other ppf c = Fmt.pf ppf "%d women" c in
+  Fmt.cardinal ~zero ~one ~other ()
+]}
+
 {1:logging Logging}
 
 {2:logging_set_level How do I set the log level?}
