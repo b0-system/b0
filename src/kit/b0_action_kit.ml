@@ -6,11 +6,14 @@
 open B0_std
 open Result.Syntax
 
-let fetch_url
-    ?env ?stderr ?args ?(progress = true) env' url file
+let download_url
+    ?env ?stderr ?args ?(progress = true) env'
+    ?mode ~force ~make_path url ~dst:file
   =
   if progress then (Log.stdout (fun m -> m "Fetching %a" Fmt.code url));
-  let args = B0_http.Http_client.curl_fetch_args ?args ~progress url file in
+  let curlfile = Fpath.dash in
+  let args = B0_http.Http_client.curl_fetch_args ?args ~progress url curlfile in
   let cmd = Cmd.(tool "curl" %% args) in
   let* curl = B0_env.get_cmd env' cmd in
-  Os.Cmd.run ?env ?stderr curl
+  let stdout = Os.Cmd.out_file ?mode ~force ~make_path file in
+  Os.Cmd.run ?env ?stderr ~stdout curl
