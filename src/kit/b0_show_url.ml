@@ -17,9 +17,9 @@ let url_of_path _env path =
 (* URLs *)
 
 type url =
-[ `Url of B0_url.t
+[ `Url of Net.Url.t
 | `In of B0_env.dir * Fpath.t
-| `Fun of string * (B0_env.t -> B0_unit.t -> (B0_url.t, string) result) ]
+| `Fun of string * (B0_env.t -> B0_unit.t -> (Net.Url.t, string) result) ]
 
 let pp_url ppf = function
 | `Url u -> Fmt.pf ppf "URL %s" u
@@ -68,7 +68,7 @@ let make_server_cmd cmd args ~listen_args =
   let args = List.rev_append prev (Cmd.to_list listen_args) @ rest in
   Cmd.(cmd %% of_list Fun.id args)
 
-let endpoint_of_url_and_authority url authority = match B0_url.scheme url with
+let endpoint_of_url_and_authority url authority = match Net.Url.scheme url with
 | None -> Fmt.error "URL %s: no scheme found" url
 | Some "http" -> Net.Endpoint.of_string ~default_port:80 authority
 | Some "https" -> Net.Endpoint.of_string ~default_port:443 authority
@@ -106,7 +106,7 @@ let find_server_mode_unit = function
             Fmt.error "@[%a@]" pp (entity, suggs)
 
 let server_mode env timeout_cli no_exec ~url args =
-  match B0_url.authority url with
+  match Net.Url.authority url with
   | None -> Fmt.error "Could not extract authority from %s" url
   | Some authority ->
       let* endpoint = endpoint_of_url_and_authority url authority in

@@ -30,7 +30,7 @@ let show_urls ~background ~prefix ~browser ~urls ~tname =
       | url ->
           let* cwd = Os.Dir.cwd () in
           let root_path = Some (Fpath.to_url_path cwd) in
-          Ok (B0_url.to_absolute ~scheme:"file" ~root_path url)
+          Ok (Net.Url.to_absolute ~scheme:"file" ~root_path url)
       in
       let* () = B0_web_browser.show ~background ~prefix browser url in
       loop urls

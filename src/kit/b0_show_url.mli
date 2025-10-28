@@ -14,16 +14,16 @@ open B0_std
 (** {1:urls URLs} *)
 
 type url =
-[ `Url of B0_url.t (** The URL. *)
+[ `Url of Net.Url.t (** The URL. *)
 | `In of B0_env.dir * Fpath.t (** The path in given directory. *)
-| `Fun of string * (B0_env.t -> B0_unit.t -> (B0_url.t, string) result) ]
+| `Fun of string * (B0_env.t -> B0_unit.t -> (Net.Url.t, string) result) ]
 (** The type for dermining the URL to show. *)
 
 val url : url B0_meta.key
 (** [url] defines the default URL to show when
     [.show-url] is used on a unit without specifying a path.*)
 
-val get_url : B0_env.t -> B0_unit.t -> (B0_url.t, string) result
+val get_url : B0_env.t -> B0_unit.t -> (Net.Url.t, string) result
 (** [get_url env u] performs the logic to get the {!val-url} for unit [u]
     in environment [env]. *)
 

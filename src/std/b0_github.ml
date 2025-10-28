@@ -199,7 +199,7 @@ module Repo = struct
   let make ~owner name = { owner; name }
   let of_url url =
     let err () = Fmt.error "%S: Can't parse GitHub owner and repo." url in
-    match B0_url.path url with
+    match Net.Url.path url with
     | None -> err ()
     | Some p ->
         match String.split_on_char '/' p with

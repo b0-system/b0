@@ -296,8 +296,6 @@ let update_webs_modules =
   let dst_dir = B0_env.in_scope_dir env ~/"src/std" in
   let src_dir = Fpath.(dir / "src" / "kit") in
   let* () = copy_module ~src_dir ~dst_dir "webs_base64" "b0_base64" in
-  let src_dir = Fpath.(dir / "src" ) in
-  let* () = copy_module ~src_dir ~dst_dir "webs__url" "b0_url" in
   Ok ()
 
 let update_htmlit =

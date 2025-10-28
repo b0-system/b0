@@ -11,7 +11,7 @@ let open_issue ~user ~repo_url ~title ~body =
   let* auth = B0_github.Auth.make ~user () in
   let* repo = B0_github.Repo.of_url repo_url in
   let* num, url = B0_github.Issue.open' httpc auth repo ~title ~body () in
-  let* path = match B0_url.path url with
+  let* path = match Net.Url.path url with
   | None -> Fmt.error "No path in returned url %s" url
   | Some path -> Ok path
   in

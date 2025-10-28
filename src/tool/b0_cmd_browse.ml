@@ -16,7 +16,7 @@ let process_url ~browser ~background ~prefix ~output_urls ~no_pager =
   Result.ok @@ fun url ->
   let* cwd = Os.Dir.cwd () in
   let root_path = Some (Fpath.to_url_path cwd) in
-  let url = B0_url.to_absolute ~scheme:"file" ~root_path url in
+  let url = Net.Url.to_absolute ~scheme:"file" ~root_path url in
   B0_web_browser.show ~background ~prefix browser url
 
 let browse
