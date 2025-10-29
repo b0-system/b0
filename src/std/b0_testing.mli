@@ -141,7 +141,6 @@ module Test : sig
   (** [error_to_failstop (Error e)] is [failstop "%s" e].
       [error_to_failstop (Ok v)] is [v]. *)
 
-
   (** {2:blocks Blocks and loops}
 
       Blocks and loops can be used as larger sub units of {!test}

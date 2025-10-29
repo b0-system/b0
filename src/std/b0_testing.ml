@@ -932,7 +932,7 @@ module Test = struct
         Atomic.set Skip.count 0;
         begin try f v with
         | Stop | Skip -> ()
-        | exn when Os.exn_don't_catch exn ->
+        | exn when not (Os.exn_don't_catch exn) ->
             let bt = Printexc.get_raw_backtrace () in
             log_exn_fail bt exn;
             Fail.incr ();
