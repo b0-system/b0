@@ -1112,8 +1112,8 @@ module Test = struct
     Rand.report log_fail;
     Fail.report ~dur
 
-  let main' ?(man = Cli.default_man) ?doc ?name args f =
-    let run () args =
+  let main' ?(man = Cli.default_man) ?doc ?name f =
+    let run () f =
       if Def.output_list () then (Def.print_list (); 0) else
       let () = Printexc.record_backtrace true in
       let dur = Os.Mtime.counter () in
@@ -1127,7 +1127,7 @@ module Test = struct
                    Atomic.get Long.count <> 0 then Cli.exit_long_skip else 0)
           else (report_fail ~dur; 1)
       in
-      try (f args; exit_main dur) with
+      try (f (); exit_main dur) with
       | Stop -> exit_main dur
       | Skip ->
           log_raw_flush "@[%a The test was %a in %a@]"
@@ -1147,11 +1147,11 @@ module Test = struct
     | None -> Filename.basename Sys.executable_name
     in
     let info = Cmdliner.Cmd.info ?doc ~man ~exits:Cli.exits name in
-    let term = Cmdliner.Term.(const run $ Cli.setup $ args) in
+    let term = Cmdliner.Term.(const run $ Cli.setup $ f) in
     let cmd = Cmdliner.Cmd.make info term in
     Cmdliner.Cmd.eval' cmd
 
-  let main ?doc ?name f = main' ?doc (Cmdliner.Term.const ()) f
+  let main ?doc ?name f = main' ?doc (Cmdliner.Term.const f)
 
   module Fmt = Test_fmt
 end

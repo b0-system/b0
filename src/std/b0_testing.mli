@@ -73,7 +73,7 @@ module Test : sig
 
   val main' :
     ?man:Cmdliner.Manpage.block list ->
-    ?doc:string -> ?name:string -> 'a Cmdliner.Term.t -> ('a -> unit) -> int
+    ?doc:string -> ?name:string -> (unit -> unit) Cmdliner.Term.t -> int
   (** [main'] is like {!main} but allows to define your own additional
       command line. *)
 
@@ -757,6 +757,7 @@ module Test : sig
     val padding : string
     val fail_color : Fmt.style list
     val skip_color : Fmt.style list
+    val pass_color : Fmt.style list
     val test : unit Fmt.t
     val fail : unit Fmt.t
     val pass : unit Fmt.t
