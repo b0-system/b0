@@ -29,5 +29,5 @@ module V000 : sig
   (** [~/path] is [Fpath.v path] *)
 
   val ( ~~ ) : 'a B0_meta.key -> 'a -> B0_meta.t -> B0_meta.t
-  (** [~~ k v m] is [B0_meta.key k v m].  *)
+  (** [~~ k v m] is [B0_meta.add k v m].  *)
 end
