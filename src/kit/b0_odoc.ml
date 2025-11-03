@@ -13,7 +13,7 @@ let read_path_writes m file =
       | Error e -> Fmt.failwith_line n " %s" e
       | Ok p -> p :: acc
     in
-    try Ok (String.fold_ascii_lines ~strip_newlines:true parse_line [] s)
+    try Ok (String.fold_ascii_lines ~drop_newlines:true parse_line [] s)
     with Failure e -> Fpath.error file "%s" e
   in
   let* lines = B0_memo.read m file in
@@ -51,7 +51,7 @@ module Compile = struct
 
     let read m file =
       let parse lines =
-        try Ok (String.fold_ascii_lines ~strip_newlines:true parse_dep [] lines)
+        try Ok (String.fold_ascii_lines ~drop_newlines:true parse_dep [] lines)
         with Failure e -> Fpath.error file "%s" e
       in
       let* lines = B0_memo.read m file in
@@ -115,7 +115,7 @@ module Html = struct
 
     let read m file =
       let parse s =
-        try Ok (String.fold_ascii_lines ~strip_newlines:true parse_dep [] s)
+        try Ok (String.fold_ascii_lines ~drop_newlines:true parse_dep [] s)
         with Failure e -> Fpath.error file "%s" e
       in
       let* lines = B0_memo.read m file in
@@ -258,9 +258,15 @@ module Theme = struct
             let name pkg name = Fmt.str "%s.%s" pkg name in
             let add_theme _ sub dir acc = (name pkg sub, dir) :: acc in
             Result.error_to_failure @@
-            Os.Dir.fold_dirs ~recurse:false add_theme tdir acc
+            let dotfiles = false and follow_symlinks = true and recurse = false
+            in
+            Os.Dir.fold_dirs
+              ~dotfiles ~follow_symlinks ~recurse add_theme tdir acc
       in
-      let ts = Os.Dir.fold_dirs ~recurse:false add_themes dir [] in
+      let ts =
+        let dotfiles = false and follow_symlinks = true and recurse = false in
+        Os.Dir.fold_dirs ~dotfiles ~follow_symlinks ~recurse add_themes dir []
+      in
       let compare (n0, _) (n1, _) =
         compare (String.Ascii.lowercase n0) (String.Ascii.lowercase n1)
       in
@@ -291,7 +297,11 @@ module Theme = struct
       B0_memo.copy m src ~dst
     in
     let src_root = path theme in
-    let files = Os.Dir.fold_files ~recurse:true Os.Dir.path_list src_root [] in
+    let files =
+      let dotfiles = true and follow_symlinks = true and recurse = true in
+      Os.Dir.fold_files ~dotfiles ~follow_symlinks ~recurse
+        Os.Dir.path_list src_root []
+    in
     let files = B0_memo.fail_if_error m files in
     List.iter (copy_file m ~src_root ~dst_root:to_dir) files
 end

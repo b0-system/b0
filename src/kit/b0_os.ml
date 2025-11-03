@@ -59,7 +59,7 @@ let os_release =
         let map =
           try
             Ok (String.fold_ascii_lines
-                  ~strip_newlines:true parse_line String.Map.empty s)
+                  ~drop_newlines:true parse_line String.Map.empty s)
           with Failure e -> Fpath.error file "%s" e
         in
         let map = B0_memo.notify_if_error m `Warn ~use:String.Map.empty map in

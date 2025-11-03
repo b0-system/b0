@@ -365,8 +365,8 @@ let ready_and_copy_to_dir m ?mode ?linenum ?src_root src ~dst_dir =
   ready_file m src; copy_to_dir m ?mode ?linenum ?src_root src ~dst_dir
 
 let ready_and_copy_dir
-    ?(rel = false) ?follow_symlinks ?(prune = fun _ _ _ -> false) m
-    ?mode ?linenum ~recurse ?src_root src ~dst:dst_root
+    ?(rel = false) ?(prune = fun _ _ _ -> false) m
+    ?mode ?linenum ~follow_symlinks ~recurse ?src_root src ~dst:dst_root
   =
   let src_root = Option.value ~default:src src_root in
   let copy_file st name src acc =
@@ -383,7 +383,7 @@ let ready_and_copy_dir
   let* () = Os.Dir.must_exist src in
   let prune_dir st name dir _ = prune st name dir and dotfiles = true in
   Os.Dir.fold_files
-    ~rel ~dotfiles ?follow_symlinks ~prune_dir ~recurse copy_file src []
+    ~rel ~dotfiles ~follow_symlinks ~prune_dir ~recurse copy_file src []
 
 let mkdir m ?(mode = 0o755) dir =
   let id = new_op_id m and mark = m.c.mark and created = timestamp m in
@@ -504,9 +504,10 @@ let spawn'
   | Some writes -> writes
   | None ->
       fun o ->
-        let dotfiles = true and recurse = true in
+        let dotfiles = true and follow_symlinks = false and recurse = true in
         fail_if_error m
-          Os.Dir.(fold_files ~dotfiles ~recurse path_list writes_root [])
+          Os.Dir.(fold_files ~dotfiles ~follow_symlinks ~recurse
+                    path_list writes_root [])
   in
   let post_exec o =
     if B0_zero.Op.revived o || B0_zero.Op.status o <> B0_zero.Op.Success

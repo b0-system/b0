@@ -110,6 +110,9 @@ module Span : sig
       exact floating point integer) the result is an approximation and
       will not round trip with {!of_float_ns}. *)
 
+  val to_float_s : t -> float
+  (** [to_float_s s] is [1e9 * ]{!to_float_ns}[ s]. *)
+
   (** {1:fmt Formatting} *)
 
   val pp : t B0__fmt.t

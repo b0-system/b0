@@ -63,8 +63,10 @@ let make ?vcs_repo ?(log_absolute = false) ?(log_diffs = true) env ~base =
 
 let base ctx = ctx.base
 let base_files ?rel ctx ~recurse =
+  let dotfiles = false and follow_symlinks = true in
   result_to_abort @@
-  Os.Dir.fold_files ?rel ~recurse Os.Dir.path_list ctx.base []
+  Os.Dir.fold_files ?rel ~dotfiles ~follow_symlinks ~recurse
+    Os.Dir.path_list ctx.base []
 
 let dur ctx = Os.Mtime.count ctx.time
 let env ctx = ctx.env

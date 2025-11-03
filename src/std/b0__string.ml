@@ -5,266 +5,287 @@
 
 include String
 
-let invalid_start ~start len =
-  let i = Int.to_string in
-  invalid_arg @@ concat "" ["start: "; i start; "not in range [0;"; i len; "]"]
-
 (* Strings *)
 
-let empty = ""
 let head s = if s = "" then None else Some s.[0]
 let of_char c = make 1 c
-let is_empty s = equal empty s
+let is_empty s = String.length s = 0
 
 (* Finding indices *)
 
-(* FIXME make indices work like find_sub *)
+let invalid_start ~start len =
+  let i = string_of_int in
+  invalid_arg @@ concat "" ["start: "; i start; " not in range [0;"; i len; "]"]
 
-let find_first_index ?(start = 0) sat s =
-  let max = length s - 1 in
+let find_first_index sat ?(start = 0) s =
+  let len = length s in
+  if not (0 <= start && start <= len) then invalid_start ~start len else
   let i = ref start in
-  while (!i <= max && not (sat s.[!i])) do incr i done;
-  if !i > max then None else Some !i
+  while !i < len && not (sat (unsafe_get s !i)) do incr i done;
+  if !i < len then Some !i else None
 
-let find_last_index ?start sat s =
-  let start = match start with None -> length s - 1 | Some s -> s in
-  let i = ref start in
-  while (0 <= !i && not (sat s.[!i])) do decr i done;
+let find_last_index sat ?start s =
+  let len = length s in
+  let start = match start with None -> len | Some s -> s in
+  if not (0 <= start && start <= len) then invalid_start ~start len else
+  let i = ref (if start = len then len - 1 else start) in
+  while !i >= 0 && not (sat (unsafe_get s !i)) do decr i done;
   if !i < 0 then None else Some !i
 
-(* Finding substrings.  *)
+(* Finding substrings *)
 
-(* Two way string search, see https://doi.org/10.1145/116825.116845 or
-   http://www-igm.univ-mlv.fr/~lecroq/string/node26.html#SECTION00260 *)
+module Search = struct
+  (* Two way string search, see https://doi.org/10.1145/116825.116845 or
+     http://www-igm.univ-mlv.fr/~lecroq/string/node26.html#SECTION00260 *)
 
-let find_maximal_suffix_and_period ~sub =
-  let sublen = length sub in
-  let i = ref (-1) and j = ref 0 and k = ref 1 and p = ref 1 in
-  let[@inline] maximal_suffix ~order =
-    while (!j + !k < sublen) do
-      let c = order * Char.compare (get sub (!j + !k)) (get sub (!i + !k)) in
-      if c < 0 then (j := !j + !k; k := 1; p := !j - !i) else
-      if c > 0 then (i := !j; j := !i + 1; k := 1; p := 1) else (* c = 0 *)
-      if !k = !p then (j := !j + !p; k := 1) else incr k
-    done;
-  in
-  (maximal_suffix[@inlined]) ~order:1;
-  let l0 = !i and p0 = !p in
-  i := -1; j := 0; k := 1; p := 1;
-  (maximal_suffix[@inlined]) ~order:(-1);
-  let l1 = !i and p1 = !p in
-  if l0 > l1 then (l0, p0) else (l1, p1)
-
-let periodic_sub ~sub ~sub_lp:(l, p) =
-  let i = ref 0 in
-  while !i <= l && Char.equal (get sub !i) (get sub (!i + p))
-  do incr i done;
-  !i > l
-
-let primitive_find_sub ~start ~sub ~sub_lp:(l, p as sub_lp) s =
-  let slen = length s in
-  if not (0 <= start && start <= slen) then invalid_start ~start slen else
-  let sublen = length sub in
-  let smax = slen - sublen in
-  let j = ref start in
-  try
-    if periodic_sub ~sub ~sub_lp then begin
-      let memory = ref (-1) in
-      while (!j <= smax) do
-        let i = ref (1 + Int.max l !memory) in
-        while (!i < sublen && Char.equal (get sub !i) (get s (!i + !j)))
-        do incr i done;
-        if !i < sublen then (j := !j + (!i - l); memory := -1) else
-        begin
-          i := l;
-          while (!i > !memory && Char.equal (get sub !i) (get s (!i + !j)))
-          do decr i done;
-          if !i <= !memory then raise_notrace Exit else
-          (j := !j + p; memory := sublen - p - 1)
-        end
-      done;
-      -1
-    end else begin
-      let p = 1 + Int.max (l + 1) (sublen - l - 1) in
-      while (!j <= smax) do
-        let i = ref (l + 1) in
-        while (!i < sublen && Char.equal (get sub !i) (get s (!i + !j)))
-        do incr i done;
-        if !i < sublen then (j := !j + (!i - l)) else
-        begin
-          i := l;
-          while (!i >= 0 && Char.equal (get sub !i) (get s (!i + !j)))
-          do decr i done;
-          if !i < 0 then raise_notrace Exit else (j := !j + p)
-        end
-      done;
-      -1
-    end
-  with Exit -> !j
-
-(* FIXME this is buggy we use naive string search for now
-
-let primitive_rfind_sub ~start ~sub ~sub_lp:(l, p as sub_lp) s =
-  (* Note this is the same as above except for the assignement
-       and test logic on [j] where we move from right to left. *)
-  let slen = length s in
-  if not (0 <= start && start <= slen) then invalid_start ~start slen else
-  let sublen = length sub in
-  let smax = slen - sublen in
-  let j = ref (if start > smax then smax else start) in
-  try
-    if periodic_sub ~sub ~sub_lp then begin
-      let memory = ref (-1) in
-      while (!j >= 0) do
-        let i = ref (1 + Int.max l !memory) in
-        while (!i < sublen && Char.equal (get sub !i) (get s (!i + !j)))
-        do incr i done;
-        if !i < sublen then (j := !j - (!i - l); memory := -1) else
-        begin
-          i := l;
-          while (!i > !memory && Char.equal (get sub !i) (get s (!i + !j)))
-          do decr i done;
-          if !i <= !memory then raise_notrace Exit else
-          (j := !j - p; memory := sublen - p - 1)
-        end
-      done;
-      -1
-    end else begin
-      let p = 1 + Int.max (l + 1) (sublen - l - 1) in
-      while (!j >= 0) do
-        let i = ref (l + 1) in
-        while (!i < sublen && Char.equal (get sub !i) (get s (!i + !j)))
-        do incr i done;
-        if !i < sublen then (j := !j - (!i - l)) else
-        begin
-          i := l;
-          while (!i >= 0 && Char.equal (get sub !i) (get s (!i + !j)))
-          do decr i done;
-          if !i < 0 then raise_notrace Exit else (j := !j - p)
-        end
-      done;
-      -1
-    end
-  with Exit -> !j
-*)
-
-let primitive_rfind_sub ~start ~sub s =
-  let is_sub ~sub s j =
+  let find_maximal_suffix_and_period ~sub =
     let sublen = length sub in
+    let i = ref (-1) and j = ref 0 and k = ref 1 and p = ref 1 in
+    let[@inline] maximal_suffix ~order =
+      while (!j + !k < sublen) do
+        let c = order * Char.compare (get sub (!j + !k)) (get sub (!i + !k)) in
+        if c < 0 then (j := !j + !k; k := 1; p := !j - !i) else
+        if c > 0 then (i := !j; j := !i + 1; k := 1; p := 1) else
+        (* c = 0 *)
+        if !k = !p then (j := !j + !p; k := 1) else incr k
+      done;
+    in
+    (maximal_suffix[@inlined]) ~order:1;
+    let l0 = !i and p0 = !p in
+    i := -1; j := 0; k := 1; p := 1;
+    (maximal_suffix[@inlined]) ~order:(-1);
+    let l1 = !i and p1 = !p in
+    if l0 > l1 then (l0, p0) else (l1, p1)
+
+  let is_sub_periodic ~sub ~sub_lp:(l, p) =
     let i = ref 0 in
-    while !i < sublen && Char.equal (get s (j + !i)) (get sub !i)
+    while !i <= l && Char.equal (get sub !i) (get sub (!i + p))
     do incr i done;
-    !i = sublen
-  in
-  let slen = length s in
-  if not (0 <= start && start <= slen) then invalid_start ~start slen else
-  let smax = length s - length sub in
-  let j = ref (if start > smax then smax else start) in
-  while !j >= 0 && not (is_sub ~sub s !j) do decr j done;
-  if !j >= 0 then !j else -1
+    !i > l
 
-let includes ~affix:sub s =
-  let sub_lp = find_maximal_suffix_and_period ~sub in
-  primitive_find_sub ~start:0 ~sub ~sub_lp s <> -1
+  let find ~start ~sub ~sub_lp:(l, p) ~sub_periodic s = (* -1 on not found *)
+    let slen = length s and sublen = length sub in
+    if not (0 <= start && start <= slen) then invalid_start ~start slen else
+    let smax = slen - sublen in
+    let j = ref start in
+    try
+      if sub_periodic then begin
+        let memory = ref (-1) in
+        while (!j <= smax) do
+          let i = ref (1 + Int.max l !memory) in
+          while (!i < sublen && Char.equal (get sub !i) (get s (!i + !j)))
+          do incr i done;
+          if !i < sublen then (j := !j + (!i - l); memory := -1) else
+          begin
+            i := l;
+            while (!i > !memory && Char.equal (get sub !i) (get s (!i + !j)))
+            do decr i done;
+            if !i <= !memory then raise_notrace Exit else
+            (j := !j + p; memory := sublen - p - 1)
+          end
+        done;
+        -1
+      end else begin
+        let p = 1 + Int.max (l + 1) (sublen - l - 1) in
+        while (!j <= smax) do
+          let i = ref (l + 1) in
+          while (!i < sublen && Char.equal (get sub !i) (get s (!i + !j)))
+          do incr i done;
+          if !i < sublen then (j := !j + (!i - l)) else
+          begin
+            i := l;
+            while (!i >= 0 && Char.equal (get sub !i) (get s (!i + !j)))
+            do decr i done;
+            if !i < 0 then raise_notrace Exit else (j := !j + p)
+          end
+        done;
+        -1
+      end
+    with Exit -> !j
 
-let find_first ?(start = 0) ~sub s =
-  let sub_lp = find_maximal_suffix_and_period ~sub in
-  match primitive_find_sub ~start ~sub_lp ~sub s with
-  | -1 -> None | i -> Some i
+  (* The following searches from the end of string. Except for changes
+     marked with explicit comments this a cut and paste of the code to
+     search forward, except the [get] function it invokes map indices
+     from the range [0;n-1] to [n-1;0] which we call the reverse space *)
 
-let find_last ?start ~sub s =
-  let start = match start with None -> length s | Some s -> s in
-  (* Once reverse two way works
-  let sub_lp = find_maximal_suffix_and_period ~sub in
-  match primitive_rfind_sub ~start ~sub_lp ~sub s with
-  | -1 -> None | i -> Some i
-  *)
-  match primitive_rfind_sub ~start ~sub s with -1 -> None | i -> Some i
+  let[@inline] get s i = get s (String.length s - 1 - i)
 
-let find_all ?(start = 0) f ~sub s acc =
-  let rec loop f acc sub sub_lp s ~start ~slen =
-    if start > slen then acc else
-    match primitive_find_sub ~start ~sub ~sub_lp s with
-    | -1 -> acc
+  let rfind_maximal_suffix_and_period ~sub =
+    let sublen = length sub in
+    let i = ref (-1) and j = ref 0 and k = ref 1 and p = ref 1 in
+    let[@inline] maximal_suffix ~order =
+      while (!j + !k < sublen) do
+        let c = order * Char.compare (get sub (!j + !k)) (get sub (!i + !k)) in
+        if c < 0 then (j := !j + !k; k := 1; p := !j - !i) else
+        if c > 0 then (i := !j; j := !i + 1; k := 1; p := 1) else
+        (* c = 0 *)
+        if !k = !p then (j := !j + !p; k := 1) else incr k
+      done;
+    in
+    (maximal_suffix[@inlined]) ~order:1;
+    let l0 = !i and p0 = !p in
+    i := -1; j := 0; k := 1; p := 1;
+    (maximal_suffix[@inlined]) ~order:(-1);
+    let l1 = !i and p1 = !p in
+    if l0 > l1 then (l0, p0) else (l1, p1)
+
+  let ris_sub_periodic ~sub ~rsub_lp:(l, p) =
+    let i = ref 0 in
+    while !i <= l && Char.equal (get sub !i) (get sub (!i + p))
+    do incr i done;
+    !i > l
+
+  let rfind ~start ~sub ~rsub_lp:(l, p) ~rsub_periodic s = (* -1 on not found *)
+    let slen = length s and sublen = length sub in
+    if not (0 <= start && start <= slen) then invalid_start ~start slen else
+    let start =
+      (* In the reverse space we find the index of the end of [sub] so we
+         need to allow to adjust start to search from there which is
+         the index [start + sublen - 1]. This index then converted into the
+         reverse index space, that may end up negative, e.g. if [start] is
+         toward the end and [sub] is large so we clamp to 0. *)
+      Int.max 0 (slen - 1 - (start + (sublen - 1)))
+    in
+    let smax = slen - sublen in
+    let j = ref start in
+    try
+      if rsub_periodic then begin
+        let memory = ref (-1) in
+        while (!j <= smax) do
+          let i = ref (1 + Int.max l !memory) in
+          while (!i < sublen && Char.equal (get sub !i) (get s (!i + !j)))
+          do incr i done;
+          if !i < sublen then (j := !j + (!i - l); memory := -1) else
+          begin
+            i := l;
+            while (!i > !memory && Char.equal (get sub !i) (get s (!i + !j)))
+            do decr i done;
+            if !i <= !memory then raise_notrace Exit else
+            (j := !j + p; memory := sublen - p - 1)
+          end
+        done;
+        -1
+      end else begin
+        let p = 1 + Int.max (l + 1) (sublen - l - 1) in
+        while (!j <= smax) do
+          let i = ref (l + 1) in
+          while (!i < sublen && Char.equal (get sub !i) (get s (!i + !j)))
+          do incr i done;
+          if !i < sublen then (j := !j + (!i - l)) else
+          begin
+            i := l;
+            while (!i >= 0 && Char.equal (get sub !i) (get s (!i + !j)))
+            do decr i done;
+            if !i < 0 then raise_notrace Exit else (j := !j + p)
+          end
+        done;
+        -1
+      end
+    with Exit ->
+      (* This transforms back from the reverse space and compensates
+         for the fact that we found the location of the end of [sub]. *)
+      slen - 1 - (!j + (sublen - 1))
+end
+
+let find_first ~sub =
+  let sub_lp = Search.find_maximal_suffix_and_period ~sub in
+  let sub_periodic = Search.is_sub_periodic ~sub ~sub_lp in
+  fun ?(start = 0) s ->
+    match Search.find ~start ~sub_lp ~sub_periodic ~sub s with
+    | -1 -> None | i -> Some i
+
+let find_last ~sub =
+  let rsub_lp = Search.rfind_maximal_suffix_and_period ~sub in
+  let rsub_periodic = Search.ris_sub_periodic ~sub ~rsub_lp in
+  fun ?start s ->
+    let start = match start with None -> length s | Some s -> s in
+    match Search.rfind ~start ~sub ~rsub_lp ~rsub_periodic s with
+    | -1 -> None | i -> Some i
+
+let find_all ~sub =
+  let sub_lp = Search.find_maximal_suffix_and_period ~sub in
+  let sub_periodic = Search.is_sub_periodic ~sub ~sub_lp in
+  fun f ?(start = 0) s acc ->
+    let rec loop f acc sub sub_lp sub_periodic s ~start ~slen =
+      if start > slen then acc else
+      match Search.find ~start ~sub ~sub_lp ~sub_periodic s with
+      | -1 -> acc
+      | i ->
+          let start = i + Int.max (length sub) 1 in
+          loop f (f i acc) sub sub_lp sub_periodic s ~start ~slen
+    in
+    let slen = length s in
+    if not (0 <= start && start <= slen) then invalid_start ~start slen else
+    loop f acc sub sub_lp sub_periodic s ~start ~slen
+
+let rfind_all ~sub =
+  let rsub_lp = Search.rfind_maximal_suffix_and_period ~sub in
+  let rsub_periodic = Search.ris_sub_periodic ~sub ~rsub_lp in
+  fun f ?start s acc ->
+    let rec loop f acc sub rsub_lp rsub_periodic s ~start ~slen =
+      if start < 0 then acc else
+      match Search.rfind ~start ~sub ~rsub_lp ~rsub_periodic s with
+      | -1 -> acc
+      | i ->
+          let start = i - Int.max (length sub) 1 in
+          loop f (f i acc) sub rsub_lp rsub_periodic s ~start ~slen
+    in
+    let slen = length s in
+    let start = match start with None -> length s | Some s -> s in
+    if not (0 <= start && start <= slen) then invalid_start ~start slen else
+    loop f acc sub rsub_lp rsub_periodic s ~start ~slen
+
+let replace_first ~sub:needle =
+  let sub_lp = Search.find_maximal_suffix_and_period ~sub:needle in
+  let sub_periodic = Search.is_sub_periodic ~sub:needle ~sub_lp in
+  fun ~by ?(start = 0) s ->
+    match Search.find ~start ~sub:needle ~sub_lp ~sub_periodic s with
+    | -1 -> s
     | i ->
-        let acc = f i acc in
-        let start = i + length sub in
-        let start = if start = i then start + 1 else start in
-        loop f acc sub sub_lp s ~start ~slen
-  in
-  let slen = length s in
-  if not (0 <= start && start <= slen) then invalid_start ~start slen else
-  let sub_lp = find_maximal_suffix_and_period ~sub in
-  loop f acc sub sub_lp s ~start ~slen
+        let rest_first = i + length needle in
+        let rest_len = length s - i - length needle in
+        concat by [sub s 0 i; sub s rest_first rest_len]
 
-let rfind_all ?start f ~sub s acc =
-  (* Once reverse two way works
-  let rec loop f acc sub sub_lp s ~start ~slen =
-    if start < 0 then acc else
-    match primitive_rfind_sub ~start ~sub ~sub_lp s with
-    | -1 -> acc
+let replace_last ~sub:needle =
+  let rsub_lp = Search.rfind_maximal_suffix_and_period ~sub:needle in
+  let rsub_periodic = Search.ris_sub_periodic ~sub:needle ~rsub_lp in
+  fun ~by ?start s ->
+    let start = match start with None -> length s | Some s -> s in
+    match Search.rfind ~start ~sub:needle ~rsub_lp ~rsub_periodic s with
+    | -1 -> s
     | i ->
-        let start = i - Int.max (length sub) 1 in
-        loop f (f i acc) sub sub_lp s ~start ~slen
-  in
-  let slen = length s in
-  let start = match start with None -> length s | Some s -> s in
-  if not (0 <= start && start <= slen) then invalid_start ~start slen else
-  let sub_lp = find_maximal_suffix_and_period ~sub in
-  loop f acc sub sub_lp s ~start ~slen *)
-  let rec loop f acc sub s ~start ~slen =
-    if start < 0 then acc else
-    match primitive_rfind_sub ~start ~sub s with
-    | -1 -> acc
-    | i ->
-        let start = i - Int.max (length sub) 1 in
-        loop f (f i acc) sub s ~start ~slen
-  in
-  let slen = length s in
-  let start = match start with None -> length s | Some s -> s in
-  if not (0 <= start && start <= slen) then invalid_start ~start slen else
-  loop f acc sub s ~start ~slen
+        let rest_first = i + length needle in
+        let rest_len = length s - i - length needle in
+        concat by [sub s 0 i; sub s rest_first rest_len]
 
-let replace_first ?(start = 0) ~sub:needle ~by s =
-  let sub_lp = find_maximal_suffix_and_period ~sub:needle in
-  match primitive_find_sub ~start ~sub:needle ~sub_lp s with
-  | -1 -> s
-  | i ->
-      let rest_first = i + length needle in
-      let rest_len = length s - i - length needle in
-      concat by [sub s 0 i; sub s rest_first rest_len]
+let replace_all ~sub:needle =
+  let find_all = find_all ~sub:needle in
+  fun ~by ?start s ->
+    let chunk_first = ref 0 in
+    let add_chunk i acc =
+      let acc = sub s !chunk_first (i - !chunk_first) :: acc in
+      chunk_first := i + length needle; acc
+    in
+    match find_all ?start add_chunk s [] with
+    | [] -> s
+    | chunks ->
+        let chunks = sub s !chunk_first (length s - !chunk_first) :: chunks in
+        concat by (List.rev chunks)
 
-let replace_last ?start ~sub:needle ~by s =
-  let start = match start with None -> length s | Some s -> s in
-  match primitive_rfind_sub ~start ~sub:needle s with
-  | -1 -> s
-  | i ->
-      let rest_first = i + length needle in
-      let rest_len = length s - i - length needle in
-      concat by [sub s 0 i; sub s rest_first rest_len]
-
-let replace_all ?start ~sub:needle ~by s =
-  let chunk_first = ref 0 in
-  let add_chunk i acc =
-    let acc = sub s !chunk_first (i - !chunk_first) :: acc in
-    chunk_first := i + length needle; acc
-  in
-  match find_all ?start add_chunk ~sub:needle s [] with
-  | [] -> s
-  | chunks ->
-      let chunks = sub s !chunk_first (length s - !chunk_first) :: chunks in
-      concat by (List.rev chunks)
+let includes ~affix:sub =
+  let sub_lp = Search.find_maximal_suffix_and_period ~sub in
+  let sub_periodic = Search.is_sub_periodic ~sub ~sub_lp in
+  fun s ->  Search.find ~start:0 ~sub ~sub_lp ~sub_periodic s <> -1
 
 (* Extracting substrings *)
 
-let subrange ?(first = 0) ?last s =
+let[@inline] subrange ?(first = 0) ?(last = max_int) s =
   let max = length s - 1 in
   let first = if first < 0 then 0 else first in
-  let last = match last with None -> max | Some last -> last in
   let last = if last > max then max else last in
   if first > last then "" else sub s first (last - first + 1)
 
-(* Breaking with magnitudes *)
+(* Splitting with magnitudes *)
 
 let take_first n s = subrange ~last:(n - 1) s
 let drop_first n s = subrange ~first:n s
@@ -273,7 +294,7 @@ let take_last n s = subrange ~first:(length s - n) s
 let drop_last n s = subrange ~last:(length s - n - 1) s
 let cut_last n s = (drop_last n s, take_last n s)
 
-(* Breaking with predicates *)
+(* Splitting with predicates *)
 
 let take_first_while sat s =
   let len = length s and i = ref 0 in
@@ -296,7 +317,9 @@ let take_last_while sat s =
   let len = length s in
   let i = ref (len - 1) in
   while !i >= 0 && sat (unsafe_get s !i) do decr i done;
-  if !i < 0 then s else sub s (!i + 1) (len - (!i + 1))
+  if !i < 0 then s else
+  let j = !i + 1 in
+  sub s j (len - j)
 
 let drop_last_while sat s =
   let len = length s in
@@ -307,47 +330,57 @@ let drop_last_while sat s =
 let cut_last_while sat s =
   let len = length s in
   let i = ref (len - 1) in
-  while !i >= 0 && sat s.[!i] do decr i done;
+  while !i >= 0 && sat (unsafe_get s !i) do decr i done;
   if !i < 0 then "", s else
   if !i = len - 1 then s, "" else
   let j = !i + 1 in
   sub s 0 j, sub s j (len - j)
 
-(* Breaking with separators *)
+(* Splitting with separators *)
 
-let split_first ~sep s = match find_first ~sub:sep s with
-| None -> None
-| Some i -> Some (subrange ~last:(i - 1) s, subrange ~first:(i + length sep) s)
+let split_first ~sep =
+  let find_first = find_first ~sub:sep in
+  fun s -> match find_first s with
+  | None -> None
+  | Some i ->
+      Some (subrange ~last:(i - 1) s, subrange ~first:(i + length sep) s)
 
-let split_last ~sep s = match find_last ~sub:sep s with
-| None -> None
-| Some i -> Some (subrange ~last:(i - 1) s, subrange ~first:(i + length sep) s)
+let split_last ~sep =
+  let find_last = find_last ~sub:sep in
+  fun s -> match find_last s with
+  | None -> None
+  | Some i ->
+      Some (subrange ~last:(i - 1) s, subrange ~first:(i + length sep) s)
 
-let split_all ?(drop = Fun.const false) ~sep s =
-  let first = ref 0 in
-  let add_token i acc =
-    let token = subrange ~first:!first ~last:(i - 1) s in
-    first := i + length sep;
-    if drop token then acc else token :: acc
-  in
-  let tokens = find_all add_token ~sub:sep s [] in
-  let last = subrange ~first:!first s in
-  List.rev (if drop last then tokens else last :: tokens)
+let split_all ~sep =
+  let find_all = find_all ~sub:sep in
+  fun ?(drop = Fun.const false) s ->
+    let first = ref 0 in
+    let add_token i acc =
+      let token = subrange ~first:!first ~last:(i - 1) s in
+      first := i + length sep;
+      if drop token then acc else token :: acc
+    in
+    let tokens = find_all add_token s [] in
+    let last = subrange ~first:!first s in
+    List.rev (if drop last then tokens else last :: tokens)
 
-let rsplit_all ?(drop = Fun.const false) ~sep s =
-  let last = ref (length s - 1) in
-  let add_token i acc =
-    let token = subrange ~first:(i + length sep) ~last:!last s in
-    last := i - 1;
-    if drop token then acc else token :: acc
-  in
-  let tokens = rfind_all add_token ~sub:sep s [] in
-  let last = subrange ~last:!last s in
-  if drop last then tokens else (last :: tokens)
+let rsplit_all ~sep =
+  let rfind_all = rfind_all ~sub:sep in
+  fun ?(drop = Fun.const false) s ->
+    let last = ref (length s - 1) in
+    let add_token i acc =
+      let token = subrange ~first:(i + length sep) ~last:!last s in
+      last := i - 1;
+      if drop token then acc else token :: acc
+    in
+    let tokens = rfind_all add_token s [] in
+    let last = subrange ~last:!last s in
+    if drop last then tokens else (last :: tokens)
 
-(* Breaking lines *)
+(* Splitting lines *)
 
-let fold_ascii_lines ~strip_newlines:strip f acc s =
+let fold_ascii_lines ~drop_newlines:strip f acc s =
   let rec loop ~strip linenum s start i max f acc =
     if i > max then
         f linenum acc (if start = 0 then s else sub s start (i - start))
@@ -369,7 +402,7 @@ let fold_ascii_lines ~strip_newlines:strip f acc s =
   in
   if s = "" then acc else loop ~strip 1 s 0 0 (length s - 1) f acc
 
-let detach_ascii_newline s =
+let cut_ascii_newline s =
   if s = "" then ("", "") else
   let len = length s in
   let last = len - 1 in
@@ -387,10 +420,30 @@ let detach_ascii_newline s =
 
 (* Tokenize *)
 
-let next_token
-    ?(is_sep = B0__char.Ascii.is_white)
-    ?(is_token = B0__char.Ascii.is_graphic) s
-  =
+let is_sep_default = B0__char.Ascii.is_white
+let is_token_default = B0__char.Ascii.is_graphic
+
+let take_token ?(is_sep = is_sep_default) ?(is_token = is_token_default) s =
+  let len = length s in
+  let i = ref 0 in
+  while !i < len && is_sep s.[!i] do incr i done;
+  if !i >= len then "" else
+  let first = !i in
+  while !i < len && is_token s.[!i] do incr i done;
+  if !i = first then "" else
+  subrange ~first ~last:(!i - 1) s
+
+let drop_token ?(is_sep = is_sep_default) ?(is_token = is_token_default) s =
+  let len = length s in
+  let i = ref 0 in
+  while !i < len && is_sep s.[!i] do incr i done;
+  if !i >= len then s else
+  let first = !i in
+  while !i < len && is_token s.[!i] do incr i done;
+  if !i = first then subrange ~first s else
+  subrange ~first:!i s
+
+let cut_token ?(is_sep = is_sep_default) ?(is_token = is_token_default) s =
   let len = length s in
   let i = ref 0 in
   while !i < len && is_sep s.[!i] do incr i done;

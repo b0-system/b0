@@ -77,7 +77,7 @@ val set_no_color :
   ?docs:Cmdliner.Manpage.section_name -> ?env:Cmdliner.Cmd.Env.info option ->
   unit -> unit Cmdliner.Term.t
 (** [set_no_color ()] behaves like {!no_color} and sets
-    {!B0_std.Fmt.styler} to [Plain] when it's [true]. See
+    {!B0_std.Fmt.val-styler} to [Plain] when it's [true]. See
     {{!page-b0_std_cookbook.blueprint_color_log}an example}. *)
 
 val no_color_var : Cmdliner.Cmd.Env.info
@@ -145,9 +145,9 @@ val output_details : ?docs:string -> unit -> output_details Cmdliner.Term.t
 
 val net_endpoint_conv :
   default_port:int -> Net.Endpoint.t Cmdliner.Arg.conv
-(** [net_endpoint_conv] is a convert for socket endpoints using
-    {!default_port} as the default port. It parses strings with
-    {!Net.Endpoint.of_string}. *)
+(** [net_endpoint_conv ~default_port] is a converter for socket
+    endpoints using [default_port] as the default port. It parses
+    strings with {!B0_std.Net.Endpoint.of_string}. *)
 
 val net_endpoint_listener :
   ?opts:string list -> ?docs:string -> default_port:int ->

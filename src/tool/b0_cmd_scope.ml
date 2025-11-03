@@ -64,7 +64,7 @@ let exec_when
                     ()
                   else (print_string dir; print_string l)
                 in
-                String.fold_ascii_lines ~strip_newlines:false print_line () out;
+                String.fold_ascii_lines ~drop_newlines:false print_line () out;
                 loop ss
           end
   in

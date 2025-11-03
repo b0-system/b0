@@ -286,6 +286,8 @@ let vendor_more_modules =
       "more_stubs_time.c" "b0_stubs_time.c" in
   let* () = copy_file ~substs ~src_dir ~dst_dir
       "more_stubs_uname.c" "b0_stubs_uname.c" in
+  let* () = copy_file ~substs ~src_dir ~dst_dir
+      "more_stubs_openpty.c" "b0_stubs_openpty.c" in
   Ok ()
 
 let update_webs_modules =

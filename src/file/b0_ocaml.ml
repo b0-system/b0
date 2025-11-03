@@ -225,9 +225,9 @@ module Conf = struct
     | Some (k, v) -> String.Map.add (String.trim k) (String.trim v) acc
     in
     try
-      let s = String.trim s and strip_newlines = true in
+      let s = String.trim s and drop_newlines = true in
       let fields =
-        String.fold_ascii_lines ~strip_newlines parse_line String.Map.empty s
+        String.fold_ascii_lines ~drop_newlines parse_line String.Map.empty s
       in
       Ok (of_string_map fields |> Result.error_to_failure)
     with Failure e -> Fpath.error file "OCaml config: %s" e
@@ -264,7 +264,7 @@ end
 module Modname = struct
   type t = string
   let of_path_filename f =
-    String.Ascii.capitalize (Fpath.basename ~strip_exts:true f)
+    String.Ascii.capitalize (Fpath.basename ~drop_exts:true f)
 
   let v n = String.Ascii.capitalize n
   let equal = String.equal
@@ -393,8 +393,8 @@ module Modsrc = struct
             Fpath.Map.add file mods acc
       in
       try
-        let strip_newlines = true and parse = parse_line ~src_root in
-        Ok (String.fold_ascii_lines ~strip_newlines parse Fpath.Map.empty s)
+        let drop_newlines = true and parse = parse_line ~src_root in
+        Ok (String.fold_ascii_lines ~drop_newlines parse Fpath.Map.empty s)
       with
       | Failure e -> Fpath.error file "%s" e
 
@@ -701,7 +701,10 @@ module Lib = struct
               ~cma:None ~cmxa:None ~c_archive:None ~c_stubs:[] ~js_stubs:[]
               ~warning)
     | true ->
-        Result.bind (Os.Dir.fold_files ~recurse:false Os.Dir.path_list dir [])
+        let dotfiles = false and follow_symlinks = true and recurse = false in
+        Result.bind
+          (Os.Dir.fold_files ~dotfiles ~follow_symlinks ~recurse
+             Os.Dir.path_list dir [])
         @@ fun fs ->
         let js_stubs = List.map (fun f -> Fpath.(dir // f)) js_stubs in
         let () = B0_memo.ready_files m js_stubs in
@@ -712,9 +715,9 @@ module Lib = struct
         | f :: fs ->
             let is_lib_archive f = match archive with
             | None -> false
-            | Some a -> String.equal (Fpath.basename ~strip_exts:true f) a
+            | Some a -> String.equal (Fpath.basename ~drop_exts:true f) a
             in
-            match Fpath.get_ext ~multi:false f with
+            match Fpath.take_ext ~multi:false f with
             | ".cmi" ->
                 B0_memo.ready_file m f;
                 loop (f :: cmis) cmxs cma cmxa c_archive c_stubs fs
@@ -1121,7 +1124,7 @@ module Compile = struct
     writes
 
   let mli_to_cmi ?post_exec ?k ~and_cmti m ~comp ~opts ~reads ~mli ~o =
-    let base = Fpath.strip_ext ~multi:false o in
+    let base = Fpath.drop_ext ~multi:false o in
     let stamp = Fpath.basename base in
     let reads = mli :: reads in
     let writes = o :: if and_cmti then [Fpath.(base + ".cmti")] else [] in
@@ -1134,7 +1137,7 @@ module Compile = struct
 
   let ml_to_cmo ?post_exec ?k ~and_cmt m ~opts ~reads ~has_cmi ~ml ~o =
     let ocamlc = B0_memo.tool m Tool.ocamlc in
-    let base = Fpath.strip_ext ~multi:false o in
+    let base = Fpath.drop_ext ~multi:false o in
     let stamp = Fpath.basename base (* output depends on mod name *) in
     let reads = ml :: reads in
     let writes =
@@ -1150,7 +1153,7 @@ module Compile = struct
 
   let ml_to_cmx ?post_exec ?k ~and_cmt m ~opts ~reads ~has_cmi ~ml ~o =
     let ocamlopt = B0_memo.tool m Tool.ocamlopt in
-    let base = Fpath.strip_ext ~multi:false o in
+    let base = Fpath.drop_ext ~multi:false o in
     let stamp = Fpath.basename base (* output depends on mod name *) in
     let reads = ml :: reads in
     let writes =
@@ -1286,7 +1289,7 @@ module Archive = struct
     in
     let cmxa = Fpath.(odir / Fmt.str "%s.cmxa" oname) in
     let writes = cmxa :: cmxa_clib in
-    let c_objs = List.rev_map (Fpath.set_ext ~multi:false obj_ext) cobjs in
+    let c_objs = List.rev_map (Fpath.with_ext ~multi:false obj_ext) cobjs in
     let reads = List.rev_append c_objs cobjs in
     B0_memo.spawn m ?post_exec ?k ~reads ~writes @@
     ocamlopt Cmd.(arg "-a" % "-o" %% unstamp (path cmxa) %% cstubs_opts %%
@@ -1306,7 +1309,7 @@ module Archive = struct
     let cstubs_opts, reads =
       if not has_cstubs then Cmd.empty, [cmxa; cmxa_clib] else
       (* Fixme do this on a cstubs path *)
-      let oname = Fpath.basename ~strip_exts:true cmxa in
+      let oname = Fpath.basename ~drop_exts:true cmxa in
       let cstubs_dir = Fpath.(parent cmxa) in
       let cstubs = Fpath.(cstubs_dir / cstubs_clib oname lib_ext) in
       let inc = Cmd.(arg "-I" %% unstamp (path cstubs_dir)) in
@@ -1371,7 +1374,7 @@ module Link = struct
           match Fpath.has_ext ".cmx" cobj with
           | true ->
               (* Add the side `.o` C object to read files. *)
-              let rsides = Fpath.set_ext ~multi:false obj_ext cobj :: rsides in
+              let rsides = Fpath.with_ext ~multi:false obj_ext cobj :: rsides in
               loop rsides (cobj :: rcobjs) cobjs
           | false ->
               match Fpath.has_ext ".cmxa" cobj with
@@ -1403,7 +1406,7 @@ let compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs =
   let rec loop os cunits hs = function
   | [] -> List.rev os
   | c :: cs ->
-      let cname = Fpath.basename ~strip_exts:true c in
+      let cname = Fpath.basename ~drop_exts:true c in
       match String.Map.find cname cunits with
       | exception Not_found ->
           let o = Fpath.(build_dir / Fmt.str "%s%s" cname obj_ext) in
@@ -1514,7 +1517,7 @@ let script_proc set_exe_path file b =
       let find_error _ () s =
         if String.starts_with ~prefix:"Error:" s then raise Exit else ()
       in
-      try String.fold_ascii_lines ~strip_newlines:false find_error () log
+      try String.fold_ascii_lines ~drop_newlines:false find_error () log
       with Exit -> B0_zero.Op.set_status op (Failed (Exec (Some log)))
   in
   let reads = [exe_file] and writes = [stdout_file] in
@@ -1668,7 +1671,7 @@ let test
     |> B0_meta.add B0_unit.Action.cwd `Scope_dir
   in
   let name = match name with
-  | None -> Fpath.basename ~strip_exts:true src
+  | None -> Fpath.basename ~drop_exts:true src
   | Some name -> name
   in
   exe ?wrap ?doc name ~srcs ?requires ~meta
@@ -2059,7 +2062,7 @@ module Cobj = struct
 
   let of_string ?(file = Fpath.dash) data =
     let line num acc l = (num, l) :: acc in
-    let rev_lines = String.fold_ascii_lines ~strip_newlines:true line [] data in
+    let rev_lines = String.fold_ascii_lines ~drop_newlines:true line [] data in
     try Ok (parse_files [] (List.rev rev_lines)) with
     | Failure e -> Fpath.error file "%s" e
 
@@ -2275,7 +2278,9 @@ module Cobj_index = struct
       in
       let dir = B0_build.unit_dir (B0_env.build env) u in
       let entity_cobjs, by_digest =
-        Os.Dir.fold_files ~recurse:true add_unit_file dir ([], index.by_digest)
+        let dotfiles = false and follow_symlinks = true and recurse = true in
+        Os.Dir.fold_files ~dotfiles ~follow_symlinks ~recurse
+          add_unit_file dir ([], index.by_digest)
         |> Result.error_to_failure
       in
       let by_entity = (`Unit u, entity_cobjs) :: index.by_entity in

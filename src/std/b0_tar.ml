@@ -129,7 +129,7 @@ let of_dir ~dir ~exclude_paths ~root ~mtime =
 (* Compressing and unarchiving *)
 
 let compress_tool_for_file_ext ?(de = "") file =
-  match Fpath.get_ext ~multi:false file with
+  match Fpath.take_ext ~multi:false file with
   | ".tar" -> Ok None
   | ".tgz" | ".gz" -> Ok (Some (Cmd.tool "gzip"))
   | ".tbz" | ".bzip2" -> Ok (Some (Cmd.tool "bzip2"))

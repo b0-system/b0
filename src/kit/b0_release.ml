@@ -250,7 +250,7 @@ module Archive = struct
     let search = B0_env.get_cmd env ~skip_build:false in
     let force = true and make_path = true in
     let* () = B0_tar.compress ~search ~force ~make_path archive_file ~archive in
-    let archive_dir = Fpath.strip_ext ~multi:false archive_file in
+    let archive_dir = Fpath.drop_ext ~multi:false archive_file in
     Log.stdout (fun m -> m "Wrote %a" (Fmt.code' Fpath.pp) archive_file);
     Log.stdout (fun m ->
         m "TODO Checking release in %a" (Fmt.code' Fpath.pp) archive_dir);

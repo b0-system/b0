@@ -53,6 +53,8 @@ module Span = struct
     if Int64.compare 0L s <= 0 then Int64.to_float s else
     int64_max_int_float +. (-. int64_min_int_float +. Int64.to_float s)
 
+  let to_float_s s = 1e-9 *. to_float_ns s
+
   let pp = B0__fmt.uint64_ns_span
   let pp_ns ppf s = B0__fmt.pf ppf "%Luns" s
 end

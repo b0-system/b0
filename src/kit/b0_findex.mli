@@ -19,8 +19,8 @@ val empty : t
 (** [empty] is an empty file index. *)
 
 val of_dirs :
-  ?dotfiles:bool -> ?follow_symlinks:bool ->
   ?prune_dir:(Unix.stats -> string -> Fpath.t -> bool) ->
+  dotfiles:bool -> follow_symlinks:bool ->
   Fpath.t list -> (t, string) result
 (** [of_dirs dirs] returns a file index for the files in [dirs] whose
     prefixes may be reduced see {!root_root_dirs}. See

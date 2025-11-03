@@ -13,7 +13,7 @@ let stdin_file_url ~tname =
   | None -> let* tmp = Os.Path.tmp ~name:"show-url-%s" () in Ok (tmp, false)
   | Some n ->
       let file = Os.Dir.default_tmp () in
-      let* tmp = Fpath.add_segment file n in Ok (tmp, true)
+      let* tmp = Fpath.append_segment file n in Ok (tmp, true)
   in
   let* data = Os.File.read Fpath.dash in
   let* () = Os.File.write ~force ~make_path:false tmp data in

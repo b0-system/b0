@@ -43,6 +43,8 @@ val iter_stop_on_error :
 
 val iter_iter_on_error :
   error:((unit, 'e) result -> unit) -> ('a -> (unit, 'e) result) -> 'a list ->
-  unit
+  (unit, int) result
 (** [iter_iter_on_error ~error f] applies [f] to the elements of [l]
-    starting with [acc] and invoked [error] on those that do. *)
+    and invokes [error] on those that do. Returns [Ok ()] if there
+    were no errors and [Error count], with [count] the number of
+    errors if there were some. *)

@@ -17,7 +17,7 @@ let get_kind ~kind ~units = match kind with
 | Some kind -> kind
 
 let output_dir dir =
-  Fmt.pr "@[%a@]@." Fpath.pp (Fpath.strip_trailing_dir_sep dir);
+  Fmt.pr "@[%a@]@." Fpath.pp (Fpath.drop_trailing_dir_sep dir);
   Os.Exit.ok
 
 let output_dirs ~kind ~units conf = match get_kind ~kind ~units with

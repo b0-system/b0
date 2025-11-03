@@ -168,7 +168,7 @@ val pp_arg : string B0__fmt.t
 (** [pp_arg] formats an argument [a]. The string is quoted with
     {!Filename.quote} iff it contains one of the characters mentioned
     in {{:https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02}this
-    section} of POSIX. *)
+    section} of POSIX or if it is the empty string. *)
 
 val pp : t B0__fmt.t
 (** [pp] is an unspecified formatter for commands. *)

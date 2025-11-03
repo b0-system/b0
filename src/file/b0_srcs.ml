@@ -40,7 +40,7 @@ let select_files m u (seen, by_ext) fs =
           if Fpath.Set.mem f seen then loop m u seen by_ext fs else
           let seen = Fpath.Set.add f seen in
           let by_ext =
-            String.Map.add_to_list (Fpath.get_ext ~multi:false f) f by_ext
+            String.Map.add_to_list (Fpath.take_ext ~multi:false f) f by_ext
           in
           loop m u seen by_ext fs
   in
@@ -67,12 +67,12 @@ let select_files_in_dirs m u xs (seen, by_ext as acc) ds =
     | _ ->
         if Fpath.Set.mem p seen then acc else
         Fpath.Set.add p seen,
-        String.Map.add_to_list (Fpath.get_ext ~multi:false p) p by_ext
+        String.Map.add_to_list (Fpath.take_ext ~multi:false p) p by_ext
   in
   let rec loop m u xs (seen, by_ext as acc) = function
   | [] -> acc
   | (d, recurse) :: ds ->
-      let d = Fpath.strip_trailing_dir_sep d in
+      let d = Fpath.drop_trailing_dir_sep d in
       if Fpath.Set.mem d xs then loop m u xs acc ds else
       match Os.Dir.exists d |> fail_if_error m u with
       | false ->
@@ -81,7 +81,11 @@ let select_files_in_dirs m u xs (seen, by_ext as acc) ds =
       | true ->
           let prune_dir _ dname dir _ = exclude dname dir  in
           let dotfiles = true (* exclusions handled by prune *) in
-          let acc = Os.Dir.fold ~dotfiles ~prune_dir ~recurse add_file d acc in
+          let follow_symlinks = true in
+          let acc =
+            Os.Dir.fold
+              ~prune_dir ~dotfiles ~follow_symlinks ~recurse add_file d acc
+          in
           loop m u xs (acc |> fail_if_error m u) ds
   in
   loop m u xs acc ds
@@ -97,7 +101,7 @@ let select b sels =
     | `Dir d :: ss -> loop fs ((abs d, false) :: ds) xs futs ss
     | `Dir_rec d :: ss -> loop fs ((abs d, true) :: ds) xs futs ss
     | `X x :: ss ->
-        let x = Fpath.strip_trailing_dir_sep (abs x) in
+        let x = Fpath.drop_trailing_dir_sep (abs x) in
         loop fs ds (Fpath.Set.add x xs) futs ss
     | `File f :: ss -> loop ((abs f) :: fs) ds xs futs ss
     | `Fut f :: ss -> loop fs ds xs (f b :: futs) ss
@@ -112,7 +116,7 @@ let select b sels =
   let add_files acc files =
     let add_file file (seen, by_ext as acc) =
       if Fpath.Set.mem file seen then acc else
-      let ext = Fpath.get_ext ~multi:false file in
+      let ext = Fpath.take_ext ~multi:false file in
       let by_ext = String.Map.add_to_list ext file by_ext in
       (Fpath.Set.add file seen), by_ext
     in

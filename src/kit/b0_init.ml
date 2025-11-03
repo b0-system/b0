@@ -35,7 +35,7 @@ let find_project_name ?(root_markers = default_root_markers) ~cwd () =
         in
         loop cwd
     in
-    Ok (Some (Fpath.basename ~strip_exts:true project_dir))
+    Ok (Some (Fpath.basename ~drop_exts:true project_dir))
   with
   | Exit -> Ok None
   | Failure e -> Fmt.error "@[<v>While looking for a project name:@,%s@]" e

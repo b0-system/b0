@@ -39,7 +39,7 @@ let files i = i.files
 let find_filename i n = match String.Map.find n i.files_by_name with
 | files -> files | exception Not_found -> []
 
-let of_dirs ?dotfiles ?follow_symlinks ?prune_dir root_dirs =
+let of_dirs ?prune_dir ~dotfiles ~follow_symlinks root_dirs =
   let sort files =
     let rec loop ds ds_by_dir ds_by_name fs fs_by_dir fs_by_name = function
     | [] -> ds, ds_by_dir, ds_by_name, fs, fs_by_dir, fs_by_name
@@ -69,7 +69,7 @@ let of_dirs ?dotfiles ?follow_symlinks ?prune_dir root_dirs =
     in
     let recurse = true in
     Result.error_to_failure @@ Os.Dir.fold
-      ?dotfiles ?follow_symlinks ?prune_dir ~recurse Os.Dir.path_list dir acc
+      ?prune_dir ~dotfiles ~follow_symlinks ~recurse Os.Dir.path_list dir acc
   in
   try
     let root_root_dirs =

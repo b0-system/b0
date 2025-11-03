@@ -35,7 +35,8 @@ module Auth = struct
   let get_tokens conf_dir =
     let is_token_file n = String.ends_with ~suffix:".token" n in
     let add _ fname p acc = if is_token_file fname then p :: acc else acc in
-    Os.Dir.fold_files ~recurse:false add conf_dir []
+    let dotfiles = false and follow_symlinks = true and recurse = false in
+    Os.Dir.fold_files ~dotfiles ~follow_symlinks ~recurse add conf_dir []
 
   let get_token conf_dir ~user =
     match Os.Env.var ~empty_is_none:true token_env with
@@ -84,7 +85,7 @@ module Auth = struct
 
   let user_of_token_file f =
     Result.map_error (Fmt.str "%a: %s" Fpath.pp_quoted f) @@
-    parse_user (Fpath.basename ~strip_exts:true f)
+    parse_user (Fpath.basename ~drop_exts:true f)
 
   let get_user conf_dir ~user =
     let err default_file =
@@ -384,7 +385,8 @@ module Pages = struct
     in
     let cp r ~follow_symlinks src dst =
       let dst = Fpath.(B0_vcs_repo.(work_dir r) // dst) in
-      Os.Path.copy ~follow_symlinks ~make_path:true ~recurse:true src ~dst
+      Os.Path.copy
+        ~force:false ~follow_symlinks ~make_path:true ~recurse:true src ~dst
     in
     let rec loop r = function
     | [] -> do_commit r ~log ~amend ~msg

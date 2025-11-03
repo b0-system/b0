@@ -48,8 +48,12 @@ let rec iter_stop_on_error f = function
     | Error _ as e -> e
     | Ok v -> iter_stop_on_error f vs
 
-let rec iter_iter_on_error ~error f = function
-| [] -> ()
-| v :: vs ->
-    (match f v with Error _ as e -> error e | Ok _ -> ());
-    iter_iter_on_error ~error f vs
+let rec iter_iter_on_error ~error f =
+  let rec loop ecount f = function
+  | [] -> if ecount > 0 then Error ecount else Ok ()
+  | v :: vs ->
+      match f v with
+      | Error _ as e -> error e; loop (ecount + 1) f vs
+      | Ok () -> loop ecount f vs
+  in
+  loop 0 f

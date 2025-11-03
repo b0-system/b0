@@ -291,11 +291,11 @@ val ready_and_copy_to_dir :
     on the copied file. *)
 
 val ready_and_copy_dir :
-  ?rel:bool -> ?follow_symlinks:bool ->
+  ?rel:bool ->
   ?prune:(Unix.stats -> string -> Fpath.t -> bool) ->
   t -> ?mode:int -> ?linenum:int->
-  recurse:bool -> ?src_root:Fpath.t -> Fpath.t -> dst:Fpath.t ->
-  Fpath.t list
+  follow_symlinks:bool -> recurse:bool -> ?src_root:Fpath.t -> Fpath.t ->
+  dst:Fpath.t -> Fpath.t list
 (** [ready_and_copy_dir m ~recurse src ~dst] lists files of [src]
     and applies {!ready_and_copy_to_dir} with the corresponding
     arguments.

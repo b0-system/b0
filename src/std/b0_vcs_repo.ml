@@ -11,7 +11,7 @@ let parse_changes s =
   | None -> Fmt.failwith "line %d: %S: can't parse log line" n line
   | Some cut -> cut :: acc
   in
-  try Ok (List.rev (String.fold_ascii_lines ~strip_newlines:true line [] s))
+  try Ok (List.rev (String.fold_ascii_lines ~drop_newlines:true line [] s))
   with Failure e -> Error e
 
 let parse_ptime ptime = try Ok (int_of_string ptime) with

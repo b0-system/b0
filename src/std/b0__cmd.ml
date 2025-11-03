@@ -153,15 +153,16 @@ let of_string s =
     B0__fmt.error "command line %a: %s" B0__fmt.OCaml.string s err
 
 let must_quote s =
-  (* See https://pubs.opengroup.org/onlinepubs/9699919799/utilities/\
-     V3_chap02.html#tag_18_02 *)
+  (* See https://pubs.opengroup.org/onlinepubs/9799919799/utilities/\
+     V3_chap02.html#tag_19_02 *)
   let posix_shell_meta = function
   | ' ' | '\n' | '\t'
   | '|' | '&' | ';' | '<' | '>' | '(' | ')' | '$' | '`' | '\\' | '"' | '\''
-  | '*' | '?' | '[' | '#' | '~' | '=' | '%' -> true
+  | '*' | '?' | '[' | ']' | '^' | (* '-' | *) '#' | '~' | '=' | '%'
+  | '{' | (* ',' | *) '}' -> true
   | _ -> false
   in
-  String.exists posix_shell_meta s
+  s = "" || String.exists posix_shell_meta s
 
 let maybe_quote a = if must_quote a then Filename.quote a else a
 let to_string l = String.concat " " (List.map maybe_quote @@ to_list l)
