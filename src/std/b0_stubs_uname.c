@@ -88,7 +88,7 @@ CAMLprim value ocaml_b0_caml_win32_version (value unit)
   Field (version, 1) = Val_int (caml_win32_minor);
   Field (version, 2) = Val_int (caml_win32_build);
   Field (version, 3) = Val_int (caml_win32_revision);
-  return version
+  return version;
 }
 
 #else

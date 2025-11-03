@@ -2224,12 +2224,12 @@ module Name = struct
         (Bsd sysname), (Bsd sysname), id_unknown
     | "windows" ->
         let id, version = windows_info sysname in
-        (Windows id), (Windows id), id_unknown
+        (Windows id), (Windows id), version
     | sysname when String.starts_with ~prefix:"cygwin_nt" sysname ->
         let id, version = windows_info sysname in
         (Windows id), (Windows id), version
     | id ->
-        (Other id), (Other id), id_unknown
+        (Other id), (Other id), id_unknown (* version "unknown" *)
     in
     Atomic.set name n; Atomic.set like name_like; Atomic.set version vers
 end
