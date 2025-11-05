@@ -147,6 +147,13 @@ module Http_client = struct
     in
     loop follow [] request
 
+  let head_request_follow_location ?headers httpc url =
+    let head_request = Http.Request.make ?headers `HEAD ~url in
+    let* response = request httpc ~follow:true head_request in
+    let headers = Http.Response.headers response in
+    match List.assoc_opt x_follow_location headers with
+    | None -> Ok url | Some final_url -> Ok final_url
+
   (* Command line interface *)
 
   let curl ?docs ?env () =

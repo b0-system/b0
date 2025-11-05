@@ -99,6 +99,13 @@ module Http_client : sig
 
       The response's {!Http.Response.headers} are lowercased. *)
 
+  val head_request_follow_location :
+    ?headers:Http.headers -> t -> Net.Url.t -> (Net.Url.t, string) result
+  (** [head_request_follow_location httpc url] performs a [`HEAD] request
+      on [url], follows redirection and returns the final location or
+      [url] if there was no redirection. If specified [headers] are
+      added to the request (and redirect requests). *)
+
   val x_follow_location : string
   (** [x_follow_location] is ["x-follow-location"] the location
       that was finally requested on {!request} with [~follow:true]. *)
