@@ -12,6 +12,7 @@ module Qmap = Map.Make (Qname)
 type doc = value Qmap.t
 type nested_doc = Value of value | Bindings of (string * nested_doc) list
 
+let empty = Qmap.empty
 let find q doc = Qmap.find_opt q doc
 let to_assoc doc = Qmap.bindings doc
 let to_nested_doc doc =
@@ -35,6 +36,30 @@ let to_nested_doc doc =
               Bindings (List.rev (b :: rev_left))
   in
   Qmap.fold add doc (Bindings [])
+
+let find_section q doc =
+  let rec drop_prefix q0 q1 = match q0, q1 with
+  | [], q1 -> Some q1
+  | n0 :: q0, n1 :: q1 when String.equal n0 n1 -> drop_prefix q0 q1
+  | _ -> None
+  in
+  let add_sub n v acc = match drop_prefix q n with
+  | None -> acc | Some n -> Qmap.add n v acc
+  in
+  Qmap.fold add_sub doc Qmap.empty
+
+let top_sections doc =
+  let add_top_name q _ acc = match q with
+  | n :: _ :: _ when not (List.mem n acc) -> n :: acc
+  | _ -> acc
+  in
+  List.rev (Qmap.fold add_top_name doc [])
+
+let pp_qname ppf qname =
+  let pp_sep ppf () = Format.pp_print_char ppf '.' in
+  Format.pp_open_hovbox ppf 1;
+  Format.pp_print_list ~pp_sep Format.pp_print_string ppf qname;
+  Format.pp_close_box ppf ()
 
 (* Character classes *)
 
