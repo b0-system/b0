@@ -545,8 +545,7 @@ let take_ext ~multi p = match ext_range ~multi p with
 | exception Not_found -> ""
 | first, last -> B0__string.subrange ~first ~last p
 
-
-let _rem_ext efirst elast p =
+let rem_ext' efirst elast p =
   let plen = String.length p in
   match elast = plen - 1 with
   | true -> B0__string.subrange ~last:(efirst - 1) p
@@ -560,13 +559,13 @@ let _rem_ext efirst elast p =
 
 let drop_ext ~multi p = match ext_range ~multi p with
 | exception Not_found -> p
-| efirst, elast -> _rem_ext efirst elast p
+| efirst, elast -> rem_ext' efirst elast p
 
 let cut_ext ~multi p = match ext_range ~multi p with
 | exception Not_found -> p, ""
 | efirst, elast ->
     let ext = B0__string.subrange ~first:efirst ~last:elast p in
-    let p = _rem_ext efirst elast p in
+    let p = rem_ext' efirst elast p in
     p, ext
 
 let append_ext p ext =

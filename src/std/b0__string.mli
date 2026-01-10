@@ -19,7 +19,9 @@ val of_char : char -> string
 
     {b Available} in OCaml 5.5. *)
 
-(** {1:preds Predicates} *)
+(** {1:preds Predicates}
+
+    {b All additions available} in OCaml 5.5 *)
 
 val is_empty : string -> bool
 (** [is_empty s] is [true] if and only [s] is empty.
@@ -35,7 +37,9 @@ val includes : affix:string -> string -> bool
     applying the [~affix] argument and using the resulting function repeatedly
     is more efficient. *)
 
-(** {1:find_indices Finding indices} *)
+(** {1:find_indices Finding indices}
+
+    {b All additions available} in OCaml 5.5 *)
 
 val find_first_index : (char -> bool) -> ?start:int -> string -> int option
 (** [find_first_index p ~start s] is the index of the first character
@@ -57,7 +61,9 @@ val find_last_index : (char -> bool) -> ?start:int -> string -> int option
 
     {b Note.} To find the same [sub] string multiple times, partially
     applying the [~sub] argument of these functions and using the
-    resulting function repeatedly is more efficient *)
+    resulting function repeatedly is more efficient
+
+    {b All additions available} in OCaml 5.5 *)
 
 val find_first : sub:string -> ?start:int -> string -> int option
 (** [find_first ~sub ~start s] is the starting position of the first

@@ -210,7 +210,10 @@ module Test = struct
     Fail.incr (); klog_fail ?__POS__ (fun _ -> stop ()) fmt
 
   let error_to_failstop ?__POS__ = function
-  | Error e -> failstop "%s" e | Ok v -> v
+  | Error e -> failstop ?__POS__ "%s" e | Ok v -> v
+
+  let error_to_fail ?__POS__ = function
+  | Error e -> fail ?__POS__  "%s" e | Ok v -> ()
 
   (* Blocks and loops *)
 

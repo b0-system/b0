@@ -164,6 +164,12 @@ module Fd = struct
   let write_string fd s =
     write fd (Bytes.unsafe_of_string s) ~first:0 ~length:(String.length s)
 
+  let rec ftruncate fd size = try Unix.ftruncate fd size with
+  | Unix.Unix_error (EINTR, _, _) -> ftruncate fd size
+
+  let rec lseek fd pos cmd = try Unix.lseek fd pos cmd with
+  | Unix.Unix_error (EINTR, _, _) -> lseek fd pos cmd
+
   (* Terminals and pseudoterminals *)
 
   external openpty' : unit -> Unix.file_descr * Unix.file_descr =
@@ -992,11 +998,13 @@ module File = struct
     with
     | Sys_error e -> Error e
 
-  let read_with_fd file f =
+  let read_with_fd
+      ?(flags = Unix.[O_RDONLY; O_SHARE_DELETE; O_CLOEXEC]) file f
+    =
     try
       let fd =
         if B0__fpath.is_dash file then Unix.stdin else
-        Fd.openfile (B0__fpath.to_string file) Unix.[O_RDONLY] 0
+        Fd.openfile (B0__fpath.to_string file) flags 0
       in
       let finally () = if fd = Unix.stdin then () else Fd.close_noerr fd in
       Ok (Fun.protect ~finally (fun () -> f fd))
@@ -1034,6 +1042,10 @@ module File = struct
     let* file, fd = Tmp.open' ?flags ?mode ?make_path ?dir ?name () in
     let finally () = Fd.close_noerr fd; Tmp.rem_file file in
     Ok (Fun.protect ~finally (fun () -> f file fd))
+
+  let with_tmp ?flags ?mode ?make_path ?dir ?name f =
+    with_tmp_fd ?mode ?make_path ?dir ?name @@ fun file fd ->
+    Fd.close_noerr fd; f file
 
   let open_tmp_fd = Tmp.open'
 
@@ -1597,6 +1609,15 @@ module Path = struct
     try B0__fpath.of_string (Unix.realpath (B0__fpath.to_string p)) with
     | Unix.Unix_error (EINTR, _, _) -> realpath p
     | Unix.Unix_error (ENOTDIR, _, _) -> Error (path_msg p err_seg_not_dir)
+    | Unix.Unix_error (e, _, _) -> Error (path_msg p (uerror e))
+
+  let rec exists_realpath p =
+    try
+      Result.map Option.some @@
+      B0__fpath.of_string (Unix.realpath (B0__fpath.to_string p))
+    with
+    | Unix.Unix_error (EINTR, _, _) -> exists_realpath p
+    | Unix.Unix_error ((ENOENT|ENOTDIR), _, _) -> Ok None
     | Unix.Unix_error (e, _, _) -> Error (path_msg p (uerror e))
 
   (* Copying *)

@@ -131,7 +131,6 @@ val try_drop_relative_dirs : t -> t
     {- [p] is relative the result is either ["."] or has possibly
        only a sequence of parent segments at the start}} *)
 
-
 (** {2:root Root paths}
 
     {b Warning.} Do not assume there is a single root path and

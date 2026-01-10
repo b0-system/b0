@@ -73,6 +73,10 @@ module Path : sig
       file system that corresponds to [p]. The function errors with
       an error message that mentions [p] if [p] does not exist. *)
 
+  val exists_realpath : B0__fpath.t -> (B0__fpath.t option, string) result
+  (** [exists_realpath] is like {!realpath} but returns [None] if
+      the path does not exist. *)
+
   (** {1:copying Copying} *)
 
   val copy :
@@ -158,20 +162,26 @@ module Path : sig
       information about the link itself. If [p] is not a symlink then
       this is {!stat}. *)
 
-  (** {1:tmppaths Temporary paths} *)
+  (** {1:tmppaths Temporary paths}
+
+      See also temporary {{!B0_std.Os.File.tmpfiles}files} and
+      {{!B0_std.Os.Dir.tmpdirs}directories}. *)
 
   type tmp_name = (string -> string, unit, string) format
-  (** The type for temporary file name patterns. The string format
-      is replaced by random hexadecimal ASCII characters. *)
+  (** The type for temporary file name patterns.
+
+       The format string needs has a single [%s] directive which is replaced
+       by lowercase random hexadecimal ASCII characters. Examples:
+       ["image-%s.png"], ["docs-%s"], etc. *)
 
   val tmp :
     ?make_path:bool -> ?dir:B0__fpath.t -> ?name:tmp_name -> unit ->
     (B0__fpath.t, string) result
-  (** [tmp ~make_path ~dir name ()] is a file system path in [dir] that
-      did not exist when the name was devised. It may exist once the function
-      returns though, prefer temporary {{!File.tmpfiles}files} and
-      {{!Dir.tmpdirs}directories} creation functions to guarantee the
-      creation of the temporary objects.
+  (** [tmp ~make_path ~dir ~name ()] is a file system path in [dir]
+      that did not exist when the name was devised. However it may
+      exist by the time the function returns. In general prefer temporary
+      {{!File.tmpfiles}files} and {{!Dir.tmpdirs}directory} creation
+      functions to guarantee ownership of the temporary objects.
       {ul
       {- [name] is used to construct the filename of the file,
          see {!type:tmp_name} for details. It defaults to ["tmp-%s"].}
@@ -244,32 +254,44 @@ module File : sig
       See also {!Path.val-delete}, {!Dir.val-delete}. *)
 
   val truncate : B0__fpath.t -> int -> (unit, string) result
-  (** [trunacte file size] truncates [file] to [size]. *)
+  (** [truncate file size] truncates [file] to [size]. *)
 
   (** {1:reads Reading} *)
 
+  val read : B0__fpath.t -> (string, string) result
+  (** [read file] is [file]'s content as a string. If [file] is
+      {!Fpath.dash} the contents of {!stdin} is read.
+
+      Errors have the form [Fmt.str "%s: %s" file err].
+
+      {b Warning.} The signature of this function limits files to be
+      at most {!Sys.max_string_length} in size. On 32-bit platforms
+      this is {b only around [16MB]}. *)
+
   val read_with_fd :
-    B0__fpath.t -> (Unix.file_descr -> 'b) -> ('b, string) result
-  (** [read_with_ic file f] opens [file] as a file descriptor [fdi]
-      and returns [Ok (f ic)]. If [file] is {!Fpath.dash}, [ic] is
-      {!stdin}.  After the function returns (normally or via an
-      exception raised by [f]), [ic] is ensured to be closed, except
-      if it is {!stdin}. The function errors if opening [file]
-      fails. Errors have the form [Fmt.str "%s: %s" file err]. *)
+    ?flags:Unix.open_flag list -> B0__fpath.t ->
+    (Unix.file_descr -> 'b) -> ('b, string) result
+  (** [read_with_fd ~flags file f] opens a file descriptor [fdi] for reading
+      [file] and returns [Ok (f fdi)]. If [file] is {!Fpath.dash}, [fdi] is
+      {!Unix.stdin}. After the function returns (normally or via an
+      exception), [fdi] is ensured to be closed, except if it is {!Unix.stdin}.
+      {ul
+      {- [flags] are the flags given to {!B0_std.Fd.openfile}. The default
+         is [O_RDONLY; O_SHARE_DELETE; O_CLOEXEC]}}
+      The function errors if opening [file] fails. Errors have the
+      form [Fmt.str "%s: %s" file err]. *)
 
   val read_with_ic : B0__fpath.t -> (in_channel -> 'b) -> ('b, string) result
   (** [read_with_ic file f] is exactly like {!read_with_fd} but
       opens an OCaml input channel in binary mode. *)
 
-  val read : B0__fpath.t -> (string, string) result
-  (** [read file] is [file]'s content as a string. If [file] is
-      {!Fpath.dash} the contents of {!stdin} is read. {b Warning.} The
-      signature of this function limits files to be at most
-      {!Sys.max_string_length} in size. On 32-bit platforms this is
-      {b only around [16MB]}. Errors have the form
-      [Fmt.str "%s: %s" file err]. *)
-
   (** {1:writes Writing} *)
+
+  val write :
+    ?atomic:bool -> ?mode:int -> force:bool -> make_path:bool ->
+    B0__fpath.t -> string -> (unit, string) result
+  (** [write ~atomic ~mode ~force ~make_path file s] operates like
+      {!write_with_fd} but directly writes [s] to [file]. *)
 
   val write_with_fd :
     ?flags:Unix.open_flag list -> ?atomic:bool -> ?mode:int -> force:bool ->
@@ -312,12 +334,6 @@ module File : sig
   (** [write_with_oc ~force ~make_path file f] operates like
       {!write_with_fd} but opens an OCaml channel in binary mode. *)
 
-  val write :
-    ?atomic:bool -> ?mode:int -> force:bool -> make_path:bool ->
-    B0__fpath.t -> string -> (unit, string) result
-  (** [write ~atomic ~mode ~force ~make_path file s] operates like
-      {!write_with_fd} but directly writes [s] to [file]. *)
-
   (** {1:copying Copying} *)
 
   val copy :
@@ -354,12 +370,21 @@ module File : sig
 
   (** {1:tmpfiles Temporary files}
 
-      See also {{!B0_std.Os.Path.tmppaths}temporary paths}. *)
+      See also temporary {{!B0_std.Os.Dir.tmpdirs}directories} and
+      {{!B0_std.Os.Path.tmppaths}paths}. *)
+
+  val with_tmp :
+    ?flags:Unix.open_flag list -> ?mode:int -> ?make_path:bool ->
+    ?dir:B0__fpath.t -> ?name:Path.tmp_name -> (B0__fpath.t -> 'a) ->
+    ('a, string) result
+  (** [with_tmp f] is like {!with_tmp_fd} but before [f] is called it
+      closes the file descriptor which allows other tools to operate
+      on the temporary file. *)
 
   val with_tmp_fd :
     ?flags:Unix.open_flag list -> ?mode:int -> ?make_path:bool ->
     ?dir:B0__fpath.t -> ?name:Path.tmp_name ->
-    (B0__fpath.t -> Unix.file_descr -> 'b) -> ('b, string) result
+    (B0__fpath.t -> Unix.file_descr -> 'a) -> ('a, string) result
   (** [with_tmp_fd ~flags ~mode ~make_path ~dir ~name f] opens an output file
       descriptor [fdo] to a temporary file and returns [Ok (f fdo)].
       After the function returns (normally or via an exception) [fdo] is
@@ -378,6 +403,13 @@ module File : sig
          to [Unix.[O_WRONLY; O_CREAT; O_EXCL; O_SHARE_DELETE;
          O_CLOEXEC]]}} *)
 
+  val with_tmp_oc :
+    ?flags:Unix.open_flag list -> ?mode:int -> ?make_path:bool ->
+    ?dir:B0__fpath.t -> ?name:Path.tmp_name ->
+    (B0__fpath.t -> out_channel -> 'a) -> ('a, string) result
+  (** [with_tmp_oc] is like {!with_tmp_fd} but uses an OCaml output channel
+      instead of a file decriptor. *)
+
   val open_tmp_fd :
     ?flags:Unix.open_flag list -> ?mode:int -> ?make_path:bool ->
     ?dir:B0__fpath.t -> ?name:Path.tmp_name -> unit ->
@@ -385,13 +417,6 @@ module File : sig
   (** [open_tmp_fd] is like {!with_tmp_fd} except it is the client's
       duty to close the file descriptor and delete the file (if the
       file is not deleted it will be when the program exits). *)
-
-  val with_tmp_oc :
-    ?flags:Unix.open_flag list -> ?mode:int -> ?make_path:bool ->
-    ?dir:B0__fpath.t -> ?name:Path.tmp_name ->
-    (B0__fpath.t -> out_channel -> 'b) -> ('b, string) result
-  (** [with_tmp_oc] is like {!with_tmp_fd} but uses an OCaml output channel
-      instead of a file decriptor. *)
 end
 
 (** Directory operations.
@@ -637,13 +662,14 @@ module Dir : sig
 
   (** {1:tmpdirs Temporary directories}
 
-      See also {{!B0_std.Os.Path.tmppaths}temporary paths}. *)
+      See also temporary {{!B0_std.Os.File.tmpfiles}files}
+      or {{!B0_std.Os.Path.tmppaths}paths}. *)
 
   val with_tmp :
     ?mode:int -> ?make_path:bool -> ?dir:B0__fpath.t -> ?name:Path.tmp_name ->
     (B0__fpath.t -> 'a) -> ('a, string) result
   (** [with_tmp ~mode ~make_path ~dir ~name f] creates a temporary empty
-      directory [t] and returns Ok (f t). After the function returns
+      directory [t] and returns [Ok (f t)]. After the function returns
       (normally or via an exception) [t] and its content are deleted.
       {ul
       {- [name] is used to construct the filename of the directory,
@@ -727,12 +753,39 @@ module Fd : sig
 
       {b Available} in 5.4 as {!Sys.io_buffer_size}. *)
 
+  (** {1:uninterrupted Uninterrupted system calls} *)
+
+  val openfile :
+    string -> Unix.open_flag list -> Unix.file_perm -> Unix.file_descr
+  (** [openfile] is like {!Unix.openfile} but handles [Unix.EINTR]. *)
+
+  val close : Unix.file_descr -> unit
+  (** [close] is like {!Unix.close} but handles [Unix.EINTR]. *)
+
   val close_noerr : Unix.file_descr -> unit
   (** [close_noerr fd] uses {!Unix.close} on [fd], retries on [EINTR]
       and silently catches any error it may raise. Typically used with
       {!Fun.protect}. *)
 
+  val ftruncate : Unix.file_descr -> int -> unit
+  (** [ftruncate] is {!Unix.ftruncate} but handles [Unix.EINTR]. *)
+
+  val lseek : Unix.file_descr -> int -> Unix.seek_command -> int
+  (** [lseek] is {!Unix.lseek} but handles [Unix.EINTR]. *)
+
   (** {1:rw Read and write convenience} *)
+
+  val read : Unix.file_descr -> bytes -> first:int -> length:int -> int
+  (** [read fd b ~first ~length] reads at most [length] bytes of [fd] into [b]
+      starting at [first]. Raises [Unix.Unix_error] but handles [Unix.EINTR]. *)
+
+  val write : Unix.file_descr -> bytes -> first:int -> length:int -> unit
+  (** [write fd b ~first ~length] writes [length] byte of [b] starting at
+      [first] on [fd]. Returns when the bytes have been fully written.
+      Raises [Unix.Unix_error] but handles [Unix.EINTR]. *)
+
+  val write_string : Unix.file_descr -> string -> unit
+  (** [write_string fd s] is like {!write} but write the string [s]. *)
 
   val copy : ?buf:Bytes.t -> Unix.file_descr -> dst:Unix.file_descr -> unit
   (** [copy ~buf src ~dst] reads [src] and writes it to [dst] using
@@ -748,20 +801,6 @@ module Fd : sig
   (** [read_file fn fd] reads [fd] to a string assuming it is a file
       descriptor open on file path [fn]. Raises [Failure] in case of error
       with an error message that mentions [fn]. *)
-
-  (** {2:rw Uninterrupted} *)
-
-  val read : Unix.file_descr -> bytes -> first:int -> length:int -> int
-  (** [read fd b ~first ~length] reads at most [length] bytes of [fd] into [b]
-      starting at [first]. Raises [Unix.Unix_error] but handles [Unix.EINTR]. *)
-
-  val write : Unix.file_descr -> bytes -> first:int -> length:int -> unit
-  (** [write fd b ~first ~length] writes [length] byte of [b] starting at
-      [first] on [fd]. Returns when the bytes have been fully written.
-      Raises [Unix.Unix_error] but handles [Unix.EINTR]. *)
-
-  val write_string : Unix.file_descr -> string -> unit
-  (** [write_string fd s] is like {!write} but write the string [s]. *)
 
   (** {1:pseudo Terminals and pseudoterminals} *)
 
@@ -781,7 +820,6 @@ module Fd : sig
 
       {b TODO.} Implement on Windows using
       {{:https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session}[conPTY]}. *)
-
 
   val with_raw_mode : Unix.file_descr -> (unit -> 'a) -> ('a, string) result
   (** [with_raw_mode fd f] sets [fd]'s input to raw mode and calls [f].
