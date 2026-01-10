@@ -948,6 +948,8 @@ val ( !! ) : ?loc:Test.loc -> 'a -> 'a Test.Snapshot.t
     to invoke them manually.
 
 {[
+open B0_testing
+
 let test_string_get =
   Test.test "String.get" @@ fun () ->
   Test.char (String.get "a" 0) 'a' ~__POS__;

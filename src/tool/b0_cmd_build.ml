@@ -213,7 +213,8 @@ let make_build conf ~store ~may_build ~must_build =
 
 let warn_noexec u =
   Log.warn @@ fun m ->
-  m "@[Unit %a not actionable, execution ignored@ (no@ %a@ or@ %a@ key).@]"
+  m "@[<v>@[Only building, unit %a@ is not actionable:@]@,\
+     It has no %a or %a key.@]"
     B0_unit.pp_name u B0_meta.Key.pp_name B0_unit.Action.key B0_meta.Key.pp_name
     B0_unit.exe_file
 

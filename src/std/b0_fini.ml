@@ -5,39 +5,15 @@
 
 type atom = string
 type value = atom list
-type name = atom (* but non empty *)
+type name = atom (* but non-empty *)
 type qname = name list
 module Qname = struct type t = qname let compare = Stdlib.compare end
 module Qmap = Map.Make (Qname)
 type doc = value Qmap.t
-type nested_doc = Value of value | Bindings of (string * nested_doc) list
-
 let empty = Qmap.empty
+let fold = Qmap.fold
 let find q doc = Qmap.find_opt q doc
-let to_assoc doc = Qmap.bindings doc
-let to_nested_doc doc =
-  let rec find_name rev_left n = function
-  | (n', nested) :: bs when n = n' -> Either.Right (rev_left, nested, bs)
-  | b :: bs -> find_name (b :: rev_left) n bs
-  | [] -> Either.Left rev_left
-  in
-  let rec add qname value nested = match qname with
-  | [] -> Value value
-  | n :: ns ->
-      match nested with
-      | Value _ as v -> add qname value (Bindings ["", v])
-      | Bindings bs ->
-          match find_name [] n bs with
-          | Either.Right (rev_left, nested, right) ->
-              let b = n, add ns value nested in
-              Bindings (List.rev_append (b :: rev_left) right)
-          | Either.Left rev_left ->
-              let b = n, add ns value (Bindings []) in
-              Bindings (List.rev (b :: rev_left))
-  in
-  Qmap.fold add doc (Bindings [])
-
-let find_section q doc =
+let get_section q doc =
   let rec drop_prefix q0 q1 = match q0, q1 with
   | [], q1 -> Some q1
   | n0 :: q0, n1 :: q1 when String.equal n0 n1 -> drop_prefix q0 q1
@@ -47,6 +23,10 @@ let find_section q doc =
   | None -> acc | Some n -> Qmap.add n v acc
   in
   Qmap.fold add_sub doc Qmap.empty
+
+let find_section q doc =
+  let doc = get_section q doc in
+  if Qmap.is_empty doc then None else Some doc
 
 let top_sections doc =
   let add_top_name q _ acc = match q with
@@ -63,8 +43,8 @@ let pp_qname ppf qname =
 
 (* Character classes *)
 
-let sot = 0x1A0000  (* start of text U+10FFFF + 1 *)
-let eot = 0x1A0001  (* end of text   U+10FFFF + 2 *)
+let sot = 0x110000  (* start of text U+10FFFF + 1 *)
+let eot = 0x110001  (* end of text   U+10FFFF + 2 *)
 
 let[@inline] in_urange (u : int) umin umax = (umin <= u) && (u <= umax)
 let is_dec_digit u = in_urange u 0x0030 0x0039
@@ -96,11 +76,11 @@ let uchar_to_utf8 u =
   ignore (Bytes.set_utf_8_uchar b 0 u); Bytes.unsafe_to_string b
 
 let pp_uchar_err ppf = function (* Formats uchars in error messages *)
-| 0x1A0000 -> Format.pp_print_string ppf "start of text"
-| 0x1A0001 -> Format.pp_print_string ppf "end of text"
+| 0x110000 -> Format.pp_print_string ppf "start of text"
+| 0x110001 -> Format.pp_print_string ppf "end of text"
 | u when is_cchar u ->
     let utf8 = uchar_to_utf8 (Uchar.of_int u) in
-    Format.fprintf ppf "''@<1>%s' (U+%04X)" utf8 u
+    Format.fprintf ppf "'@<1>%s' (U+%04X)" utf8 u
 | u -> Format.fprintf ppf "U+%04X" u
 
 (* Decoder *)
@@ -175,7 +155,6 @@ let err_atom d = err_exp "an atom" d
 let err_equal d = err_exp "'='" d
 let err_binding d = err_exp "an atom or a section header" d
 let err_doc d = err_exp "a binding or a section header" d
-let err_soc d = err_exp "newline" d
 let err_name d ~start:(l, c) =
   err_loc d l c "Expected: a name but found: an empty atom"
 
@@ -243,22 +222,22 @@ let decode_escape_or_break d = match d.u with
 | (0x0020 (* SP *) | 0x005C (* \ *) | 0x0022 (* DQUOTE *)) as esc ->
     nextc d; token_add d esc
 | 0x0075 (* u *) as uletter ->
-      nextc d;
-      if d.u = 0x007B (* { *) then (nextc d; decode_uescape d) else
-      (token_add d 0x005C (* \ *); token_add d uletter;)
+    nextc d;
+    if d.u = 0x007B (* { *) then (nextc d; decode_uescape d) else
+    (token_add d 0x005C (* \ *); token_add d uletter;)
 | 0x000A (* LF *) | 0x000D (* CR *) -> decode_abreak d
 | u (* not an escape *) -> token_add d 0x005C (* \ *)
 
 let decode_sbreak d = token_add d 0x000A (* LF *); decode_wchars d
 let decode_qatom d = (* [ was eaten *)
   let rec loop d = match d.u with
-    | 0x005C (* \ *) -> nextc d; decode_escape_or_break d; loop d
-    | u when is_qchar u -> nextc d; token_add d u; loop d
-    | 0x0022 (* DQUOTE *) -> nextc d; token_pop d
-    | 0x000A (* LF *) -> nextc d; decode_sbreak d; loop d
-    | 0x000D (* CR *) ->
-        nextc d; (if d.u = 0x000A then nextc d); decode_sbreak d; loop d
-    | u -> err_char_qatom d
+  | 0x005C (* \ *) -> nextc d; decode_escape_or_break d; loop d
+  | u when is_qchar u -> nextc d; token_add d u; loop d
+  | 0x0022 (* DQUOTE *) -> nextc d; token_pop d
+  | 0x000A (* LF *) -> nextc d; decode_sbreak d; loop d
+  | 0x000D (* CR *) ->
+      nextc d; (if d.u = 0x000A then nextc d); decode_sbreak d; loop d
+  | u -> err_char_qatom d
   in
   loop d
 
@@ -288,51 +267,56 @@ let decode_header d = (* d.u is '[', header name is returned reversed *)
   in
   nextc d; loop d []
 
-let decode_bindings d ~secname =
-  let add_binding d sec k v =
-    d.map <- Qmap.add (List.rev (k :: sec)) (List.rev v) d.map
+let decode_bindings d ~rev_secname =
+  let add_binding d ~rev_secname k v =
+    d.map <- Qmap.add (List.rev (k :: rev_secname)) (List.rev v) d.map
   in
-  let rec loop d sec nl k v = match d.u with
+  let rec loop d ~rev_secname nl k v = match d.u with
   | u when is_atom_start u ->
       let start = get_loc d in
       let a = decode_atom d in
       let nl' = decode_skip d in
-      if not (nl && d.u = 0x003D (* = *)) then loop d sec nl' k (a :: v) else
+      if not (nl && d.u = 0x003D (* = *))
+      then loop d ~rev_secname nl' k (a :: v) else
       let n = atom_to_name d ~start a in
       let nl = nextc d; decode_skip d in
-      add_binding d sec k v; loop d sec nl n []
-  | 0x005B (* [ *) when nl -> add_binding d sec k v
-  | 0x1A0001 (* eot *) -> add_binding d sec k v
-    | _ -> err_binding d
+      add_binding d ~rev_secname k v;
+      loop d ~rev_secname nl n []
+  | 0x005B (* [ *) when nl -> add_binding d ~rev_secname k v
+  | 0x110001 (* eot *) -> add_binding d ~rev_secname k v
+  | _ -> err_binding d
   in
   let start = get_loc d in
   let k = atom_to_name d ~start (decode_atom d) in
   ignore (decode_skip d);
   (if d.u <> 0x003D (* = *) then err_equal d else nextc d);
   let nl = decode_skip d in
-  loop d secname nl k []
+  loop d ~rev_secname nl k []
 
 let decode_soc d =
   begin match d.u with
   | 0x000A (* LF *) -> nextc d
   | 0x000D (* CR *) -> nextc d; if d.u = 0x000A (* LF *) then nextc d
-  | 0x1A0000 (* sot *) -> nextc d; if d.u = 0xFEFF (* BOM *) then nextc d
+  | 0x110000 (* sot *) -> nextc d; if d.u = 0xFEFF (* BOM *) then nextc d
   | _ -> ()
   end;
   decode_wchars d
 
 let decode_doc d =
-  let rec loop d ~secname (* in reverse order *) = match d.u with
+  let rec loop d ~rev_secname = match d.u with
+  | u when is_atom_start u ->
+      decode_bindings d ~rev_secname; loop d ~rev_secname
   | 0x005B (* [ *) ->
-      let secname = decode_header d in
-      decode_soc d; loop d ~secname
-  | u when is_atom_start u -> decode_bindings d ~secname; loop d ~secname
-  | 0x000A (* LF *) | 0x000D (* CR *) -> decode_soc d; loop d ~secname
-  | 0x0023 (* # *) -> decode_comment d; decode_soc d; loop d ~secname
-  | 0x1A0001 (* eot *) -> ()
+      let rev_secname = decode_header d in
+      decode_soc d; loop d ~rev_secname
+  | 0x0023 (* # *) ->
+      decode_comment d; decode_soc d; loop d ~rev_secname
+  | 0x000A (* LF *) | 0x000D (* CR *) ->
+      decode_soc d; loop d ~rev_secname
+  | 0x110001 (* eot *) -> ()
   | _ -> err_doc d
   in
-  decode_soc d; loop d ~secname:[]
+  decode_soc d; loop d ~rev_secname:[]
 
 let of_string ?file i =
   let d = make_decoder ?file i in

@@ -12,6 +12,7 @@ module V000 = struct
   module List = B0_std.List
   module Fpath = B0_std.Fpath
   module Mtime = B0_std.Mtime
+  module Net = B0_std.Net
   module Cmd = B0_std.Cmd
   module Fut = B0_std.Fut
   module Os = B0_std.Os
