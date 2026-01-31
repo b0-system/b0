@@ -192,6 +192,7 @@ module El = struct
   let colgroup = cons "colgroup"
   let command = cons "command"
   let datalist = cons "datalist"
+  let dialog = cons "dialog"
   let dd = cons "dd"
   let del = cons "del"
   let details = cons "details"

@@ -510,6 +510,10 @@ module El : sig
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/datalist}
       datalist} *)
 
+  val dialog : cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/dialog}
+      dialog} *)
+
   val dd : cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/dd}dd} *)
 
