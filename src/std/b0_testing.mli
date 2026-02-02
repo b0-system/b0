@@ -138,12 +138,12 @@ module Test : sig
   (** [failf fmt …] is like {!fail} but also {!stop}s the test. *)
 
   val error_to_failstop : ?__POS__:loc -> ('a, string) result -> 'a
-  (** [error_to_failstop (Error e)] is [failstop "%s" e].
-      [error_to_failstop (Ok v)] is [v]. *)
+  (** - [error_to_failstop (Error e)] is [failstop "%s" e].
+      - [error_to_failstop (Ok v)] is [v]. *)
 
-  val error_to_fail : ?__POS__:loc -> (unit, string) result -> unit
-  (** [error_to_fail (Error e)] is [fail "%s" e].
-      [error_to_fail (Ok v)] is [()]. *)
+  val error_to_fail : ?__POS__:loc -> ('a, string) result -> unit
+  (** - [error_to_fail (Error e)] is [fail "%s" e].
+      - [error_to_fail (Ok v)] is [()]. *)
 
   (** {2:blocks Blocks and loops}
 
