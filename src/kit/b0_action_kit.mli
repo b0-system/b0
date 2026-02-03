@@ -23,4 +23,4 @@ val download_url :
        on [stderr]. Defaults to [true].}
     {- [args] are arguments added to the invocation.}
     {- [env] and [stderr] are given to the corresponding
-       {!B0_std.Os.Cmd.val-run}}}. *)
+       {!B0_std.Os.Cmd.val-run}}} *)

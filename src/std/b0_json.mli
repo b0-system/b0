@@ -13,117 +13,104 @@
 
 open B0_text
 
+(** Generic JSON values. *)
 module Json : sig
 
   (** {1:json JSON text} *)
 
-  type loc = Tloc.t
-  (** The type for text locations. *)
+  type meta = Tloc.t
+  (** The type for node metadata. *)
 
-  val loc_nil : loc
-  (** [loc_nil] is an invalid input location. *)
+  val meta_none : meta
+  (** [meta_none] is an invalid input location. *)
 
-  type mem = (string * loc) * t
-  (** The type for JSON object members. *)
+  type 'a node = 'a * meta
+  (** Abstract syntax tree nodes. *)
+
+  type name = string node
+  (** The type for generic JSON object names. *)
+
+  type mem = name * t
+  (** The type for generic JSON object members. *)
+
+  and object' = mem list
+  (** The type for generic JSON objects. *)
 
   and t =
-  [ `Null of loc
-  | `Bool of bool * loc
-  | `Float of float * loc
-  | `String of string * loc
-  | `A of t list * loc
-  | `O of mem list * loc ]
+  | Null of unit node
+  | Bool of bool node
+  | Number of float node (** Encoders must use [Null] if float is not finite *)
+  | String of string node
+  | Array of t list node
+  | Object of object' node
   (** The type for generic JSON text representations. *)
 
-  val loc : t -> loc
-  (** [loc j] is [j]'s input location. *)
+  val meta : t -> meta
+  (** [meta j] is [j]'s node meta data. *)
+
+  val equal : t -> t -> bool
+  (** [equal j0 j1] is {!compare}[ j0 j1 = 0]. *)
+
+  val compare : t -> t -> int
+  (** [compare j0 j1] is a total order on JSON values:
+      {ul
+      {- Floating point values are compared with {!Float.compare},
+       this means NaN values are equal.}
+      {- Strings are compared byte wise.}
+      {- Objects members are sorted before being compared.}
+      {- meta values are ignored.}} *)
 
   (** {1:cons Constructors} *)
 
-  val null : t
-  (** [null] is [`Null loc_nil]. *)
+  type 'a cons = ?meta:meta -> 'a -> t
+  (** The type for constructing JSON values from an OCaml value of type ['a].
+      [meta] default to {!meta_none}. *)
 
-  val bool : bool -> t
-  (** [bool b] is [`Bool (b, loc_nil)]. *)
+  (** {2:nulls Nulls and options} *)
 
-  val float : float -> t
-  (** [float b] is [`Float (f, loc_nil)]. *)
+  val null : unit cons
+  (** [null] is [Null (unit, meta)]. *)
 
-  val string : string -> t
-  (** [string s] is [`String (s, loc_nil)]. *)
+  val option : 'a cons -> 'a option cons
+  (** [null] is [Null (unit, meta)]. *)
 
-  val array : t list -> t
-  (** [a vs] is [`A (vs, loc_nil)]. *)
+  (** {2:bools Booleans} *)
 
-  val mem : string -> t -> mem
-  (** [mem n v] is [((n, loc_nil), v)]. *)
+  val bool : bool cons
+  (** [bool b] is [Bool (b, meta)]. *)
 
-  val obj : mem list -> t
-  (** [obj mems] is [`O (mems, loc_nil)]. *)
+  (** {2:numbers Numbers} *)
 
-  (** {1:access Accessors} *)
+  val number : float cons
+  (** [number n] is [Number (b, meta)]. *)
 
-  val to_null : t -> (unit, string) result
-  (** [to_null j] extracts a null from [j]. If [j] is not a null an
-      error with the location formatted according to {!Tloc.pp}
-      is returned. *)
+  val any_float : float cons
+  (** [any_float v] is [number v] if {!Float.is_finit}[ v] is [true]
+      and string [Float.to_string v] otherwise. *)
 
-  val to_bool : t -> (bool, string) result
-  (** [to_bool j] extracts a bool from [j]. If [j] is not a bool an
-      error with the location formatted according to {!Tloc.pp}
-      is returned. *)
+  (** {1:strings Strings} *)
 
-  val to_float : t -> (float, string) result
-  (** [to_float j] extracts a float from [j]. If [j] is not a float an
-      error with the location formatted according to {!Tloc.pp}
-      is returned. *)
+  val string : string cons
+  (** [string s] is [`String (s, meta)]. *)
 
-  val to_string : t -> (string, string) result
-  (** [to_string j] extracts a string from [j]. If [j] is not a string an
-      error with the location formatted according to {!Tloc.pp}
-      is returned. *)
+  (** {1:arrays Arrays} *)
 
-  val to_array : t -> (t list, string) result
-  (** [to_array j] extracts a array from [j]. If [j] is not a array an
-      error with the location formatted according to {!Tloc.pp}
-      is returned. *)
+  val list : t list cons
+  (** [list vs] is [Array (vs, meta)]. *)
 
-  val to_obj : t -> (mem list, string) result
-  (** [to_obj j] extracts a array from [j]. If [j] is not a array an
-      error with the location formatted according to {!Tloc.pp}
-      is returned. *)
+  val array : t array cons
+  (** [array a] is [Array (Array.to_list a, meta)]. *)
 
-  val get_null : t -> unit
-  (** [get_null j] is like {!to_null} but raises [Invalid_argument]
-      if [j] is not a null. *)
+  (** {1:objects Objects} *)
 
-  val get_bool : t -> bool
-  (** [get_bool j] is like {!to_bool} but raises [Invalid_argument]
-      if [j] is not a bool. *)
+  val name : ?meta:meta -> string -> name
+  (** [name ?meta n] is [n, meta]. [meta] defaults to {!meta_none}. *)
 
-  val get_float : t -> float
-  (** [get_float j] is like {!to_float} but raises [Invalid_argument]
-      if [j] is not a float. *)
+  val mem : name -> t -> mem
+  (** [mem n v] is [(name, v)]. *)
 
-  val get_string : t -> string
-  (** [get_string j] is like {!to_string} but raises [Invalid_argument]
-      if [j] is not a string. *)
-
-  val get_array : t -> t list
-  (** [get_array j] is like {!to_array} but raises [Invalid_argument]
-      if [j] is not a array. *)
-
-  val get_obj : t -> mem list
-  (** [get_obj j] is like {!to_obj} but raises [Invalid_argument]
-      if [j] is not a array. *)
-
-  (** {1:fmt Formatters} *)
-
-  val pp : Format.formatter -> t -> unit
-  (** [pp] formats JSON text.
-
-      {b Warning.} Assumes all OCaml strings in the formatted value
-      are UTF-8 encoded. *)
+  val object' : mem list cons
+  (** [object' mems] is [Object (mems, meta)]. *)
 
   (** {1:codec Codec} *)
 
@@ -133,9 +120,7 @@ module Json : sig
       limitations:
       {ul
       {- Numbers are parsed with [string_of_float] which is not
-         compliant.}
-      {- TODO Unicode escapes are left unparsed (this will not round trip
-         with {!to_string}).}}
+         compliant.}}
 
       {b Note.} All OCaml strings returned by this function are UTF-8
       encoded. *)
@@ -145,6 +130,31 @@ module Json : sig
       {{:https://tools.ietf.org/html/rfc8259}RFC8259}.
 
       {b Warning.} Assumes all OCaml strings in [j] are UTF-8 encoded. *)
+
+  (** {1:fmt Formatters} *)
+
+  type number_format = (float -> unit, Format.formatter, unit) Stdlib.format
+  (** The type for JSON number formatters. *)
+
+  val default_number_format : number_format
+  (** [default_number_format] is ["%.17g"]. This number formats ensures
+      that finite floating point values can be interchanged without loss
+      of precision. *)
+
+  val pp' :
+    ?number_format:number_format -> unit -> Format.formatter -> t -> unit
+  (** [pp' ~format ~number_format () ppf j] formats [j] on [ppf]. The output
+      is indented but may be more compact than an [Indent] JSON encoder may do.
+      For example arrays may be output on one line if they fit etc.
+      {ul
+      {- [number_format] is used to format JSON numbers. Defaults to
+       {!default_number_format}}
+      {- Non-finite numbers are output as JSON nulls
+       ({{!page-cookbook.non_finite_numbers}explanation}).}
+      {- Strings are assumed to be valid UTF-8.}} *)
+
+  val pp : Format.formatter -> t -> unit
+  (** [pp] formats JSON, see {!pp'}. *)
 end
 
 (** JSON value generation. *)
@@ -302,10 +312,10 @@ module Jsonq : sig
   val json : Json.t t
   (** [json] queries any JSON value and returns it. *)
 
-  val loc : Json.loc t
+  val loc : Json.meta t
   (** [loc]is [map Sexp.loc sexp]. *)
 
-  val with_loc : 'a t -> ('a * Json.loc) t
+  val with_loc : 'a t -> ('a * Json.meta) t
   (** [with_loc q] queries with [q] and returns the result with the
       location of the queried JSON value. *)
 
@@ -326,8 +336,8 @@ module Jsonq : sig
   val bool : bool t
   (** [bool] queries JSON bool values as a [bool] value and fails otherwise. *)
 
-  val float : float t
-  (** [float] queries JSON number values as a [float] value and fails
+  val number : float t
+  (** [number] queries JSON number values as a [float] value and fails
       otherwise. *)
 
   val int : int t
