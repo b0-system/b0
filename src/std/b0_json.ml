@@ -9,8 +9,8 @@ module Json = struct
 
   (* JSON text *)
 
-  type meta = Tloc.t
-  let meta_none = Tloc.nil
+  type meta = Textloc.t
+  let meta_none = Textloc.none
   type 'a node = 'a * meta
   type name = string node
   type mem = name * t
@@ -47,6 +47,14 @@ module Json = struct
       List.compare compare_mem (List.sort order_mem o0) (List.sort order_mem o1)
 
   let equal j0 j1 = compare j0 j1 = 0
+
+  let rec normalize = function
+  | Null _ | Bool _ | Number _ | String _ | Array _ as j -> j
+  | Object (mems, loc) ->
+      let rev_sort_name ((n0, _), _) ((n1, _), _) = String.compare n1 n0 in
+      let mems = List.sort rev_sort_name mems in
+      let mems = List.rev_map (fun (m, v) -> (m, normalize v)) mems in
+      Object (mems, loc)
 
   (* Constructors *)
 
@@ -151,230 +159,170 @@ module Json = struct
 
   (* Decode *)
 
-  let sot = 0x110000  (* start of text U+10FFFF + 1 *)
-  let eot = 0x110001  (* end of text   U+10FFFF + 2 *)
-
-  let uchar_to_utf8 u =
-    let b = Bytes.create (Uchar.utf_8_byte_length u) in
-    ignore (Bytes.set_utf_8_uchar b 0 u); Bytes.unsafe_to_string b
-
-  let pp_uchar_err ppf = function (* Formats uchars in error messages *)
-  | 0x110000 -> Format.pp_print_string ppf "start of text"
-  | 0x110001 -> Format.pp_print_string ppf "end of text"
-  | u when true (* we should devise something that excludes C0 and C1 etc. *) ->
-      let utf8 = uchar_to_utf8 (Uchar.of_int u) in
-      Format.fprintf ppf "'@<1>%s' (U+%04X)" utf8 u
-  | u -> Format.fprintf ppf "U+%04X" u
-
-  type decoder' =
-    { file : string;
-      i : string;
-      mutable u : int; (* Current character scalar value or sot or eot *)
-      mutable line : int; (* Current line number *)
-      mutable line_start : int; (* Current line first byte position. *)
-      mutable next : int; (* Next character byte position. *)
-      token : Buffer.t; }
-
-  let make_decoder ?(file = "-") i =
-    let token = Buffer.create 255 in
-    { file; i; u = sot; line = 1; line_start = 0; next = 0; token }
-
-  (* Decoder positions and errors *)
-
-  let byte_pos d =
-    if d.u = sot then 0 else
-    if d.u = eot then String.length d.i else
-    d.next - Uchar.utf_8_byte_length (Uchar.of_int d.u)
-
-  let save_pos d = byte_pos d, (d.line, d.line_start)
-
-  let get_loc d =
-    let byte_pos = byte_pos d in
-    let line = d.line, d.line_start in
-    Tloc.v ~file:d.file ~sbyte:byte_pos ~ebyte:byte_pos ~sline:line ~eline:line
-
-  let get_loc_span d ~start:(sbyte, sline) =
-    let ebyte = byte_pos d in
-    let eline = d.line, d.line_start in
-    Tloc.v ~file:d.file ~sbyte ~ebyte ~sline ~eline
-
   let error d loc fmt =
     Format.kasprintf (fun s -> raise_notrace (Failure s))
-      ("%a: " ^^ fmt) Tloc.pp loc
+      ("%a: " ^^ fmt) Textloc.pp loc
 
-  let err d fmt = error d (get_loc d) fmt
+  let err d fmt = error d (Textdec.textloc d) fmt
   let err_loc = error
-  let err_span d ~start fmt = error d (get_loc_span d ~start) fmt
-  let err_malformed_utf_8 d =
-    err_loc d (get_loc d) "UTF-8 decoding error at input byte %d" d.next
+  let err_span d ~start fmt = error d (Textdec.textloc_span d ~start) fmt
 
   let nextc d =
-    if d.next >= String.length d.i then d.u <- eot else
-    let udec = String.get_utf_8_uchar d.i d.next in
-    if not (Uchar.utf_decode_is_valid udec) then err_malformed_utf_8 d else
-    let u = Uchar.to_int (Uchar.utf_decode_uchar udec) in
-    d.next <- d.next + Uchar.utf_decode_length udec;
-    begin match u with
-    | 0x000D (* CR *) ->
-        d.line_start <- d.next;
-        d.line <- d.line + 1;
-    | 0x000A (* LF *) ->
-        d.line_start <- d.next;
-        if d.u <> 0x000D then d.line <- d.line + 1;
-    | _ -> ()
-    end;
-    d.u <- u
+    Textdec.next d;
+    if Textdec.is_error d then err d "UTF-8 decoding error"
 
-  (* Decoder tokenizer *)
-
-  let token_clear d = Buffer.clear d.token
-  let token_pop d = let t = Buffer.contents d.token in token_clear d; t
-  let token_add d u = Buffer.add_utf_8_uchar d.token (Uchar.unsafe_of_int u)
+  let uchar = Uchar.unsafe_of_int
 
   (* JSON decoding *)
 
   let decode_ascii d s = (* assert (d.u = s.[0]) *)
     let rec loop d s i max =
       if i > max then () else
-      if Char.code s.[i] = d.u then (nextc d; loop d s (i + 1) max) else
-      err d "expected %C found: %a while parsing '%s'" s.[i] pp_uchar_err d.u s
+      let u = Textdec.current d in
+      if Char.code s.[i] = u then (nextc d; loop d s (i + 1) max) else
+      err d "Expected %C but found %a while parsing '%s'" s.[i]
+        Textdec.pp_decode u s
     in
     nextc d; loop d s 1 (String.length s - 1)
 
-  let rec skip_ws d = match d.u with
+  let rec skip_ws d = match Textdec.current d with
   | 0x20 | 0x09 | 0x0A | 0x0D -> nextc d; skip_ws d | _ -> ()
 
   let parse_true d =
-    let start = save_pos d in
-    decode_ascii d "true"; Bool (true, get_loc_span d ~start)
+    let start = Textdec.pos d in
+    decode_ascii d "true"; Bool (true, Textdec.textloc_span d ~start)
 
   let parse_false d =
-    let start = save_pos d in
-    decode_ascii d "false"; Bool (false, get_loc_span d ~start)
+    let start = Textdec.pos d in
+    decode_ascii d "false"; Bool (false, Textdec.textloc_span d ~start)
 
   let parse_null d =
-    let start = save_pos d in
-    decode_ascii d "null"; Null ((), get_loc_span d ~start)
+    let start = Textdec.pos d in
+    decode_ascii d "null"; Null ((), Textdec.textloc_span d ~start)
 
   let parse_number d = (* not fully compliant *)
-    let rec loop d ~start = match d.u with
+    let rec loop d ~start = match Textdec.current d with
     | 0x20 | 0x09 | 0x0A | 0x0D | 0x2C | 0x5D | 0x7D | 0x11_0001 ->
-        let token = token_pop d in
+        let token = Textdec.lexeme_pop d in
         begin match Float.of_string_opt token with
         | None -> err_span d ~start "could not parse a float from: %S" token
-        | Some n -> Number (n, get_loc_span d ~start)
+        | Some n -> Number (n, Textdec.textloc_span d ~start)
         end
-    | _ -> token_add d d.u; nextc d; loop d ~start
+    | u -> Textdec.lexeme_add d (uchar u); nextc d; loop d ~start
     in
-    let start = save_pos d in
-    token_clear d; token_add d d.u; nextc d; loop d ~start
+    let start = Textdec.pos d in
+    let u = uchar (Textdec.current d) in
+    Textdec.lexeme_clear d; Textdec.lexeme_add d u; nextc d; loop d ~start
 
   let rec parse_uescape d hi u count =
     let pp_ucp ppf d = Format.fprintf ppf "U+%04X" d in
     let err_not_lo d u = err d "not a low surrogate %a" pp_ucp u in
     let err_lo d u = err d "lone low surrogate %a" pp_ucp u in
     let err_hi d u = err d "lone high surrogate %a" pp_ucp u in
-    if count > 0 then begin match d.u with
+    if count > 0 then begin match Textdec.current d with
     | c when 0x30 <= c && c <= 0x39 ->
         nextc d; parse_uescape d hi (u * 16 + c - 0x30) (count - 1)
     | c when 0x41 <= c && c <= 0x46 ->
         nextc d; parse_uescape d hi (u * 16 + c - 0x37) (count - 1)
     | c when 0x61 <= c && c <= 0x66 ->
         nextc d; parse_uescape d hi (u * 16 + c - 0x57) (count - 1)
-    | c ->
-        err d "Expected hex digit but found %a" pp_uchar_err u
+    | u ->
+        err d "Expected hex digit but found %a" Textdec.pp_decode u
     end else match hi with
     | Some hi -> (* combine high and low surrogate into scalar value. *)
         if u < 0xDC00 || u > 0xDFFF then err_not_lo d u else
         let u = ((((hi land 0x3FF) lsl 10) lor (u land 0x3FF)) + 0x10000) in
-        token_add d u
+        Textdec.lexeme_add d (uchar u)
     | None ->
-        if u < 0xD800 || u > 0xDFFF then token_add d u
-        else if u > 0xDBFF then err_lo d u else
-        match d.u with
+        if u < 0xD800 || u > 0xDFFF
+        then Textdec.lexeme_add d (Uchar.unsafe_of_int u)
+        else if u > 0xDBFF then err_lo d u
+        else match Textdec.current d with
         | 0x5C ->
             nextc d;
-            begin match d.u with
+            begin match Textdec.current d with
             | 0x75 -> nextc d; parse_uescape d (Some u) 0 4
             | _ -> err_hi d u
             end
         | _ -> err_hi d u
 
   let parse_string d = (* assert (d.u = '\"') *)
-    let parse_escape d = match d.u with
-    | (0x22 | 0x5C | 0x2F as b) -> token_add d b; nextc d
-    | 0x62 -> token_add d 0x08; nextc d
-    | 0x66 -> token_add d 0x0C; nextc d
-    | 0x6E -> token_add d 0x0A; nextc d
-    | 0x72 -> token_add d 0x0D; nextc d
-    | 0x74 -> token_add d 0x09; nextc d
+    let uchar u = Uchar.unsafe_of_int u in
+    let parse_escape d = match Textdec.current d with
+    | (0x22 | 0x5C | 0x2F as b) -> Textdec.lexeme_add d (uchar b); nextc d
+    | 0x62 -> Textdec.lexeme_add d (uchar 0x08); nextc d
+    | 0x66 -> Textdec.lexeme_add d (uchar 0x0C); nextc d
+    | 0x6E -> Textdec.lexeme_add d (uchar 0x0A); nextc d
+    | 0x72 -> Textdec.lexeme_add d (uchar 0x0D); nextc d
+    | 0x74 -> Textdec.lexeme_add d (uchar 0x09); nextc d
     | 0x75 -> nextc d; parse_uescape d None 0 4
-    | _ -> err d "Expected escape but found %a" pp_uchar_err d.u
+    | u -> err d "Expected escape but found %a" Textdec.pp_decode u
     in
-    let rec loop d ~start = match d.u with
+    let rec loop d ~start = match Textdec.current d with
     | 0x5C (* '\' *) -> nextc d; parse_escape d; loop d ~start
     | 0x22 (* '"' *) ->
-        let loc = get_loc_span d ~start in
-        nextc d; String (token_pop d, loc)
+        let loc = Textdec.textloc_span d ~start in
+        nextc d; String (Textdec.lexeme_pop d, loc)
     | 0x11_0001 (* eot *) -> err d "Unclosed string"
-    | u -> token_add d d.u; nextc d; loop d ~start
+    | u -> Textdec.lexeme_add d (uchar u); nextc d; loop d ~start
     in
-    let start = save_pos d in
-    nextc d; token_clear d; loop d ~start
+    let start = Textdec.pos d in
+    nextc d; Textdec.lexeme_clear d; loop d ~start
 
   let rec parse_object d = (* assert (d.u = '{') *)
-    let start = save_pos d in
-    match (nextc d; skip_ws d; d.u) with
+    let start = Textdec.pos d in
+    match (nextc d; skip_ws d; Textdec.current d) with
     | 0x7D (* '}' *) ->
-        let loc = get_loc_span d ~start in
+        let loc = Textdec.textloc_span d ~start in
         nextc d; Object ([], loc)
     | _ ->
         let parse_name d =
-          let name = match (skip_ws d; d.u) with
+          let name = match (skip_ws d; Textdec.current d) with
           | 0x22 (* '"' *) ->
               (match parse_string d with String n -> n | _ -> assert false)
-          | u -> err d "Expected '\"' but found %a" pp_uchar_err u
+          | u -> err d "Expected '\"' but found %a" Textdec.pp_decode u
           in
           skip_ws d; name
         in
         let rec loop acc d ~start =
           let name = parse_name d in
-          match d.u with
+          match Textdec.current d with
           | 0x3A (* ':' *) ->
               let v = (nextc d; parse_value d) in
-              begin match d.u with
+              begin match Textdec.current d with
               | 0x2C (* ',' *) -> nextc d; loop ((name, v) :: acc) d ~start
               | 0x7D (* '}' *) ->
-                  let loc = get_loc_span d ~start in
+                  let loc = Textdec.textloc_span d ~start in
                   nextc d;
                   Object (List.rev ((name, v) :: acc), loc)
-              | u -> err d "Expected ',' or '}' but found %a" pp_uchar_err u
+              | u ->
+                  err d "Expected ',' or '}' but found %a" Textdec.pp_decode u
               end
-          | u -> err d "Expected ':' but found %a" pp_uchar_err u
+          | u -> err d "Expected ':' but found %a" Textdec.pp_decode u
         in
         loop [] d ~start
 
   and parse_array d = (* assert (d.u = '[') *)
-    let start = save_pos d in
-    match (nextc d; skip_ws d; d.u) with
+    let start = Textdec.pos d in
+    match (nextc d; skip_ws d; Textdec.current d) with
     | 0x5D (* ']' *) ->
-        let loc = get_loc_span d ~start in
+        let loc = Textdec.textloc_span d ~start in
         nextc d; Array ([], loc)
     | _ ->
         let rec loop acc d =
           let v = parse_value d in
-          match d.u with
+          match Textdec.current d with
           | 0x2C (* ',' *) -> nextc d; loop (v :: acc) d
           | 0x5D (* ']' *) ->
-              let loc = get_loc_span d ~start in
+              let loc = Textdec.textloc_span d ~start in
               nextc d;
               Array (List.rev (v :: acc), loc)
-          | u -> err d "Expected ',' or ']' but found %a" pp_uchar_err u
+          | u -> err d "Expected ',' or ']' but found %a" Textdec.pp_decode u
         in
         loop [] d
 
   and parse_value d : t =
-    let v = match (skip_ws d; d.u) with
+    let v = match (skip_ws d; Textdec.current d) with
     | 0x22 (* '"' *) -> parse_string d
     | 0x74 (* 't' *) -> parse_true d
     | 0x66 (* 'f' *) -> parse_false d
@@ -383,18 +331,18 @@ module Json = struct
     | 0x5B (* '[' *) -> parse_array d
     | 0x2D (* '-' *) -> parse_number d
     | b when 0x30 (* '0' *) <= b && b <= 0x39 (* '9' *) -> parse_number d
-    | u -> err d "Expected a JSON value but found %a" pp_uchar_err u
+    | u -> err d "Expected a JSON value but found %a" Textdec.pp_decode u
     in
     skip_ws d;
     v
 
   let of_string ?file s =
     try
-      let d = make_decoder ?file s in
+      let d = Textdec.make ?file s in
       let v = nextc d; parse_value d in
-      match d.u with
+      match Textdec.current d with
       | 0x11_0001 (* eot *) -> Ok v
-      | u -> err d "Expected end of input but found %a" pp_uchar_err u
+      | u -> err d "Expected end of input but found %a" Textdec.pp_decode u
     with
     | Failure e -> Error e
 
@@ -509,16 +457,16 @@ module Jsonq = struct
 
   let path_to_trace ?(pp_mem = pp_mem) p =
     let seg = function
-    | `A, l -> Format.asprintf "%a: in array" Tloc.pp l
-    | `O m, l -> Format.asprintf "%a: in key %a" Tloc.pp l pp_mem m
+    | `A, l -> Format.asprintf "%a: in array" Textloc.pp l
+    | `O m, l -> Format.asprintf "%a: in key %a" Textloc.pp l pp_mem m
     in
     String.concat "\n" (List.map seg p)
 
   (* Errors *)
 
-  exception Err of path * Tloc.t * string
+  exception Error of path * Textloc.t * string
 
-  let err p l msg = raise_notrace (Err (p, l, msg))
+  let err p l msg = raise_notrace (Error (p, l, msg))
   let errf p l fmt = Format.kasprintf (err p l) fmt
   let err_exp exp p fnd =
     errf p (Json.meta fnd) "Found %s but expected %s" (kind fnd) exp
@@ -538,17 +486,17 @@ module Jsonq = struct
         (String.split_on_char '\n' s)
     in
     match p with
-    | [] -> Format.asprintf "%a:@\n%a" Tloc.pp loc pp_lines msg
+    | [] -> Format.asprintf "%a:@\n%a" Textloc.pp loc pp_lines msg
     | p ->
         Format.asprintf "%a:@\n%a@\n  @[%a@]"
-          Tloc.pp loc pp_lines msg pp_lines (path_to_trace p)
+          Textloc.pp loc pp_lines msg pp_lines (path_to_trace p)
 
   (* Queries *)
 
   type 'a t = path -> Json.t -> 'a
 
   let query q s = try Ok (q [] s) with
-  | Err (p, l, m) -> Error (err_to_string p l m)
+  | Error (p, l, m) -> Result.Error (err_to_string p l m)
 
   (* Succeeding and failing queries *)
 
@@ -599,8 +547,8 @@ module Jsonq = struct
     | Object _ as j -> with_q obj p j
 
   let json p s = s
-  let loc p s = Json.meta s
-  let with_loc q p s = (q p s), Json.meta s
+  let meta p s = Json.meta s
+  let with_meta q p s = (q p s), Json.meta s
 
   (* Nulls *)
 
@@ -624,13 +572,14 @@ module Jsonq = struct
   | Json.String (s, _) when Sset.mem s ss -> s
   | Json.String (s, l) ->
       let ss = Sset.elements ss in
-      let hint, ss = match Tdec.err_suggest ss s with
-      | [] -> Tdec.pp_must_be, ss
-      | ss -> Tdec.pp_did_you_mean, ss
+      let dict yield = List.iter yield ss in
+      let hint, ss = match B0_std.String.spellcheck dict s with
+      | [] -> B0_std.Fmt.must_be, ss
+      | ss -> B0_std.Fmt.did_you_mean, ss
       in
       let kind ppf () = Format.pp_print_string ppf kind in
       let pp_v = Format.pp_print_string in
-      errf p l "%a" (Tdec.pp_unknown' ~kind pp_v ~hint) (s, ss)
+      errf p l "%a" (B0_std.Fmt.unknown' ~kind pp_v ~hint) (s, ss)
   | j -> err_exp kind p j
 
   let enum_map ~kind sm p = function
@@ -639,13 +588,14 @@ module Jsonq = struct
       | v -> v
       | exception Not_found ->
           let ss = Smap.fold (fun k _ acc -> k :: acc) sm [] in
-          let hint, ss = match Tdec.err_suggest ss s with
-          | [] -> Tdec.pp_must_be, ss
-          | ss -> Tdec.pp_did_you_mean, ss
+          let dict yield = List.iter yield ss in
+          let hint, ss = match B0_std.String.spellcheck dict s with
+          | [] -> B0_std.Fmt.must_be, ss
+          | ss -> B0_std.Fmt.did_you_mean, ss
           in
           let kind ppf () = Format.pp_print_string ppf kind in
           let pp_v = Format.pp_print_string in
-          errf p l "%a" (Tdec.pp_unknown' ~kind pp_v ~hint) (s, ss)
+          errf p l "%a" (B0_std.Fmt.unknown' ~kind pp_v ~hint) (s, ss)
       end
   | j -> err_exp kind p j
 
@@ -661,9 +611,9 @@ module Jsonq = struct
 
   let tl q p = function
   | Json.Array ([], l) -> err_empty_array p l
-  | Json.Array (_ :: [], l) -> q p (Json.Array ([], Tloc.to_end l))
+  | Json.Array (_ :: [], l) -> q p (Json.Array ([], Textloc.to_last l))
   | Json.Array (_ :: (v :: _ as a), l) ->
-      let l = Tloc.restart ~at:(Tloc.to_start (Json.meta v)) l in
+      let l = Textloc.reloc ~first:(Json.meta v) ~last:l in
       q p (Json.Array (a, l))
   | j -> err_exp_array p j
 
@@ -723,13 +673,14 @@ module Jsonq = struct
           | true -> Sset.add n acc
           | false ->
               let ns = Sset.elements dom in
-              let hint, ss = match Tdec.err_suggest ns n with
-              | [] -> Tdec.pp_must_be, ns
-              | ss -> Tdec.pp_did_you_mean, ss
+              let dict yield = List.iter yield ns in
+              let hint, ss = match B0_std.String.spellcheck dict n with
+              | [] -> B0_std.Fmt.must_be, ns
+              | ss -> B0_std.Fmt.did_you_mean, ss
               in
               let kind ppf () = Format.pp_print_string ppf "member" in
               let pp_v = Format.pp_print_string in
-              errf p l "%a" (Tdec.pp_unknown' ~kind pp_v ~hint) (n, ss)
+              errf p l "%a" (B0_std.Fmt.unknown' ~kind pp_v ~hint) (n, ss)
       in
       List.fold_left add_mem Sset.empty ms
   | j -> err_exp_obj p j

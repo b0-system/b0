@@ -7,265 +7,323 @@
 
     Open this module to use it defines only module in your scope. *)
 
-(** Text locations. *)
-module Tloc : sig
+(** Text locations.
+
+    A text location identifies a text span in a given UTF-8 encoded file
+    by an inclusive range of absolute {{!Textloc.type-byte_pos}byte} positions
+    and the {{!Textloc.type-line_pos}line positions} on which those occur. *)
+module Textloc : sig
+
+  (** {1:fpath File paths} *)
+
+  type filepath = string
+  (** The type for file paths. *)
+
+  val file_none : filepath
+  (** [file_none] is ["-"]. A file path to use when there is none. *)
+
+  (** {1:pos Positions} *)
+
+  (** {2:byte_pos Byte positions} *)
+
+  type byte_pos = int
+  (** The type for zero-based, absolute, byte positions in text. If
+      the text has [n] bytes, [0] is the first position and [n-1] is
+      the last position. *)
+
+  val byte_pos_none : byte_pos
+  (** [byte_pos_none] is [-1]. A position to use when there is none. *)
+
+  (** {2:lines Lines} *)
+
+  type line_num = int
+  (** The type for one-based, line numbers in the text. Lines
+      increment after a {e newline} which is either a line feed ['\n']
+      (U+000A), a carriage return ['\r'] (U+000D) or a carriage return
+      and a line feed ["\r\n"] (<U+000D,U+000A>). *)
+
+  val line_num_none : line_num
+  (** [line_num_none] is [-1]. A line number to use when there is none. *)
+
+  (** {2:line_pos Line positions} *)
+
+  type line_pos = line_num * byte_pos
+  (** The type for line positions. This identifies a line by its line
+      number and the absolute byte position following its newline
+      (or the start of text for the first line). That byte position:
+      {ul
+      {- Indexes the first byte of text of the line if the line is non-empty.}
+      {- Indexes the first byte of the next {e newline} sequence if the line
+         is empty.}
+      {- Is out of bounds and equal to the text's length for a last empty
+         line. This is also the case on empty text.}} *)
+
+  val line_pos_first : line_pos
+  (** [line_pos_first] is [1, 0]. Note that this is the only line position
+      of the empty text. *)
+
+  val line_pos_none : line_pos
+  (** [line_pos_none] is [(line_pos_none, pos_pos_none)]. *)
 
   (** {1:tloc Text locations} *)
 
-  type fpath = string
-  (** The type for file paths. *)
-
-  val no_file : fpath
-  (** [no_file] is [Fpath.t "-"], a path used when no file is specified. *)
-
-  type pos = int
-  (** The type for zero-based, absolute, byte positions in text. *)
-
-  type line = int
-  (** The type for one-based, line numbers in the text. Lines
-      increment after a line feed ['\n'] (U+000A), a carriage return
-      ['\r'] (U+000D) or a carriage return and a line feed ["\r\n"]
-      (<U+000D,U+000A>). *)
-
-  type line_pos = line * pos
-  (** The type for line positions. The line number and the byte
-      position of the first element on the line. The later is the
-      byte position after the newline which may not exist (at the end
-      of file). *)
-
   type t
-  (** The type for text locations. A text location is a range of byte
-      positions and the lines on which they occur in the UTF-8 encoded
-      text of a particular file. *)
+  (** The type for text locations. A text location identifies a text
+      span in an UTF-8 encoded file by an inclusive range of absolute
+      {{!type-byte_pos}byte positions} and the {{!type-line_pos}line
+      positions} on which they occur.
 
-  val v :
-    file:fpath -> sbyte:pos -> ebyte:pos -> sline:line_pos -> eline:line_pos ->
-    t
-  (** [v ~file ~sbyte ~ebyte ~sline ~eline] is a contructor for
-      text locations. See corresponding accessors for the semantics.
-      If you don't have a file use {!no_file}. *)
+      If the first byte equals the last byte the range contains
+      exactly that byte. If the first byte is greater than the last
+      byte this represents an insertion point before the first
+      byte. In this case information about the last position should
+      be ignored: it can contain anything. *)
 
-  val file : t -> fpath
+  val none : t
+  (** [none] is a position to use when there is none. *)
+
+  val make :
+    file:filepath -> first_byte:byte_pos -> last_byte:byte_pos ->
+    first_line:line_pos -> last_line:line_pos -> t
+  (** [v ~file ~first_byte ~last_byte ~first_line ~last_line] is a text
+      location with the given arguments, see corresponding accessors for
+      the semantics. If you don't have a file use {!file_none}. *)
+
+  val file : t -> filepath
   (** [file l] is [l]'s file. *)
 
-  val sbyte : t -> pos
-  (** [sbyte l] is [l]'s start position. *)
+  val set_file : t -> filepath -> t
+  (** [set_file l file] is [l] with {!file} set to [file]. *)
 
-  val ebyte : t -> pos
-  (** [ebyte l] is [l]'s end position. *)
+  val first_byte : t -> byte_pos
+  (** [first_byte l] is [l]'s first byte. Irrelevant if {!is_none} is
+      [true]. *)
 
-  val sline : t -> line_pos
-  (** [sline l] is the line position on which [sbyte l] lies. *)
+  val last_byte : t -> byte_pos
+  (** [last_byte l] is [l]'s last byte. Irrelevant if {!is_none} or
+      {!is_empty} is [true]. *)
 
-  val eline : t -> line_pos
-  (** [elin l] is the line position on which [ebyte l] lies. *)
+  val first_line : t -> line_pos
+  (** [first_line l] is the line position on which [first_byte l] lies.
+      Irrelevant if {!is_none} is [true].*)
 
-  val nil : t
-  (** [loc_nil] is an invalid location. *)
+  val last_line : t -> line_pos
+  (** [last_line l] is the line position on which [last_byte l] lies.
+      Irrelevant if {!is_none} or {!is_empty} is [true].*)
 
-  val merge : t -> t -> t
-  (** [merge l0 l1] merges the location [l0] and [l1] to the smallest
-      location that spans both location. The file path taken from [l0]. *)
+  (** {2:preds Predicates and comparisons} *)
 
-  val to_start : t -> t
-  (** [to_start l] has both start and end positions at [l]'s start. *)
+  val is_none : t -> bool
+  (** [is_none t] is [true] iff [first_byte < 0]. *)
 
-  val to_end : t -> t
-  (** [to_end l] has both start and end positions at [l]'s end. *)
+  val is_empty : t -> bool
+  (** [is_empty t] is [true] iff [first_byte t > last_byte t]. *)
 
-  val restart : at:t -> t -> t
-  (** [restart ~at l] is [l] with the start position of [at]. *)
+  val equal : t -> t -> bool
+  (** [equal t0 t1] is [true] iff [t0] and [t1] are equal. This checks
+      that {!file}, {!first_byte} and {!last_byte} are equal. Line information
+      is ignored. *)
+
+  val compare : t -> t -> int
+  (** [compare t0 t1] orders [t0] and [t1]. The order is compatible
+      with {!equal}. Comparison starts with {!file}, follows with
+      {!first_byte} and ends, if needed, with {!last_byte}. Line
+      information is ignored. *)
+
+  (** {2:shrink_and_stretch Shrink and stretch} *)
+
+  val set_first : t -> first_byte:byte_pos -> first_line:line_pos -> t
+  (** [set_first l ~first_byte ~first_line] sets the the first position of
+      [l] to given values. *)
+
+  val set_last : t -> last_byte:byte_pos -> last_line:line_pos -> t
+  (** [set_last l ~last_byte ~last_line] sets the last position of [l]
+      to given values. *)
+
+  val to_first : t -> t
+  (** [to_first l] has both first and last positions set to [l]'s first
+      position. The range spans {!first_byte}. See also {!before}. *)
+
+  val to_last : t -> t
+  (** [to_last l] has both first and last positions set to [l]'s last
+        position. The range spans {!last_byte}. See also {!after}. *)
+
+  val before : t -> t
+  (** [before t] is the {{!is_empty}empty} text location starting at
+      {!first_byte}. *)
+
+  val after : t -> t
+  (** [after t] is the empty {{!is_empty}empty} location starting at
+      [last_byte t + 1]; note that at the end of input this may be an
+      invalid byte {e index}. The {!first_line} and {!last_line} of the
+      result is [last_line t]. *)
+
+  val span : t -> t -> t
+  (** [span l0 l1] is the span from the smallest byte position of [l0] and
+      [l1] to the largest byte position of [l0] and [l1]. The file path is
+      taken from the greatest byte position. *)
+
+  val reloc : first:t -> last:t -> t
+  (** [reloc ~first ~last] uses the first position of [first], the
+      last position of [last] and the file of [last]. *)
+
+  (** {2:fmt Formatting} *)
 
   val pp_ocaml : Format.formatter -> t -> unit
-  (** [pp_ocaml] formats location like the OCaml compiler. *)
+  (** [pp_ocaml] formats text locations like the OCaml compiler. *)
 
   val pp_gnu : Format.formatter -> t -> unit
-  (** [pp_gnu] formats location according to the
+  (** [pp_gnu] formats text locations according to the
       {{:https://www.gnu.org/prep/standards/standards.html#Errors}GNU
       convention}. *)
 
   val pp : Format.formatter -> t -> unit
-  (** [pp] is {!pp_gnu}. *)
+  (** [pp] is {!pp_ocaml}. *)
 
   val pp_dump : Format.formatter -> t -> unit
   (** [pp_dump] formats raw data for debugging. *)
-
-  (** {1:text Substitutions and insertions}
-
-      Strictly speaking this doesn't belong here but here you go. *)
-
-  val string_subrange : ?first:int -> ?last:int -> string -> string
-  (** [string_subrange ~first ~last s] are the consecutive bytes of [s]
-      whose indices exist in the range \[[first];[last]\].
-
-      [first] defaults to [0] and last to [String.length s - 1].
-
-      Note that both [first] and [last] can be any integer. If
-      [first > last] the interval is empty and the empty string is
-      returned. *)
-
-  val string_replace : start:int -> stop:int -> rep:string -> string -> string
-  (** [string_replace ~start ~stop ~rep s] replaces the index range
-      \[[start];stop-1\] of [s] with [rep] as follows. If [start = stop]
-      the [rep] is inserted before [start]. [start] and [stop] must be
-      in range \[[0];[String.length s]\] and [start <= stop] or
-      [Invalid_argument] is raised. *)
 end
 
 (** Text decoder.
 
-    A text decoder inputs UTF-8 data and checks its validity.  It
-    updates locations according to advances in the input and has a
-    token buffer used for lexing. *)
-module Tdec : sig
+    A text decoder inputs UTF-8 encoded characters from a string. It checks
+    its validity and maintains information the absolute byte positions and line
+    position (incrementing on LF, CR or CRLF) of the last decoded character.
+    It also has a token buffer that can be used for lexing. *)
+module Textdec : sig
 
-  (** {1:decoder Decoder} *)
+  (** {1:decodes Decodes} *)
+
+  type decode = int
+  (** The type for decodes. This is either an arbitrary Unicode scalar
+      value, {!sot} or {!eot}, if not either of those can be safely
+      converted to an [Uchar.t] value with {!Uchar.unsafe_of_int}. *)
+
+  val sot : decode
+  (** [sot] is [x11_0000] ({!Uchar.max} + 1) an integer to represent the start
+      of text. *)
+
+  val eot : decode
+  (** [eot] is [x11_0001] ({!Uchar.max} + 2) an integer to represent the end
+      of text. *)
+
+  val pp_decode : Format.formatter -> decode -> unit
+  (** [pp_decode] formats decodes for inspection. This can be used
+      in error messages, it escapes control characters and uses
+      the strings ["start of text"] and ["end of text"] for {!sot}
+      and {!eot}. *)
+
+  (** {1:decoders Decoders} *)
 
   type t
-  (** The type for UTF-8 text decoders. *)
+  (** The type for text decoders. *)
 
-  val create : ?file:Tloc.fpath -> string -> t
-  (** [create ~file input] decodes [input] using [file] (defaults to
-      {!Tloc.no_file}) for text location. *)
+  val make : ?file:Textloc.filepath -> string -> t
+  (** [make ~file s] decodes UTF-8 text from [s] assuming
+      to have been read from a file [file] (defaults to
+      {!Textloc.file_none}). *)
 
-  (** {1:loc Locations} *)
+  val input : t -> string
+  (** [input d] is the input string of [d] *)
 
-  val file : t -> Tloc.fpath
-  (** [file d] is the input file. *)
-
-  val pos : t -> Tloc.pos
-  (** [pos d] is the current decoding byte position. *)
-
-  val line : t -> Tloc.line_pos
-  (** [line d] is the current line position. Lines increment as
-      described {{!Tloc.line}here}. *)
-
-  val loc :
-    t -> sbyte:Tloc.pos -> ebyte:Tloc.pos -> sline:Tloc.line_pos ->
-    eline:Tloc.line_pos -> Tloc.t
-  (** [loc d ~sbyte ~ebyte ~sline ~eline] is a location with the
-      correponding position ranges and file according to {!file}. *)
-
-  val loc_to_here :
-    t -> sbyte:Tloc.pos -> sline:Tloc.line_pos -> Tloc.t
-  (** [loc_to_here d ~sbyte ~sline] is a location that starts at
-      [~sbyte] and [~sline] and ends at the current decoding
-      position. *)
-
-  val loc_here : t -> Tloc.t
-  (** [loc_here d] is like {!loc_to_here} with the start position
-      at the current decoding position. *)
-
-  (** {1:err Errors} *)
-
-  exception Err of Tloc.t * string
-  (** The exception for errors. A location and an error message *)
-
-  val err : Tloc.t -> string -> 'b
-  (** [err loc msg] raises [Err (loc, msg)] with no trace. *)
-
-  val err_to_here :
-    t -> sbyte:Tloc.pos -> sline:Tloc.line_pos ->
-    ('a, Format.formatter, unit, 'b) format4 -> 'a
-  (** [err_to_here d ~sbyte ~sline fmt ...] is
-      [err d (loc_to_here d ~sbyte ~sline) fmt ...] *)
-
-  val err_here : t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
-  (** [err_here d] is [err d (loc_here d) fmt ...]. *)
-
-  (** {2:err_msg Error message helpers} *)
-
-  val err_suggest : ?dist:int -> string list -> string -> string list
-  (** [err_suggest ~dist candidates s] are the elements of [candidates]
-      whose edit distance is the smallest to [s] and
-      at most at a distance of [dist] of [s] (defaults to [2]). If
-      multiple results are returned the order of [candidates] is
-      preserved. *)
-
-  type 'a fmt = Format.formatter -> 'a -> unit
-  (** The type for formatters. *)
-
-  val pp_and_enum : ?empty:unit fmt -> 'a fmt -> 'a list fmt
-  (** [and_enum ~empty pp_v ppf l] formats [l] according to its length.
-      {ul
-      {- [0], formats [empty] (defaults to [nop]).}
-      {- [1], formats the element with [pp_v].}
-      {- [2], formats ["%a and %a"] with the list elements}
-      {- [n], formats ["%a, ... and %a"] with the list elements}} *)
-
-  val pp_or_enum : ?empty:unit fmt -> 'a fmt -> 'a list fmt
-  (** [or_enum] is like {!pp_and_enum} but uses "or" instead of "and". *)
-
-  val pp_did_you_mean : 'a fmt -> 'a list fmt
-  (** [did_you_mean pp_v] formats ["Did you mean %a ?"] with {!pp_or_enum}
-      if the list is non-empty and [nop] otherwise. *)
-
-  val pp_must_be : 'a fmt -> 'a list fmt
-  (** [must_be pp_v] formats ["Must be %a."] with {!pp_or_enum} if the list
-      is non-empty and [nop] otherwise. *)
-
-  val pp_unknown : kind:unit fmt -> 'a fmt -> 'a fmt
-  (** [pp_unknown ~kind pp_v] formats ["Unknown %a %a." kind () pp_v]. *)
-
-  val pp_unknown' :
-    kind:unit fmt -> 'a fmt -> hint:('a fmt -> 'a list fmt) ->
-    ('a * 'a list) fmt
-  (** [pp_unknown' ~kind pp_v ~hint (v, hints)] formats {!pp_unknown} followed
-      by a space and [hint pp_v hints] if [hints] is non-empty. *)
+  val file : t -> Textloc.filepath
+  (** [file d] is the file associated to [d]. *)
 
   (** {1:decoding Decoding} *)
 
-  val eoi : t -> bool
-  (** [eoi d] is [true] iff the decoder is at the end of input. *)
+  val current : t -> decode
+  (** [current d] is the current decode. This is either:
+      {ul
+      {- {!sot}, if {!next} was never called on [d].}
+      {- {!eot}, if all {!input} characters have been decoded via {!next}.}
+      {- A Unicode scalar value.}} *)
 
-  val byte : t -> int
-  (** [byte d] is the byte at current position or [0xFFFF] if
-      [eoi d] is [true]. *)
+  val is_error : t -> bool
+  (** [is_error d] is [true] if [current d] is {!Uchar.rep} and not the result
+      of a valid UTF-8 decode. *)
 
-  val accept_uchar : t -> unit
-  (** [accept_uchar d] accepts an UTF-8 encoded character starting at
-      the current position and moves to the byte after it. Raises
-      {!Err} in case of UTF-8 decoding error. *)
+  val next : t -> unit
+  (** [next d] decodes the next UTF-8 character into {!current} and
+      updates the text locations. Repeated calls to {!next} after
+      {!eot} has been returned have no effect.
 
-  val accept_byte : t -> unit
-  (** [accept_byte d] accepts the byte at the current position and
-      moves to the next byte. {b Warning.} Faster than {!accept_uchar}
-      but the client needs to make sure it's not accepting invalid
-      UTF-8 data, i.e. that [byte d] is an US-ASCII encoded character
-      (i.e. [<= 0x7F]). *)
+      If an UTF-8 decoding error occurs {!current} becomes
+      {!Uchar.rep} and {!current_is_error} returns [true]. {!next} can
+      still be called afterwards for best-effort decoding. *)
 
-  (** {1:tok Token buffer} *)
+  (** {1:textlocs Text locations} *)
 
-  val tok_reset : t -> unit
-  (** [tok_reset d] resets the token. *)
+  (** {2:byte_pos Byte positions} *)
 
-  val tok_pop : t -> string
-  (** [tok_pop d] returns the token and {!tok_reset}s it. *)
+  val first_byte_pos : t -> Textloc.byte_pos
+  (** [first_byte_pos d] is the first byte position of the
+      {!current} decode. If {!current} is:
+      {ul
+      {- {!sot}, this is [0].}
+      {- {!eot}, this is [String.length (input d)]}
+      {- A Unicode Scalar value, this is the first index in [input d]
+         of its UTF-8 encoding.}} *)
 
-  val tok_accept_uchar : t -> unit
-  (** [tok_accept_uchar d] is like {!accept_uchar} but also
-      adds the UTF-8 byte sequence to the token. *)
+  val last_byte_pos : t -> Textloc.byte_pos
+  (** [last_byte_pos d] is the last position of the current {{!decode}decode}.
+      If {!current} is:
+      {ul
+      {- {!sot}, this is [0].}
+      {- {!eot}, this is [String.length (input d)]}
+      {- A Unicode Scalar value, this is the last index in [input d]
+         of its UTF-8 encoding.}} *)
 
-  val tok_accept_byte : t -> unit
-  (** [tok_accept_byte d] is like {!accept_byte} but also
-      adds the byte to the token. {b Warning.} {!accept_byte}'s
-      warning applies. *)
+  (** {2:line_pos Line positions} *)
 
-  val tok_add_byte : t -> int -> unit
-  (** [tok_add_byte d b] adds byte [b] to the token. *)
+  val line_num : t -> Textloc.line_num
+  (** [line_num d] is the current line number. *)
 
-  val tok_add_bytes : t -> string -> unit
-  (** [tok_add_byte d s] adds bytes [s] to the token. *)
+  val line_start : t -> Textloc.byte_pos
+  (** [line_num d] is the first byte position on the current line.
+      See {!Textloc.line_pos}. *)
 
-  val tok_add_char : t -> char -> unit
-  (** [tok_add_char d c] adds character [c] to the token. *)
+  val line_pos : t -> Textloc.line_pos
+  (** [line_pos d] is the line position of the current decode. *)
 
-  val tok_add_uchar : t -> Uchar.t -> unit
-  (** [tok_add_uchar t u] adds the UTF-8 encoding of character [u]
-      to the token. *)
+  val prev_line_num : t -> Textloc.line_num
+  (** [prev_line_num d] is the previous line number. This is {!line_num}
+      minus one or 1 on the first line. *)
 
-  (**/**)
-  (* XXX get rid of that once serialk_json uses serialk_text *)
-  val buffer_add_uchar : Buffer.t -> Uchar.t -> unit
-  (**/**)
+  val prev_line_start : t -> Textloc.byte_pos
+  (** [prev_line_start] is the line start of the previous line. *)
+
+  val prev_line_pos : t -> Textloc.line_pos
+  (** [previous_line_pos d] is the line position of the previous line. *)
+
+  (** {2:text_loc Text locations} *)
+
+  val pos : t -> Textloc.byte_pos * Textloc.line_pos
+  (** [pos d] is [first_byte_pos d, line_pos d]. This is the first
+      position of the current decode. *)
+
+  val textloc : t -> Textloc.t
+  (** [textloc d] is the text position of the current decode. The text location
+      spans the UTF-8 bytes of the decode it is on {!line_pos}[ d]. *)
+
+  val textloc_span :
+    t -> start:(Textloc.byte_pos * Textloc.line_pos) -> Textloc.t
+  (** [textloc_span d ~start] is a text location that spans from [start] to
+      the last byte of the current decode. *)
+
+  val textloc_span_to_prev_decode :
+    t -> start:(Textloc.byte_pos * Textloc.line_pos) -> Textloc.t
+  (** [textloc_span_to_prev_decode d ~start] is a text location that spans
+      from [start] to the last byte of the previous decode. *)
+
+  (** {1:lexemebuffer Lexeme buffer} *)
+
+  val lexeme_clear : t -> unit
+  (** [lexeme_clear d] clears the lexeme buffer. *)
+
+  val lexeme_pop : t -> string
+  (** [lexeme_pop d] gets the lexeme buffer contents and clears is. *)
+
+  val lexeme_add : t -> Uchar.t -> unit
+  (** [lexeme_add d u] adds the UTF-8 encoding of [u] to the lexeme
+      buffer. *)
 end

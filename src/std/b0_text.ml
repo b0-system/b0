@@ -3,352 +3,274 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(* Error message helpers. *)
-
-module Err_msg = struct
-  let pf = Format.fprintf
-  let pp_sp = Format.pp_print_space
-  let pp_nop _ () = ()
-  let pp_any fmt ppf _ = pf ppf fmt
-
-  let pp_op_enum op ?(empty = pp_nop) pp_v ppf = function
-  | [] -> empty ppf ()
-  | [v] -> pp_v ppf v
-  | _ as vs ->
-      let rec loop ppf = function
-      | [v0; v1] -> pf ppf "%a@ %s@ %a" pp_v v0 op pp_v v1
-      | v :: vs -> pf ppf "%a,@ " pp_v v; loop ppf vs
-      | [] -> assert false
-      in
-      loop ppf vs
-
-  let pp_and_enum ?empty pp_v ppf vs = pp_op_enum "and" ?empty pp_v ppf vs
-  let pp_or_enum ?empty pp_v ppf vs = pp_op_enum "or" ?empty pp_v ppf vs
-  let pp_did_you_mean pp_v ppf = function
-  | [] -> () | vs -> pf ppf "Did@ you@ mean %a ?" (pp_or_enum pp_v) vs
-
-  let pp_must_be pp_v ppf = function
-  | [] -> () | vs -> pf ppf "Must be %a." (pp_or_enum pp_v) vs
-
-  let pp_unknown ~kind pp_v ppf v = pf ppf "Unknown %a %a." kind () pp_v v
-  let pp_unknown' ~kind pp_v ~hint ppf (v, hints) = match hints with
-  | [] -> pp_unknown ~kind pp_v ppf v
-  | hints -> pp_unknown ~kind pp_v ppf v; pp_sp ppf (); (hint pp_v) ppf hints
-
-  let min_by f a b = if f a <= f b then a else b
-  let max_by f a b = if f a <= f b then b else a
-
-  let edit_distance s0 s1 =
-    let minimum a b c = min a (min b c) in
-    let s0 = min_by String.length s0 s1     (* row *)
-    and s1 = max_by String.length s0 s1 in  (* column *)
-    let m = String.length s0 and n = String.length s1 in
-    let rec rows row0 row i =
-      if i > n then row0.(m) else begin
-        row.(0) <- i;
-        for j = 1 to m do
-          if s0.[j - 1] = s1.[i - 1] then row.(j) <- row0.(j - 1) else
-          row.(j) <-minimum (row0.(j - 1) + 1) (row0.(j) + 1) (row.(j - 1) + 1)
-        done;
-        rows row row0 (i + 1)
-      end in
-    rows (Array.init (m + 1) (fun x -> x)) (Array.make (m + 1) 0) 1
-
-  let suggest ?(dist = 2) candidates s =
-    let add (min, acc) name =
-      let d = edit_distance s name in
-      if d = min then min, (name :: acc) else
-      if d < min then d, [name] else
-      min, acc
-    in
-    let d, suggs = List.fold_left add (max_int, []) candidates in
-    if d <= dist (* suggest only if not too far *) then List.rev suggs else []
-end
-
 (* Text locations *)
 
-module Tloc = struct
-  type fpath = string
-  let pp_path = Format.pp_print_string
+module Textloc = struct
 
-  type pos = int
-  type line = int
-  type line_pos = line * pos
-  (* For lines we keep the byte position just after the newlinexs. It
-     editors are still expecting tools to compute visual columns which
-     is stupid.  By keeping these byte positions we can approximate
-     columns by subtracting the line byte position from the byte
-     location. This will only be correct on US-ASCII data though. Best
-     would be to be able to give them [sbyte] and [ebyte]. *)
+  (* File paths *)
 
-  let l v = v
+  type filepath = string
+  let file_none = "-"
+  let pp_filepath = Format.pp_print_string
+
+  (* Byte positions *)
+
+  type byte_pos = int (* zero-based *)
+  let byte_pos_none = -1
+
+  (* Lines *)
+
+  type line_num = int (* one-based *)
+  let line_num_none = -1
+
+  (* Line positions
+
+     We keep the byte position of the first element on the line. This
+     first element may not exist and be equal to the text length if
+     the input ends with a newline. Editors expect tools to compute
+     visual columns (not a very good idea). By keeping these byte
+     positions we can approximate columns by subtracting the line byte
+     position data byte location. This will only be correct on
+     US-ASCII data. *)
+
+  type line_pos = line_num * byte_pos
+  let line_pos_first = 1, 0
+  let line_pos_none = line_num_none, byte_pos_none
+
+  (* Text locations *)
+
   type t =
-    { file : fpath;
-      sbyte : pos; ebyte : pos;
-      sline : pos * line; eline : pos * line }
+    { file : filepath;
+      first_byte : byte_pos; last_byte : byte_pos;
+      first_line : line_pos; last_line : line_pos }
 
-  let no_file = "-"
-  let v ~file ~sbyte ~ebyte ~sline ~eline = { file; sbyte; ebyte; sline; eline }
+  let make ~file ~first_byte ~last_byte ~first_line ~last_line =
+    { file; first_byte; last_byte; first_line; last_line }
+
   let file l = l.file
-  let sbyte l = l.sbyte
-  let ebyte l = l.ebyte
-  let sline l = l.sline
-  let eline l = l.eline
-  let nil =
-    let pnil = -1 in
-    let lnil = (-1, pnil) in
-    v ~file:no_file ~sbyte:pnil ~ebyte:pnil ~sline:lnil ~eline:lnil
+  let set_file l file = { l with file }
+  let first_byte l = l.first_byte
+  let last_byte l = l.last_byte
+  let first_line l = l.first_line
+  let last_line l = l.last_line
+  let none =
+    let first_byte = byte_pos_none and last_byte = byte_pos_none in
+    let first_line = line_pos_none and last_line = line_pos_none in
+    make ~file:file_none ~first_byte ~last_byte ~first_line ~last_line
 
-  let merge l0 l1 =
-    let sbyte, sline =
-      if l0.sbyte < l1.sbyte then l0.sbyte, l0.sline else l1.sbyte, l1.sline
+  (* Predicates and comparisons *)
+
+  let is_none l = l.first_byte < 0
+  let is_empty l = l.first_byte > l.last_byte
+  let equal l0 l1 =
+    String.equal l0.file l1.file &&
+    Int.equal l0.first_byte l1.first_byte &&
+    Int.equal l0.last_byte l1.last_byte
+
+  let compare l0 l1 =
+    let c = String.compare l0.file l1.file in
+    if c <> 0 then c else
+    let c = Int.compare l0.first_byte l1.first_byte in
+    if c <> 0 then c else
+    Int.compare l0.last_byte l1.last_byte
+
+  (* Shrink and stretch *)
+
+  let set_first l ~first_byte ~first_line = { l with first_byte; first_line }
+  let set_last l ~last_byte ~last_line = { l with last_byte; last_line }
+
+  [@@@warning "-6"]
+  let to_first l =
+    make l.file l.first_byte l.first_byte l.first_line l.first_line
+
+  let to_last l =
+    make l.file l.last_byte l.last_byte l.last_line l.last_line
+
+  let before l =
+    make l.file l.first_byte byte_pos_none l.first_line line_pos_none
+
+  let after l =
+    make l.file (l.first_byte + 1) byte_pos_none l.last_line line_pos_none
+  [@@@warning "+6"]
+
+  let span l0 l1 =
+    let first_byte, first_line =
+      if l0.first_byte < l1.first_byte
+      then l0.first_byte, l0.first_line
+      else l1.first_byte, l1.first_line
     in
-    let ebyte, eline =
-      if l0.ebyte < l1.ebyte then l1.ebyte, l1.eline else l0.ebyte, l0.eline
+    let last_byte, last_line, file =
+      if l0.last_byte < l1.last_byte
+      then l1.last_byte, l1.last_line, l1.file
+      else l0.last_byte, l0.last_line, l0.file
     in
-    v ~file:l0.file ~sbyte ~ebyte ~sline ~eline
+    make ~file ~first_byte ~first_line ~last_byte ~last_line
 
-  let to_start l =
-    v ~file:l.file ~sbyte:l.sbyte ~ebyte:l.sbyte ~sline:l.sline ~eline:l.sline
+  [@@@warning "-6"]
+  let reloc ~first ~last =
+    make last.file first.first_byte last.last_byte first.first_line
+      last.last_line
+  [@@@warning "+6"]
 
-  let to_end l =
-    v ~file:l.file ~sbyte:l.ebyte ~ebyte:l.ebyte ~sline:l.eline ~eline:l.eline
-
-  let restart ~at:s e =
-    v ~file:e.file ~sbyte:s.sbyte ~ebyte:e.ebyte ~sline:s.sline ~eline:e.eline
+  (* Formatters *)
 
   let pf = Format.fprintf
-  let pp_ocaml ppf l = match l.ebyte < 0 with
-  | true -> pf ppf "File \"%a\", line n/a, characters n/a" pp_path l.file
-  | false ->
-      let pp_lines ppf l = match fst l.sline = fst l.eline with
-      | true -> pf ppf "line %d" (fst l.sline)
-      | false -> pf ppf "lines %d-%d" (fst l.sline) (fst l.eline)
-      in
-      (* "characters" represent positions (insertion points) not columns *)
-      let pos_s = l.sbyte - snd l.sline in
-      let pos_e = l.ebyte - snd l.eline + 1 in
-      pf ppf "File \"%a\", %a, characters %d-%d"
-        pp_path l.file pp_lines l pos_s pos_e
+  let pp_ocaml ppf l =
+    if is_none l
+    then pf ppf "File \"%a\"" pp_filepath l.file else
+    let pp_lines ppf l =
+      if fst l.first_line = fst l.last_line
+      then pf ppf "line %d" (fst l.first_line)
+      else pf ppf "lines %d-%d" (fst l.first_line) (fst l.last_line)
+    in
+    (* "characters" represent positions (insertion points) not columns *)
+    let pos_s = l.first_byte - snd l.first_line in
+    let pos_e = l.last_byte - snd l.last_line + 1 in
+    if pos_s = 0 && pos_e = 0
+    then pf ppf "File \"%a\", %a" pp_filepath l.file pp_lines l
+    else pf ppf "File \"%a\", %a, characters %d-%d"
+        pp_filepath l.file pp_lines l pos_s pos_e
 
-  let pp_gnu ppf l = match l.ebyte < 0 with
-  | true -> pf ppf "%a:" pp_path l.file
-  | false ->
-      let pp_lines ppf l =
-        let col_s = l.sbyte - snd l.sline + 1 in
-        let col_e = l.ebyte - snd l.eline + 1 in
-        match fst l.sline = fst l.eline with
-        | true ->  pf ppf "%d.%d-%d" (fst l.sline) col_s col_e
-        | false ->
-            pf ppf "%d.%d-%d.%d" (fst l.sline) col_s (fst l.eline) col_e
-      in
-      pf ppf "%a:%a" pp_path l.file pp_lines l
+  let pp_gnu ppf l =
+    if is_none l then pf ppf "%a:" pp_filepath l.file else
+    let pp_lines ppf l =
+      let col_s = l.first_byte - snd l.first_line + 1 in
+      let col_e = l.last_byte - snd l.last_line + 1 in
+      if fst l.first_line = fst l.last_line
+      then pf ppf "%d.%d-%d" (fst l.first_line) col_s col_e
+      else pf ppf "%d.%d-%d.%d" (fst l.first_line) col_s (fst l.last_line) col_e
+    in
+    pf ppf "%a:%a" pp_filepath l.file pp_lines l
+
+  let pp = pp_ocaml
 
   let pp_dump ppf l =
-    pf ppf "[bytes %d;%d][lines %d;%d][lbytes %d;%d]"
-      l.sbyte l.ebyte (fst l.sline) (fst l.eline) (snd l.sline) (snd l.eline)
-
-  let pp = pp_gnu
-
-  (* Insertions and substitutions *)
-
-  let string_subrange ?(first = 0) ?last s =
-    let max = String.length s - 1 in
-    let last = match last with
-    | None -> max
-    | Some l when l > max -> max
-    | Some l -> l
-    in
-    let first = if first < 0 then 0 else first in
-    if first > last then "" else
-    String.sub s first (last - first + 1)
-
-  let string_replace ~start ~stop ~rep s =
-    let len = String.length s in
-    if stop < start || start < 0 || start > len || stop < 0 || stop > len
-    then invalid_arg (Printf.sprintf "invalid start:%d stop:%d" start stop) else
-    let b = String.sub s 0 start in
-    let a = String.sub s stop (len - stop) in
-    String.concat "" [b; rep; a]
+    pf ppf "file:%s bytes:%d-%d lines:(%d,%d)-(%d,%d)"
+      l.file l.first_byte l.last_byte (fst l.first_line)
+      (snd l.first_line)  (fst l.last_line) (snd l.last_line)
 end
 
-(* UTF-8 decoding table. *)
+module Textdec = struct
 
-module Utf_8 = struct
-  type case =
-  | L1 | L2 | L3_E0 | L3_E1_EC_or_EE_EF | L3_ED | L4_F0 | L4_F1_F3 | L4_F4 | E
+  (* Decodes *)
 
-  let case =
-(*
-  (* See https://tools.ietf.org/html/rfc3629#section-4 *)
-  Printf.printf "[|";
-  for i = 0 to 255 do
-    if i mod 16 = 0 then Printf.printf "\n";
-    if 0x00 <= i && i <= 0x7F then Printf.printf "L1; " else
-    if 0xC2 <= i && i <= 0xDF then Printf.printf "L2; " else
-    if 0xE0 = i then Printf.printf "L3_E0; " else
-    if 0xE1 <= i && i <= 0xEC || 0xEE <= i && i <= 0xEF
-    then Printf.printf "L3_E1_EC_or_EE_EF; " else
-    if 0xED = i then Printf.printf "L3_ED;" else
-    if 0xF0 = i then Printf.printf "L4_F0; " else
-    if 0xF1 <= i && i <= 0xF3 then Printf.printf "L4_F1_F3; " else
-    if 0xF4 = i then Printf.printf "L4_F4; " else
-    Printf.printf "E; "
-  done;
-  Printf.printf "\n|]"
-*)
-  [|
-    L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1;
-    L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1;
-    L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1;
-    L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1;
-    L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1;
-    L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1;
-    L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1;
-    L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1; L1;
-    E; E; E; E; E; E; E; E; E; E; E; E; E; E; E; E;
-    E; E; E; E; E; E; E; E; E; E; E; E; E; E; E; E;
-    E; E; E; E; E; E; E; E; E; E; E; E; E; E; E; E;
-    E; E; E; E; E; E; E; E; E; E; E; E; E; E; E; E;
-    E; E; L2; L2; L2; L2; L2; L2; L2; L2; L2; L2; L2; L2; L2; L2;
-    L2; L2; L2; L2; L2; L2; L2; L2; L2; L2; L2; L2; L2; L2; L2; L2;
-    L3_E0; L3_E1_EC_or_EE_EF; L3_E1_EC_or_EE_EF; L3_E1_EC_or_EE_EF;
-    L3_E1_EC_or_EE_EF; L3_E1_EC_or_EE_EF; L3_E1_EC_or_EE_EF; L3_E1_EC_or_EE_EF;
-    L3_E1_EC_or_EE_EF; L3_E1_EC_or_EE_EF; L3_E1_EC_or_EE_EF; L3_E1_EC_or_EE_EF;
-    L3_E1_EC_or_EE_EF; L3_ED;L3_E1_EC_or_EE_EF; L3_E1_EC_or_EE_EF;
-    L4_F0; L4_F1_F3; L4_F1_F3; L4_F1_F3; L4_F4; E; E; E; E; E; E; E; E; E; E; E;
-  |]
-end
+  type decode = int
 
-(* UTF-8 text decoder *)
+  let sot = 0x110000  (* start of text U+10FFFF + 1 *)
+  let eot = 0x110001  (* end of text   U+10FFFF + 2 *)
 
-module Tdec = struct
-  type 'a fmt = Format.formatter -> 'a -> unit
-  let pp_did_you_mean = Err_msg.pp_did_you_mean
-  let pp_and_enum = Err_msg.pp_and_enum
-  let pp_or_enum = Err_msg.pp_or_enum
-  let pp_did_you_mean = Err_msg.pp_did_you_mean
-  let pp_must_be = Err_msg.pp_must_be
-  let pp_unknown = Err_msg.pp_unknown
-  let pp_unknown' = Err_msg.pp_unknown'
+  let needs_escape = function
+  | u when 0x0000 <= u && u <= 0x001F -> true (* C0 control characters *)
+  | u when 0x0080 <= u && u <= 0x009F -> true (* C1 control characters *)
+  | 0x2028 (* line separator *) | 0x2029 (* paragraph separator *)
+  | 0x200E (* left-to-right mark *) | 0x200F (* right-to-left mark *) -> true
+  | _ -> false
+
+  let pp_decode ppf = function
+  | 0x110000 -> Format.pp_print_string ppf "start of text"
+  | 0x110001 -> Format.pp_print_string ppf "end of text"
+  | u when needs_escape u -> Format.fprintf ppf "U+%04X" u
+  | u ->
+      let uchar = Uchar.of_int u in
+      let utf8 =
+        let b = Bytes.create (Uchar.utf_8_byte_length uchar) in
+        ignore (Bytes.set_utf_8_uchar b 0 uchar); Bytes.unsafe_to_string b
+      in
+      Format.fprintf ppf "'@<1>%s' (U+%04X)" utf8 u
 
   (* Decoders *)
 
   type t =
-    { file : Tloc.fpath; i : string; tok : Buffer.t;
-      mutable pos : int; mutable line : int; mutable line_pos : int; }
+    { file : string;
+      i : string;
+      mutable current : decode; (* Current scalar value or sot or eot *)
+      mutable is_error : bool;
+      mutable next : Textloc.byte_pos; (* Next character byte position. *)
+      mutable line_num : Textloc.line_num;
+      mutable line_start : Textloc.byte_pos; (* Line first byte *)
+      mutable prev_line_start : Textloc.byte_pos; (* Previous line first byte *)
+      lexeme : Buffer.t; }
 
-  let create ?(file = Tloc.no_file) i =
-    { file; i; tok = Buffer.create 255; pos = 0; line = 1; line_pos = 0 }
+  let make ?(file = "-") i =
+    let lexeme = Buffer.create 255 in
+    let current = sot and is_error = false in
+    { file; i; current; is_error; next = 0; line_num = 1;
+      line_start = 0; prev_line_start = 0; lexeme }
 
-  (* Location *)
+  let input d = d.i
+  let file d = d.i
+  let[@inline] current d = d.current
+  let[@inline] is_error d = d.is_error
+  let next d =
+    if d.next >= String.length d.i
+    then (d.current <- eot; d.is_error <- false) else
+    begin
+      let udec = String.get_utf_8_uchar d.i d.next in
+      let u = Uchar.to_int (Uchar.utf_decode_uchar udec) in
+      d.is_error <- not (Uchar.utf_decode_is_valid udec);
+      d.next <- d.next + Uchar.utf_decode_length udec;
+      begin match u with
+      | 0x000D (* CR *) ->
+          d.line_num <- d.line_num + 1;
+          d.prev_line_start <- d.line_start;
+          d.line_start <- d.next;
+      | 0x000A (* LF *) ->
+          if d.current <> 0x000D then begin
+            d.line_num <- d.line_num + 1;
+            d.prev_line_start <- d.line_start;
+          end;
+          d.line_start <- d.next;
+      | _ -> ()
+      end;
+      d.current <- u
+    end
 
-  let file d = d.file
-  let pos d = d.pos
-  let line d = d.line, d.line_pos
+  (* Byte positions *)
 
-  let loc d ~sbyte ~ebyte ~sline ~eline =
-    Tloc.v ~file:d.file ~sbyte ~ebyte ~sline ~eline
+  let first_byte_pos d =
+    if d.current = sot then 0 else
+    if d.current = eot then String.length d.i else
+    d.next - Uchar.utf_8_byte_length (Uchar.unsafe_of_int d.current)
 
-  let loc_to_here d ~sbyte ~sline =
-    loc d ~sbyte ~ebyte:d.pos ~sline ~eline:(d.line, d.line_pos)
+  let last_byte_pos d =
+    if d.current = sot then 0 else
+    if d.current = eot then String.length d.i else
+    d.next - 1
 
-  let loc_here d = loc_to_here d ~sbyte:d.pos ~sline:(d.line, d.line_pos)
+  let prev_decode_last_byte_pos d =
+    if d.current = sot then 0 else
+    if d.current = eot then String.length d.i - 1 else
+    let prev = d.next - Uchar.utf_8_byte_length (Uchar.of_int d.current) - 1 in
+    if prev < 0 then 0 else prev
 
-  (* Errors *)
+  let[@inline] line_num d = d.line_num
+  let[@inline] line_start d = d.line_start
+  let[@inline] line_pos d = line_num d, line_start d
+  let[@inline] prev_line_num d = if d.line_num = 1 then 1 else d.line_num - 1
+  let[@inline] prev_line_start d = d.prev_line_start
+  let[@inline] prev_line_pos d = prev_line_num d, prev_line_start d
+  let[@inline] pos d = first_byte_pos d, line_pos d
+  let textloc d =
+    let first_byte = first_byte_pos d and first_line = line_pos d in
+    let last_byte = last_byte_pos d and last_line = first_line in
+    Textloc.make ~file:d.file ~first_byte ~last_byte ~first_line ~last_line
 
-  exception Err of Tloc.t * string
+  let textloc_span d ~start:(first_byte, first_line) =
+    let last_byte = last_byte_pos d and last_line = line_pos d in
+    Textloc.make ~file:d.file ~first_byte ~last_byte ~first_line ~last_line
 
-  let err loc msg = raise_notrace (Err (loc, msg))
-  let err_to_here d ~sbyte ~sline fmt =
-    Format.kasprintf (err (loc_to_here d ~sbyte ~sline)) fmt
-
-  let err_here d fmt = Format.kasprintf (err (loc_here d)) fmt
-  let err_suggest = Err_msg.suggest
-
-  (* Lexing *)
-
-  let incr_line d = match d.i.[d.pos] with (* assert (not (eoi d)) *)
-  | '\r' -> d.line <- d.line + 1; d.line_pos <- d.pos + 1
-  | '\n' ->
-      (if d.pos = 0 || d.i.[d.pos - 1] <> '\r' then d.line <- d.line + 1);
-      d.line_pos <- d.pos + 1;
-  | _ -> ()
-  [@@ ocaml.inline]
-
-  let eoi d = d.pos >= String.length d.i [@@ ocaml.inline]
-  let byte d = if eoi d then 0xFFFF else Char.code d.i.[d.pos] [@@ ocaml.inline]
-  let accept_byte d = incr_line d; d.pos <- d.pos + 1
-  [@@ ocaml.inline]
-
-  let accept_utf_8 accept d =
-    let err d = match byte d with
-    | 0xFFFF -> err_here d "UTF-8 decoding error: unexpected end of input"
-    | b -> err_here d "UTF-8 decoding error: byte %02x illegal here" b
+  let textloc_span_to_prev_decode d ~start:(first_byte, first_line) =
+    let last_byte = prev_decode_last_byte_pos d in
+    let last_line =
+      if (d.current = 0x000D) ||
+         (d.current = 0x000A && last_byte > 0 && d.i.[last_byte] <> '\x0D')
+      then prev_line_pos d else line_pos d
     in
-    let accept_tail d = if (byte d lsr 6 = 0b10) then accept d else err d in
-    match byte d with
-    | 0xFFFF -> err d
-    | b ->
-        (* If a subsequent [byte d] invocation is 0xFFFF we get to [err]. *)
-        match Utf_8.case.(b) with
-        | L1 -> accept d
-        | L2 -> accept d; accept_tail d
-        | L3_E0 ->
-            accept d;
-            if (byte d - 0xA0 < 0xBF - 0xA0) then accept d else err d;
-            accept_tail d
-        | L3_E1_EC_or_EE_EF -> accept d; accept_tail d; accept_tail d
-        | L3_ED ->
-            accept d;
-            if (byte d - 0x80 < 0x9F - 0x80) then accept d else err d;
-            accept_tail d
-        | L4_F0 ->
-            accept d;
-            if (byte d - 0x90 < 0xBF - 0x90) then accept d else err d;
-            accept_tail d; accept_tail d
-        | L4_F1_F3 ->
-            accept d;
-            accept_tail d; accept_tail d; accept_tail d;
-        | L4_F4 ->
-            accept d;
-            if (byte d - 0x80 < 0x8F - 0x80) then accept d else err d;
-        | E -> err d
+    Textloc.make ~file:d.file ~first_byte ~last_byte ~first_line ~last_line
 
-  let accept_uchar d = accept_utf_8 accept_byte d
+  (* Lexeme buffer *)
 
-  (* Tokenizer *)
-
-  let tok_reset d = Buffer.reset d.tok [@@ ocaml.inline]
-  let tok_pop d = let t = Buffer.contents d.tok in tok_reset d; t
-  [@@ ocaml.inline]
-
-  let tok_accept_byte d =
-    Buffer.add_char d.tok d.i.[d.pos]; accept_byte d; [@@ ocaml.inline]
-
-  let tok_accept_uchar d = accept_utf_8 tok_accept_byte d [@@ ocaml.inline]
-  let tok_add_byte d b = Buffer.add_char d.tok (Char.chr b) [@@ ocaml.inline]
-  let tok_add_bytes d s = Buffer.add_string d.tok s [@@ ocaml.inline]
-  let tok_add_char d c = Buffer.add_char d.tok c [@@ ocaml.inline]
-
-  let buffer_add_uchar b u = match Uchar.to_int u with
-  (* XXX From 4.06 use Buffer.add_utf_8_uchar *)
-  | u when u < 0 -> assert false
-  | u when u <= 0x007F ->
-      Buffer.add_char b (Char.unsafe_chr u)
-  | u when u <= 0x07FF ->
-      Buffer.add_char b (Char.unsafe_chr (0xC0 lor (u lsr 6)));
-      Buffer.add_char b (Char.unsafe_chr (0x80 lor (u land 0x3F)));
-  | u when u <= 0xFFFF ->
-      Buffer.add_char b (Char.unsafe_chr (0xE0 lor (u lsr 12)));
-      Buffer.add_char b (Char.unsafe_chr (0x80 lor ((u lsr 6) land 0x3F)));
-      Buffer.add_char b (Char.unsafe_chr (0x80 lor (u land 0x3F)));
-  | u when u <= 0x10FFFF ->
-      Buffer.add_char b (Char.unsafe_chr (0xF0 lor (u lsr 18)));
-      Buffer.add_char b (Char.unsafe_chr (0x80 lor ((u lsr 12) land 0x3F)));
-      Buffer.add_char b (Char.unsafe_chr (0x80 lor ((u lsr 6) land 0x3F)));
-      Buffer.add_char b (Char.unsafe_chr (0x80 lor (u land 0x3F)))
-  | _ -> assert false
-
-  let tok_add_uchar d u = buffer_add_uchar d.tok u
+  let lexeme_clear d = Buffer.clear d.lexeme
+  let lexeme_pop d = let t = Buffer.contents d.lexeme in lexeme_clear d; t
+  let lexeme_add d u = Buffer.add_utf_8_uchar d.lexeme u
 end

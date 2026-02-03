@@ -18,7 +18,7 @@ module Json : sig
 
   (** {1:json JSON text} *)
 
-  type meta = Tloc.t
+  type meta = Textloc.t
   (** The type for node metadata. *)
 
   val meta_none : meta
@@ -59,6 +59,10 @@ module Json : sig
       {- Strings are compared byte wise.}
       {- Objects members are sorted before being compared.}
       {- meta values are ignored.}} *)
+
+  val normalize : t -> t
+  (** [normalize j] normalizes JSON [j] by sorting object's
+      members by name using {!String.compare}. *)
 
   (** {1:cons Constructors} *)
 
@@ -114,7 +118,7 @@ module Json : sig
 
   (** {1:codec Codec} *)
 
-  val of_string : ?file:Tloc.fpath -> string -> (t, string) result
+  val of_string : ?file:Textloc.filepath -> string -> (t, string) result
   (** [of_string s] parses JSON text from [s] according to
       {{:https://tools.ietf.org/html/rfc8259}RFC8259} with the following
       limitations:
@@ -312,11 +316,11 @@ module Jsonq : sig
   val json : Json.t t
   (** [json] queries any JSON value and returns it. *)
 
-  val loc : Json.meta t
-  (** [loc]is [map Sexp.loc sexp]. *)
+  val meta : Json.meta t
+  (** [loc] is [map Json.meta sexp]. *)
 
-  val with_loc : 'a t -> ('a * Json.meta) t
-  (** [with_loc q] queries with [q] and returns the result with the
+  val with_meta : 'a t -> ('a * Json.meta) t
+  (** [with_meta q] queries with [q] and returns the result with the
       location of the queried JSON value. *)
 
   (** {1:nulls Nulls} *)

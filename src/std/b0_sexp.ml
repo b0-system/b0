@@ -14,19 +14,27 @@ open B0_text
    {- Devise a way to [pp] absent layout according to context}
    {- Revise empty paths.} *)
 
+let string_subrange ?(first = 0) ?last s =
+  let max = String.length s - 1 in
+  let last = match last with
+  | None -> max
+  | Some l when l > max -> max
+  | Some l -> l
+  in
+  let first = if first < 0 then 0 else first in
+  if first > last then "" else
+  String.sub s first (last - first + 1)
+
 module Sexp = struct
 
   (* Meta information *)
 
-  type loc = Tloc.t
-  let pp_loc = Tloc.pp
-
   type a_meta =
-    { a_loc : loc; a_quoted : string option; a_before : string;
+    { a_loc : Textloc.t; a_quoted : string option; a_before : string;
       a_after : string }
 
   type l_meta =
-    { l_loc : loc; l_before : string; l_start : string; l_end : string;
+    { l_loc : Textloc.t; l_before : string; l_start : string; l_end : string;
       l_after : string }
 
   let a_meta_loc a_loc =
@@ -35,9 +43,8 @@ module Sexp = struct
   let l_meta_loc l_loc =
     { l_loc; l_before = ""; l_start = ""; l_end = ""; l_after = "" }
 
-  let loc_nil = Tloc.nil
-  let a_meta_nil = a_meta_loc loc_nil
-  let l_meta_nil = l_meta_loc loc_nil
+  let a_meta_nil = a_meta_loc Textloc.none
+  let l_meta_nil = l_meta_loc Textloc.none
 
   (* S-expressions *)
 
@@ -52,7 +59,7 @@ module Sexp = struct
   let loc = function `A (_, p) -> p.a_loc | `L (_, p) -> p.l_loc
   let kind = function `A (_, _) -> "atom" | `L (_, _) -> "list"
   let err_exp exp fnd =
-    Format.asprintf "%a: %s but expected %s" Tloc.pp (loc fnd) (kind fnd) exp
+    Format.asprintf "%a: %s but expected %s" Textloc.pp (loc fnd) (kind fnd) exp
 
   let err_exp_atom s = err_exp "atom" s
   let err_exp_list s = err_exp "list" s
@@ -69,13 +76,23 @@ module Sexp = struct
 
   (* Decode *)
 
+  (* Errors *)
+
+  exception Error of Textloc.t * string
+
+  let err loc msg = raise_notrace (Error (loc, msg))
+  let err_span d ~start fmt =
+    Format.kasprintf (err (Textdec.textloc_span d ~start)) fmt
+
+  let err_here d fmt = Format.kasprintf (err (Textdec.textloc d)) fmt
+
   type error_kind = string (* FIXME eventually move to a variant *)
   let pp_error_kind () = Format.pp_print_string
 
-  type error = error_kind * loc
+  type error = error_kind * Textloc.t
   let pp_prefix ppf () = Format.pp_print_string ppf "Error: "
   let pp_error
-      ?(pp_loc = Tloc.pp) ?(pp_error_kind = pp_error_kind ())
+      ?(pp_loc = Textloc.pp) ?(pp_error_kind = pp_error_kind ())
       ?(pp_prefix = pp_prefix) () ppf (k, l)
     =
     Format.fprintf ppf "@[<v>%a:@,%a%a@]" pp_loc l pp_prefix () pp_error_kind k
@@ -83,100 +100,98 @@ module Sexp = struct
   let error_to_string ?(pp_error = pp_error ()) = function
   | Ok _ as v -> v | Error e -> Error (Format.asprintf "%a" pp_error e)
 
-  let curr_char d = (* TODO better escaping (this is for error reports) *)
-    Tdec.tok_reset d; Tdec.tok_accept_uchar d; Tdec.tok_pop d
-
-  let err_eoi msg d ~sbyte ~sline =
-    Tdec.err_to_here d ~sbyte ~sline "end of input: %s" msg
+  let err_eoi msg d ~start = err_span d ~start "end of input: %s" msg
 
   let err_eoi_qtoken = err_eoi "unclosed quoted atom"
   let err_eoi_list = err_eoi "unclosed list"
   let err_eoi_esc = err_eoi "truncated escape"
-  let err_illegal_uchar d b = Tdec.err_here d "illegal character U+%04X" b
-  let err_rpar d = Tdec.err_here d "mismatched right parenthesis ')'"
+  let err_illegal_uchar d b = err_here d "illegal character U+%04X" b
+  let err_rpar d = err_here d "mismatched right parenthesis ')'"
 
-  let err_esc_exp_hex d ~sbyte ~sline =
-    Tdec.err_to_here d ~sbyte ~sline
-      "%s: illegal Unicode escape: expected an hexadecimal digit" (curr_char d)
+  let err_esc_exp_hex d ~start u =
+    err_span d ~start
+      "%a: Illegal Unicode escape: expected an hexadecimal digit"
+      Textdec.pp_decode u
 
-  let err_esc_uchar d ~sbyte ~sline code =
-    Tdec.err_to_here d ~sbyte ~sline
-      "illegal Unicode escape: %04X is not a Unicode character" code
+  let err_esc_uchar d ~start code =
+    err_span d ~start
+      "Illegal Unicode escape: %04X is not a Unicode character" code
 
-  let err_esc_illegal d ~sbyte ~sline pre =
-    Tdec.err_to_here d ~sbyte ~sline "%s%s: illegal escape" pre (curr_char d)
+  let err_esc_illegal d ~start pre u =
+    err_span d ~start "%s%a: illegal escape" pre Textdec.pp_decode u
 
-  let err_esc_uchar_end d ~sbyte ~sline =
-    Tdec.err_to_here d ~sbyte ~sline
-      "%s: illegal Unicode escape: expected end of escape '}'"
-      (curr_char d)
+  let err_esc_uchar_end d ~start u =
+    err_span d ~start
+      "%a: illegal Unicode escape: expected end of escape '}'"
+      Textdec.pp_decode u
 
   let err_esc_char d =
-    Tdec.err_here d "escape character '^' illegal outside quoted atoms"
+    err_here d "escape character '^' illegal outside quoted atoms"
 
-  let dec_byte d = match Tdec.byte d with
-  | c when 0x00 <= c && c <= 0x08 || 0x0E <= c && c <= 0x1F || c = 0x7F ->
-      err_illegal_uchar d c
-  | c -> c
-  [@@ ocaml.inline]
+  let nextc d =
+    Textdec.next d;
+    if Textdec.is_error d then err_here d "UTF-8 decoding error"
 
-  let rec skip_white d = match dec_byte d with
-  | 0x20 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D -> Tdec.accept_byte d; skip_white d
+  let uchar = Uchar.unsafe_of_int
+
+  let rec skip_white d = match Textdec.current d with
+  | 0x20 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D -> nextc d; skip_white d
   | _ -> ()
 
-  let dec_skip_as_tok d = (* skip white and comment, but tokenize it *)
-    let rec skip d = match dec_byte d with
-    | 0x20 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D -> Tdec.tok_accept_byte d; skip d
-    | 0x3B (* ; *) -> Tdec.tok_accept_byte d; skip_comment d
+  let decode_skip d = (* skip white and comment, but tokenize it *)
+    let rec skip d = match Textdec.current d with
+    | 0x20 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D as u ->
+        Textdec.lexeme_add d (uchar u); nextc d; skip d
+    | 0x3B (* ; *) as u ->
+        Textdec.lexeme_add d (uchar u); nextc d; skip_comment d
     | _ -> ()
-    and skip_comment d = match dec_byte d with
-    | 0x0A | 0x0D -> Tdec.tok_accept_byte d; skip d
-    | 0xFFFF -> ()
-    | _ -> Tdec.tok_accept_uchar d; skip_comment d
+    and skip_comment d = match Textdec.current d with
+    | 0x0A | 0x0D as u -> Textdec.lexeme_add d (uchar u); nextc d; skip d
+    | 0x11_0001 -> ()
+    | u -> Textdec.lexeme_add d (uchar u); nextc d; skip_comment d
     in
     skip d
 
-  let rec dec_uchar_esc d ~sbyte ~sline =
-    match (Tdec.accept_byte d; dec_byte d) with
+  let rec decode_uchar_escape d ~start =
+    match (nextc d; Textdec.current d) with
     | 0x7B (* { *)  ->
-        let rec loop d acc count = match (Tdec.accept_byte d; dec_byte d) with
-        | c when count > 6 -> err_esc_uchar_end d ~sbyte ~sline
-        | c when 0x30 <= c && c <= 0x39 ->
-            loop d (acc * 16 + c - 0x30) (count + 1)
-        | c when 0x41 <= c && c <= 0x46 ->
-            loop d (acc * 16 + c - 0x37) (count + 1)
-        | c when 0x61 <= c && c <= 0x66 ->
-            loop d (acc * 16 + c - 0x57) (count + 1)
-        | 0x7D when count = 0 -> err_esc_exp_hex d ~sbyte ~sline
-        | 0x7D when not (Uchar.is_valid acc) ->
-            err_esc_uchar d ~sbyte ~sline acc
-        | 0x7D ->
-            Tdec.accept_byte d; Tdec.tok_add_uchar d (Uchar.unsafe_of_int acc);
-        | 0xFFFF -> err_eoi_esc d ~sbyte ~sline
-        | _ -> err_esc_exp_hex d ~sbyte ~sline
+        let rec loop d ~start acc count =
+          match (nextc d; Textdec.current d) with
+          | c when count > 6 -> err_esc_uchar_end d ~start c
+          | c when 0x30 <= c && c <= 0x39 ->
+              loop d ~start (acc * 16 + c - 0x30) (count + 1)
+          | c when 0x41 <= c && c <= 0x46 ->
+              loop d ~start (acc * 16 + c - 0x37) (count + 1)
+          | c when 0x61 <= c && c <= 0x66 ->
+              loop d ~start (acc * 16 + c - 0x57) (count + 1)
+          | 0x7D as u when count = 0 -> err_esc_exp_hex d ~start u
+          | 0x7D when not (Uchar.is_valid acc) ->
+              err_esc_uchar d ~start acc
+          | 0x7D -> Textdec.lexeme_add d (uchar acc); nextc d
+          | 0x11_0001 -> err_eoi_esc d ~start
+          | u -> err_esc_exp_hex d ~start u
         in
-        loop d 0 0
-    | 0xFFFF -> err_eoi_esc d ~sbyte ~sline
-    | c -> err_esc_illegal d ~sbyte ~sline "^u"
+        loop d ~start 0 0
+    | 0x11_0001 -> err_eoi_esc d ~start
+    | u -> err_esc_illegal d ~start "^u" u
 
-  let rec dec_esc d =
-    let sbyte = Tdec.pos d and sline = Tdec.line d in
-    match (Tdec.accept_byte d; dec_byte d) with
-    | 0x22 -> Tdec.accept_byte d; Tdec.tok_add_char d '"'
-    | 0x5E -> Tdec.accept_byte d; Tdec.tok_add_char d '^'
-    | 0x6E -> Tdec.accept_byte d; Tdec.tok_add_char d '\n'
-    | 0x72 -> Tdec.accept_byte d; Tdec.tok_add_char d '\r'
-    | 0x20 -> Tdec.accept_byte d; Tdec.tok_add_char d ' '
-    | 0x75 -> dec_uchar_esc d ~sbyte ~sline
+  let rec decode_escape d =
+    let start = Textdec.pos d in
+    match (nextc d; Textdec.current d) with
+    | 0x22 -> Textdec.lexeme_add d (Uchar.of_char '"'); nextc d
+    | 0x5E -> Textdec.lexeme_add d (Uchar.of_char '^'); nextc d
+    | 0x6E -> Textdec.lexeme_add d (Uchar.of_char '\n'); nextc d
+    | 0x72 -> Textdec.lexeme_add d (Uchar.of_char '\r'); nextc d
+    | 0x20 -> Textdec.lexeme_add d (Uchar.of_char ' '); nextc d
+    | 0x75 -> decode_uchar_escape d ~start
     | 0x0A | 0x0D -> (* continuation line *) skip_white d
-    | 0xFFFF -> err_eoi_esc d ~sbyte ~sline
-    | _ -> err_esc_illegal d ~sbyte ~sline "^"
+    | 0x11_0001 -> err_eoi_esc d ~start
+    | u -> err_esc_illegal d ~start "^" u
 
   let rec dec_qtoken d ws =
-    let sbyte = Tdec.pos d and sline = Tdec.line d in
-    let rec loop d = match dec_byte d with
+    let rec loop ~start d = match Textdec.current d with
     | 0x22 ->
-        let a = Tdec.tok_pop d in
+        let a = Textdec.lexeme_pop d in
         let a_quoted =
           (* TODO this should preserve escapes. It seems we are better
              off to simply tokenize without escaping and then parse the
@@ -184,33 +199,32 @@ module Sexp = struct
              decoder ? *)
           Some a
         in
-        let a_loc = Tdec.loc_to_here d ~sbyte ~sline in
+        let a_loc = Textdec.textloc_span d ~start in
         let m = { a_loc; a_quoted; a_before = ws; a_after = "" } in
-        Tdec.accept_byte d; `A (a, m)
-    | 0x5E -> dec_esc d; loop d
-    | 0xFFFF -> err_eoi_qtoken d ~sbyte ~sline
-    | _ -> Tdec.tok_accept_uchar d; loop d
+        nextc d; `A (a, m)
+    | 0x5E -> decode_escape d; loop ~start d
+    | 0x11_0001 -> err_eoi_qtoken d ~start
+    | u -> Textdec.lexeme_add d (uchar u); loop ~start d
     in
-    Tdec.accept_byte d; loop d
+    let start = Textdec.pos d in
+    nextc d; loop d ~start
 
-  and dec_token d ws =
-    let sbyte = Tdec.pos d and sline = Tdec.line d in
-    let rec loop d = match dec_byte d with
+  and decode_token d ws =
+    let rec loop d ~start = match Textdec.current d with
     | 0x28 | 0x29 | 0x3B | 0x22
     | 0x20 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D
-    | 0xFFFF ->
-        let ebyte = Tdec.pos d - 1 in
-        let eline = Tdec.line d in
-        let a_loc = Tdec.loc d ~sbyte ~ebyte ~sline ~eline in
+    | 0x11_0001 ->
+        let a_loc = Textdec.textloc_span_to_prev_decode d ~start in
         let m = { a_loc; a_quoted = None; a_before = ws; a_after = "" } in
-        `A (Tdec.tok_pop d, m)
+        `A (Textdec.lexeme_pop d, m)
     | 0x5E -> err_esc_char d
-    | _ -> Tdec.tok_accept_uchar d; loop d
+    | u -> Textdec.lexeme_add d (uchar u); nextc d; loop d ~start
     in
-    loop d
+    let start = Textdec.pos d in
+    loop d ~start
 
   and dec_eoi d stack ews acc = match stack with
-  | (sbyte, sline, sws, _) :: [] ->
+  | (start, sws, _) :: [] ->
       begin match acc with
       | [] ->
           (* There's a tricky bit here. If sws is a comment followed
@@ -220,7 +234,10 @@ module Sexp = struct
              pp layout without update changing anything so we simply
              put the comment in l_after. This means that edits
              will occur before the comment. *)
-          let l_loc = Tdec.loc d ~sbyte:0 ~ebyte:0 ~sline:(1,0) ~eline:(1,0) in
+          let l_loc =
+            Textloc.make ~file:(Textdec.file d)
+              ~first_byte:0 ~last_byte:0 ~first_line:(1,0) ~last_line:(1,0)
+          in
           let l_after = String.concat "" [sws; ews] in
           let m = { l_loc; l_before = ""; l_start = ""; l_end = ""; l_after } in
           `L ([], m)
@@ -228,43 +245,43 @@ module Sexp = struct
           let eloc = loc (List.hd acc) in
           let acc = List.rev acc in
           let sloc = loc (List.hd acc) in
-          let l_loc = Tloc.merge sloc eloc  in
+          let l_loc = Textloc.reloc ~first:sloc ~last:eloc  in
           let m =
             { l_loc; l_before = sws; l_start = ""; l_end = ""; l_after = ews }
           in
           `L (acc, m)
       end
-  | (sbyte, sline, _, _) :: locs -> err_eoi_list d ~sbyte ~sline
+  | (start, _, _) :: locs -> err_eoi_list d ~start
   | [] -> assert false
 
-  and dec_sexp_seq d stack acc =
-    let ws = (dec_skip_as_tok d; Tdec.tok_pop d) in
-    match dec_byte d with
+  and decode_sexp_seq d stack acc =
+    let ws = (decode_skip d; Textdec.lexeme_pop d) in
+    match Textdec.current d with
     | 0x28 ->
-        let stack = (Tdec.pos d, Tdec.line d, ws, acc) :: stack in
-        Tdec.accept_byte d; dec_sexp_seq d stack []
+        let stack = (Textdec.pos d, ws, acc) :: stack in
+        nextc d; decode_sexp_seq d stack []
     | 0x29 ->
         begin match stack with
-        | (sbyte, sline, _, _) :: [] -> err_rpar d
-        | (sbyte, sline, l_before, prev_acc) :: stack ->
-            let ebyte = Tdec.pos d and eline = Tdec.line d in
-            let l_loc = Tdec.loc d ~sbyte ~ebyte ~sline ~eline in
-            let m = { l_loc; l_before; l_start = ""; l_end = ws; l_after = "" }
+        | (start, _, _) :: [] -> err_rpar d
+        | (start, l_before, prev_acc) :: stack ->
+            let l_loc = Textdec.textloc_span d ~start in
+            let m =
+              { l_loc; l_before; l_start = ""; l_end = ws; l_after = "" }
             in
             let acc = `L (List.rev acc, m) :: prev_acc in
-            Tdec.accept_byte d; dec_sexp_seq d stack acc
+            nextc d; decode_sexp_seq d stack acc
         | [] -> assert false
         end
-    | 0xFFFF -> dec_eoi d stack ws acc
-    | 0x22 -> dec_sexp_seq d stack (dec_qtoken d ws :: acc)
-    | _ -> dec_sexp_seq d stack (dec_token d ws :: acc)
+    | 0x11_0001 -> dec_eoi d stack ws acc
+    | 0x22 -> decode_sexp_seq d stack (dec_qtoken d ws :: acc)
+    | _ -> decode_sexp_seq d stack (decode_token d ws :: acc)
 
-  let seq_of_string ?(file = Tloc.no_file) s =
+  let seq_of_string ?file s =
     try
-      let d = Tdec.create ~file s in
-      let before = (dec_skip_as_tok d; Tdec.tok_pop d) in
-      Ok (dec_sexp_seq d [(0, (1, 0), before, [])] [])
-    with Tdec.Err (loc, msg) -> Error (msg, loc)
+      let d = Textdec.make ?file s in
+      let before = (Textdec.next d; decode_skip d; Textdec.lexeme_pop d) in
+      Ok (decode_sexp_seq d [((0, (1, 0)), before, [])] [])
+    with Error (loc, msg) -> Result.Error (msg, loc)
 
   let seq_of_string' ?pp_error ?file s =
     error_to_string ?pp_error (seq_of_string ?file s)
@@ -477,7 +494,7 @@ module Sexp = struct
   let path_err_unexp_char i s = path_err i "unexpected character: %C" s.[i]
   let path_err_illegal_char i s = path_err i "illegal character here: %C" s.[i]
   let err_unexp i s =
-    path_err i "unexpected input: %S" (Tloc.string_subrange ~first:i s)
+    path_err i "unexpected input: %S" (string_subrange ~first:i s)
 
   let path_parse_eoi s i max = if i > max then () else err_unexp i s
   let path_parse_index p s i max =
@@ -493,7 +510,7 @@ module Sexp = struct
       in
       loop stop s first max
     in
-    let idx = Tloc.string_subrange ~first ~last s in
+    let idx = string_subrange ~first ~last s in
     if idx = "" then path_err first "illegal empty index" else
     match int_of_string idx with
     | exception Failure _ -> next, (Key idx) :: p
@@ -572,11 +589,11 @@ module Sexpq = struct
 
   (* Result paths *)
 
-  type path = (Sexp.index * Sexp.loc) list (* reversed *)
+  type path = (Sexp.index * Textloc.t) list (* reversed *)
   let push_nth n v p = (Sexp.Nth n, Sexp.loc v) :: p
   let push_key k b p = (Sexp.Key k, Sexp.loc b) :: p
 
-  let pp_path ?(pp_loc = Sexp.pp_loc) ?(pp_key = Sexp.pp_key) () ppf p =
+  let pp_path ?(pp_loc = Textloc.pp) ?(pp_key = Sexp.pp_key) () ppf p =
     let pp_index pp_key ppf = function
     | Sexp.Key k, l -> pf ppf "%a: in key %a" pp_loc l pp_key k
     | Sexp.Nth i, l -> pf ppf "%a: at index %d" pp_loc l i
@@ -596,11 +613,13 @@ module Sexpq = struct
     = function
     | `Key_unbound (k, ks) ->
         let binds pp_v ppf l =
-          pf ppf "This@ dictionary@ only@ binds@ %a." (Tdec.pp_and_enum pp_v) l
+          pf ppf "This@ dictionary@ only@ binds@ %a."
+            (B0_std.Fmt.and_enum pp_v) l
         in
-        let hint, ks = match Tdec.err_suggest ks k with
+        let dict yield = List.iter yield ks in
+        let hint, ks = match B0_std.String.spellcheck dict k with
         | [] -> binds, ks
-        | ks -> Tdec.pp_did_you_mean, ks
+        | ks -> B0_std.Fmt.did_you_mean, ks
         in
         pf ppf "@[Key %a unbound@].@ %a" pp_key k (hint pp_key) ks
     | `Msg m -> pp_lines ppf m
@@ -615,16 +634,17 @@ module Sexpq = struct
         end
     | `Out_of_dom (kind, s, ss) ->
         let kind ppf () = Format.pp_print_string ppf kind in
-        let hint, ss = match Tdec.err_suggest ss s with
-        | [] -> Tdec.pp_must_be, ss
-        | ss -> Tdec.pp_did_you_mean, ss
+        let dict yield = List.iter yield ss in
+        let hint, ss = match B0_std.String.spellcheck dict s with
+        | [] -> B0_std.Fmt.must_be, ss
+        | ss -> B0_std.Fmt.did_you_mean, ss
         in
-        pf ppf "@[%a@]" (Tdec.pp_unknown' ~kind pp_em ~hint) (s, ss)
+        pf ppf "@[%a@]" (B0_std.Fmt.unknown' ~kind pp_em ~hint) (s, ss)
 
-  type error = error_kind * (path * Sexp.loc)
+  type error = error_kind * (path * Textloc.t)
   let pp_prefix ppf () = Format.pp_print_string ppf "Error: "
   let pp_error
-      ?(pp_loc = Sexp.pp_loc) ?(pp_path = pp_path ~pp_loc ())
+      ?(pp_loc = Textloc.pp) ?(pp_path = pp_path ~pp_loc ())
       ?(pp_error_kind = pp_error_kind ()) ?(pp_prefix = pp_prefix) ()
       ppf (k, (p, loc))
     =
@@ -743,7 +763,7 @@ module Sexpq = struct
   let tl q p = function
   | `L (_ :: [], m) -> q p (`L ([], Sexp.l_meta_loc m.Sexp.l_loc))
   | `L (_ :: (v :: _ as s), m) ->
-      let l_loc = Tloc.restart ~at:(Tloc.to_start (Sexp.loc v)) m.Sexp.l_loc in
+      let l_loc = Textloc.reloc ~first:(Sexp.loc v) ~last:m.Sexp.l_loc in
       q p (`L (s, Sexp.l_meta_loc l_loc))
   | `L ([], m) -> err_empty_list p m.Sexp.l_loc
   | `A (_, _) as s -> err_exp_list p s
@@ -806,8 +826,11 @@ module Sexpq = struct
 
   let key_value_fake_list vs bmeta =
     let fake_list_loc bmeta = function
-    | [] -> (* XXX problem span emptyness... *) Tloc.to_end bmeta.Sexp.l_loc
-    | vs -> Tloc.merge (Sexp.loc (List.hd vs)) (Sexp.loc List.(hd (rev vs)))
+    | [] -> (* XXX problem span emptyness... *) Textloc.to_last bmeta.Sexp.l_loc
+    | vs ->
+        let first = Sexp.loc (List.hd vs) in
+        let last = Sexp.loc List.(hd (rev vs)) in
+        Textloc.reloc ~first ~last
     in
     `L (vs, Sexp.l_meta_loc (fake_list_loc bmeta vs))
 

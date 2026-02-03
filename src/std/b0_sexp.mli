@@ -36,15 +36,6 @@ module Sexp : sig
   type 'a fmt = Format.formatter -> 'a -> unit
   (** The type for formatting functions. *)
 
-  type loc = Tloc.t
-  (** The type for source text locations. *)
-
-  val loc_nil : Tloc.t
-  (** [loc_nil] is a source text location for non-parsed s-expressions. *)
-
-  val pp_loc : loc fmt
-  (** [pp_loc] is {!Tloc.pp}. *)
-
   type a_meta
   (** The type for meta information about atoms. *)
 
@@ -71,7 +62,7 @@ module Sexp : sig
 
   (** {1:access Accessors} *)
 
-  val loc : t -> loc
+  val loc : t -> Textloc.t
   (** [loc s] is [s]'s source text location. *)
 
   val to_atom : t -> (string, string) result
@@ -122,11 +113,11 @@ module Sexp : sig
   val pp_error_kind : unit -> error_kind fmt
   (** [pp_error_kind ()] formats an error kind. *)
 
-  type error = error_kind * loc
+  type error = error_kind * Textloc.t
   (** The type for decoding errors. *)
 
   val pp_error :
-    ?pp_loc:loc fmt -> ?pp_error_kind:error_kind fmt ->
+    ?pp_loc:Textloc.t fmt -> ?pp_error_kind:error_kind fmt ->
     ?pp_prefix:unit fmt -> unit -> error fmt
   (** [pp_error ~pp_loc ~pp_error_kind ~pp_prefix ()] formats errors
       using [pp_loc] (defaults to {!pp_loc}), [pp_error_kind]
@@ -138,7 +129,7 @@ module Sexp : sig
   (** [error_to_string r] converts an error to a string using [pp_error]
       (defaults to {!pp_error}). *)
 
-  val seq_of_string : ?file:Tloc.fpath -> string -> (t, error) result
+  val seq_of_string : ?file:Textloc.filepath -> string -> (t, error) result
   (** [seq_of_string ?file s] parses a {e sequence} of s-expressions from
       [s]. [file] is the file for locations, defaults to ["-"]. The
       sequence is returned as a fake s-expression list that spans from
@@ -154,7 +145,8 @@ module Sexp : sig
       encoded. *)
 
   val seq_of_string' :
-    ?pp_error:error fmt -> ?file:Tloc.fpath -> string -> (t, string) result
+    ?pp_error:error fmt -> ?file:Textloc.filepath -> string ->
+    (t, string) result
   (** [seq_of_string'] s {!seq_of_string} composed with {!error_to_string}. *)
 
   val seq_to_string : t -> string
@@ -293,13 +285,13 @@ module Sexpq : sig
 
   (** {1:query_results Result paths} *)
 
-  type path = (Sexp.index * Sexp.loc) list
+  type path = (Sexp.index * Textloc.t) list
   (** The type for result paths. This is a sequence of indexing
       operations tupled with the source text location of the indexed
       s-expression in {b reverse} order. *)
 
   val pp_path :
-    ?pp_loc:Sexp.loc Sexp.fmt -> ?pp_key:string Sexp.fmt -> unit ->
+    ?pp_loc:Textloc.t Sexp.fmt -> ?pp_key:string Sexp.fmt -> unit ->
     path Sexp.fmt
   (** [pp_path ~pp_loc ~pp_key ()] formats paths using [pp_loc]
       (defaults to {!Sexp.pp_loc}) and [pp_key] to format the keys
@@ -330,13 +322,13 @@ module Sexpq : sig
       using [pp_loc] for locations, [pp_em] for emphasis and [pp_key]
       for keys. *)
 
-  type error = error_kind * (path * Sexp.loc)
+  type error = error_kind * (path * Textloc.t)
   (** The type for query errors. The error kind tupled with the path
       to the offending s-expression and the location of the
       s-expression. *)
 
   val pp_error :
-    ?pp_loc:Sexp.loc Sexp.fmt -> ?pp_path:path Sexp.fmt ->
+    ?pp_loc:Textloc.t Sexp.fmt -> ?pp_path:path Sexp.fmt ->
     ?pp_error_kind:error_kind Sexp.fmt -> ?pp_prefix:unit Sexp.fmt -> unit ->
     error Sexp.fmt
   (** [pp_error ~pp_loc ~pp_path ~pp_error_kind ~pp_prefix ()] formats
@@ -406,7 +398,7 @@ module Sexpq : sig
   val some : 'a t -> 'a option t
   (** [some q] is [map Option.some q]. *)
 
-  val loc : 'a t -> ('a * (path * Sexp.loc)) t
+  val loc : 'a t -> ('a * (path * Textloc.t)) t
   (** [loc q] queries with [q] an returns the result with the
       query path and source text location to the queried
       s-expression. *)

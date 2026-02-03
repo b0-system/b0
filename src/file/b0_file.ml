@@ -9,11 +9,11 @@ open B0_text
 
 (* Syntactic metadata *)
 
-type smeta = Tloc.t
+type smeta = Textloc.t
 let smeta ~loc = loc
 let loc m = m
 
-let pp_loc = Tloc.pp_ocaml
+let pp_loc = Textloc.pp
 let loc_err_fmt ffmt m fmt =
   ffmt ("@[<v>%a:@,@[%a: " ^^ fmt ^^ "@]@]")
     pp_loc (loc m) (Fmt.st [`Fg `Red; `Bold ]) "Error"
@@ -87,137 +87,142 @@ let is_dir_letter c =
   (0x61 <= c && c <= 0x7A) || c = 0x5F || (0x41 <= c && c <= 0x5A) ||
   c = 0x2E || c = 0x40 || (0x30 <= c && c <= 0x39)
 
-let err_eoi msg d ~sbyte ~sline =
-  Tdec.err_to_here d ~sbyte ~sline "Unexpected end of input: %s" msg
+exception Error of Textloc.t * string
+
+let err loc msg = raise_notrace (Error (loc, msg))
+let err_span d ~start fmt =
+  Format.kasprintf (err (Textdec.textloc_span d ~start)) fmt
+
+let err_here d fmt = Format.kasprintf (err (Textdec.textloc d)) fmt
+
+let err_eoi msg d ~start =
+  err_span d ~start "Unexpected end of input: %s" msg
 
 let err_eoi_string = err_eoi "unclosed string"
 let err_eoi_esc = err_eoi "truncated escape"
 let err_eoi_dir = err_eoi "unclosed directive"
-let err_exp_dir_arg d = Tdec.err_here d "Expected directive argument"
-let err_illegal_uchar d b = Tdec.err_here d "Illegal character U+%04X" b
+let err_exp_dir_arg d = err_here d "Expected directive argument"
+let err_illegal_uchar d b = err_here d "Illegal character U+%04X" b
 
-let err_exp_eodir d ~sbyte ~sline =
-  Tdec.err_to_here d ~sbyte ~sline "Expected end of directive (']')"
+let err_exp_eodir d ~start u =
+  err_span d ~start "Expected end of directive (']') found %a"
+    Textdec.pp_decode u
 
-let curr_char d = (* TODO better escaping (this is for error reports) *)
-  Tdec.tok_reset d; Tdec.tok_accept_uchar d; Tdec.tok_pop d
-
-let err_esc_illegal d ~sbyte ~sline pre =
-  Tdec.err_to_here d ~sbyte ~sline "%s%s: illegal escape" pre (curr_char d)
+let err_esc_illegal d ~start pre u =
+  err_span d ~start "%s%a: illegal escape" pre Textdec.pp_decode u
 
 let err_unsupported_directive sharp dir_loc dir =
   let hint = Fmt.must_be in
   let unknown = Fmt.(unknown' ~kind:(any "directive") pp_directive ~hint) in
-  Tdec.err dir_loc (Fmt.str "@[%a@]" unknown (sharp ^ dir, directives))
+  err dir_loc (Fmt.str "@[%a@]" unknown (sharp ^ dir, directives))
 
-let dec_byte d = match Tdec.byte d with
-| c when 0x00 <= c && c <= 0x08 || 0x0E <= c && c <= 0x1F || c = 0x7F ->
-    err_illegal_uchar d c
-| c -> c
-[@@ ocaml.inline]
+let nextc d =
+  Textdec.next d;
+  if Textdec.is_error d then err_here d "UTF-8 decoding error"
 
-let rec skip_ws d = match dec_byte d with
-| 0x20 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D -> Tdec.accept_byte d; skip_ws d
+let uchar = Uchar.unsafe_of_int
+
+let rec skip_ws d = match Textdec.current d with
+| 0x20 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D -> nextc d; skip_ws d
 | _ -> ()
 
-let parse_esc d =
-  let sbyte = Tdec.pos d and sline = Tdec.line d in
-  match (Tdec.accept_byte d; dec_byte d) with
-  | 0x22 -> Tdec.accept_byte d; Tdec.tok_add_char d '"'
-  | 0x5C -> Tdec.accept_byte d; Tdec.tok_add_char d '\\'
+let parse_escape d =
+  let start = Textdec.pos d in
+  match (nextc d; Textdec.current d) with
+  | 0x22 -> Textdec.lexeme_add d (Uchar.of_char '"'); nextc d
+  | 0x5C -> Textdec.lexeme_add d (Uchar.of_char '\\'); nextc d
   | 0x0A | 0x0D -> (* continuation line *) skip_ws d
-  | 0xFFFF -> err_eoi_esc d ~sbyte ~sline
-  | _ -> err_esc_illegal d ~sbyte ~sline "\\"
+  | 0x11_0001 -> err_eoi_esc d ~start
+  | u -> err_esc_illegal d ~start "\\" u
 
-let parse_string d = match (skip_ws d; dec_byte d) with
+let parse_string d = match (skip_ws d; Textdec.current d) with
 | 0x22 ->
-    let rec loop d ~sbyte ~sline = match dec_byte d with
+    let rec loop d ~start = match Textdec.current d with
     | 0x22 ->
-        let loc = Tdec.loc_to_here d ~sbyte ~sline in
-        let arg = Tdec.tok_pop d in
-        Tdec.accept_byte d; (arg, smeta ~loc)
-    | 0x5C -> parse_esc d; loop d ~sbyte ~sline
-    | 0xFFFF -> err_eoi_string d ~sbyte ~sline
-    | _ -> Tdec.tok_accept_byte d; loop d ~sbyte ~sline
+        let loc = Textdec.textloc_span d ~start in
+        let arg = Textdec.lexeme_pop d in
+        nextc d; (arg, smeta ~loc)
+    | 0x5C -> parse_escape d; loop d ~start
+    | 0x11_0001 -> err_eoi_string d ~start
+    | u -> Textdec.lexeme_add d (uchar u); nextc d; loop d ~start
     in
-    let sbyte = Tdec.pos d and sline = Tdec.line d in
-    Tdec.accept_byte d; loop ~sbyte ~sline d
+    nextc d; loop d ~start:(Textdec.pos d)
+
 | c -> err_exp_dir_arg d
 
 let string_to parse (arg, smeta) =
-  match parse arg with Ok v -> v, smeta | Error e -> Tdec.err (loc smeta) e
+  match parse arg with Ok v -> v, smeta | Error e -> err (loc smeta) e
 
 let parse_fpath d = string_to Fpath.of_string (parse_string d)
 
-let rec parse_directive_name d ~sbyte ~sline = match dec_byte d with
-| c when is_dir_letter c ->
-    Tdec.tok_accept_byte d; parse_directive_name d ~sbyte ~sline
-| c ->
-    let ebyte = Tdec.pos d - 1 and eline = Tdec.line d in
-    let loc = Tdec.loc d ~sbyte ~ebyte ~sline ~eline in
-    Tdec.tok_pop d, loc
+let rec parse_directive_name d ~start =
+  match Textdec.current d with
+  | c when is_dir_letter c ->
+      Textdec.lexeme_add d (uchar c); nextc d; parse_directive_name d ~start
+  | c ->
+      let textloc = Textdec.textloc_span_to_prev_decode d ~start in
+      Textdec.lexeme_pop d, textloc
 
-let rec parse_annot_arg_list d acc p_arg ~sbyte ~sline =
-  match (skip_ws d; dec_byte d) with
-  | 0x5D (* ] *) -> Tdec.accept_byte d; List.rev acc
-  | 0xFFFF -> err_eoi_dir d ~sbyte ~sline
-  | _ -> parse_annot_arg_list d (p_arg d :: acc) p_arg ~sbyte ~sline
+let rec parse_annot_arg_list d acc p_arg ~start =
+  match (skip_ws d; Textdec.current d) with
+  | 0x5D (* ] *) -> nextc d; List.rev acc
+  | 0x11_0001 -> err_eoi_dir d ~start
+  | _ -> parse_annot_arg_list d (p_arg d :: acc) p_arg ~start
 
-let parse_boot_directive d ~sbyte ~sline =
-  parse_annot_arg_list d [] parse_string ~sbyte ~sline
+let parse_boot_directive d ~start =
+  parse_annot_arg_list d [] parse_string ~start
 
-let parse_include_directive d ~sbyte ~sline =
+let parse_include_directive d ~start =
   let parse_scope_name (s, smeta as scope) =
-    if s = "" then Tdec.err (loc smeta) "Scope name cannot be empty." else
+    if s = "" then err (loc smeta) "Scope name cannot be empty." else
     if not (String.exists (Char.equal '.') s) then scope else
-    Tdec.err (loc smeta)
-      (Fmt.str "Scope name %a contains a dot." Fmt.code s)
+    err (loc smeta) (Fmt.str "Scope name %a contains a dot." Fmt.code s)
   in
   let arg = parse_string d in
-  match skip_ws d; dec_byte d with
+  match skip_ws d; Textdec.current d with
   | 0x5D (* ] *) ->
-      Tdec.accept_byte d;
+      nextc d;
       let (p, smeta as file) = string_to Fpath.of_string arg in
       let scope = Fpath.(basename @@ parent p), smeta in
       parse_scope_name scope, file
-  | 0xFFFF -> err_eoi_dir d ~sbyte ~sline
+  | 0x11_0001 -> err_eoi_dir d ~start
   | _ ->
       let file = string_to Fpath.of_string (parse_string d) in
-      match skip_ws d; dec_byte d with
-      | 0x5D (* ] *) -> Tdec.accept_byte d; (parse_scope_name arg, file)
-      | 0xFFFF -> err_eoi_dir d ~sbyte ~sline
-      | _ -> err_exp_eodir d ~sbyte ~sline
+      match skip_ws d; Textdec.current d with
+      | 0x5D (* ] *) -> nextc d; (parse_scope_name arg, file)
+      | 0x11_0001 -> err_eoi_dir d ~start
+      | u -> err_exp_eodir d ~start u
 
-let parse_require_directive d ~sbyte ~sline =
+let parse_require_directive d ~start =
   string_to B0_ocaml.Libname.of_string (parse_string d)
 
-let parse_mod_use_directive d ~sbyte ~sline =
+let parse_mod_use_directive d ~start =
   string_to Fpath.of_string (parse_string d)
 
 let parse_preamble d =
-  let rec loop boots incs reqs mus d = match skip_ws d; dec_byte d with
+  let rec loop boots incs reqs mus d = match skip_ws d; Textdec.current d with
   | 0x23 (* # *) ->
-      let sbyte = Tdec.pos d and sline = Tdec.line d in
-      Tdec.accept_byte d;
-      begin match parse_directive_name d ~sbyte ~sline with
+      let start = Textdec.pos d in
+      nextc d;
+      begin match parse_directive_name d ~start with
       | "require", _ ->
-          let r = parse_require_directive d ~sbyte ~sline in
+          let r = parse_require_directive d ~start in
           loop boots incs (r :: reqs) mus d
       | "mod_use", _ ->
-          let m = parse_mod_use_directive d ~sbyte ~sline in
+          let m = parse_mod_use_directive d ~start in
           loop boots incs reqs (m :: mus) d
       | dir, dir_loc ->
           err_unsupported_directive "#" dir_loc dir
       end
   | 0x5B (* [ *) ->
-      let sbyte = Tdec.pos d and sline = Tdec.line d in
-      Tdec.accept_byte d;
-      begin match parse_directive_name d ~sbyte ~sline with
+      let start = Textdec.pos d in
+      nextc d;
+      begin match parse_directive_name d ~start with
       | "@@@B0.boot", _ ->
-          let b = parse_boot_directive d ~sbyte ~sline in
+          let b = parse_boot_directive d ~start in
           loop (b :: boots) incs reqs mus d
       | "@@@B0.include", _ ->
-          let i = parse_include_directive d ~sbyte ~sline in
+          let i = parse_include_directive d ~start in
           loop boots (i :: incs) reqs mus d
       | dir, dir_loc ->
           (* FIXME warn on @@@B0.* do not error. *)
@@ -226,17 +231,17 @@ let parse_preamble d =
   | _ ->
       List.rev boots, List.rev incs, List.rev reqs, List.rev mus
   in
-  loop [] [] [] [] d
+  (nextc d; loop [] [] [] [] d)
 
 let of_string ~file src =
   try
-    let d = Tdec.create ~file:(Fpath.to_string file) src in
+    let d = Textdec.make ~file:(Fpath.to_string file) src in
     let b0_boots, b0_includes, requires, mod_uses = parse_preamble d in
-    let rest = String.subrange ~first:(Tdec.pos d) src in
-    let ocaml_unit = rest, smeta ~loc:(Tdec.loc_here d) in
+    let rest = String.subrange ~first:(Textdec.first_byte_pos d) src in
+    let ocaml_unit = rest, smeta ~loc:(Textdec.textloc d) in
     let cwd = Fpath.parent file in
     Ok { file; cwd; b0_boots; b0_includes; requires; ocaml_unit; mod_uses }
-  with Tdec.Err (loc, e) -> loc_error loc "%a" (Fmt.vbox Fmt.lines) e
+  with Error (loc, e) -> loc_error loc "%a" (Fmt.vbox Fmt.lines) e
 
 (* Expansion *)
 
@@ -287,7 +292,7 @@ let get_mod_use_srcs b0_file manif (p, smeta) =
 let nil_loc = "#1 \"-\""
 let lineno meta =
   let l = loc meta in
-  Fmt.str "#%d %S" (fst (Tloc.sline l)) (Tloc.file l)
+  Fmt.str "#%d %S" (fst (Textloc.first_line l)) (Textloc.file l)
 
 let w acc l = l :: acc [@@ocaml.inline]
 

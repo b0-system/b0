@@ -13,7 +13,7 @@ open B0_text
 type smeta
 (** Metadata attached to syntactic constructs. *)
 
-val loc : smeta -> Tloc.t
+val loc : smeta -> Textloc.t
 (** [loc m] is the text source location of [i]. *)
 
 val loc_errf : smeta -> ('a, Format.formatter, unit, string) format4 -> 'a
