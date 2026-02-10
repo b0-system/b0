@@ -218,7 +218,7 @@ let outcome_of_file ?(diff = true) ctx file =
       in
       Outcome.v status (File { file; diff })
   | Hg ->
-    failwith "Hg support is TODO"
+      failwith "Hg support is TODO"
 
 let check_add ctx o = match Outcome.test o with
 | File { file; _ } ->

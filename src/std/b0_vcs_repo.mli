@@ -184,7 +184,7 @@ val latest_tag : t -> commit_ish -> (tag option, string) result
 
 val find_greatest_version_tag : t -> (tag option, string) result
 (** [find_latest_version_tag repo] lists tags with {!val-tags} sorts
-    those who parse with {!B0_std.String.to_version} in increasing order
+    those who parse with {!B0_version.of_string} in increasing order
     and takes the greatest ones. *)
 
 (** {1:vcs VCS specific operations} *)

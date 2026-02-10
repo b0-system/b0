@@ -28,14 +28,17 @@ let () =
 
     (* Doc *)
     Pkg.doc "doc/action.mld" ~dst:"odoc-pages/action.mld";
+    Pkg.doc "doc/b0_std_cookbook.mld" ~dst:"odoc-pages/b0_std_cookbook.mld";
+    Pkg.doc "doc/b0_testing_cookbook.mld"
+      ~dst:"odoc-pages/b0_testing_cookbook.mld";
     Pkg.doc "doc/driver.mld" ~dst:"odoc-pages/driver.mld";
     Pkg.doc "doc/index.mld" ~dst:"odoc-pages/index.mld";
     Pkg.doc "doc/manual.mld" ~dst:"odoc-pages/manual.mld";
     Pkg.doc "doc/memo.mld" ~dst:"odoc-pages/memo.mld";
     Pkg.doc "doc/ocaml.mld" ~dst:"odoc-pages/ocaml.mld";
+    Pkg.doc "doc/occasionally.mld" ~dst:"odoc-pages/occasionally.mld";
     Pkg.doc "doc/old_manual.mld" ~dst:"odoc-pages/old_manual.mld";
     Pkg.doc "doc/opam.mld" ~dst:"odoc-pages/opam.mld";
-    Pkg.doc "doc/occasionally.mld" ~dst:"odoc-pages/occasionally.mld";
     Pkg.doc "doc/rationale.mld" ~dst:"odoc-pages/rationale.mld";
     Pkg.doc "doc/release.mld" ~dst:"odoc-pages/release.mld";
     Pkg.doc "doc/testing.mld" ~dst:"odoc-pages/testing.mld";

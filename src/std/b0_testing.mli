@@ -5,9 +5,10 @@
 
 (** Unit, random and snapshot testing for OCaml.
 
-    {{!example}This example} is a blueprint for a test executable. See
-    also the {{!page-testing}b0 testing manual} to integrate your
-    tests in your [B0.ml] file and run them with [b0 test].
+    {{!quick_start}The quick start} is a blueprint for a test
+    executable see also the {{!page-b0_testing_cookbook}cookbook}. To
+    integrate your tests in your [B0.ml] file and run them with [b0
+    test] see the {{!page-testing}b0 testing manual}.
 
     This module is designed to be opened.
 
@@ -18,7 +19,8 @@ open B0_std
 
 (** Testing structure and assertions.
 
-    See an {{!example}example}. *)
+    See the {{!quick_start}quick start} and the
+    {{!page-b0_testing_cookbook}cookbook}. *)
 module Test : sig
 
   (** {1:locs Source locations} *)
@@ -42,16 +44,16 @@ module Test : sig
   (** [log fmt …] logs a message formatted by [fmt]. *)
 
   val log_pass : 'a log
-  (** [log_pass fmt …] is like {!log} but formatted for passing.
+  (** [log_pass fmt …] is like {!val-log} but formatted for passing.
       This does not increment passed assertions, use {!pass} to do so. *)
 
   val log_fail : 'a log
-  (** [log_fail fmt …] is like {!log} but formatted for failures. This
+  (** [log_fail fmt …] is like {!val-log} but formatted for failures. This
       does not increment failed assertions, use {!fail} to register a
       failure. *)
 
   val log_start : 'a log
-  (** [log_start] is like {!log} but does not finish the line. {!log_end}
+  (** [log_start] is like {!val-log} but does not finish the line. {!log_finish}
       does. *)
 
   val log_finish : ('a, Format.formatter, unit, unit) format4 -> 'a
@@ -68,14 +70,16 @@ module Test : sig
       {!Stdlib.exit}. Usually [f] calls functions that call {!test}.
       {ul
       {- [doc] is a synopsis for the test executable.}
-      {- [name] is a name for the test executable.}}
-      See an {{!example}example}. *)
+      {- [name] is a name for the test executable. Defaults to the basename
+         of {!Sys.executable_name}.}}
+      See an {{!quick_start}example}. *)
 
   val main' :
     ?man:Cmdliner.Manpage.block list ->
     ?doc:string -> ?name:string -> (unit -> unit) Cmdliner.Term.t -> int
   (** [main'] is like {!main} but allows to define your own additional
-      command line. *)
+      command line. See the
+      {{!page-b0_testing_cookbook.how_cli_arg}cookbook}. *)
 
   val set_main_exit : (unit -> int) -> unit
   (** [set_main_exit f] will disable the final report performed
@@ -83,17 +87,22 @@ module Test : sig
 
   (** Test arguments. *)
   module Arg : sig
+
+    (** {1:arguments Arguments} *)
+
     type 'a t
     (** The type for arguments of type ['a]. *)
-
-    type value
-    (** The type for argument values. *)
 
     val make : unit -> 'a t
     (** [make ()] is a new test argument. *)
 
+    (** {1:defining Defining them} *)
+
+    type value
+    (** The type for argument values. *)
+
     val value : 'a t -> 'a -> value
-    (** [value arg v] is the argument [arg]  value [v]. *)
+    (** [value arg v] is [arg] with a value of [v]. *)
   end
 
   val test : ?long:bool -> string -> (unit -> unit) -> (unit -> unit)
@@ -101,16 +110,16 @@ module Test : sig
       executes [f ()]. The test fails if any {{!flow}failure} is
       reported in [f] or if [f] raises an unexpected exception. If
       [long] is true, this is a long test an only run when explicitely
-      requested.  See {{!example}examples}.  *)
+      requested.  See {{!quick_start}examples}.  *)
 
   val test' : 'a Arg.t -> ?long:bool -> string -> ('a -> unit) -> ('a -> unit)
-  (** [test' arg] is like {!test} but takes an argument. *)
+  (** [test' arg] is like {!test} but takes an argument. See the
+      {{!page-b0_testing_cookbook.how_test_arg}cookbook}. *)
 
   val autorun : ?args:Arg.value list -> unit -> unit
   (** [autorun ()] calls all the tests defined by {!test} and
-      {!test'}, possibly filtered by the command line. For the latter
-      an argument value should be provided in [args] (defaults to
-      [[]]). *)
+      {!test'}, possibly filtered by the command line. [args]
+      defines the value of {{!Arg}test arguments}.*)
 
   (** {1:flow Stop, pass, skip and fail}
 
@@ -118,13 +127,13 @@ module Test : sig
       the test fails. *)
 
   val stop : unit -> 'a
-  (** [stop ()] stops the current {{!block}block}, {{!test}test}, or
-      {!main}. Note that this does not increment failed assertions,
-      use {!fail} or {!failstop} for that. *)
+  (** [stop ()] stops execution of the current {{!block}block},
+      {{!test}test}, or {!main}. Note that this does not increment
+      failed assertions, use {!fail} or {!failstop} for that. *)
 
   val skip : 'a log
-  (** [skip ()] skips the current {{!block}block}, {{!test}test}, or
-      {!main}. *)
+  (** [skip fmt …] logs [fmt] and skips the current {{!block}block},
+      {{!test}test}, {!main}. *)
 
   val pass : unit -> unit
   (** [pass ()] increments the number of successfull assertions.  *)
@@ -135,7 +144,7 @@ module Test : sig
       {!stop} or {!failstop} to stop the test. *)
 
   val failstop : ?__POS__:loc -> ('a, Format.formatter, unit, 'b) format4 -> 'a
-  (** [failf fmt …] is like {!fail} but also {!stop}s the test. *)
+  (** [failf fmt …] is like {!fail} but also {!stop}s the test or block. *)
 
   val error_to_failstop : ?__POS__:loc -> ('a, string) result -> 'a
   (** - [error_to_failstop (Error e)] is [failstop "%s" e].
@@ -148,8 +157,8 @@ module Test : sig
   (** {2:blocks Blocks and loops}
 
       Blocks and loops can be used as larger sub units of {!test}
-      which you can {!stop} and {!failstop} without stopping the test
-      itself. *)
+      which you can {!skip}, {!stop} and {!failstop} without
+      skipping or stopping the test itself. *)
 
   val block :
     ?pass:(?__POS__:loc -> int -> unit) ->
@@ -160,8 +169,8 @@ module Test : sig
       [assertions] the total number of assertions that were performed.
       If [f] peforms a {!failstop} the block is stopped but not the
       test. It is possible to fail stop the test by stoppping in
-      [fail]. If no assertion fails [pass] is called with the number of
-      assertions (defaults does nothing).
+      [fail]. If no assertion fails [pass] is called with the number
+      of assertions (defaults does nothing).
 
       {b TODO.} Should we simply make blocks nested {!test}s ? *)
 
@@ -194,7 +203,7 @@ module Test : sig
       to print values.
 
       {b Important.} We indicate when the printers respect the OCaml syntax.
-      Only these testers are suitable for use with {!Test.snap}. *)
+      Only these testers are suitable for use with {!Test.val-snap}. *)
   module T : sig
 
     (** {1:testers Testers} *)
@@ -206,12 +215,12 @@ module Test : sig
     (** [make ~equal ~pp ()] is a tester using [equal] to assert
         values and [pp] to inspect them. Note the following points:
         {ol
-        {- If your module [M] implement {!T}  it can directly be used as an
-           equality tester value as [(module M)], you don't need to call
-           this function.}
-        {- If you want to use [M] with {!Test.snap} note that it
+        {- If your module [M] implement {!module-type-T} it can directly be
+           used as an equality tester value as [(module M)], you don't need
+           to call this function.}
+        {- If you want to use [M] with {!Test.val-snap} note that it
            expects [M.pp] to output valid OCaml syntax. If that is not
-           the case you can redefine it with {!with_tester}.}
+           the case you can redefine it with {!with'}.}
         {- By convention the first argument of [equal] is the value to
            test and the second value is the reference value. This is
            somtimes used by the combinators.}} *)
@@ -259,69 +268,69 @@ module Test : sig
 
     val unit : unit t
     (** [unit] tests units and prints them as OCaml syntax with
-        {!B0_std.Fmt.Lit.unit}. *)
+        {!B0_std.Fmt.OCaml.unit}. *)
 
     val bool : bool t
     (** [bool] tests booleans and prints them as OCaml syntax with
-        {!B0_std.Fmt.Lit.bool}. *)
+        {!B0_std.Fmt.OCaml.bool}. *)
 
     val int : int t
     (** [int] tests integers and prints them as OCaml syntax with
-        {!B0_std.Fmt.Lit.int}. *)
+        {!B0_std.Fmt.OCaml.int}. *)
 
     val int32 : int32 t
     (** [int32] tests 32-bit integers and prints them as OCaml syntax
-        with {!B0_std.Fmt.Lit.int32}. *)
+        with {!B0_std.Fmt.OCaml.int32}. *)
 
     val uint32 : int32 t
     (** [uint32] tests unsigned 32-bit integers and prints them with
-        {!B0_std.Fmt.Lit.uint32} *)
+        {!B0_std.Fmt.OCaml.uint32} *)
 
     val int64 : int64 t
     (** [int64] tests 64-bit integers and prints them as OCaml syntax with
-        {!B0_std.Fmt.Lit.int64}. *)
+        {!B0_std.Fmt.OCaml.int64}. *)
 
     val uint64 : int64 t
     (** [uint64] tests unsigned 64-bit integers and prints them as OCaml
-        syntax with {!B0_std.Fmt.Lit.uint64}. *)
+        syntax with {!B0_std.Fmt.OCaml.uint64}. *)
 
     val nativeint : nativeint t
     (** [nativeint] tests native integers and prints them as OCaml syntax
-        with {!Fmt.Lit.nativeint}. *)
+        with {!B0_std.Fmt.OCaml.nativeint}. *)
 
     val nativeuint : nativeint t
     (** [nativeuint] tests unsigned native integers and prints them
-        as OCaml syntax with {!B0_std.Fmt.Lit.nativeuint}. *)
+        as OCaml syntax with {!B0_std.Fmt.OCaml.nativeuint}. *)
 
     val float : float t
     (** [float] tests float with {!Float.equal} so it can be used
         to assert [nan] values and prints as OCaml syntax
-        them with {!B0_std.Fmt.Lit.floatl}.
+        them with {!B0_std.Fmt.OCaml.float}.
 
         {b Warning.} Be aware of the limitations of testing floats
         for strict binary equality. *)
 
     val hex_float : float t
     (** [hex_float] is like {!float} but uses the OCaml syntax
-        {!B0_std.Fmt.Lit.hex_float} for printing. *)
+        {!B0_std.Fmt.OCaml.hex_float} for printing. *)
 
     (** {2:strings Characters and strings} *)
 
     val char : char t
     (** [char] tests characters (bytes) and prints them as OCaml syntax
-        with {!B0_std.Fmt.Lit.char}. *)
+        with {!B0_std.Fmt.OCaml.char}. *)
 
     val ascii_string : string t
     (** [ascii_string] tests strings and prints them as OCaml syntax with
-        {!B0_std.Fmt.Lit.ascii_string}. *)
+        {!B0_std.Fmt.OCaml.ascii_string}. *)
 
     val string : string t
     (** [string] tests strings and prints them as OCaml syntax with
-        {!B0_std.Fmt.Lit.val-string} *)
+        {!B0_std.Fmt.OCaml.val-string} *)
 
     val binary_string : string t
     (** [binary_string] tests strings and prints them with as OCaml syntax
-        with {!B0_std.Fmt.Lit.binary_string}. *)
+        with {!B0_std.Fmt.OCaml.binary_string}. *)
 
     val styled_string : string t
     (** [styled_string] tests strings and prints them with
@@ -344,54 +353,54 @@ module Test : sig
 
     val option : 'a t -> 'a option t
     (** [option v] tests options of values tested with [v] and prints
-        them as OCaml syntax with {!B0_std.Fmt.Lit.option}. *)
+        them as OCaml syntax with {!B0_std.Fmt.OCaml.option}. *)
 
     val either : left:'a t -> right:'b t -> ('a, 'b) Either.t t
     (** [either ~left ~right] tests [Either.t] values and prints
-        them as OCaml syntax with {!B0_std.Fmt.Lit.either}. *)
+        them as OCaml syntax with {!B0_std.Fmt.OCaml.either}. *)
 
     val result : ok:'a t -> ('a, string) result t
     (** [result ok] tests result values using [ok] for
         [Ok] and a {!string} for [Error] and prints
-        them as OCaml syntax with {!B0_std.Fmt.Lit.result}. *)
+        them as OCaml syntax with {!B0_std.Fmt.OCaml.result}. *)
 
     val result' : ok:'a t -> error:'e t -> ('a, 'e) result t
     (** [result ok error] tests result values using the given
         equalities for the values of each cas and prints
-        them as OCaml syntax with {!B0_std.Fmt.Lit.result}. *)
+        them as OCaml syntax with {!B0_std.Fmt.OCaml.result}. *)
 
     val list : 'a t -> 'a list t
     (** [list elt] tests list of elements tested with [elt] and prints
-        them as OCaml syntax with {!B0_std.Fmt.Lit.list}. *)
+        them as OCaml syntax with {!B0_std.Fmt.OCaml.list}. *)
 
     val array : 'a t -> 'a array t
     (** [array elt] test array of elements tested with [elt] and prints
-        them as OCaml syntax with {!B0_std.Fmt.Lit.array}. *)
+        them as OCaml syntax with {!B0_std.Fmt.OCaml.array}. *)
 
     val pair : 'a t -> 'b t -> ('a * 'b) t
     (** [pair fst snd] tests pairs with [fst] and [snd] and prints them
-        as OCaml syntax with {!B0_std.Fmt.Lit.pair}. *)
+        as OCaml syntax with {!B0_std.Fmt.OCaml.pair}. *)
 
     val t2 : 'a t -> 'b t -> ('a * 'b) t
     (** [t2] is {!pair}. *)
 
     val t3 : 'a t -> 'b t -> 'c t -> ('a * 'b * 'c) t
     (** [t3] tests triplets and prints them as OCaml syntax with
-        {!B0_std.Fmt.List.t3}. *)
+        {!B0_std.Fmt.OCaml.t3}. *)
 
     val t4 : 'a t -> 'b t -> 'c t -> 'd t -> ('a * 'b * 'c * 'd) t
     (** [t4] tests quadruplets and prints them as OCaml syntax with
-        {!B0_std.Fmt.List.t4}. *)
+        {!B0_std.Fmt.OCaml.t4}. *)
 
     val t5 : 'a t -> 'b t -> 'c t -> 'd t -> 'e t -> ('a * 'b * 'c * 'd * 'e) t
     (** [t5] tests quintuplets and prints them as OCaml syntax with
-        {!B0_std.Fmt.List.t5}. *)
+        {!B0_std.Fmt.OCaml.t5}. *)
 
     val t6 :
       'a t -> 'b t -> 'c t -> 'd t -> 'e t -> 'f t ->
       ('a * 'b * 'c * 'd * 'e * 'f) t
     (** [t6] tests sextuplets and prints them as OCaml syntax with
-        {!B0_std.Fmt.List.t6}. *)
+        {!B0_std.Fmt.OCaml.t6}. *)
   end
 
   (** Reporting value differences.
@@ -399,7 +408,7 @@ module Test : sig
       In general the generic differs will do but depending
       on your application domain you may want to customize how
       differences on value mismatch are reported. For that devise
-      a differ with {!make} and pass it to assertion functions. *)
+      a differ with {!Diff.make} and pass it to assertion functions. *)
   module Diff : sig
 
     (** {1:diffs Differs} *)
@@ -483,10 +492,10 @@ module Test : sig
     (** {1:files Patching files} *)
 
     val get : Fpath.t -> t option
-    (** [get file] is the patch for file [file]. This is [None]
-        only if [file] did not exist, in which case an error messages
-        has been logged. The first time you lookup [file] you get
-        an empty patch. *)
+    (** [get file] is the patch for file [file]. This is [None] only
+        if [file] does not exist in the file system, in which case an
+        error messages has been logged. The first time you lookup
+        [file] you get an {{!is_empty}empty patch}. *)
 
     val update : Fpath.t -> t -> unit
     (** [update file p] updates the patch of file [file] to [p]. *)
@@ -495,11 +504,19 @@ module Test : sig
     (** [write_files ()] writes the patched files. {b Note.}
         if you are using {!Test.main}, this is done automatically. *)
 
+    (** {1:filepath File paths}
+
+        {b TODO.} This should be moved somewhere else. *)
+
+    val get_filepath : Fpath.t -> Fpath.t
+    (** [get_filepath f] prepends {!src_root} to [f] if [f]
+        is relative. *)
+
     (** {1:run_state Run state} *)
 
     val src_root : unit -> Fpath.t option
     (** [src_root ()] if present it prefixed to {!Test.loc} path
-        with {!Fpath.append} for looking up files. *)
+        with {!B0_std.Fpath.append} for looking up files. *)
   end
 
   (** {1:assertions Assertions} *)
@@ -538,7 +555,7 @@ module Test : sig
       catched.  *)
 
   val exn : exn eq
-  (** [ex ] is [eq ]{!T.exn}. *)
+  (** [ex ] is [eq ]{!module-T.val-exn}. *)
 
   val raises :
     ?ret:'a T.t -> ?exn:exn T.t -> ?diff:exn Diff.t ->
@@ -561,101 +578,101 @@ module Test : sig
   (** {2:test_base_types Base types} *)
 
   val unit : unit eq
-  (** [unit] is [eq ]{!T.unit}. *)
+  (** [unit] is [eq ]{!module-T.unit}. *)
 
   val bool : bool eq
-  (** [bool] is [eq ]{!T.bool}. *)
+  (** [bool] is [eq ]{!module-T.bool}. *)
 
   val int : int eq
-  (** [int] is [eq ]{!T.int}. *)
+  (** [int] is [eq ]{!module-T.int}. *)
 
   val int32 : int32 eq
-  (** [int32] is [eq ]{!T.int32}. *)
+  (** [int32] is [eq ]{!module-T.int32}. *)
 
   val uint32 : int32 eq
-  (** [uint32] is [eq ]{!T.uint32}. *)
+  (** [uint32] is [eq ]{!module-T.uint32}. *)
 
   val int64 : int64 eq
-  (** [int64] is [eq ]{!T.int64}. *)
+  (** [int64] is [eq ]{!module-T.int64}. *)
 
   val uint64 : int64 eq
-  (** [uint64] is [eq ]{!T.uint64}. *)
+  (** [uint64] is [eq ]{!module-T.uint64}. *)
 
   val nativeint : nativeint eq
-  (** [nativeint] is [eq ]{!T.nativeint}. *)
+  (** [nativeint] is [eq ]{!module-T.nativeint}. *)
 
   val nativeuint : nativeint eq
-  (** [nativeuint] is [eq ]{!T.nativeuint}. *)
+  (** [nativeuint] is [eq ]{!module-T.nativeuint}. *)
 
   val float : float eq
-  (** [float] is [eq ]{!T.float}. *)
+  (** [float] is [eq ]{!module-T.float}. *)
 
   (** {2:chars_and_strings Character and strings} *)
 
   val char : char eq
-  (** [char] is [eq ]{!T.char}. *)
+  (** [char] is [eq ]{!module-T.char}. *)
 
   val string : string eq
-  (** [string] is [eq ]{!T.string}. Assumes UTF-8 encoded strings. *)
+  (** [string] is [eq ]{!module-T.string}. Assumes UTF-8 encoded strings. *)
 
   val lines : string eq
-  (** [lines] is [eq ]{!T.lines}. Assumes UTF-8 encoded strings. *)
+  (** [lines] is [eq ]{!module-T.lines}. Assumes UTF-8 encoded strings. *)
 
   val binary_string : string eq
-  (** [binary_string] is [eq ]{!T.binary_string}. Assumes arbitrary binary
-      strings. *)
+  (** [binary_string] is [eq ]{!module-T.binary_string}. Assumes arbitrary
+      binary strings. *)
 
   val styled_string : string eq
-  (** [styled_string] is [eq ]{!T.styled_string}. Assumes strings with ANSI
-      escape sequences. *)
+  (** [styled_string] is [eq ]{!module-T.styled_string}. Assumes strings with
+      ANSI escape sequences. *)
 
   val bytes : bytes eq
-  (** [string] is [eq ]{!T.bytes}. *)
+  (** [string] is [eq ]{!module-T.bytes}. *)
 
   (** {2:parametric Parametric types} *)
 
   val any : 'a eq
-  (** [any] uses {!T.any}. *)
+  (** [any] uses {!module-T.any}. *)
 
   val option : 'a T.t -> 'a option eq
-  (** [option some] is [eq (]{!T.option}[ some)]. *)
+  (** [option some] is [eq (]{!module-T.option}[ some)]. *)
 
   val either : left:'a T.t -> right:'b T.t -> ('a, 'b) Either.t eq
-  (** [either ~left ~right] is [eq (]{!T.either}[ ~left ~right)]. *)
+  (** [either ~left ~right] is [eq (]{!module-T.either}[ ~left ~right)]. *)
 
   val result : ok:'a T.t -> ('a, string) result eq
-  (** [result ~ok] is [eq (]{!T.result}[ ~ok)]. *)
+  (** [result ~ok] is [eq (]{!module-T.result}[ ~ok)]. *)
 
   val result' : ok:'a T.t -> error:'e T.t -> ('a, 'e) result eq
-  (** [result' ~ok ~error] is [eq (]{!T.result'}[ ~ok ~error)]. *)
+  (** [result' ~ok ~error] is [eq (]{!module-T.result'}[ ~ok ~error)]. *)
 
   val list : 'a T.t -> 'a list eq
-  (** [list elt] is [eq (]{!T.list}[ elt)]. *)
+  (** [list elt] is [eq (]{!module-T.list}[ elt)]. *)
 
   val array : 'a T.t -> 'a array eq
-  (** [array elt] is [eq (]{!T.array}[ elt)]. *)
+  (** [array elt] is [eq (]{!module-T.array}[ elt)]. *)
 
   val pair : 'a T.t -> 'b T.t -> ('a * 'b) eq
-  (** [pair fst snd] is [eq (]{!T.pair}[ fst snd)]. *)
+  (** [pair fst snd] is [eq (]{!module-T.pair}[ fst snd)]. *)
 
   val t2 : 'a T.t -> 'b T.t -> ('a * 'b) eq
-  (** [t2] is {!pair}. *)
+  (** [t2] is {!val-pair}. *)
 
   val t3 : 'a T.t -> 'b T.t -> 'c T.t -> ('a * 'b * 'c) eq
-  (** [t3] is {!eq} for triplets. *)
+  (** [t3] is {!val-eq} for triplets. *)
 
   val t4 : 'a T.t -> 'b T.t -> 'c T.t -> 'd T.t -> ('a * 'b * 'c * 'd) eq
-  (** [t4] is {!eq} for quadruplets. *)
+  (** [t4] is {!val-eq} for quadruplets. *)
 
   val t5 :
     'a T.t -> 'b T.t -> 'c T.t -> 'd T.t -> 'e T.t ->
     ('a * 'b * 'c * 'd * 'e) eq
-  (** [t5] is {!eq} for quintuplets. *)
+  (** [t5] is {!val-eq} for quintuplets. *)
 
   val t6 :
     'a T.t -> 'b T.t -> 'c T.t -> 'd T.t -> 'e T.t -> 'f T.t ->
     ('a * 'b * 'c * 'd * 'e * 'f) eq
-  (** [t6] is {!eq} for sextuplets. *)
+  (** [t6] is {!val-eq} for sextuplets. *)
 
   (** {1:random Randomized testing} *)
 
@@ -677,17 +694,16 @@ module Test : sig
 
     (** {1:snapshots Snaphots} *)
 
-    type 'a t = loc * 'a
-    (** The type for expected snapshots of type 'a.
+    type 'a t
+    (** The type for expected snapshots of type 'a. *)
 
-        {b Warning.} Do not rely on this being a structural type use
-        {!loc} and {!value} to deconstruct it. *)
+    val src_loc : 'a t -> loc
+    (** [src_loc s] is the location of the snapshot in the sources. *)
 
-    val loc : 'a t -> loc
-    (** [loc s] is the location of the expected snapshot. *)
-
-    val value : 'a t -> 'a
-    (** [value s] is the value of the expected snapshot. *)
+    val exp_loc : 'a t -> loc
+    (** [exp_loc s] is the location of the expected value of the
+        snapshot. This is either equal to [src_loc] or in an external
+        file. *)
 
     (** {1:substitutions Substitutions} *)
 
@@ -718,11 +734,11 @@ module Test : sig
         regardless of their correctness. *)
   end
 
-  type 'a snap = ?diff:'a Diff.t -> 'a -> 'a Snapshot.t -> unit
+  type 'a snap = ?__POS__:loc -> ?diff:'a Diff.t -> 'a -> 'a Snapshot.t -> unit
   (** The type for snapshot functions. *)
 
   val snap : ?subst:'a Snapshot.subst -> 'a T.t -> 'a snap
-  (** [snap t fnd @@ __POS_OF__ exp] compares snapshot [fnd] to [exp].
+  (** [snap t fnd @> __POS_OF__ exp] compares snapshot [fnd] to [exp].
       [subst] is used to correct snapshots, it defaults to
       {!Snapshot.generic_subst} which depends on [t]'s pretty printer
       formatting valid OCaml code.
@@ -781,16 +797,20 @@ end
 (** Snapshots.
 
     These combinators can be used to snapshot values.  They are based
-    on the {!Test.val-snap} primitive.
+    on the {!Test.val-snap} primitive. Snapshots can be stored
+    directly in the source or in external files relative to the
+    source's parent directory.
 
     While we wait for {{:https://github.com/ocaml/RFCs/pull/52}implicit
     source location} support to be integrated in
     the compiler they are expected to be used as follows:
     {[
-    Snap.bool (Bool.not true) @@ __POS_OF__ false;
-    Snap.string ("a" ^ "b") @@ __POS_OF__
+    Snap.bool (Bool.not true) @> __POS_OF__ false;
+    Snap.string ("a" ^ "b") @> __POS_OF__
       "ab";
-    ]} *)
+    Snap.string ("a" ^ "b") @! (Fpath.v "snapshots/ab.string") ~__POS__
+    ]}
+*)
 module Snap : sig
 
   (** Repeated here for convenience, e.g. [Snap.(list T.int)].  *)
@@ -799,13 +819,13 @@ module Snap : sig
   (** {1:exn Exceptions} *)
 
   val exn : exn Test.snap
-  (** [exn] is {!Test.val-snap}[ ]{!Test.module-T.snap}. *)
+  (** [exn] is {!Test.val-snap}[ ]{!Test.module-T.val-exn}. *)
 
   val raise :
     ?ret:'a Test.T.t -> ?exn:exn Test.T.t -> ?diff:exn Test.Diff.t ->
     ?__POS__:Test.loc -> (unit -> 'a) -> exn Test.Snapshot.t -> unit
   (** [raise f] snapshots the exception raised by [f] by printing
-      it using [exn] (defaults to {!T.exn}). The combinators
+      it using [exn] (defaults to {!T.val-exn}). The combinators
       fails if no exception is raised by [f]. *)
 
   (** {1:base Base types} *)
@@ -928,25 +948,56 @@ module Snap : sig
 
   val stdout :
     ?__POS__:Test.loc ->
-    ?diff:string Test.Diff.t -> ?env:Os.Env.assignments -> ?cwd:Fpath.t ->
-    ?stdin:Os.Cmd.stdi -> ?stderr:[`Stdo of Os.Cmd.stdo | `Out] ->
-    trim:bool -> Cmd.t -> string Test.Snapshot.t -> unit
+    ?test:string T.t -> ?diff:string Test.Diff.t -> ?env:Os.Env.assignments ->
+    ?cwd:Fpath.t -> ?stdin:Os.Cmd.stdi ->
+    ?stderr:[`Stdo of Os.Cmd.stdo | `Out] -> trim:bool -> Cmd.t ->
+    string Test.Snapshot.t -> unit
   (** [stdout cmd] snaphosts the standard output of the execution (see
-      {!Os.run_status_out}). The function {!Test.fails} if there's
-      any sort of error. The [status] is ignored (FIXME do something
-      more sensitive we could assert it)). *)
+      {!B0_std.Os.Cmd.run_status_out}). The function {!Test.fail}s if there's
+      any sort of error. The [status] is ignored (FIXME do something more
+      sensitive we could assert it)).
+
+      {b Improtant.} For now if you use an external file with {!(!@)},
+      specify ~__POS__ and the file path should be relative to the source.
+  *)
+
+  val run :
+    ?__POS__:Test.loc -> ?test:string T.t -> ?diff:string Test.Diff.t ->
+    ?env:Os.Env.assignments -> ?cwd:Fpath.t -> ?stdin:Os.Cmd.stdi -> Cmd.t ->
+    string Test.Snapshot.t -> unit
+  (** [run cmd] snapshots the standard output, standard error and
+      exit code of the execution. *)
 end
 
-val ( !! ) : ?loc:Test.loc -> 'a -> 'a Test.Snapshot.t
+val ( !> ) : ?loc:Test.loc -> 'a -> 'a Test.Snapshot.t
 (** This doesn't work for now, but is what we would like to use
-    in the future. Use {!Stdlib.__POS_OF__} for now see {!Snap}. *)
+    in the future. Use for now see {!Snap}. *)
 
-(** {1:example Example}
+val ( !@ ) : ?loc:Test.loc -> Fpath.t -> string Test.Snapshot.t
+(** [!@ file] indicates that the snapshot is stored in file [file]. For
+    example:
+    {[
+    Snap.string "bla!" !@ (Fpath.v "snapshots/bla.string") ~__POS__
+    ]}
 
-    This is a typical test executable. Note that tests
-    are [let] bound. This mans that you can load them in the toplevel
-    to invoke them manually.
+    {b Important.} For now when used in a combinator use the [__POS__]
+    argument of the combinator and specify the file relative to the source
+    file. Alternatively specify an absolute path derived from a fixed
+    cwd. *)
 
+val ( @> ) : ('a Test.Snapshot.t -> 'b) -> Test.loc * 'a -> 'b
+(** This should be used for now with [__POS_OF__] instead of {!(!>)}. For
+    example:
+    {[
+    Snap.bool b @> __POS_OF__ true
+    ]}
+ *)
+
+(** {1:quick_start Quick start}
+
+    This is a typical test executable. Note that tests are [let]
+    bound. This means that you can load them in the toplevel to invoke
+    them manually.
 {[
 open B0_testing
 
@@ -954,14 +1005,14 @@ let test_string_get =
   Test.test "String.get" @@ fun () ->
   Test.char (String.get "a" 0) 'a' ~__POS__;
   Snap.char (String.get "ab" 1) @@ __POS_OF__ 'b';
-  Snap.raise (fun () -> String.get "" 0) @@ __POS_OF__
+  Snap.raise (fun () -> String.get "" 0) @> __POS_OF__
     (Invalid_argument("index out of bounds"));
   ()
 
 let test_list_map =
   Test.test "List.map" @@ fun () ->
   Test.(list T.int) (List.map succ [1; 2; 3]) [2; 3; 4] ~__POS__;
-  Snap.(list T.int) (List.map succ [1; 2; 3]) @@ __POS_OF__
+  Snap.(list T.int) (List.map succ [1; 2; 3]) @> __POS_OF__
     [2; 3; 4];
   ()
 
@@ -976,7 +1027,7 @@ let test_randomized =
 
 let test_snapshots =
   Test.test "Snapshots" @@ fun () ->
-  Snap.string (String.concat "," ["a";"b";"c"]) @@ __POS_OF__
+  Snap.string (String.concat "," ["a";"b";"c"]) @> __POS_OF__
     "a,b,c";
   ()
 
@@ -984,10 +1035,9 @@ let main () = Test.main @@ fun () -> Test.autorun ()
 let () = if !Sys.interactive then () else exit (main ())
 ]}
 
-  Note that if you are in a testing hurry or migrating you can always
-  simply use OCaml's [assert] in the test functions: you just won't
-  get any rendering on assertion failures and tests stop at the first
-  assertion failure.
+If you are in a testing hurry or migrating you can always simply use
+OCaml's [assert] in the test functions: you just won't get any
+rendering on assertion failures and tests stop at the first assertion
+    failure.
 
-  {b TODO.} Show how to use arguments.
-*)
+More in the {{!page-b0_testing_cookbook}cookbook}. *)

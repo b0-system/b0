@@ -68,7 +68,7 @@ module File_cache : sig
   (** The type for keys. A key maps to a metadata hunk and an ordered
       list of file contents. The module treats keys as sequence of
       bytes however since they are used as file names they should
-      satisfy the {!B0_std.Fpath.is_seg} predicate; this is not
+      satisfy the {!B0_std.Fpath.is_segment} predicate; this is not
       checked by the module. *)
 
   type t
@@ -582,7 +582,7 @@ module Op : sig
 
   val revived : t -> bool
   (** [revived o] is [true] iff [o] was revived from a cache. Only
-      relevant if {!hash} is not {!B0_std.Hash.nil}. *)
+      relevant if {!hash} is not {!B0_hash.nil}. *)
 
   val status : t -> status
   (** [status o] is [o] execution status. *)
@@ -599,9 +599,9 @@ module Op : sig
       [root] are stored along-side the cache key. *)
 
   val hash : t -> B0_hash.t
-  (** [hash o] is the operation's hash. This is {!B0_std.Hash.nil} before the
+  (** [hash o] is the operation's hash. This is {!B0_hash.nil} before the
       operation hash has been effectively computed and set via
-      {!set_hash}. This remains {!B0_std.Hash.nil} for operations that are
+      {!set_hash}. This remains {!B0_hash.nil} for operations that are
       not revivable. *)
 
   val supports_reviving : t -> bool
@@ -764,7 +764,7 @@ end
 (** Build operation revivers.
 
     An operation reviver combines a {{!File_cache}file cache} and a
-    {{!B0_std.Hash.T}hash function} to record and revive the effect of
+    {{!B0_hash.T}hash function} to record and revive the effect of
     {{!Op}build operations}.
 
     {b Note.} Hashes performed on files by this module are

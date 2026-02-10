@@ -8,15 +8,15 @@ open B0_testing
 let test_string_get =
   Test.test "String.get" @@ fun () ->
   Test.char (String.get "a" 0) 'a' ~__POS__;
-  Snap.char (String.get "ab" 1) @@ __POS_OF__ 'b';
-  Snap.raise (fun () -> String.get "" 0) @@ __POS_OF__
+  Snap.char (String.get "ab" 1) @> __POS_OF__ 'b';
+  Snap.raise (fun () -> String.get "" 0) @> __POS_OF__
     (Invalid_argument("index out of bounds"));
   ()
 
 let test_list_map =
   Test.test "List.map" @@ fun () ->
   Test.(list T.int) (List.map succ [1; 2; 3]) [2; 3; 4] ~__POS__;
-  Snap.(list T.int) (List.map succ [1; 2; 3]) @@ __POS_OF__
+  Snap.(list T.int) (List.map succ [1; 2; 3]) @> __POS_OF__
     [2; 3; 4];
   ()
 
@@ -31,7 +31,7 @@ let test_randomized =
 
 let test_snapshots =
   Test.test "Snapshots" @@ fun () ->
-  Snap.string (String.concat "," ["a";"b";"c"]) @@ __POS_OF__
+  Snap.string (String.concat "," ["a";"b";"c"]) @> __POS_OF__
     "a,b,c";
   ()
 

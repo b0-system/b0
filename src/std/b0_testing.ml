@@ -4,6 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open B0_std
+open Result.Syntax
 
 let array_equal equal a0 a1 =
   (* 5.3, still no Array.equal (?!)
@@ -80,6 +81,7 @@ end
 
 module Test = struct
   type loc = string * int * int * int
+  let invalid_loc = ("/dev/null", 0, 0, 0)
 
   (* Logging *)
 
@@ -99,9 +101,9 @@ module Test = struct
     Fmt.kpf k !out ("%a @[" ^^ fmt ^^ "@]@.") (Fmt.st color) pad
 
   let log_padded_loc_flush ?(pad = Test_fmt.padding) ~color ~mark_none loc =
-    match loc with
-    | Some loc -> log_pad_flush ~pad ~color "%a" Test_fmt.loc loc
-    | None -> if mark_none then Fmt.pf !out "%a@."  (Fmt.st color) pad
+    if loc == invalid_loc
+    then (if mark_none then Fmt.pf !out "%a@."  (Fmt.st color) pad)
+    else (log_pad_flush ~pad ~color "%a" Test_fmt.loc loc)
 
   let loc_log ?pad ~color loc fmt =
     log_padded_loc_flush ~color ~mark_none:false loc;
@@ -112,16 +114,21 @@ module Test = struct
     klog_pad_flush ?pad ~color k fmt
 
   let log_finish fmt = Fmt.pf !out ("@[" ^^ fmt ^^ "@]@.")
-  let log_start ?__POS__:loc fmt =
+  let log_start ?__POS__:(loc = invalid_loc) fmt =
     let color = Test_fmt.test_color in
     log_padded_loc_flush ~color ~mark_none:false loc;
     log_pad_noflush ~color fmt
 
-  let log ?__POS__:loc fmt = loc_log ~color:Test_fmt.test_color loc fmt
-  let log_pass ?__POS__:loc fmt = loc_log ~color:Test_fmt.pass_color loc fmt
+  let log ?__POS__:(loc = invalid_loc) fmt =
+    loc_log ~color:Test_fmt.test_color loc fmt
 
-  let log_fail ?__POS__:loc fmt = loc_log ~color:Test_fmt.fail_color loc fmt
-  let klog_fail ?__POS__:loc k fmt =
+  let log_pass ?__POS__:(loc = invalid_loc) fmt =
+    loc_log ~color:Test_fmt.pass_color loc fmt
+
+  let log_fail ?__POS__:(loc = invalid_loc) fmt =
+    loc_log ~color:Test_fmt.fail_color loc fmt
+
+  let klog_fail ?__POS__:(loc = invalid_loc) k fmt =
     loc_klog ~color:Test_fmt.fail_color loc k fmt
 
   let log_exn_fail bt exn =
@@ -199,7 +206,7 @@ module Test = struct
   exception Skip
 
   let stop () = raise_notrace Stop
-  let skip ?__POS__:pos fmt =
+  let skip ?__POS__:(pos = invalid_loc) fmt =
     Skip.incr ();
     loc_klog ~pad:Test_fmt.skip_str ~color:Test_fmt.skip_color pos
       (fun _ -> raise_notrace Skip) fmt
@@ -232,12 +239,13 @@ module Test = struct
           log_fail ?__POS__ "Block %a on %a assertions"
             Test_fmt.failed () Test_fmt.fail_count_ratio (fail_diff, assertions)
     in
-    begin try f () with
-    | Stop | Skip -> ()
-    | exn when not (Os.exn_don't_catch exn) ->
-        let bt = Printexc.get_raw_backtrace () in
-        log_exn_fail bt exn;
-        Fail.incr ()
+    begin
+      try f () with
+      | Stop | Skip -> ()
+      | exn when not (Os.exn_don't_catch exn) ->
+          let bt = Printexc.get_raw_backtrace () in
+          log_exn_fail bt exn;
+          Fail.incr ()
     end;
     finish ()
 
@@ -419,8 +427,6 @@ module Test = struct
     type 'a t = 'a T.t -> fnd:'a -> exp:'a -> unit Fmt.t
     let make render = render
 
-    open Result.Syntax
-
     let dumb (type a) t ~fnd ~exp ppf () =
       Fmt.pf ppf "@[<v>@[%a@]@,%a@,@[%a@]@]"
         (T.pp t) fnd Test_fmt.neq () (T.pp t) exp
@@ -526,12 +532,12 @@ module Test = struct
 
     let src_root = ref None
     let set_src_root root = src_root := root
+    let get_filepath file = match !src_root with
+    | None -> file | Some root -> Fpath.append root file
 
     let files : t option Fpath.Map.t ref = ref Fpath.Map.empty
     let get file =
-      let file = match !src_root with
-      | None -> file | Some root -> Fpath.append root file
-      in
+      let file = get_filepath file in
       match Fpath.Map.find_opt file !files with
       | Some v -> v
       | None ->
@@ -566,10 +572,19 @@ module Test = struct
 
   type 'a eq = ?diff:'a Diff.t -> ?__POS__:loc -> 'a -> 'a -> unit
 
-  let failneq ?diff ?__POS__:loc t fnd exp =
+  let failneq ?diff ?__POS__:(loc = invalid_loc) t fnd exp =
     Fail.incr ();
     log_padded_loc_flush ~color:Test_fmt.fail_color ~mark_none:true loc;
     log_raw_flush "%a" (Diff.pp ?diff t ~fnd ~exp) ()
+
+  let failneq_2locs ?diff ~loc0 ~loc1 t fnd exp =
+    if loc0 = loc1 then failneq ?diff ~__POS__:loc0 t fnd exp else
+    begin
+      Fail.incr ();
+      log_padded_loc_flush ~color:Test_fmt.fail_color ~mark_none:true loc0;
+      log_padded_loc_flush ~color:Test_fmt.fail_color ~mark_none:true loc1;
+      log_raw_flush "%a" (Diff.pp ?diff t ~fnd ~exp) ()
+    end
 
   let eq t ?diff ?__POS__ fnd exp =
     if T.equal t fnd exp then pass () else failneq ?diff ?__POS__ t fnd exp
@@ -716,7 +731,7 @@ module Test = struct
         Test_fmt.fail_count fail_count plural
         Test_fmt.incorrect () Fmt.code ("--" ^ cli_correct) it
 
-    let log_correcting ?__POS__:loc fmt =
+    let log_correcting ~loc fmt =
       let color = Test_fmt.pass_color in
       log_padded_loc_flush ~color ~mark_none:true loc;
       log_raw_flush "%a reference snapshot to:"
@@ -780,14 +795,22 @@ module Test = struct
 
     (* Snapshots *)
 
-    type 'a t = loc * 'a
-    type 'a subst = 'a T.t -> loc * 'a -> by:'a -> src:string -> Patch.subst
+    type 'a t =
+    | In_source : loc * 'a -> 'a t
+    | External : loc * Fpath.t -> string t (* a codec could generalize *)
 
-    let loc = fst
-    let value = snd
-    let generic_subst t exp ~by ~src =
+    let src_loc : type a. a t -> loc = function
+    | In_source (loc, _) | External (loc, _) -> loc
+
+    let exp_loc : type a. a t -> loc = function
+    | In_source (loc, _) -> loc
+    | External (_, f) -> (Fpath.to_string f, 1, 0, 0)
+
+    type 'a subst = 'a T.t -> 'a t -> by:'a -> src:string -> Patch.subst
+
+    let generic_subst t snap ~by ~src =
       let subst = Fmt.str "@[%a@]" (T.pp t) by in
-      let first, last = find_value_subrange (loc exp) src in
+      let first, last = find_value_subrange (src_loc snap) src in
       let first, last =
         if src.[first] = '(' && subst.[0] <> '('
         then first + 1, last - 1 (* keep parens *)
@@ -797,8 +820,8 @@ module Test = struct
       let subst = reindent ~indent subst in
       { Patch.first; last; subst }
 
-    let string_subst _ exp ~by ~src =
-      let first, last = find_value_subrange (loc exp) src in
+    let string_subst _ snap ~by ~src =
+      let first, last = find_value_subrange (src_loc snap) src in
       if src.[first] = '\"' then begin
         let indent = Text.find_col ~start:(first - 1) src in
         let subst = Fmt.str "%a" Fmt.text_string_literal by in
@@ -810,36 +833,89 @@ module Test = struct
          expand the token if it happens in [by]. *)
       { Patch.first = first + 2; last = last - 2; subst = by }
 
-    let correct_snapshot ?subst t fnd ((fname, _, _, _), _ as exp) =
-      let file = Fpath.of_string fname |> Result.error_to_failure in
-      match Patch.get file with
-      | None -> ()
-      | Some patch ->
-          let subst = match subst with
-          | None -> generic_subst t exp ~by:fnd ~src:patch.src
-          | Some subst -> subst t exp ~by:fnd ~src:patch.src
-          in
-          Patch.update file (Patch.add_subst patch subst)
+    let correct_snapshot :
+      type a. ?subst:a subst -> a T.t -> a -> a t -> unit
+      =
+      fun ?subst t fnd snap -> match snap with
+      | External (_, file) ->
+          let force = true and make_path = true in
+          Os.File.write ~force ~make_path file fnd |> Result.error_to_failure
+      | In_source _ ->
+          let fname, _, _, _ = src_loc snap in
+          let file = Fpath.of_string fname |> Result.error_to_failure in
+          match Patch.get file with
+          | None -> ()
+          | Some patch ->
+              let subst = match subst with
+              | None -> generic_subst t snap ~by:fnd ~src:patch.src
+              | Some subst -> subst t snap ~by:fnd ~src:patch.src
+              in
+              Patch.update file (Patch.add_subst patch subst)
 
-    let snap ?subst t ?diff fnd exp =
-      try
-        if T.equal t fnd (value exp) then begin
-          if force_correct () then correct_snapshot ?subst t fnd exp;
-          pass ()
+    let snap_value :
+      type a. ?subst:a subst -> a T.t -> ?diff:a Diff.t -> a -> a -> a t -> unit
+      =
+      fun ?subst t ?diff fnd exp snap ->
+      if T.equal t fnd exp then begin
+        if force_correct () then correct_snapshot ?subst t fnd snap;
+        pass ()
+      end else begin
+        incr_fail ();
+        if not (correct () || force_correct ()) then begin
+          failneq_2locs
+            ~loc0:(src_loc snap) ~loc1:(exp_loc snap) ?diff t fnd exp
         end else begin
+          log_correcting ~loc:(exp_loc snap) "%a" (T.pp t) fnd;
+          correct_snapshot ?subst t fnd snap
+        end
+      end
+
+    let snap_external ?subst t ?diff fnd loc file snap =
+      match Os.File.exists file with
+      | Error e -> Fail.incr (); log_fail ~__POS__:loc "%s" e
+      | Ok false ->
           incr_fail ();
           if not (correct () || force_correct ())
-          then failneq ~__POS__:(loc exp) ?diff t fnd (value exp) else
-          begin
-            log_correcting ~__POS__:(loc exp) "%a" (T.pp t) fnd;
-            correct_snapshot ?subst t fnd exp
+          then begin
+            Fail.incr ();
+            log_fail ~__POS__:loc
+              "@[<v>Missing %a@]" (Fmt.code' Fpath.pp) file;
+            log_raw_flush "%a" (T.pp t) fnd
+          end else begin
+            log_correcting ~loc:(exp_loc snap) "%a" (T.pp t) fnd;
+            correct_snapshot ?subst t fnd snap
           end
-        end
+      | Ok true ->
+          match Os.File.read file with
+          | Error e -> Fail.incr (); log_fail ~__POS__:loc "%s" e;
+          | Ok exp -> snap_value ?subst t ?diff fnd exp snap
+
+    (* Hack to get absolute paths in [External] snaps. We should change that
+       see the cookbook. *)
+    let adjust_external_snap ?__POS__:pos loc file = match pos with
+    | None -> loc, Patch.get_filepath file (* cli src-root *)
+    | Some (src_file, _, _, _ as loc) ->
+        let base = Fpath.(parent (v src_file)) in
+        let file = Fpath.append base file in
+        loc, file
+
+    let snap : type a.
+      ?subst:a subst -> a T.t -> ?__POS__:loc -> ?diff:a Diff.t -> a -> a t ->
+      unit
+      =
+      fun ?subst t ?__POS__:pos ?diff fnd snap ->
+      try match snap with
+      | In_source (_, exp) -> snap_value ?subst t ?diff fnd exp snap
+      | External (loc, file) ->
+          let loc, file = adjust_external_snap ?__POS__:pos loc file in
+          let snap = External (loc, file) in
+          snap_external ?subst t ?diff fnd loc file snap
       with
       | Failure e -> log_fail "Correction failure: %s" e
+
   end
 
-  type 'a snap = ?diff:'a Diff.t -> 'a -> 'a Snapshot.t -> unit
+  type 'a snap = ?__POS__:loc -> ?diff:'a Diff.t -> 'a -> 'a Snapshot.t -> unit
   let snap = Snapshot.snap
 
   module Long = struct
@@ -1164,9 +1240,11 @@ module Snap = struct
 
   let exn = Test.(snap T.exn)
   let raise ?ret ?(exn = T.exn) ?diff ?__POS__:pos f exp =
-    let pos = match pos with None -> Test.Snapshot.loc exp | Some pos -> pos in
+    let pos = match pos with
+    | None -> Test.Snapshot.src_loc exp | Some pos -> pos
+    in
     Test.catch ?ret ~__POS__:pos f @@ fun fnd ->
-    Test.snap exn ?diff fnd exp
+    Test.snap exn ~__POS__:pos ?diff fnd exp
 
   let unit = Test.(snap T.unit)
   let bool = Test.(snap T.bool)
@@ -1209,12 +1287,42 @@ module Snap = struct
   let t5 v0 v1 v2 v3 v4 = Test.(snap (T.t5 v0 v1 v2 v3 v4))
   let t6 v0 v1 v2 v3 v4 v5 = Test.(snap (T.t6 v0 v1 v2 v3 v4 v5))
 
-  (* Command spawns. *)
+  (* Command spawns *)
 
-  let stdout ?__POS__ ?diff ?env ?cwd ?stdin ?stderr ~trim cmd exp =
-    match Os.Cmd.run_status_out ?env ?cwd ?stdin ?stderr ~trim cmd with
-    | Error e -> Test.fail ?__POS__ "%s" e
-    | Ok (_status, out) -> string ?diff out exp
+  let stdout
+      ?__POS__ ?(test = Test.T.lines) ?diff ?env ?cwd ?stdin ?stderr ~trim
+      cmd snap
+    =
+    Test.error_to_fail ?__POS__ @@
+    let* _st, fnd = Os.Cmd.run_status_out ?env ?cwd ?stdin ?stderr ~trim cmd in
+    let subst = Test.Snapshot.string_subst in
+    Ok (Test.snap ~subst test ?__POS__ ?diff fnd snap)
+
+  let make_run_snapshot status ~stdout ~stderr =
+    let* stdout = Os.File.read stdout in
+    let* stderr = Os.File.read stderr in
+    let exit = match status with
+    | `Exited st -> Fmt.str "exited:%d\n" st
+    | `Signaled sg -> Fmt.str "signaled:%d\n" sg
+    in
+    let ohdr = Fmt.str "┌─ stdout:%d\n" (String.length stdout) in
+    let ehdr = Fmt.str "┌─ stderr:%d\n" (String.length stderr) in
+    let olen = String.length stdout in
+    let nl_pad = if olen > 0 && stdout.[olen - 1] <> '\n' then "\n" else "" in
+    Ok (String.concat "" [exit; ohdr; stdout; nl_pad; ehdr; stderr])
+
+  let run ?__POS__ ?(test = T.lines) ?diff ?env ?cwd ?stdin cmd snap =
+    Test.error_to_fail ?__POS__ @@ Result.join @@
+    Os.File.with_tmp @@ fun stdoutf ->
+    Os.File.with_tmp @@ fun stderrf ->
+    let stdout = Os.Cmd.out_file ~force:true ~make_path:false stdoutf in
+    let stderr = Os.Cmd.out_file ~force:true ~make_path:false stderrf in
+    let* status = Os.Cmd.run_status ?env ?cwd ?stdin ~stderr ~stdout cmd in
+    let* run = make_run_snapshot status ~stdout:stdoutf ~stderr:stderrf in
+    let subst = Test.Snapshot.string_subst in
+    Ok (Test.snap ~subst test ?__POS__ ?diff run snap)
 end
 
-let ( !! ) ?(loc = ("/dev/null", 0, 0, 0)) v = (loc, v)
+let ( !> ) ?(loc = Test.invalid_loc) v = Test.Snapshot.In_source (loc, v)
+let ( !@ ) ?(loc = Test.invalid_loc) file = Test.Snapshot.External (loc, file)
+let ( @> ) f (loc, v) = f (Test.Snapshot.In_source (loc, v))

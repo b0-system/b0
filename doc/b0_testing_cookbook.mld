@@ -1,0 +1,119 @@
+{0 {!B0_testing} cookbook}
+
+A few recipes and starting {{!blueprints}blueprints} for using {!B0_testing}.
+
+{b Note.} Some of the code snippets here assume they are done after:
+
+{[
+open B0_std
+open B0_testing
+]}
+
+{1:run Running}
+
+{2:cwd What is the current working directory?}
+
+That depens on you run the test. The current working directory is
+important for snapshots, both in source and external. In general it's
+better to declare your tests in [B0.ml] as running from the scope
+directory. This way you can use scope relative file paths in your test
+files.
+
+{2:ext_snaps How should I specify external snapshot files?}
+
+For now the best is to specify them relative to the source file
+and use the [__POS__] argument in the snapshot function. The file
+path then gets adjusted to have absolute file paths, which is good
+for your editor.
+{[
+let root = Fpath.v "snapshot" (* In the directory of this source *)
+Snap.run Cmd.(tool "echo" % "Hey!") !@ Fpath.(root / "echo.run") ~__POS__;
+]}
+If the [--src-root] option is specified that takes over.
+
+{b FIXME.} In the end all that relies on having absolute paths in the
+build rules, which means we get absolute paths in `__POS__` once we
+start playing w ith reproducible builds that will no longer be the
+case. We should rather define a cli argument backed by an env var
+[TESTING_ROOT] and provide b0 action support to automatically setup
+that.
+
+{b TODO.} Strategies to test file locations.
+
+
+{1:tests Tests}
+
+{1:arguments Test arguments}
+
+{2:how_test_arg How can I define an argument for my test?}
+
+A test can depend on arguments. In order to do so you need to declare
+the argument with {!B0_testing.Test.Arg.make}, then declare your test
+with {!B0_testing.Test.test'}, and the argument value must be supplied
+in the in the [main] procedure. This leads to the following structure:
+
+{[
+let limit = Test.Arg.make ()
+
+let test =
+  Test.test' limit "Try to break it" @@ fun limit ->
+  for i = 1 to limit do () done
+
+let main () =
+  Test.main @@ fun () ->
+  Test.autorun () ~args:Test.Arg.[value limit 10]
+
+let () = if !Sys.interactive then () else exit (main ())
+]}
+
+{2:how_cli_arg How can I define a new command line argument?}
+
+
+{2:how_args How can I read tests from a file?}
+
+If some tests are defined in a file you can read the file and pass
+them to the tests as an argument and execute the tests in a
+{!B0_testing.Test.block}.
+
+{[
+(* Specification tests *)
+
+type spec_test = …
+let load_spec_tests file = …
+let run_test t = if true then Test.pass () else Test.fail "Oh no!"
+
+(* Running them *)
+
+let spec_tests : test list Test.Arg.t = Test.Arg.make ()
+let test_spec =
+  Test.test' spec_tests "specification tests" @@ fun tests ->
+  let pass ?__POS__ count =
+    Test.log "%a %a %a" Test.Fmt.count count test count Test.Fmt.passed ()
+  in
+  let fail ?__POS__ count ~assertions =
+    Test.log "%a %a %a"
+      Test.Fmt.fail_count_ratio (count, assertions) test assertions
+      Test.Fmt.failed ()
+  in
+  Test.block ~pass ~fail (fun () -> List.iter (run_test cmd) tests)
+
+open Cmdliner
+open Cmdliner.Term.Syntax
+
+let main () =
+  Test.main' @@
+  let+ spec_tests_file =
+    let doc = "$(docv) is the specification tests file." in
+    let default = Fpath.v "test/spec-tests.json" in
+    Arg.(value & opt B0_std_cli.filepath default & info ["file"] ~doc)
+  in
+  fun () ->
+    let open Syntax.Result in
+    Test.error_to_failstop @@
+    let* tests = read_spec_tests spec_tests_file in
+    Test.autorun ~args:Test.Arg.[value spec_tests tests]
+
+let () = if !Sys.interactive then () else exit (main ())
+]}
+
+{1:blueprints Blueprints}

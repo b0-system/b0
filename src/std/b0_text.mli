@@ -248,7 +248,7 @@ module Textdec : sig
       {!eot} has been returned have no effect.
 
       If an UTF-8 decoding error occurs {!current} becomes
-      {!Uchar.rep} and {!current_is_error} returns [true]. {!next} can
+      {!Uchar.rep} and {!is_error} returns [true]. {!next} can
       still be called afterwards for best-effort decoding. *)
 
   (** {1:textlocs Text locations} *)
@@ -280,7 +280,7 @@ module Textdec : sig
 
   val line_start : t -> Textloc.byte_pos
   (** [line_num d] is the first byte position on the current line.
-      See {!Textloc.line_pos}. *)
+      See {!Textloc.val-line_pos}. *)
 
   val line_pos : t -> Textloc.line_pos
   (** [line_pos d] is the line position of the current decode. *)
@@ -303,7 +303,7 @@ module Textdec : sig
 
   val textloc : t -> Textloc.t
   (** [textloc d] is the text position of the current decode. The text location
-      spans the UTF-8 bytes of the decode it is on {!line_pos}[ d]. *)
+      spans the UTF-8 bytes of the decode it is on {!val-line_pos}[ d]. *)
 
   val textloc_span :
     t -> start:(Textloc.byte_pos * Textloc.line_pos) -> Textloc.t
