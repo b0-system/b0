@@ -13,3 +13,5 @@ in a set of modules aligned on the different tools of the eco-system:
 - {!B0_opam}. Support for [opam]. Describe opam packages via b0 pack
   ymetadata and publish to them to the public OCaml opam repository. It
   has its own {{!page-opam}manual}.
+- {!B0_testing}. Support for unit, random and snapshot testing.
+  It has its own {{!page-b0_testing_cookbook}cookbook}.

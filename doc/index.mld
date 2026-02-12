@@ -35,6 +35,9 @@ occasionally.
   for handling your OCaml projects.
 - The {{!page-opam}b0 opam manual} describes support to generate
   [opam] files and publish them in repositories with the [.opam] action.
+- To test your programs and libraries the {!B0_testing}
+  module and its {{!page-b0_testing_cookbook}cookbook} can be used. Note
+  that this tool is independent from [b0] itself.
 
 {2:manuals_dev For b0 developers}
 

@@ -79,126 +79,419 @@ module Test_fmt = struct
   let anon ppf _ = Fmt.string ppf "<abstr>"
 end
 
-module Test = struct
-  type loc = string * int * int * int
-  let invalid_loc = ("/dev/null", 0, 0, 0)
+type loc = string * int * int * int
+let invalid_loc = ("/dev/null", 0, 0, 0)
 
-  (* Logging *)
+(* Logging *)
 
-  type 'a log = ?__POS__:loc -> ('a, Format.formatter, unit, unit) format4 -> 'a
+module Log = struct
+
+  type 'a t = ?__POS__:loc -> ('a, Format.formatter, unit, unit) format4 -> 'a
 
   let out = ref Format.std_formatter
-  let log_raw fmt = Fmt.pf !out fmt
-  let log_raw_flush fmt = log_raw (fmt ^^ "@.")
+  let raw fmt = Fmt.pf !out fmt
+  let raw_flush fmt = raw (fmt ^^ "@.")
 
-  let log_pad_noflush ?(pad = Test_fmt.padding) ~color fmt =
+  let pad_noflush ?(pad = Test_fmt.padding) ~color fmt =
     Fmt.pf !out ("%a @[" ^^ fmt ^^ "@]@?") (Fmt.st color) pad
 
-  let log_pad_flush ?(pad = Test_fmt.padding) ~color fmt =
+  let pad_flush ?(pad = Test_fmt.padding) ~color fmt =
     Fmt.pf !out ("%a @[" ^^ fmt ^^ "@]@.") (Fmt.st color) pad
 
-  let klog_pad_flush ?(pad = Test_fmt.padding) ~color k fmt =
+  let kpad_flush ?(pad = Test_fmt.padding) ~color k fmt =
     Fmt.kpf k !out ("%a @[" ^^ fmt ^^ "@]@.") (Fmt.st color) pad
 
-  let log_padded_loc_flush ?(pad = Test_fmt.padding) ~color ~mark_none loc =
+  let padded_loc_flush ?(pad = Test_fmt.padding) ~color ~mark_none loc =
     if loc == invalid_loc
     then (if mark_none then Fmt.pf !out "%a@."  (Fmt.st color) pad)
-    else (log_pad_flush ~pad ~color "%a" Test_fmt.loc loc)
+    else (pad_flush ~pad ~color "%a" Test_fmt.loc loc)
 
   let loc_log ?pad ~color loc fmt =
-    log_padded_loc_flush ~color ~mark_none:false loc;
-    log_pad_flush ?pad ~color fmt
+    padded_loc_flush ~color ~mark_none:false loc;
+    pad_flush ?pad ~color fmt
 
   let loc_klog ?pad ~color loc k fmt =
-    log_padded_loc_flush ~color ~mark_none:false loc;
-    klog_pad_flush ?pad ~color k fmt
+    padded_loc_flush ~color ~mark_none:false loc;
+    kpad_flush ?pad ~color k fmt
 
-  let log_finish fmt = Fmt.pf !out ("@[" ^^ fmt ^^ "@]@.")
-  let log_start ?__POS__:(loc = invalid_loc) fmt =
+  let finish fmt = Fmt.pf !out ("@[" ^^ fmt ^^ "@]@.")
+  let start ?__POS__:(loc = invalid_loc) fmt =
     let color = Test_fmt.test_color in
-    log_padded_loc_flush ~color ~mark_none:false loc;
-    log_pad_noflush ~color fmt
+    padded_loc_flush ~color ~mark_none:false loc;
+    pad_noflush ~color fmt
 
-  let log ?__POS__:(loc = invalid_loc) fmt =
+  let msg ?__POS__:(loc = invalid_loc) fmt =
     loc_log ~color:Test_fmt.test_color loc fmt
 
-  let log_pass ?__POS__:(loc = invalid_loc) fmt =
+  let pass ?__POS__:(loc = invalid_loc) fmt =
     loc_log ~color:Test_fmt.pass_color loc fmt
 
-  let log_fail ?__POS__:(loc = invalid_loc) fmt =
+  let fail ?__POS__:(loc = invalid_loc) fmt =
     loc_log ~color:Test_fmt.fail_color loc fmt
 
-  let klog_fail ?__POS__:(loc = invalid_loc) k fmt =
+  let kfail ?__POS__:(loc = invalid_loc) k fmt =
     loc_klog ~color:Test_fmt.fail_color loc k fmt
 
-  let log_exn_fail bt exn =
+  let exn_fail bt exn =
     let color = Test_fmt.fail_color in
     begin match exn with
-    | Assert_failure _ -> log_pad_flush ~color "%s" "Assertion failed";
-    | exn -> log_pad_flush ~color "%a raised" (Fmt.code' Fmt.exn) exn
+    | Assert_failure _ -> pad_flush ~color "%s" "Assertion failed";
+    | exn -> pad_flush ~color "%a raised" (Fmt.code' Fmt.exn) exn
     end;
     match Printexc.backtrace_slots bt with
     | None ->
-        log_pad_flush ~color "No backtrace. Did you compile with %a ?"
+        pad_flush ~color "No backtrace. Did you compile with %a ?"
           Fmt.code "-g"
     | Some slots ->
-        Array.iter (log_pad_flush ~color "%a" Test_fmt.bt_slot_loc) slots
+        Array.iter (pad_flush ~color "%a" Test_fmt.bt_slot_loc) slots
+end
 
-  (* Testing state, note this stuff is not thread safe.
+(* Testing state, note this stuff is not thread safe.
 
-     When we can afford effects we could move this to [test].
-     Basically all fail combinators (except failstop) raise an
-     effect to increment local references and we continue. *)
+   When we can afford effects we could move this to [Test.test].
+   Basically all fail combinators (except failstop) raise an
+   effect to increment local references and we continue. *)
 
-  let run_test_count = Atomic.make 0
+let run_test_count = Atomic.make 0
 
-  module Pass = struct
-    let count = Atomic.make 0
-    let incr () = Atomic.incr count
-    let report ~dur =
-      if Atomic.get run_test_count = 0 then begin
-        log_pad_flush ~pad:Test_fmt.pass_str ~color:Test_fmt.pass_color
-          "@[Test %a in %a@]"
-          Test_fmt.passed () Test_fmt.dur (Os.Mtime.count dur)
-      end else begin
-        log_pad_flush ~pad:Test_fmt.pass_str ~color:Test_fmt.pass_color
-          "@[%a %s %a in %a@]"
-          Test_fmt.count (Atomic.get run_test_count)
-          (Text.teststr (Atomic.get run_test_count))
-          Test_fmt.passed () Test_fmt.dur (Os.Mtime.count dur)
-      end
-  end
+module Pass = struct
+  let count = Atomic.make 0
+  let incr () = Atomic.incr count
+  let report ~dur =
+    if Atomic.get run_test_count = 0 then begin
+      Log.pad_flush ~pad:Test_fmt.pass_str ~color:Test_fmt.pass_color
+        "@[Test %a in %a@]"
+        Test_fmt.passed () Test_fmt.dur (Os.Mtime.count dur)
+    end else begin
+      Log.pad_flush ~pad:Test_fmt.pass_str ~color:Test_fmt.pass_color
+        "@[%a %s %a in %a@]"
+        Test_fmt.count (Atomic.get run_test_count)
+        (Text.teststr (Atomic.get run_test_count))
+        Test_fmt.passed () Test_fmt.dur (Os.Mtime.count dur)
+    end
+end
 
-  module Fail = struct
-    let count = Atomic.make 0
-    let incr () = Atomic.incr count
-    let test_count = Atomic.make 0
-    let report ~dur =
-      let pad = Test_fmt.fail_str and color = Test_fmt.fail_color in
-      if Atomic.get test_count = 0 then begin
-        log_pad_flush ~pad ~color "@[Test %a in %a@]"
-          Test_fmt.failed () Test_fmt.dur (Os.Mtime.count dur)
-      end else begin
-        let ratio = Atomic.get test_count, Atomic.get run_test_count in
-        log_pad_flush ~pad ~color "@[%a %s %a in %a@]"
-          Test_fmt.fail_count_ratio ratio
-          (Text.teststr (Atomic.get test_count))
-          Test_fmt.failed () Test_fmt.dur (Os.Mtime.count dur)
-      end
-  end
+module Fail = struct
+  let count = Atomic.make 0
+  let incr () = Atomic.incr count
+  let test_count = Atomic.make 0
+  let report ~dur =
+    let pad = Test_fmt.fail_str and color = Test_fmt.fail_color in
+    if Atomic.get test_count = 0 then begin
+      Log.pad_flush ~pad ~color "@[Test %a in %a@]"
+        Test_fmt.failed () Test_fmt.dur (Os.Mtime.count dur)
+    end else begin
+      let ratio = Atomic.get test_count, Atomic.get run_test_count in
+      Log.pad_flush ~pad ~color "@[%a %s %a in %a@]"
+        Test_fmt.fail_count_ratio ratio
+        (Text.teststr (Atomic.get test_count))
+        Test_fmt.failed () Test_fmt.dur (Os.Mtime.count dur)
+    end
+end
 
-  module Skip = struct
-    let count = Atomic.make 0
-    let incr () = Atomic.incr count
-    let test_count = Atomic.make 0
-    let incr_test () = Atomic.incr test_count
-    let report () =
-      let count = Atomic.get test_count in
-      if count <> 0 then begin
-        log_pad_flush ~color:Test_fmt.skip_color "@[%a %s %a@]"
-          Test_fmt.count count (Text.teststr count) Test_fmt.skipped ()
-      end
-  end
+module Skip = struct
+  let count = Atomic.make 0
+  let incr () = Atomic.incr count
+  let test_count = Atomic.make 0
+  let incr_test () = Atomic.incr test_count
+  let report () =
+    let count = Atomic.get test_count in
+    if count <> 0 then begin
+      Log.pad_flush ~color:Test_fmt.skip_color "@[%a %s %a@]"
+        Test_fmt.count count (Text.teststr count) Test_fmt.skipped ()
+    end
+end
+
+(* Testers *)
+
+module type T = sig
+  type t
+  val equal : t -> t -> bool
+  val pp : Format.formatter -> t -> unit
+end
+
+module T = struct
+  type 'a t = (module T with type t = 'a)
+
+  let repr_equal v0 v1 = Stdlib.compare v0 v1 = 0 (* works on nan values *)
+
+  let make (type a) ?(equal = repr_equal) ?(pp = Test_fmt.anon) () : a t =
+    (module (struct type t = a let equal = equal let pp = pp end))
+
+  let equal (type a) (module T : T with type t = a) = T.equal
+  let pp (type a) (module T : T with type t = a) = T.pp
+  let with' (type a) ?equal ?pp (module T : T with type t = a) =
+    let equal = Option.value ~default:T.equal equal in
+    let pp = Option.value ~default:T.pp pp in
+    make ~equal ~pp ()
+
+  (* Predefined testers *)
+
+  let true' (type a) : a t =
+    let equal _ _ = true and pp = Test_fmt.anon in
+    (module struct type t = a let equal = equal let pp = pp end)
+
+  let false' (type a) : a t =
+    let equal _ _ = false and pp = Test_fmt.anon in
+    (module struct type t = a let equal = equal let pp = pp end)
+
+  let any (type a) : a t =
+    let equal = repr_equal and pp = Test_fmt.anon in
+    (module struct type t = a let equal = equal let pp = pp end)
+
+  let exn = make ~equal:repr_equal ~pp:Fmt.exn ()
+  let invalid_arg =
+    let equal exn _ = match exn with
+    | Invalid_argument _ -> true | _ -> false
+    in
+    let pp ppf = function
+    | Invalid_argument _ -> Fmt.string ppf "Invalid_argument _"
+    | exn -> Fmt.exn ppf exn
+    in
+    make ~equal ~pp ()
+
+  let failure =
+    let equal exn _ = match exn with
+    | Failure _ -> true | _ -> false
+    in
+    let pp ppf = function
+    | Failure _ -> Fmt.string ppf "Failure _"
+    | exn -> Fmt.exn ppf exn
+    in
+    make ~equal ~pp ()
+
+  let unit = make ~equal:(fun () () -> true) ~pp:Fmt.OCaml.unit ()
+  let bool = make ~equal:Bool.equal ~pp:Fmt.OCaml.bool ()
+  let int = make ~equal:Int.equal ~pp:Fmt.OCaml.int ()
+  let int32 = make ~equal:Int32.equal ~pp:Fmt.OCaml.int32 ()
+  let uint32 = make ~equal:Int32.equal ~pp:Fmt.OCaml.uint32 ()
+  let int64 = make ~equal:Int64.equal ~pp:Fmt.OCaml.int64 ()
+  let uint64 = make ~equal:Int64.equal ~pp:Fmt.OCaml.uint64 ()
+  let nativeint = make ~equal:Nativeint.equal ~pp:Fmt.OCaml.nativeint ()
+  let nativeuint = make ~equal:Nativeint.equal ~pp:Fmt.OCaml.nativeuint ()
+  let float = make ~equal:Float.equal ~pp:Fmt.OCaml.float ()
+  let hex_float = make ~equal:Float.equal ~pp:Fmt.OCaml.hex_float ()
+  let char = make ~equal:Char.equal ~pp:Fmt.OCaml.char ()
+  let ascii_string = make ~equal:String.equal ~pp:Fmt.OCaml.ascii_string ()
+  let string = make ~equal:String.equal ~pp:Fmt.OCaml.string ()
+  let lines = make ~equal:String.equal ~pp:Fmt.lines ()
+  let binary_string = make ~equal:String.equal ~pp:Fmt.binary_string ()
+  let styled_string =
+    make ~equal:String.equal ~pp:Fmt.styled_text_string_literal ()
+
+  let bytes : bytes t = make ~equal:Bytes.equal ~pp:Fmt.bytes  ()
+
+  let bigbytes = make ~equal:( = ) ~pp:Fmt.bigbytes ()
+
+  let option (type a) (module Some : T with type t = a) : a option t =
+    make ~equal:(Option.equal Some.equal) ~pp:(Fmt.OCaml.option Some.pp) ()
+
+  let either
+      (type a) ~left:(module Left : T with type t = a)
+      (type b) ~right:(module Right : T with type t = b)
+    =
+    let equal = Either.equal ~left:Left.equal ~right:Right.equal in
+    let pp = Fmt.OCaml.either ~left:Left.pp ~right:Right.pp in
+    make ~equal ~pp ()
+
+  let result'
+      (type a) ~ok:(module Ok : T with type t = a)
+      (type b) ~error:(module Error : T with type t = b)
+    =
+    let equal = Result.equal ~ok:Ok.equal ~error:Error.equal in
+    let pp = Fmt.OCaml.result ~ok:Ok.pp ~error:Error.pp in
+    make ~equal ~pp ()
+
+  let result ~ok = result' ~ok ~error:string
+
+  let list (type a) (module Elt : T with type t = a) =
+    make ~equal:(List.equal Elt.equal) ~pp:(Fmt.OCaml.list Elt.pp) ()
+
+  let array (type a) (module Elt : T with type t = a) =
+      make ~equal:(array_equal Elt.equal) ~pp:(Fmt.OCaml.array Elt.pp) ()
+
+  let pair
+      (type a) (module Fst : T with type t = a)
+      (type b) (module Snd : T with type t = b)
+    =
+      let equal (x0, y0) (x1, y1) = Fst.equal x0 x1 && Snd.equal y0 y1 in
+      let pp = Fmt.OCaml.pair Fst.pp Snd.pp in
+      make ~equal ~pp ()
+
+  let t2 = pair
+  let t3 v0 v1 v2 =
+    let equal (a0, a1, a2) (b0, b1, b2) =
+      (equal v0) a0 b0 && (equal v1) a1 b1 && (equal v2) a2 b2
+    in
+    let pp = Fmt.OCaml.t3 (pp v0) (pp v1) (pp v2) in
+    make ~equal ~pp ()
+
+  let t4 v0 v1 v2 v3 =
+    let equal (a0, a1, a2, a3) (b0, b1, b2, b3) =
+      (equal v0) a0 b0 && (equal v1) a1 b1 && (equal v2) a2 b2 &&
+      (equal v3) a3 b3
+    in
+    let pp = Fmt.OCaml.t4 (pp v0) (pp v1) (pp v2) (pp v3) in
+    make ~equal ~pp ()
+
+  let t5 v0 v1 v2 v3 v4 =
+    let equal (a0, a1, a2, a3, a4) (b0, b1, b2, b3, b4) =
+      (equal v0) a0 b0 && (equal v1) a1 b1 && (equal v2) a2 b2 &&
+      (equal v3) a3 b3 && (equal v4) a4 b4
+    in
+    let pp = Fmt.OCaml.t5 (pp v0) (pp v1) (pp v2) (pp v3) (pp v4) in
+      make ~equal ~pp ()
+
+  let t6 v0 v1 v2 v3 v4 v5 =
+    let equal (a0, a1, a2, a3, a4, a5) (b0, b1, b2, b3, b4, b5) =
+      (equal v0) a0 b0 && (equal v1) a1 b1 && (equal v2) a2 b2 &&
+      (equal v3) a3 b3 && (equal v4) a4 b4 && (equal v5) a5 b5
+    in
+    let pp = Fmt.OCaml.t6 (pp v0) (pp v1) (pp v2) (pp v3) (pp v4) (pp v5) in
+    make ~equal ~pp ()
+end
+
+module Diff = struct
+  type 'a t = 'a T.t -> fnd:'a -> exp:'a -> unit Fmt.t
+  let make render = render
+
+  let dumb (type a) t ~fnd ~exp ppf () =
+    Fmt.pf ppf "@[<v>@[%a@]@,%a@,@[%a@]@]"
+      (T.pp t) fnd Test_fmt.neq () (T.pp t) exp
+
+  let run_diff_cmd ?env cmd ~fnd ~exp =
+    Result.join @@ Os.Dir.with_tmp @@ fun dir ->
+    let force = false and make_path = false in
+    let* () = Os.File.write ~force ~make_path Fpath.(dir / "expected") exp in
+    let* () = Os.File.write ~force ~make_path Fpath.(dir / "found") fnd in
+    let diff = Cmd.(cmd % "expected" % "found") in
+    match Os.Cmd.run_status_out ?env ~trim:false ~cwd:dir diff with
+    | Error _ as e -> e
+    | Ok (st, diff) -> Ok diff
+
+  let of_cmd cmd t ~fnd ~exp ppf () =
+    (* The newlines are to avoid 'No newline at the end of file' reported
+       by diffing tools. *)
+    let fnd = Fmt.str "%a@\n" (T.pp t) fnd in
+    let exp = Fmt.str "%a@\n" (T.pp t) exp in
+    match run_diff_cmd cmd ~fnd ~exp with
+    | Error e -> Fmt.pf ppf  "diff command error: %s" e
+    | Ok diff -> Fmt.pf ppf "@[%a@]" Fmt.lines diff
+
+  let git_diff_cmd = B0_std.Cmd.(tool "git" % "diff")
+  let git_diff = lazy (Os.Cmd.get git_diff_cmd)
+  let git_diff ~fnd ~exp =
+    let* git_diff = Lazy.force git_diff in
+    let opts =
+      let color = match Fmt.styler () with
+      | Fmt.Plain -> "--color=never"
+      | Fmt.Ansi -> "--color=always"
+      in
+      Cmd.(arg "--ws-error-highlight=all" %
+           "--no-index" % "--no-prefix" % "--patience" % color)
+    in
+    let env = ["GIT_CONFIG_SYSTEM=/dev/null"; "GIT_CONFIG_GLOBAL=/dev/null"]in
+    (* Add newlines to avoid 'No newline at the end of file' reported
+         by diffing tools. *)
+    let fnd = fnd ^ "\n" in
+    let exp = exp ^ "\n" in
+    let cmd = Cmd.(git_diff %% opts) in
+    let* diff = run_diff_cmd ~env cmd ~fnd ~exp in
+    (* Trim the first two lines these are: diff --git …\n index …  *)
+    match Text.find_newline ~nth:2 diff with
+    | None -> Ok diff
+    | Some first -> Ok (String.subrange ~first diff)
+
+  let git t ~fnd ~exp ppf () =
+    let fnd = Fmt.str "%a" (T.pp t) fnd in
+    let exp = Fmt.str "%a" (T.pp t) exp in
+    match git_diff ~fnd ~exp with
+    | Error e -> Fmt.pf ppf "git diff error: %s" e
+    | Ok diff -> Fmt.pf ppf "@[%a@]" Fmt.lines diff
+
+  type default = { default : 'a. 'a t }
+  let default = ref { default = git }
+  let set_cmd = function
+  | None -> ()
+  | Some cmd ->
+      let d = match Cmd.to_list cmd with
+      | ["dumb"] -> { default = dumb }
+      | _  :: _ ->
+          let default : 'a. 'a t =
+            fun t ~fnd ~exp ppf () -> of_cmd cmd t ~fnd ~exp ppf ()
+          in
+          { default }
+      | [] ->
+          (B0_std.Log.warn @@ fun m ->
+           m "No diff command specified. Using %a." Fmt.code "dumb");
+          { default = dumb }
+      in
+        default := d
+
+  let default () = !default.default
+
+  let pp ?diff t ~fnd ~exp =
+    let diff = match diff with None -> default () | Some diff -> diff in
+    diff t ~fnd ~exp
+end
+
+module Patch = struct
+  type subst = { first : int; last : int; subst : string }
+  type t = { src : string; substs : subst list; }
+
+  let make ~src = { src; substs = [] }
+  let src p = p.src
+  let substs p = p.substs
+  let is_empty p = p.substs = []
+  let add_subst p subst = { p with substs = subst :: p.substs }
+  let apply { src; substs } =
+    let rec loop acc src ~start = function
+    | [] ->
+        let last = String.subrange ~first:start src in
+        String.concat "" (List.rev (last :: acc))
+    | { first; last; subst } :: substs ->
+        let before = String.subrange ~first:start ~last:(first - 1) src in
+          loop (subst :: before :: acc) src ~start:(last + 1) substs
+    in
+    let compare s0 s1 = Int.compare s0.first s1.first in
+    loop [] src ~start:0 (List.stable_sort compare (List.rev substs))
+
+  (* Files to patch *)
+
+  let files : t option Fpath.Map.t ref = ref Fpath.Map.empty
+
+  let get file = match Fpath.Map.find_opt file !files with
+  | Some v -> v
+  | None ->
+      let substs = match Os.File.read file with
+      | Ok src -> Some { src; substs = [] }
+      | Error e ->
+          Log.fail "Correction failure: %a: %s" Fpath.pp file e;
+          None
+      in
+      files := Fpath.Map.add file substs !files;
+      substs
+
+  let update file patch =
+    files := Fpath.Map.add file (Some patch) !files
+
+  let write_files () =
+    let write_file file = function
+    | None -> ()
+    | Some patch when is_empty patch -> ()
+    | Some patch ->
+        let force = true and make_path = false in
+        match Os.File.write ~force ~make_path file (apply patch) with
+        | Error e -> Log.fail "Correction failure: %a: %s" Fpath.pp file e
+        | Ok () -> ()
+    in
+    Fpath.Map.iter write_file !files
+end
+
+module Test = struct
+  type nonrec loc = loc
+
+  module Log = Log
 
   (* Stop, pass and fail *)
 
@@ -208,13 +501,13 @@ module Test = struct
   let stop () = raise_notrace Stop
   let skip ?__POS__:(pos = invalid_loc) fmt =
     Skip.incr ();
-    loc_klog ~pad:Test_fmt.skip_str ~color:Test_fmt.skip_color pos
+    Log.loc_klog ~pad:Test_fmt.skip_str ~color:Test_fmt.skip_color pos
       (fun _ -> raise_notrace Skip) fmt
 
   let pass () = Pass.incr ()
-  let fail ?__POS__ fmt = Fail.incr (); log_fail ?__POS__ fmt
+  let fail ?__POS__ fmt = Fail.incr (); Log.fail ?__POS__ fmt
   let failstop ?__POS__ fmt =
-    Fail.incr (); klog_fail ?__POS__ (fun _ -> stop ()) fmt
+    Fail.incr (); Log.kfail ?__POS__ (fun _ -> stop ()) fmt
 
   let error_to_failstop ?__POS__ = function
   | Error e -> failstop ?__POS__ "%s" e | Ok v -> v
@@ -224,34 +517,51 @@ module Test = struct
 
   (* Blocks and loops *)
 
-  let block ?pass ?fail ?__POS__ f =
+  let block ?kind ?pass ?fail ?__POS__ f =
     let before_pass_count = Atomic.get Pass.count in
     let before_fail_count = Atomic.get Fail.count in
     let finish () =
       let fail_diff = Atomic.get Fail.count - before_fail_count in
       let assertions = Atomic.get Pass.count - before_pass_count + fail_diff in
-      if fail_diff = 0 then begin
-        match pass with None -> () | Some pass -> pass ?__POS__ assertions
-      end else
-      match fail with
+      if fail_diff = 0 then begin match pass with
+      | Some pass -> pass ?__POS__ assertions
+      | None ->
+          match kind with
+          | None -> ()
+          | Some kind ->
+              let one ppf _ = Fmt.string ppf kind in
+              let pp_kind = Fmt.cardinal ~one () in
+              Log.msg "%a %a %a"
+                  Test_fmt.count assertions pp_kind assertions
+                  Test_fmt.passed ()
+      end else begin match fail with
       | Some fail -> fail ?__POS__ fail_diff ~assertions
       | None ->
-          log_fail ?__POS__ "Block %a on %a assertions"
-            Test_fmt.failed () Test_fmt.fail_count_ratio (fail_diff, assertions)
+          match kind with
+          | None ->
+              Log.fail ?__POS__ "Block %a on %a assertions"
+                Test_fmt.failed () Test_fmt.fail_count_ratio
+                (fail_diff, assertions)
+          | Some kind ->
+              let one ppf _ = Fmt.string ppf kind in
+              let pp_kind = Fmt.cardinal ~one () in
+              Log.msg "%a %a %a"
+                  Test_fmt.fail_count_ratio (fail_diff, assertions)
+                  pp_kind assertions Test_fmt.failed ()
+      end
     in
-    begin
-      try f () with
-      | Stop | Skip -> ()
-      | exn when not (Os.exn_don't_catch exn) ->
-          let bt = Printexc.get_raw_backtrace () in
-          log_exn_fail bt exn;
-          Fail.incr ()
+    begin try f () with
+    | Stop | Skip -> ()
+    | exn when not (Os.exn_don't_catch exn) ->
+        let bt = Printexc.get_raw_backtrace () in
+        Log.exn_fail bt exn;
+        Fail.incr ()
     end;
     finish ()
 
   let rec range ?(kind = "Test") ~first ~last ?__POS__:loc f =
     let log_fail ?__POS__ ~kind ~first ~last n =
-      log_fail ?__POS__ "%s in range [%d;%d] failed on %a" kind first last
+      Log.fail ?__POS__ "%s in range [%d;%d] failed on %a" kind first last
         (Fmt.code' Fmt.int) n
     in
     let rec loop loc ~kind ~first ~last n f =
@@ -268,322 +578,45 @@ module Test = struct
           then log_fail ?__POS__:loc ~kind ~first ~last n
       | exn when not (Os.exn_don't_catch exn) ->
           let bt = Printexc.get_raw_backtrace () in
-          log_exn_fail bt exn;
+          Log.exn_fail bt exn;
           log_fail ?__POS__:loc ~kind ~first ~last n;
           loop loc ~kind ~first ~last (n + 1) f
     in
     loop loc ~kind ~first ~last first f
 
+  (* Test directory *)
+
+  let dir = ref Fpath.null
+  let set_dir d = dir := d
+  let dir () =
+    let d = !dir in
+    if not (Fpath.is_null d) then d else
+    failstop "@[The test directory is not set.@ \
+              See option %a@]" Fmt.code "--test-dir"
+
   (* Testers *)
 
-  module type T = sig
-    type t
-    val equal : t -> t -> bool
-    val pp : Format.formatter -> t -> unit
-  end
+  module type T = T
+  module T = T
+  module Diff = Diff
+  module Patch = Patch
 
-  module T = struct
-    type 'a t = (module T with type t = 'a)
-
-    let repr_equal v0 v1 = Stdlib.compare v0 v1 = 0 (* works on nan values *)
-
-    let make (type a) ?(equal = repr_equal) ?(pp = Test_fmt.anon) () : a t =
-      (module (struct type t = a let equal = equal let pp = pp end))
-
-    let equal (type a) (module T : T with type t = a) = T.equal
-    let pp (type a) (module T : T with type t = a) = T.pp
-    let with' (type a) ?equal ?pp (module T : T with type t = a) =
-      let equal = Option.value ~default:T.equal equal in
-      let pp = Option.value ~default:T.pp pp in
-      make ~equal ~pp ()
-
-    (* Predefined testers *)
-
-    let true' (type a) : a t =
-      let equal _ _ = true and pp = Test_fmt.anon in
-      (module struct type t = a let equal = equal let pp = pp end)
-
-    let false' (type a) : a t =
-      let equal _ _ = false and pp = Test_fmt.anon in
-      (module struct type t = a let equal = equal let pp = pp end)
-
-    let any (type a) : a t =
-      let equal = repr_equal and pp = Test_fmt.anon in
-      (module struct type t = a let equal = equal let pp = pp end)
-
-    let exn = make ~equal:repr_equal ~pp:Fmt.exn ()
-    let invalid_arg =
-      let equal exn _ = match exn with
-      | Invalid_argument _ -> true | _ -> false
-      in
-      let pp ppf = function
-      | Invalid_argument _ -> Fmt.string ppf "Invalid_argument _"
-      | exn -> Fmt.exn ppf exn
-      in
-      make ~equal ~pp ()
-
-    let failure =
-      let equal exn _ = match exn with
-      | Failure _ -> true | _ -> false
-      in
-      let pp ppf = function
-      | Failure _ -> Fmt.string ppf "Failure _"
-      | exn -> Fmt.exn ppf exn
-      in
-      make ~equal ~pp ()
-
-    let unit = make ~equal:(fun () () -> true) ~pp:Fmt.OCaml.unit ()
-    let bool = make ~equal:Bool.equal ~pp:Fmt.OCaml.bool ()
-    let int = make ~equal:Int.equal ~pp:Fmt.OCaml.int ()
-    let int32 = make ~equal:Int32.equal ~pp:Fmt.OCaml.int32 ()
-    let uint32 = make ~equal:Int32.equal ~pp:Fmt.OCaml.uint32 ()
-    let int64 = make ~equal:Int64.equal ~pp:Fmt.OCaml.int64 ()
-    let uint64 = make ~equal:Int64.equal ~pp:Fmt.OCaml.uint64 ()
-    let nativeint = make ~equal:Nativeint.equal ~pp:Fmt.OCaml.nativeint ()
-    let nativeuint = make ~equal:Nativeint.equal ~pp:Fmt.OCaml.nativeuint ()
-    let float = make ~equal:Float.equal ~pp:Fmt.OCaml.float ()
-    let hex_float = make ~equal:Float.equal ~pp:Fmt.OCaml.hex_float ()
-    let char = make ~equal:Char.equal ~pp:Fmt.OCaml.char ()
-    let ascii_string = make ~equal:String.equal ~pp:Fmt.OCaml.ascii_string ()
-    let string = make ~equal:String.equal ~pp:Fmt.OCaml.string ()
-    let lines = make ~equal:String.equal ~pp:Fmt.lines ()
-    let binary_string = make ~equal:String.equal ~pp:Fmt.binary_string ()
-    let styled_string =
-      make ~equal:String.equal ~pp:Fmt.styled_text_string_literal ()
-
-    let bytes : bytes t = make ~equal:Bytes.equal ~pp:Fmt.bytes  ()
-
-    let bigbytes = make ~equal:( = ) ~pp:Fmt.bigbytes ()
-
-    let option (type a) (module Some : T with type t = a) : a option t =
-      make ~equal:(Option.equal Some.equal) ~pp:(Fmt.OCaml.option Some.pp) ()
-
-    let either
-        (type a) ~left:(module Left : T with type t = a)
-        (type b) ~right:(module Right : T with type t = b)
-      =
-      let equal = Either.equal ~left:Left.equal ~right:Right.equal in
-      let pp = Fmt.OCaml.either ~left:Left.pp ~right:Right.pp in
-      make ~equal ~pp ()
-
-    let result'
-        (type a) ~ok:(module Ok : T with type t = a)
-        (type b) ~error:(module Error : T with type t = b)
-      =
-      let equal = Result.equal ~ok:Ok.equal ~error:Error.equal in
-      let pp = Fmt.OCaml.result ~ok:Ok.pp ~error:Error.pp in
-      make ~equal ~pp ()
-
-    let result ~ok = result' ~ok ~error:string
-
-    let list (type a) (module Elt : T with type t = a) =
-      make ~equal:(List.equal Elt.equal) ~pp:(Fmt.OCaml.list Elt.pp) ()
-
-    let array (type a) (module Elt : T with type t = a) =
-      make ~equal:(array_equal Elt.equal) ~pp:(Fmt.OCaml.array Elt.pp) ()
-
-    let pair
-        (type a) (module Fst : T with type t = a)
-        (type b) (module Snd : T with type t = b)
-      =
-      let equal (x0, y0) (x1, y1) = Fst.equal x0 x1 && Snd.equal y0 y1 in
-      let pp = Fmt.OCaml.pair Fst.pp Snd.pp in
-      make ~equal ~pp ()
-
-    let t2 = pair
-    let t3 v0 v1 v2 =
-      let equal (a0, a1, a2) (b0, b1, b2) =
-        (equal v0) a0 b0 && (equal v1) a1 b1 && (equal v2) a2 b2
-      in
-      let pp = Fmt.OCaml.t3 (pp v0) (pp v1) (pp v2) in
-      make ~equal ~pp ()
-
-    let t4 v0 v1 v2 v3 =
-      let equal (a0, a1, a2, a3) (b0, b1, b2, b3) =
-        (equal v0) a0 b0 && (equal v1) a1 b1 && (equal v2) a2 b2 &&
-        (equal v3) a3 b3
-      in
-      let pp = Fmt.OCaml.t4 (pp v0) (pp v1) (pp v2) (pp v3) in
-      make ~equal ~pp ()
-
-    let t5 v0 v1 v2 v3 v4 =
-      let equal (a0, a1, a2, a3, a4) (b0, b1, b2, b3, b4) =
-        (equal v0) a0 b0 && (equal v1) a1 b1 && (equal v2) a2 b2 &&
-        (equal v3) a3 b3 && (equal v4) a4 b4
-      in
-      let pp = Fmt.OCaml.t5 (pp v0) (pp v1) (pp v2) (pp v3) (pp v4) in
-      make ~equal ~pp ()
-
-    let t6 v0 v1 v2 v3 v4 v5 =
-      let equal (a0, a1, a2, a3, a4, a5) (b0, b1, b2, b3, b4, b5) =
-        (equal v0) a0 b0 && (equal v1) a1 b1 && (equal v2) a2 b2 &&
-        (equal v3) a3 b3 && (equal v4) a4 b4 && (equal v5) a5 b5
-      in
-      let pp = Fmt.OCaml.t6 (pp v0) (pp v1) (pp v2) (pp v3) (pp v4) (pp v5) in
-      make ~equal ~pp ()
-  end
-
-  module Diff = struct
-    type 'a t = 'a T.t -> fnd:'a -> exp:'a -> unit Fmt.t
-    let make render = render
-
-    let dumb (type a) t ~fnd ~exp ppf () =
-      Fmt.pf ppf "@[<v>@[%a@]@,%a@,@[%a@]@]"
-        (T.pp t) fnd Test_fmt.neq () (T.pp t) exp
-
-    let run_diff_cmd ?env cmd ~fnd ~exp =
-      Result.join @@ Os.Dir.with_tmp @@ fun dir ->
-      let force = false and make_path = false in
-      let* () = Os.File.write ~force ~make_path Fpath.(dir / "expected") exp in
-      let* () = Os.File.write ~force ~make_path Fpath.(dir / "found") fnd in
-      let diff = Cmd.(cmd % "expected" % "found") in
-      match Os.Cmd.run_status_out ?env ~trim:false ~cwd:dir diff with
-      | Error _ as e -> e
-      | Ok (st, diff) -> Ok diff
-
-    let of_cmd cmd t ~fnd ~exp ppf () =
-      (* The newlines are to avoid 'No newline at the end of file' reported
-         by diffing tools. *)
-      let fnd = Fmt.str "%a@\n" (T.pp t) fnd in
-      let exp = Fmt.str "%a@\n" (T.pp t) exp in
-      match run_diff_cmd cmd ~fnd ~exp with
-      | Error e -> Fmt.pf ppf  "diff command error: %s" e
-      | Ok diff -> Fmt.pf ppf "@[%a@]" Fmt.lines diff
-
-    let git_diff_cmd = B0_std.Cmd.(tool "git" % "diff")
-    let git_diff = lazy (Os.Cmd.get git_diff_cmd)
-    let git_diff ~fnd ~exp =
-      let* git_diff = Lazy.force git_diff in
-      let opts =
-        let color = match Fmt.styler () with
-        | Fmt.Plain -> "--color=never"
-        | Fmt.Ansi -> "--color=always"
-        in
-        Cmd.(arg "--ws-error-highlight=all" %
-             "--no-index" % "--no-prefix" % "--patience" % color)
-      in
-      let env = ["GIT_CONFIG_SYSTEM=/dev/null"; "GIT_CONFIG_GLOBAL=/dev/null"]in
-      (* Add newlines to avoid 'No newline at the end of file' reported
-         by diffing tools. *)
-      let fnd = fnd ^ "\n" in
-      let exp = exp ^ "\n" in
-      let cmd = Cmd.(git_diff %% opts) in
-      let* diff = run_diff_cmd ~env cmd ~fnd ~exp in
-      (* Trim the first two lines these are: diff --git …\n index …  *)
-      match Text.find_newline ~nth:2 diff with
-      | None -> Ok diff
-      | Some first -> Ok (String.subrange ~first diff)
-
-    let git t ~fnd ~exp ppf () =
-      let fnd = Fmt.str "%a" (T.pp t) fnd in
-      let exp = Fmt.str "%a" (T.pp t) exp in
-      match git_diff ~fnd ~exp with
-      | Error e -> Fmt.pf ppf "git diff error: %s" e
-      | Ok diff -> Fmt.pf ppf "@[%a@]" Fmt.lines diff
-
-    type default = { default : 'a. 'a t }
-    let default = ref { default = git }
-    let set_cmd = function
-    | None -> ()
-    | Some cmd ->
-        let d = match Cmd.to_list cmd with
-        | ["dumb"] -> { default = dumb }
-        | _  :: _ ->
-            let default : 'a. 'a t =
-              fun t ~fnd ~exp ppf () -> of_cmd cmd t ~fnd ~exp ppf ()
-            in
-            { default }
-        | [] ->
-            (Log.warn @@ fun m ->
-             m "No diff command specified. Using %a." Fmt.code "dumb");
-            { default = dumb }
-        in
-        default := d
-
-    let default () = !default.default
-
-    let pp ?diff t ~fnd ~exp =
-      let diff = match diff with None -> default () | Some diff -> diff in
-      diff t ~fnd ~exp
-  end
-
-  module Patch = struct
-    type subst = { first : int; last : int; subst : string }
-    type t = { src : string; substs : subst list; }
-
-    let make ~src = { src; substs = [] }
-    let src p = p.src
-    let substs p = p.substs
-    let is_empty p = p.substs = []
-    let add_subst p subst = { p with substs = subst :: p.substs }
-    let apply { src; substs } =
-      let rec loop acc src ~start = function
-      | [] ->
-          let last = String.subrange ~first:start src in
-          String.concat "" (List.rev (last :: acc))
-      | { first; last; subst } :: substs ->
-          let before = String.subrange ~first:start ~last:(first - 1) src in
-          loop (subst :: before :: acc) src ~start:(last + 1) substs
-      in
-      let compare s0 s1 = Int.compare s0.first s1.first in
-      loop [] src ~start:0 (List.stable_sort compare (List.rev substs))
-
-    (* Files to patch *)
-
-    let src_root = ref None
-    let set_src_root root = src_root := root
-    let get_filepath file = match !src_root with
-    | None -> file | Some root -> Fpath.append root file
-
-    let files : t option Fpath.Map.t ref = ref Fpath.Map.empty
-    let get file =
-      let file = get_filepath file in
-      match Fpath.Map.find_opt file !files with
-      | Some v -> v
-      | None ->
-          let substs = match Os.File.read file with
-          | Ok src -> Some { src; substs = [] }
-          | Error e ->
-              log_fail "Correction failure: %a: %s" Fpath.pp file e;
-              None
-          in
-          files := Fpath.Map.add file substs !files;
-          substs
-
-    let update file patch =
-      files := Fpath.Map.add file (Some patch) !files
-
-    let write_files () =
-      let write_file file = function
-      | None -> ()
-      | Some patch when is_empty patch -> ()
-      | Some patch ->
-          let force = true and make_path = false in
-          match Os.File.write ~force ~make_path file (apply patch) with
-          | Error e -> log_fail "Correction failure: %a: %s" Fpath.pp file e
-          | Ok () -> ()
-      in
-      Fpath.Map.iter write_file !files
-
-    let src_root () = !src_root
-  end
-
-  (* Assertions *)
+  (* Assertion tests *)
 
   type 'a eq = ?diff:'a Diff.t -> ?__POS__:loc -> 'a -> 'a -> unit
 
   let failneq ?diff ?__POS__:(loc = invalid_loc) t fnd exp =
     Fail.incr ();
-    log_padded_loc_flush ~color:Test_fmt.fail_color ~mark_none:true loc;
-    log_raw_flush "%a" (Diff.pp ?diff t ~fnd ~exp) ()
+    Log.padded_loc_flush ~color:Test_fmt.fail_color ~mark_none:true loc;
+    Log.raw_flush "%a" (Diff.pp ?diff t ~fnd ~exp) ()
 
   let failneq_2locs ?diff ~loc0 ~loc1 t fnd exp =
     if loc0 = loc1 then failneq ?diff ~__POS__:loc0 t fnd exp else
     begin
       Fail.incr ();
-      log_padded_loc_flush ~color:Test_fmt.fail_color ~mark_none:true loc0;
-      log_padded_loc_flush ~color:Test_fmt.fail_color ~mark_none:true loc1;
-      log_raw_flush "%a" (Diff.pp ?diff t ~fnd ~exp) ()
+      Log.padded_loc_flush ~color:Test_fmt.fail_color ~mark_none:true loc0;
+      Log.padded_loc_flush ~color:Test_fmt.fail_color ~mark_none:true loc1;
+      Log.raw_flush "%a" (Diff.pp ?diff t ~fnd ~exp) ()
     end
 
   let eq t ?diff ?__POS__ fnd exp =
@@ -599,112 +632,7 @@ module Test = struct
     | None -> fail ?__POS__ "@[Assertion failed@]"
     | Some msg -> fail ?__POS__ "@[Assertion failed: %s@]" msg
 
-  (* Exceptions *)
-
-  let noraise ?__POS__ f = try f () with
-  | Stop | Skip as exn -> raise_notrace exn
-  | exn when not (Os.exn_don't_catch exn) ->
-      Fail.incr ();
-      log_fail ?__POS__ "@[Unexpected exception:@]";
-      log_raw_flush "%a" Fmt.exn exn;
-      stop ()
-
-  let catch ?ret ?__POS__ f k =
-    try
-      let v = f () in
-      match ret with
-      | None -> fail ?__POS__ "@[Expected an exception but got a value.@]"
-      | Some ret ->
-          Fail.incr ();
-          log_fail ?__POS__ "@[Expected an exception but got value:";
-          log_raw_flush "%a" (T.pp ret) v
-    with
-    | Stop | Skip as exn -> raise_notrace exn
-    | exn when not (Os.exn_don't_catch exn) -> k exn
-
-  let raises ?ret ?(exn = T.exn) ?diff ?__POS__ exp f =
-    catch ?ret ?__POS__ f @@ fun fnd -> eq exn ?diff ?__POS__ fnd exp
-
-  let invalid_arg ?ret ?diff ?__POS__ f =
-    raises ?ret ~exn:T.invalid_arg ?diff ?__POS__ (Invalid_argument "") f
-
-  let failure ?ret ?diff ?__POS__ f =
-    raises ?ret ~exn:T.failure ?diff ?__POS__ (Failure "") f
-
-  (* Values *)
-
-  let any ?(diff = Diff.dumb) = eq T.any ~diff
-  let exn = eq T.exn
-  let unit = eq T.unit
-  let bool = eq T.bool
-  let char = eq T.char
-  let int = eq T.int
-  let int32 = eq T.int32
-  let uint32 = eq T.uint32
-  let int64 = eq T.int64
-  let uint64 = eq T.uint64
-  let nativeint = eq T.nativeint
-  let nativeuint = eq T.nativeuint
-  let float = eq T.float
-  let string = eq T.string
-  let lines = eq T.lines
-  let binary_string = eq T.binary_string
-  let styled_string = eq T.styled_string
-  let bytes = eq T.bytes
-  let option some = eq (T.option some)
-  let either ~left ~right = eq (T.either ~left ~right)
-  let result ~ok = eq (T.result ~ok)
-  let result' ~ok ~error = eq (T.result' ~ok ~error)
-  let list elt = eq (T.list elt)
-  let array elt = eq (T.array elt)
-  let pair fst snd = eq (T.pair fst snd)
-  let t2 = pair
-  let t3 v0 v1 v2 = eq (T.t3 v0 v1 v2)
-  let t4 v0 v1 v2 v3 = eq (T.t4 v0 v1 v2 v3)
-  let t5 v0 v1 v2 v3 v4 = eq (T.t5 v0 v1 v2 v3 v4)
-  let t6 v0 v1 v2 v3 v4 v5 = eq (T.t6 v0 v1 v2 v3 v4 v5)
-
-  (* Randomized testing *)
-
-  module Rand = struct
-    let cli_seed = "seed"
-    let env_seed = "SEED"
-    let rseed = ref None
-    let rstate = ref None
-
-    let set_seed seed = rseed := seed
-    let rec init_random_state seed = match seed with
-    | None ->
-        (* auto-seed *)
-        let s = Random.State.make_self_init () in
-        init_random_state (Some (Random.State.bits s))
-    | Some seed ->
-        rseed := Some seed;
-        rstate := Some (Random.State.make [| seed |])
-
-    let rec state () = match !rstate with
-    | Some s -> s
-    | None ->
-        match Os.Env.var ~empty_is_none:true env_seed with
-        | None -> init_random_state None; state ()
-        | Some i ->
-            match int_of_string_opt i with
-            | Some _ as seed -> init_random_state seed; state ()
-            | None ->
-                log_fail "Cannot parse integer from %a env value %s, ignoring."
-                  Fmt.code env_seed i;
-                init_random_state None; state ()
-
-    (* Reporting *)
-
-    let report (log : 'a log) = match !rstate with
-    | None -> () (* Was not used *)
-    | Some _ ->
-        log "Run with %a %a to reproduce randomness."
-          Fmt.code ("--" ^ cli_seed) Fmt.(code' int) (Option.get !rseed);
-  end
-
-  (* Snapshot testing *)
+  (* Snapshot tests *)
 
   module Snapshot = struct
     let cli_correct = "correct"
@@ -727,16 +655,16 @@ module Test = struct
       let plural, it =
         if fail_count > 1 then "s are", "them" else " is", "it"
       in
-      log_fail "%a snapshot%s %a. Run with %a to correct %s."
+      Log.fail "%a snapshot%s %a. Run with %a to correct %s."
         Test_fmt.fail_count fail_count plural
         Test_fmt.incorrect () Fmt.code ("--" ^ cli_correct) it
 
     let log_correcting ~loc fmt =
       let color = Test_fmt.pass_color in
-      log_padded_loc_flush ~color ~mark_none:true loc;
-      log_raw_flush "%a reference snapshot to:"
+      Log.padded_loc_flush ~color ~mark_none:true loc;
+      Log.raw_flush "%a reference snapshot to:"
         (Fmt.st [`Fg `Green_bright]) "Correcting";
-      log_raw_flush fmt
+      Log.raw_flush fmt
 
     (* Correcting sources *)
 
@@ -843,6 +771,7 @@ module Test = struct
       | In_source _ ->
           let fname, _, _, _ = src_loc snap in
           let file = Fpath.of_string fname |> Result.error_to_failure in
+          let file = Fpath.(dir () // file) in
           match Patch.get file with
           | None -> ()
           | Some patch ->
@@ -872,32 +801,23 @@ module Test = struct
 
     let snap_external ?subst t ?diff fnd loc file snap =
       match Os.File.exists file with
-      | Error e -> Fail.incr (); log_fail ~__POS__:loc "%s" e
+      | Error e -> Fail.incr (); Log.fail ~__POS__:loc "%s" e
       | Ok false ->
           incr_fail ();
           if not (correct () || force_correct ())
           then begin
             Fail.incr ();
-            log_fail ~__POS__:loc
+            Log.fail ~__POS__:loc
               "@[<v>Missing %a@]" (Fmt.code' Fpath.pp) file;
-            log_raw_flush "%a" (T.pp t) fnd
+            Log.raw_flush "%a" (T.pp t) fnd
           end else begin
             log_correcting ~loc:(exp_loc snap) "%a" (T.pp t) fnd;
             correct_snapshot ?subst t fnd snap
           end
       | Ok true ->
           match Os.File.read file with
-          | Error e -> Fail.incr (); log_fail ~__POS__:loc "%s" e;
+          | Error e -> Fail.incr (); Log.fail ~__POS__:loc "%s" e;
           | Ok exp -> snap_value ?subst t ?diff fnd exp snap
-
-    (* Hack to get absolute paths in [External] snaps. We should change that
-       see the cookbook. *)
-    let adjust_external_snap ?__POS__:pos loc file = match pos with
-    | None -> loc, Patch.get_filepath file (* cli src-root *)
-    | Some (src_file, _, _, _ as loc) ->
-        let base = Fpath.(parent (v src_file)) in
-        let file = Fpath.append base file in
-        loc, file
 
     let snap : type a.
       ?subst:a subst -> a T.t -> ?__POS__:loc -> ?diff:a Diff.t -> a -> a t ->
@@ -907,16 +827,59 @@ module Test = struct
       try match snap with
       | In_source (_, exp) -> snap_value ?subst t ?diff fnd exp snap
       | External (loc, file) ->
-          let loc, file = adjust_external_snap ?__POS__:pos loc file in
+          let loc = match pos with None -> loc | Some pos -> pos in
+          let file = Fpath.(dir () // file) in
           let snap = External (loc, file) in
           snap_external ?subst t ?diff fnd loc file snap
       with
-      | Failure e -> log_fail "Correction failure: %s" e
+      | Failure e -> Log.fail "Correction failure: %s" e
 
   end
 
   type 'a snap = ?__POS__:loc -> ?diff:'a Diff.t -> 'a -> 'a Snapshot.t -> unit
   let snap = Snapshot.snap
+
+  (* Randomized tests *)
+
+  module Rand = struct
+    let cli_seed = "seed"
+    let env_seed = "SEED"
+    let rseed = ref None
+    let rstate = ref None
+
+    let set_seed seed = rseed := seed
+    let rec init_random_state seed = match seed with
+    | None ->
+        (* auto-seed *)
+        let s = Random.State.make_self_init () in
+        init_random_state (Some (Random.State.bits s))
+    | Some seed ->
+        rseed := Some seed;
+        rstate := Some (Random.State.make [| seed |])
+
+    let rec state () = match !rstate with
+    | Some s -> s
+    | None ->
+        match Os.Env.var ~empty_is_none:true env_seed with
+        | None -> init_random_state None; state ()
+        | Some i ->
+            match int_of_string_opt i with
+            | Some _ as seed -> init_random_state seed; state ()
+            | None ->
+                Log.fail "Cannot parse integer from %a env value %s, ignoring."
+                  Fmt.code env_seed i;
+                init_random_state None; state ()
+
+    (* Reporting *)
+
+    let report (log : 'a Log.t) = match !rstate with
+    | None -> () (* Was not used *)
+    | Some _ ->
+        log "Run with %a %a to reproduce randomness."
+          Fmt.code ("--" ^ cli_seed) Fmt.(code' int) (Option.get !rseed);
+  end
+
+  (* Long tests *)
 
   module Long = struct
     let cli_l = "l"
@@ -935,12 +898,14 @@ module Test = struct
     let report () =
       let count = Atomic.get count in
       if not (run ()) && count > 0 then begin
-        log_pad_flush ~color:Test_fmt.skip_color
+        Log.pad_flush ~color:Test_fmt.skip_color
           "@[%a long %s %a. Run with %a to execute.@]"
           Test_fmt.count count (Text.teststr count) Test_fmt.skipped ()
           Fmt.code ("-" ^ cli_l)
       end
   end
+
+  (* Tests *)
 
   module Name = struct
     let includes = ref []
@@ -957,8 +922,6 @@ module Test = struct
       let name = String.lowercase_ascii name in
       (!includes = [] || match_includes name) && not (match_excludes name)
   end
-
-  (* Tests *)
 
   module Arg = struct
     type 'a t = 'a Type.Id.t
@@ -1001,10 +964,10 @@ module Test = struct
     if not (Name.selected name) then () else begin
       if long && not (Long.run ()) then begin
         let pad = Test_fmt.long_str and color = Test_fmt.skip_color in
-        log_pad_flush ~pad ~color "Test %s" name
+        Log.pad_flush ~pad ~color "Test %s" name
       end else begin
         let pad = if long then Test_fmt.long_str else Test_fmt.padding in
-        log_pad_flush ~pad "Test %s" ~color:Test_fmt.test_color name;
+        Log.pad_flush ~pad "Test %s" ~color:Test_fmt.test_color name;
         Atomic.incr run_test_count;
         Atomic.set Pass.count 0;
         Atomic.set Fail.count 0;
@@ -1013,7 +976,7 @@ module Test = struct
         | Stop | Skip -> ()
         | exn when not (Os.exn_don't_catch exn) ->
             let bt = Printexc.get_raw_backtrace () in
-            log_exn_fail bt exn;
+            Log.exn_fail bt exn;
             Fail.incr ();
         end;
         if Atomic.get Fail.count <> 0 then Atomic.incr Fail.test_count;
@@ -1048,9 +1011,75 @@ module Test = struct
     in
     List.iter exec (List.rev !Def.list)
 
+
+    (* Predefined assertions *)
+
+  let noraise ?__POS__ f = try f () with
+  | Stop | Skip as exn -> raise_notrace exn
+  | exn when not (Os.exn_don't_catch exn) ->
+      Fail.incr ();
+      Log.fail ?__POS__ "@[Unexpected exception:@]";
+      Log.raw_flush "%a" Fmt.exn exn;
+      stop ()
+
+  let catch ?ret ?__POS__ f k =
+    try
+      let v = f () in
+      match ret with
+      | None -> fail ?__POS__ "@[Expected an exception but got a value.@]"
+      | Some ret ->
+          Fail.incr ();
+          Log.fail ?__POS__ "@[Expected an exception but got value:";
+          Log.raw_flush "%a" (T.pp ret) v
+    with
+    | Stop | Skip as exn -> raise_notrace exn
+    | exn when not (Os.exn_don't_catch exn) -> k exn
+
+  let raises ?ret ?(exn = T.exn) ?diff ?__POS__ exp f =
+    catch ?ret ?__POS__ f @@ fun fnd -> eq exn ?diff ?__POS__ fnd exp
+
+  let invalid_arg ?ret ?diff ?__POS__ f =
+    raises ?ret ~exn:T.invalid_arg ?diff ?__POS__ (Invalid_argument "") f
+
+  let failure ?ret ?diff ?__POS__ f =
+    raises ?ret ~exn:T.failure ?diff ?__POS__ (Failure "") f
+
+  let any ?(diff = Diff.dumb) = eq T.any ~diff
+  let exn = eq T.exn
+  let unit = eq T.unit
+  let bool = eq T.bool
+  let char = eq T.char
+  let int = eq T.int
+  let int32 = eq T.int32
+  let uint32 = eq T.uint32
+  let int64 = eq T.int64
+  let uint64 = eq T.uint64
+  let nativeint = eq T.nativeint
+  let nativeuint = eq T.nativeuint
+  let float = eq T.float
+  let string = eq T.string
+  let lines = eq T.lines
+  let binary_string = eq T.binary_string
+  let styled_string = eq T.styled_string
+  let bytes = eq T.bytes
+  let option some = eq (T.option some)
+  let either ~left ~right = eq (T.either ~left ~right)
+  let result ~ok = eq (T.result ~ok)
+  let result' ~ok ~error = eq (T.result' ~ok ~error)
+  let list elt = eq (T.list elt)
+  let array elt = eq (T.array elt)
+  let pair fst snd = eq (T.pair fst snd)
+  let t2 = pair
+  let t3 v0 v1 v2 = eq (T.t3 v0 v1 v2)
+  let t4 v0 v1 v2 v3 = eq (T.t4 v0 v1 v2 v3)
+  let t5 v0 v1 v2 v3 v4 = eq (T.t5 v0 v1 v2 v3 v4)
+  let t6 v0 v1 v2 v3 v4 v5 = eq (T.t6 v0 v1 v2 v3 v4 v5)
+
+  (* Command line arguments *)
+
   module Cli = struct
     let setup
-        ~correct ~diff_cmd ~force_correct ~seed ~src_root ~long ~long_skip_exit
+        ~correct ~diff_cmd ~force_correct ~seed ~test_dir ~long ~long_skip_exit
         ~includes ~excludes ~output_list ~locs:_
       =
       Name.set_includes includes;
@@ -1058,7 +1087,7 @@ module Test = struct
       Def.set_output_list output_list;
       Long.set_run long;
       Long.set_skip_exit long_skip_exit;
-      Patch.set_src_root src_root;
+      set_dir (match test_dir with Some dir -> dir | None -> Fpath.null);
       Diff.set_cmd diff_cmd;
       Rand.set_seed seed;
       Snapshot.set_correct correct;
@@ -1083,6 +1112,15 @@ module Test = struct
 
     let docs = s_common_options
 
+    let test_name_conv =
+      let complete _ ~token =
+        let names = List.map (fun def -> def.Def.name) !Def.list in
+        let names = List.filter (String.starts_with ~prefix:token) names in
+        Ok (List.map Arg.Completion.string names)
+      in
+      let completion = Arg.Completion.make complete in
+      Arg.Conv.of_conv ~completion Arg.string
+
     let diff_cmd =
       let doc =
         "$(docv) is the command used for making textual diffs. The tool is \
@@ -1097,35 +1135,38 @@ module Test = struct
            info ["diff-cmd"] ~doc ~docv:"CMD" ~docs)
 
     let correct =
-      let doc = "Update expected snapshot mismatches to the snapshots computed \
-                 during the run. See also $(b,--force-correct)."
+      let doc =
+        "Update expected snapshot mismatches to the snapshots computed \
+         during the run. See also $(b,--force-correct)."
       in
       let env = Cmd.Env.info "CORRECT" in
       Arg.(value & flag & info ["c"; Snapshot.cli_correct] ~env ~doc ~docs)
 
     let force_correct =
-      let doc = "Force all expected snapshots to update to the snapshots \
-                 computed during the run, regardless of their correctness. \
-                 Use for example if you changed a snapshot printer."
+      let doc =
+        "Force all expected snapshots to update to the snapshots \
+         computed during the run, regardless of their correctness. \
+         Use for example if you changed a snapshot printer."
       in
       Arg.(value & flag & info [Snapshot.cli_force_correct] ~doc ~docs)
 
     let includes =
-      let doc = "Select tests whose lowercased name match prefix \
-                 $(docv). Repeatable. The selection is filtered by \
-                 $(b,-x) options which take over. Test names are printed \
-                 during execution and can be (partially) listed with \
-                 $(b,--list)."
+      let doc =
+        "Select tests whose lowercased name match prefix $(docv). Repeatable. \
+         The selection is filtered by $(b,-x) options which take over. Test \
+         names are printed during execution and can be (partially) listed with \
+         $(b,--list)."
       in
       let absent = "All tests are selected" in
-      Arg.(value & opt_all string [] &
+      Arg.(value & opt_all test_name_conv [] &
            info ["i"; "include"] ~doc ~docv:"PREFIX" ~absent ~docs)
 
     let excludes =
-      let doc = "Drop selected tests whose lowercased names match \
-                 prefix $(docv), takes over $(b,-i). Repeatable."
+      let doc =
+        "Drop selected tests whose lowercased names match prefix $(docv), \
+         takes over $(b,-i). Repeatable."
       in
-      Arg.(value & opt_all string [] &
+      Arg.(value & opt_all test_name_conv [] &
            info ["x"; "exclude"] ~doc ~docv:"PREFIX" ~docs)
 
     let locs =
@@ -1150,12 +1191,16 @@ module Test = struct
       let env = Cmd.Env.info "LONG" in
       Arg.(value & flag & info [Long.cli_l; "long"] ~doc ~env ~docs)
 
-    let src_root =
-      let doc = "$(docv) is prependend to relative snapshot source file \
-                 locations to look them up for patching."
+    let test_dir =
+      let doc =
+        "$(docv) is the test directory. Tests use this directory as the root \
+         to resolve relative files. A correct value is needed via the option \
+         or the environment variable to lookup sources and external files to \
+         update reference snapshots."
       in
-      Arg.(value & opt (some' B0_std_cli.dirpath) None &
-           info ["src-root"] ~doc ~docs)
+      let env = Cmd.Env.info "TEST_DIR" in
+      Arg.(value & opt (some B0_std_cli.dirpath) None &
+           info ["test-dir"] ~doc ~docs ~env)
 
     let seed =
       let doc =
@@ -1168,10 +1213,10 @@ module Test = struct
 
     let setup =
       let open Cmdliner.Term.Syntax in
-      let+ seed and+ correct and+ force_correct and+ diff_cmd and+ src_root
+      let+ seed and+ correct and+ force_correct and+ diff_cmd and+ test_dir
       and+ long and+ long_skip_exit and+ includes and+ excludes
       and+ output_list and+ locs in
-      setup ~diff_cmd ~correct ~force_correct ~seed ~src_root ~long
+      setup ~diff_cmd ~correct ~force_correct ~seed ~test_dir ~long
         ~long_skip_exit ~includes ~excludes ~output_list ~locs
   end
 
@@ -1183,15 +1228,17 @@ module Test = struct
   let report_pass ~dur =
     Skip.report ();
     Long.report ();
-    Rand.report log_pass;
+    Rand.report Log.pass;
     Pass.report ~dur
 
   let report_fail ~dur =
     Snapshot.report_fail ();
-    Rand.report log_fail;
+    Rand.report Log.fail;
     Fail.report ~dur
 
   let main' ?(man = Cli.default_man) ?doc ?name f =
+    (* XXX once we get implicit positions we could set Test.dir to the
+       parent of the source if it was not set yet. *)
     let run () f =
       if Def.output_list () then (Def.print_list (); 0) else
       let () = Printexc.record_backtrace true in
@@ -1209,14 +1256,14 @@ module Test = struct
       try (f (); exit_main dur) with
       | Stop -> exit_main dur
       | Skip ->
-          log_raw_flush "@[%a The test was %a in %a@]"
+          Log.raw_flush "@[%a The test was %a in %a@]"
             Test_fmt.skip () Test_fmt.skipped ()
             Test_fmt.dur (Os.Mtime.count dur);
           0
       | exn when not (Os.exn_don't_catch exn) ->
           let bt = Printexc.get_raw_backtrace () in
-          log_exn_fail bt exn;
-          log_raw_flush "@[%a The test %a unexpectedly in %a@]"
+          Log.exn_fail bt exn;
+          Log.raw_flush "@[%a The test %a unexpectedly in %a@]"
             Test_fmt.fail () Test_fmt.failed () Test_fmt.dur
             (Os.Mtime.count dur);
           1
@@ -1236,7 +1283,7 @@ module Test = struct
 end
 
 module Snap = struct
-  module T = Test.T
+  module T = T
 
   let exn = Test.(snap T.exn)
   let raise ?ret ?(exn = T.exn) ?diff ?__POS__:pos f exp =
@@ -1287,8 +1334,6 @@ module Snap = struct
   let t5 v0 v1 v2 v3 v4 = Test.(snap (T.t5 v0 v1 v2 v3 v4))
   let t6 v0 v1 v2 v3 v4 v5 = Test.(snap (T.t6 v0 v1 v2 v3 v4 v5))
 
-  (* Command spawns *)
-
   let stdout
       ?__POS__ ?(test = Test.T.lines) ?diff ?env ?cwd ?stdin ?stderr ~trim
       cmd snap
@@ -1323,6 +1368,6 @@ module Snap = struct
     Ok (Test.snap ~subst test ?__POS__ ?diff run snap)
 end
 
-let ( !> ) ?(loc = Test.invalid_loc) v = Test.Snapshot.In_source (loc, v)
-let ( !@ ) ?(loc = Test.invalid_loc) file = Test.Snapshot.External (loc, file)
+let ( !> ) ?(loc = invalid_loc) v = Test.Snapshot.In_source (loc, v)
+let ( !@ ) ?(loc = invalid_loc) file = Test.Snapshot.External (loc, file)
 let ( @> ) f (loc, v) = f (Test.Snapshot.In_source (loc, v))

@@ -235,6 +235,11 @@ module Action = struct
   let run' ?(envf = Fun.id) exit_rc run b0_env u ~args action =
     let open Result.Syntax in
     let* env = get_env b0_env u in
+    let env = match find_meta B0_meta.test_dir u with
+    | None -> env | Some dir ->
+        let dir = B0_env.in_scope_dir b0_env dir in
+        Os.Env.add "TEST_DIR" (Fpath.to_string dir) env
+    in
     let env = Os.Env.to_assignments (envf env) in
     let* cwd = get_cwd b0_env u in
     match action with

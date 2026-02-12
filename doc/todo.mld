@@ -223,7 +223,6 @@ the build variant level.
   aswell but it's unsatisfactory. Static requires and/or build
   scheme level restrictions should be added. *)
 
-
 {2:b0_srcs [B0_srcs]}
 
 - Review.
@@ -244,16 +243,15 @@ On hold until we get the {!B0_srcs} thing right.
 - Implicit source location improvements. We could get rid of
   [__POS__] and [__POS_OF__]. We could add a --test-locs option,
   which outputs test function locations (we did not add a [__POS__]
-  argument to Test.test
-- The path business is a bit shady in {!B0_testing} we should
-  get a proper strategy, read also in the {!page-b0_testing_cookbook}.
+  argument to Test.test. We could automatically setup test_dir to
+  the source's parent directory.
 - Streamline the tool testing case, see testing of `jsont`, `cmarkit`, etc.
 - [b0 test], run as soon as build, run in parallel.
 - [b0 test], more exit code semantics for skips and long tests.
 - [b0 test], document the full test executable protocol (env var + exit codes)
-  concisely.
+  concisely. Also describes all the unit keys that influence the process.
 - [b0 test] now that we have a protocol with test executables should
-  we drop the skips at the unit level ?
+  we drop the long skips at the unit level ?
 - Timeouts (see pathological.ml in cmarkit)
 - Progress.
 - Once we run snapshot tests on Windows we will likely need a newline
@@ -261,6 +259,12 @@ On hold until we get the {!B0_srcs} thing right.
 - [Test.Arg] add lazy arguments.
 - More general {!B0_testing.Snap.run} that captures effects
   on the file system?
+- {!B0_testing.Snap.run} should we begin with the cli arguments
+  on the first line (but then why not the environment). Also
+  be careful with path if the executable is in the build.
+- {!B0_testing.Snap.run} streamline the story to snapshot built
+  executables. One idea would be to augment the PATH with an
+  install of said executables.
 - Get a story for binary/visual regression. First we should have a
   good `git difftool` and `pixeldrift` setup regardless of
   testing. Then we likely want combinators that automatically checkout

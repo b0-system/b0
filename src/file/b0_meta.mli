@@ -291,6 +291,15 @@ val exe : bool key
 val test : bool key
 (** [test] tags testing entities. Defaults to [false]. *)
 
+val test_dir : Fpath.t key
+(** [test_dir] defines a testing directory. This should be a relative
+    path expressed relative to the scope of the entity. See
+    {!page-testing.test_dir}. This is resolved to an absolute
+    directory and set to the [TEST_DIR] environment variable in
+    execution environments. See {!page-testing.test_directory}.
+
+    TODO do we want other scopes ? *)
+
 val lib : bool key
 (** [lib] tags library entities. Defaults to [false]. *)
 

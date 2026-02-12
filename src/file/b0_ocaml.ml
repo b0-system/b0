@@ -1659,9 +1659,10 @@ let script
 
 let test
     ?wrap ?doc ?(meta = B0_meta.empty) ?requires ?name ?(run = true)
-    ?(long  = false) ?(srcs = []) src
+    ?(long  = false) ?test_dir ?(srcs = []) src
   =
   let srcs = (`File src) :: srcs in
+  let test_dir = match test_dir with Some d -> d | None -> Fpath.parent src in
   let meta =
     B0_meta.override ~by:meta @@
     B0_meta.empty
@@ -1669,6 +1670,7 @@ let test
     |> B0_meta.add B0_meta.run run
     |> B0_meta.add B0_meta.long long
     |> B0_meta.add B0_unit.Action.cwd `Scope_dir
+    |> B0_meta.add B0_meta.test_dir test_dir
   in
   let name = match name with
   | None -> Fpath.basename ~drop_exts:true src

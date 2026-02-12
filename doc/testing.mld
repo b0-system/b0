@@ -68,6 +68,22 @@ This can be useful if the testing framework used by [mytest] provides
 command line options that cannot be specified by using the generic [b0
 test] interface. For example to run tests with a finer granularity.
 
+{2:test_directory Test directory}
+
+Tests often need to lookup data or reference files for snapshot
+testing. Test units can specify a scope relative directory in
+{!B0_meta.test_dir}. This directory is made absolute and set to the
+[TEST_DIR] environment variable when the unit is run (either directly
+or via [b0 test]).
+
+This provides a stable root directory according to which data can be
+looked up or snapshots can be updated.
+
+For example units created with {!B0_ocaml.test} default that value
+to the parent directory of the main source file and the {!B0_testing}
+framework makes this value available via the {!B0_testing.Test.dir}
+function (whose value can be overriden by the [--test-dir] option).
+
 {1:random_snapshot Random and snapshot testing}
 
 The [b0 test] command supports an environment variable interface for

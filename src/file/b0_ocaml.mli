@@ -984,15 +984,17 @@ val script :
 val test :
   ?wrap:(B0_unit.build_proc -> B0_unit.build_proc) -> ?doc:string ->
   ?meta:B0_meta.t -> ?requires:Libname.t list -> ?name:string ->
-  ?run:bool -> ?long:bool -> ?srcs:B0_srcs.sel list -> Fpath.t ->
-  B0_unit.t
+  ?run:bool -> ?long:bool -> ?test_dir:Fpath.t -> ?srcs:B0_srcs.sel list ->
+  Fpath.t ->  B0_unit.t
 (** [test file] is a test for an OCaml [.ml] [file] (and additional [srcs] if
     specified). This is just {!exe} with added metadata predefined for a test
     and a [name] derived from the basename of [file] if unspecified:
     {ul
-    {- {!B0_meta.test} is [run], default to [true].}
+    {- {!B0_meta.Action.cwd} is set to `Scope_dir}
     {- {!B0_meta.long} is [long], defaults to [false]}
-    {- {!B0_meta.Action.cwd} is set to `Scope_dir}} *)
+    {- {!B0_meta.run} is [run], default to [true].}
+    {- {!B0_meta.test} is [true].}
+    {- {!B0_meta.test_dir} is set to the parent directory of [file].}} *)
 
 (** {2:libs Libraries} *)
 

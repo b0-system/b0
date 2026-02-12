@@ -9,43 +9,260 @@ open B0_std
 open B0_testing
 ]}
 
-{1:run Running}
+{1:tips Tips}
 
-{2:cwd What is the current working directory?}
+{2:migrating Migrating}
 
-That depens on you run the test. The current working directory is
-important for snapshots, both in source and external. In general it's
-better to declare your tests in [B0.ml] as running from the scope
-directory. This way you can use scope relative file paths in your test
-files.
+If you are in a testing hurry or migrating tests you can always simply
+use OCaml's [assert] in the test functions: you just won't get any
+rendering on assertion failures and tests stop at the first assertion
+failure.
 
-{2:ext_snaps How should I specify external snapshot files?}
+{1:conventions Conventions}
 
-For now the best is to specify them relative to the source file
-and use the [__POS__] argument in the snapshot function. The file
-path then gets adjusted to have absolute file paths, which is good
-for your editor.
+{2:conv_test_exec Test executables names and location}
+
+In general the following is suggested:
+
+{ul
+{- Place your test executables in a [test] directory at the root of your
+   project}
+{- For tests for a partical module [M] call the main source file
+   [test_m.ml]}
+{- For tests for a particular tool [M] call the main source file
+   [test_mytool.ml] or [test_mytool_tool.ml] if it clashes with the name
+   of a module.}}
+
+{2:conv_test_name Test names}
+
+If you are testing the function [M.f] in a test call the test ["M.f"].
+If you are testing multiple function in a single test use glob-like
+syntax, for example for [f] and [g] use ["M.{f,g}"].
+
+{2:conv_snapshot_file External snapshot files}
+
+For external snapshot files it is suggested to:
+{ul
+{- Write them in the file hierarchy rooted in [test/snapshots]}
+{- If they are the result of {!B0_testing.Snap.run} to use
+   [.run] for the file extension.}}
+
+{2:conv_found_exp Found and expected values}
+
+Tests often entail comparing a computed or "found" value against an
+expected or reference one. The convention is to specify first the
+found value and then the expected one. For example if testing the
+[sin] function:
+
 {[
-let root = Fpath.v "snapshot" (* In the directory of this source *)
-Snap.run Cmd.(tool "echo" % "Hey!") !@ Fpath.(root / "echo.run") ~__POS__;
+Test.float (sin 0.) 0.
 ]}
-If the [--src-root] option is specified that takes over.
 
-{b FIXME.} In the end all that relies on having absolute paths in the
-build rules, which means we get absolute paths in `__POS__` once we
-start playing w ith reproducible builds that will no longer be the
-case. We should rather define a cli argument backed by an env var
-[TESTING_ROOT] and provide b0 action support to automatically setup
-that.
-
-{b TODO.} Strategies to test file locations.
-
+There is no choice if you snapshot values as the snapshot correction
+mecanism enforces the reference snapshot to be on the second position.
+{[
+Test.snap (sin 0.) @> __POS_OF__ 0.
+]}
 
 {1:tests Tests}
 
-{1:arguments Test arguments}
+{2:tests_declare How do I declare a new test?}
 
-{2:how_test_arg How can I define an argument for my test?}
+Just devise a name for it and call {!B0_testing.Test.test}.
+
+{[
+let test_my_test =
+  Test.test "my test" @@ fun () -> ()
+]}
+
+The test name gets logged on execution and can be used to select or
+exclude them via the command line see {!selecting}
+
+Tests are [let] bound functions of type [unit -> unit]. So you can
+call them directly to execute them. However usually this is done
+automatically via a call to {!B0_testing.Test.autorun} in the test
+executable main function, see the {{!blueprint_minimal}minimal
+blueprint}.
+
+{2:pass_fail How do I pass and fail tests?}
+
+The {!B0_testing.Test.pass} and {!B0_testing.Test.fail} can be called
+to pass and fail tests. Note that {!B0_testing.Test.fail} does not
+stop the test use {!B0_testing.Test.failstop} if you want to stop the
+test abrubtly.
+
+{[
+let test_pass =
+  Test.test "pass" @@ fun () ->
+  Test.pass ()
+
+let test_fail =
+  Test.test "fail" @@ fun () ->
+  Test.fail "Oh no!";
+  Test.Log.msg "But let's continue";
+  ()
+]}
+
+{2:testing_value How do I test a value?}
+
+Basic {{!B0_testing.Test.assertions}assertions} for testing equality
+of basic types are in the {!B0_testing.Test} module. They
+can be used as follows:
+
+{[
+let test_values =
+  Test.test "values" @@ fun () ->
+  Test.int (1 + 1) 2 ~__POS__;
+  Test.(list T.int) (List.map succ [1;2]) [2;3] ~__POS__;
+  ()
+]}
+
+The function {!B0_testing.Test.val-eq} allows to compare a value of an
+arbitrary type against an expected value of that type. You need to
+provide a tester {!B0_testing.Test.module-T.t} for the value. Often you can
+using a type's module directly:
+
+{[
+let test_fpath =
+  Test.test "fpath" @@ fun () ->
+  Test.eq (module Fpath) Fpath.null Fpath.null ~__POS__;
+  ()
+]}
+
+{2:testing_snap How do I snapshot a value?}
+
+Assuming you understood how {{!testing_value}testing a value} works,
+snapshoting is the same except the value you test against can be
+automatically corrected.
+
+{[
+let snap_values =
+  Test.test "snap values" @@ fun () ->
+  Snap.int (1 + 1) @> __POS_OF__ 2;
+  Snap.(list T.int) (List.map succ [1;2]) @> __POS_OF__ [2;3];
+  ()
+]}
+
+If you don't want to specify the first snapshot just use
+a simple element for the type and let the machinery correct it for
+you. For example:
+
+{[
+let snap_list =
+  Test.test "snap list" @@ fun () ->
+  Snap.(list T.int) (List.map succ [1;2]) @> __POS_OF__ [];
+  ()
+]}
+
+Now running the test executable with option [-c] will correct the
+empty list to the result of the computation.
+
+{2:testing_snap_file How do I snapshot a value to a file?}
+
+Use the {!B0_testing.(!@)} operator with the file path for the
+snapshot.  Relative files are relative to the {{!test_dir}test
+directory}.
+{[
+let test_snap =
+  Test.test "snap" @@ fun () ->
+  Snap.string "hey" !@ (Fpath.v "snapshots/hey.string");
+  ()
+]}
+For now only snapshots of type [string] can be stored in files.
+
+{2:testing_snap_run How do I snapshot command runs?}
+
+The {!B0_testing.Snap.run} combinator does that. It snapshots the exit
+status, [stdin] and [stderr]. If you snapshot to a relative file it is
+relative to the {{!test_dir}test directory}.
+
+{[
+let test_echo =
+  Test.test "echo" @@ fun () ->
+  Snap.run Cmd.(tool "echo" % "Hey") !@ (Fpath.v "snapshots/echo-hey.run");
+  Snap.run Cmd.(tool "echo" % "Hey!") @> __POS_OF__
+{|exited:0
+┌─ stdout:5
+Hey!
+┌─ stderr:0
+|}
+
+]}
+
+If you don't care about the exit status and [stderr],
+{!B0_testing.Snap.stdout} only snapshots the standard output.
+
+{2:testing_build_tool How do I test tools from the build?}
+
+TODO need to streamline this, see [jsont], [cmarkit] and idea would be
+to augment the [PATH] with a directory which has the executables in
+the build.
+
+
+{2:test_log How do I log messages in my tests?}
+
+Use the {!B0_testing.Test.Log} module.
+
+{[
+let test_log =
+  Test.test "log" @@ fun () ->
+  Test.Log.msg "All is good";
+  Test.pass ()
+]}
+
+{1:test_setup Test setup}
+
+{2:test_setup_rw How do I read and write test data?}
+
+Anything can be used in a test function. However to ensure file paths
+are looked up correctly in every contexts in which the test executable
+may be invoked, read and write persistent data relative to the absolute
+path given by {!B0_testing.Test.dir}. See also {!test_dir}
+
+{2:test_setup_file_tests How do I read tests from a file?}
+
+If some tests are defined in a file you can read the file and pass
+them to the tests as an argument and execute the tests in a
+{!B0_testing.Test.block}. This is a better strategy than defining
+tests dynamically (especially if there are thousands of
+them). Assuming the tests are loaded in the [tests] arguments the test
+below does that. To see how you can add a command line option to
+specify the external file and load it see
+{{!blueprint_with_data_file}this blueprint}.
+
+{[
+let tests = Test.Arg.make ()
+let file_tests =
+  Test.test' tests "file tests" @@ fun tests ->
+  Test.block ~kind:"file test" (fun () -> List.iter (run_test cmd) tests)
+]}
+
+{2:test_setup_errors How do I deal with test setup errors?}
+
+If you are using {!Result} values and you are get trapped in the error
+just use {!Test.error_to_fail} and {!Test.error_to_failstop}.
+
+{[
+let test =
+  Test.test "munge file" @@ fun () ->
+  Test.error_to_failstop @@
+  let* text = Os.File.read Fpath.(Test.dir () / "data.txt") in
+  Test.string text "Hey!" ~__POS__;
+  Ok ()
+]}
+
+{2:test_setup_where Where should I execute test setup?}
+
+It depends but if the setup is going to be shared among tests then
+it's better to do it in the main function and communicate the result
+to tests via {{!test_setup_arguments}test arguments}.
+
+Note that the main
+function can be made to {!Test.failstop} like mentioned in
+{!test_setup_errors} to deal with setup errors.  See for example
+{{!blueprint_with_data_file}this blueprint}.
+
+{2:test_setup_arguments How do I define an argument for my test?}
 
 A test can depend on arguments. In order to do so you need to declare
 the argument with {!B0_testing.Test.Arg.make}, then declare your test
@@ -66,54 +283,140 @@ let main () =
 let () = if !Sys.interactive then () else exit (main ())
 ]}
 
-{2:how_cli_arg How can I define a new command line argument?}
+{2:how_cli_arg How do I add more command line arguments?}
 
+To add more command line arguments to the test executable use the
+the {!B0_testing.Test.main'}. See {{!blueprint_with_data_file}this blueprint}
+for an example.
 
-{2:how_args How can I read tests from a file?}
+{1:test_long Long tests}
 
-If some tests are defined in a file you can read the file and pass
-them to the tests as an argument and execute the tests in a
-{!B0_testing.Test.block}.
+{2:test_long_what What is a long test?}
+
+A long test is a test that you don't want to execute on every test
+run because it's too costly.
+
+{2:test_long_declare How do I declare a test to be long?}
+
+Use the corresponding option in {!Test.test}.
+
+{2:test_long_exec How do I execute the long tests?}
+
+Long tests are not executed by default. Invoke the test executable
+with [-l] to run them.
+
+{1:test_randomized Randomized test}
+
+The support is minimal at the moment. There is just infrastructure
+for seeding and reproducing {!B0_testing.Test.Rand.state}.
+
+{1:run Running}
+
+{2:selecting How do I run only certain tests?}
+
+Tests can be selected by the name you specify in
+{!B0_testing.Test.test} calls.
+
+The [-x] and [-i] options of the test executable can respectively be
+used to exclude or include tests by name. Invoke the test executable
+with [--list] to list the names. Completion should also work if you
+have it setup. Invoke the test executable with [--help] for more
+information.
+
+{2:cwd What is the current working directory?}
+
+That depens on you how run the test. In general it's better to avoid
+relying on the current working directory of the test executable. Use
+the {!B0_testing.Test.dir} path to make the file paths you want to
+read or write absolute. See also {!test_dir}
+
+{2:cwd_set Should I set the current working directory?}
+
+For the test executable it is better to rely on {!B0_testing.Test.dir}
+to resolve relative file paths. This ensure everything will work fine
+regardless of the executable's current working directory.
+
+However it may be useful to set the [cwd] on processes spawned by the
+test executable for example by {!B0_testing.Snap.run}.
+
+On example is snapshoting outputs which contains text file location.
+In this case you will want to set the cwd of the invocation and pass
+it relative file paths so that the snapshot of text locations does not
+mention absolute paths.
+
+{2:test_dir What is the test directory?}
+
+The test directory is an absolute path according to which the relative
+paths in your test executable should be resolved. It is notably used
+by snapshot testing for storing and updating the reference snapshots
+in sources and external files.
+
+The test directory should be set by the test runner with the
+[TEST_DIR] environment variable or the [--test-dir] option of your
+test executable. For snapshot tests it is important for the test
+directory to be setup correctly (usually to the parent directory of
+the executable source file). Read {!page-testing.test_directory} to
+understand how [b0] sets this variable on unit action executions and
+[b0 test].
+
+The test directory can be used for example to load test data and is
+available by calling {!B0_testing.Test.dir}.
+
+{2:toplevel Running tests in the toplevel (REPL)}
+
+Since the tests are [let] bound you can easily invoke them in the
+toplevel individually. At least those that do not have arguments.
+
+{1:blueprints Blueprints}
+
+{2:blueprint_minimal Minimal}
+
+A minimal example.
 
 {[
-(* Specification tests *)
+open B0_testing
 
-type spec_test = …
-let load_spec_tests file = …
-let run_test t = if true then Test.pass () else Test.fail "Oh no!"
+let test =
+  Test.test "nothing" @@ fun () ->
+  Test.pass ()
 
-(* Running them *)
+let main () = Test.main @@ fun () -> Test.autorun ()
+let () = if !Sys.interactive then () else exit (main ())
+]}
 
-let spec_tests : test list Test.Arg.t = Test.Arg.make ()
-let test_spec =
-  Test.test' spec_tests "specification tests" @@ fun tests ->
-  let pass ?__POS__ count =
-    Test.log "%a %a %a" Test.Fmt.count count test count Test.Fmt.passed ()
-  in
-  let fail ?__POS__ count ~assertions =
-    Test.log "%a %a %a"
-      Test.Fmt.fail_count_ratio (count, assertions) test assertions
-      Test.Fmt.failed ()
-  in
-  Test.block ~pass ~fail (fun () -> List.iter (run_test cmd) tests)
+{2:blueprint_with_data_file With a data file}
+
+This adds an additional [--data-file] argument to the
+test executable. The data file is loaded and its data made
+available in a test via a {{!test_setup_arguments}test argument}.
+
+{[
+open B0_std
+open Result.Syntax
+open B0_testing
+
+let data = Test.Arg.make ()
+
+let test =
+  Test.test' data "nothing" @@ fun data ->
+  Test.pass ()
+
+(* Command line interface *)
 
 open Cmdliner
 open Cmdliner.Term.Syntax
 
 let main () =
   Test.main' @@
-  let+ spec_tests_file =
-    let doc = "$(docv) is the specification tests file." in
-    let default = Fpath.v "test/spec-tests.json" in
-    Arg.(value & opt B0_std_cli.filepath default & info ["file"] ~doc)
+  let+ data_file =
+    let doc = "$(docv) is the data file to use." in
+    let default = Fpath.v "data.json" in
+    Arg.(value & opt B0_std_cli.filepath default & info ["data-file"] ~doc)
   in
   fun () ->
-    let open Syntax.Result in
-    Test.error_to_failstop @@
-    let* tests = read_spec_tests spec_tests_file in
-    Test.autorun ~args:Test.Arg.[value spec_tests tests]
+    let file = Fpath.(Test.dir () // data_file) in
+    let* data = Os.File.read data |> Test.error_to_failstop in
+    Test.autorun ~args:Test.Arg.[value data_file tests] ()
 
 let () = if !Sys.interactive then () else exit (main ())
 ]}
-
-{1:blueprints Blueprints}

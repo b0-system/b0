@@ -5,10 +5,12 @@
 
 (** Unit, random and snapshot testing for OCaml.
 
-    {{!quick_start}The quick start} is a blueprint for a test
-    executable see also the {{!page-b0_testing_cookbook}cookbook}. To
-    integrate your tests in your [B0.ml] file and run them with [b0
-    test] see the {{!page-testing}b0 testing manual}.
+    See {{!quick_start}the quick start}, the
+    {{!page-b0_testing_cookbook}cookbook} and
+    {{!page-b0_testing_cookbook.blueprints}starting blueprints}.
+    To integrate your tests in
+    your [B0.ml] file and run them with [b0 test] see the
+    {{!page-testing}b0 testing manual}.
 
     This module is designed to be opened.
 
@@ -17,52 +19,55 @@
 
 open B0_std
 
-(** Testing structure and assertions.
-
-    See the {{!quick_start}quick start} and the
-    {{!page-b0_testing_cookbook}cookbook}. *)
+(** Assertion tests and test infrastructure. *)
 module Test : sig
 
-  (** {1:locs Source locations} *)
+  (** {1:infrastucture Test infrastucture} *)
 
   type loc = string * int * int * int
-  (** The type for test source locations. This is the type of
-      {!Stdlib.__POS_OF__}.
+  (** The type for text locations. This is the type of {!Stdlib.__POS_OF__}.
 
-      It is an optional argument of most combinators to keep track of precise
-      locations of failures. The idea is that the argument is simply used
-      with {!Stdlib.__POS__}. For example:
+      It is an optional argument of most combinators to keep track of
+      precise locations of failures while we wait for
+      {{:https://github.com/ocaml/RFCs/pull/52}implicit source
+      location} support to be integrated in the compiler . The idea is
+      that the argument is simply used with {!Stdlib.__POS__}. For
+      example:
       {[Test.string s0 s1 ~__POS__]} *)
 
-  (** {1:log Logging} *)
+  (** {2:logging Logging} *)
 
-  type 'a log = ?__POS__:loc -> ('a, Format.formatter, unit, unit) format4 -> 'a
-  (** The type for log functions. If [__POS__] is specified starts by
-      logging the position on a line before logging the format. *)
+  (** Logging. *)
+  module Log : sig
 
-  val log : 'a log
-  (** [log fmt …] logs a message formatted by [fmt]. *)
+    type 'a t = ?__POS__:loc -> ('a, Format.formatter, unit, unit) format4 -> 'a
+    (** The type for log functions. If [__POS__] is specified starts by
+        logging the position on a line before logging the format. *)
 
-  val log_pass : 'a log
-  (** [log_pass fmt …] is like {!val-log} but formatted for passing.
-      This does not increment passed assertions, use {!pass} to do so. *)
+    val msg : 'a t
+    (** [msg fmt …] logs a message formatted by [fmt]. *)
 
-  val log_fail : 'a log
-  (** [log_fail fmt …] is like {!val-log} but formatted for failures. This
-      does not increment failed assertions, use {!fail} to register a
-      failure. *)
+    val pass : 'a t
+    (** [pass fmt …] is like {!val-log} but formatted for passing.
+        This does not increment passed assertions, use {!pass} to do so. *)
 
-  val log_start : 'a log
-  (** [log_start] is like {!val-log} but does not finish the line. {!log_finish}
-      does. *)
+    val fail : 'a t
+    (** [log_fail fmt …] is like {!val-log} but formatted for failures. This
+        does not increment failed assertions, use {!fail} to register a
+        failure. *)
 
-  val log_finish : ('a, Format.formatter, unit, unit) format4 -> 'a
-  (** [log_finish] ends a line started with {!log_start}. *)
+    val start : 'a t
+    (** [log_start] is like {!val-log} but does not finish the line.
+        {!log_finish} does. *)
 
-  val log_raw : ('a, Format.formatter, unit, unit) format4 -> 'a
-  (** [log_raw fmt …] outputs to the test log. *)
+    val finish : ('a, Format.formatter, unit, unit) format4 -> 'a
+    (** [finish] ends a line started with {!log_start}. *)
 
-  (** {1:main_tests Main & tests} *)
+    val raw : ('a, Format.formatter, unit, unit) format4 -> 'a
+    (** [raw fmt …] outputs to the test log. *)
+  end
+
+  (** {2:main Main} *)
 
   val main : ?doc:string -> ?name:string -> (unit -> unit) -> int
   (** [main f] executes [f ()], logs the resulting testing status and
@@ -75,8 +80,8 @@ module Test : sig
       See an {{!quick_start}example}. *)
 
   val main' :
-    ?man:Cmdliner.Manpage.block list ->
-    ?doc:string -> ?name:string -> (unit -> unit) Cmdliner.Term.t -> int
+    ?man:Cmdliner.Manpage.block list -> ?doc:string -> ?name:string ->
+    (unit -> unit) Cmdliner.Term.t -> int
   (** [main'] is like {!main} but allows to define your own additional
       command line. See the
       {{!page-b0_testing_cookbook.how_cli_arg}cookbook}. *)
@@ -84,6 +89,8 @@ module Test : sig
   val set_main_exit : (unit -> int) -> unit
   (** [set_main_exit f] will disable the final report performed
       by {!main} and invoke [f] instead. {b TODO.} A bit ad-hoc. *)
+
+  (** {2:tests Tests} *)
 
   (** Test arguments. *)
   module Arg : sig
@@ -118,10 +125,10 @@ module Test : sig
 
   val autorun : ?args:Arg.value list -> unit -> unit
   (** [autorun ()] calls all the tests defined by {!test} and
-      {!test'}, possibly filtered by the command line. [args]
-      defines the value of {{!Arg}test arguments}.*)
+      {!test'}, possibly filtered by the command line. [args] defines
+      the value of {{!Arg}test arguments}.*)
 
-  (** {1:flow Stop, pass, skip and fail}
+  (** {3:flow Stop, pass, skip and fail}
 
       A {!test} is usually made of many assertions. If an assertion fails
       the test fails. *)
@@ -131,14 +138,14 @@ module Test : sig
       {{!test}test}, or {!main}. Note that this does not increment
       failed assertions, use {!fail} or {!failstop} for that. *)
 
-  val skip : 'a log
+  val skip : 'a Log.t
   (** [skip fmt …] logs [fmt] and skips the current {{!block}block},
       {{!test}test}, {!main}. *)
 
   val pass : unit -> unit
   (** [pass ()] increments the number of successfull assertions.  *)
 
-  val fail : 'a log
+  val fail : 'a Log.t
   (** [fail fmt …] increments the number of failed assertions and logs
       [fmt] with {!log_fail}. The test or block continues to execute, use
       {!stop} or {!failstop} to stop the test. *)
@@ -154,25 +161,37 @@ module Test : sig
   (** - [error_to_fail (Error e)] is [fail "%s" e].
       - [error_to_fail (Ok v)] is [()]. *)
 
-  (** {2:blocks Blocks and loops}
+  (** {3:blocks Blocks and loops}
 
       Blocks and loops can be used as larger sub units of {!test}
       which you can {!skip}, {!stop} and {!failstop} without
       skipping or stopping the test itself. *)
 
   val block :
-    ?pass:(?__POS__:loc -> int -> unit) ->
+    ?kind:string -> ?pass:(?__POS__:loc -> int -> unit) ->
     ?fail:(?__POS__:loc -> int -> assertions:int -> unit) -> ?__POS__:loc ->
     (unit -> unit) -> unit
-  (** [block ~fail f] runs [f ()], if that results in [n > 0] failed
-      assertions, [fail n ~assertions] is called afterwards with
-      [assertions] the total number of assertions that were performed.
-      If [f] peforms a {!failstop} the block is stopped but not the
-      test. It is possible to fail stop the test by stoppping in
-      [fail]. If no assertion fails [pass] is called with the number
-      of assertions (defaults does nothing).
+  (** [block ~kind ~pass ~fail f] runs [f ()], if that results in:
+      {ul
+      {- [n > 0] failed assertions, [fail n ~assertions] is called afterwards
+         with [assertions] the total number of assertions that were
+         performed. The default prints the fail to count ratio of assertions
+         of type [kind] (["example"], ["test"], etc.) if specified.}
+      {- [f] peforms a {!failstop} the block is stopped but not the
+         test. It is possible to fail stop the test by stoppping in
+         the [fail] function.}
+      {- If no assertion fails [pass] is called with the number
+         of assertions. Defaults does nothing, unless [kind] if specified
+         in which case it indicates that [count] kinds passed.}}
 
-      {b TODO.} Should we simply make blocks nested {!test}s ? *)
+      For example if you are testing a list of examples use:
+      {[
+      Test.block ~kind:"example" (fun () -> List.iter test_example examples)
+      ]}
+      This will log either the number of examples that succeeded or
+      the ratio of failures.
+      See {{!page-b0_testing_cookbook.test_setup_file_tests}this example
+      in the cookbook}. *)
 
   val range :
     ?kind:string -> first:int -> last:int -> ?__POS__:loc -> (int -> unit) ->
@@ -182,6 +201,13 @@ module Test : sig
       logs ["%s in range [%d;%d] failed on %d" kind first last n].
       If [f] performs a {!failstop} the loop is stopped but not the test.
       [kind] defaults to ["Test"]. *)
+
+  (** {2:test_dir Test directory} *)
+
+  val dir : unit -> Fpath.t
+  (** [dir ()] is the test directory.
+      See {{!page-b0_testing_cookbook.test_dir}the cookbook} for more
+      information. *)
 
   (** {1:testers Testers} *)
 
@@ -232,8 +258,7 @@ module Test : sig
     (** [pp t] is the formatting function of [t]. *)
 
     val with' : ?equal:('a -> 'a -> bool) -> ?pp:'a Fmt.t -> 'a t -> 'a t
-    (** [with' t] is [t] with those arguments specified
-        replaced. *)
+    (** [with' t] is [t] with those arguments specified replaced. *)
 
     (** {1:predef Predefined testers} *)
 
@@ -349,7 +374,7 @@ module Test : sig
     (** [bigbytes] tests bigbytes and prints them with
         {!B0_std.Fmt.bigbytes} *)
 
-    (** {2:parametric Parametric types} *)
+    (** {2:type_constructors Type constructors} *)
 
     val option : 'a t -> 'a option t
     (** [option v] tests options of values tested with [v] and prints
@@ -503,26 +528,14 @@ module Test : sig
     val write_files : unit -> unit
     (** [write_files ()] writes the patched files. {b Note.}
         if you are using {!Test.main}, this is done automatically. *)
-
-    (** {1:filepath File paths}
-
-        {b TODO.} This should be moved somewhere else. *)
-
-    val get_filepath : Fpath.t -> Fpath.t
-    (** [get_filepath f] prepends {!src_root} to [f] if [f]
-        is relative. *)
-
-    (** {1:run_state Run state} *)
-
-    val src_root : unit -> Fpath.t option
-    (** [src_root ()] if present it prefixed to {!Test.loc} path
-        with {!B0_std.Fpath.append} for looking up files. *)
   end
 
-  (** {1:assertions Assertions} *)
+  (** {2:assertions Assertion tests}
+
+      See the {{!predefined_assertions}predefined assertions}. *)
 
   type 'a eq = ?diff:'a Diff.t -> ?__POS__:loc -> 'a -> 'a -> unit
-  (** The type for functions aasserting equality. [diff] indicates
+  (** The type for functions asserting equality. [diff] indicates
       how to report differences on mismatches. *)
 
   val eq : 'a T.t -> 'a eq
@@ -539,6 +552,81 @@ module Test : sig
   val holds : ?msg:string -> ?__POS__:loc -> bool -> unit
   (** [holds b] asserts that [b] is [true]. [msg] is logged if the
       assertion fails. *)
+
+  (** {2:snapshot Snapshot tests}
+
+      See the {{!Snap}predefined snapshots}. *)
+
+  (** Snapshot tests. *)
+  module Snapshot : sig
+
+    (** {1:snapshots Snaphots} *)
+
+    type 'a t
+    (** The type for expected snapshots of type 'a. *)
+
+    val src_loc : 'a t -> loc
+    (** [src_loc s] is the location of the snapshot in the sources. *)
+
+    val exp_loc : 'a t -> loc
+    (** [exp_loc s] is the location of the expected value of the
+        snapshot. This is either equal to [src_loc] or in an external
+        file. *)
+
+    (** {1:substitutions Substitutions} *)
+
+    type 'a subst =
+      'a T.t -> 'a t -> by:'a -> src:string -> Patch.subst
+    (** The type for snapshot substitution functions, returns a substitution
+        to perform in [src]. Raise [Failure] if you can't. *)
+
+    val generic_subst : 'a subst
+    (** [generic_subst] is a generic snapshot substution function.
+        It uses the given tester's pretty printer to print the new
+        snapshot which must result in valid OCaml syntax. *)
+
+    val string_subst : string subst
+    (** [string_subst] is a special snapshot substitution function for
+        [string] literals. It looks in the context to preserve quoted
+        literal strings. *)
+
+    (** {1:run_state Test run state} *)
+
+    val correct : unit -> bool
+    (** [correct ()] is [true] if expected snapshot mismatches must
+        be updated to the snapshot computed during the run. *)
+
+    val force_correct : unit -> bool
+    (** [force_correct ()] is [true] if all expected snapshots must be
+        be updated to the snapshots computed during the run,
+        regardless of their correctness. *)
+  end
+
+  type 'a snap = ?__POS__:loc -> ?diff:'a Diff.t -> 'a -> 'a Snapshot.t -> unit
+  (** The type for snapshot functions. *)
+
+  val snap : ?subst:'a Snapshot.subst -> 'a T.t -> 'a snap
+  (** [snap t fnd @> __POS_OF__ exp] compares snapshot [fnd] to [exp].
+      [subst] is used to correct snapshots, it defaults to
+      {!Snapshot.generic_subst} which depends on [t]'s pretty printer
+      formatting valid OCaml code.
+
+       See {!B0_testing.Snap} for preapplied combinators. *)
+
+  (** {2:random Randomized tests} *)
+
+  (** Randomized tests. *)
+  module Rand : sig
+
+    (** {1:run_state Run state} *)
+
+    val state : unit -> Random.State.t
+    (** [state ()] returns a random state. This is self seeded unless
+        the [SEED] environment variable is set in which case an
+        integer. *)
+  end
+
+  (** {1:predefined_assertions Predefined assertions} *)
 
   (** {2:test_exns Exceptions} *)
 
@@ -629,7 +717,7 @@ module Test : sig
   val bytes : bytes eq
   (** [string] is [eq ]{!module-T.bytes}. *)
 
-  (** {2:parametric Parametric types} *)
+  (** {2:type_constructors Type constructors} *)
 
   val any : 'a eq
   (** [any] uses {!module-T.any}. *)
@@ -674,77 +762,6 @@ module Test : sig
     ('a * 'b * 'c * 'd * 'e * 'f) eq
   (** [t6] is {!val-eq} for sextuplets. *)
 
-  (** {1:random Randomized testing} *)
-
-  (** Randomized testing. *)
-  module Rand : sig
-
-    (** {1:run_state Run state} *)
-
-    val state : unit -> Random.State.t
-    (** [state ()] returns a random state. This is self seeded unless
-        the [SEED] environment variable is set in which case an
-        integer. *)
-  end
-
-  (** {1:snapshot Snapshot testing} *)
-
-  (** Snapshot tests. *)
-  module Snapshot : sig
-
-    (** {1:snapshots Snaphots} *)
-
-    type 'a t
-    (** The type for expected snapshots of type 'a. *)
-
-    val src_loc : 'a t -> loc
-    (** [src_loc s] is the location of the snapshot in the sources. *)
-
-    val exp_loc : 'a t -> loc
-    (** [exp_loc s] is the location of the expected value of the
-        snapshot. This is either equal to [src_loc] or in an external
-        file. *)
-
-    (** {1:substitutions Substitutions} *)
-
-    type 'a subst =
-      'a T.t -> 'a t -> by:'a -> src:string -> Patch.subst
-    (** The type for snapshot substitution functions, returns a substitution
-        to perform in [src]. Raise [Failure] if you can't. *)
-
-    val generic_subst : 'a subst
-    (** [generic_subst] is a generic snapshot substution function.
-        It uses the given tester's pretty printer to print the new
-        snapshot which must result in valid OCaml syntax. *)
-
-    val string_subst : string subst
-    (** [string_subst] is a special snapshot substitution function for
-        [string] literals. It looks in the context to preserve quoted
-        literal strings. *)
-
-    (** {1:run_state Test run state} *)
-
-    val correct : unit -> bool
-    (** [correct ()] is [true] if expected snapshot mismatches must
-        be updated to the snapshot computed during the run. *)
-
-    val force_correct : unit -> bool
-    (** [force_correct ()] is [true] if all expected snapshots must be
-        be updated to the snapshots computed during the run,
-        regardless of their correctness. *)
-  end
-
-  type 'a snap = ?__POS__:loc -> ?diff:'a Diff.t -> 'a -> 'a Snapshot.t -> unit
-  (** The type for snapshot functions. *)
-
-  val snap : ?subst:'a Snapshot.subst -> 'a T.t -> 'a snap
-  (** [snap t fnd @> __POS_OF__ exp] compares snapshot [fnd] to [exp].
-      [subst] is used to correct snapshots, it defaults to
-      {!Snapshot.generic_subst} which depends on [t]'s pretty printer
-      formatting valid OCaml code.
-
-       See {!B0_testing.Snap} for preapplied combinators. *)
-
   (** {1:low Low-level modules}
 
       These modules are not needed for basic [B0_testing] usage. *)
@@ -766,7 +783,8 @@ module Test : sig
         {- [--correct] and [CORRECT] to indicate snapshot correction.}
         {- [--force-correct] to force expected snapshots to update.}
         {- [--diff-cmd] to set the external command used for diffing}
-        {- [--src-root] to resolve relative source file paths}
+        {- [--test-dir] and [TEST_DIR] to resolve relative file paths
+           (notably for snapshots).}
         {- [-i NAME] and [-x NAME] to select tests}} *)
   end
 
@@ -794,29 +812,34 @@ module Test : sig
   end
 end
 
-(** Snapshots.
+(** Snapshots tests.
 
-    These combinators can be used to snapshot values.  They are based
+    These combinators can be used to snapshot values. They are based
     on the {!Test.val-snap} primitive. Snapshots can be stored
-    directly in the source or in external files relative to the
-    source's parent directory.
+    directly in the source code or in external files.
+
+    To be able to correct the snapshots when they change, access to
+    these files must be provided. They are assumed to be in a file
+    hierarchy rooted in the {!Test.dir} directory which must be
+    properly setup by the test runner. See the [--test-dir] option
+    of test executable and b0's {{!page-testing.test_directory}test directory
+    support}. Using {!B0_ocaml.test} does the right thing.
 
     While we wait for {{:https://github.com/ocaml/RFCs/pull/52}implicit
     source location} support to be integrated in
-    the compiler they are expected to be used as follows:
+    the compiler the combinators are expected to be used as follows:
     {[
-    Snap.bool (Bool.not true) @> __POS_OF__ false;
-    Snap.string ("a" ^ "b") @> __POS_OF__
-      "ab";
+    Snap.string ("a" ^ "b") @> __POS_OF__ "ab";
     Snap.string ("a" ^ "b") @! (Fpath.v "snapshots/ab.string") ~__POS__
-    ]}
-*)
+    ]} *)
 module Snap : sig
+
+  (** {1:predefined Predefined snapshots} *)
 
   (** Repeated here for convenience, e.g. [Snap.(list T.int)].  *)
   module T = Test.T
 
-  (** {1:exn Exceptions} *)
+  (** {2:exn Exceptions} *)
 
   val exn : exn Test.snap
   (** [exn] is {!Test.val-snap}[ ]{!Test.module-T.val-exn}. *)
@@ -828,7 +851,7 @@ module Snap : sig
       it using [exn] (defaults to {!T.val-exn}). The combinators
       fails if no exception is raised by [f]. *)
 
-  (** {1:base Base types} *)
+  (** {2:base Base types} *)
 
   val unit : unit Test.snap
   (** [unit] is {!Test.val-snap}[ ]{!Test.module-T.unit}. *)
@@ -898,7 +921,7 @@ module Snap : sig
   (** [string fnd exp] asserts that [fnd] and [exp] are equal. *)
 *)
 
-  (** {1:parametric Parametric types} *)
+  (** {2:type_constructors Type constructors} *)
 
   val option : 'a Test.T.t -> 'a option Test.snap
   (** [option t] snapshots [t] option. *)
@@ -944,7 +967,7 @@ module Snap : sig
     'f Test.T.t -> ('a * 'b * 'c * 'd * 'e * 'f) Test.snap
   (** [t6] is {!Test.val-snap} for sextuplets. *)
 
-  (** {1:exec Command executions} *)
+  (** {2:exec Command executions} *)
 
   val stdout :
     ?__POS__:Test.loc ->
@@ -952,48 +975,40 @@ module Snap : sig
     ?cwd:Fpath.t -> ?stdin:Os.Cmd.stdi ->
     ?stderr:[`Stdo of Os.Cmd.stdo | `Out] -> trim:bool -> Cmd.t ->
     string Test.Snapshot.t -> unit
-  (** [stdout cmd] snaphosts the standard output of the execution (see
-      {!B0_std.Os.Cmd.run_status_out}). The function {!Test.fail}s if there's
-      any sort of error. The [status] is ignored (FIXME do something more
-      sensitive we could assert it)).
-
-      {b Improtant.} For now if you use an external file with {!(!@)},
-      specify ~__POS__ and the file path should be relative to the source.
-  *)
+  (** [stdout cmd] snapshots the standard output of the execution (see
+      {!B0_std.Os.Cmd.run_status_out}). The function {!Test.fail}s if
+      there's any sort of error. The [status] is ignored. *)
 
   val run :
     ?__POS__:Test.loc -> ?test:string T.t -> ?diff:string Test.Diff.t ->
     ?env:Os.Env.assignments -> ?cwd:Fpath.t -> ?stdin:Os.Cmd.stdi -> Cmd.t ->
     string Test.Snapshot.t -> unit
   (** [run cmd] snapshots the standard output, standard error and
-      exit code of the execution. *)
+      exit code of the execution (see {!B0_std.Os.Cmd.val-run}). *)
 end
 
 val ( !> ) : ?loc:Test.loc -> 'a -> 'a Test.Snapshot.t
 (** This doesn't work for now, but is what we would like to use
-    in the future. Use for now see {!Snap}. *)
+    in the future. Use {!(@>)} for now. *)
 
 val ( !@ ) : ?loc:Test.loc -> Fpath.t -> string Test.Snapshot.t
-(** [!@ file] indicates that the snapshot is stored in file [file]. For
-    example:
+(** [!@ file] indicates that the snapshot is stored in file [file] which
+    is expressed relative to {!Test.dir}.
+    For example:
     {[
-    Snap.string "bla!" !@ (Fpath.v "snapshots/bla.string") ~__POS__
-    ]}
-
-    {b Important.} For now when used in a combinator use the [__POS__]
-    argument of the combinator and specify the file relative to the source
-    file. Alternatively specify an absolute path derived from a fixed
-    cwd. *)
+    Snap.string ("a" ^ "b") @! (Fpath.v "snapshots/ab.string") ~__POS__
+    ]} *)
 
 val ( @> ) : ('a Test.Snapshot.t -> 'b) -> Test.loc * 'a -> 'b
-(** This should be used for now with [__POS_OF__] instead of {!(!>)}. For
-    example:
+(** For now this should be used in conjunction with [__POS_OF__] instead
+    of {!(!>)}. For example:
     {[
-    Snap.bool b @> __POS_OF__ true
-    ]}
- *)
+    Snap.string ("a" ^ "b") @> __POS_OF__ "ab";
+    ]} *)
 
 (** {1:quick_start Quick start}
+
+    TODO rewrite in a few bite sized chunks.
 
     This is a typical test executable. Note that tests are [let]
     bound. This means that you can load them in the toplevel to invoke
@@ -1035,9 +1050,4 @@ let main () = Test.main @@ fun () -> Test.autorun ()
 let () = if !Sys.interactive then () else exit (main ())
 ]}
 
-If you are in a testing hurry or migrating you can always simply use
-OCaml's [assert] in the test functions: you just won't get any
-rendering on assertion failures and tests stop at the first assertion
-    failure.
-
-More in the {{!page-b0_testing_cookbook}cookbook}. *)
+See also the {{!page-b0_testing_cookbook}cookbook}. *)
