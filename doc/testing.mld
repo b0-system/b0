@@ -101,8 +101,4 @@ OCaml:
 {ul
 {- {!B0_testing} in the [b0.std] library is a basic testing framework
    with support for unit, random and snapshot testing and integrates nicely
-   with [b0 test]'s rendering.}
-{- FIXME get rid of it in favor of {!B0_testing}.
-   {!B0_expect} in the [b0.kit] library provides
-   snapshot testing. It is expected to change a little bit in order to
-   integrate better with [b0 test] and {!B0_testing}.}}
+   with [b0 test]'s rendering.}}

@@ -169,7 +169,6 @@ B0_web_page
 {2:testing Testing and releasing}
 
 {!modules:
-B0_expect
 B0_release
 B0_show_url
 }

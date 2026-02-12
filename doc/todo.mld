@@ -239,15 +239,15 @@ Is missing.
 
 On hold until we get the {!B0_srcs} thing right.
 
-{2:b0_test Testing and [B0_testing] and [B0_expect]}
+{2:b0_test Testing and [B0_testing]}
 
 - Implicit source location improvements. We could get rid of
   [__POS__] and [__POS_OF__]. We could add a --test-locs option,
   which outputs test function locations (we did not add a [__POS__]
   argument to Test.test
-
-- Now that we added [Test.Snapshot] we should try to meld [B0_expect] into
-  [B0_testing].
+- The path business is a bit shady in {!B0_testing} we should
+  get a proper strategy, read also in the {!page-b0_testing_cookbook}.
+- Streamline the tool testing case, see testing of `jsont`, `cmarkit`, etc.
 - [b0 test], run as soon as build, run in parallel.
 - [b0 test], more exit code semantics for skips and long tests.
 - [b0 test], document the full test executable protocol (env var + exit codes)
@@ -259,11 +259,8 @@ On hold until we get the {!B0_srcs} thing right.
 - Once we run snapshot tests on Windows we will likely need a newline
   normalization business.
 - [Test.Arg] add lazy arguments.
-- We want tests to be [let] bound so that it's easy to invoke
-  them induvidually, e.g. in the toplevel.
-- Have test for a full program execution effect (file system, exit
-  code, standard outputs) via a dedicated machine readable file that
-  is updated by the run.
+- More general {!B0_testing.Snap.run} that captures effects
+  on the file system?
 - Get a story for binary/visual regression. First we should have a
   good `git difftool` and `pixeldrift` setup regardless of
   testing. Then we likely want combinators that automatically checkout
@@ -272,14 +269,6 @@ On hold until we get the {!B0_srcs} thing right.
   perceptual tool with `path` and `git show HEAD:path`, if the tool
   exits with 0 do a `git checkout path` to make it as if nothing
   happened.
-- Add a notion of group in Outcome.test.
-- Add filtering to selectively test expecations. Based on group names
-  and file globs.
-- Logging maybe move to:
-  {ul
-  {- normal, paths but no diff}
-  {- long, paths and diffs}
-  {- short, only final summary}}
 
 {2:b0_opam [B0_opam]}
 
