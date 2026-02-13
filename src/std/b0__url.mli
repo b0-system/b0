@@ -50,9 +50,9 @@ val fragment : t -> fragment option
 (** {1:derived Derived components} *)
 
 val target : t -> string option
-(** [target u] is the contenation of {!path}, {!query} and {!fragment},
-    that is everything that comes after the {!scheme} and {!authority} in
-    an URL. *)
+(** [target u] is the contenation of {!val-path}, {!val-query} and
+    {!val-fragment}, that is everything that comes after the {!val-scheme}
+    and {!val-authority} in an URL. *)
 
 (** {1:kinds Kinds} *)
 
@@ -83,7 +83,7 @@ val of_url : t ->
     deleted. *)
 
 val append : t -> t -> t
-(** [append root u] is [u] if {!kind}[ u] is [`Absolute]. Otherwise
+(** [append root u] is [u] if {!val-kind}[ u] is [`Absolute]. Otherwise
     uses [root] to make it absolute according to its {!relative_kind}.
     The result is guaranteed to be absolute if [root] is, the result
     may be surprising or non-sensical if [root] isn't (FIXME can't we
@@ -91,7 +91,7 @@ val append : t -> t -> t
 
 val to_absolute : scheme:scheme -> root_path:path option -> t -> t
 (** [to_absolute ~scheme ~root_path] transforms [u] depending on the value of
-    {!kind}[ u]:
+    {!val-kind}[ u]:
     {ul
     {- If [`Absolute] then this is [u] itself.}
     {- If [`Relative `Scheme] then [u] is given the scheme [scheme].}
@@ -115,7 +115,7 @@ val drop_path_and_rest : t -> string
 (** Sloppy authority processing. *)
 module Authority : sig
   type t = authority
-  (** See {!authority}. *)
+  (** See {!type-authority}. *)
 
   val userinfo : authority -> string option
   (** [userinfo a] is anything before the lefmost ['@'] (if any) *)
@@ -162,8 +162,7 @@ val pp_kind : Format.formatter -> kind -> unit
     {b Note.} This should not be used for URL query strings and
     {{:https://url.spec.whatwg.org/#application/x-www-form-urlencoded}
     [application/x-www-form-urlencoded]} which is slightly different (welcome
-    to the Web).
-    The {!Webs.Http.Query} module handles that. *)
+    to the Web). The {!Webs.Http.Query} module handles that. *)
 module Percent : sig
   type kind = [
     | `Uri_component

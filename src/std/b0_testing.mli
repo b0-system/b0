@@ -830,7 +830,7 @@ end
     the compiler the combinators are expected to be used as follows:
     {[
     Snap.string ("a" ^ "b") @> __POS_OF__ "ab";
-    Snap.string ("a" ^ "b") @! (Fpath.v "snapshots/ab.string") ~__POS__
+    Snap.string ("a" ^ "b") !@ (Fpath.v "snapshots/ab.string") ~__POS__
     ]} *)
 module Snap : sig
 
@@ -1001,7 +1001,7 @@ val ( !@ ) : ?loc:Test.loc -> Fpath.t -> string Test.Snapshot.t
     is expressed relative to {!Test.dir}.
     For example:
     {[
-    Snap.string ("a" ^ "b") @! (Fpath.v "snapshots/ab.string") ~__POS__
+    Snap.string ("a" ^ "b") !@ (Fpath.v "snapshots/ab.string") ~__POS__
     ]} *)
 
 val ( @> ) : ('a Test.Snapshot.t -> 'b) -> Test.loc * 'a -> 'b

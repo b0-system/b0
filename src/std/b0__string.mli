@@ -113,6 +113,8 @@ val rfind_all :
 
 (** {1:replacing Replacing substrings}
 
+    {b All additions available} in OCaml 5.5
+
     {b Note.} To replace the same [sub] string multiple times, partially
     applying the [~sub] argument of these functions and using the
     resulting function repeatedly is more efficient. *)
@@ -213,6 +215,8 @@ val cut_last_while : (char -> bool) -> string -> string * string
     [(drop_last_while sat s, take_last_while sat s)]. *)
 
 (** {2:splitting_sep Splitting with separators}
+
+    {b All additions available} in OCaml 5.5
 
     {b Note.} To split the same [sep] string multiple times, partially
     applying the [~sep] argument of these functions and using the

@@ -384,7 +384,7 @@ val array : ?empty:unit t -> ?sep:unit t -> 'a t -> 'a array t
 
 val text : string t
 (** [text] is {!Format.pp_print_text}. {b FIXME.} replace this
-    by the behaviour of {!styled text}. *)
+    by the behaviour of {!styled_text}. *)
 
 val styled_text : string t
 (** [styled_text] formats ANSI escape sequences as zero width

@@ -24,10 +24,10 @@
 type level =
 | Quiet (** Do not report anything. *)
 | Stdout (** Outputs to the [stdout] of the program. Using this allows the
-             output to be silenced when the {!level} is set to [Quiet],
+             output to be silenced when the {!val-level} is set to [Quiet],
              which may be desirable, or not. *)
 | Stderr (** Outputs to the [stderr] of the program. Using this allows the
-             output to be silenced when the {!level} is set to [Quiet],
+             output to be silenced when the {!val-level} is set to [Quiet],
              which may be desirable, or not. *)
 | Error (** For error conditions that prevent the program from running
             correctly. *)
@@ -148,7 +148,7 @@ val time :
     [Info]) and the time [f ()] took as the message header with
     {!Mtime.Span.pp}.
 
-    {b Note.} The reporting {!level} is determined after [f] has been
+    {b Note.} The reporting {!val-level} is determined after [f] has been
     called. This means [f] can change it to affect the report.
     See for example {!page-b0_std_cookbook.logging_main} *)
 
@@ -175,7 +175,8 @@ module Reporter : sig
 
   type t = { kmsg : 'a 'b. (unit -> 'b) -> level -> ('a, 'b) msgf -> 'b }
   (** The type for log message reporters. [kmsg] is never invoked with
-      a level of [Quiet] or with a level smaller than the reporting {!level}. *)
+      a level of [Quiet] or with a level smaller than the reporting
+      {!val-level}. *)
 
   val nop : t
   (** [nop] is a logger that reports nothing. *)

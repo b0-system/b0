@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------
-   Copyright (c) 2024 The b0 programmers. All rights reserved.
+   Copyright (c) 2025 The more programmers. All rights reserved.
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*/
 
@@ -60,5 +60,40 @@ function ocaml_b0_monotonic_now_ns () {
 //Requires: caml_raise_sys_error
 function caml_unix_error_message (err)
 {
-  caml_raise_sys_error ("Unix.error_message is not available");
+  caml_raise_sys_error ("caml_unix_error_message is not available");
+}
+
+//Provides: caml_unix_dup
+//Requires: caml_raise_sys_error
+function caml_unix_dup (cloexec, fd)
+{
+  caml_raise_sys_error ("caml_unix_dup is not available");
+}
+
+//Provides: caml_unix_spawn
+//Requires: caml_raise_sys_error
+function caml_unix_spawn (exe, args, optenv, usepath, redirect)
+{
+  caml_raise_sys_error ("caml_unix_spawn is not available");
+}
+
+//Provides: caml_unix_waitpid
+//Requires: caml_raise_sys_error
+function caml_unix_waitpid (flags, pid_req)
+{
+  caml_raise_sys_error ("caml_unix_waitpid is not available");
+}
+
+//Provides: caml_unix_environment
+//Requires: caml_raise_sys_error
+function caml_unix_environment (unit)
+{
+  caml_raise_sys_error ("caml_unix_environment is not available");
+}
+
+//Provides: ocaml_b0_openpty
+//Requires: caml_raise_sys_error
+function ocaml_b0_openpty (unit)
+{
+  caml_raise_sys_error ("ocaml_b0_openpty is not available");
 }

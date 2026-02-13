@@ -276,7 +276,7 @@ module File : sig
       {!Unix.stdin}. After the function returns (normally or via an
       exception), [fdi] is ensured to be closed, except if it is {!Unix.stdin}.
       {ul
-      {- [flags] are the flags given to {!B0_std.Fd.openfile}. The default
+      {- [flags] are the flags given to {!B0_std.Os.Fd.openfile}. The default
          is [O_RDONLY; O_SHARE_DELETE; O_CLOEXEC]}}
       The function errors if opening [file] fails. Errors have the
       form [Fmt.str "%s: %s" file err]. *)
@@ -865,22 +865,22 @@ module Socket : sig
          Otherwise [fd] is a new file descriptor set according to
          [nonblock] and has
          {{!Unix.set_close_on_exec}close on exec} set to [true]. The socket
-         is not connected, use either {!connect} or {!bind} on it. Alternatively
-         directly use {!connect_endpoint}.}
+         is not connected, use either {!val-connect} or {!bind} on it.
+         Alternatively directly use {!connect_endpoint}.}
       {- [close] is [true] if the caller is in charge of closing it. This
          is [false] iff [c] is [`Fd _].}
       {- [addr], the socket peer address for the endpoint, if any.}}
 
       [nonblock] defaults to [false]. See also {!connect_endpoint}. *)
 
-  (** {1:connect Connecting} *)
+  (** {1:connecting Connecting} *)
 
   val connect_endpoint :
     ?nonblock:bool -> B0__net.Endpoint.t -> Unix.socket_type ->
     (Unix.file_descr * bool * Unix.sockaddr, string) result
   (** [connect_endpoint ep st] is [Ok (fd, close, addr)] with:
       {ul
-      {- [fd], a file descriptor for the socket {{!connect}connected} to the
+      {- [fd], a file descriptor for the socket {{!val-connect}connected} to the
           endpoint. If [c] is [`Fd fd] this is [fd] untouched except for
           setting or clearing [nonblock], it also checks that the [fd] is
           connected and errors otherwise.}
@@ -1031,9 +1031,9 @@ module Env : sig
 
   val of_assignments : ?init:t -> string list -> (t, string) result
   (** [of_assignments ~init ss] folds over strings in [ss],
-      {{!B0_std.String.cut}cuts} them at the leftmost ['='] character and
-      adds the resulting pair to [init] (defaults to {!empty}). If
-      the same variable is bound more than once, the last one takes
+      {{!B0_std.String.split_first}splits} them at the leftmost ['=']
+      character and adds the resulting pair to [init] (defaults to {!empty}).
+      If the same variable is bound more than once, the last one takes
       over. *)
 
   val to_assignments : t -> assignments
@@ -1475,7 +1475,7 @@ module Pty : sig
   (** [close_noerr pty] closes [pty] and in particular, all file
       descriptors held by it.
 
-      {b FIXME} The function does not {!wait} on the underlying the spawn.
+      {b FIXME} The function does not [wait] on the underlying the spawn.
       {b FIXME} Should it kill and reap the process ? *)
 
   val with_spawn :
@@ -1693,7 +1693,7 @@ module Name : sig
       {ul
       {- Pattern matching on [Other "…"] constants is not recommended.
          If you need to select such an identifier start by pattern matching
-         on {!id} before dropping to pattern matching on this type.}
+         on {!val-id} before dropping to pattern matching on this type.}
       {- Unless you want your code to be informed by the introduction
          of a new family, end your pattern match with a catch all
          branch [_] rather than [Other _].}} *)
@@ -1702,7 +1702,7 @@ module Name : sig
   (** [id n] is the identifier of [n]. *)
 
   val family : t -> t
-  (** [family n] is the {{!family}family} of [n]. On [Other _] values
+  (** [family n] is the {{!section-family}family} of [n]. On [Other _] values
       this is the value itsef, not the {!unknown} value.
       Note that you don't need to apply this
       function to {{!equal}test} for family equality. *)
@@ -1740,7 +1740,7 @@ module Name : sig
 
       {b Warning.} The standard comparisons functions assert families.
       If you want the finer grain you can use {!String} equalities on
-      {!id}. *)
+      {!val-id}. *)
 
   val equal : t -> t -> bool
   (** [equal] asserts equality {b by family}. [Other id] values
@@ -1756,7 +1756,7 @@ module Name : sig
       identifier is not printed use {!pp_id} for that. *)
 
   val pp_id : t B0__fmt.t
-  (** [pp_id ppf n] formats the {!id} of [n]. *)
+  (** [pp_id ppf n] formats the {!val-id} of [n]. *)
 end
 
 val name : ?id_like:bool -> unit -> Name.t
@@ -1829,7 +1829,7 @@ module Arch : sig
       {ul
       {- Pattern matching on [Other "…"] constants is not recommended.
          If you need to select such an identifier start by pattern matching
-         on {!id} before dropping to pattern matching on this type.}
+         on {!val-id} before dropping to pattern matching on this type.}
       {- Unless you want your code to be informed by the introduction
          of a new family, end your pattern match with a catch all
          branch [_] rather than [Other _].}} *)
@@ -1892,7 +1892,7 @@ module Arch : sig
 
       {b Warning.} The standard comparisons functions assert families.
       If you want to the finer grain you can use {!String}
-      equalities on {!id}. *)
+      equalities on {!val-id}. *)
 
   val equal : t -> t -> bool
   (** [equal] asserts equality {b by family}. [Other id] values
@@ -1908,7 +1908,7 @@ module Arch : sig
       identifier is not printed. *)
 
   val pp_id : t B0__fmt.t
-  (** [pp_id ppf arch] formats the {!id} of [arch]. *)
+  (** [pp_id ppf arch] formats the {!val-id} of [arch]. *)
 
   val pp_bits : t B0__fmt.t
   (** [pp_bits ppf arch] formats the integer {!bits} of [arch] or ["<unknown>"]
