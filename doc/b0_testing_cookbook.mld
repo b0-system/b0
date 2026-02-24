@@ -181,7 +181,8 @@ let test_echo =
   Test.test "echo" @@ fun () ->
   Snap.run Cmd.(tool "echo" % "Hey") !@ (Fpath.v "snapshots/echo-hey.run");
   Snap.run Cmd.(tool "echo" % "Hey!") @> __POS_OF__
-{|exited:0
+{|echo Hey!
+exited:0
 ┌─ stdout:5
 Hey!
 ┌─ stderr:0

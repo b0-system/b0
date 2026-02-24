@@ -117,7 +117,8 @@ let test_arg =
   Snap.string "bla" !@ Fpath.(root / "bla.string") ~__POS__;
   Snap.run Cmd.(tool "echo" % "Hey!") !@ Fpath.(root / "echo.run");
   Snap.run Cmd.(tool "echo" % "Hey!") @> __POS_OF__
-  {|exited:0
+  {|echo Hey!
+exited:0
 ┌─ stdout:5
 Hey!
 ┌─ stderr:0

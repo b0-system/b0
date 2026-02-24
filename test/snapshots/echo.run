@@ -1,3 +1,4 @@
+echo Hey!
 exited:0
 ┌─ stdout:5
 Hey!

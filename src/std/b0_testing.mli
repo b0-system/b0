@@ -981,10 +981,15 @@ module Snap : sig
 
   val run :
     ?__POS__:Test.loc -> ?test:string T.t -> ?diff:string Test.Diff.t ->
-    ?env:Os.Env.assignments -> ?cwd:Fpath.t -> ?stdin:Os.Cmd.stdi -> Cmd.t ->
-    string Test.Snapshot.t -> unit
-  (** [run cmd] snapshots the standard output, standard error and
-      exit code of the execution (see {!B0_std.Os.Cmd.val-run}). *)
+    ?env:Os.Env.assignments -> ?cwd:Fpath.t -> ?stdin:Os.Cmd.stdi ->
+    ?snap_cmd:(Cmd.t -> Cmd.t) -> Cmd.t -> string Test.Snapshot.t -> unit
+  (** [run cmd] snapshots the command, standard output, standard error and
+      exit code of the execution (see {!B0_std.Os.Cmd.val-run}).
+
+      [snap_cmd cmd] is added on the first line of the snapshot,
+      unless the result is {!Cmd.empty}, defaults to munge the invoked
+      tool to its basename.  This generally useful to elide absolute
+      filepath. *)
 end
 
 val ( !> ) : ?loc:Test.loc -> 'a -> 'a Test.Snapshot.t

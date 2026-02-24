@@ -1343,7 +1343,8 @@ module Snap = struct
     let subst = Test.Snapshot.string_subst in
     Ok (Test.snap ~subst test ?__POS__ ?diff fnd snap)
 
-  let make_run_snapshot status ~stdout ~stderr =
+  let make_run_snapshot status ~stdout ~stderr cmd =
+    let cmd = if Cmd.is_empty cmd then "" else Cmd.to_string cmd ^ "\n" in
     let* stdout = Os.File.read stdout in
     let* stderr = Os.File.read stderr in
     let exit = match status with
@@ -1354,16 +1355,24 @@ module Snap = struct
     let ehdr = Fmt.str "┌─ stderr:%d\n" (String.length stderr) in
     let olen = String.length stdout in
     let nl_pad = if olen > 0 && stdout.[olen - 1] <> '\n' then "\n" else "" in
-    Ok (String.concat "" [exit; ohdr; stdout; nl_pad; ehdr; stderr])
+    Ok (String.concat "" [cmd; exit; ohdr; stdout; nl_pad; ehdr; stderr])
 
-  let run ?__POS__ ?(test = T.lines) ?diff ?env ?cwd ?stdin cmd snap =
+  let snap_cmd_default cmd = match Cmd.find_tool cmd with
+  | None -> cmd
+  | Some tool -> Cmd.set_tool (Fpath.basepath tool) cmd
+
+  let run
+      ?__POS__ ?(test = T.lines) ?diff ?env ?cwd ?stdin
+      ?(snap_cmd = snap_cmd_default) cmd snap
+    =
     Test.error_to_fail ?__POS__ @@ Result.join @@
     Os.File.with_tmp @@ fun stdoutf ->
     Os.File.with_tmp @@ fun stderrf ->
     let stdout = Os.Cmd.out_file ~force:true ~make_path:false stdoutf in
     let stderr = Os.Cmd.out_file ~force:true ~make_path:false stderrf in
     let* status = Os.Cmd.run_status ?env ?cwd ?stdin ~stderr ~stdout cmd in
-    let* run = make_run_snapshot status ~stdout:stdoutf ~stderr:stderrf in
+    let cmd = snap_cmd cmd in
+    let* run = make_run_snapshot status ~stdout:stdoutf ~stderr:stderrf cmd in
     let subst = Test.Snapshot.string_subst in
     Ok (Test.snap ~subst test ?__POS__ ?diff run snap)
 end
