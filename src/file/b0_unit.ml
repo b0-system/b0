@@ -31,7 +31,7 @@ let outcomes =
 
 let copy_outcomes_to_dir memo unit ~dst_dir =
   B0_memo.run_proc memo @@ fun () ->
-  let files = get_meta outcomes unit in
+  let files = find_meta_or_error outcomes unit in
   let files = B0_memo.fail_if_error memo files in
   Fut.bind (Bval.get files) @@ fun files ->
   let copy src = ignore (B0_memo.copy_to_dir memo src ~dst_dir) in
@@ -131,7 +131,7 @@ module Action = struct
     let default = `Build_env in
     B0_meta.Key.make "action-env" ~default ~doc ~pp_value:pp_env
 
-  let get_env b0_env u = match find_or_default_meta env u with
+  let get_env b0_env u = match find_meta_or_default env u with
   | #B0_env.env as env -> Ok (B0_env.env b0_env env)
   | `Override (env, by) -> Ok (Os.Env.override (B0_env.env b0_env env) ~by)
   | `Env env -> Ok env
@@ -154,7 +154,7 @@ module Action = struct
     let default = `Cwd in
     B0_meta.Key.make "action-cwd" ~default ~doc ~pp_value:pp_cwd
 
-  let get_cwd b0_env u = match find_or_default_meta cwd u with
+  let get_cwd b0_env u = match find_meta_or_default cwd u with
   | #B0_env.dir as dir -> Ok (B0_env.dir b0_env dir)
   | `In (#B0_env.dir as dir, p) -> Ok (B0_env.in_dir b0_env dir p)
   | `Fun (_doc, f) -> f b0_env u
@@ -275,7 +275,7 @@ module Action = struct
     run' ?envf exit_rc run b0_env u ~args action
 end
 
-let is_actionable u = match find_or_default_meta Action.key u with
+let is_actionable u = match find_meta_or_default Action.key u with
 | `Unit_exe -> mem_meta exe_file u | `Fun _ -> true
 
 (* Actions *)

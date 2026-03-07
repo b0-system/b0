@@ -31,7 +31,7 @@ let url : url B0_meta.key =
   let default = `In (`Unit_dir, Fpath.v ".") in
   B0_meta.Key.make "url" ~default ~doc ~pp_value:pp_url
 
-let get_url env unit = match B0_unit.find_or_default_meta url unit with
+let get_url env unit = match B0_unit.find_meta_or_default url unit with
 | `Url url -> Ok url
 | `In (`Unit_dir, p) ->
     let dir = B0_env.unit_dir env unit in
@@ -135,10 +135,10 @@ let server_mode env timeout_cli no_exec ~url args =
           let* cmd = Result.map Cmd.path (B0_env.unit_exe_file env unit) in
           let timeout = match timeout_cli with
           | Some timeout -> timeout
-          | None -> B0_unit.find_or_default_meta timeout_s unit
+          | None -> B0_unit.find_meta_or_default timeout_s unit
           in
           let listen_args =
-            (B0_unit.find_or_default_meta listen_args unit) ~authority
+            (B0_unit.find_meta_or_default listen_args unit) ~authority
           in
           let cmd = make_server_cmd cmd args ~listen_args in
           let* cwd = B0_unit.Action.get_cwd env unit in
@@ -199,8 +199,10 @@ let dyn_units ~args =
         (* XXX We are piling the hacks here this should be reviewed. But
            if server_mode eventually invokes the action this is the right
            thing to do  *)
-        let* units = B0_unit.get_meta B0_unit.Action.units u in
-        let* dyn_units = B0_unit.get_meta B0_unit.Action.dyn_units u in
+        let units = B0_unit.find_meta_or_default B0_unit.Action.units u in
+        let dyn_units =
+          B0_unit.find_meta_or_default B0_unit.Action.dyn_units u
+        in
         let dyns = dyn_units ~args:(Cmd.list args) in
         Ok (u :: List.rev_append dyns units)
   in

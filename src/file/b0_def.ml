@@ -47,8 +47,8 @@ module type S = sig
   val mem_meta : 'a B0_meta.key -> t -> bool
   val has_tag : bool B0_meta.key -> t -> bool
   val find_meta : 'a B0_meta.key -> t -> 'a option
-  val find_or_default_meta : 'a B0_meta.key -> t -> 'a
-  val get_meta : 'a B0_meta.key -> t -> ('a, string) result
+  val find_meta_or_default : 'a B0_meta.key -> t -> 'a
+  val find_meta_or_error : 'a B0_meta.key -> t -> ('a, string) result
   val add : t -> unit
   val fold : (t -> 'a -> 'a) -> 'a -> 'a
   val list : unit -> t list
@@ -99,8 +99,8 @@ module Make (V : VALUE) = struct
   let mem_meta k v = B0_meta.mem k (meta v)
   let has_tag k v = B0_meta.has_tag k (meta v)
   let find_meta k v = B0_meta.find k (meta v)
-  let find_or_default_meta k v = B0_meta.find_or_default k (meta v)
-  let get_meta k v = match find_meta k v with
+  let find_meta_or_default k v = B0_meta.find_or_default k (meta v)
+  let find_meta_or_error k v = match find_meta k v with
   | Some v -> Ok v
   | None ->
       Fmt.error "%s %a does not define metadata %a"

@@ -129,7 +129,7 @@ let default_github_src_archive_url repo =
 
 let src_archive_url_of_pack ~version p =
   let archive_name = src_archive_name_of_pack p in
-  let archive_ext = B0_pack.find_or_default_meta src_archive_ext p in
+  let archive_ext = B0_pack.find_meta_or_default src_archive_ext p in
   let vars = function
   | "ARCHIVE_NAME" -> Some archive_name
   | "ARCHIVE_EXT" -> Some archive_ext
@@ -207,7 +207,7 @@ let changes_file =
   B0_meta.Key.make "changes-file" ~default ~doc ~pp_value
 
 let changes_file_of_pack pack =
-  let changes = B0_pack.find_or_default_meta changes_file pack in
+  let changes = B0_pack.find_meta_or_default changes_file pack in
   match B0_pack.in_scope_dir pack changes with
   | None -> Ok None
   | Some changes ->
@@ -216,7 +216,7 @@ let changes_file_of_pack pack =
 
 let get_changes_file_of_pack pack =
   Result.map_error (fun e -> Fmt.str "pack %a: %s" B0_pack.pp_name pack e) @@
-  let changes = B0_pack.find_or_default_meta changes_file pack in
+  let changes = B0_pack.find_meta_or_default changes_file pack in
   let* changes = B0_pack.in_scope_dir' pack changes in
   let* () = Os.File.must_exist changes in
   Ok changes
@@ -244,7 +244,7 @@ module Archive = struct
         ~repo ~checkout_dir ~keep_checkout_dir ~commit_ish pack
     in
     let archive_file =
-      let archive_ext = B0_pack.find_or_default_meta src_archive_ext pack in
+      let archive_ext = B0_pack.find_meta_or_default src_archive_ext pack in
       B0_env.in_scratch_dir env Fpath.(archive_base + archive_ext)
     in
     let search = B0_env.get_cmd env ~skip_build:false in

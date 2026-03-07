@@ -104,7 +104,7 @@ module Code = struct
     let find_restrictions u acc =
       if not (B0_unit.(has_tag ocaml_tag u && has_tag B0_meta.exe u))
       then acc else
-      let _doc, restrict = B0_unit.find_or_default_meta restrict u in
+      let _doc, restrict = B0_unit.find_meta_or_default restrict u in
       Set.union acc (restrict available)
     in
     let* build = B0_store.get store B0_build.self in
@@ -756,7 +756,7 @@ module Lib = struct
   let of_unit b u =
     B0_build.require_unit b u;
     let m = B0_build.memo b in
-    let lib = B0_unit.get_meta key u |> B0_memo.fail_if_error m in
+    let lib = B0_unit.find_meta_or_error key u |> B0_memo.fail_if_error m in
     Fut.map Option.some lib
 
   let libname l = l.libname
@@ -2499,7 +2499,7 @@ module Meta = struct
     let libname = B0_unit.find_meta library unit |> Option.get in
     let archive_name = Libname.to_archive_name libname in
     let description = B0_unit.doc unit in
-    let requires = B0_unit.find_or_default_meta requires unit in
+    let requires = B0_unit.find_meta_or_default requires unit in
     let requires = List.map Libname.to_string requires in
     let warning = B0_unit.find_meta B0_meta.warning unit in
     let requires, exports = match B0_unit.find_meta exports unit with

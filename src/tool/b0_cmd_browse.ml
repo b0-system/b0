@@ -33,7 +33,7 @@ let browse
   let rec loop = function
   | [] -> Ok Os.Exit.ok
   | pack :: packs ->
-      match B0_pack.get_meta key pack with
+      match B0_pack.find_meta_or_error key pack with
       | Error _ when no_lookup_error -> loop packs
       | Error _ as e -> Log.if_error' ~use:Os.Exit.no_such_name e
       | Ok v ->

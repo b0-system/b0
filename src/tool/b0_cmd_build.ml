@@ -78,14 +78,14 @@ let get_must_units_and_locked_packs ~is_action ~units ~packs ~args () =
     let store, units, action_packs =
       let add_unit (store, us, ps) u =
         if not (is_action u) then (store, u :: us, ps) else
-        let st = B0_unit.find_or_default_meta B0_unit.Action.store u in
-        let units = B0_unit.find_or_default_meta B0_unit.Action.units u in
+        let st = B0_unit.find_meta_or_default B0_unit.Action.store u in
+        let units = B0_unit.find_meta_or_default B0_unit.Action.units u in
         let dyn_units =
-          (B0_unit.find_or_default_meta
+          (B0_unit.find_meta_or_default
              B0_unit.Action.dyn_units u) ~args:(Cmd.list args)
         in
         let us = u :: List.rev_append ( List.rev_append dyn_units units) us in
-        let packs = B0_unit.find_or_default_meta B0_unit.Action.packs u in
+        let packs = B0_unit.find_meta_or_default B0_unit.Action.packs u in
           List.rev_append st store, us, List.rev_append packs ps
       in
       List.fold_left add_unit ([], [], []) units
@@ -223,7 +223,7 @@ let error_no_path action_unit =
     B0_unit.pp_name action_unit B0_meta.Key.pp_name B0_unit.exe_file
 
 let do_output_path action_unit ~args =
-  let* path = B0_unit.get_meta B0_unit.exe_file action_unit in
+  let* path = B0_unit.find_meta_or_error B0_unit.exe_file action_unit in
   let p = Fut.sync path in
   (* Is there a way of quoting to make the shell notation $() work if args
      or p have spaces ? *)
@@ -242,7 +242,7 @@ let do_action_exit c build action_unit ~args =
   (* Note if we want to run the action asap we should not exit, but
      B0_unit.Action.run *)
   let env = env_for_unit c build action_unit in
-  let a = B0_unit.(find_or_default_meta Action.key action_unit) in
+  let a = B0_unit.(find_meta_or_default Action.key action_unit) in
   B0_unit.Action.exit env action_unit ~args a
 
 (* Build command *)

@@ -129,13 +129,13 @@ module type S = sig
   val find_meta : 'a B0_meta.key -> t -> 'a option
   (** [find_meta k v] is [B0_meta.find k (B0_def.meta v)]. *)
 
-  val find_or_default_meta : 'a B0_meta.key -> t -> 'a
-  (** [find_or_default_meta k u] is
+  val find_meta_or_default : 'a B0_meta.key -> t -> 'a
+  (** [find_meta_or_default k u] is
       [B0_meta.find_or_default k (B0_unit.meta u)]. *)
 
-  val get_meta : 'a B0_meta.key -> t -> ('a, string) result
-  (** [get_meta m k u] is [Ok v] if {!find_meta}[ k u] is [Some v] and
-      a final user friendly error message if [None]. *)
+  val find_meta_or_error : 'a B0_meta.key -> t -> ('a, string) result
+  (** [find_meta_or_error m k u] is [Ok v] if {!find_meta}[ k u] is
+      [Some v] and a final user friendly error message if [None]. *)
 
   (** {1:add_lookup Add & Lookup} *)
 

@@ -77,11 +77,12 @@ let get_cmd ?(skip_build = false) env cmd =
       | None -> Os.Cmd.get cmd
       | Some u ->
           Result.map (fun v -> Cmd.set_tool (Fut.sync v) cmd)
-            (B0_defs.Unit.get_meta B0_defs.exe_file u)
+            (B0_defs.Unit.find_meta_or_error B0_defs.exe_file u)
 
 let unit_exe_file env u =
   if B0_defs.Unit.Set.mem u (B0_build.did_build env.B0_defs.build)
-  then Result.map Fut.sync (B0_defs.Unit.get_meta B0_defs.exe_file u) else
+  then Result.map Fut.sync (B0_defs.Unit.find_meta_or_error B0_defs.exe_file u)
+  else
   Fmt.error "Cannot get executable of unit %a: it did not build."
     B0_defs.Unit.pp_name u
 
