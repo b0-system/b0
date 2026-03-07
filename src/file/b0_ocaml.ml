@@ -466,7 +466,6 @@ module Modsrc = struct
   | Code.Native -> cmx_file m
   | Code.Wasm -> assert false
 
-
   let as_intf_dep_files ?(init = []) m = cmi_file m :: init
   let as_impl_dep_files ?(init = []) ~code m = match code with
   | Code.Byte -> cmi_file m :: init

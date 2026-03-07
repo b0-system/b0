@@ -194,7 +194,15 @@ let dyn_units ~args =
   let server_mode_unit args =
     let* unit = find_server_mode_unit (List.tl args) in
     match unit with
-    | None -> Ok [] | Some (u, _) -> Ok [u]
+    | None -> Ok []
+    | Some (u, args) ->
+        (* XXX We are piling the hacks here this should be reviewed. But
+           if server_mode eventually invokes the action this is the right
+           thing to do  *)
+        let* units = B0_unit.get_meta B0_unit.Action.units u in
+        let* dyn_units = B0_unit.get_meta B0_unit.Action.dyn_units u in
+        let dyns = dyn_units ~args:(Cmd.list args) in
+        Ok (u :: List.rev_append dyns units)
   in
   if first_is_url args
   then server_mode_unit args
