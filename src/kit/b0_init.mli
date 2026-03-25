@@ -64,14 +64,14 @@ val get_license : B0_meta.t -> B0_meta.spdxid option -> B0_meta.spdxid
     (author bias, open to a better scheme). *)
 
 val download_license_template :
-  ?httpc:B0_http.Http_client.t -> strip_meta:bool -> B0_meta.spdxid ->
+  ?httpc:B0_http.Client.t -> strip_meta:bool -> B0_meta.spdxid ->
   (string, string) result
 (** [download_license_template spdxid] tries to download a licence
     template for [spdxid]. The SPDX project doesn't seem to provide
     this. We rely on the data from {{:https://choosealicense.com/}
     [choosealicense.com]}. [strip_meta] inidicates whether the YAML preamble
     should be stripped. [httpc] is the client to use, it default to
-    {!B0_http.Http_client.get}.
+    {!B0_http.Client.get}.
 
     {b Note.} These templates should have ["[year]"] and ["[fullname]"]
     variables to substitute. Except for licenses that do not, like

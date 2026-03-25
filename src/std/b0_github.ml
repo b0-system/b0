@@ -6,7 +6,6 @@
 open B0_std
 open Result.Syntax
 open B0_json
-open B0_http
 
 (* GitHub authentication. *)
 
@@ -148,18 +147,18 @@ let v4_api_url = "https://api.github.com/graphql"
 let v3_api_url = "https://api.github.com"
 
 let response_success auth request response =
-  match Http.Response.status response with
-  | 200 | 201 -> Json.of_string (Http.Response.body response)
+  match B0_http.Response.status response with
+  | 200 | 201 -> Json.of_string (B0_http.Response.body response)
   | 401 ->
       Fmt.error "GitHub authentication failure on %s.\n\
                  Are you sure the token in %a\n\
                  is valid for user '%s' and has scope '%s' ?\n"
-        (Http.Request.url request) Auth.pp_token_src auth.Auth.token_src
+        (B0_http.Request.url request) Auth.pp_token_src auth.Auth.token_src
         auth.Auth.user Auth.token_scope
   | st ->
       Fmt.error "GitHub API request returned unexpected status %d for %s on %s"
-        st (Http.method_to_string (Http.Request.method' request))
-        (Http.Request.url request)
+        st (B0_http.method_to_string (B0_http.Request.method' request))
+        (B0_http.Request.url request)
 
 type content_type = string
 let content_type c = ("Content-Type", c)
@@ -179,8 +178,8 @@ let req_json_v3 ?(headers = []) http auth ~path m body =
   | `Empty -> headers, ""
   in
   let url = v3_api_url ^ path in
-  let request = Http.Request.make ~url m ~headers ~body in
-  let* response = Http_client.request ~follow:true http request in
+  let request = B0_http.Request.make ~url m ~headers ~body in
+  let* response = B0_http.Client.request ~follow:true http request in
   response_success auth request response
 
 let query_v4 http auth q =
@@ -189,8 +188,8 @@ let query_v4 http auth q =
   let query = Jsong.(obj |> mem "query" (string q) |> obj_end) in
   let headers = req_v4_headers auth in
   let body = Jsong.to_string query in
-  let request = Http.Request.make ~url:v4_api_url `POST ~headers ~body in
-  let* response = Http_client.request ~follow:true http request in
+  let request = B0_http.Request.make ~url:v4_api_url `POST ~headers ~body in
+  let* response = B0_http.Client.request ~follow:true http request in
   response_success auth request response
 
 (* Higher-level interfaces *)

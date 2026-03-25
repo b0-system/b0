@@ -6,76 +6,74 @@
 open B0_std
 open Result.Syntax
 
-module Http = struct
-  type method' =
-  [ `CONNECT | `DELETE | `GET | `HEAD | `OPTIONS | `Other of string
-  | `PATCH | `POST | `PUT | `TRACE ]
+type method' =
+[ `CONNECT | `DELETE | `GET | `HEAD | `OPTIONS | `Other of string
+| `PATCH | `POST | `PUT | `TRACE ]
 
-  let method_to_string = function
-  | `GET -> "GET" | `HEAD -> "HEAD" | `POST -> "POST" | `PUT -> "PUT"
-  | `DELETE -> "DELETE" | `CONNECT -> "CONNECT" | `OPTIONS -> "OPTIONS"
-  | `TRACE -> "TRACE" | `PATCH -> "PATCH" | `Other s -> s
+let method_to_string = function
+| `GET -> "GET" | `HEAD -> "HEAD" | `POST -> "POST" | `PUT -> "PUT"
+| `DELETE -> "DELETE" | `CONNECT -> "CONNECT" | `OPTIONS -> "OPTIONS"
+| `TRACE -> "TRACE" | `PATCH -> "PATCH" | `Other s -> s
 
-  type headers = (string * string) list
-  let header_to_string (k, v) = String.concat "" [k; ": "; v]
+type headers = (string * string) list
+let header_to_string (k, v) = String.concat "" [k; ": "; v]
 
-  module Request = struct
-    type t =
-      { url : string;
-        method' : method';
-        headers : headers;
-        body : string; }
+module Request = struct
+  type t =
+    { url : string;
+      method' : method';
+      headers : headers;
+      body : string; }
 
-    let make ?(headers = []) ?(body = "") method' ~url =
-      { url; method'; headers; body }
+  let make ?(headers = []) ?(body = "") method' ~url =
+    { url; method'; headers; body }
 
-    let url r = r.url
-    let method' r = r.method'
-    let headers r = r.headers
-    let body r = r.body
-    let has_body r = not (String.is_empty r.body)
-  end
-
-  module Response = struct
-    type t =
-      { status : int;
-        headers : headers;
-        body : string; }
-
-    let make ?(headers = []) ?(body = "") status = { status; headers; body }
-    let status r = r.status
-    let headers r = r.headers
-    let body r = r.body
-
-    let status_of_status_line l =
-      let err i = Fmt.error "%S: could not parse HTTP status code" i in
-      match String.split_all ~sep:" " l with
-      | (_ :: code :: _) ->
-          (try Ok (int_of_string code) with | Failure _ -> err code)
-      | _ -> err l
-
-    let headers_and_body_of_string s =
-      let rec loop acc s = match String.split_first ~sep:"\r\n" s with
-      | None -> Fmt.failwith "%S: could not find CRLF" s
-      | Some ("", body) -> Ok (List.rev acc, body)
-      | Some (h, rest) ->
-          match String.split_first ~sep:":" h with
-          | None -> Fmt.failwith "%S: could not parse HTTP header" h
-          | Some (k, v) ->
-              loop ((String.lowercase_ascii k, String.trim v) :: acc) rest
-      in
-      try loop [] s with Failure e -> Error e
-
-    let of_string resp = match String.split_first ~sep:"\r\n" resp with
-    | None -> Fmt.error "%S: could not parse status line" resp
-    | Some (status_line, rest) ->
-        let* status = status_of_status_line status_line in
-        let* headers, body = headers_and_body_of_string rest in
-        Ok { status; headers; body }
-  end
+  let url r = r.url
+  let method' r = r.method'
+  let headers r = r.headers
+  let body r = r.body
+  let has_body r = not (String.is_empty r.body)
 end
 
-module Http_client = struct
+module Response = struct
+  type t =
+    { status : int;
+      headers : headers;
+      body : string; }
+
+  let make ?(headers = []) ?(body = "") status = { status; headers; body }
+  let status r = r.status
+  let headers r = r.headers
+  let body r = r.body
+
+  let status_of_status_line l =
+    let err i = Fmt.error "%S: could not parse HTTP status code" i in
+    match String.split_all ~sep:" " l with
+    | (_ :: code :: _) ->
+        (try Ok (int_of_string code) with | Failure _ -> err code)
+    | _ -> err l
+
+  let headers_and_body_of_string s =
+    let rec loop acc s = match String.split_first ~sep:"\r\n" s with
+    | None -> Fmt.failwith "%S: could not find CRLF" s
+    | Some ("", body) -> Ok (List.rev acc, body)
+    | Some (h, rest) ->
+        match String.split_first ~sep:":" h with
+        | None -> Fmt.failwith "%S: could not parse HTTP header" h
+        | Some (k, v) ->
+            loop ((String.lowercase_ascii k, String.trim v) :: acc) rest
+    in
+    try loop [] s with Failure e -> Error e
+
+  let of_string resp = match String.split_first ~sep:"\r\n" resp with
+  | None -> Fmt.error "%S: could not parse status line" resp
+  | Some (status_line, rest) ->
+      let* status = status_of_status_line status_line in
+      let* headers, body = headers_and_body_of_string rest in
+      Ok { status; headers; body }
+end
+
+module Client = struct
   type t = Cmd.t
   let default = Cmd.tool "curl"
   let make ?(insecure = false) ?(progress = false) ?search ?(cmd = default) () =
@@ -84,10 +82,10 @@ module Http_client = struct
     Ok (Cmd.(curl %% if' insecure (arg "--insecure") %% arg progress))
 
   let find_location request response =
-    match List.assoc_opt "location" (Http.Response.headers response) with
+    match List.assoc_opt "location" (Response.headers response) with
     | None -> Error "No 'location' header found in 3XX response"
     | Some loc ->
-        let url = Http.Request.url request in
+        let url = Request.url request in
         try match Net.Url.kind loc with
         | `Absolute -> Ok loc
         | `Relative `Relative_path ->
@@ -109,7 +107,7 @@ module Http_client = struct
             Fmt.error "Could not construct redirect from %s to %s" url loc
 
   let redirect_response visited request response =
-    match Http.Response.status response with
+    match Response.status response with
     | 301 | 302 | 303 | 305 | 307 ->
         let* url = find_location request response in
         if List.mem url visited then Error "Infinite redirection loop" else
@@ -120,22 +118,22 @@ module Http_client = struct
 
   let request curl ~follow request =
     let rec loop follow visited request =
-      let method' = Http.Request.method' request in
+      let method' = Request.method' request in
       let is_head = method' = `HEAD in
       let follow = match method' with `GET | `HEAD -> follow | _ -> false in
-      let method' = Http.method_to_string method' in
+      let method' = method_to_string method' in
       let method' = Cmd.(arg "-X" % method' %% if' is_head (arg "--head")) in
-      let headers = Http.Request.headers request in
-      let headers = Cmd.of_list ~slip:"-H" Http.header_to_string headers in
-      let has_body = Http.Request.has_body request in
-      let body = Http.Request.body request in
+      let headers = Request.headers request in
+      let headers = Cmd.of_list ~slip:"-H" header_to_string headers in
+      let has_body = Request.has_body request in
+      let body = Request.body request in
       let stdin = if has_body then Os.Cmd.in_string body else Os.Cmd.in_stdin in
       let body = Cmd.(if' has_body (arg "--data-binary" % "@-")) in
-      let url = Http.Request.url request in
+      let url = Request.url request in
       let base = Cmd.(arg "-i" (* resp. headers *)) in
       let args = Cmd.(base %% method' %% headers %% body % url) in
       let* out = Os.Cmd.run_out ~trim:false ~stdin Cmd.(curl %% args) in
-      let* response = Http.Response.of_string out in
+      let* response = Response.of_string out in
       if not follow then Ok response else
       let* redirect = redirect_response visited request response in
       match redirect with
@@ -148,9 +146,9 @@ module Http_client = struct
     loop follow [] request
 
   let head_request_follow_location ?headers httpc url =
-    let head_request = Http.Request.make ?headers `HEAD ~url in
+    let head_request = Request.make ?headers `HEAD ~url in
     let* response = request httpc ~follow:true head_request in
-    let headers = Http.Response.headers response in
+    let headers = Response.headers response in
     match List.assoc_opt x_follow_location headers with
     | None -> Ok url | Some final_url -> Ok final_url
 

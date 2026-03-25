@@ -7,7 +7,7 @@ open B0_std
 open Result.Syntax
 
 let open_issue ~user ~repo_url ~title ~body =
-  let* httpc = B0_http.Http_client.make () in
+  let* httpc = B0_http.Client.make () in
   let* auth = B0_github.Auth.make ~user () in
   let* repo = B0_github.Repo.of_url repo_url in
   let* num, url = B0_github.Issue.open' httpc auth repo ~title ~body () in

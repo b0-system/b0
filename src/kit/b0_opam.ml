@@ -597,19 +597,18 @@ module Publish = struct
     | None -> Ok csum | Some (csum, _) -> Ok csum
 
   let add_url_checksums http shasum ~dry_run is =
-    let open B0_http in
     let add csum i = add_url_csum (Fmt.str "sha%s=%s" shasum_algo csum) i in
     let add_url (acc, is) i = match String.Map.find_opt i.url acc with
     | Some csum -> acc, add csum i :: is
     | None ->
         let meth = if dry_run then `HEAD else `GET in
-        let request = Http.Request.make ~url:i.url meth in
+        let request = B0_http.Request.make ~url:i.url meth in
         let csum =
           Result.error_to_failure @@
           Result.map_error (Fmt.str "%a: %s" Pkg.pp_err i.pkg) @@
-          let* response = Http_client.request ~follow:true http request in
-          match Http.Response.status response with
-          | 200 -> checksum shasum (Http.Response.body response)
+          let* response = B0_http.Client.request ~follow:true http request in
+          match B0_http.Response.status response with
+          | 200 -> checksum shasum (B0_http.Response.body response)
           | c -> Fmt.error "[%a] %s" Fmt.(st' [`Fg `Red] int) c i.url
         in
         String.Map.add i.url csum acc, add csum i :: is
@@ -721,7 +720,7 @@ module Publish = struct
       ~dry_run no_pr
     =
     let* opam = get () in
-    let* httpc = B0_http.Http_client.make () in
+    let* httpc = B0_http.Client.make () in
     let* shasum = Os.Cmd.get (Cmd.tool "shasum") in
     let* git = B0_vcs_repo.Git.get_cmd () in
     let* is = collect_results (List.map (info_of_pkg opam) pkgs) in

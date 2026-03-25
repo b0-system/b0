@@ -12,7 +12,7 @@ let download_url
   =
   if progress then (Log.stdout (fun m -> m "Fetching %a" Fmt.code url));
   let curlfile = Fpath.dash in
-  let args = B0_http.Http_client.curl_fetch_args ?args ~progress url curlfile in
+  let args = B0_http.Client.curl_fetch_args ?args ~progress url curlfile in
   let cmd = Cmd.(tool "curl" %% args) in
   let* curl = B0_env.get_cmd env' cmd in
   let stdout = Os.Cmd.out_file ?mode ~force ~make_path file in

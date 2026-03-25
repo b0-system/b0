@@ -76,18 +76,20 @@ let download_license_template ?httpc ~strip_meta id =
         let text = String.subrange ~first:(i + String.length marker) text in
         Ok (String.trim text)
   in
-  let open B0_http in
-  let* httpc = match httpc with Some c -> Ok c | None -> Http_client.make () in
+  let* httpc = match httpc with
+  | Some c -> Ok c
+  | None -> B0_http.Client.make ()
+  in
   let lid = String.Ascii.lowercase id in
   let url =
     Fmt.str "https://raw.githubusercontent.com/github/choosealicense.com/\
              gh-pages/_licenses/%s.txt" lid
   in
-  let request = Http.Request.make `GET ~url in
-  let* response = Http_client.request ~follow:true httpc request in
-  match Http.Response.status response with
+  let request = B0_http.Request.make `GET ~url in
+  let* response = B0_http.Client.request ~follow:true httpc request in
+  match B0_http.Response.status response with
   | 200 ->
-      let text = Http.Response.body response in
+      let text = B0_http.Response.body response in
       if strip_meta then strip_meta_block text else Ok text
   | st -> Fmt.error "[%d] Could not download a license template for %s" st id
 
