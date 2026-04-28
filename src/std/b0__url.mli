@@ -14,11 +14,30 @@
 
 (** {1:urls URLs} *)
 
+(** Sloppy authority processing. *)
+module Authority : sig
+  type t = string
+  (** The type for [[userinfo@]HOST:PORT] authorities. *)
+
+  type port = int
+  (** The type for authority ports. *)
+
+  type host = string
+  (** The type for authority hosts. *)
+
+  val userinfo : t -> string option
+  (** [userinfo a] is anything before the lefmost ['@'] (if any) *)
+
+  val host : t -> host
+  (** [host a] is anything between the first ['@'] (if any) and the
+      [':'] separating the {!port}. *)
+
+  val port : t -> port option
+  (** [port a] is the port made of suffix decimal digits before a [':']. *)
+end
+
 type scheme = string
 (** The type for schemes, without the [':'] separator. *)
-
-type authority = string
-(** The type for [HOST:PORT] authorities. *)
 
 type path = string
 (** The type for paths. *)
@@ -35,7 +54,7 @@ type t = string
 val scheme : t -> scheme option
 (** [scheme u] is the {!type-scheme} of [u], if any. *)
 
-val authority : t -> authority option
+val authority : t -> Authority.t option
 (** [authority u] is the {!type-authority} of [u], if any. *)
 
 val path : t -> path option
@@ -56,12 +75,12 @@ val target : t -> string option
 
 (** {1:kinds Kinds} *)
 
-type relative_kind = [ `Scheme | `Absolute_path | `Relative_path | `Empty ]
+type relative_kind = Scheme | Absolute_path | Relative_path | Empty
 (** The type for kinds of relative references. Represents
     {{:https://www.rfc-editor.org/rfc/rfc3986.html#section-4.2}this
     alternation}. *)
 
-type kind = [ `Absolute | `Relative of relative_kind ]
+type kind = Absolute | Relative of relative_kind
 (** The type for kinds of URLs. Represents this
     {{:https://www.rfc-editor.org/rfc/rfc3986.html#section-4.1} this
     alternation}. *)
@@ -75,7 +94,7 @@ val kind : t -> kind
 (** {1:ops Operations} *)
 
 val of_url : t ->
-  ?scheme:scheme option -> ?authority:authority option ->
+  ?scheme:scheme option -> ?authority:Authority.t option ->
   ?path:path option -> ?query:query option -> ?fragment:fragment option ->
   unit -> t
 (** [of_url u ()] is a new url whith unspecified components defaulting
@@ -110,51 +129,23 @@ val drop_path_and_rest : t -> string
 (** [drop_path_and_rest u] is [u] without the path and query. *)
 *)
 
-(** {1:authorities Authorities} *)
-
-(** Sloppy authority processing. *)
-module Authority : sig
-  type t = authority
-  (** See {!type-authority}. *)
-
-  val userinfo : authority -> string option
-  (** [userinfo a] is anything before the lefmost ['@'] (if any) *)
-
-  val host : authority -> string
-  (** [host a] is anything between the first ['@'] (if any) and the
-      [':'] separating the {!port}. *)
-
-  val port : authority -> int option
-  (** [port a] is the port made of suffix decimal digits before a [':']. *)
-end
-
-(** {1:scraping Scraping} *)
-
-val list_of_text_scrape : ?root:t -> string -> t list
-(** [list_of_text_scrape ?root s] roughly finds absolute and relative
-    URLs in the ASCII compatible (including UTF-8) textual data [s] by
-    looking in order:
-    {ol
-    {- For the next [href] or [src] substring then tries to parses the
-       content of an HTML attribute. This may result in relative
-       or absolute paths.}
-    {- For next [http] substrings in [s] and then delimits an URL
-       depending on the previous characters and checks that the delimited
-       URL starts with [http://] or [https://].}}
-
-    Relative URLs are {{!append}appended} to [root] if provided. Otherwise
-    they are kept as is. The result may have duplicates.
-*)
-
-(** {1:formatting Formatting} *)
-
-val pp : Format.formatter -> t -> unit
-(** [pp] formats an URL. For now this is just {!Format.pp_print_string}. *)
-
-val pp_kind : Format.formatter -> kind -> unit
-(** [pp_kind] formats an unspecified representation of kinds. *)
-
 (** {1:pct Percent encoding} *)
+
+val is_likely_percent_decoded : t -> bool
+(** [is_likely_percent_decoded u] tries to guess if [u] is percent
+    decoded. It returns
+
+    {ul
+    {- [true] if there is a byte in [u] such that {!Char.Ascii.is_graphic}
+       is [false].}
+    {- [false] otherwise. In this case [u] is likely encoded or needs no
+       encoding.}}
+
+    If [u] is the result of {!Percent.encode}[ `Uri] this always returns
+    [false] but on foreign data the test mail fail e.g. it wrongly returns
+    [false] on [http://example.org/zoom/100%].
+
+    {b Note.} This function can likely be improved. *)
 
 (** Percent-encoding codecs according to
     {{:https://www.rfc-editor.org/rfc/rfc3986#section-2.1}RFC 3986}.
@@ -164,24 +155,22 @@ val pp_kind : Format.formatter -> kind -> unit
     [application/x-www-form-urlencoded]} which is slightly different (welcome
     to the Web). The {!Webs.Http.Query} module handles that. *)
 module Percent : sig
-  type kind = [
-    | `Uri_component
-      (**  Percent-encodes anything but
-           {{:https://www.rfc-editor.org/rfc/rfc3986#section-2.3}
-           [unreserved]} and
-           {{:https://www.rfc-editor.org/rfc/rfc3986#section-2.2}
-           sub-delims} URI characters. In other words only
+  type kind =
+  | Uri_component
+  (**  Percent-encodes anything but
+       {{:https://www.rfc-editor.org/rfc/rfc3986#section-2.3}[unreserved]}
+       and
+       {{:https://www.rfc-editor.org/rfc/rfc3986#section-2.2}sub-delims}
+       URI characters. In other words only
            ['a'..'z'], ['A'..'Z'], ['0'..'9'], ['-'], ['.'], ['_'], ['~']
            and ['!'], ['$'], ['&'], ['\''], ['('], [')']
            ['*'], ['+'], [','], [';'], ['='] are not percent-encoded. *)
-      | `Uri
-      (** Percent-encodes like [`Uri_component] except it also
-           preserves
-           {{:https://www.rfc-editor.org/rfc/rfc3986#section-2.2}
-           gen-delims} URI characters. In other words in addition to those
-           characters above, [':'], ['/'], ['?'], ['#'], ['\['], ['\]'], ['@']
-           are not percent-encoded. *)
-      ]
+  | Uri
+  (** Percent-encodes like [`Uri_component] except it also preserves
+      {{:https://www.rfc-editor.org/rfc/rfc3986#section-2.2}gen-delims}
+      URI characters. In other words in addition to those characters above,
+      [':'], ['/'], ['?'], ['#'], ['\['], ['\]'], ['@'] are not
+      percent-encoded. *)
   (** The kind of percent encoding. *)
 
   val encode : kind -> string -> string
@@ -199,3 +188,53 @@ module Percent : sig
   val encode_to_buffer : (char -> bool) -> Buffer.t -> string -> unit
   val decode_to_buffer : Buffer.t -> string -> first:int -> last:int -> unit
 end
+
+(** {1:predicates Predicates and comparisons} *)
+
+val equal : t -> t -> bool
+(** [equal] tests URLs for binary equality. *)
+
+val compare : t -> t -> int
+(** [compare] is a total order on URLs compatible with {!equal}. *)
+
+(** {1:converting Converting} *)
+
+val to_endpoint :
+  supported_schemes:(scheme * Authority.port) list -> t ->
+  ([> `Host of Authority.host * Authority.port], string) result
+(** [to_endpoint ~supported_scheme url]:
+    {ul
+    {- [Ok (`Host (host, port))] iff [url] has a {!scheme} and it can be found
+       in [supported_schemes] and [url] has an {!authority}. The [host] value is
+       the {!Authority.host} and [port] the {!Authority.port} or the default
+       port specified in [supported_schemes] if absent.}
+    {- [Error _], if [url] has no scheme or that it can't be found in
+       [supported_schems] or if [url] has no authority. The error message
+       is of the form ["URL <url>: …"]}}
+
+    Raises [Invalid_argument] if [supported_schemes] is empty. *)
+
+(** {1:formatting Formatting} *)
+
+val pp : Format.formatter -> t -> unit
+(** [pp] formats an URL. For now this is just {!Format.pp_print_string}. *)
+
+val pp_kind : Format.formatter -> kind -> unit
+(** [pp_kind] formats an unspecified representation of kinds. *)
+
+(** {1:scraping Scraping} *)
+
+val list_of_text_scrape : ?root:t -> string -> t list
+(** [list_of_text_scrape ?root s] roughly finds absolute and relative
+    URLs in the ASCII compatible (including UTF-8) textual data [s] by
+    looking in order:
+    {ol
+    {- For the next [href] or [src] substring then tries to parses the
+       content of an HTML attribute. This may result in relative
+       or absolute paths.}
+    {- For the next [http] substrings in [s] and then delimits an URL
+       depending on the previous characters and checks that the delimited
+       URL starts with [http://] or [https://].}}
+
+    Relative URLs are {{!append}appended} to [root] if provided. Otherwise
+    they are kept as is. The result may have duplicates. *)

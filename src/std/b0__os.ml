@@ -85,8 +85,15 @@ module Fd = struct
   let rec openfile fn mode perm = try Unix.openfile fn mode perm with
   | Unix.Unix_error (EINTR, _, _) -> openfile fn mode perm
 
-  let rec close fd = try Unix.close fd with
-  | Unix.Unix_error (EINTR, _, _) -> close fd
+  let close fd =
+    (* Platform may be differ as whether an EINTR results in a closed fd
+       or not, so this loop ignores an EBADF after an EINTR *)
+    let rec loop ~had_eintr fd = try Unix.close fd with
+    | Unix.Unix_error (EINTR, _, _) -> loop ~had_eintr:true fd
+    | Unix.Unix_error (EBADF, _, _) when had_eintr -> ()
+    | Unix.Unix_error (EINPROGRESS, _, _) -> ()
+    in
+    loop ~had_eintr:false fd
 
   let rec close_noerr fd = try Unix.close fd with
   | Unix.Unix_error (EINTR, _, _) -> close_noerr fd
@@ -2502,16 +2509,18 @@ module Name = struct
         (Other id), (Other id), id_unknown (* version "unknown" *)
     in
     Atomic.set name n; Atomic.set like name_like; Atomic.set version vers
+
+  let get ?(id_like = false) () =
+    let name = if id_like then like else name in
+    match Atomic.get name with
+    | Other "" -> init_info (); Atomic.get name
+    | v -> v
 end
 
-let name ?(id_like = false) () =
-  let name = if id_like then Name.like else Name.name in
-  match Atomic.get name with
-  | Name.Other "" -> Name.init_info (); Atomic.get name
-  | v -> v
-
-let version () = match Atomic.get Name.version with
-| "" -> Name.init_info (); Atomic.get Name.version | v -> v
+module Version = struct
+  let get () = match Atomic.get Name.version with
+  | "" -> Name.init_info (); Atomic.get Name.version | v -> v
+end
 
 module Arch = struct
   type id = string
@@ -2549,6 +2558,8 @@ module Arch = struct
     | Some Riscv32 _ -> Riscv32 id | Some Riscv64 _ -> Riscv64 id
     | Some X86_32 _ -> X86_32 id | Some X86_64 _ -> X86_64 id
     | Some Other _ -> Other id
+
+  let get () = of_string (uname_machine ())
 
   let id = function
   | Arm32 id | Arm64 id | Ppc32 id | Ppc64 id | Riscv32 id | Riscv64 id
@@ -2603,7 +2614,7 @@ module Arch = struct
     B0__fmt.using bits B0__fmt.(option int ~none:(any "<unknown>"))
 end
 
-let arch () = Arch.of_string (uname_machine ())
+
 
 (* Bazaar *)
 

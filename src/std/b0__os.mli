@@ -1666,7 +1666,7 @@ module Mtime : sig
       {{:https://msdn.microsoft.com/en-us/library/windows/desktop/aa373083%28v=vs.85%29.aspx}Performance counters}.}} *)
 end
 
-(** {1:info Name, version and architecture} *)
+(** {1:info Operating system information} *)
 
 (** OS names. *)
 module Name : sig
@@ -1692,11 +1692,46 @@ module Name : sig
       except to fix the odd bug). As such:
       {ul
       {- Pattern matching on [Other "…"] constants is not recommended.
-         If you need to select such an identifier start by pattern matching
-         on {!val-id} before dropping to pattern matching on this type.}
+         If you need to select such an identifier spattern match
+         on {!val-id}.}
       {- Unless you want your code to be informed by the introduction
          of a new family, end your pattern match with a catch all
          branch [_] rather than [Other _].}} *)
+
+  val get : ?id_like:bool -> unit -> t
+  (** [get ()] is the name of the operating system running the process.
+      If [id_like] is [true] returns a possible parent name instead (e.g.
+      ["debian"] instead of ["ubuntu"]), defaults to [false]. This is
+      determined, along with {!Os.Version.get} as follows:
+      {ul
+      {- On POSIX environments it depends on the lowercased [sysname] field
+       returned by
+       {{:https://pubs.opengroup.org/onlinepubs/009604599/basedefs/sys/utsname.h.html}[uname(2)]}:
+       {ul
+       {- ["linux"], the file
+          {{:https://www.freedesktop.org/software/systemd/man/latest/os-release.html}/etc/os-release}
+          is consulted. The lowercased [ID] or first element of [ID_LIKE]
+          if [id_like] is [true] determines [id] and [Name.Linux id]
+          is returned. The field [VERSION_ID] is used to determine {!version}.
+          If the file can't be found [id] is [sysname] and {!version}
+          ["unknown"].}
+       {- ["freebsd"], behaves like the Linux case but [Bsd id] is returned.}
+       {- ["darwin"], the file
+          [/System/Library/CoreServices/SystemVersion.plist] is consulted.
+          The lowercased [ProductName] key determines [id] and [Name.Darwin id]
+          is returned. The [ProductVersion] key determines {!version}. If
+          the file can't be found [id] is [sysname] and {!version}
+          ["unknown"].}
+        {- ["netbsd"] and ["openbsd"] then [Name.Bsd sysname] is returned
+           and {!version} is ["unknown"].}
+        {- Starts with ["cygwin_nt"], then [Name.Windows "cygwin"] and
+           {!version} is determined like windows (see below).}
+        {- Otherwise it returns [Other sysname] and {!version} is ["unknown"]}}}
+      {- On Windows this returns [Windows "windows"] and {!version} uses the
+       the [caml_win32_*]
+       variables of the OCaml runtime system to format a version number}
+      {- Otherwise it uses [Name.Other "unknown"] and {!version} is
+       ["unknown"]}} *)
 
   val id : t -> id
   (** [id n] is the identifier of [n]. *)
@@ -1713,7 +1748,7 @@ module Name : sig
       the normalized [s]. Strings printed by {!pp} are guaranteed to
       parse (with the family as the identifier).
 
-      Identifiers returned by {!Os.name} and classified into a proper
+      Identifiers returned by {!Os.Name.get} and classified into a proper
       family may be classified as [Other _] by this function, as the
       contextual information provided by [uname(2)] is not available.
       However if [family] is provided, [s] is simply normalized and the
@@ -1759,45 +1794,14 @@ module Name : sig
   (** [pp_id ppf n] formats the {!val-id} of [n]. *)
 end
 
-val name : ?id_like:bool -> unit -> Name.t
-(** [name ()] is the name of the operating system running the process.
-    If [id_like] is [true] returns a possible parent name instead (e.g.
-    ["debian"] instead of "ubuntu"), defaults to [false]. This is
-    determined, along with {!version} as follows:
-    {ul
-    {- On POSIX environments it depends on the lowercased [sysname] field
-       returned by
-       {{:https://pubs.opengroup.org/onlinepubs/009604599/basedefs/sys/utsname.h.html}[uname(2)]}:
-       {ul
-       {- ["linux"], the file
-          {{:https://www.freedesktop.org/software/systemd/man/latest/os-release.html}/etc/os-release}
-          is consulted. The lowercased [ID] or first element of [ID_LIKE]
-          if [id_like] is [true] determines [id] and [Name.Linux id]
-          is returned. The field [VERSION_ID] is used to determine {!version}.
-          If the file can't be found [id] is [sysname] and {!version}
-          ["unknown"].}
-       {- ["freebsd"], behaves like the Linux case but [Bsd id] is returned.}
-       {- ["darwin"], the file
-          [/System/Library/CoreServices/SystemVersion.plist] is consulted.
-          The lowercased [ProductName] key determines [id] and [Name.Darwin id]
-          is returned. The [ProductVersion] key determines {!version}. If
-          the file can't be found [id] is [sysname] and {!version}
-          ["unknown"].}
-        {- ["netbsd"] and ["openbsd"] then [Name.Bsd sysname] is returned
-           and {!version} is ["unknown"].}
-        {- Starts with ["cygwin_nt"], then [Name.Windows "cygwin"] and
-           {!version} is determined like windows (see below).}
-        {- Otherwise it returns [Other sysname] and {!version} is ["unknown"]}}}
-    {- On Windows this returns [Windows "windows"] and {!version} uses the
-       the [caml_win32_*]
-       variables of the OCaml runtime system to format a version number}
-    {- Otherwise it uses [Name.Other "unknown"] and {!version} is
-       ["unknown"]}} *)
+(** OS version. *)
+module Version : sig
 
-val version : unit -> string
-(** [version ()] is a version string for the operating system. The format
-    and determination depends on {!name}, read there. If no version
-    can be determined this is ["unknown"]. *)
+  val get : unit -> string
+  (** [version ()] is a version string for the operating system. The format
+        and determination depends on {!Os.Name.get}, read there. If no version
+        can be determined this is ["unknown"]. *)
+end
 
 (** OS architectures. *)
 module Arch : sig
@@ -1833,6 +1837,18 @@ module Arch : sig
       {- Unless you want your code to be informed by the introduction
          of a new family, end your pattern match with a catch all
          branch [_] rather than [Other _].}} *)
+
+
+  val get : unit -> t
+  (** [get ()] is the architecture of the operating system running the
+      process (it may differ from your CPU). It is determined by calling
+      {!Arch.of_string} with a string obtained as follows.
+      {ul
+      {- On POSIX environments it uses the [machine] field returned
+       by {{:https://pubs.opengroup.org/onlinepubs/009604599/basedefs/sys/utsname.h.html}[uname(2)]}.}
+      {- On Windows it uses the {{:https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getnativesysteminfo}[GetNativeSystemInfo]}
+       function and munges the [wProcessorArchitecture] field into a string.}
+      {- Otherwise it uses ["unknown"].}} *)
 
   val of_string : ?family:t -> string -> t
   (** [of_string s] is an architecture determined by [s] normalized by
@@ -1914,17 +1930,6 @@ module Arch : sig
   (** [pp_bits ppf arch] formats the integer {!bits} of [arch] or ["<unknown>"]
       if [None]. *)
 end
-
-val arch : unit -> Arch.t
-(** [arch ()] is the architecture of the operating system running the
-    process (it may differ from your CPU). It is determined by calling
-    {!Arch.of_string} with a string obtained as follows.
-    {ul
-    {- On POSIX environments it uses the [machine] field returned
-       by {{:https://pubs.opengroup.org/onlinepubs/009604599/basedefs/sys/utsname.h.html}[uname(2)]}.}
-    {- On Windows it uses the {{:https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getnativesysteminfo}[GetNativeSystemInfo]}
-       function and munges the [wProcessorArchitecture] field into a string.}
-    {- Otherwise it uses ["unknown"].}} *)
 
 (** {1:bazaar Bazaar} *)
 

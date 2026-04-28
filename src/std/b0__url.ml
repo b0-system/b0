@@ -17,10 +17,37 @@ let white = function ' ' | '\t' .. '\r'  -> true | _ -> false
 let alpha = function 'A' .. 'Z' | 'a' .. 'z' -> true | _ -> false
 let digit = function '0' .. '9' -> true | _ -> false
 
-(* Urls *)
+module Authority = struct
+  type t = string
+  type host = string
+  type port = int
+
+  let find_userinfo_at a = String.index_opt a '@'
+  let find_port_colon a =
+    if a = "" then None else
+    let max = String.length a - 1 in
+    let i = ref max in
+    while !i >= 0 && digit a.[!i] do decr i done;
+    if !i < 0 then None else
+    if a.[!i] = ':' then Some !i else None
+
+  let userinfo a = match find_userinfo_at a with
+  | None -> None | Some i -> Some (String.sub a 0 i)
+
+  let host a =
+    let first = match find_userinfo_at a with None -> 0 | Some at -> at + 1 in
+    let last = match find_port_colon a with
+    | None -> String.length a - 1
+    | Some colon -> colon - 1
+    in
+    string_subrange a ~first ~last
+
+  let port a = match find_port_colon a with
+  | None -> None
+  | Some c -> int_of_string_opt (string_subrange a ~first:(c + 1))
+end
 
 type scheme = string
-type authority = string
 type path = string
 type query = string
 type fragment = string
@@ -109,19 +136,19 @@ let target u =
 
 (* Kinds *)
 
-type relative_kind = [ `Scheme | `Absolute_path | `Relative_path | `Empty ]
-type kind = [ `Absolute | `Relative of relative_kind ]
+type relative_kind = Scheme | Absolute_path | Relative_path | Empty
+type kind = Absolute | Relative of relative_kind
 
 let relative_kind s =
   let len = String.length s in
-  if len = 0 then `Empty else
+  if len = 0 then Empty else
   if s.[0] = '/'
-  then (if len > 1 && s.[1] = '/' then `Scheme else `Absolute_path)
-  else `Relative_path
+  then (if len > 1 && s.[1] = '/' then Scheme else Absolute_path)
+  else Relative_path
 
 let kind s = match find_scheme_colon s with
-| Some _ -> `Absolute
-| None -> `Relative (relative_kind s)
+| Some _ -> Absolute
+| None -> Relative (relative_kind s)
 
 (* Operations *)
 
@@ -146,13 +173,13 @@ let drop_path_and_rest u = match path_first u with
 | None -> u | Some first -> string_subrange ~last:(first - 1) u
 
 let append root u = match kind u with
-| `Absolute -> u
-| `Relative `Scheme ->
+| Absolute -> u
+| Relative Scheme ->
     begin match scheme root with
     | None -> u | Some scheme -> String.concat ":" [scheme; u]
     end
-| `Relative `Absolute_path -> String.concat "" [drop_path_and_rest root; u]
-| `Relative `Relative_path ->
+| Relative Absolute_path -> String.concat "" [drop_path_and_rest root; u]
+| Relative Relative_path ->
     if root <> "" && root.[String.length root - 1] = '/'
     then String.concat "" [root; u] else
     begin match String.rindex root '/' with
@@ -163,124 +190,31 @@ let append root u = match kind u with
         | Some j when j + 2 = i -> String.concat "/" [root; u]
         | Some _ -> String.concat "" [string_subrange ~last:i root; u]
     end
-| `Relative `Empty -> root
+| Relative Empty -> root
 
 let to_absolute ~scheme ~root_path u = match kind u with
-| `Absolute -> u
-| `Relative `Scheme -> String.concat ":" [scheme; u]
-| `Relative `Absolute_path -> String.concat "://" [scheme; u]
-| `Relative `Relative_path ->
+| Absolute -> u
+| Relative Scheme -> String.concat ":" [scheme; u]
+| Relative Absolute_path -> String.concat "://" [scheme; u]
+| Relative Relative_path ->
     let root = match root_path with
     | Some "" | None -> ""
     | Some root when root.[String.length root - 1] = '/' -> root
     | Some root -> root ^ "/"
     in
     String.concat "" [scheme; "://"; root; u]
-| `Relative `Empty ->
+| Relative Empty ->
     let root = Option.value ~default:"" root_path in
     String.concat "" [scheme; "://"; root]
 
-(* Authority *)
-
-module Authority = struct
-  type t = authority
-  let find_userinfo_at a = String.index_opt a '@'
-  let find_port_colon a =
-    if a = "" then None else
-    let max = String.length a - 1 in
-    let i = ref max in
-    while !i >= 0 && digit a.[!i] do decr i done;
-    if !i < 0 then None else
-    if a.[!i] = ':' then Some !i else None
-
-  let userinfo a = match find_userinfo_at a with
-  | None -> None | Some i -> Some (String.sub a 0 i)
-
-  let host a =
-    let first = match find_userinfo_at a with None -> 0 | Some at -> at + 1 in
-    let last = match find_port_colon a with
-    | None -> String.length a - 1
-    | Some colon -> colon - 1
-    in
-    string_subrange a ~first ~last
-
-  let port a = match find_port_colon a with
-  | None -> None
-  | Some c -> int_of_string_opt (string_subrange a ~first:(c + 1))
-end
-
-(* Scraping *)
-
-let list_of_text_scrape ?root s = (* See .mli to understand what it does *)
-  let rec find_stop s i max stop =
-    if i > max then i else
-    if stop s.[i] then i else find_stop s (i + 1) max stop
-  in
-  let parse_att s i max =
-    let j = find_stop s i max (Fun.negate white) in
-    if not (j < max && s.[j] = '=') then None else
-    let k = find_stop s (j + 1) max (Fun.negate white) in
-    if not (k < max && (s.[k] = '\'' || s.[k] = '\"')) then None else
-    let l = find_stop s (k + 1) max (Char.equal s.[k]) in
-    if not (l <= max) then None else
-    let url = String.trim (string_subrange ~first:(k + 1) ~last:(l - 1) s) in
-    if url = "" then None else Some (url, l + 1)
-  in
-  let rec find_next acc s i max =
-    let add_url url acc = match root with
-    | None -> url :: acc | Some root -> (append root url) :: acc
-    in
-    if i > max then List.rev acc else
-    match s.[i] with
-    | 's' when i + 5 <= max && s.[i+1] = 'r' && s.[i+2] = 'c' ->
-        begin match parse_att s (i + 3) max with
-        | None -> find_next acc s (i + 3) max
-        | Some (url, next) -> find_next (add_url url acc) s next max
-        end
-    | 'h' when i + 6 <= max &&
-               s.[i+1] = 'r' && s.[i+2] = 'e' && s.[i+3] = 'f' ->
-        begin match parse_att s (i + 4) max with
-        | None -> find_next acc s (i + 4) max
-        | Some (url, next) -> find_next (add_url url acc) s next max
-        end
-    | 'h' when i + 7 <= max &&
-               s.[i+1] = 't' && s.[i+2] = 't' && s.[i+3] = 'p' ->
-        let stop =
-          if i = 0 then Some white else
-          match s.[i - 1] with
-          | '\"' | '\'' as c -> Some (Char.equal c)
-          | '<' -> Some (Char.equal '>')
-          | c when white c -> Some white
-          | _ -> None
-        in
-        begin match stop with
-        | None -> find_next acc s (i + 1) max
-        | Some stop ->
-            let stop = find_stop s i max stop in
-            let url = string_subrange ~first:i ~last:(stop - 1) s in
-            if not (String.starts_with ~prefix:"http://" url ||
-                    String.starts_with ~prefix:"https://" url)
-            then find_next acc s (i + 1) max
-            else find_next (add_url url acc) s stop max
-        end
-    | _ -> find_next acc s (i + 1) max
-  in
-  find_next [] s 0 (String.length s - 1)
-
-(* Formatting *)
-
-let pp = Format.pp_print_string
-let pp_kind ppf k = Format.pp_print_string ppf @@ match k with
-| `Absolute -> "abs"
-| `Relative `Scheme -> "rel-scheme"
-| `Relative `Absolute_path -> "rel-abs-path"
-| `Relative `Relative_path -> "rel-rel-path"
-| `Relative `Empty -> "rel-empty"
 
 (* Percent encoding *)
 
+let is_likely_percent_decoded s =
+  String.exists (Fun.negate Char.Ascii.is_graphic) s
+
 module Percent = struct (* See https://tools.ietf.org/html/rfc3986 *)
-  type kind = [ `Uri_component | `Uri ]
+  type kind = Uri_component | Uri
 
   let is_char_verbatim_in_uri_component = function
   (* unreserved *)
@@ -342,8 +276,8 @@ module Percent = struct (* See https://tools.ietf.org/html/rfc3986 *)
        length and then use Bytes directly is faster – see
        Query.pct_encode_space_as_plus – one day. *)
     let is_verbatim = match kind with
-    | `Uri_component -> is_char_verbatim_in_uri_component
-    | `Uri -> is_char_verbatim_in_uri
+    | Uri_component -> is_char_verbatim_in_uri_component
+    | Uri -> is_char_verbatim_in_uri
     in
     let b = Buffer.create (String.length s * 2) in
     encode_to_buffer is_verbatim b s;
@@ -354,3 +288,117 @@ module Percent = struct (* See https://tools.ietf.org/html/rfc3986 *)
     decode_to_buffer b s ~first:0 ~last:(String.length s - 1);
     Buffer.contents b
 end
+
+(* Scraping *)
+
+let list_of_text_scrape ?root s = (* See .mli to understand what it does *)
+  let rec find_stop s i max stop =
+    if i > max then i else
+    if stop s.[i] then i else find_stop s (i + 1) max stop
+  in
+  let parse_att s i max =
+    let j = find_stop s i max (Fun.negate white) in
+    if not (j < max && s.[j] = '=') then None else
+    let k = find_stop s (j + 1) max (Fun.negate white) in
+    if not (k < max && (s.[k] = '\'' || s.[k] = '\"')) then None else
+    let l = find_stop s (k + 1) max (Char.equal s.[k]) in
+    if not (l <= max) then None else
+    let url = String.trim (string_subrange ~first:(k + 1) ~last:(l - 1) s) in
+    if url = "" then None else Some (url, l + 1)
+  in
+  let rec find_next acc s i max =
+    let add_url url acc = match root with
+    | None -> url :: acc | Some root -> (append root url) :: acc
+    in
+    if i > max then List.rev acc else
+    match s.[i] with
+    | 's' when i + 5 <= max && s.[i+1] = 'r' && s.[i+2] = 'c' ->
+        begin match parse_att s (i + 3) max with
+        | None -> find_next acc s (i + 3) max
+        | Some (url, next) -> find_next (add_url url acc) s next max
+        end
+    | 'h' when i + 6 <= max &&
+               s.[i+1] = 'r' && s.[i+2] = 'e' && s.[i+3] = 'f' ->
+        begin match parse_att s (i + 4) max with
+        | None -> find_next acc s (i + 4) max
+        | Some (url, next) -> find_next (add_url url acc) s next max
+        end
+    | 'h' when i + 7 <= max &&
+               s.[i+1] = 't' && s.[i+2] = 't' && s.[i+3] = 'p' ->
+        let stop =
+          if i = 0 then Some white else
+          match s.[i - 1] with
+          | '\"' | '\'' as c -> Some (Char.equal c)
+          | '<' -> Some (Char.equal '>')
+          | c when white c -> Some white
+          | _ -> None
+        in
+        begin match stop with
+        | None -> find_next acc s (i + 1) max
+        | Some stop ->
+            let stop = find_stop s i max stop in
+            let url = string_subrange ~first:i ~last:(stop - 1) s in
+            if not (String.starts_with ~prefix:"http://" url ||
+                    String.starts_with ~prefix:"https://" url)
+            then find_next acc s (i + 1) max
+            else find_next (add_url url acc) s stop max
+        end
+    | _ -> find_next acc s (i + 1) max
+  in
+  find_next [] s 0 (String.length s - 1)
+
+(* Predicates and comparisons *)
+
+let equal = Repr.equal
+let compare = Repr.compare
+
+(* Formatting *)
+
+let pp = Format.pp_print_string
+let pp_kind ppf k = Format.pp_print_string ppf @@ match k with
+| Absolute -> "abs"
+| Relative Scheme -> "rel-scheme"
+| Relative Absolute_path -> "rel-abs-path"
+| Relative Relative_path -> "rel-rel-path"
+| Relative Empty -> "rel-empty"
+
+(* Converting *)
+
+let err url msg =
+  Format.asprintf "@[URL %a: %a@]" pp url Format.pp_print_text msg
+
+let to_endpoint ~supported_schemes url =
+  if List.is_empty supported_schemes
+  then invalid_arg "supported_schemes cannot be the empty list" else
+  try
+    let dom () = match supported_schemes with
+    | [] -> assert false
+    | [(s, _)] -> Format.asprintf "Must be %s." s
+    | [(s0, _);(s1, _)] -> Format.asprintf "Must be %s or %s." s0 s1
+    | ss ->
+        let last = fst (List.hd (List.rev ss)) in
+        let ss = String.concat ", " (List.map fst (List.tl ss)) in
+        Format.asprintf "Must be one of %s or %s." ss last
+    in
+    let default_port = match scheme url with
+    | None ->
+        let msg = Format.asprintf "No scheme found. %s" (dom ()) in
+        failwith (err url msg)
+    | Some scheme ->
+        match List.assoc_opt scheme supported_schemes with
+        | Some default_port -> default_port
+        | None ->
+            let msg =
+              Format.asprintf "Unsupported scheme %s. %s" scheme (dom ())
+            in
+            failwith (err url msg)
+    in
+    let authority = match authority url with
+    | None -> failwith (err url "No authority found")
+    | Some authority -> authority
+    in
+    let host = Authority.host authority in
+    let port = Option.value ~default:default_port (Authority.port authority) in
+    Ok (`Host (host, port))
+  with
+  | Failure msg -> Error msg
