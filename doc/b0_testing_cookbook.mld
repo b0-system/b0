@@ -29,7 +29,7 @@ In general the following is suggested:
    project}
 {- For tests for a partical module [M] call the main source file
    [test_m.ml]}
-{- For tests for a particular tool [M] call the main source file
+{- For tests for a particular tool [mytool] call the main source file
    [test_mytool.ml] or [test_mytool_tool.ml] if it clashes with the name
    of a module.}}
 

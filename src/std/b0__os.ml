@@ -371,7 +371,7 @@ module Socket = struct
      code around. *)
 
   let err_wait ep e = B0__fmt.str "Wait on %a: %s" B0__net.Endpoint.pp ep e
-  let endpoint_wait_connectable ?(socket_type = Unix.SOCK_STREAM) ~timeout ep =
+  let endpoint_wait_connectable' ?(socket_type = Unix.SOCK_STREAM) ~timeout ep =
     let relax = Mtime.sleep B0__mtime.Span.(1 * ms) in
     Result.map_error (err_wait ep) @@
     let rec loop ~deadline dur =
@@ -397,8 +397,8 @@ module Socket = struct
     in
     loop ~deadline:timeout (Mtime.counter ())
 
-  let endpoint_wait_connectable' ?socket_type ~timeout ep =
-    match endpoint_wait_connectable ?socket_type ~timeout ep with
+  let endpoint_wait_connectable ?socket_type ~timeout ep =
+    match endpoint_wait_connectable' ?socket_type ~timeout ep with
     | Error _ as e -> e
     | Ok `Ready -> Ok ()
     | Ok `Timeout ->
@@ -406,7 +406,6 @@ module Socket = struct
           B0__fmt.str "Timed out after %a" B0__mtime.Span.pp timeout
         in
         Error (err_wait ep err)
-
 end
 
 module Env = struct

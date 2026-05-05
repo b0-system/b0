@@ -75,12 +75,12 @@ val target : t -> string option
 
 (** {1:kinds Kinds} *)
 
-type relative_kind = Scheme | Absolute_path | Relative_path | Empty
+type relative_kind = Scheme | Absolute_path | Relative_path | Empty (** *)
 (** The type for kinds of relative references. Represents
     {{:https://www.rfc-editor.org/rfc/rfc3986.html#section-4.2}this
     alternation}. *)
 
-type kind = Absolute | Relative of relative_kind
+type kind = Absolute | Relative of relative_kind (** *)
 (** The type for kinds of URLs. Represents this
     {{:https://www.rfc-editor.org/rfc/rfc3986.html#section-4.1} this
     alternation}. *)
@@ -102,7 +102,7 @@ val of_url : t ->
     deleted. *)
 
 val append : t -> t -> t
-(** [append root u] is [u] if {!val-kind}[ u] is [`Absolute]. Otherwise
+(** [append root u] is [u] if {!val-kind}[ u] is [Absolute]. Otherwise
     uses [root] to make it absolute according to its {!relative_kind}.
     The result is guaranteed to be absolute if [root] is, the result
     may be surprising or non-sensical if [root] isn't (FIXME can't we
@@ -112,12 +112,12 @@ val to_absolute : scheme:scheme -> root_path:path option -> t -> t
 (** [to_absolute ~scheme ~root_path] transforms [u] depending on the value of
     {!val-kind}[ u]:
     {ul
-    {- If [`Absolute] then this is [u] itself.}
-    {- If [`Relative `Scheme] then [u] is given the scheme [scheme].}
-    {- If [`Relative `Absolute_path] then [u] is given the scheme [scheme].}
-    {- If [`Relative `Relative_path] then [u] is given the scheme [scheme] and
+    {- If [Absolute] then this is [u] itself.}
+    {- If [Relative Scheme] then [u] is given the scheme [scheme].}
+    {- If [Relative Absolute_path] then [u] is given the scheme [scheme].}
+    {- If [Relative Relative_path] then [u] is given the scheme [scheme] and
            the path of [u] is prepended by [root_path] (if any).}
-    {- If [`Relative `Empty] then [u] is given the scheme [scheme] and the
+    {- If [Relative Empty] then [u] is given the scheme [scheme] and the
        path is [root_path] (if any).}} *)
 
 (*
@@ -141,7 +141,7 @@ val is_likely_percent_decoded : t -> bool
     {- [false] otherwise. In this case [u] is likely encoded or needs no
        encoding.}}
 
-    If [u] is the result of {!Percent.encode}[ `Uri] this always returns
+    If [u] is the result of {!Percent.encode}[ Uri] this always returns
     [false] but on foreign data the test mail fail e.g. it wrongly returns
     [false] on [http://example.org/zoom/100%].
 
@@ -166,7 +166,7 @@ module Percent : sig
            and ['!'], ['$'], ['&'], ['\''], ['('], [')']
            ['*'], ['+'], [','], [';'], ['='] are not percent-encoded. *)
   | Uri
-  (** Percent-encodes like [`Uri_component] except it also preserves
+  (** Percent-encodes like [Uri_component] except it also preserves
       {{:https://www.rfc-editor.org/rfc/rfc3986#section-2.2}gen-delims}
       URI characters. In other words in addition to those characters above,
       [':'], ['/'], ['?'], ['#'], ['\['], ['\]'], ['@'] are not

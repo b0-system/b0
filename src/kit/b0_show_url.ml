@@ -224,7 +224,7 @@ let show_url
       if dry_run
       then (Log.stdout (fun m -> m "%s" url); Ok Os.Exit.ok) else
       let timeout = secs timeout in
-      let* () = Os.Socket.endpoint_wait_connectable' ~timeout endpoint in
+      let* () = Os.Socket.endpoint_wait_connectable ~timeout endpoint in
       let* () = show url in
       Ok Os.Exit.ok
   | `Show_url_server (endpoint, timeout, url, cmd, cwd, env) ->
@@ -233,7 +233,7 @@ let show_url
       let* server = Os.Cmd.spawn ~cwd ~env cmd in
       let* () =
         let timeout = secs timeout in
-        Os.Socket.endpoint_wait_connectable' ~timeout endpoint
+        Os.Socket.endpoint_wait_connectable ~timeout endpoint
       in
       let* () = show url in
       let* st = Os.Cmd.spawn_wait_status server in

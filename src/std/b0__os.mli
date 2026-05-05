@@ -836,22 +836,21 @@ module Socket : sig
       {b TODO.} We'd like to have this in {!B0_std.Net.Endpoint} but
       we need to restructure the sources. *)
 
-  val endpoint_wait_connectable :
+  val endpoint_wait_connectable' :
     ?socket_type:Unix.socket_type -> timeout:B0__mtime.Span.t ->
     B0__net.Endpoint.t ->
     ([`Ready | `Timeout], string) result
   (** [endpoint_wait_connectable ~timeout ep st] blocks until [ep] becomes
-      connectable
-      or duration [timeout] elapses.
+      connectable or duration [timeout] elapses.
 
       [socket_type] defines the kind of socket connection, it defaults to
       {!Unix.SOCK_STREAM}. *)
 
-  val endpoint_wait_connectable' :
+  val endpoint_wait_connectable :
     ?socket_type:Unix.socket_type -> timeout:B0__mtime.Span.t ->
     B0__net.Endpoint.t -> (unit, string) result
-    (** [wait_connectable'] is like {!wait_connectable} but errors with a
-        message on timeout. *)
+  (** [wait_connectable] is like {!wait_connectable'} but errors with a
+      message on timeout. *)
 
   (** {1:socket_endpoint Sockets} *)
 
