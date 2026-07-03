@@ -88,22 +88,23 @@ module Log = struct
 
   type 'a t = ?__POS__:loc -> ('a, Format.formatter, unit, unit) format4 -> 'a
 
-  let out = ref Format.std_formatter
-  let raw fmt = Fmt.pf !out fmt
+  let out = ref (fun () -> Format.std_formatter)
+  let set_out fmt = out := fmt
+  let raw fmt = Fmt.pf (!out ()) fmt
   let raw_flush fmt = raw (fmt ^^ "@.")
 
   let pad_noflush ?(pad = Test_fmt.padding) ~color fmt =
-    Fmt.pf !out ("%a @[" ^^ fmt ^^ "@]@?") (Fmt.st color) pad
+    Fmt.pf (!out ()) ("%a @[" ^^ fmt ^^ "@]@?") (Fmt.st color) pad
 
   let pad_flush ?(pad = Test_fmt.padding) ~color fmt =
-    Fmt.pf !out ("%a @[" ^^ fmt ^^ "@]@.") (Fmt.st color) pad
+    Fmt.pf (!out ()) ("%a @[" ^^ fmt ^^ "@]@.") (Fmt.st color) pad
 
   let kpad_flush ?(pad = Test_fmt.padding) ~color k fmt =
-    Fmt.kpf k !out ("%a @[" ^^ fmt ^^ "@]@.") (Fmt.st color) pad
+    Fmt.kpf k (!out ()) ("%a @[" ^^ fmt ^^ "@]@.") (Fmt.st color) pad
 
   let padded_loc_flush ?(pad = Test_fmt.padding) ~color ~mark_none loc =
     if loc == invalid_loc
-    then (if mark_none then Fmt.pf !out "%a@."  (Fmt.st color) pad)
+    then (if mark_none then Fmt.pf (!out ()) "%a@."  (Fmt.st color) pad)
     else (pad_flush ~pad ~color "%a" Test_fmt.loc loc)
 
   let loc_log ?pad ~color loc fmt =
@@ -114,7 +115,7 @@ module Log = struct
     padded_loc_flush ~color ~mark_none:false loc;
     kpad_flush ?pad ~color k fmt
 
-  let finish fmt = Fmt.pf !out ("@[" ^^ fmt ^^ "@]@.")
+  let finish fmt = Fmt.pf (!out ()) ("@[" ^^ fmt ^^ "@]@.")
   let start ?__POS__:(loc = invalid_loc) fmt =
     let color = Test_fmt.test_color in
     padded_loc_flush ~color ~mark_none:false loc;

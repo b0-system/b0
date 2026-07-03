@@ -65,6 +65,9 @@ module Test : sig
 
     val raw : ('a, Format.formatter, unit, unit) format4 -> 'a
     (** [raw fmt …] outputs to the test log. *)
+
+    (**/**)
+    val set_out : (unit -> Format.formatter) -> unit
   end
 
   (** {2:main Main} *)
