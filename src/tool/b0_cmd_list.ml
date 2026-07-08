@@ -6,19 +6,26 @@
 open B0_std
 open Result.Syntax
 
-let get_defs ~names ~with_lib_defs ~only_tests =
-  let keep ~no_lib_def_test ~no_test_tag_test (B0_def.V ((module Def), v)) =
+let get_defs ~names ~with_lib_defs ~only_tests ~only_benchs =
+  let keep
+      ~no_lib_def_test ~no_test_tag_test ~no_bench_tag_test
+      (B0_def.V ((module Def), v))
+    =
     (no_lib_def_test || not (String.starts_with ~prefix:"." (Def.name v)))
     &&
     (no_test_tag_test || Def.has_tag B0_meta.test v)
+    &&
+    (no_bench_tag_test || Def.has_tag B0_meta.bench v)
   in
   let defs = B0_tool.def_list and all_if_empty = true in
   let* vs = B0_tool.def_list_get_list_or_hint defs ~all_if_empty names in
   let no_lib_def_test = with_lib_defs || names <> [] in
   let no_test_tag_test = not only_tests in
-  Ok (List.filter (keep ~no_lib_def_test ~no_test_tag_test) vs)
+  let no_bench_tag_test = not only_benchs in
+  Ok (List.filter (keep ~no_lib_def_test ~no_test_tag_test ~no_bench_tag_test)
+        vs)
 
-let edit ~names ~only_tests conf =
+let edit ~names ~only_tests ~only_benchs conf =
   let rec find_files not_found fs = function
   | [] -> not_found, Fpath.distinct fs
   | (B0_def.V ((module Def), def) as v) :: vs ->
@@ -27,7 +34,7 @@ let edit ~names ~only_tests conf =
      | Some f -> find_files not_found (f :: fs) vs
   in
   Log.if_error ~use:Os.Exit.no_such_name @@
-  let* vs = get_defs ~names ~with_lib_defs:false ~only_tests in
+  let* vs = get_defs ~names ~with_lib_defs:false ~only_tests ~only_benchs in
   let defs = B0_tool.def_list and all_if_empty = true in
   let* vs = B0_tool.def_list_get_list_or_hint defs ~all_if_empty names in
   let not_found, files = find_files [] [] vs in
@@ -45,7 +52,7 @@ let edit ~names ~only_tests conf =
       | `Exited 0 -> Ok Os.Exit.ok
       | _ -> Ok Os.Exit.some_error
 
-let list ~output_details ~names ~all ~only_tests conf =
+let list ~output_details ~names ~all ~only_tests ~only_benchs conf =
   let pp_v ppf (B0_def.V ((module Def), v)) = match output_details with
   | `Short -> Def.pp_name ppf v
   | `Normal -> Def.pp_synopsis ppf v
@@ -63,15 +70,15 @@ let list ~output_details ~names ~all ~only_tests conf =
     Ok ()
   in
   Log.if_error ~use:Os.Exit.no_such_name @@
-  let* vs = get_defs ~names ~with_lib_defs:all ~only_tests in
+  let* vs = get_defs ~names ~with_lib_defs:all ~only_tests ~only_benchs in
   let* () = list conf vs in
   Ok Os.Exit.ok
 
-let info ~output_details ~names ~all ~only_tests conf =
+let info ~output_details ~names ~all ~only_tests ~only_benchs conf =
   let output_details =
     if output_details = `Normal then `Long else output_details
   in
-  list ~output_details ~names ~all ~only_tests conf
+  list ~output_details ~names ~all ~only_tests ~only_benchs conf
 
 (* Command line interface *)
 
@@ -88,6 +95,11 @@ let only_tests =
   let doc = "List only tests. That is units tagged with $(b,B0_meta.test)." in
   Arg.(value & flag & info ["tests"] ~doc)
 
+let only_benchs =
+  let doc = "List only benchmarks. That is units tagged with \
+             $(b,B0_meta.bench)." in
+  Arg.(value & flag & info ["benchs"] ~doc)
+
 let names =
   let doc =
     "The $(docv) to act on. All of them except library definitions \
@@ -103,8 +115,8 @@ let cmd =
   in
   B0_tool_cli.cmd_with_b0_file "list" ~doc ~descr @@
   let+ output_details = B0_cli.output_details
-  and+ names and+ all and+ only_tests in
-  list ~output_details ~names ~all ~only_tests
+  and+ names and+ all and+ only_tests and+ only_benchs in
+  list ~output_details ~names ~all ~only_tests ~only_benchs
 
 
 let cmd_info =
@@ -116,8 +128,8 @@ let cmd_info =
   in
   B0_tool_cli.cmd_with_b0_file "info" ~doc ~descr @@
   let+ output_details = B0_cli.output_details
-  and+ names and+ all and+ only_tests in
-  info ~output_details ~names ~all ~only_tests
+  and+ names and+ all and+ only_tests and+ only_benchs in
+  info ~output_details ~names ~all ~only_tests ~only_benchs
 
 let cmd_edit =
   let doc = "Edit definitions" in
@@ -127,5 +139,5 @@ let cmd_edit =
   in
   let envs = B0_editor.Env.infos in
   B0_tool_cli.cmd_with_b0_file "edit" ~doc ~descr ~envs @@
-  let+ names and+ only_tests in
-  edit ~names ~only_tests
+  let+ names and+ only_tests and+ only_benchs in
+  edit ~names ~only_tests ~only_benchs
