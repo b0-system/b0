@@ -176,11 +176,23 @@ module Fail = struct
   let count = Atomic.make 0
   let incr () = Atomic.incr count
   let test_count = Atomic.make 0
+
+  exception Stop
+  let fail_stop = ref false
+  let set_fail_stop f = fail_stop := f
+  let is_fail_stop () = !fail_stop && Atomic.get test_count > 0
+  let maybe_fail_stop () = if is_fail_stop () then raise Stop
+
   let report ~dur =
     let pad = Test_fmt.fail_str and color = Test_fmt.fail_color in
     if Atomic.get test_count = 0 then begin
       Log.pad_flush ~pad ~color "@[Test %a in %a@]"
         Test_fmt.failed () Test_fmt.dur (Os.Mtime.count dur)
+    end else if is_fail_stop () then begin
+      let success = Atomic.get run_test_count - 1 in
+      Log.pad_flush ~pad ~color "@[Stop at %a test after %a %s in %a@]"
+        Test_fmt.failed () Test_fmt.count success (Text.teststr success)
+        Test_fmt.dur (Os.Mtime.count dur)
     end else begin
       let ratio = Atomic.get test_count, Atomic.get run_test_count in
       Log.pad_flush ~pad ~color "@[%a %s %a in %a@]"
@@ -981,7 +993,8 @@ module Test = struct
             Fail.incr ();
         end;
         if Atomic.get Fail.count <> 0 then Atomic.incr Fail.test_count;
-        if Atomic.get Skip.count <> 0 then Atomic.incr Skip.test_count
+        if Atomic.get Skip.count <> 0 then Atomic.incr Skip.test_count;
+        Fail.maybe_fail_stop ();
       end
     end
 
@@ -1081,7 +1094,7 @@ module Test = struct
   module Cli = struct
     let setup
         ~correct ~diff_cmd ~force_correct ~seed ~test_dir ~long ~long_skip_exit
-        ~includes ~excludes ~output_list ~locs:_
+        ~includes ~excludes ~output_list ~locs:_ ~fail_stop
       =
       Name.set_includes includes;
       Name.set_excludes excludes;
@@ -1092,7 +1105,9 @@ module Test = struct
       Diff.set_cmd diff_cmd;
       Rand.set_seed seed;
       Snapshot.set_correct correct;
-      Snapshot.set_force_correct force_correct
+      Snapshot.set_force_correct force_correct;
+      Fail.set_fail_stop fail_stop;
+      ()
 
     open Cmdliner
 
@@ -1212,13 +1227,17 @@ module Test = struct
       Arg.(value & opt (some int) None &
            info [Rand.cli_seed] ~absent ~env ~doc ~docv:"SEED" ~docs)
 
+    let fail_stop =
+      let doc = "Stop at first test failure." in
+      Arg.(value & flag & info ["S"; "fail-stop"] ~doc ~docs)
+
     let setup =
       let open Cmdliner.Term.Syntax in
       let+ seed and+ correct and+ force_correct and+ diff_cmd and+ test_dir
       and+ long and+ long_skip_exit and+ includes and+ excludes
-      and+ output_list and+ locs in
+      and+ output_list and+ locs and+ fail_stop in
       setup ~diff_cmd ~correct ~force_correct ~seed ~test_dir ~long
-        ~long_skip_exit ~includes ~excludes ~output_list ~locs
+        ~long_skip_exit ~includes ~excludes ~output_list ~locs ~fail_stop
   end
 
   (* Main *)
@@ -1255,7 +1274,7 @@ module Test = struct
           else (report_fail ~dur; 1)
       in
       try (f (); exit_main dur) with
-      | Stop -> exit_main dur
+      | Stop | Fail.Stop -> exit_main dur
       | Skip ->
           Log.raw_flush "@[%a The test was %a in %a@]"
             Test_fmt.skip () Test_fmt.skipped ()
