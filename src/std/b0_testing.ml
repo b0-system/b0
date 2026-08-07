@@ -393,9 +393,16 @@ module Diff = struct
     | Ok diff -> Fmt.pf ppf "@[%a@]" Fmt.lines diff
 
   let git_diff_cmd = B0_std.Cmd.(tool "git" % "diff")
-  let git_diff = lazy (Os.Cmd.get git_diff_cmd)
+  let git_diff = Atomic.make None
+
+  let get_git_diff () = match Atomic.get git_diff with
+  | Some cmd -> cmd
+  | None ->
+      let cmd = Os.Cmd.get git_diff_cmd in
+      Atomic.set git_diff (Some cmd); cmd
+
   let git_diff ~fnd ~exp =
-    let* git_diff = Lazy.force git_diff in
+    let* git_diff = get_git_diff () in
     let opts =
       let color = match Fmt.styler () with
       | Fmt.Plain -> "--color=never"
