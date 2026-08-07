@@ -7,7 +7,15 @@ open B0__result.Syntax
 
 (* A bit of randomness for functions that need unique filenames *)
 
-let rand_gen = lazy (Random.State.make_self_init ()) (* FIXME multicore *)
+(* FIXME once we require OCaml > 5.0 use DLS and the split scheme of
+   implemented in Random. This may be problematic. *)
+
+let rand_gen = Atomic.make None
+let rand_gen () = match Atomic.get rand_gen with
+| Some gen -> gen
+| None ->
+    let gen = Random.State.make_self_init () in
+    Atomic.set rand_gen (Some gen); gen
 
 (* Error handling *)
 
@@ -806,7 +814,7 @@ module Tmp = struct
   type name = (string -> string, unit, string) format
   let default_name = format_of_string "tmp-%s"
 
-  let rand_num () = Random.State.bits (Lazy.force rand_gen) land 0xFFFFFF
+  let rand_num () = Random.State.bits (rand_gen ()) land 0xFFFFFF
   let rand_str () = Printf.sprintf "%06x" (rand_num ())
   let tmp_path dir name rand =
     let dir = B0__fpath.to_string dir in

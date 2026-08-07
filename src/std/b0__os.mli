@@ -1653,16 +1653,21 @@ module Mtime : sig
       program to log it and abort the program. It indicates a serious
       error condition in the system.
 
-      {1:platform_support Platform support}
+      {1:the_monotonic_clock The monotonic clock}
 
       {ul
-      {- Platforms with a POSIX clock (includes Linux) use
-      {{:http://pubs.opengroup.org/onlinepubs/9699919799/functions/clock_gettime.html}[clock_gettime]}
-      with CLOCK_MONOTONIC.}
-      {- Darwin uses
-      {{:https://developer.apple.com/library/mac/qa/qa1398/_index.html}[mach_absolute_time]}.}
+      {- Linux uses {{:http://pubs.opengroup.org/onlinepubs/9699919799/functions/clock_gettime.html}[clock_gettime]}
+       with {{:https://www.man7.org/linux/man-pages/man3/clock_settime.3.html}
+       CLOCK_BOOTTIME}. This means that sleep time is taken into account.}
+      {- Platforms with a POSIX clock use
+       {{:http://pubs.opengroup.org/onlinepubs/9699919799/functions/clock_gettime.html}[clock_gettime]}
+       with CLOCK_MONOTONIC.}
+      {- MacOS >= 10.12 uses
+       {{:https://developer.apple.com/documentation/kernel/1646199-mach_continuous_time}[mach_continous_time]}, sleep time is taken into
+       account. For MacOS < 10.12, {{:https://developer.apple.com/documentation/kernel/1462446-mach_absolute_time}[mach_absolute_time]} is used, sleep time
+       is not taken into account.}
       {- Windows uses
-      {{:https://msdn.microsoft.com/en-us/library/windows/desktop/aa373083%28v=vs.85%29.aspx}Performance counters}.}} *)
+       {{:https://msdn.microsoft.com/en-us/library/windows/desktop/aa373083%28v=vs.85%29.aspx}Performance counters}.}} *)
 end
 
 (** {1:info Operating system information} *)

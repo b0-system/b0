@@ -64,6 +64,9 @@ module Span : sig
   (** [n * dur] is [n] times duration [n]. Does not check for
       overflow or that [n] is positive. *)
 
+  val ( + ) : t -> t -> t
+  (** [s0 + s1] is [s0] + [s1]. {b Warning.} Rolls over on overflow. *)
+
   val ns : t
   (** [ns] is a nanosecond duration, 1·10{^-9}s. *)
 

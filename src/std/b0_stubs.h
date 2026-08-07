@@ -25,6 +25,10 @@
   #endif
 #endif
 
+#if defined(__linux__)
+  #define OCAML_B0_LINUX
+#endif
+
 #if defined (__CYGWIN__)
   #define OCAML_B0_CYGWIN
 #endif

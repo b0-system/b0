@@ -10,6 +10,15 @@
 
 #include <mach/mach_time.h>
 
+#include <AvailabilityMacros.h>
+
+#if MACOSX_VERSION_MIN_REQUIRED >= 101200
+  #define ocaml_darwin_mach_time mach_continuous_time
+#else
+  #define ocaml_darwin_mach_time mach_absolute_time
+#endif
+
+
 static mach_timebase_info_data_t scale = {0};
 static void _ocaml_b0_clock_init_scale (void)
 {
@@ -23,7 +32,7 @@ static void _ocaml_b0_clock_init_scale (void)
 CAMLprim value ocaml_b0_monotonic_now_ns (value unit)
 {
   if (scale.denom == 0) { _ocaml_b0_clock_init_scale (); }
-  uint64_t now = mach_absolute_time ();
+  uint64_t now = ocaml_darwin_mach_time ();
   return caml_copy_int64 ((now * scale.numer) / scale.denom);
 }
 
@@ -31,11 +40,17 @@ CAMLprim value ocaml_b0_monotonic_now_ns (value unit)
 
 #include <time.h>
 
+#if defined(OCAML_B0_LINUX)
+  #define ocaml_clockid CLOCK_BOOTTIME
+#else
+  #define ocaml_clockid CLOCK_MONOTONIC
+#endif
+
 CAMLprim value ocaml_b0_monotonic_now_ns (value unit)
 {
   struct timespec now;
 
-  if (clock_gettime (CLOCK_MONOTONIC, &now))
+  if (clock_gettime (ocaml_clockid, &now))
     OCAML_B0_RAISE_SYS_ERROR ("clock_gettime () failed");
 
   return caml_copy_int64 ((uint64_t)(now.tv_sec) *
