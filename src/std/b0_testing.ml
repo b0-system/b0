@@ -160,9 +160,10 @@ module Pass = struct
   let incr () = Atomic.incr count
   let report ~dur =
     if Atomic.get run_test_count = 0 then begin
-      Log.pad_flush ~pad:Test_fmt.pass_str ~color:Test_fmt.pass_color
-        "@[Test %a in %a@]"
-        Test_fmt.passed () Test_fmt.dur (Os.Mtime.count dur)
+      Log.pad_flush ~pad:Test_fmt.pass_str ~color:Test_fmt.skip_color
+        "@[%a test ran in %a@]"
+        Test_fmt.count 0
+        Test_fmt.dur (Os.Mtime.count dur)
     end else begin
       Log.pad_flush ~pad:Test_fmt.pass_str ~color:Test_fmt.pass_color
         "@[%a %s %a in %a@]"
