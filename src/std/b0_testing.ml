@@ -924,12 +924,12 @@ module Test = struct
     let includes = ref []
     let set_includes incs = includes := (List.map String.lowercase_ascii incs)
     let match_includes name =
-      List.exists (fun prefix -> String.starts_with ~prefix name) !includes
+      List.exists (fun affix -> String.includes ~affix name) !includes
 
     let excludes = ref []
     let set_excludes excs = excludes := (List.map String.lowercase_ascii excs)
     let match_excludes name =
-      List.exists (fun prefix -> String.starts_with ~prefix name) !excludes
+      List.exists (fun affix -> String.includes ~affix name) !excludes
 
     let selected name =
       let name = String.lowercase_ascii name in
@@ -1168,22 +1168,22 @@ module Test = struct
 
     let includes =
       let doc =
-        "Select tests whose lowercased name match prefix $(docv). Repeatable. \
-         The selection is filtered by $(b,-x) options which take over. Test \
-         names are printed during execution and can be (partially) listed with \
-         $(b,--list)."
+        "Select tests whose lowercased name contain the string $(docv). \
+         Repeatable. The selection is filtered by $(b,-x) options which \
+         take over. Test names are printed during execution and can \
+         be (partially) listed with $(b,--list)."
       in
       let absent = "All tests are selected" in
       Arg.(value & opt_all test_name_conv [] &
-           info ["i"; "include"] ~doc ~docv:"PREFIX" ~absent ~docs)
+           info ["i"; "include"] ~doc ~docv:"AFFIX" ~absent ~docs)
 
     let excludes =
       let doc =
-        "Drop selected tests whose lowercased names match prefix $(docv), \
-         takes over $(b,-i). Repeatable."
+        "Drop selected tests whose lowercased names contain the string \
+         $(docv), takes over $(b,-i). Repeatable."
       in
       Arg.(value & opt_all test_name_conv [] &
-           info ["x"; "exclude"] ~doc ~docv:"PREFIX" ~docs)
+           info ["x"; "exclude"] ~doc ~docv:"AFFIX" ~docs)
 
     let locs =
       let doc = "No effect. Option name reserved for the future." in
