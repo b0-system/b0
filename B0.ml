@@ -37,7 +37,7 @@ let b0_kit_lib =
 
 let bootstrap_env env unit =
   let boot_root = (* TODO b0: need to access the root of the build  *)
-    Fpath.to_string (B0_env.in_unit_dir env unit ~/"..")
+    Filepath.to_string (B0_env.in_unit_dir env unit ~/"..")
   in
   B0_env.build_env env
   (* If the build is locked via `b0 lock`, unlock it. *)
@@ -63,7 +63,7 @@ let b0 =
 
 let tool_exe ?(requires = []) tool src =
   let requires = cmdliner :: b0_std :: requires in
-  let srcs = [`File Fpath.(v "src/lowtools" / src)] in
+  let srcs = [`File Filepath.(v "src/lowtools" / src)] in
   B0_ocaml.exe tool ~public:true ~srcs ~requires
 
 let show_url_tool = tool_exe "show-url" "show_url.ml"
@@ -208,9 +208,9 @@ let bowl =
 (* Updating vendored code. *)
 
 let copy_file ?substs ~src_dir ~dst_dir src dst =
-  Log.stdout (fun m -> m "Copy %s to %s in %a" src dst Fpath.pp dst_dir);
-  let src = Fpath.(src_dir / src) in
-  let dst = Fpath.(dst_dir / dst) in
+  Log.stdout (fun m -> m "Copy %s to %s in %a" src dst Filepath.pp dst_dir);
+  let src = Filepath.(src_dir / src) in
+  let dst = Filepath.(dst_dir / dst) in
   let force = true and make_path = false in
   match substs with
   | None -> Os.File.copy ~force ~make_path src ~dst:dst
@@ -242,7 +242,7 @@ let vendor_more_modules =
   let repo = "https://erratique.ch/repos/more.git" in
   with_cloned_repo_dir ~env ~repo @@ fun dir ->
   let dst_dir = B0_env.in_scope_dir env ~/"src/std" in
-  let src_dir = Fpath.(dir / "src") in
+  let src_dir = Filepath.(dir / "src") in
   let substs =
     ["More__", "B0__"; "More.", "B0_std."; "{!More}", "{!B0_std}";
      "ocaml_more", "ocaml_b0"; "open More", "open B0_std";
@@ -267,12 +267,12 @@ let vendor_more_modules =
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__type" "b0__type" in
   (* more.cli library *)
   let* () =
-    let src_dir = Fpath.(src_dir / "cli") in
+    let src_dir = Filepath.(src_dir / "cli") in
     copy_module ~substs ~src_dir ~dst_dir "more_cli" "b0_std_cli"
   in
   (* docs *)
   let* () =
-    let src_dir = Fpath.(dir / "doc") in
+    let src_dir = Filepath.(dir / "doc") in
     let dst_dir = B0_env.in_scope_dir env ~/"doc" in
     copy_file ~substs ~src_dir ~dst_dir "cookbook.mld" "b0_std_cookbook.mld"
   in
@@ -300,7 +300,7 @@ let update_webs_modules =
   let repo = "https://erratique.ch/repos/webs.git" in
   with_cloned_repo_dir ~env ~repo @@ fun dir ->
   let dst_dir = B0_env.in_scope_dir env ~/"src/std" in
-  let src_dir = Fpath.(dir / "src" / "kit") in
+  let src_dir = Filepath.(dir / "src" / "kit") in
   let* () = copy_module ~src_dir ~dst_dir "webs_base64" "b0_base64" in
   Ok ()
 
@@ -310,6 +310,6 @@ let update_htmlit =
   let repo = "https://erratique.ch/repos/htmlit.git" in
   with_cloned_repo_dir ~env ~repo @@ fun dir ->
   let dst_dir = B0_env.in_scope_dir env ~/"src/std" in
-  let src_dir = Fpath.(dir / "src") in
+  let src_dir = Filepath.(dir / "src") in
   let* () = copy_module ~src_dir ~dst_dir "htmlit" "b0_html" in
   Ok ()
