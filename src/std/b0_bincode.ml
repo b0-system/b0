@@ -37,9 +37,9 @@ let dec c = c.dec
 let to_string ?(buf = Buffer.create 1024) c v =
   c.enc buf v; Buffer.contents buf
 
-let of_string ?(file = Fpath.dash) c s =
+let of_string ?(file = Filepath.dash) c s =
   try let i, v = c.dec s 0 in dec_eoi s i; Ok v with
-  | Failure e -> Fmt.error "%a: %s" Fpath.pp file e
+  | Failure e -> Fmt.error "%a: %s" Filepath.pp file e
 
 (* Magic numbers *)
 
@@ -151,16 +151,16 @@ let dec_string s i =
 
 let string = make enc_string dec_string
 
-(* fpath *)
+(* filepath *)
 
-let enc_fpath b p = enc_string b (Fpath.to_string p)
-let dec_fpath s i =
+let enc_filepath b p = enc_string b (Filepath.to_string p)
+let dec_filepath s i =
   let next, s = dec_string s i in
-  match Fpath.of_string s with
+  match Filepath.of_string s with
   | Error e -> err i "corrupted file path value: %s" e
   | Ok p -> next, p
 
-let fpath = make enc_fpath dec_fpath
+let filepath = make enc_filepath dec_filepath
 
 (* list *)
 

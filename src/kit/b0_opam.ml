@@ -206,7 +206,7 @@ let pkg_name_of_pack p =
       if not (String.equal n "default") then n else
       match B0_def.scope_dir (B0_pack.def p) with
       | None -> "unknown" (* unlikely, libraries should not do this. *)
-      | Some d -> Fpath.basename d
+      | Some d -> Filepath.basename d
 
 type pkg_spec = string * string
 let available = File.available_field
@@ -337,7 +337,7 @@ module Pkg = struct
     | None -> name pkg ^ ".opam"
     | Some v -> String.concat "." [name pkg; v]
     in
-    Os.File.write ~force:true ~make_path:true Fpath.(dir / fname) file
+    Os.File.write ~force:true ~make_path:true Filepath.(dir / fname) file
 
   let lint_opam_file opam ~normalize pkg file =
     let opam_lint = Cmd.(opam % "lint" % "-" % "--normalise") in
@@ -388,7 +388,7 @@ let gen_files pkgs ~normalize ~with_name ~dst =
     | `Dir dir -> Ok (Some dir)
     | `In_scope ->
         match B0_def.scope_dir (B0_pack.def (Pkg.pack pkg)) with
-        | Some s -> Ok (Some Fpath.(s / "opam"))
+        | Some s -> Ok (Some Filepath.(s / "opam"))
         | None ->
             Fmt.error "can't write opam file, pack %a has no scope."
               B0_pack.pp_name (Pkg.pack pkg)
@@ -437,7 +437,7 @@ module Publish = struct
       version : string;
       file : File.t; (* Without the URL section *)
       file_meta : B0_meta.t;
-      changes_file : Fpath.t option;
+      changes_file : Filepath.t option;
       changes_latest : (string * string) option;
       url : string; }
 
@@ -455,7 +455,7 @@ module Publish = struct
         | None ->
             warn @@
             Fmt.str "@[<v>Could not parse latest changes from:@, %a@]"
-              Fpath.pp f
+              Filepath.pp f
 
   let info_of_pkg opam (pkg, version) =
     Result.map_error (Fmt.str "%a: %s" Pkg.pp_err_pack pkg) @@
@@ -531,9 +531,9 @@ module Publish = struct
     | None -> acc
     | Some file ->
         match i.changes_latest with
-        | None -> acc | Some _ -> Fpath.Map.add_to_list file i acc
+        | None -> acc | Some _ -> Filepath.Map.add_to_list file i acc
     in
-    let by_file = List.fold_left add Fpath.Map.empty is in
+    let by_file = List.fold_left add Filepath.Map.empty is in
     let with_pkg _ pkgs acc = (* they all have the same notes *)
       let pkg = List.hd pkgs in
       let tit, notes = Option.get ((List.hd pkgs).changes_latest) in
@@ -542,7 +542,7 @@ module Publish = struct
       let pkgs = String.concat ", " (List.sort compare pkgs) in
       Fmt.str "\n\n---\n\n#### %s %s\n\n%s" pkgs tit notes :: acc
     in
-    List.sort compare (Fpath.Map.fold with_pkg by_file [])
+    List.sort compare (Filepath.Map.fold with_pkg by_file [])
 
   let msg_links i =
     let pack = Pkg.pack i.pkg in
@@ -649,13 +649,13 @@ module Publish = struct
     let* local = B0_vcs_repo.Git.find ~dir () in
     match local with
     | Some repo ->
-        Log.stdout (fun m -> m "Updating %a" Fpath.pp dir);
+        Log.stdout (fun m -> m "Updating %a" Filepath.pp dir);
         let git = B0_vcs_repo.repo_cmd repo in
         let fetch = Cmd.(arg "fetch" % "origin" % master) in
         let* () = Os.Cmd.run ?stdout ?stderr Cmd.(git %% fetch) in
         Ok repo
     | None ->
-        Log.stdout (fun m -> m "Cloning %s to %a" pkgs_repo Fpath.pp dir);
+        Log.stdout (fun m -> m "Cloning %s to %a" pkgs_repo Filepath.pp dir);
         let clone =
           Cmd.(arg "clone" % "--bare" % "--single-branch" %
                "--branch" % master % pkgs_repo %% path dir)
@@ -672,11 +672,11 @@ module Publish = struct
     Result.join @@ B0_vcs_repo.Git.with_transient_checkout
       ?stdout ?stderr repo ~force ~branch fetch_head
     @@ fun r ->
-    Result.join @@ Os.Dir.with_cwd Fpath.(B0_vcs_repo.work_dir r) @@ fun () ->
+    Result.join @@ Os.Dir.with_cwd Filepath.(B0_vcs_repo.work_dir r) @@ fun () ->
     let incompats = String.concat "," incompats in
     let add_pkg ~base_dir pkg =
       let file =
-        Fpath.(base_dir / Pkg.name pkg.pkg / versioned_name pkg / "opam")
+        Filepath.(base_dir / Pkg.name pkg.pkg / versioned_name pkg / "opam")
       in
       let* contents = File.to_string opam ~normalize:true pkg.file in
       let* () = Os.File.write ~force:true ~make_path:true file contents in
@@ -685,10 +685,10 @@ module Publish = struct
       let add_constraint = Cmd.(opam % "admin" % "add-constraint") in
       Os.Cmd.run Cmd.(add_constraint % "--packages" % incompats % upperbound)
     in
-    let base_dir = Fpath.(B0_vcs_repo.work_dir r / pkgs_dir) in
+    let base_dir = Filepath.(B0_vcs_repo.work_dir r / pkgs_dir) in
     let* () = List.iter_stop_on_error (add_pkg ~base_dir) pkginfos in
     let msg = msg_title pkginfos in
-    let pkgs_dir = Fpath.v pkgs_dir in
+    let pkgs_dir = Filepath.v pkgs_dir in
     let* () = B0_vcs_repo.Git.add ?stdout ?stderr r ~force:false [pkgs_dir] in
     let* () = B0_vcs_repo.Git.commit ?stdout ?stderr ~msg r in
     Ok ()
@@ -761,7 +761,7 @@ module Publish = struct
         | Some d -> Ok d
         | None ->
             let* cache_dir = Os.Dir.cache () in
-            Ok (Fpath.(cache_dir / "opam-repository.git"))
+            Ok (Filepath.(cache_dir / "opam-repository.git"))
         in
         let* github_auth = github_auth in
         let fork_repo = match fork_repo with
@@ -813,7 +813,7 @@ let unit =
       pkgs ~doc ()
     and+ dst =
       let doc = "Write files in directory $(docv)." in
-      Arg.(value & opt (some ~none:"stdout" B0_std_cli.dirpath) None &
+      Arg.(value & opt (some ~none:"stdout" B0_std_cli.dir) None &
            info ["d"; "dir"] ~doc)
     and+ in_scope =
       let doc =
@@ -865,7 +865,7 @@ let unit =
          the package repository."
       in
       let none = "XDG_CACHE_HOME/opam-repository.git" in
-      Arg.(value & opt (some ~none B0_std_cli.dirpath) None &
+      Arg.(value & opt (some ~none B0_std_cli.dir) None &
            info ["local-repo"] ~doc)
     and+ github_auth = B0_github.Auth.cli ()
     and+ pkgs =

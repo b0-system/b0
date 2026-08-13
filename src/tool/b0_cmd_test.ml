@@ -69,8 +69,8 @@ let run_test ~long ~seed ~correct c build u =
   let env env =
     let env = match B0_unit.find_meta B0_meta.test_dir u with
     | None -> env | Some dir ->
-        Os.Env.add "TEST_DIR" (Fpath.to_string (B0_env.in_scope_dir b0_env dir))
-          env
+        Os.Env.add "TEST_DIR"
+          (Filepath.to_string (B0_env.in_scope_dir b0_env dir)) env
     in
     let env = Os.Env.add "SEED" (string_of_int seed) env in
     let env = Os.Env.add "LONG_SKIP_EXIT" "true" env in

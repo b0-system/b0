@@ -14,7 +14,7 @@ let echo m ~reads ~writes f msg =
 
 let cannot_read build_dir m =
   let cat = B0_memo.tool m cat in
-  let f file = Fpath.(build_dir / file) in
+  let f file = Filepath.(build_dir / file) in
   let r = f "nosuchfile" in
   let w = f "out" in
   B0_memo.ready_file m r;
@@ -22,12 +22,12 @@ let cannot_read build_dir m =
   cat Cmd.(path r)
 
 let did_not_write build_dir m =
-  let f p = Fpath.(build_dir // p) in
-  echo m ~reads:[] ~writes:[f (Fpath.v "heyho/bla"); f (Fpath.v "bli")]
-    Fpath.null "echoooo"
+  let f p = Filepath.(build_dir // p) in
+  echo m ~reads:[] ~writes:[f (Filepath.v "heyho/bla"); f (Filepath.v "bli")]
+    Filepath.null "echoooo"
 
 let failures build_dir m =
-  let f file = Fpath.(build_dir / file) in
+  let f file = Filepath.(build_dir / file) in
   let cat = B0_memo.tool m cat in
   let r = f "doesnotexist" and o = f "o" in
   B0_memo.spawn
@@ -36,7 +36,7 @@ let failures build_dir m =
 (* Test stuck builds *)
 
 let never_ready build_dir m =
-  let f file = Fpath.(build_dir / file) in
+  let f file = Filepath.(build_dir / file) in
   let e0 = f "e0" and e1 = f "e1" and e2 = f "e2" in
   let n0 = f "never0" and n1 = f "never1" and n2 = f "never2" in
   echo m ~reads:[n0; n1] ~writes:[e0] e0 "e0";
@@ -45,18 +45,18 @@ let never_ready build_dir m =
   ()
 
 let cycle0 build_dir m =
-  let f file = Fpath.(build_dir / file) in
+  let f file = Filepath.(build_dir / file) in
   let c0 = f "c0" in
   echo m ~reads:[c0] ~writes:[c0] c0 "c0"
 
 let cycle1 build_dir m =
-  let f file = Fpath.(build_dir / file) in
+  let f file = Filepath.(build_dir / file) in
   let c0 = f "c0" and c1 = f "c1" in
   echo m ~reads:[c1] ~writes:[c0] c0 "c0";
   echo m ~reads:[c0] ~writes:[c1] c1 "c1"
 
 let cycle2 build_dir m =
-  let f file = Fpath.(build_dir / file) in
+  let f file = Filepath.(build_dir / file) in
   let c0 = f "c0" and c1 = f "c1" and c2 = f "c2" in
   echo m ~reads:[c2] ~writes:[c0] c0 "c0";
   echo m ~reads:[c0] ~writes:[c1] c1 "c1";

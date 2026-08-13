@@ -123,9 +123,9 @@ let template_list () conf =
 
 let get_lang ~file ~lang = match lang with
 | Some lang -> Ok lang
-| None when Fpath.equal file Fpath.dash -> Ok `Ocaml
+| None when Filepath.equal file Filepath.dash -> Ok `Ocaml
 | None ->
-    let ext = Fpath.take_ext ~multi:false file in
+    let ext = Filepath.take_ext ~multi:false file in
     match B0_init.lang_of_file_ext ext with
     | Some lang -> Ok lang
     | None ->
@@ -171,7 +171,7 @@ let force =
 
 let file =
   let doc = "Generate to file $(docv). Use $(b,-) for stdout." in
-  Arg.(value & pos 0 B0_std_cli.filepath Fpath.dash & info [] ~doc)
+  Arg.(value & pos 0 B0_std_cli.file Filepath.dash & info [] ~doc)
 
 let license_opt =
   let doc =
@@ -324,7 +324,7 @@ let src_cmd =
     let doc =
       "Generate to file $(docv). Use $(b,-) for $(b,stdout). Repeatable."
     in
-    Arg.(value & pos_all B0_std_cli.filepath [Fpath.dash] &
+    Arg.(value & pos_all B0_std_cli.file [Filepath.dash] &
          info [] ~doc ~absent:"$(b,-)")
   and+ example =
     let doc =
@@ -349,7 +349,7 @@ let snip_cmd =
       "Generate to file $(docv). Use $(b,-) for $(b,stdout). Repeatable."
     in
     let absent = "$(b,-)" in
-    Arg.(value & pos_right 0 B0_std_cli.filepath [Fpath.dash] &
+    Arg.(value & pos_right 0 B0_std_cli.file [Filepath.dash] &
          info [] ~doc ~absent)
   and+ template =
     let doc =

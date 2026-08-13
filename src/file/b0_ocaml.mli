@@ -251,16 +251,16 @@ module Conf : sig
   type t
   (** The type for the OCaml toolchain configuration. *)
 
-  val of_string : ?file:Fpath.t -> string -> (t, string) result
+  val of_string : ?file:Filepath.t -> string -> (t, string) result
   (** [of_string ~file data] parses toolchain configuration from [data]
       as output by the compiler's [-config] option assuming it was read
-      from file [file] (defaults to {!B0_std.Fpath.dash}). *)
+      from file [file] (defaults to {!B0_std.Filepath.dash}). *)
 
-  val write : B0_memo.t -> comp:B0_memo.Tool.t -> o:Fpath.t -> unit
+  val write : B0_memo.t -> comp:B0_memo.Tool.t -> o:Filepath.t -> unit
   (** [write m ~o] writes the toolchain configuration to [o] by
       running [comp] with [-config]. *)
 
-  val read : B0_memo.t -> Fpath.t -> t Fut.t
+  val read : B0_memo.t -> Filepath.t -> t Fut.t
   (** [read m file] reads a toolchain configuration from [file]. *)
 
   (** {1:fields Fields} *)
@@ -276,22 +276,22 @@ module Conf : sig
       [(major, minor, patch, additional-info)]. If [patch-level]
       is absent it is turned into a [0]. *)
 
-  val where : t -> Fpath.t
+  val where : t -> Filepath.t
   (** [where c] is the location of OCaml's library directory. *)
 
-  val asm_ext : t -> Fpath.ext
+  val asm_ext : t -> Filepath.ext
   (** [asm_ext] is the file extension for assembly files. *)
 
-  val dll_ext : t -> Fpath.ext
+  val dll_ext : t -> Filepath.ext
   (** [dll_ext] is the file extension for C dynamic libraries. *)
 
-  val exe_ext : t -> Fpath.ext
+  val exe_ext : t -> Filepath.ext
   (** [ext_ext] is the file extension for executable binaries. *)
 
-  val lib_ext : t -> Fpath.ext
+  val lib_ext : t -> Filepath.ext
   (** [ext_lib] is the file extension for C static libraries. *)
 
-  val obj_ext : t -> Fpath.ext
+  val obj_ext : t -> Filepath.ext
   (** [obj_ext] is the file extension for C object files. *)
 
   val has_dynlink : t -> bool
@@ -332,7 +332,7 @@ module Modname : sig
   val v : string -> t
   (** [v n] is a module name for [n], the result is capitalized. *)
 
-  val of_path_filename : Fpath.t -> t
+  val of_path_filename : Filepath.t -> t
   (** [of_path_filename f] is the basename of [f], without extension,
       capitalized. This assumes the basename of [f] follows the OCaml file
       naming convention mandated by the toolchain. If you know that may not
@@ -489,7 +489,7 @@ module Modsrc : sig
       As found by {!Tool.ocamldep}. *)
   module Deps : sig
     val write :
-      ?src_root:Fpath.t -> B0_memo.t -> srcs:Fpath.t list -> o:Fpath.t -> unit
+      ?src_root:Filepath.t -> B0_memo.t -> srcs:Filepath.t list -> o:Filepath.t -> unit
     (** [write m ~src_root ~srcs ~o] writes the module dependencies of each
         file in [srcs] in file [o]. If [src_root] if specified it is used
         as the [cwd] for the operation and assumed to be a prefix of every
@@ -505,8 +505,8 @@ module Modsrc : sig
         machines. *)
 
     val read :
-      ?src_root:Fpath.t -> B0_memo.t -> Fpath.t ->
-      Modname.Set.t Fpath.Map.t Fut.t
+      ?src_root:Filepath.t -> B0_memo.t -> Filepath.t ->
+      Modname.Set.t Filepath.Map.t Fut.t
     (** [read ~src_root file] reads dependencies produced by {!write}
         as a map from absolute file paths to their dependencies.
         Relative file paths are made absolute relative to [src_root]
@@ -518,9 +518,9 @@ module Modsrc : sig
       in a build directory. *)
 
   val make :
-    modname:Modname.t -> opaque:bool -> mli:Fpath.t option ->
-    mli_deps:Modname.Set.t -> ml:Fpath.t option -> ml_deps:Modname.Set.t ->
-    build_dir:Fpath.t -> t
+    modname:Modname.t -> opaque:bool -> mli:Filepath.t option ->
+    mli_deps:Modname.Set.t -> ml:Filepath.t option -> ml_deps:Modname.Set.t ->
+    build_dir:Filepath.t -> t
   (** [v ~modname ~opaque ~mli ~mli_deps ~ml ~ml_deps ~build_dir]
       is a module whose name is [modname], interface file is [mli] (if
       any), interface file module dependencies is [mli_deps],
@@ -536,13 +536,13 @@ module Modsrc : sig
       opaque for compilation. See the [-opaque] option in the OCaml
       manual. *)
 
-  val mli : t -> Fpath.t option
+  val mli : t -> Filepath.t option
   (** [mli m] is [m]'s interface file (if any). *)
 
   val mli_deps : t -> Modname.Set.t
   (** [mli_deps m] are [m]'s interface file dependencies. *)
 
-  val ml : t -> Fpath.t option
+  val ml : t -> Filepath.t option
   (** [ml m] is [m]'s implementation file (if any). *)
 
   val ml_deps : t -> Modname.Set.t
@@ -550,34 +550,34 @@ module Modsrc : sig
 
   (** {1:files Constructing file paths} *)
 
-  val build_dir : t -> Fpath.t
+  val build_dir : t -> Filepath.t
   (** [build_dir m] is the build directory for the module. *)
 
-  val built_file : t -> ext:string -> Fpath.t
+  val built_file : t -> ext:string -> Filepath.t
   (** [built_file m ~ext] is a file for module [m] with extension [ext]
       in directory {!build_dir}[ m]. *)
 
-  val cmi_file : t -> Fpath.t
+  val cmi_file : t -> Filepath.t
   (** [cmi_file m] is [built_file m ext:".cmi"]. *)
 
-  val cmo_file : t -> Fpath.t option
+  val cmo_file : t -> Filepath.t option
   (** [cmo_file m] is [built_file m ext:".cmo"] if {!ml} is [Some _]. *)
 
-  val cmx_file : t -> Fpath.t option
+  val cmx_file : t -> Filepath.t option
   (** [cmx_file m] is [built_file m ext:".cmx"] if {!ml} is [Some _]. *)
 
-  val impl_file : code:Code.t -> t -> Fpath.t option
+  val impl_file : code:Code.t -> t -> Filepath.t option
   (** [impl_file ~code m] is {!cmx_file} or {!cmo_file}
       according to [code]. *)
 
-  val as_intf_dep_files : ?init:Fpath.t list -> t -> Fpath.t list
+  val as_intf_dep_files : ?init:Filepath.t list -> t -> Filepath.t list
   (** [as_intf_dep_files ~init m] adds to [init] (defaults to [[]])
       the files that are read by the OCaml compiler if module source
       [m] is compiled in {!build_dir} and used as an interface
       compilation dependency. *)
 
   val as_impl_dep_files :
-    ?init:Fpath.t list -> code:Code.t -> t -> Fpath.t list
+    ?init:Filepath.t list -> code:Code.t -> t -> Filepath.t list
   (** [as_impl_dep_files ~init ~code m] adds to [init] (defaults to
       [[]]) the files that are read by the OCaml compiler if module
       source [m] is compiled in {!build_dir} and used an
@@ -586,8 +586,8 @@ module Modsrc : sig
   (** {1:map Module name maps} *)
 
   val map_of_srcs :
-    B0_memo.t -> build_dir:Fpath.t -> srcs:Fpath.t list ->
-    src_deps:Modname.Set.t Fpath.Map.t -> t Modname.Map.t
+    B0_memo.t -> build_dir:Filepath.t -> srcs:Filepath.t list ->
+    src_deps:Modname.Set.t Filepath.Map.t -> t Modname.Map.t
   (** [of_srcs m ~srcs ~src_deps] determines source modules values
       to be built in [build_dir] (mapped by their names) given
       sources [srcs] and their dependencies [src_deps]
@@ -607,7 +607,7 @@ module Modsrc : sig
   (** {1:convenience Convenience} *)
 
   val map_of_files :
-    ?only_mlis:bool -> B0_memo.t -> build_dir:Fpath.t -> src_root:Fpath.t ->
+    ?only_mlis:bool -> B0_memo.t -> build_dir:Filepath.t -> src_root:Filepath.t ->
     srcs:B0_file_exts.map -> t Modname.Map.t Fut.t
   (** [map_of_files m ~only_mlis ~build_dir ~src_root ~srcs] looks for
       [.ml] (if [only_mlis] is [false], default) and [.mli] files in
@@ -678,9 +678,9 @@ module Libname : sig
   val to_string : t -> string
   (** [to_string n] is [n] as a string. *)
 
-  val to_fpath : t -> Fpath.t
-  (** [to_fpath n] is [n] with dots replaced by
-        {!B0_std.Fpath.dir_sep_char}. *)
+  val to_filepath : t -> Filepath.t
+  (** [to_filepath n] is [n] with dots replaced by
+        {!B0_std.Filepath.dir_sep_char}. *)
 
   val equal : t -> t -> bool
   (** [equal n0 n1] is [true] iff [n0] and [n1] are the same library name. *)
@@ -717,17 +717,18 @@ module Lib : sig
 
   val make :
     libname:Libname.t -> requires:Libname.t list ->
-    exports:Libname.t list -> dir:Fpath.t ->
-    cmis:Fpath.t list -> cmxs:Fpath.t list -> cma:Fpath.t option ->
-    cmxa:Fpath.t option -> c_archive:Fpath.t option ->
-    c_stubs:Fpath.t list -> js_stubs:Fpath.t list -> warning:string option -> t
+    exports:Libname.t list -> dir:Filepath.t ->
+    cmis:Filepath.t list -> cmxs:Filepath.t list -> cma:Filepath.t option ->
+    cmxa:Filepath.t option -> c_archive:Filepath.t option ->
+    c_stubs:Filepath.t list -> js_stubs:Filepath.t list ->
+    warning:string option -> t
   (** [make] is a library with given properties. See corresponding
       accessors for semantics. *)
 
   val of_dir :
-    B0_memo.t -> clib_ext:Fpath.ext -> libname:Libname.t ->
-    requires:Libname.t list -> exports:Libname.t list -> dir:Fpath.t ->
-    archive:string option -> js_stubs:Fpath.t list -> warning:string option ->
+    B0_memo.t -> clib_ext:Filepath.ext -> libname:Libname.t ->
+    requires:Libname.t list -> exports:Libname.t list -> dir:Filepath.t ->
+    archive:string option -> js_stubs:Filepath.t list -> warning:string option ->
     (t, string) result
   (** [of_dir] is a library with given properties, looked up in [dir]
       using [clib_ext] for the platform specific extension for C
@@ -759,30 +760,30 @@ module Lib : sig
   val exports : t -> Libname.t list
   (** [exports l] are the libraries that are represented by [l]. *)
 
-  val dir : t -> Fpath.t
+  val dir : t -> Filepath.t
   (** [dir l] is the library directory of [l]. *)
 
-  val cmis : t -> Fpath.t list
+  val cmis : t -> Filepath.t list
   (** [cmis l] is the list of cmis of [l]. *)
 
-  val cmxs : t -> Fpath.t list
+  val cmxs : t -> Filepath.t list
   (** [cmxs l] is the list of cmxs of [l]. *)
 
-  val cma : t -> Fpath.t option
+  val cma : t -> Filepath.t option
   (** [cma l] is the cma file of [l] (if any). *)
 
-  val cmxa : t -> Fpath.t option
+  val cmxa : t -> Filepath.t option
   (** [cmxa l] is the cmxa file of [l] (if any). *)
 
-  val c_archive : t -> Fpath.t option
+  val c_archive : t -> Filepath.t option
   (** [c_archive l] is the [cmxa]'s companion C archive of [l]. Must
       exist if the [cmxa] exists and, since 4.12 if [cmxa] is not
       empty. *)
 
-  val c_stubs : t -> Fpath.t list
+  val c_stubs : t -> Filepath.t list
   (** [c_stubs l] is the C stubs archives of [l] (if any). *)
 
-  val js_stubs : t -> Fpath.t list
+  val js_stubs : t -> Filepath.t list
   (** [js_stubs l] is the list of JavaScript stubs of [l] (if any). *)
 
   val warning : t -> string option
@@ -837,14 +838,14 @@ module Libresolver : sig
     (** [cache_dir_name] is a name that can be used for the
          cache directory of resolution scopes. *)
 
-    val ocamlpath : cache_dir:Fpath.t -> t
+    val ocamlpath : cache_dir:Filepath.t -> t
     (** [ocampath ~cache_dir] looks up libraries according to the
         OCaml library convention in the [OCAMLPATH] of the memo using
         [cache_dir] to cache results.
 
         {b Note.} This is a nop for now. *)
 
-    val ocamlfind : cache_dir:Fpath.t -> t
+    val ocamlfind : cache_dir:Filepath.t -> t
     (** [ocamlfind ~cache_dir] looks up libraries using [ocamlfind]
         and caches the result in [cache_dir].
 
@@ -964,7 +965,7 @@ val exe :
 
 val script :
   ?wrap:(B0_unit.build_proc -> B0_unit.build_proc) -> ?doc:string ->
-  ?meta:B0_meta.t -> ?public:bool -> ?name:string -> Fpath.t -> B0_unit.t
+  ?meta:B0_meta.t -> ?public:bool -> ?name:string -> Filepath.t -> B0_unit.t
 (** [script file] is a build unit for an OCaml script in [file].  The
     build unit simply checks that it typechecks and is runnable. Due to
     upstream limitations this is a hack. You should invoke your main as:
@@ -984,8 +985,8 @@ val script :
 val test :
   ?wrap:(B0_unit.build_proc -> B0_unit.build_proc) -> ?doc:string ->
   ?meta:B0_meta.t -> ?requires:Libname.t list -> ?name:string ->
-  ?run:bool -> ?long:bool -> ?test_dir:Fpath.t -> ?srcs:B0_srcs.sel list ->
-  Fpath.t ->  B0_unit.t
+  ?run:bool -> ?long:bool -> ?test_dir:Filepath.t -> ?srcs:B0_srcs.sel list ->
+  Filepath.t ->  B0_unit.t
 (** [test file] is a test for an OCaml [.ml] [file] (and additional [srcs] if
     specified). This is just {!exe} with added metadata predefined for a test
     and a [name] derived from the basename of [file] if unspecified:
@@ -1076,8 +1077,8 @@ module Compile : sig
 
   val c_to_o :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
-    B0_memo.t -> comp:B0_memo.Tool.t -> opts:Cmd.t -> reads:Fpath.t list ->
-    c:Fpath.t -> o:Fpath.t -> Fpath.t list
+    B0_memo.t -> comp:B0_memo.Tool.t -> opts:Cmd.t -> reads:Filepath.t list ->
+    c:Filepath.t -> o:Filepath.t -> Filepath.t list
   (** [c_to_o m ~comp ~opts ~reads ~c ~o] compiles the C file [c] to
       the object file [o] with options [opts] and using compiler
       [comp].  It assumes the compilation depends on C include header
@@ -1087,21 +1088,21 @@ module Compile : sig
   val mli_to_cmi :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
     and_cmti:bool -> B0_memo.t -> comp:B0_memo.Tool.t -> opts:Cmd.t ->
-    reads:Fpath.t list -> mli:Fpath.t -> o:Fpath.t -> Fpath.t list
+    reads:Filepath.t list -> mli:Filepath.t -> o:Filepath.t -> Filepath.t list
   (** [mli_to_cmi ~and_cmti m ~comp ~opts ~reads ~mli ~o] compiles the
       file [mli] to the cmi file [o] and, if [and_cmti] is [true], to
-      the cmti file [Fpath.(o -+ ".cmti")] with options [opts] and
+      the cmti file [Filepath.(o -+ ".cmti")] with options [opts] and
       using compiler [comp]. It assumes the compilation depends on cmi
       files [reads] whose parent directories are added as [-I]
       options. Returns the written files. *)
 
   val ml_to_cmo :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
-    and_cmt:bool -> B0_memo.t -> opts:Cmd.t -> reads:Fpath.t list ->
-    has_cmi:bool -> ml:Fpath.t -> o:Fpath.t -> Fpath.t list
+    and_cmt:bool -> B0_memo.t -> opts:Cmd.t -> reads:Filepath.t list ->
+    has_cmi:bool -> ml:Filepath.t -> o:Filepath.t -> Filepath.t list
   (** [ml_to_cmo ~and_cmt m ~opts ~reads ~has_cmi ~ml ~o] compiles the
       file [ml] to cmo file [o] and, if [and_cmt] is [true], to the
-      cmt file [Fpath.(o -+ ".cmt")] with options [opts]. It assumes
+      cmt file [Filepath.(o -+ ".cmt")] with options [opts]. It assumes
       the compilation depends on the cmi files [reads] whose parent
       directories are added as [-I] options. [has_cmi] indicates
       whether the [ml] file already a corresponding cmi file, in which
@@ -1109,11 +1110,11 @@ module Compile : sig
 
   val ml_to_cmx :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
-    and_cmt:bool -> B0_memo.t -> opts:Cmd.t -> reads:Fpath.t list ->
-    has_cmi:bool -> ml:Fpath.t -> o:Fpath.t -> Fpath.t list
+    and_cmt:bool -> B0_memo.t -> opts:Cmd.t -> reads:Filepath.t list ->
+    has_cmi:bool -> ml:Filepath.t -> o:Filepath.t -> Filepath.t list
   (** [ml_to_cmx ~and_cmt m ~opts ~reads ~has_cmi ~ml ~o ~and_cmt]
       compiles the file [ml] to cmx file [o] and, if [and_cmt] is
-      [true], to the cmt file [Fpath.(o -+ ".cmt")] with options
+      [true], to the cmt file [Filepath.(o -+ ".cmt")] with options
       [opts]. It assumes the compilation depends on the cmi and cmx
       files [reads] whose parent directories are added as [-I]
       options. [has_cmi] indicates whether the [ml] file already has a
@@ -1122,8 +1123,8 @@ module Compile : sig
 
   val ml_to_impl :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
-    B0_memo.t -> code:Code.t -> opts:Cmd.t -> reads:Fpath.t list ->
-    has_cmi:bool -> ml:Fpath.t -> o:Fpath.t -> and_cmt:bool -> Fpath.t list
+    B0_memo.t -> code:Code.t -> opts:Cmd.t -> reads:Filepath.t list ->
+    has_cmi:bool -> ml:Filepath.t -> o:Filepath.t -> and_cmt:bool -> Filepath.t list
   (** [ml_to_impl] is {!ml_to_cmo} or {!ml_to_cmx} according to [code].
       Beware that the given arguments must be common to both *)
 
@@ -1134,7 +1135,7 @@ module Compile : sig
   val modsrc_intf :
     and_cmti:bool -> B0_memo.t -> comp:B0_memo.Tool.t -> opts:Cmd.t ->
     requires:Lib.t list -> modsrcs:Modsrc.t Modname.Map.t -> Modsrc.t ->
-    Fpath.t list
+    Filepath.t list
   (** [modsrc_intf m ~opts ~requires ~modsrcs ~and_cmti src]
       compiles the interface of [src] with options [opts] and compiler
       [comp] assuming its dependencies are in [modsrcs] and
@@ -1145,7 +1146,7 @@ module Compile : sig
   val modsrc_impl :
     and_cmt:bool -> B0_memo.t -> code:Code.t -> opts:Cmd.t ->
     requires:Lib.t list -> modsrcs:Modsrc.t Modname.Map.t -> Modsrc.t ->
-    Fpath.t list
+    Filepath.t list
   (** [modsrc_impl m ~code ~opts ~requires ~modsrcs src] compile the
       implementation of [src] with option [opts] to code [code]
       asuming it dependencies are in [modsrc]. If [and_cmt] is [true]
@@ -1154,12 +1155,12 @@ module Compile : sig
 
   val intfs :
     and_cmti:bool -> B0_memo.t -> comp:B0_memo.Tool.t -> opts:Cmd.t ->
-    requires:Lib.t list -> modsrcs:Modsrc.t Modname.Map.t -> Fpath.t list
+    requires:Lib.t list -> modsrcs:Modsrc.t Modname.Map.t -> Filepath.t list
   (** [intfs] iters {!modsrc_intf} over the elements of [modsrcs]. *)
 
   val impls :
     and_cmt:bool -> B0_memo.t -> code:Code.t -> opts:Cmd.t ->
-    requires:Lib.t list -> modsrcs:Modsrc.t Modname.Map.t -> Fpath.t list
+    requires:Lib.t list -> modsrcs:Modsrc.t Modname.Map.t -> Filepath.t list
    (** [impls] iters {!modsrc_impl} over the elements of [modsrcs]. *)
 end
 
@@ -1168,8 +1169,8 @@ module Archive : sig
 
   val cstubs :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
-    B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> c_objs:Fpath.t list ->
-    odir:Fpath.t -> oname:string -> Fpath.t list
+    B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> c_objs:Filepath.t list ->
+    odir:Filepath.t -> oname:string -> Filepath.t list
   (** [cstubs m ~conf ~opts ~c_objs ~odir ~oname] creates in directory
       [odir] C stubs archives for a library named [oname]. It returns
       the written files. *)
@@ -1180,7 +1181,7 @@ module Archive : sig
   val byte :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
     B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> has_cstubs:bool ->
-    cobjs:Fpath.t list -> odir:Fpath.t -> oname:string -> Fpath.t list
+    cobjs:Filepath.t list -> odir:Filepath.t -> oname:string -> Filepath.t list
   (** [byte_archive m ~opts ~has_cstubs ~cobjs ~obase] creates in directory
       [odir] a bytecode archive named [oname] with the OCaml bytecode
       compilation objects [cobjs]. It returns the written files. *)
@@ -1188,7 +1189,7 @@ module Archive : sig
   val native :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
     B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> has_cstubs:bool ->
-    cobjs:Fpath.t list -> odir:Fpath.t -> oname:string -> Fpath.t list
+    cobjs:Filepath.t list -> odir:Filepath.t -> oname:string -> Filepath.t list
   (** [native m ~opts ~has_cstubs ~cobjs ~obase] creates in directory
       [odir] a native code archive named [oname] with the OCaml native
       code compilation objects [cobjs]. *)
@@ -1196,21 +1197,21 @@ module Archive : sig
   val code :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
     B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> code:Code.t -> has_cstubs:bool ->
-    cobjs:Fpath.t list -> odir:Fpath.t -> oname:string -> Fpath.t list
+    cobjs:Filepath.t list -> odir:Filepath.t -> oname:string -> Filepath.t list
   (** [archive] is {!byte} or {!native} according to [code]. *)
 
   val native_dynlink :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
-    B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> has_cstubs:bool -> cmxa:Fpath.t ->
-    o:Fpath.t -> Fpath.t list
+    B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> has_cstubs:bool -> cmxa:Filepath.t ->
+    o:Filepath.t -> Filepath.t list
 end
 
 (** Linking. *)
 module Link : sig
   val byte :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
-    B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> c_objs:Fpath.t list ->
-    cobjs:Fpath.t list -> o:Fpath.t -> unit
+    B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> c_objs:Filepath.t list ->
+    cobjs:Filepath.t list -> o:Filepath.t -> unit
   (** [byte_exe m ~opts ~c_objs ~cmos ~o] links the C objects [c_objs]
       and the OCaml compilation object files [cobjs] into a byte code
       executable [o] compiled in [-custom] mode. In [cobjs] you need
@@ -1219,8 +1220,8 @@ module Link : sig
 
   val native :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
-    B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> c_objs:Fpath.t list ->
-    cobjs:Fpath.t list -> o:Fpath.t -> unit
+    B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> c_objs:Filepath.t list ->
+    cobjs:Filepath.t list -> o:Filepath.t -> unit
   (** [byte_exe m ~opts ~c_objs ~cobjs ~o] links the C objects
       [c_objs] and the OCaml compilation object files [cobjs] into a
       native code executable [o], in [cobjs] you need to add the C [lib_ext]
@@ -1233,7 +1234,7 @@ module Link : sig
   val code :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
     B0_memo.t -> conf:Conf.t -> opts:Cmd.t -> code:Code.t ->
-    c_objs:Fpath.t list -> cobjs:Fpath.t list -> o:Fpath.t -> unit
+    c_objs:Filepath.t list -> cobjs:Filepath.t list -> o:Filepath.t -> unit
   (** [code] is {!byte} or {!native} according to [code]. *)
 end
 
@@ -1242,10 +1243,10 @@ end
 (** Compiled object information. *)
 module Cobj : sig
 
-  val archive_ext_of_code : Code.t -> Fpath.ext
+  val archive_ext_of_code : Code.t -> Filepath.ext
   (** [archive_ext_of_code code] is [.cma] or [.cmxa] according to [code]. *)
 
-  val object_ext_of_code : Code.t -> Fpath.ext
+  val object_ext_of_code : Code.t -> Filepath.ext
   (** [object_ext_of_code code] is [.cmo] or [.cmx] according to [code]. *)
 
   (** {1:cobjs Compilation objects} *)
@@ -1254,7 +1255,7 @@ module Cobj : sig
   (** The type for compilation objects. This can represent one
       of a [cmi], [cmti], [cmo], [cmx], [cmt], [cma] or [cmxa] file. *)
 
-  val file : t -> Fpath.t
+  val file : t -> Filepath.t
   (** [file c] is the file path of [c]. *)
 
   val defs : t -> Modref.Set.t
@@ -1287,7 +1288,7 @@ module Cobj : sig
       external dependencies needed by [cobjs]. *)
 
   val equal : t -> t -> bool
-  (** [equal c0 c1] is [Fpath.equal (file c0) (file c1)]. *)
+  (** [equal c0 c1] is [Filepath.equal (file c0) (file c1)]. *)
 
   val compare : t -> t -> int
   (** [compare] is a total order on compilation objects compatible
@@ -1301,17 +1302,17 @@ module Cobj : sig
 
   (** {1:io IO} *)
 
-  val write : B0_memo.t -> cobjs:Fpath.t list -> o:Fpath.t -> unit
+  val write : B0_memo.t -> cobjs:Filepath.t list -> o:Filepath.t -> unit
   (** [write m ~cobjs o] writes information about the compilation [cobjs]
       to [o]. *)
 
-  val read : B0_memo.t -> Fpath.t -> t list Fut.t
+  val read : B0_memo.t -> Filepath.t -> t list Fut.t
   (** [read m file] has the [cobjs] of a {!write} to [file]. *)
 
-  val of_string : ?file:Fpath.t -> string -> (t list, string) result
+  val of_string : ?file:Filepath.t -> string -> (t list, string) result
   (** [of_string ~file data] parses compilation object information from
       [data] as output by {!Tool.ocamlobjinfo} assuming it was
-      read from [file] (defaults to {!B0_std.Fpath.dash}). *)
+      read from [file] (defaults to {!B0_std.Filepath.dash}). *)
 end
 
 (** {2:crunch Crunching} *)

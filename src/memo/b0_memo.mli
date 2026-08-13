@@ -56,7 +56,7 @@ module Tool : sig
   (** The type for response file specification. *)
 
   val response_file_of :
-    (Cmd.t -> string) -> (Fpath.t -> Cmd.t) -> response_file
+    (Cmd.t -> string) -> (Filepath.t -> Cmd.t) -> response_file
   (** [response_file_of to_file cli] is a response file specification
       that uses [to_file cmd] to convert the command line [cmd] to a
       response file content and [cli f] a command line fragment to be
@@ -88,7 +88,7 @@ module Tool : sig
     ?vars:env_vars -> string -> t
   (** [by_name] is like {!make} but reference the tool directly via a name.
 
-      Raises [Invalid_argument] if {!B0_std.Fpath.is_seg} [name] is [false]. *)
+      Raises [Invalid_argument] if {!B0_std.Filepath.is_seg} [name] is [false]. *)
 
   val name : t -> Cmd.tool
   (** [name t] is [t]'s tool name. If this is a relative file path
@@ -133,7 +133,7 @@ module Env : sig
       even if empty. *)
 end
 
-type tool_lookup = t -> Cmd.tool -> (Fpath.t, string) result Fut.t
+type tool_lookup = t -> Cmd.tool -> (Filepath.t, string) result Fut.t
 (** The type for tool lookups. Given a command line tool
     {{!type:B0_std.Cmd.tool}specification} returns a file path to
     the tool executable or an error message mentioning the tool if
@@ -143,10 +143,10 @@ val tool_lookup_of_os_env :
   ?sep:string -> ?var:string -> Os.Env.t -> tool_lookup
 (** [env_tool_lookup ~sep ~var env] is a tool lookup that gets the
     value of the [var] variable in [env] treats it as a [sep]
-    separated {{!B0_std.Fpath.list_of_search_path}search path} and
+    separated {{!B0_std.Filepath.list_of_search_path}search path} and
     uses the result to lookup with {!B0_std.Os.Cmd.get} with
     the memo's {!win_exe}. [var] defaults to [PATH] and [sep] to
-    {!B0_std.Fpath.search_path_sep}. *)
+    {!B0_std.Filepath.search_path_sep}. *)
 
 type cmd
 (** The type for memoized tool invocations. *)
@@ -163,8 +163,8 @@ val tool_opt : t -> Tool.t -> (Cmd.t -> cmd) option Fut.t
     if the tool cannot be found. y*)
 
 val spawn :
-  t -> ?stamp:string -> ?reads:Fpath.t list -> ?writes:Fpath.t list ->
-  ?env:Os.Env.t -> ?cwd:Fpath.t -> ?stdin:Fpath.t ->
+  t -> ?stamp:string -> ?reads:Filepath.t list -> ?writes:Filepath.t list ->
+  ?env:Os.Env.t -> ?cwd:Filepath.t -> ?stdin:Filepath.t ->
   ?stdout:B0_zero.Op.Spawn.stdo -> ?stderr:B0_zero.Op.Spawn.stdo ->
   ?success_exits:B0_zero.Op.Spawn.success_exits ->
   ?post_exec:(B0_zero.Op.t -> unit) ->
@@ -177,12 +177,12 @@ val spawn :
     {- [stdin] reads input from the given file. If unspecified reads
        from the standard input of the program running the build.  {b
        Warning.} The file is not automatically added to [reads],
-       this allows for example to use {!B0_std.Fpath.null}.}
+       this allows for example to use {!B0_std.Filepath.null}.}
     {- [stdout] and [stderr], the redirections for the standard
        outputs of the command, see {!B0_zero.Op.Spawn.stdo}. Path to files are
        created if needed. {b Warning.} File redirections
        are not automatically added to [writes]; this allows for example
-       to use {!B0_std.Fpath.null}.}
+       to use {!B0_std.Filepath.null}.}
     {- [success_exits] the exit codes that determine if the build operation
        is successful (defaults to [0], use [[]] to always succeed)}
     {- [env], environment variables added to the build environment.
@@ -213,9 +213,9 @@ val spawn :
     tracer. *)
 
 val spawn' :
-  t -> ?stamp:string -> ?reads:Fpath.t list -> writes_root:Fpath.t ->
-  ?writes:(B0_zero.Op.t -> Fpath.t list) -> ?env:Os.Env.t -> ?cwd:Fpath.t ->
-  ?stdin:Fpath.t -> ?stdout:B0_zero.Op.Spawn.stdo ->
+  t -> ?stamp:string -> ?reads:Filepath.t list -> writes_root:Filepath.t ->
+  ?writes:(B0_zero.Op.t -> Filepath.t list) -> ?env:Os.Env.t -> ?cwd:Filepath.t ->
+  ?stdin:Filepath.t -> ?stdout:B0_zero.Op.Spawn.stdo ->
   ?stderr:B0_zero.Op.Spawn.stdo ->
   ?success_exits:B0_zero.Op.Spawn.success_exits ->
   ?k:(B0_zero.Op.t -> int -> unit) -> cmd -> unit
@@ -243,28 +243,28 @@ val fail_if_error : t -> ('a, string) result -> 'a
 
 (** {1:files Files and directories} *)
 
-val ready_file : t -> Fpath.t -> unit
+val ready_file : t -> Filepath.t -> unit
 (** [read_file m p] declares path [p] to be ready, that is exists and is
     up-to-date in [b]. This is typically used with source files
     and files external to the build like installed libraries. *)
 
-val ready_files : t -> Fpath.t list -> unit
+val ready_files : t -> Filepath.t list -> unit
 (** [ready_files m ps] is [List.iter (ready_files m) ps]. *)
 
-val read : t -> Fpath.t -> string Fut.t
+val read : t -> Filepath.t -> string Fut.t
 (** [read m file k] is a future that determines with the contents
     [s] of file [file] when it becomes ready in [m]. *)
 
 val write :
-  t -> ?stamp:string -> ?reads:Fpath.t list -> ?mode:int ->
-  Fpath.t -> (unit -> (string, string) result) -> unit
+  t -> ?stamp:string -> ?reads:Filepath.t list -> ?mode:int ->
+  Filepath.t -> (unit -> (string, string) result) -> unit
 (** [write m ~reads file w] writes [file] with data [w ()] and mode
     [mode] (defaults to [0o644]) when [reads] are ready. [w]'s
     result must only depend on [reads], [mode] and [stamp] (defaults to
     [""]) and should not perform other side effects on the file system. *)
 
 val copy :
-  t -> ?mode:int -> ?linenum:int -> Fpath.t -> dst:Fpath.t -> unit
+  t -> ?mode:int -> ?linenum:int -> Filepath.t -> dst:Filepath.t -> unit
 (** [copy m ~mode ?linenum src ~dst] copies file [src] to [dst] with
     mode [mode] (defaults to [0o644]) when [src] is ready. If [linenum]
     is specified, the following line number directive is prependend
@@ -274,46 +274,46 @@ val copy :
 ]} *)
 
 val copy_to_dir :
-  t -> ?mode:int -> ?linenum:int -> ?src_root:Fpath.t -> Fpath.t ->
-  dst_dir:Fpath.t -> Fpath.t
+  t -> ?mode:int -> ?linenum:int -> ?src_root:Filepath.t -> Filepath.t ->
+  dst_dir:Filepath.t -> Filepath.t
 (** [copy_to_dir ~src_root src dir] is [copy src ~dst_dir] with [dst] defined
-    as {!B0_std.Fpath.reroot}[ ~src_root ~dst_root:dst_dir src]
+    as {!B0_std.Filepath.reroot}[ ~src_root ~dst_root:dst_dir src]
 
     Otherwise said, [src] gets copied in a subpath of [dst] defined by
-    {!Fpath.strip_prefix}[ src_root src]. [src_root] defaults to
-    [Fpath.parent src] which means that [src] gets copied at the root of
+    {!Filepath.strip_prefix}[ src_root src]. [src_root] defaults to
+    [Filepath.parent src] which means that [src] gets copied at the root of
     [dst]. *)
 
 val ready_and_copy_to_dir :
   t -> ?mode:int -> ?linenum:int ->
-  ?src_root:Fpath.t -> Fpath.t -> dst_dir:Fpath.t -> Fpath.t
+  ?src_root:Filepath.t -> Filepath.t -> dst_dir:Filepath.t -> Filepath.t
 (** [ready_and_copy_to_dir] is like {!copy_to_dir} but calls {!ready_file}
     on the copied file. *)
 
 val ready_and_copy_dir :
   ?rel:bool ->
-  ?prune:(Unix.stats -> string -> Fpath.t -> bool) ->
+  ?prune:(Unix.stats -> string -> Filepath.t -> bool) ->
   t -> ?mode:int -> ?linenum:int->
-  follow_symlinks:bool -> recurse:bool -> ?src_root:Fpath.t -> Fpath.t ->
-  dst:Fpath.t -> Fpath.t list
+  follow_symlinks:bool -> recurse:bool -> ?src_root:Filepath.t -> Filepath.t ->
+  dst:Filepath.t -> Filepath.t list
 (** [ready_and_copy_dir m ~recurse src ~dst] lists files of [src]
     and applies {!ready_and_copy_to_dir} with the corresponding
     arguments.
 
-    [src_root] defaults to [src] which is the {!B0_std.Fpath.parent} of the
+    [src_root] defaults to [src] which is the {!B0_std.Filepath.parent} of the
     copied files. So elements of [src] are rooted at [dst] by default. *)
 
-val mkdir : t -> ?mode:int -> Fpath.t -> unit Fut.t
+val mkdir : t -> ?mode:int -> Filepath.t -> unit Fut.t
 (** [mkdir m dir p] is a future that determines with [()] when the
     directory path [p] has been created with mode [mode] (defaults
     to [0o755]). The behaviour with respect to file permission
     of intermediate path segments matches {!B0_std.Os.Dir.create}. *)
 
-val delete : t -> Fpath.t -> unit Fut.t
+val delete : t -> Filepath.t -> unit Fut.t
 (** [delete m p] is a future that determines with [()] when path [p]
     is deleted (trashed in fact) and free to reuse. *)
 
-val wait_files : t -> Fpath.t list -> unit Fut.t
+val wait_files : t -> Filepath.t list -> unit Fut.t
 (** [wait_files m files] is a future that deterines with [()]
     when all [files] are ready in [m]. {b FIXME} Unclear whether
     we really want this, but somehow it's part of the primitives.  *)
@@ -357,16 +357,16 @@ type feedback = [ `Op_complete of B0_zero.Op.t ]
 
 val make_zero :
   ?clock:Os.Mtime.counter -> ?cpu_clock:Os.Cpu.Time.counter ->
-  feedback:(feedback -> unit) -> cwd:Fpath.t ->
+  feedback:(feedback -> unit) -> cwd:Filepath.t ->
   ?win_exe:bool -> ?tool_lookup:tool_lookup -> ?env:Os.Env.t ->
   ?forced_env_vars:Tool.env_vars ->
   B0_zero.Guard.t -> B0_zero.Reviver.t -> B0_zero.Exec.t -> (t, string) result
 
 val make :
   ?hash_fun:(module B0_hash.T) -> ?win_exe:bool -> ?tool_lookup:tool_lookup ->
-  ?env:Os.Env.t -> ?forced_env_vars:Tool.env_vars -> ?cwd:Fpath.t ->
+  ?env:Os.Env.t -> ?forced_env_vars:Tool.env_vars -> ?cwd:Filepath.t ->
   ?jobs:int -> ?feedback:([feedback | B0_zero.Exec.feedback] -> unit) ->
-  cache_dir:Fpath.t -> trash_dir:Fpath.t -> unit -> (t, string) result
+  cache_dir:Filepath.t -> trash_dir:Filepath.t -> unit -> (t, string) result
 (** [make] is a simpler {!make_zero}
     {ul
     {- [hash_fun] defaults to {!B0_std.Hash.Xxh3_64}.}
@@ -389,7 +389,7 @@ val delete_trash : block:bool -> t -> (unit, string) result
 val hash_string : t -> string -> B0_hash.t
 (** [hash_string m s] is {!B0_zero.Reviver.hash_string}[ (reviver m) s]. *)
 
-val hash_file : t -> Fpath.t -> (B0_hash.t, string) result
+val hash_file : t -> Filepath.t -> (B0_hash.t, string) result
 (** [hash_file m f] is {!B0_zero.Reviver.hash_file}[ (reviver m) f].
     Note that these file hashes operations are memoized. *)
 

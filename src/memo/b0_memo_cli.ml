@@ -213,12 +213,12 @@ module File_cache = struct
       ?doc_absent:(absent = "$(b,.cache) in b0 directory")
       ?(env = dir_var) ()
     =
-    Arg.(value & opt (some B0_std_cli.dirpath) None &
+    Arg.(value & opt (some B0_std_cli.dir) None &
          info opts ~env ~absent ~doc ~docs)
 
   let key_arg =
     let parser s =
-      if Fpath.is_segment s then Ok s else
+      if Filepath.is_segment s then Ok s else
       Error ("Not a valid key (not a path segment)")
     in
     let completion = Arg.Completion.complete_files in
@@ -274,7 +274,7 @@ module Op = struct
 
   let find_deps ?(acc = Op.Set.empty) ~recursive index deps ops =
     let add_direct index o acc =
-      let add_index_ops index acc p = match Fpath.Map.find p index with
+      let add_index_ops index acc p = match Filepath.Map.find p index with
       | exception Not_found -> acc
       | ops -> Op.Set.union ops acc
       in
@@ -308,10 +308,10 @@ module Op = struct
       reads = [] && writes = [] && ids = [] && hashes = [] && marks = []
     in
     if all then fun _ -> true else
-    let reads = Fpath.Set.of_list reads in
-    let mem_reads f = Fpath.Set.mem f reads in
-    let writes = Fpath.Set.of_list writes in
-    let mem_writes f = Fpath.Set.mem f writes in
+    let reads = Filepath.Set.of_list reads in
+    let mem_reads f = Filepath.Set.mem f reads in
+    let writes = Filepath.Set.of_list writes in
+    let mem_writes f = Filepath.Set.mem f writes in
     let hashes =
       String.Set.of_list (List.rev_map B0_hash.to_binary_string hashes)
     in
@@ -403,11 +403,11 @@ module Op = struct
   let select_cli ?docs ?(marks = marks () ?docs) () =
     let+ reads =
       let doc = "Select operations that read file $(docv). Repeatable." in
-      Arg.(value & opt_all B0_std_cli.filepath [] &
+      Arg.(value & opt_all B0_std_cli.file [] &
            info ["r"; "read"] ~doc ?docs)
     and+ writes =
       let doc = "Select operations that wrote file $(docv). Repeatable." in
-      Arg.(value & opt_all B0_std_cli.filepath [] &
+      Arg.(value & opt_all B0_std_cli.file [] &
            info ["w"; "write"] ~doc ?docs)
     and+ ids =
       let doc = "Select operation with identifier $(docv). Repeatable." in
@@ -536,11 +536,11 @@ module Log = struct
   (* Log formatters *)
 
   let hashed_byte_size file_hashes =
-    let add_file f _ acc = match Unix.stat (Fpath.to_string f) with
+    let add_file f _ acc = match Unix.stat (Filepath.to_string f) with
     | exception Unix.Unix_error (_, _, _) -> 0
     | s -> acc + s.Unix.st_size
     in
-    Fpath.Map.fold add_file file_hashes 0
+    Filepath.Map.fold add_file file_hashes 0
 
   let pp_stats ~hashed_size sel ppf l =
     let sc, st, sd, wc, wt, wd, cc, ct, cd, rt, rd, ot, od =
@@ -573,7 +573,7 @@ module Log = struct
     let pp_hashes ppf l =
       let file_hashes = B0_memo_log.file_hashes l in
       let hash_dur = B0_memo_log.hash_dur l in
-      let hc, hd = Fpath.Map.cardinal file_hashes, hash_dur in
+      let hc, hd = Filepath.Map.cardinal file_hashes, hash_dur in
       let hs = if not hashed_size then 0 else hashed_byte_size file_hashes
       in
       let pp_hashed_size ppf s =
@@ -639,15 +639,15 @@ module Log = struct
         B0_hash.pp ppf (B0_zero.Op.hash o)
 
   let pp_hashed_file = function
-  | `Short -> Fmt.using fst Fpath.pp_unquoted
+  | `Short -> Fmt.using fst Filepath.pp_unquoted
   | `Normal | `Long ->
       fun ppf (f, h) ->
-        B0_hash.pp ppf h; Fmt.char ppf ' '; Fpath.pp_unquoted ppf f
+        B0_hash.pp ppf h; Fmt.char ppf ' '; Filepath.pp_unquoted ppf f
 
   let pp ?(sep = Fmt.cut) ~format ~output_details ~query ~path () ppf l =
     match format with
     | `Path ->
-        Fmt.pf ppf "@[%a@]%a" Fpath.pp_unquoted path sep ()
+        Fmt.pf ppf "@[%a@]%a" Filepath.pp_unquoted path sep ()
     | `Ops ->
         let ops = query (B0_memo_log.ops l) in
         if ops = [] then () else
@@ -670,26 +670,26 @@ module Log = struct
           (Fmt.list (pp_op_hash output_details)) ops sep ()
     | `Root_hashed_files ->
         let writes =
-          let add_write acc f = Fpath.Set.add f acc in
+          let add_write acc f = Filepath.Set.add f acc in
           let add_op acc o =
             List.fold_left add_write acc (B0_zero.Op.writes o)
           in
-          List.fold_left add_op Fpath.Set.empty (B0_memo_log.ops l)
+          List.fold_left add_op Filepath.Set.empty (B0_memo_log.ops l)
         in
         let add_file writes f h acc =
-          if Fpath.Set.mem f writes then acc else (f, h) :: acc
+          if Filepath.Set.mem f writes then acc else (f, h) :: acc
         in
         let file_hashes = B0_memo_log.file_hashes l in
-        let roots = Fpath.Map.fold (add_file writes) file_hashes [] in
+        let roots = Filepath.Map.fold (add_file writes) file_hashes [] in
         if roots = [] then () else
         Fmt.pf ppf "@[<v>%a@]%a"
           (Fmt.list (pp_hashed_file output_details)) roots sep ()
     | `Hashed_files ->
         let pp_hashed_files =
-          Fmt.iter_bindings Fpath.Map.iter (pp_hashed_file output_details)
+          Fmt.iter_bindings Filepath.Map.iter (pp_hashed_file output_details)
         in
         let file_hashes = B0_memo_log.file_hashes l in
-        if Fpath.Map.is_empty file_hashes then () else
+        if Filepath.Map.is_empty file_hashes then () else
         Fmt.pf ppf "@[<v>%a@]%a" pp_hashed_files file_hashes sep ()
     | `Diagnosis ->
         let ops = query (B0_memo_log.ops l) in
@@ -750,7 +750,7 @@ module Log = struct
       ?doc_absent:(absent = "$(b,_log) in b0 directory")
       ?(env = file_var) ()
     =
-    Arg.(value & opt (some B0_std_cli.filepath) None &
+    Arg.(value & opt (some B0_std_cli.file) None &
          info opts ~absent ~env ~doc ~docs ~docv:"LOG_FILE")
 end
 

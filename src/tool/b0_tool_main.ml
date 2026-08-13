@@ -90,7 +90,7 @@ let try_exec_with_b0_file () =
           (Log.warn @@ fun m -> m "%s. See %a." e Fmt.code "b0 file log -e");
           Ok ()
       | Ok exe ->
-          let exe = Fpath.to_string exe in
+          let exe = Filepath.to_string exe in
           let cmd = match Array.to_list Sys.argv with
           | [] -> Cmd.arg exe
           | _ :: args -> Cmd.list (exe :: args)

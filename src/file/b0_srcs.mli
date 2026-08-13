@@ -57,11 +57,11 @@ open B0_std
 (** {1:sel Source selection} *)
 
 type sel =
-[ `Dir of Fpath.t
-| `Dir_rec of Fpath.t
-| `X of Fpath.t
-| `File of Fpath.t
-| `Fut of B0_build.t -> Fpath.Set.t Fut.t ]
+[ `Dir of Filepath.t
+| `Dir_rec of Filepath.t
+| `X of Filepath.t
+| `File of Filepath.t
+| `Fut of B0_build.t -> Filepath.Set.t Fut.t ]
 (** The type for file selectors.
     {ul
     {- [`File f] unconditionaly selects the file [f]. [f] must exist and be
@@ -101,15 +101,15 @@ val select : B0_build.t -> sels -> t Fut.t
 
 val by_ext : t -> B0_file_exts.map
 (** [by_ext s] are the selected files mapped by their file extension
-    (not {{!B0_std.Fpath.file_exts}multiple file extension}).  Each
+    (not {{!B0_std.Filepath.file_exts}multiple file extension}).  Each
     file is guaranteed to appear only once in the map and is absolute. *)
 
 (*
-val root_for_file : t -> Fpath.t -> Fpath.t
+val root_for_file : t -> Filepath.t -> Filepath.t
 (** [root_for_file s f] is an absolute root directory for a file
     [f] selected by [s]. If [f] was selected by:
     {ul
-    {- [`File p] then this is [Fpath.parent p].}
+    {- [`File p] then this is [Filepath.parent p].}
     {- [`Dir d] or [`Dir_rec d] this is [d].}
     {- [`Fut fs] then this is like the parent of file.
        {b FIXME} We should also be able to specify root dirs here.}}

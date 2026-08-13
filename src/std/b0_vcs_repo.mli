@@ -42,12 +42,12 @@ type t
 val kind : t -> kind
 (** [kind r] is [r]'s VCS kind. *)
 
-val repo_dir : t -> Fpath.t
+val repo_dir : t -> Filepath.t
 (** [repo_dir r] is [r]'s repository directory (not the working directory). *)
 
-val work_dir : t -> Fpath.t
+val work_dir : t -> Filepath.t
 (** [work_dir r] is [r]'s working directory. On a git bare repo this
-    may be {!B0_std.Fpath.null}. *)
+    may be {!B0_std.Filepath.null}. *)
 
 val repo_cmd : t -> Cmd.t
 (** [repo_cmd r] is the base command to use to act on [r]. Use only if you
@@ -64,7 +64,7 @@ val pp_long : t Fmt.t
 (** {1:get Finding local repositories} *)
 
 val find :
-  ?search:Cmd.tool_search -> ?kind:kind -> ?dir:Fpath.t -> unit ->
+  ?search:Cmd.tool_search -> ?kind:kind -> ?dir:Filepath.t -> unit ->
   (t option, string) result
 (** [find ~dir ()] finds, using VCS functionality, a repository
     starting in directory [dir] (if unspecified this is the [cwd]). If [kind]
@@ -72,7 +72,7 @@ val find :
     is looked up with [search] (default to [Os.Cmd.find ?search]. *)
 
 val get :
-  ?search:Cmd.tool_search -> ?kind:kind -> ?dir:Fpath.t -> unit ->
+  ?search:Cmd.tool_search -> ?kind:kind -> ?dir:Filepath.t -> unit ->
   (t, string) result
 (** [get] is like {!find} but errors if no VCS was found. *)
 
@@ -113,13 +113,13 @@ val changes :
     one-line synopsis from commit-ish [after] (defaults to the start
     of the branch) to commit-ish [last] (defaults to {!head}). *)
 
-val tracked_files : t -> tree_ish:string -> (Fpath.t list, string) result
+val tracked_files : t -> tree_ish:string -> (Filepath.t list, string) result
 (** [tracked_files repo ~tree_ish] are the files tracked by the tree
     object [tree_ish]. *)
 
 val commit_files :
   ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo -> ?msg:string -> t ->
-  Fpath.t list -> (unit, string) result
+  Filepath.t list -> (unit, string) result
 (** [commit_files rrepo ~msg files] commits the file [files] with message
     [msg] (if unspecified the VCS should prompt). *)
 
@@ -136,7 +136,7 @@ val not_dirty : t -> (unit, string) result
 (** [not_dirty repo] is [Ok ()] iff the working directory of [repo] is not dirty
     and an error that enjoins to stash or commit otherwise. *)
 
-val file_is_dirty : t -> Fpath.t -> (bool, string) result
+val file_is_dirty : t -> Filepath.t -> (bool, string) result
 (** [file_is_dirty repo file] is [Ok true] iff [file] has uncommited changes. *)
 
 val checkout : ?and_branch:string -> t -> commit_ish -> (unit, string) result
@@ -144,7 +144,7 @@ val checkout : ?and_branch:string -> t -> commit_ish -> (unit, string) result
     working directory of [repo]. Checks out in a new branch [and_branch]
     if provided. This fails if the current working directory {!is_dirty}. *)
 
-val local_clone : t -> dir:Fpath.t -> (t, string) result
+val local_clone : t -> dir:Filepath.t -> (t, string) result
 (** [local_clone repo ~dir] clones [repo] to a working directory [dir] and
     returns a repo to operate on it. *)
 
@@ -202,7 +202,7 @@ module Git : sig
   (** [cmd ()] looks for [git] with [Os.Cmd.get ?search]. *)
 
   val find :
-    ?search:Cmd.tool_search -> ?dir:Fpath.t -> unit -> (t option, string) result
+    ?search:Cmd.tool_search -> ?dir:Filepath.t -> unit -> (t option, string) result
   (** [find ~dir ()] finds, using VCS functionality, a git repository
       starting in directory [dir] (if unspecified this is the [cwd]). *)
 
@@ -273,7 +273,7 @@ module Git : sig
 
   val transient_checkout :
     ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo -> t -> force:bool ->
-    branch:branch -> Fpath.t -> commit_ish option -> (t, string) result
+    branch:branch -> Filepath.t -> commit_ish option -> (t, string) result
   (** [checkout_tmp_branch r ~force ~branch dir commit_ish] creates
       and checkouts and a branch [branch] in [dir] that points to
       [commit_ish] (if [None] an empty orphan branch is
@@ -292,7 +292,7 @@ module Git : sig
 
   val with_transient_checkout :
     ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo ->
-    ?dir:Fpath.t -> t -> force:bool -> branch:branch -> commit_ish option ->
+    ?dir:Filepath.t -> t -> force:bool -> branch:branch -> commit_ish option ->
     (t -> 'a) -> ('a, string) result
   (** [with_transient_checkout r ~force ~branch ~dir commit_ish f]
       calls {!transient_checkout} and then [f r] with [r] the repo to
@@ -304,7 +304,7 @@ module Git : sig
 
   val add :
     ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo -> t -> force:bool ->
-    Fpath.t list -> (unit, string) result
+    Filepath.t list -> (unit, string) result
   (** [add t ~force fs] adds [fs] to [r]'s staged changes. If [force]
       bypasses the [.gitignore]s. *)
 
@@ -328,7 +328,7 @@ module Git : sig
 
   val rm :
     ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo -> t -> force:bool ->
-    recurse:bool -> ignore_unmatch:bool -> Fpath.t list -> (unit, string) result
+    recurse:bool -> ignore_unmatch:bool -> Filepath.t list -> (unit, string) result
   (** [rm r ~force ~recurse ~ignore_unmatch files] removes [files]
       from the working tree and from the index. if [force] removes the files
       even if they are not up-to-date. If [recurse] removes directories
@@ -345,7 +345,8 @@ module Hg : sig
   (** [get_cmd ()] looks for [hg] with [Os.Cmd.get ?search]. *)
 
   val find :
-    ?search:Cmd.tool_search -> ?dir:Fpath.t -> unit -> (t option, string) result
+    ?search:Cmd.tool_search -> ?dir:Filepath.t -> unit ->
+    (t option, string) result
   (** [find ~dir ()] finds, using VCS functionality, an hg repository
       starting in directory [dir] (if unspecified this is the [cwd]). *)
 end

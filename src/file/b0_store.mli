@@ -29,7 +29,7 @@ type binding = B : 'a key * 'a Fut.t -> binding (** *)
 type t
 (** The type for stores. *)
 
-val make : B0_memo.t -> dir:Fpath.t -> binding list -> t
+val make : B0_memo.t -> dir:Filepath.t -> binding list -> t
 (** [make memo ~dir bs] is a store with predefined bindings [bs].
     If a key is mentioned more than once in [bs] the last binding
     takes over. The store uses [memo] to determine other keys as
@@ -39,7 +39,7 @@ val make : B0_memo.t -> dir:Fpath.t -> binding list -> t
 val memo : t -> B0_memo.t
 (** [memo s] is [s]'s memo as given on {!make}. *)
 
-val dir : t -> Fpath.t
+val dir : t -> Filepath.t
 (** [dir s] is the scratch directory of [s]. Key determination functions
     using this directory to write files should do so using nice file name
     prefixes (e.g. lowercased module or lib names) to avoid name

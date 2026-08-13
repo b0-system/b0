@@ -9,8 +9,8 @@ open Result.Syntax
 let output_dir conf =
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
   let* b0_file = B0_driver.Conf.get_b0_file conf in
-  let root = Fpath.parent b0_file in
-  Fmt.pr "@[%a@]@." Fpath.pp (Fpath.drop_trailing_dir_sep root);
+  let root = Filepath.parent b0_file in
+  Fmt.pr "@[%a@]@." Filepath.pp (Filepath.drop_trailing_dir_sep root);
   Ok Os.Exit.ok
 
 (* Command line interface *)

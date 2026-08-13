@@ -17,7 +17,7 @@ val find :
 (** [find ?search ~pdf_viewer] tries to find a PDF viewer in a
     platform dependent way using [Os.Cmd.find ?search]. *)
 
-val show : t -> Fpath.t -> (unit, string) result
+val show : t -> Filepath.t -> (unit, string) result
 (** [show pdf_viewer file] shows PDF [file] using [pdf_viewer]. *)
 
 (** {1:cli Cli interface} *)

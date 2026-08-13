@@ -62,10 +62,10 @@ module type S = sig
   val scope_path : t -> string list
   val in_root_scope : t -> bool
   val in_current_scope : t -> bool
-  val scope_dir : t -> Fpath.t option
-  val scope_dir' : t -> (Fpath.t, string) result
-  val in_scope_dir : t -> Fpath.t -> Fpath.t option
-  val in_scope_dir' : t -> Fpath.t -> (Fpath.t, string) result
+  val scope_dir : t -> Filepath.t option
+  val scope_dir' : t -> (Filepath.t, string) result
+  val in_scope_dir : t -> Filepath.t -> Filepath.t option
+  val in_scope_dir' : t -> Filepath.t -> (Filepath.t, string) result
 
   val pp_name_str : string Fmt.t
   val pp_name : t Fmt.t
@@ -191,13 +191,13 @@ module Make (V : VALUE) = struct
   | Some dir -> Ok dir
 
   let in_scope_dir v path = match scope_dir v with
-  | None -> None | Some dir -> Some Fpath.(dir // path)
+  | None -> None | Some dir -> Some Filepath.(dir // path)
 
   let in_scope_dir' v path = match in_scope_dir v path with
   | Some v -> Ok v
   | None ->
       Fmt.error "%s %a has no scope directory, cannot lookup %a in it."
-        def_kind pp_name v Fpath.pp path
+        def_kind pp_name v Filepath.pp path
 
   module T = struct type nonrec t = t let compare = compare end
   module Set = Set.Make(T)

@@ -77,7 +77,7 @@ module type T = sig
   (** [fd fd] [mmap(2)]s and hashes the object pointed by [fd].
       @raise Sys_error if [mmap] fails. *)
 
-  val file : Fpath.t -> (t, string) result
+  val file : Filepath.t -> (t, string) result
   (** [file f] is the hash of file [f]. *)
 end
 

@@ -14,7 +14,7 @@ let write_file ~dry_run file content =
     then Ok ()
     else Os.File.write ~force:true ~make_path:true file content
   in
-  Log.stdout (fun m -> m ~header:"WROTE" "%a" Fpath.pp file);
+  Log.stdout (fun m -> m ~header:"WROTE" "%a" Filepath.pp file);
   if dry_run
   then Ok (Log.stdout (fun m -> m "%s@\n" content))
   else Ok ()
@@ -44,7 +44,7 @@ let dune_file libs =
     Fmt.(list ~sep:Fmt.(cut ++ cut) library_stanza) libs
 
 let write_dune_file ~dry_run (scope_dir, libs) =
-  let file = Fpath.(scope_dir / "dune") in
+  let file = Filepath.(scope_dir / "dune") in
   write_file ~dry_run file (dune_file libs)
 
 let dune_project () =
@@ -55,17 +55,17 @@ let ocaml_libs_by_scope us =
     if not (B0_unit.mem_meta B0_ocaml.library u) then acc else
     Log.if_error ~use:acc @@
     let* scope_dir = B0_unit.scope_dir' u in
-    Ok (Fpath.Map.add_to_list scope_dir u acc)
+    Ok (Filepath.Map.add_to_list scope_dir u acc)
   in
-  List.fold_left add_by_scope_dir Fpath.Map.empty us
+  List.fold_left add_by_scope_dir Filepath.Map.empty us
 
 let file ~env ~units ~dry_run =
   let dry_run = true in
   Log.if_error ~use:Os.Exit.no_such_name @@
   let* units = B0_unit.get_list_or_hint ~all_if_empty:true units in
-  let ocaml_libs = Fpath.Map.bindings (ocaml_libs_by_scope units) in
+  let ocaml_libs = Filepath.Map.bindings (ocaml_libs_by_scope units) in
   let root_dir = B0_env.root_dir env (* Do one dune file per scope dirs ? *) in
-  let root_project = Fpath.(root_dir / "dune-project") in
+  let root_project = Filepath.(root_dir / "dune-project") in
   let* () = write_file ~dry_run root_project (dune_project ()) in
   let* () = List.iter_stop_on_error (write_dune_file ~dry_run) ocaml_libs in
   Ok Os.Exit.ok

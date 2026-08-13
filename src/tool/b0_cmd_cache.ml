@@ -49,7 +49,7 @@ let keys ~kind conf =
 let path conf =
   Log.if_error ~use:Os.Exit.some_error @@
   let dir = B0_driver.Conf.cache_dir conf in
-  Fmt.pr "%a@." Fpath.pp_unquoted dir;
+  Fmt.pr "%a@." Filepath.pp_unquoted dir;
   Ok Os.Exit.ok
 
 let stats conf =

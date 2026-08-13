@@ -17,7 +17,7 @@ let tag = B0_meta.Key.make_tag "tag" ~doc:"js_of_ocaml related entity"
 
 let assets_root =
   let doc = "Root path from which assets are rerooted." in
-  let pp_value = Fpath.pp_unquoted in
+  let pp_value = Filepath.pp_unquoted in
   B0_meta.Key.make "assets-root" ~pp_value ~doc
 
 type compilation_mode = [ `Separate | `Whole ]
@@ -65,7 +65,7 @@ let build_runtime m ~opts ~jss ~o =
 let handle_source_map ~o = function
 | None -> [o], Cmd.empty
 | Some `Inline -> [o], Cmd.(arg "--source-map-inline")
-| Some `File -> [o; Fpath.(o -+ ".map")], Cmd.(arg "--source-map")
+| Some `File -> [o; Filepath.(o -+ ".map")], Cmd.(arg "--source-map")
 
 let compile m ~opts ~source_map ~jss ~byte ~o =
   let jsoo = B0_memo.tool m tool in
@@ -85,7 +85,7 @@ let write_page
     ?(lang = "") ?(generator = "") ?(styles = [])  ?(scripts = [])
     ?(title = "") m ~o
   =
-  let title = if title = "" then Fpath.basename ~drop_exts:true o else title in
+  let title = if title = "" then Filepath.basename ~drop_exts:true o else title in
   let stamp = List.rev_append styles scripts in
   let stamp = String.concat "" (lang :: generator :: title :: stamp) in
   B0_memo.write m ~stamp o @@ fun () ->
@@ -140,7 +140,7 @@ let byte_exe ~modsrcs ~o b =
   let meta = B0_build.current_meta b in
   let requires = B0_meta.get B0_ocaml.requires meta in
   let* conf = B0_build.get b B0_ocaml.Conf.key in
-  let o = Fpath.(o + B0_ocaml.Conf.exe_ext conf) in
+  let o = Filepath.(o + B0_ocaml.Conf.exe_ext conf) in
   let* resolver = B0_build.get b B0_ocaml.Libresolver.key in
   let toplevel = Option.value ~default:false (B0_meta.find toplevel meta) in
   let global_opts = Cmd.(arg "-g") (* TODO *) in
@@ -152,7 +152,7 @@ let byte_exe ~modsrcs ~o b =
   Fut.return (o, lib_jss)
 
 let js_of_byte_exe ~jss ~modsrcs ~o b =
-  let* byte, lib_jss = byte_exe ~modsrcs ~o:Fpath.(o -+ ".byte") b in
+  let* byte, lib_jss = byte_exe ~modsrcs ~o:Filepath.(o -+ ".byte") b in
   let meta = B0_build.current_meta b in
   let source_map = Option.join (B0_meta.find source_map meta) in
   let opts = Option.value ~default:Cmd.empty (B0_meta.find compile_opts meta) in
@@ -181,7 +181,7 @@ let js_of_byte_objs ~jss ~modsrcs ~o b =
   let ocamlrt_js =
     let opts = Cmd.empty in
     let build_dir = B0_build.current_dir b in
-    let o = Fpath.(build_dir / "ocamlrt.js") in
+    let o = Filepath.(build_dir / "ocamlrt.js") in
     build_runtime m ~opts ~jss ~o;
     o
   in
@@ -195,23 +195,23 @@ let js_of_byte_objs ~jss ~modsrcs ~o b =
     let compile obj =
       (* FIXME this won't work with lib convention we need to
          remember the lib_name and mangle. *)
-      let o = Fpath.(build_dir / (Fpath.basename obj ^ ".js")) in
-      let opts = Cmd.(opts %% arg "-I" %% path (Fpath.parent obj)) in
+      let o = Filepath.(build_dir / (Filepath.basename obj ^ ".js")) in
+      let opts = Cmd.(opts %% arg "-I" %% path (Filepath.parent obj)) in
       compile m ~opts ~source_map ~jss:[] ~byte:obj ~o;
       o
     in
     let compile_lib acc obj = compile obj :: acc  in
     let jss = List.rev (List.fold_left compile_lib [] lib_objs) in
     (* FIXME at least stdlib should be looked up via resolver *)
-    let stdlib_cma = Fpath.(B0_ocaml.Conf.where conf / "stdlib.cma") in
+    let stdlib_cma = Filepath.(B0_ocaml.Conf.where conf / "stdlib.cma") in
     let stdlib_js = B0_memo.ready_file m stdlib_cma; compile stdlib_cma in
-    let std_exit_cmo = Fpath.(B0_ocaml.Conf.where conf / "std_exit.cmo") in
+    let std_exit_cmo = Filepath.(B0_ocaml.Conf.where conf / "std_exit.cmo") in
     let std_exit_js = B0_memo.ready_file m std_exit_cmo; compile std_exit_cmo in
     stdlib_js :: jss, std_exit_js
   in
   let mod_obj_jss =
     let compile_obj acc obj =
-      let o = Fpath.(obj + ".js") in
+      let o = Filepath.(obj + ".js") in
       compile m ~opts ~source_map ~jss:[] ~byte:obj ~o;
       o :: acc
     in
@@ -238,14 +238,14 @@ let build_setup ~srcs b = (* return a record maybe ? *)
   let jss = B0_file_exts.find_files B0_file_exts.js srcs in
   let build_dir = B0_build.current_dir b in
   let tool_name = B0_meta.get B0_unit.tool_name (B0_build.current_meta b) in
-  let js = Fpath.(build_dir / tool_name) in
-  let html = Fpath.(js -+ ".html") in
-  let exe_html = Fpath.basename html in
+  let js = Filepath.(build_dir / tool_name) in
+  let html = Filepath.(js -+ ".html") in
+  let exe_html = Filepath.basename html in
   let htmls = B0_file_exts.find_files B0_file_exts.html srcs in
   let html = match htmls with
   | [] -> html (* This will be generated *)
   | htmls ->
-      let base b f = Fpath.basename f = b in
+      let base b f = Filepath.basename f = b in
       let file = match List.find_opt (base exe_html) htmls with
       | Some f -> f
       | None ->
@@ -254,9 +254,9 @@ let build_setup ~srcs b = (* return a record maybe ? *)
           | None -> List.hd htmls
       in
       match B0_meta.find assets_root (B0_build.current_meta b) with
-      | Some r when Fpath.strictly_starts_with ~prefix:r file ->
-          Fpath.reroot ~src_root:r ~dst_root:build_dir file
-      | _ -> Fpath.(build_dir / Fpath.basename file)
+      | Some r when Filepath.strictly_starts_with ~prefix:r file ->
+          Filepath.reroot ~src_root:r ~dst_root:build_dir file
+      | _ -> Filepath.(build_dir / Filepath.basename file)
   in
   Fut.return (srcs, modsrcs, jss, js, html)
 
@@ -276,7 +276,7 @@ let node_action build u ~args =
   | Error e -> err e
   | Ok exe_file ->
       let* exe_file = exe_file in
-      let node = Fpath.v "node" in
+      let node = Filepath.v "node" in
       match Os.Cmd.get_tool (* FIXME first search in build *) node with
       | Error e -> err e
       | Ok node_exe ->
@@ -331,21 +331,21 @@ let copy_assets m srcs ~exts ~assets_root ~dst =
   let assets = B0_file_exts.find_files exts srcs in
   let copy acc src =
     let dst = match assets_root with
-    | Some r when Fpath.strictly_starts_with ~prefix:r src ->
-        Fpath.reroot ~src_root:r ~dst_root:dst src
-    | _ -> Fpath.(dst / Fpath.basename src)
+    | Some r when Filepath.strictly_starts_with ~prefix:r src ->
+        Filepath.reroot ~src_root:r ~dst_root:dst src
+    | _ -> Filepath.(dst / Filepath.basename src)
     in
     B0_memo.copy m src ~dst;
-    Fpath.Set.add dst acc
+    Filepath.Set.add dst acc
   in
   B0_memo.ready_files m assets;
-  List.fold_left copy Fpath.Set.empty assets
+  List.fold_left copy Filepath.Set.empty assets
 
 let copy_html_page_assets ~srcs b =
   let assets_root =
     match B0_meta.find assets_root (B0_build.current_meta b) with
     | None -> None
-    | Some r -> Some (Fpath.(B0_build.scope_dir b // r))
+    | Some r -> Some (Filepath.(B0_build.scope_dir b // r))
   in
   let build_dir = B0_build.current_dir b in
   let exts = String.Set.remove ".js" B0_file_exts.www in
@@ -362,17 +362,17 @@ let html_page_proc ~html_file ~js_file set_modsrcs srcs b =
   let jss = B0_file_exts.find_files B0_file_exts.js srcs in
   let* () = js_exe ~modsrcs ~jss ~o:js_file b in
   let assets = copy_html_page_assets ~srcs b in
-  if Fpath.Set.mem html_file assets then Fut.return () else
-  let css = Fpath.Set.filter (Fpath.has_ext ".css") assets in
+  if Filepath.Set.mem html_file assets then Fut.return () else
+  let css = Filepath.Set.filter (Filepath.has_ext ".css") assets in
   let styles =
     let build_dir = B0_build.current_dir b in
     let base f =
-      Fpath.to_string
-        (Option.get (Fpath.drop_strict_prefix ~prefix:build_dir f))
+      Filepath.to_string
+        (Option.get (Filepath.drop_strict_prefix ~prefix:build_dir f))
     in
-    List.map base (Fpath.Set.elements css)
+    List.map base (Filepath.Set.elements css)
   in
-  let scripts = [Fpath.basename js_file] in
+  let scripts = [Filepath.basename js_file] in
   write_page (B0_build.memo b) ~styles ~scripts ~o:html_file;
   Fut.return ()
 
@@ -381,9 +381,9 @@ let html_page
     ?assets_root:aroot ?requires ?name ?js_file page ~srcs
   =
   let name = Option.value ~default:page name in
-  let html_file = Fpath.fmt "%s.html" page in
+  let html_file = Filepath.fmt "%s.html" page in
   let js_file = match js_file with
-  | Some f -> Fpath.v f | None -> Fpath.fmt "%s.js" page
+  | Some f -> Filepath.v f | None -> Filepath.fmt "%s.js" page
   in
   let modsrcs, set_modsrcs = Fut.make () in
   let base =

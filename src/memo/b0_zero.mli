@@ -20,14 +20,14 @@ module Trash : sig
   type t
   (** The type for trashes. *)
 
-  val make : Fpath.t -> t
+  val make : Filepath.t -> t
   (** [make dir] is a trash using directory [dir] for data
       storage. [dir] may not exist. *)
 
-  val dir : t -> Fpath.t
+  val dir : t -> Filepath.t
   (** [dir t] is the trash's directory (may not exist) *)
 
-  val trash : t -> Fpath.t -> (unit, string) result
+  val trash : t -> Filepath.t -> (unit, string) result
   (** [trash t p] trashes path [p] in [dir t]. If [p] does not exist
       this has no effect. Note that [p] needs to be on the same device
       as [dir t] and that the latter is created if needed. *)
@@ -68,18 +68,18 @@ module File_cache : sig
   (** The type for keys. A key maps to a metadata hunk and an ordered
       list of file contents. The module treats keys as sequence of
       bytes however since they are used as file names they should
-      satisfy the {!B0_std.Fpath.is_segment} predicate; this is not
+      satisfy the {!B0_std.Filepath.is_segment} predicate; this is not
       checked by the module. *)
 
   type t
   (** The type for file caches. *)
 
-  val make : Fpath.t -> (t, string) result
+  val make : Filepath.t -> (t, string) result
   (** [make dir] is a file cache using directory [dir] for data
       storage. The full path to [dir] is created by the call if [dir]
       doesn't exist. *)
 
-  val dir : t -> Fpath.t
+  val dir : t -> Filepath.t
   (** [dir c] is [c]'s storage directory. *)
 
   val keys : t -> (key list, string) result
@@ -95,7 +95,7 @@ module File_cache : sig
   val mem : t -> key -> bool
   (** [mem c k] is [true] iff [k] is bound in [c]. *)
 
-  val add : t -> key -> string -> Fpath.t list -> (bool, string) result
+  val add : t -> key -> string -> Filepath.t list -> (bool, string) result
   (** [add c k m fs], binds the metadata [m] and the {e contents} of
       the ordered list of files [fs] to [k] in [c]. The function
       returns:
@@ -107,7 +107,8 @@ module File_cache : sig
          resulting state of the cache for key [k] is undefined.}} *)
 
   val manifest_add :
-    t -> key -> string -> root:Fpath.t -> Fpath.t list -> (bool, string) result
+    t -> key -> string -> root:Filepath.t -> Filepath.t list ->
+    (bool, string) result
   (** [manifest_add c k m ~root fs] is like {!add} except it also
       stores the file paths [fs] relativized with respect to
       [root]. This means the actual file paths need not to be provided
@@ -119,7 +120,7 @@ module File_cache : sig
       returned if [k] was bound in [c] and [Ok false] otherwise. *)
 
   val find : t -> key ->
-    ((Fpath.t option * Fpath.t * Fpath.t list) option, string) result
+    ((Filepath.t option * Filepath.t * Filepath.t list) option, string) result
   (** [find c k] is [Some (mf, m, fs)] if [k] is bound in [c] with
       [mf] the file that holds the file manifest (if any), [m] the
       file that holds the key metadata and [fs] the files that hold
@@ -128,7 +129,7 @@ module File_cache : sig
       unbound in [c]. *)
 
   val revive :
-    t -> key -> Fpath.t list -> (string option, string) result
+    t -> key -> Filepath.t list -> (string option, string) result
   (** [revive c k fs] binds the file contents of key [k] to the file
       {e path}s [fs]. These file paths are overwritten if they exist
       and intermediate directories are created if needed (with
@@ -145,7 +146,8 @@ module File_cache : sig
          undefined.}} *)
 
   val manifest_revive :
-    t -> key -> root:Fpath.t -> ((Fpath.t list * string) option, string) result
+    t -> key -> root:Filepath.t ->
+    ((Filepath.t list * string) option, string) result
   (** [manifest_revive] is like {!revive} however the file paths
       that are written to are determined by the cache's file manifest
       whose path are made absolute using [root] and returned in
@@ -180,8 +182,8 @@ module Op : sig
 
   type failure =
   | Exec of string option (** Execution failure with a potential error msg. *)
-  | Missing_writes of Fpath.t list (** Write specification failure. *)
-  | Missing_reads of Fpath.t list (** Read synchronisation failure. *)
+  | Missing_writes of Filepath.t list (** Write specification failure. *)
+  | Missing_reads of Filepath.t list (** Read synchronisation failure. *)
   (** The type for operation failures. *)
 
   type status =
@@ -216,22 +218,23 @@ module Op : sig
 
     val make_op :
       id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
-      ?k:(op -> unit) -> mode:int -> linenum:int option -> Fpath.t ->
-      dst:Fpath.t -> op
+      ?k:(op -> unit) -> mode:int -> linenum:int option -> Filepath.t ->
+      dst:Filepath.t -> op
     (** [make_op] declares a file copy operation, see the corresponding
         accessors for the semantics of various arguments. *)
 
-    val make : src:Fpath.t -> dst:Fpath.t -> mode:int -> linenum:int option -> t
+    val make :
+      src:Filepath.t -> dst:Filepath.t -> mode:int -> linenum:int option -> t
     (** [make] constructs a bare copy operation. *)
 
     val get : op -> t
     (** [get o] is the copy operation [o]. Raises [Invalid_argument] if [o]
         is not a copy. *)
 
-    val src : t -> Fpath.t
+    val src : t -> Filepath.t
     (** [src c] is the file read for the copy. *)
 
-    val dst : t -> Fpath.t
+    val dst : t -> Filepath.t
     (** [dst c] is the written by the copy. *)
 
     val mode : t -> int
@@ -252,18 +255,18 @@ module Op : sig
 
     val make_op :
       id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
-      ?k:(op -> unit) -> Fpath.t -> op
+      ?k:(op -> unit) -> Filepath.t -> op
     (** [make_op] declares a path deletion operation, see the corresponding
         accessors for the semantics of the various arguments. *)
 
-    val make : path:Fpath.t -> t
+    val make : path:Filepath.t -> t
     (** [make] constructs a bare deletion operation. *)
 
     val get : op -> t
     (** [get o] is the delete operation [o]. Raises [Invalid_argument] if [o]
         is not a delete. *)
 
-    val path : t -> Fpath.t
+    val path : t -> Filepath.t
     (** [path d] is the path to delete. *)
   end
 
@@ -277,19 +280,19 @@ module Op : sig
 
     val make_op :
       id:id -> mark:mark -> mode:int -> created:Mtime.Span.t ->
-      ?post_exec:(op -> unit) -> ?k:(op -> unit) -> Fpath.t -> op
+      ?post_exec:(op -> unit) -> ?k:(op -> unit) -> Filepath.t -> op
     (** [make_op] declares a directory creation operation, see the
         corresponding accessors for the semantics of the various
         arguments. *)
 
-    val make : dir:Fpath.t -> mode:int -> t
+    val make : dir:Filepath.t -> mode:int -> t
     (** [make] constructs a bare mkdir operation. *)
 
     val get : op -> t
     (** [get o] is the mkdir [o]. Raises [Invalid_argument] if [o] is not
         a mkdir. *)
 
-    val dir : t -> Fpath.t
+    val dir : t -> Filepath.t
     (** [dir mk] is the directory created by [mk]. *)
 
     val mode : t -> int
@@ -337,18 +340,18 @@ module Op : sig
 
     val make_op :
       id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
-      ?k:(op -> unit) -> Fpath.t -> op
+      ?k:(op -> unit) -> Filepath.t -> op
     (** [make_op] declares a file read operation, see the corresponding
         accessors for the semantics of the various arguments. *)
 
-    val make : file:Fpath.t -> data:string -> t
+    val make : file:Filepath.t -> data:string -> t
     (** [make] constructs a bare read operation. *)
 
     val get : op -> t
     (** [get o] is the read [o]. Raise [Invalid_argument] if [o]
         is not a read. *)
 
-    val file : t -> Fpath.t
+    val file : t -> Filepath.t
     (** [file r] is the file read by [r]. *)
 
     val data : t -> string
@@ -366,7 +369,7 @@ module Op : sig
 
     (** {1:spawn Tool spawns} *)
 
-    type stdo = [ `Ui | `File of Fpath.t | `Tee of Fpath.t ]
+    type stdo = [ `Ui | `File of Filepath.t | `Tee of Filepath.t ]
     (** The type for spawn standard outputs redirections.
         {ul
         {- [`Ui] redirects the output to the user interface of the build
@@ -385,19 +388,19 @@ module Op : sig
     (** The type for process spawn operations. *)
 
     val make_op :
-      id:id -> mark:mark -> created:Mtime.Span.t -> reads:Fpath.t list ->
-      writes:Fpath.t list -> ?writes_manifest_root:Fpath.t ->
+      id:id -> mark:mark -> created:Mtime.Span.t -> reads:Filepath.t list ->
+      writes:Filepath.t list -> ?writes_manifest_root:Filepath.t ->
       ?post_exec:(op -> unit) -> ?k:(op -> unit) ->
       stamp:string -> env:Os.Env.assignments ->
-      stamped_env:Os.Env.assignments -> cwd:Fpath.t ->
-      stdin:Fpath.t option -> stdout:stdo -> stderr:stdo ->
+      stamped_env:Os.Env.assignments -> cwd:Filepath.t ->
+      stdin:Filepath.t option -> stdout:stdo -> stderr:stdo ->
       success_exits:success_exits -> Cmd.tool -> Cmd.t -> op
     (** [make_op] declares a spawn build operation, see the corresponding
         accessors for the semantics of the various arguments. *)
 
     val make :
       env:Os.Env.assignments -> stamped_env:Os.Env.assignments ->
-      cwd:Fpath.t -> stdin:Fpath.t option -> stdout:stdo ->
+      cwd:Filepath.t -> stdin:Filepath.t option -> stdout:stdo ->
       stderr:stdo -> success_exits:success_exits -> Cmd.tool ->
       Cmd.t -> stamp:string -> stdo_ui:(string, string) result option ->
       exit:Os.Cmd.status option -> t
@@ -414,10 +417,10 @@ module Op : sig
     (** [stamped_env s] are the assignements of [env s] that may
         influence the tool outputs. *)
 
-    val cwd : t -> Fpath.t
+    val cwd : t -> Filepath.t
     (** [cwd s] is the cwd with which [s] runs. *)
 
-    val stdin : t -> Fpath.t option
+    val stdin : t -> Filepath.t option
     (** [stdin s] is the file [s] uses as stdin (if any). *)
 
     val stdout : t -> stdo
@@ -474,7 +477,7 @@ module Op : sig
 
     val make_op :
       id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
-      ?k:(op -> unit) -> Fpath.t list -> op
+      ?k:(op -> unit) -> Filepath.t list -> op
     (** [v] declares a wait files operation, these are stored in
           {!reads}. *)
 
@@ -492,13 +495,13 @@ module Op : sig
 
     val make_op :
       id:id -> mark:mark -> created:Mtime.Span.t -> ?post_exec:(op -> unit) ->
-      ?k:(op -> unit) -> stamp:string -> reads:Fpath.t list -> mode:int ->
-      write:Fpath.t -> (unit -> (string, string) result) -> op
+      ?k:(op -> unit) -> stamp:string -> reads:Filepath.t list -> mode:int ->
+      write:Filepath.t -> (unit -> (string, string) result) -> op
     (** [write] declares a file write operations, see the corresponding
         accessors for the semantics of the various arguments. *)
 
     val make :
-      stamp:string -> mode:int -> file:Fpath.t ->
+      stamp:string -> mode:int -> file:Filepath.t ->
       data:(unit -> (string, string) result) -> t
     (** [make] constructs a bare write operation. *)
 
@@ -512,7 +515,7 @@ module Op : sig
     val mode : t -> int
     (** [int w] is the mode of the file written by [w]. *)
 
-    val file : t -> Fpath.t
+    val file : t -> Filepath.t
     (** [file w] is the file written by [w]. *)
 
     val data : t -> (string, string) result
@@ -540,8 +543,8 @@ module Op : sig
   val make :
     id -> mark:mark -> time_created:Mtime.Span.t -> time_started:Mtime.Span.t ->
     duration:Mtime.Span.t -> revived:bool -> status:status ->
-    reads:Fpath.t list -> writes:Fpath.t list ->
-    writes_manifest_root:Fpath.t option -> hash:B0_hash.t ->
+    reads:Filepath.t list -> writes:Filepath.t list ->
+    writes_manifest_root:Filepath.t option -> hash:B0_hash.t ->
     ?post_exec:(op -> unit) -> ?k:(op -> unit) -> kind -> t
   (** [make] constructs an operation. See the corresponding accessors
       for the semantics of various arguments. *)
@@ -587,13 +590,13 @@ module Op : sig
   val status : t -> status
   (** [status o] is [o] execution status. *)
 
-  val reads : t -> Fpath.t list
+  val reads : t -> Filepath.t list
   (** [reads o] are the file paths read by the operation. *)
 
-  val writes : t -> Fpath.t list
+  val writes : t -> Filepath.t list
   (** [writes o] are the file paths written by [o]. *)
 
-  val writes_manifest_root : t -> Fpath.t option
+  val writes_manifest_root : t -> Filepath.t option
   (** [writes_manifest_root o] if [Some root], the operation is cached
       using a manifest key. This means the {!writes} made relative to
       [root] are stored along-side the cache key. *)
@@ -660,14 +663,14 @@ module Op : sig
       to [Executed] if [r] is [Ok _] and [Failed (Exec e)] if [r]
       is [Error e]. *)
 
-  val set_reads : t -> Fpath.t list -> unit
+  val set_reads : t -> Filepath.t list -> unit
   (** [set_reads t fs] sets the file paths read by [o] to [fs].
       Note that this resets the {!hash}. *)
 
-  val set_writes : t -> Fpath.t list -> unit
+  val set_writes : t -> Filepath.t list -> unit
   (** [set_writes t fs] sets the file paths written by [o] to [fs]. *)
 
-  val set_writes_manifest_root : t -> Fpath.t option -> unit
+  val set_writes_manifest_root : t -> Filepath.t option -> unit
   (** [set_writes_manifest_root t r] sets the writes manifest root
       to [r]. *)
 
@@ -684,24 +687,24 @@ module Op : sig
 
   (** {1:analyze Analyzing operations} *)
 
-  val did_not_write : t -> Fpath.t list
+  val did_not_write : t -> Filepath.t list
   (** [did_not_write o] compares {!writes} with the current state
       of the file system and reports those files that do not exist.  *)
 
-  val cannot_read : t -> Fpath.t list
+  val cannot_read : t -> Filepath.t list
   (** [cannot_read o] compares {!reads} with the current state
       of the file system and reports those files that cannot be read. *)
 
-  val unready_reads : ready_roots:Fpath.Set.t -> t list -> Fpath.Set.t
+  val unready_reads : ready_roots:Filepath.Set.t -> t list -> Filepath.Set.t
   (** [unready_reads os] are the file read by [os] that are not written
       by those and not in [ready_roots]. *)
 
-  val read_write_maps : t list -> Set.t Fpath.Map.t * Set.t Fpath.Map.t
+  val read_write_maps : t list -> Set.t Filepath.Map.t * Set.t Filepath.Map.t
   (** [read_write_maps ops] is [reads, writes] with [reads] mapping
       file paths to operations that reads them and [writes] mapping
       file paths to operations that write them. *)
 
-  val write_map : t list -> Set.t Fpath.Map.t
+  val write_map : t list -> Set.t Filepath.Map.t
   (** [write_map os] is [snd (read_write_maps os)]. If one of the
       operation sets in the map is not a singleton the operations
       should likely not be run toghether. *)
@@ -715,7 +718,7 @@ module Op : sig
   type aggregate_error =
   | Failures (** Some operations failed. *)
   | Cycle of t list (** Dependency cycle. *)
-  | Never_became_ready of Fpath.Set.t (** Some files never became ready. *)
+  | Never_became_ready of Filepath.Set.t (** Some files never became ready. *)
   (** The type for errors related to a {e list} of operations. This is:
       {ul
       {- [Failures], if there is one or more operations in the list that
@@ -734,15 +737,15 @@ module Op : sig
       them would not lead the user to focus on the right cause. *)
 
   val find_aggregate_error :
-    ready_roots:Fpath.Set.t -> t list -> (unit, aggregate_error) result
+    ready_roots:Filepath.Set.t -> t list -> (unit, aggregate_error) result
   (** [find_aggregate_error ~ready_roots os] finds an aggregate error among
       the list of operation [os], assuming files [ready_roots] were made
       ready. This is [Ok ()] if all operations [os] are
       {!Success}. *)
 
   type build_correctness_error =
-  | Read_before_written of { file : Fpath.t; writer : t; readers : t list }
-  | Multiple_writes of { file : Fpath.t; writers : t list } (** *)
+  | Read_before_written of { file : Filepath.t; writer : t; readers : t list }
+  | Multiple_writes of { file : Filepath.t; writers : t list } (** *)
   (** The type for build correctness errors.
 
       {b Important.} The first kind of error indicates a bug in the memo
@@ -798,7 +801,7 @@ module Reviver : sig
   val hash_string : t -> string -> B0_hash.t
   (** [hash_string r s] hashes [s] using [r]'s {!hash_fun}. *)
 
-  val hash_file : t -> Fpath.t -> (B0_hash.t, string) result
+  val hash_file : t -> Filepath.t -> (B0_hash.t, string) result
   (** [hash_file r f] hashes file [f] using [r]'s {!hash_fun}. Note
       that file hashes are {{!file_hashes}cached} by [r]. *)
 
@@ -807,7 +810,7 @@ module Reviver : sig
       file of the build operation can't be hashed, this is most
       likely because an input file does not exist. *)
 
-  val file_hashes : t -> B0_hash.t Fpath.Map.t
+  val file_hashes : t -> B0_hash.t Filepath.Map.t
   (** [file_hashes r] is a map of the files that were hashed. *)
 
   val file_hash_dur : t -> Mtime.Span.t
@@ -869,11 +872,11 @@ module Guard : sig
   val make : unit -> t
   (** [make ()] is a new guard. *)
 
-  val set_file_ready : t -> Fpath.t -> unit
+  val set_file_ready : t -> Filepath.t -> unit
   (** [set_file_ready g f] indicates to [g] that file [f] is ready,
       i.e. that it exists and is up-to-date. *)
 
-  val set_file_never : t -> Fpath.t -> unit
+  val set_file_never : t -> Filepath.t -> unit
   (** [set_file_never g f] indicate to [g] that file [f] will never
       become ready. *)
 
@@ -904,7 +907,7 @@ module Exec : sig
   (** The type for executors. *)
 
   val make :
-    ?clock:Os.Mtime.counter -> ?rand:Random.State.t -> ?tmp_dir:Fpath.t ->
+    ?clock:Os.Mtime.counter -> ?rand:Random.State.t -> ?tmp_dir:Filepath.t ->
     ?feedback:(feedback -> unit) -> trash:Trash.t -> jobs:int -> unit -> t
   (** [make ~clock ~rand ~tmp_dir ~feedback ~trash ~jobs] with:
       {ul
@@ -924,7 +927,7 @@ module Exec : sig
   val clock : t -> Os.Mtime.counter
   (** [clock e] is [e]'s clock. *)
 
-  val tmp_dir : t -> Fpath.t
+  val tmp_dir : t -> Filepath.t
   (** [tmp_dir e] is [e]'s temporary directory. *)
 
   val trash : t -> Trash.t

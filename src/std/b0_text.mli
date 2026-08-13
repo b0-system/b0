@@ -14,7 +14,7 @@
     and the {{!Textloc.type-line_pos}line positions} on which those occur. *)
 module Textloc : sig
 
-  (** {1:fpath File paths} *)
+  (** {1:filepath File paths} *)
 
   type filepath = string
   (** The type for file paths. *)

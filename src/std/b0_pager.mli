@@ -46,7 +46,7 @@ val page_stdout : t -> (unit, string) result
        waits upon the [cmd] spawn termination.}}
     If [does_page p] is [false] this function has no effect. *)
 
-val page_files : t -> Fpath.t list -> (unit, string) result
+val page_files : t -> Filepath.t list -> (unit, string) result
 (** [page_files p fs] uses [pager] to page the files [fs]. If [does_page p]
     is:
     {ul

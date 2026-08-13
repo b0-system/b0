@@ -17,7 +17,7 @@ let with_cache_dir cache_dir k =
   let* exists = Os.Dir.exists cache_dir in
   if exists then k cache_dir else
   (Log.err begin fun m ->
-      m "@[<v>%a:@,No such cache directory.@]" Fpath.pp cache_dir
+      m "@[<v>%a:@,No such cache directory.@]" Filepath.pp cache_dir
     end;
    Ok err_no_cache)
 
@@ -63,7 +63,7 @@ let keys ~b0_dir ~cache_dir ~kind ~log_files =
 
 let path ~b0_dir ~cache_dir =
   let* (_cwd, _b0_dir, cache_dir) = find_dirs ~b0_dir ~cache_dir in
-  Log.stdout (fun m -> m "%a" Fpath.pp cache_dir);
+  Log.stdout (fun m -> m "%a" Filepath.pp cache_dir);
   Ok 0
 
 let stats ~b0_dir ~cache_dir ~log_files  =
@@ -106,7 +106,7 @@ let dry_run = B0_memo_cli.File_cache.dry_run ()
 let key_kind = B0_memo_cli.File_cache.key_kind_cli ()
 let doc_log = "The hashes in $(docv) defines keys that are in use. Repeatable."
 let log_files_pos0 =
-  Arg.(pos_all B0_std_cli.filepath [] & info [] ~doc:doc_log ~docv:"LOG_FILE")
+  Arg.(pos_all B0_std_cli.file [] & info [] ~doc:doc_log ~docv:"LOG_FILE")
 
 let required_log_files_pos0 = Arg.(non_empty & log_files_pos0)
 let optional_log_files_pos0 = Arg.(value & log_files_pos0)
@@ -120,7 +120,7 @@ let delete_cmd =
   let+ set_log_level and+ b0_dir and+ cache_dir and+ kind = key_kind
   and+ keys = B0_memo_cli.File_cache.keys_none_is_all ()
   and+ log_files =
-    Arg.(value & opt_all B0_std_cli.filepath [] &
+    Arg.(value & opt_all B0_std_cli.file [] &
          info ["l";"log-file"] ~doc:doc_log)
   in
   delete ~b0_dir ~cache_dir ~kind ~keys ~log_files

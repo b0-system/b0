@@ -108,25 +108,25 @@ let b0_dir
     ?doc_none:(absent = "$(b,_b0) in root directory")
     ?(env = b0_dir_var) ()
   =
-  Arg.(value & opt (some B0_std_cli.dirpath) None &
+  Arg.(value & opt (some B0_std_cli.dir) None &
        info opts ~env ~absent ~doc ~docs)
 
 let get_b0_dir ~cwd ~root ~b0_dir = match b0_dir with
-| None -> Fpath.(root / b0_dirname)
-| Some d -> Fpath.(cwd // d)
+| None -> Filepath.(root / b0_dirname)
+| Some d -> Filepath.(cwd // d)
 
 let get_b0_dir_path ~cwd ~b0_dir default p = match p with
-| None -> Fpath.(b0_dir / default)
-| Some p -> Fpath.(cwd // p)
+| None -> Filepath.(b0_dir / default)
+| Some p -> Filepath.(cwd // p)
 
 let find_dir_with_b0_dir ~start =
   let rec loop p =
-    if Fpath.is_root p then None else
-    match Os.Dir.exists Fpath.(p / b0_dirname) with
-    | Error _ | Ok false -> loop (Fpath.parent p)
+    if Filepath.is_root p then None else
+    match Os.Dir.exists Filepath.(p / b0_dirname) with
+    | Error _ | Ok false -> loop (Filepath.parent p)
     | Ok true -> Some p
   in
-  if Fpath.is_relative start then None else (loop start)
+  if Filepath.is_relative start then None else (loop start)
 
 (* File cache directory *)
 

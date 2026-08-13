@@ -52,42 +52,42 @@ val current_meta : t -> B0_meta.t
     {b FIXME} Unify the directory story with {!B0_action} and
     We likely want to get rid of a few of the functions below. *)
 
-val unit_dir : t -> b0_unit -> Fpath.t
+val unit_dir : t -> b0_unit -> Filepath.t
 (** [unit_dir b u] is the unit build directory for unit [u].
     This is where [u] should write is build artefacts. *)
 
-val unit_scope_dir : t -> b0_unit -> Fpath.t
+val unit_scope_dir : t -> b0_unit -> Filepath.t
 (** [unit_scope_dir b u] is the directory of the b0 file in which [u] was
     defined. This is were unit relative paths like source files
     should be resolved. *)
 
-val current_dir : t -> Fpath.t
+val current_dir : t -> Filepath.t
 (** [current_dir b] is [unit_dir b current]. *)
 
-val scope_dir : t -> Fpath.t
+val scope_dir : t -> Filepath.t
 (** [scope_dir b] is [unit_scope_dir b current]. *)
 
-val shared_dir : t -> Fpath.t
+val shared_dir : t -> Filepath.t
 (** [shared_dir b] is a build directory shared by all units of the
      build. This is used by computations shared by units, most of the
      time one should rather use {!current_dir}. *)
 
 (** {1:rel Relative file resolution} *)
 
-val in_unit_dir : t -> b0_unit -> Fpath.t -> Fpath.t
-(** [in_unit_dir b u p] is [Fpath.(unit_dir b u // p)]. *)
+val in_unit_dir : t -> b0_unit -> Filepath.t -> Filepath.t
+(** [in_unit_dir b u p] is [Filepath.(unit_dir b u // p)]. *)
 
-val in_unit_scope_dir : t -> b0_unit -> Fpath.t -> Fpath.t
-(** [in_unit_scope_dir b u p] is [Fpath.(unit_scope_dir b u // p)]) *)
+val in_unit_scope_dir : t -> b0_unit -> Filepath.t -> Filepath.t
+(** [in_unit_scope_dir b u p] is [Filepath.(unit_scope_dir b u // p)]) *)
 
-val in_current_dir : t -> Fpath.t -> Fpath.t
-(** [in_current_dir b p] is [Fpath.(current_dir b // p)]). *)
+val in_current_dir : t -> Filepath.t -> Filepath.t
+(** [in_current_dir b p] is [Filepath.(current_dir b // p)]). *)
 
-val in_scope_dir : t -> Fpath.t -> Fpath.t
-(** [in_scope_dir b p] is [Fpath.(scope_dir b // p)]). *)
+val in_scope_dir : t -> Filepath.t -> Filepath.t
+(** [in_scope_dir b p] is [Filepath.(scope_dir b // p)]). *)
 
-val in_shared_dir : t -> Fpath.t -> Fpath.t
-(** [in_shared_dir b p] is [Fpath.(shared_dir b // p)]). *)
+val in_shared_dir : t -> Filepath.t -> Filepath.t
+(** [in_shared_dir b p] is [Filepath.(shared_dir b // p)]). *)
 
 (** {1:store Store} *)
 
@@ -105,7 +105,7 @@ val self : t B0_store.key
 (** {1:run Creating and running} *)
 
 val make :
-  root_dir:Fpath.t -> b0_dir:Fpath.t -> variant:string ->
+  root_dir:Filepath.t -> b0_dir:Filepath.t -> variant:string ->
   store:B0_store.binding list -> B0_memo.t ->
   may_build:b0_unit_set -> must_build:b0_unit_set -> t
 (** [make ~root_dir ~b0_dir m ~may_build ~must_build]
@@ -132,30 +132,30 @@ module B0_dir : sig
 
   (** {1:build Build directories} *)
 
-  val default_build_dir : b0_dir:Fpath.t -> (Fpath.t, string) result
+  val default_build_dir : b0_dir:Filepath.t -> (Filepath.t, string) result
   (** [default_build_dir ~b0_dir] is the build directory affected
       by the cli by default. *)
 
-  val build_dir : b0_dir:Fpath.t -> variant:string -> Fpath.t
+  val build_dir : b0_dir:Filepath.t -> variant:string -> Filepath.t
   (** [build_dir ~b0_dir ~variant] is the designated directory
       for the build variant [variant] in [b0_dir]. *)
 
   (** {1:build Build directory structure} *)
 
-  val log_file : build_dir:Fpath.t -> Fpath.t
+  val log_file : build_dir:Filepath.t -> Filepath.t
 
-  val shared_build_dir : build_dir:Fpath.t -> Fpath.t
+  val shared_build_dir : build_dir:Filepath.t -> Filepath.t
   (** [shared_build_dir ~build_dir] is the shared directory of [build_dir]
       obtained via {!build_dir}. *)
 
-  val store_dir : build_dir:Fpath.t -> Fpath.t
+  val store_dir : build_dir:Filepath.t -> Filepath.t
   (** [store_dir ~build_dir] is the store directory of [build_dir] obtained
       via [!build_dir]. *)
 
-  val unit_build_dir : build_dir:Fpath.t -> name:string -> Fpath.t
+  val unit_build_dir : build_dir:Filepath.t -> name:string -> Filepath.t
 
   (** {1:other Other} *)
 
-  val scratch_dir : b0_dir:Fpath.t -> Fpath.t
+  val scratch_dir : b0_dir:Filepath.t -> Filepath.t
   (** [scratch_dir b0_dir] can be used by cmdlets. *)
 end

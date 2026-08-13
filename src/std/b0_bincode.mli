@@ -56,10 +56,10 @@ val to_string : ?buf:Buffer.t -> 'a t -> 'a -> string
 (** [encode c v] encodes [v] using [c] (and [buf] if provided, it is
     the client's duty to reset it before an encoding). *)
 
-val of_string : ?file:Fpath.t -> 'a t -> string -> ('a, string) result
+val of_string : ?file:Filepath.t -> 'a t -> string -> ('a, string) result
 (** [of_string ~file c s] decodes a value from [s] using [c] and
     {!dec_eoi}. In case of error [file] is mentioned in the error
-    message (defaults to {!B0_std.Fpath.dash}). *)
+    message (defaults to {!B0_std.Filepath.dash}). *)
 
 (** {1:base Base codecs} *)
 
@@ -147,16 +147,16 @@ val dec_string : string dec
 val string : string t
 (** [string] is a codec for [string]. *)
 
-(** {2:fpath [Fpath.t]} *)
+(** {2:fpath [Filepath.t]} *)
 
-val enc_fpath : Fpath.t enc
-(** [enc_fpath] encodes an {!B0_std.Fpath.t}. *)
+val enc_filepath : Filepath.t enc
+(** [enc_filepath] encodes an {!B0_std.Filepath.t}. *)
 
-val dec_fpath : Fpath.t dec
-(** [dec_fpath] decodes an {!B0_std.Fpath.t}. *)
+val dec_filepath : Filepath.t dec
+(** [dec_filepath] decodes an {!B0_std.Filepath.t}. *)
 
-val fpath : Fpath.t t
-(** [fpath] is a coded for [!B0_std.Fpath.t]. *)
+val filepath : Filepath.t t
+(** [filepath] is a coded for [!B0_std.Filepath.t]. *)
 
 (** {2:list [list]} *)
 

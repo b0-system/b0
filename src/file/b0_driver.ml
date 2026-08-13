@@ -41,10 +41,10 @@ module Conf = struct
   let b0_file_name = "B0.ml"
   let drivers_dir_name = ".drivers"
   type t =
-    { b0_dir : Fpath.t;
-      b0_file : Fpath.t option;
-      cache_dir : Fpath.t;
-      cwd : Fpath.t;
+    { b0_dir : Filepath.t;
+      b0_file : Filepath.t option;
+      cache_dir : Filepath.t;
+      cwd : Filepath.t;
       env : Os.Env.t;
       code : B0_ocaml.Code.t option;
       hash_fun : (module B0_hash.T);
@@ -66,7 +66,7 @@ module Conf = struct
       ~b0_dir ~b0_file ~cache_dir ~cwd ~code ~env ~hash_fun ~jobs
       ~no_pager ()
     =
-    let trash_dir = Fpath.(b0_dir / B0_memo_cli.trash_dirname) in
+    let trash_dir = Filepath.(b0_dir / B0_memo_cli.trash_dirname) in
     let memo = lazy (memo ~hash_fun ~cwd ~env ~cache_dir ~trash_dir ~jobs) in
     { b0_dir; b0_file; cache_dir; cwd; code; env; hash_fun; jobs;
       memo; no_pager; }
@@ -85,7 +85,7 @@ module Conf = struct
   let get_b0_file c = match c.b0_file with
   | Some file -> Ok file
   | None ->
-      let path = Fmt.(code' Fpath.pp_unquoted) in
+      let path = Fmt.(code' Filepath.pp_unquoted) in
       Fmt.error
         "@[<v>No %a file found in %a@,\
                  or upwards. Use option %a to specify one or %a for help.@]"
@@ -95,14 +95,14 @@ module Conf = struct
   (* Setup *)
 
   let find_b0_file ~cwd ~b0_file = match b0_file with
-  | Some b0_file -> Some (Fpath.(cwd // b0_file))
+  | Some b0_file -> Some (Filepath.(cwd // b0_file))
   | None ->
       let rec loop dir =
-        let file = Fpath.(dir / b0_file_name) in
+        let file = Filepath.(dir / b0_file_name) in
         match Os.File.exists file with
         | Ok true -> Some file
         | _ ->
-            if not (Fpath.is_root dir) then loop (Fpath.parent dir) else None
+            if not (Filepath.is_root dir) then loop (Filepath.parent dir) else None
       in
       loop cwd
 
@@ -118,7 +118,7 @@ module Conf = struct
     let* cwd = Os.Dir.cwd () in
     let* env = Os.Env.current () in
     let b0_file = find_b0_file ~cwd ~b0_file in
-    let root = match b0_file with Some f -> Fpath.parent f | None -> cwd  in
+    let root = match b0_file with Some f -> Filepath.parent f | None -> cwd  in
     let b0_dir = B0_cli.get_b0_dir ~cwd ~root ~b0_dir in
     let cache_dir = B0_cli.get_cache_dir ~cwd ~b0_dir ~cache_dir in
     let hash_fun = B0_memo_cli.Hash.get_hash_fun ~hash_fun in
@@ -137,7 +137,7 @@ module Cli = struct
     let env = Cmd.Env.info Env.b0_file in
     let doc = "Use $(docv) as the b0 file." and docv = "PATH" in
     let absent = "$(b,B0.ml) file in cwd or first upwards" in
-    Arg.(value & opt (Arg.some B0_std_cli.filepath) None &
+    Arg.(value & opt (Arg.some B0_std_cli.file) None &
          info ["b0-file"] ~absent ~doc ~docv ~docs ~env)
 
   let cache_dir = B0_memo_cli.File_cache.dir ()
@@ -217,13 +217,13 @@ module Compile = struct
   open B0_std.Fut.Syntax
 
   let build_dir c ~driver =
-    Fpath.(Conf.b0_dir c / Conf.drivers_dir_name / name driver)
+    Filepath.(Conf.b0_dir c / Conf.drivers_dir_name / name driver)
 
   let build_log c ~driver =
-    Fpath.(Conf.b0_dir c / Conf.drivers_dir_name / name driver / "log")
+    Filepath.(Conf.b0_dir c / Conf.drivers_dir_name / name driver / "log")
 
   let exe c ~driver =
-    Fpath.(Conf.b0_dir c / Conf.drivers_dir_name / name driver / "exe")
+    Filepath.(Conf.b0_dir c / Conf.drivers_dir_name / name driver / "exe")
 
   let write_src m c expanded_src ~file_api_stamp ~src_file =
     let src_reads = B0_file.expanded_file_manifest expanded_src in
@@ -250,9 +250,9 @@ module Compile = struct
     match Os.Env.var ~empty_is_none:true "B0_BOOTSTRAP" with
     | None -> find_libs m r libs
     | Some bdir ->
-        let bdir = Fpath.v bdir in
+        let bdir = Filepath.v bdir in
         let boot_lib libname =
-          let dir = Fpath.(bdir / B0_ocaml.Libname.undot ~rep:'-' libname) in
+          let dir = Filepath.(bdir / B0_ocaml.Libname.undot ~rep:'-' libname) in
           let archive = Some (B0_ocaml.Libname.to_archive_name libname) in
           let lib =
             B0_ocaml.Lib.of_dir m ~clib_ext ~libname ~requires:[]
@@ -266,7 +266,7 @@ module Compile = struct
 
   let find_libs m ocaml_conf ~build_dir ~driver ~requires =
     let cache_dir =
-      Fpath.(build_dir / B0_ocaml.Libresolver.Scope.cache_dir_name)
+      Filepath.(build_dir / B0_ocaml.Libresolver.Scope.cache_dir_name)
     in
     (* let ocamlpath = B0_ocaml.Libresolver.Scope.ocamlpath ~cache_dir in *)
     let ocamlfind = B0_ocaml.Libresolver.Scope.ocamlfind ~cache_dir in
@@ -306,7 +306,7 @@ module Compile = struct
       | Some comp -> Fut.return (B0_ocaml.Tool.ocamlopt, B0_ocaml.Code.Native)
 
   let compile_src m c ~driver ~build_dir src ~exe =
-    let ocaml_conf = Fpath.(build_dir / "ocaml.conf") in
+    let ocaml_conf = Filepath.(build_dir / "ocaml.conf") in
     let* comp, code = find_compiler c m in
     B0_ocaml.Conf.write m ~comp ~o:ocaml_conf;
     let* ocaml_conf = B0_ocaml.Conf.read m ocaml_conf in
@@ -317,7 +317,7 @@ module Compile = struct
     let* b0_file_lib, all_libs, seen_libs =
       find_libs m ocaml_conf ~build_dir ~driver ~requires
     in
-    let src_file = Fpath.(build_dir / "src.ml") in
+    let src_file = Filepath.(build_dir / "src.ml") in
     let file_api_stamp = match code with (* archive changes when API does *)
     | B0_ocaml.Code.Byte -> Option.to_list (B0_ocaml.Lib.cma b0_file_lib)
     | B0_ocaml.Code.Native -> Option.to_list (B0_ocaml.Lib.cmxa b0_file_lib)
@@ -325,8 +325,8 @@ module Compile = struct
     in
     write_src m c expanded_src ~file_api_stamp ~src_file;
     let writes =
-      let base = Fpath.drop_ext ~multi:false src_file in
-      let base ext = Fpath.(base + ext) in
+      let base = Filepath.drop_ext ~multi:false src_file in
+      let base ext = Filepath.(base + ext) in
       match code with
       | B0_ocaml.Code.Byte -> [base ".cmo"; exe ]
       | B0_ocaml.Code.Native -> [base ".cmx"; base obj_ext; exe ]
@@ -383,7 +383,7 @@ module Compile = struct
           B0_zero_conv.Op.pp_aggregate_error
             ~read_howto ~write_howto () Fmt.stderr e;
         Fmt.error "Could not compile b0 file %a"
-          Fmt.(code' Fpath.pp) (B0_file.file src)
+          Fmt.(code' Filepath.pp) (B0_file.file src)
 end
 
 let compile_b0_file conf ~driver ~feedback b0_file =
@@ -398,7 +398,7 @@ let with_b0_file ~driver cmd =
     let* b0_file = Conf.get_b0_file conf in
     Log.if_error' ~use:Exit.b0_file_error @@
     let* exe = compile_b0_file conf ~driver ~feedback:true b0_file in
-    let exe = Fpath.to_string exe in
+    let exe = Filepath.to_string exe in
     let cmd = match Array.to_list Sys.argv with
     | [] -> Cmd.arg exe
     | _ :: args -> Cmd.list (exe :: args)
@@ -421,7 +421,7 @@ let with_b0_file_if_any ~driver cmd =
             has_failed_b0_file := true;
             cmd conf
         | Ok exe ->
-            let exe = Fpath.to_string exe in
+            let exe = Filepath.to_string exe in
             let cmd = match Array.to_list Sys.argv with
             | [] -> Cmd.arg exe
             | _ :: args -> Cmd.list (exe :: args)

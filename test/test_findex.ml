@@ -8,7 +8,7 @@ open B0_std
 let () =
   try
     let dirs = List.tl (Array.to_list Sys.argv) in
-    let dirs = List.map Fpath.of_string dirs in
+    let dirs = List.map Filepath.of_string dirs in
     let dirs = List.map Result.error_to_failure dirs in
     let c = Os.Mtime.counter () in
     let dotfiles = true and follow_symlinks = true in

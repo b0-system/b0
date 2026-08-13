@@ -14,11 +14,11 @@ let feedback =
 let with_memo ?jobs f =
   Result.error_to_failure @@
   Result.bind (Os.Dir.cwd ()) @@ fun cwd ->
-  let tmp_dir = (* Os.Dir.default_tmp () *) Fpath.v "/tmp" in
-  let log_file = Fpath.(tmp_dir / "b0-test" / "log") in
-  let cache_dir = Fpath.(tmp_dir / "b0-test" / "cache") in
-  let trash_dir = Fpath.(tmp_dir / "b0-test" / "trash") in
-  let build_dir = Fpath.(tmp_dir / "b0-test") in
+  let tmp_dir = (* Os.Dir.default_tmp () *) Filepath.v "/tmp" in
+  let log_file = Filepath.(tmp_dir / "b0-test" / "log") in
+  let cache_dir = Filepath.(tmp_dir / "b0-test" / "cache") in
+  let trash_dir = Filepath.(tmp_dir / "b0-test" / "trash") in
+  let build_dir = Filepath.(tmp_dir / "b0-test") in
   Result.bind
     (B0_memo.make ~cwd ~cache_dir ~trash_dir ?jobs ~feedback ()) @@
   fun m ->

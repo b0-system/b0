@@ -13,7 +13,7 @@ module Tool = struct
 
   type response_file =
     { to_file : Cmd.t -> string;
-      cli : Fpath.t -> Cmd.t; }
+      cli : Filepath.t -> Cmd.t; }
 
   let response_file_of to_file cli = { to_file; cli }
   let args0 =
@@ -22,7 +22,7 @@ module Tool = struct
     { to_file; cli }
 
   type t =
-    { name : Fpath.t;
+    { name : Filepath.t;
       vars : env_vars;
       unstamped_vars : env_vars;
       response_file : response_file option; }
@@ -31,9 +31,9 @@ module Tool = struct
     { name; vars; unstamped_vars; response_file }
 
   let by_name ?response_file ?unstamped_vars ?vars name =
-    match Fpath.is_segment name with
+    match Filepath.is_segment name with
     | false -> Fmt.invalid_arg "%S: tool is not a path segment" name
-    | true -> make ?unstamped_vars ?vars (Fpath.v name)
+    | true -> make ?unstamped_vars ?vars (Filepath.v name)
 
   let name t = t.name
   let vars t = t.vars
@@ -53,12 +53,12 @@ end
 type feedback = [ `Op_complete of Op.t ]
 type t = { c : ctx; m : memo }
 and ctx = { mark : Op.mark }
-and tool_lookup = t -> Cmd.tool -> (Fpath.t, string) result Fut.t
+and tool_lookup = t -> Cmd.tool -> (Filepath.t, string) result Fut.t
 and memo =
   { clock : Os.Mtime.counter;
     cpu_clock : Os.Cpu.Time.counter;
     feedback : feedback -> unit;
-    cwd : Fpath.t;
+    cwd : Filepath.t;
     win_exe : bool;
     tool_lookup : tool_lookup;
     env : Os.Env.t;
@@ -69,7 +69,7 @@ and memo =
     mutable has_failures : bool;
     mutable op_id : int;
     mutable ops : Op.t list;
-    mutable ready_roots : Fpath.Set.t; }
+    mutable ready_roots : Filepath.Set.t; }
 
 (* Properties *)
 
@@ -100,7 +100,7 @@ let ready_file m p =
      done by multiple resolvers. Fundamentally ready_roots had
      to be added for correct "never became ready" error reports. *)
   Guard.set_file_ready m.m.guard p;
-  m.m.ready_roots <- Fpath.Set.add p m.m.ready_roots
+  m.m.ready_roots <- Filepath.Set.add p m.m.ready_roots
 
 let ready_files m ps = List.iter (ready_file m) ps
 
@@ -115,7 +115,7 @@ let tool_lookup_of_os_env ?sep ?(var = "PATH") env =
   match Os.Env.find var env with
   | None -> fun _ _ -> Fut.return (Fmt.error "%s env: undefined" var)
   | Some search_path ->
-      match Fpath.list_of_search_path ?sep search_path with
+      match Filepath.list_of_search_path ?sep search_path with
       | Error _ as e -> fun _ _ -> Fut.return e
       | Ok path ->
           fun m t ->
@@ -143,7 +143,7 @@ let make_zero
   let m =
     { clock; cpu_clock; feedback; cwd; win_exe; tool_lookup; env;
       forced_env_vars; guard; reviver; exec; has_failures = false; op_id; ops;
-      ready_roots = Fpath.Set.empty }
+      ready_roots = Filepath.Set.empty }
   in
   Ok { c = { mark = "" }; m }
 
@@ -356,8 +356,8 @@ let copy m ?(mode = 0o644) ?linenum src ~dst =
 
 let copy_to_dir m ?mode ?linenum ?src_root src ~dst_dir =
   let dst = match src_root with
-  | None -> Fpath.(dst_dir / Fpath.basename src)
-  | Some src_root -> Fpath.reroot ~src_root ~dst_root:dst_dir src
+  | None -> Filepath.(dst_dir / Filepath.basename src)
+  | Some src_root -> Filepath.reroot ~src_root ~dst_root:dst_dir src
   in
   copy m ?mode ?linenum src ~dst; dst
 
@@ -372,8 +372,8 @@ let ready_and_copy_dir
   let copy_file st name src acc =
     if prune st name src then acc else
     let dst = match rel with
-    | true -> Fpath.(dst_root // src)
-    | false -> Fpath.reroot ~src_root ~dst_root src
+    | true -> Filepath.(dst_root // src)
+    | false -> Filepath.reroot ~src_root ~dst_root src
     in
     ready_file m src;
     copy m ?mode ?linenum src ~dst;
@@ -405,7 +405,7 @@ let delete m p =
 
 type _tool =
   { tool : Tool.t;
-    tool_file : Fpath.t;
+    tool_file : Filepath.t;
     tool_env : Os.Env.assignments;
     tool_stamped_env : Os.Env.assignments; }
 
@@ -430,13 +430,13 @@ let spawn_env m cmd_tool = function
 let tool m tool =
   let cmd_tool =
     let name, is_path =
-      let name = Fpath.to_string (Tool.name tool) in
+      let name = Filepath.to_string (Tool.name tool) in
       let name =
         let suffix = ".exe" in
         if not m.m.win_exe || String.ends_with ~suffix name then name else
         name ^ suffix
       in
-      Fpath.v name, String.exists Fpath.is_dir_sep_char name
+      Filepath.v name, String.exists Filepath.is_dir_sep_char name
     in
     let tool_file = match is_path with
     | true -> Fut.return (Ok name)

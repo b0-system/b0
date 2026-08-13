@@ -38,8 +38,8 @@ let raise_no_scope_error ~kind ~name =
 
 type file =
   { qname : qualified_name; (* The fully qualified name scope. *)
-    file : Fpath.t;
-    dir : Fpath.t }
+    file : Filepath.t;
+    dir : Filepath.t }
 
 type lib =
   { module' : string;
@@ -96,7 +96,7 @@ let check_no_scope () = match !current with
 | None -> ()
 | Some Lib lib -> Fmt.invalid_arg "Unclosed library scope %s" lib.qname
 | Some File (file, _) ->
-    Fmt.invalid_arg "Unclosed file scope %s %a" file.qname Fpath.pp file.file
+    Fmt.invalid_arg "Unclosed file scope %s %a" file.qname Filepath.pp file.file
 
 (* Sealing *)
 
@@ -147,7 +147,7 @@ let open_lib ~module' lib =
 
 (* File scopes *)
 
-let root_scope file = File ({ qname = ""; file; dir = Fpath.parent file}, [])
+let root_scope file = File ({ qname = ""; file; dir = Filepath.parent file}, [])
 let current_is_root () = match !current with
 | Some scope -> is_root scope | _ -> false
 
@@ -171,7 +171,7 @@ let pp_uncaught_exn ppf (exn, bt) =
                 | false -> loop file found slots (i + 1) max
                 | true -> loop file (Some loc) slots (i + 1) max
         in
-        loop (Fpath.to_string file) None slots 0 (Array.length slots - 1)
+        loop (Filepath.to_string file) None slots 0 (Array.length slots - 1)
     in
     match !current with
     | None -> invalid_arg "no current scope"
@@ -188,7 +188,7 @@ let pp_uncaught_exn ppf (exn, bt) =
                   loc.Printexc.start_char
                   loc.Printexc.end_char
         in
-        Fmt.str "File %S, %s:" (Fpath.to_string file.file) loc
+        Fmt.str "File %S, %s:" (Filepath.to_string file.file) loc
   in
   let pp_error_label ppf () = Fmt.st [`Fg `Red; `Bold] ppf "Error" in
   let pp_error ppf (err, bt) =
@@ -216,11 +216,11 @@ let open_root file =
 let open_file name file = match !current with
 | Some File ({ qname; _ } as parent, parents) ->
     let qname = if qname <> "" then String.concat sep [qname; name] else name in
-    let new' = { qname; file; dir = Fpath.parent file } in
+    let new' = { qname; file; dir = Filepath.parent file } in
     current := Some (File (new', parent :: parents))
 | _ ->
     Fmt.invalid_arg
-      "No root scope found to open scope %s for file %a" name Fpath.pp file
+      "No root scope found to open scope %s for file %a" name Filepath.pp file
 
 (* Current *)
 

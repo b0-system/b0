@@ -16,9 +16,9 @@ val tool : B0_memo.Tool.t
 
 (** {2:metadata Metadata} *)
 
-val assets_root : Fpath.t B0_meta.key
+val assets_root : Filepath.t B0_meta.key
 (** [assets_root] indicates the path with respect to which page assets
-    are are {!B0_std.Fpath.reroot}ed. Assets that are not prefixed by
+    are are {!B0_std.Filepath.reroot}ed. Assets that are not prefixed by
     [assets_root] are simply copied at the toplevel of the build
     dir. *)
 
@@ -61,7 +61,7 @@ val link_opts : Cmd.t B0_meta.key
 
 val exe :
   ?wrap:(B0_unit.build_proc -> B0_unit.build_proc) -> ?doc:string ->
-  ?meta:B0_meta.t -> ?assets_root:Fpath.t ->
+  ?meta:B0_meta.t -> ?assets_root:Filepath.t ->
   ?requires:B0_ocaml.Libname.t list -> ?public:bool -> ?name:string ->
   string -> srcs:B0_srcs.sels -> B0_unit.t
 (** [exe exename] is a JavaScript "executable" file named [exename].
@@ -86,7 +86,7 @@ val exe :
 
 val html_page :
   ?wrap:(B0_unit.build_proc -> B0_unit.build_proc) -> ?doc:string ->
-  ?meta:B0_meta.t -> ?assets_root:Fpath.t ->
+  ?meta:B0_meta.t -> ?assets_root:Filepath.t ->
   ?requires:B0_ocaml.Libname.t list -> ?name:string ->
   ?js_file:string -> string -> srcs:B0_srcs.sels ->
   B0_unit.t
@@ -133,28 +133,28 @@ val html_page :
 
 val compile :
   B0_memo.t -> opts:Cmd.t -> source_map:source_map ->
-  jss:Fpath.t list -> byte:Fpath.t -> o:Fpath.t -> unit
+  jss:Filepath.t list -> byte:Filepath.t -> o:Filepath.t -> unit
 (** [compile m ~source_map ~jss ~byte ~o] compiles the JavaScript
     files [jss] and byte code object or executable [byte] to the
     JavaScript file [o]. *)
 
 val link :
-  B0_memo.t -> opts:Cmd.t -> source_map:source_map -> jss:Fpath.t list ->
-  o:Fpath.t -> unit
+  B0_memo.t -> opts:Cmd.t -> source_map:source_map -> jss:Filepath.t list ->
+  o:Filepath.t -> unit
   (** [link m ~opts ~jss ~o] links the JavaScript files [jss] to [o] with
       options [opts]. *)
 
 val build_runtime :
-  B0_memo.t -> opts:Cmd.t -> jss:Fpath.t list -> o:Fpath.t -> unit
+  B0_memo.t -> opts:Cmd.t -> jss:Filepath.t list -> o:Filepath.t -> unit
 (** [build_runtime m ~jss o] writes a standalone runtime with JavaScript
     files [jss] to [o]. *)
 
 val copy_assets :
   B0_memo.t -> B0_file_exts.map -> exts:B0_file_exts.t ->
-  assets_root:Fpath.t option -> dst:B0_std.Fpath.t -> Fpath.Set.t
+  assets_root:Filepath.t option -> dst:B0_std.Filepath.t -> Filepath.Set.t
 (** [copy_assets m srcs ~exts ~assets_root ~dst] copies [srcs] with
     extensions in [exts] to [dst]. If [assets_root] is specified
-    indicates the path w.r.t. which assets are {!B0_std.Fpath.reroot}ed.
+    indicates the path w.r.t. which assets are {!B0_std.Filepath.reroot}ed.
     Assets that are not prefixed by [assets_root] are simply copied
     at the toplevel of [dst].
 
@@ -164,7 +164,7 @@ val copy_assets :
 val write_page :
   ?lang:string -> ?generator:string -> ?styles:string list ->
   ?scripts:string list -> ?title:string -> B0_memo.t ->
-  o:B0_std.Fpath.t -> unit
+  o:B0_std.Filepath.t -> unit
 (** [write_page m ~title ~o] writes to file [o] a full HTML document
     whose body contains only a {!B0_html.El.noscript} element that
     entices the user, in english, to enable JavaScript. [title]

@@ -11,10 +11,10 @@ module rec Build_def : sig
   type t = { u : build_ctx; b : build_state }
   and build_ctx = { current : Unit.t option; m : B0_memo.t; }
   and build_state =
-    { root_dir : Fpath.t;
-      b0_dir : Fpath.t;
-      build_dir : Fpath.t;
-      shared_dir : Fpath.t;
+    { root_dir : Filepath.t;
+      b0_dir : Filepath.t;
+      build_dir : Filepath.t;
+      shared_dir : Filepath.t;
       store : B0_store.t;
       must_build : Unit.Set.t;
       may_build : Unit.Set.t;
@@ -24,10 +24,10 @@ end = struct
   type t = { u : build_ctx; b : build_state }
   and build_ctx = { current : Unit.t option; m : B0_memo.t; }
   and build_state =
-    { root_dir : Fpath.t;
-      b0_dir : Fpath.t;
-      build_dir : Fpath.t;
-      shared_dir : Fpath.t;
+    { root_dir : Filepath.t;
+      b0_dir : Filepath.t;
+      build_dir : Filepath.t;
+      shared_dir : Filepath.t;
       store : B0_store.t;
       must_build : Unit.Set.t;
       may_build : Unit.Set.t;
@@ -56,12 +56,12 @@ type b0_unit = Unit.t
 type b0_unit_set = Unit.Set.t
 type b0_build = Build_def.t
 type b0_env =
-  { b0_dir : Fpath.t;
+  { b0_dir : Filepath.t;
     build : b0_build;
     built_tools : b0_unit String.Map.t Lazy.t;
-    cwd : Fpath.t;
-    root_dir : Fpath.t;
-    scope_dir : Fpath.t;
+    cwd : Filepath.t;
+    root_dir : Filepath.t;
+    scope_dir : Filepath.t;
     build_env : Os.Env.t;
     driver_env : Os.Env.t; }
 
@@ -77,7 +77,7 @@ let tool_is_user_accessible u = unit_is_public u || Unit.in_root_scope u
 
 let () = B0_scope.open_lib ~module':__MODULE__ "unit"
 
-let exe_file : Fpath.t Fut.t B0_meta.key =
+let exe_file : Filepath.t Fut.t B0_meta.key =
   let doc = "Absolute file path to a built executable." in
   let pp_value = Fmt.any "<built value>" in
   B0_meta.Key.make "exe-file" ~doc ~pp_value

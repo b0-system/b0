@@ -34,11 +34,11 @@ type def = t
 val scope : t -> B0_scope.t
 (** [scope d] is the scope in which [d] is defined. *)
 
-val file : t -> Fpath.t option
+val file : t -> Filepath.t option
 (** [file d] is the absolute file path in which [d] is defined, if
     defined in a file. *)
 
-val scope_dir : t -> Fpath.t option
+val scope_dir : t -> Filepath.t option
 (** [scope_dir] is the parent of [file d]. *)
 
 val name : t -> string
@@ -185,19 +185,19 @@ module type S = sig
   val in_current_scope : t -> bool
   (** [in_current_scope v] is [true] iff [v] is in the current scope. *)
 
-  val scope_dir : t -> Fpath.t option
+  val scope_dir : t -> Filepath.t option
   (** [scope_dir v] is the scope directory in which [v] is defined. *)
 
-  val scope_dir' : t -> (Fpath.t, string) result
+  val scope_dir' : t -> (Filepath.t, string) result
   (** [scope_dir' v] is like {!scope_dir} but errors with an
       end-user message if [None]. *)
 
-  val in_scope_dir : t -> Fpath.t -> Fpath.t option
+  val in_scope_dir : t -> Filepath.t -> Filepath.t option
   (** [in_scope_dir v path] makes the path [path] absolute with respect
       to the scope directory in which [v] is defined. This is [None]
       if [v]'s scope has no directory (e.g. on library scopes). *)
 
-  val in_scope_dir' : t -> Fpath.t -> (Fpath.t, string) result
+  val in_scope_dir' : t -> Filepath.t -> (Filepath.t, string) result
   (** [in_scope_dir'] is like {!in_scope_dir} but errors with an end-user
       message if [None]. *)
 

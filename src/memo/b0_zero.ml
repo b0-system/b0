@@ -9,18 +9,18 @@ open Result.Syntax
 let uerror = Unix.error_message
 
 module Trash = struct
-  type t = { dir : Fpath.t }
+  type t = { dir : Filepath.t }
   let make dir = { dir }
   let dir t = t.dir
   let trash t p =
-    Result.map_error (Fmt.str "trashing %a: %s" Fpath.pp p) @@
+    Result.map_error (Fmt.str "trashing %a: %s" Filepath.pp p) @@
     let* exists = Os.Path.exists p in
     if not exists then Ok () else
     let (* deal with races *) force = true and make_path = true in
     let* garbage = Os.Path.tmp ~make_path ~dir:t.dir ~name:"%s" () in
     Os.Path.rename ~force ~make_path p ~dst:garbage
 
-  let err_delete t err = Fmt.str "delete trash %a: %s" Fpath.pp t.dir err
+  let err_delete t err = Fmt.str "delete trash %a: %s" Filepath.pp t.dir err
 
   let delete_blocking t =
     Result.map_error (err_delete t) @@
@@ -30,7 +30,7 @@ module Trash = struct
   let delete_win32 ~block t =
     if block then delete_blocking t else
     let rm = Cmd.(arg "cmd.exe" % "/c" % "rd" % "/s" % "/q" %% path t.dir) in
-    match Os.Cmd.spawn rm (* XXX redirect stdio to Fpath.null ? *) with
+    match Os.Cmd.spawn rm (* XXX redirect stdio to Filepath.null ? *) with
     | Ok _pid -> Ok () | Error e -> Error (err_delete t e)
 
   let rec delete_posix ~block t =
@@ -109,8 +109,8 @@ module File_cache = struct
       | Unix.Unix_error (e, _, _) -> Fmt.failwith_notrace "%s: %s" d (uerror e)
 
     let rec make_path p =
-      let mkdir dir = Unix.mkdir (Fpath.to_string dir) 0o755 in
-      let dir = Fpath.parent p in
+      let mkdir dir = Unix.mkdir (Filepath.to_string dir) 0o755 in
+      let dir = Filepath.parent p in
       try mkdir dir with
       | Unix.Unix_error (Unix.ENOENT, _, _) ->
           let rec down = function
@@ -121,22 +121,22 @@ module File_cache = struct
               | exception Unix.Unix_error (Unix.EEXIST, _, _) -> down ds
               | exception Unix.Unix_error (Unix.EINTR, _, _) -> down arg
               | exception Unix.Unix_error (e, _, _) ->
-                  Fmt.failwith_notrace "%s: %s" (Fpath.to_string d) (uerror e)
+                  Fmt.failwith_notrace "%s: %s" (Filepath.to_string d) (uerror e)
           in
           let rec up todo d = match mkdir d with
           | () -> down todo
           | exception Unix.Unix_error (Unix.ENOENT, _, _) ->
-              up (d :: todo) (Fpath.parent d)
+              up (d :: todo) (Filepath.parent d)
           | exception Unix.Unix_error (Unix.EEXIST, _, _) -> down todo
           | exception Unix.Unix_error (Unix.EINTR, _, _) -> up todo d
           | exception Unix.Unix_error (e, _, _) ->
-              Fmt.failwith_notrace "%s: %s" (Fpath.to_string d) (uerror e)
+              Fmt.failwith_notrace "%s: %s" (Filepath.to_string d) (uerror e)
           in
-          up [dir] (Fpath.parent dir)
+          up [dir] (Filepath.parent dir)
       | Unix.Unix_error (Unix.EEXIST, _, _) -> ()
       | Unix.Unix_error (Unix.EINTR, _, _) -> make_path p
       | Unix.Unix_error (e, _, _) ->
-          Fmt.failwith_notrace "%s: %s" (Fpath.to_string dir) (uerror e)
+          Fmt.failwith_notrace "%s: %s" (Filepath.to_string dir) (uerror e)
 
     let fold_dir_filenames dir f acc =
       let rec closedir_noerr dh = try Unix.closedir dh with
@@ -208,21 +208,21 @@ module File_cache = struct
 
   let make dir =
     let* _exists = Os.Dir.create ~make_path:true dir in
-    let dir = Fpath.ensure_trailing_dir_sep dir (* assumed e.g. by key_dir *) in
-    Ok { dir = Fpath.to_string dir }
+    let dir = Filepath.ensure_trailing_dir_sep dir (* assumed e.g. by key_dir *) in
+    Ok { dir = Filepath.to_string dir }
 
   (* Constructing file paths into the cache *)
 
   let key_ext = ".k"
   let key_meta_filename = "zm"
   let key_manifest_filename = "zmf"
-  let key_dir c k = String.concat "" [c.dir; k; key_ext; Fpath.natural_dir_sep]
+  let key_dir c k = String.concat "" [c.dir; k; key_ext; Filepath.natural_dir_sep]
   let key_of_filename n = String.drop_last (String.length key_ext) n
   let key_dir_of_filename c n =
-    String.concat "" [c.dir; n; Fpath.natural_dir_sep]
+    String.concat "" [c.dir; n; Filepath.natural_dir_sep]
 
   let key_dir_to_key kdir =
-    String.take_last_while (Fun.negate Fpath.is_dir_sep_char) @@
+    String.take_last_while (Fun.negate Filepath.is_dir_sep_char) @@
     String.drop_last (String.length key_ext + 1 (* final dir sep *)) kdir
 
   let filename_is_key_dir dir = String.ends_with ~suffix:key_ext dir
@@ -244,34 +244,34 @@ module File_cache = struct
 
   let key_meta_file c key =
     String.concat ""
-      [c.dir; key; key_ext; Fpath.natural_dir_sep; key_meta_filename ]
+      [c.dir; key; key_ext; Filepath.natural_dir_sep; key_meta_filename ]
 
   let key_manifest_file c key =
     String.concat ""
-      [c.dir; key; key_ext; Fpath.natural_dir_sep; key_manifest_filename]
+      [c.dir; key; key_ext; Filepath.natural_dir_sep; key_manifest_filename]
 
   let key_file c key ~filenum_width ~is_last i =
     (* XXX we could blit directly rather than constructing these lists *)
     let last = if is_last then "z" else "" in
     String.concat ""
-      [c.dir; key; key_ext; Fpath.natural_dir_sep; last;
+      [c.dir; key; key_ext; Filepath.natural_dir_sep; last;
        filenum_str ~filenum_width i ]
 
   (* Manifest files *)
 
   let key_manifest_to_string ~root fs =
-    let rel root f = match Fpath.drop_strict_prefix ~prefix:root f with
-    | Some rel -> Fpath.to_string rel
+    let rel root f = match Filepath.drop_strict_prefix ~prefix:root f with
+    | Some rel -> Filepath.to_string rel
     | None ->
-        Fmt.failwith_notrace "%a: not a prefix of %a" Fpath.pp f Fpath.pp root
+        Fmt.failwith_notrace "%a: not a prefix of %a" Filepath.pp f Filepath.pp root
     in
     String.concat "\n" (List.rev_map (rel root) fs)
 
   let key_manifest_of_string ~root s =
     let path root rel =
-      let p = Fpath.of_string rel |> Result.error_to_failure in
-      if Fpath.is_relative p then Fpath.(root // p) else
-      Fmt.failwith_notrace "%a: path is not relative" Fpath.pp p
+      let p = Filepath.of_string rel |> Result.error_to_failure in
+      if Filepath.is_relative p then Filepath.(root // p) else
+      Fmt.failwith_notrace "%a: path is not relative" Filepath.pp p
     in
     List.rev_map (path root) (String.split_on_char '\n' s)
 
@@ -279,7 +279,7 @@ module File_cache = struct
 
   let key_dir_files kdir =
     let string_rev_compare f0 f1 = String.compare f1 f0 in
-    let file_path f = Fpath.v (kdir ^ f) in
+    let file_path f = Filepath.v (kdir ^ f) in
     match Fs.dir_filenames kdir with
     | None -> None
     | Some fs ->
@@ -314,7 +314,7 @@ module File_cache = struct
 
   (* Cache operations *)
 
-  let dir c = Fpath.v c.dir
+  let dir c = Filepath.v c.dir
 
   let keys c =
     let add_name acc fname = key_of_filename fname :: acc in
@@ -339,7 +339,7 @@ module File_cache = struct
     | [] -> Fs.write_file (kdir ^ key_meta_filename) meta; true
     | f :: fs ->
         let cfile = key_file c k ~filenum_width ~is_last:(fs = []) i in
-        if (add_file ~src:(Fpath.to_string f) cfile)
+        if (add_file ~src:(Filepath.to_string f) cfile)
         then loop (i + 1) fs
         else (ignore (Fs.dir_delete kdir); false)
     in
@@ -370,7 +370,7 @@ module File_cache = struct
 
   let _revive c k fs =
     let rec revive_file ~did_path cfile ~dst =
-      let dst_str = Fpath.to_string dst in
+      let dst_str = Filepath.to_string dst in
       try Fs.copy_file cfile dst_str with
       | Unix.Unix_error (Unix.EEXIST, _, _) ->
           (* XXX should we compare the files for non-clean builds ? *)
@@ -380,7 +380,7 @@ module File_cache = struct
       | Unix.Unix_error (Unix.EINTR, _, _) ->
           revive_file ~did_path cfile ~dst
       | Unix.Unix_error (e, _, arg) ->
-          Fmt.failwith_notrace "%a: %s: %s" Fpath.pp dst arg (uerror e)
+          Fmt.failwith_notrace "%a: %s: %s" Filepath.pp dst arg (uerror e)
     in
     let fs_len = List.length fs in
     let filenum_width = filenum_width fs_len in
@@ -464,33 +464,33 @@ module Op = struct
 
   type failure =
   | Exec of string option
-  | Missing_writes of Fpath.t list
-  | Missing_reads of Fpath.t list
+  | Missing_writes of Filepath.t list
+  | Missing_reads of Filepath.t list
 
   type status = Aborted | Success | Failed of failure | Waiting
 
   (* Operation kinds *)
 
   type copy =
-    { copy_src : Fpath.t; copy_dst : Fpath.t; copy_mode : int;
+    { copy_src : Filepath.t; copy_dst : Filepath.t; copy_mode : int;
       copy_linenum : int option; }
 
-  type delete = { delete_path : Fpath.t; }
-  type mkdir = { mkdir_dir : Fpath.t; mkdir_mode : int; }
+  type delete = { delete_path : Filepath.t; }
+  type mkdir = { mkdir_dir : Filepath.t; mkdir_mode : int; }
   type notify_kind = [ `End | `Fail | `Info | `Start | `Warn ]
   type notify = { notify_kind : notify_kind; notify_msg : string }
   type read =
-    { read_file : Fpath.t;
+    { read_file : Filepath.t;
       (* mutable to discard it after the read as been kontinued. *)
       mutable read_data : string; }
 
-  type spawn_stdo = [ `Ui | `File of Fpath.t | `Tee of Fpath.t ]
+  type spawn_stdo = [ `Ui | `File of Filepath.t | `Tee of Filepath.t ]
   type spawn_success_exits = int list
   type spawn =
     { env : Os.Env.assignments;
       stamped_env : Os.Env.assignments;
-      cwd : Fpath.t;
-      stdin : Fpath.t option;
+      cwd : Filepath.t;
+      stdin : Filepath.t option;
       stdout : spawn_stdo;
       stderr : spawn_stdo;
       success_exits : spawn_success_exits;
@@ -502,7 +502,7 @@ module Op = struct
 
   type wait_files = unit
   type write =
-    { write_stamp : string; write_mode : int; write_file : Fpath.t;
+    { write_stamp : string; write_mode : int; write_file : Filepath.t;
       (* mutable to discard it after the write is done. *)
       mutable write_data : unit -> (string, string) result; }
 
@@ -533,9 +533,9 @@ module Op = struct
       mutable duration : Mtime.Span.t;
       mutable revived : bool;
       mutable status : status;
-      mutable reads : Fpath.t list;
-      mutable writes : Fpath.t list;
-      mutable writes_manifest_root : Fpath.t option;
+      mutable reads : Filepath.t list;
+      mutable writes : Filepath.t list;
+      mutable writes_manifest_root : Filepath.t option;
       mutable hash : B0_hash.t;
       mutable post_exec : (t -> unit) option;
       mutable k : (t -> unit) option;
@@ -782,47 +782,47 @@ module Op = struct
 
   (* Operation analyses *)
 
-  let rec access f acc = try Unix.access (Fpath.to_string f) acc; true with
+  let rec access f acc = try Unix.access (Filepath.to_string f) acc; true with
   | Unix.Unix_error (Unix.EINTR, _, _) -> access f acc
   | _ -> false
 
   let cannot_read o =
     let add acc f = if access f Unix.[F_OK; R_OK] then acc else f :: acc in
-    List.sort Fpath.compare @@ List.fold_left add [] o.reads
+    List.sort Filepath.compare @@ List.fold_left add [] o.reads
 
   let did_not_write o =
     let add acc f = if access f [Unix.F_OK] then acc else f :: acc in
-    List.sort Fpath.compare @@ List.fold_left add [] o.writes
+    List.sort Filepath.compare @@ List.fold_left add [] o.writes
 
   let unready_reads ~ready_roots os =
-    let add_path acc p = Fpath.Set.add p acc in
+    let add_path acc p = Filepath.Set.add p acc in
     let rec loop ws rs = function
-    | [] -> Fpath.Set.diff (Fpath.Set.diff rs ws) ready_roots
+    | [] -> Filepath.Set.diff (Filepath.Set.diff rs ws) ready_roots
     | o :: os ->
         let ws = List.fold_left add_path ws (writes o) in
         let rs = List.fold_left add_path rs (reads o) in
         loop ws rs os
     in
-    loop Fpath.Set.empty Fpath.Set.empty os
+    loop Filepath.Set.empty Filepath.Set.empty os
 
   let read_write_maps os =
     let rec loop rm wm = function
     | [] -> rm, wm
     | o :: os ->
-        let add acc p = Fpath.Map.add_to_set (module Set) p o acc in
+        let add acc p = Filepath.Map.add_to_set (module Set) p o acc in
         let rm = List.fold_left add rm (reads o) in
         let wm = List.fold_left add wm (writes o) in
         loop rm wm os
     in
-    loop Fpath.Map.empty Fpath.Map.empty os
+    loop Filepath.Map.empty Filepath.Map.empty os
 
   let write_map os =
-    let add_write o acc p = Fpath.Map.add_to_set (module Set) p o acc in
+    let add_write o acc p = Filepath.Map.add_to_set (module Set) p o acc in
     let add_writes acc o = List.fold_left (add_write o) acc (writes o) in
-    List.fold_left add_writes Fpath.Map.empty os
+    List.fold_left add_writes Filepath.Map.empty os
 
   let op_deps ~write_map o =
-    let add_read_deps acc r = match Fpath.Map.find r write_map with
+    let add_read_deps acc r = match Filepath.Map.find r write_map with
     | exception Not_found -> acc
     | os -> Set.union os acc
     in
@@ -866,7 +866,7 @@ module Op = struct
   type aggregate_error =
   | Failures
   | Cycle of t list
-  | Never_became_ready of Fpath.Set.t
+  | Never_became_ready of Filepath.Set.t
 
   let find_aggregate_error ~ready_roots os =
     let rec loop ws = function
@@ -885,15 +885,15 @@ module Op = struct
     loop [] os
 
   type build_correctness_error =
-  | Read_before_written of { file : Fpath.t; writer : t; readers : t list }
-  | Multiple_writes of { file : Fpath.t; writers : t list } (** *)
+  | Read_before_written of { file : Filepath.t; writer : t; readers : t list }
+  | Multiple_writes of { file : Filepath.t; writers : t list } (** *)
 
   let find_build_correctness_errors ops =
     let read_by, written_by = read_write_maps ops in
     let add_error file writers errs = match Set.cardinal writers with
     | 0 -> assert false
     | 1 ->
-        begin match Fpath.Map.find_opt file read_by with
+        begin match Filepath.Map.find_opt file read_by with
         | None -> errs
         | Some readers ->
             let writer = Set.choose writers in
@@ -909,7 +909,7 @@ module Op = struct
         end
     | n -> Multiple_writes { file; writers = Set.elements writers } :: errs
     in
-    match Fpath.Map.fold add_error written_by [] with
+    match Filepath.Map.fold add_error written_by [] with
     | [] -> Ok () | errs -> Error (List.rev errs)
 end
 
@@ -922,12 +922,12 @@ module Reviver = struct
       hash_fun : (module B0_hash.T);
       cache : File_cache.t;
       buffer : Buffer.t; (* buffer to encode metadata *)
-      mutable file_hashes : B0_hash.t Fpath.Map.t; (* file hash cache *)
+      mutable file_hashes : B0_hash.t Filepath.Map.t; (* file hash cache *)
       mutable file_hash_dur : Mtime.Span.t; (* total file hash duration *) }
 
   let make clock hash_fun cache =
     let buffer = Buffer.create 1024 in
-    let file_hashes = Fpath.Map.empty in
+    let file_hashes = Filepath.Map.empty in
     let file_hash_dur = Mtime.Span.zero in
     { clock; hash_fun; buffer; cache; file_hashes; file_hash_dur }
 
@@ -942,7 +942,7 @@ module Reviver = struct
     let module H = (val r.hash_fun : B0_hash.T) in
     H.string s
 
-  let _hash_file r f = match Fpath.Map.find f r.file_hashes with
+  let _hash_file r f = match Filepath.Map.find f r.file_hashes with
   | h -> h
   | exception Not_found ->
       let module H = (val r.hash_fun : B0_hash.T) in
@@ -951,7 +951,7 @@ module Reviver = struct
       let dur = Mtime.Span.abs_diff (timestamp r) t in
       r.file_hash_dur <- Mtime.Span.add r.file_hash_dur dur;
       match h with
-      | Ok h -> r.file_hashes <- Fpath.Map.add f h r.file_hashes; h
+      | Ok h -> r.file_hashes <- Filepath.Map.add f h r.file_hashes; h
       | Error e -> failwith e
 
   let hash_file r f = try Ok (_hash_file r f) with Failure e -> Error e
@@ -1132,61 +1132,61 @@ module Guard = struct
      B0_memo.Memo but it allows for example to let other operations
      take over the writes of these files). *)
 
-  type gop = { op : Op.t; mutable awaits : Fpath.Set.t; }
+  type gop = { op : Op.t; mutable awaits : Filepath.Set.t; }
   type file_status = Ready | Never | Blocks of gop list
   type t =
     { allowed : Op.t Queue.t;
-      mutable files : file_status Fpath.Map.t }
+      mutable files : file_status Filepath.Map.t }
 
-  let make () = { allowed = Queue.create (); files = Fpath.Map.empty; }
+  let make () = { allowed = Queue.create (); files = Filepath.Map.empty; }
 
-  let set_file_ready g f = match Fpath.Map.find f g.files with
-  | exception Not_found -> g.files <- Fpath.Map.add f Ready g.files
+  let set_file_ready g f = match Filepath.Map.find f g.files with
+  | exception Not_found -> g.files <- Filepath.Map.add f Ready g.files
   | Blocks gops ->
       let rem_await g f gop = match Op.status gop.op with
       | Op.Aborted -> ()
       | _ ->
-          let awaits = Fpath.Set.remove f gop.awaits in
-          if Fpath.Set.is_empty awaits
+          let awaits = Filepath.Set.remove f gop.awaits in
+          if Filepath.Set.is_empty awaits
           then Queue.add gop.op g.allowed
           else (gop.awaits <- awaits)
       in
-      g.files <- Fpath.Map.add f Ready g.files;
+      g.files <- Filepath.Map.add f Ready g.files;
       List.iter (rem_await g f) gops
   | Ready | Never (* weird but ignore *) -> ()
 
-  let set_file_never g f = match Fpath.Map.find f g.files with
-  | exception Not_found -> g.files <- Fpath.Map.add f Never g.files
+  let set_file_never g f = match Filepath.Map.find f g.files with
+  | exception Not_found -> g.files <- Filepath.Map.add f Never g.files
   | Blocks gops ->
       let rem_await g f gop = match Op.status gop.op with
       | Op.Aborted -> ()
       | _ -> Op.abort gop.op; Queue.add gop.op g.allowed
       in
-      g.files <- Fpath.Map.add f Never g.files;
+      g.files <- Filepath.Map.add f Never g.files;
       List.iter (rem_await g f) gops
   | Ready (* weird but ignore *) | Never -> ()
 
   let add g o =
     let rec loop g gop awaits files = function
     | [] ->
-        if Fpath.Set.is_empty awaits
+        if Filepath.Set.is_empty awaits
         then Queue.add gop.op g.allowed
         else (gop.awaits <- awaits; g.files <- files)
     | f :: fs ->
-        match Fpath.Map.find f files with
+        match Filepath.Map.find f files with
         | exception Not_found ->
-            let awaits = Fpath.Set.add f awaits in
-            let files = Fpath.Map.add f (Blocks [gop]) files in
+            let awaits = Filepath.Set.add f awaits in
+            let files = Filepath.Map.add f (Blocks [gop]) files in
             loop g gop awaits files fs
         | Never -> Op.abort gop.op; Queue.add gop.op g.allowed
         | Ready -> loop g gop awaits files fs
         | Blocks gops ->
-            let awaits = Fpath.Set.add f awaits in
-            let files = Fpath.Map.add f (Blocks (gop :: gops)) files in
+            let awaits = Filepath.Set.add f awaits in
+            let files = Filepath.Map.add f (Blocks (gop :: gops)) files in
             loop g gop awaits files fs
     in
-    let gop = { op = o; awaits = Fpath.Set.empty } in
-    loop g gop Fpath.Set.empty g.files (Op.reads o)
+    let gop = { op = o; awaits = Filepath.Set.empty } in
+    loop g gop Filepath.Set.empty g.files (Op.reads o)
 
   let allowed g = match Queue.take g.allowed with
   | exception Queue.Empty -> None
@@ -1197,7 +1197,7 @@ module Exec = struct
   type feedback = [ `Exec_start of Os.Cmd.pid option * Op.t ]
   type t =
     { clock : Os.Mtime.counter;
-      tmp_dir : Fpath.t;
+      tmp_dir : Filepath.t;
       feedback : feedback -> unit;
       trash : Trash.t;
       todo : Op.t B0_random_queue.t; (* Waiting for OS submission. *)
@@ -1205,7 +1205,7 @@ module Exec = struct
       to_spawn : Op.t Queue.t; (* [dequeued] from [todo] waiting to spawn. *)
       jobs : int; (* Max number of spawned processes *)
       mutable spawn_count : int; (* Number of spawned processes *)
-      mutable spawns : (Os.Cmd.pid * Fpath.t option * Op.t) list; }
+      mutable spawns : (Os.Cmd.pid * Filepath.t option * Op.t) list; }
 
   let make ?clock ?rand ?tmp_dir:tmp ?feedback ~trash ~jobs () =
     let feedback = match feedback with None -> fun _ -> () | Some f -> f in
@@ -1313,7 +1313,9 @@ module Exec = struct
     | None -> Os.File.copy ~atomic ~force ~make_path ~mode src ~dst
     | Some line ->
         Result.bind (Os.File.read src) @@ fun c ->
-        let data = Fmt.str "#line %d \"%a\"\n%s" line Fpath.pp_unquoted src c in
+        let data =
+          Fmt.str "#line %d \"%a\"\n%s" line Filepath.pp_unquoted src c
+        in
         Os.File.write ~atomic ~force ~make_path ~mode dst data
 
   let op_delete e d = Trash.trash e.trash (Op.Delete.path d)

@@ -18,7 +18,7 @@ let parse_ptime ptime = try Ok (int_of_string ptime) with
 | Failure _ -> Fmt.error "Could not parse timestamp from %S" ptime
 
 let parse_files ~err o =
-  let file_of_string l = Fpath.of_string l |> Result.error_to_failure in
+  let file_of_string l = Filepath.of_string l |> Result.error_to_failure in
   try Ok (List.map file_of_string (String.split_all ~sep:"\n" o)) with
   | Failure e -> Fmt.error "%s: %s" err e
 
@@ -45,12 +45,12 @@ type r =
   { kind : kind;
     bare_cmd : Cmd.t;
     cmd : Cmd.t;
-    repo_dir : Fpath.t;
-    work_dir : Fpath.t }
+    repo_dir : Filepath.t;
+    work_dir : Filepath.t }
 
 module type VCS = sig
   val find :
-    ?search:Cmd.tool_search -> ?dir:Fpath.t -> unit -> (r option, string) result
+    ?search:Cmd.tool_search -> ?dir:Filepath.t -> unit -> (r option, string) result
 
   val repo_cmd : r -> Cmd.t
 
@@ -65,17 +65,17 @@ module type VCS = sig
     r -> ?after:commit_ish -> ?last:commit_ish -> unit ->
     ((string * string) list, string) result
 
-  val tracked_files : r -> tree_ish:string -> (Fpath.t list, string) result
+  val tracked_files : r -> tree_ish:string -> (Filepath.t list, string) result
   val commit_files :
     ?stdout:Os.Cmd.stdo -> ?stderr:Os.Cmd.stdo ->
-    ?msg:string -> r -> Fpath.t list -> (unit, string) result
+    ?msg:string -> r -> Filepath.t list -> (unit, string) result
 
   (* Working directory *)
 
   val is_dirty : r -> (bool, string) result
-  val file_is_dirty : r -> Fpath.t -> (bool, string) result
+  val file_is_dirty : r -> Filepath.t -> (bool, string) result
   val checkout : ?and_branch:string -> r -> commit_ish -> (unit, string) result
-  val local_clone : r -> dir:Fpath.t -> (r, string) result
+  val local_clone : r -> dir:Filepath.t -> (r, string) result
 
   (* Tags *)
 
@@ -130,7 +130,7 @@ module Git_vcs = struct
       | `Exited 0 ->
           if repo_dir = "" (* that seems to be returned on bare repos *)
           then Ok None
-          else Result.map Option.some (Fpath.of_string repo_dir)
+          else Result.map Option.some (Filepath.of_string repo_dir)
       | status -> Ok None
     in
     match Os.Cmd.find ?search tool with
@@ -147,7 +147,7 @@ module Git_vcs = struct
         | None -> Ok None
         | Some repo_dir ->
             let* work_dir = get_vcs_path work_dir in
-            let default = Fpath.null (* for bare repos *) in
+            let default = Filepath.null (* for bare repos *) in
             let work_dir = Option.value ~default work_dir in
             let cmd = repo_cmd git repo_dir work_dir in
             Ok (Some { kind = Git; bare_cmd = git; cmd; repo_dir; work_dir })
@@ -217,7 +217,7 @@ module Git_vcs = struct
     let* clone = find ~dir () in
     match clone with
     | Some r -> Ok r
-    | None -> Fmt.error "%a: no clone found" Fpath.pp_quoted dir
+    | None -> Fmt.error "%a: no clone found" Filepath.pp_quoted dir
 
   (* Tags *)
 
@@ -259,7 +259,7 @@ module Hg_vcs = struct
   | Some dir ->
       begin
         let work_dir = dir in
-        let repo_dir = Fpath.(work_dir / ".hg") in
+        let repo_dir = Filepath.(work_dir / ".hg") in
         Result.bind (Os.Dir.exists repo_dir) @@ function
         | false -> Ok None
         | true ->
@@ -271,7 +271,7 @@ module Hg_vcs = struct
                            work_dir})
             | None ->
               Fmt.error "%a: repo found but no hg executable in PATH"
-                Fpath.pp_quoted repo_dir
+                Filepath.pp_quoted repo_dir
       end
   | None ->
       match Os.Cmd.find ?search tool with
@@ -282,8 +282,8 @@ module Hg_vcs = struct
           let res = Os.Cmd.run_status_out ~stderr ~trim:true hg_root in
           Result.bind res @@ function
           | `Exited 0, repo_dir ->
-              Result.bind (Fpath.of_string repo_dir) @@ fun repo_dir ->
-              let work_dir = Fpath.parent repo_dir in
+              Result.bind (Filepath.of_string repo_dir) @@ fun repo_dir ->
+              let work_dir = Filepath.parent repo_dir in
               Ok (Some { kind = Hg; bare_cmd = hg;
                          cmd = repo_cmd hg repo_dir; repo_dir;
                          work_dir })
@@ -367,7 +367,7 @@ module Hg_vcs = struct
     Result.bind (run_status r args) @@ fun _ ->
     Result.bind (find ~dir ()) @@ function
     | Some r -> Ok r
-    | None -> Fmt.error "%a: no clone found" Fpath.pp_quoted dir
+    | None -> Fmt.error "%a: no clone found" Filepath.pp_quoted dir
 
   (* Tags *)
 
@@ -391,7 +391,7 @@ module Hg_vcs = struct
     let get_distance s = try Ok (int_of_string s) with
     | Failure _ ->
         Fmt.error "%a: Could not parse hg tag distance."
-          Fpath.pp_quoted r.repo_dir
+          Filepath.pp_quoted r.repo_dir
     in
     let rev = revision commit_ish in
     let parent t = Cmd.(arg "parent" % "--rev" % rev % "--template" % t) in
@@ -417,7 +417,7 @@ let work_dir (r, _) = r.work_dir
 let repo_cmd (r, (module Vcs : VCS)) = Vcs.repo_cmd r
 
 let pp ppf (r, _) =
-  Fmt.pf ppf "%a" (Fmt.st' [`Bold] Fpath.pp) r.repo_dir
+  Fmt.pf ppf "%a" (Fmt.st' [`Bold] Filepath.pp) r.repo_dir
 
 let pp_long ppf (r, _ as vcs) =
   Fmt.pf ppf "%a %a" pp_kind r.kind pp vcs
@@ -448,7 +448,7 @@ let get ?search ?kind ?dir () =
   | None ->
       let* dir = match dir with None -> Os.Dir.cwd () | Some dir -> Ok dir in
       Fmt.error
-        "%a: No %a repository found" Fpath.pp_quoted dir pp_kind_option kind
+        "%a: No %a repository found" Filepath.pp_quoted dir pp_kind_option kind
 
 (* Commits *)
 
@@ -503,7 +503,7 @@ module Git = struct
     Ok (Option.map (fun r -> r, (module Git_vcs : VCS)) vcs)
 
   let check_kind (r, _) = match r.kind with
-  | Hg -> Fmt.error "%a: not a git repository" Fpath.pp_quoted r.repo_dir
+  | Hg -> Fmt.error "%a: not a git repository" Filepath.pp_quoted r.repo_dir
   | Git -> Ok ()
 
   (* Branches *)

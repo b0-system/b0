@@ -5,7 +5,7 @@
 
 module Cmd = B0__cmd
 module Fmt = B0__fmt
-module Fpath = B0__fpath
+module Filepath = B0__filepath
 module Log = B0__log
 module Mtime = B0__mtime
 module Net = B0__net

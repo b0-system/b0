@@ -16,7 +16,7 @@ let write
   ignore @@ (* FIXME maybe get rid of that. *)
   let* contents = B0_memo.read m frag in
   let title =
-    if title = "" then El.title_of_filepath (Fpath.to_string o) else title
+    if title = "" then El.title_of_filepath (Filepath.to_string o) else title
   in
   let more_head = match more_head with
   | None -> ""

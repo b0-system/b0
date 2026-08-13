@@ -72,12 +72,12 @@ let gather_repos packs =
     Result.error_to_failure @@
     let* dir, vcs = vcs_repo_of_pack pack in
     let vcs_dir = B0_vcs_repo.repo_dir vcs in
-    match Fpath.Map.find_opt vcs_dir acc with
-    | None -> Ok (Fpath.Map.add dir vcs acc) | Some _ -> Ok acc
+    match Filepath.Map.find_opt vcs_dir acc with
+    | None -> Ok (Filepath.Map.add dir vcs acc) | Some _ -> Ok acc
   in
   try
-    let repos = List.fold_left add Fpath.Map.empty packs in
-    let repos = Fpath.Map.fold (fun _ repo acc -> repo :: acc) repos [] in
+    let repos = List.fold_left add Filepath.Map.empty packs in
+    let repos = Filepath.Map.fold (fun _ repo acc -> repo :: acc) repos [] in
     Ok (List.rev repos)
   with
   | Failure e -> Error e
@@ -96,7 +96,7 @@ let src_archive_name_of_pack p =
       if not (String.equal n "default") then n else
       match B0_def.scope_dir (B0_pack.def p) with
       | None -> "unknown" (* unlikely, libraries should not do this. *)
-      | Some d -> Fpath.basename d
+      | Some d -> Filepath.basename d
 
 let src_archive_ext =
   let doc = "Source release archive file extension" in
@@ -162,10 +162,10 @@ let src_archive_url_of_pack ~version p =
 
 let src_archive_dirname name version =
   let vnum = B0_version.string_drop_initial_v version in
-  Fpath.v (Fmt.str "%s-%s" name vnum)
+  Filepath.v (Fmt.str "%s-%s" name vnum)
 
 let default_exclude_paths =
-  Fpath.[
+  Filepath.[
     v ".git";
     v ".gitattributes";
     v ".gitignore";
@@ -188,7 +188,7 @@ let src_archive_for_pack
      to include watermarks at the source specification level.  *)
   let exclude_paths =
     (* FIXME We should have a key in the pack to override that. *)
-    Fpath.Set.of_list default_exclude_paths
+    Filepath.Set.of_list default_exclude_paths
   in
   let root = src_archive_dirname name version in
   let* archive = B0_tar.of_dir ~dir ~exclude_paths ~root ~mtime in
@@ -203,7 +203,7 @@ let src_archive_for_pack
 
 let changes_file =
   let doc = "Changes file relative to scope directory of definition." in
-  let default = Fpath.v "CHANGES.md" and pp_value = Fpath.pp in
+  let default = Filepath.v "CHANGES.md" and pp_value = Filepath.pp in
   B0_meta.Key.make "changes-file" ~default ~doc ~pp_value
 
 let changes_file_of_pack pack =
@@ -238,22 +238,22 @@ module Archive = struct
     let* is_dirty = B0_vcs_repo.is_dirty repo in
     let* commit_id = B0_vcs_repo.commit_id ~dirty_mark:false repo commit_ish in
     let name = src_archive_name_of_pack pack in
-    let checkout_dir = B0_env.in_scratch_dir env Fpath.(v name + ".build") in
+    let checkout_dir = B0_env.in_scratch_dir env Filepath.(v name + ".build") in
     let* (version, archive_base, archive) =
       src_archive_for_pack
         ~repo ~checkout_dir ~keep_checkout_dir ~commit_ish pack
     in
     let archive_file =
       let archive_ext = B0_pack.find_meta_or_default src_archive_ext pack in
-      B0_env.in_scratch_dir env Fpath.(archive_base + archive_ext)
+      B0_env.in_scratch_dir env Filepath.(archive_base + archive_ext)
     in
     let search = B0_env.get_cmd env ~skip_build:false in
     let force = true and make_path = true in
     let* () = B0_tar.compress ~search ~force ~make_path archive_file ~archive in
-    let archive_dir = Fpath.drop_ext ~multi:false archive_file in
-    Log.stdout (fun m -> m "Wrote %a" (Fmt.code' Fpath.pp) archive_file);
+    let archive_dir = Filepath.drop_ext ~multi:false archive_file in
+    Log.stdout (fun m -> m "Wrote %a" (Fmt.code' Filepath.pp) archive_file);
     Log.stdout (fun m ->
-        m "TODO Checking release in %a" (Fmt.code' Fpath.pp) archive_dir);
+        m "TODO Checking release in %a" (Fmt.code' Filepath.pp) archive_dir);
     let make_path = true and verbose = false in
     let* _exists = Os.Path.delete ~recurse:true archive_dir in
     let in_dir = B0_env.scratch_dir env in
@@ -267,12 +267,12 @@ module Archive = struct
     m "@[<v>Release: %a %a@,Commit:  %a@,Archive: %a@]@."
       Fmt.code name B0_version.pp_string version
       B0_vcs_repo.pp_commit commit_id
-      (Fmt.code' Fpath.pp) archive_file);
+      (Fmt.code' Filepath.pp) archive_file);
     if is_dirty then
       (Log.warn @@ fun m ->
        m "@[<v>%a repo in scope directory %a@,\
           Did you forget to commit some changes ?@]@."
-         B0_vcs_repo.pp_dirty () (Fmt.code' Fpath.pp) scope_dir);
+         B0_vcs_repo.pp_dirty () (Fmt.code' Filepath.pp) scope_dir);
     Ok ()
 
   let cmd ~env ~commit_ish ~packs ~x_packs =
@@ -302,7 +302,7 @@ module Tag = struct
       | None -> None | Some (t, _) -> changes_latest_version_of_title t
       in
       match version with
-      | None -> Fmt.error "Cannot extract a version from %a." Fpath.pp file
+      | None -> Fmt.error "Cannot extract a version from %a." Filepath.pp file
       | Some v -> Ok v
 
   let tag_repo repo tag ~commit_ish ~msg ~sign ~force ~delete ~dry_run =
@@ -335,20 +335,22 @@ module Tag = struct
       let* tag = tag_of_version pack version in
       let* repo = B0_vcs_repo.get ~dir () in
       let repo_dir = B0_vcs_repo.repo_dir repo in
-      match Fpath.Map.find_opt repo_dir acc with
-      | None -> Ok (Fpath.Map.add repo_dir (pack, repo, tag) acc)
+      match Filepath.Map.find_opt repo_dir acc with
+      | None -> Ok (Filepath.Map.add repo_dir (pack, repo, tag) acc)
       | Some (pack', _, tag') when tag <> tag' ->
           Fmt.error "@[<v>Cannot tag VCS %a:@,\
                      pack %a has version %a@,\
                      pack %a has version %a@]"
-            Fpath.pp repo_dir
+            Filepath.pp repo_dir
             B0_pack.pp_name pack B0_version.pp_string tag
             B0_pack.pp_name pack' B0_version.pp_string tag'
       | _ -> Ok acc
     in
     try
-      let rs = List.fold_left add_repo Fpath.Map.empty packs in
-      let rs = Fpath.Map.fold (fun _ (_, r, tag) acc -> (r, tag) :: acc) rs []in
+      let rs = List.fold_left add_repo Filepath.Map.empty packs in
+      let rs =
+        Filepath.Map.fold (fun _ (_, r, tag) acc -> (r, tag) :: acc) rs []
+      in
       Ok (List.rev rs)
     with
     | Failure e -> Error e

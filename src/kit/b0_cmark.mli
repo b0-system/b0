@@ -14,7 +14,7 @@ val tool : B0_memo.Tool.t
 
 val cmd :
   ?validate_utf_8:bool -> ?format:string -> B0_memo.t -> opts:Cmd.t ->
-  mds:Fpath.t list -> o:Fpath.t -> unit
+  mds:Filepath.t list -> o:Filepath.t -> unit
 (** [cmd m ~format ~validate_utf_8 ~args ~mds ~o] writes to file [o] the
     result of processing the CommonMark files [mds].
     {ul
@@ -31,7 +31,7 @@ val cmd :
 val to_html :
   ?generator:string -> ?lang:string -> ?scripts:string list ->
   ?styles:string list -> ?title:string -> B0_memo.t -> opts:Cmd.t ->
-  mds:Fpath.t list -> o_frag:Fpath.t -> o:Fpath.t -> unit
+  mds:Filepath.t list -> o_frag:Filepath.t -> o:Filepath.t -> unit
 (** [to_html m ~opts ~mds ~o_frag o] compiles the concatenation of
     [mds] to an HTML fragment [o_frag] and then to an HTML page [o] by
     invoking {!cmd} with [opts] and {!B0_web_page.write}; for

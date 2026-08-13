@@ -15,7 +15,7 @@ open B0_std
 
 type url =
 [ `Url of Net.Url.t (** The URL. *)
-| `In of B0_env.dir * Fpath.t (** The path in given directory. *)
+| `In of B0_env.dir * Filepath.t (** The path in given directory. *)
 | `Fun of string * (B0_env.t -> B0_unit.t -> (Net.Url.t, string) result) ]
 (** The type for dermining the URL to show. *)
 

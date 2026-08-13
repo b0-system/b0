@@ -25,24 +25,24 @@ val loc_errf : smeta -> ('a, Format.formatter, unit, string) format4 -> 'a
 type b0_boot = (string * smeta) list
 (** The type for [@@@B0.boot] directive data. The list of strings. *)
 
-type b0_include = (string * smeta) * (Fpath.t * smeta)
+type b0_include = (string * smeta) * (Filepath.t * smeta)
 (** The type for [@@@B0.include] directive data. The scope name and
     the included file. *)
 
 type require = B0_ocaml.Libname.t * smeta
 (** The type for #require directive data. The library name. *)
 
-type mod_use = Fpath.t * smeta
+type mod_use = Filepath.t * smeta
 (** The type for #mod_use directive data. The path to the module source. *)
 
 type t
 (** The type for b0 files sources. *)
 
-val of_string : file:Fpath.t -> string -> (t, string) result
+val of_string : file:Filepath.t -> string -> (t, string) result
 (** [of_string ~file s] parses a b0 file from [s]. [file] is the file
     used for locations, it must be absolute. *)
 
-val file : t -> Fpath.t
+val file : t -> Filepath.t
 (** [file f] is the b0 file's file. *)
 
 val b0_boots : t -> b0_boot list
@@ -76,7 +76,7 @@ type expanded
 val expand : t -> (expanded, string) result
 (** [expand f] expands [f]'s includes. *)
 
-val expanded_file_manifest : expanded -> Fpath.t list
+val expanded_file_manifest : expanded -> Filepath.t list
 (** [expanded_file_manifest e] are all the files that contributed
     to the expansion of [e] (including the unexpanded source). *)
 

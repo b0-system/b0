@@ -77,22 +77,22 @@ module Conf : sig
   (** The type for configurations. *)
 
   val make :
-    b0_dir:Fpath.t -> b0_file:Fpath.t option -> cache_dir:Fpath.t ->
-    cwd:Fpath.t -> code:B0_ocaml.Code.t option -> env:Os.Env.t ->
+    b0_dir:Filepath.t -> b0_file:Filepath.t option -> cache_dir:Filepath.t ->
+    cwd:Filepath.t -> code:B0_ocaml.Code.t option -> env:Os.Env.t ->
     hash_fun:(module B0_hash.T) -> jobs:int -> no_pager:bool -> unit -> t
   (** [make] constructs a configuration with given attributes. See the
       accessors for semantics. *)
 
-  val b0_file : t -> Fpath.t option
+  val b0_file : t -> Filepath.t option
   (** [b0_file] is the absolute path to the b0 file (if any). *)
 
-  val b0_dir : t -> Fpath.t
+  val b0_dir : t -> Filepath.t
   (** [b0_dir] is the absolute path to the b0 directory. *)
 
-  val cache_dir : t -> Fpath.t
+  val cache_dir : t -> Filepath.t
   (** [cache_dir] is the absolute path to the cache directory. *)
 
-  val cwd : t -> Fpath.t
+  val cwd : t -> Filepath.t
   (** [cwd] is the absolute path to the current working directory. *)
 
   val code : t -> B0_ocaml.Code.t option
@@ -115,14 +115,14 @@ module Conf : sig
 
   (** {1:derived Derived data} *)
 
-  val get_b0_file : t -> (Fpath.t, string) result
+  val get_b0_file : t -> (Filepath.t, string) result
   (** [get_b0_file] provides an error message if [b0_file] is [None]. *)
 
   (** {1:setup Setup} *)
 
   val setup_with_cli :
-    b0_dir:Fpath.t option -> b0_file:Fpath.t option ->
-    cache_dir:Fpath.t option -> code:B0_ocaml.Code.t option ->
+    b0_dir:Filepath.t option -> b0_file:Filepath.t option ->
+    cache_dir:Filepath.t option -> code:B0_ocaml.Code.t option ->
     hash_fun:(module B0_hash.T) option -> jobs:int option ->
     no_color:bool -> log_level:Log.level -> no_pager:bool -> unit ->
     (t, string) result
@@ -209,20 +209,21 @@ val has_failed_b0_file : unit -> bool
     Driver compilation is automatically handled by {!with_b0_file}.
     But a few driving bits are exposed here. *)
 module Compile : sig
-  val build_dir : Conf.t -> driver:t -> Fpath.t
+  val build_dir : Conf.t -> driver:t -> Filepath.t
   (** [build_dir c ~driver] is a build directory for driver [driver]
       in configuration [c]. *)
 
-  val build_log : Conf.t -> driver:t -> Fpath.t
+  val build_log : Conf.t -> driver:t -> Filepath.t
   (** [build_log c ~driver] is a build log file for driver [driver]
       in configuration [c]. *)
 
-  val exe : Conf.t -> driver:t -> Fpath.t
+  val exe : Conf.t -> driver:t -> Filepath.t
   (** [exe c ~driver] is the driver executable for driver [driver]
       in configuration [c]. *)
 
   val compile :
-    Conf.t -> driver:t -> feedback:bool -> B0_file.t -> (Fpath.t, string) result
+    Conf.t -> driver:t -> feedback:bool -> B0_file.t ->
+    (Filepath.t, string) result
   (** [compile c ~driver b0_file] compiles [b0_file] with driver [driver]
       in configuration [c]. If all is well the executable file path is
       returned. [feedback] indicates whether errors are reported

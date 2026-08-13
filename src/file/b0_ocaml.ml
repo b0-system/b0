@@ -167,7 +167,7 @@ module Conf = struct
   type t =
     { fields : string String.Map.t;
       version : int * int * int * string option;
-      where : Fpath.t;
+      where : Filepath.t;
       asm_ext : string;
       dll_ext : string;
       exe_ext : string;
@@ -198,7 +198,7 @@ module Conf = struct
       | None -> err "could not parse version string %S" v
       | Some v -> v
     in
-    let where = Fpath.of_string (find "standard_library" fields) in
+    let where = Filepath.of_string (find "standard_library" fields) in
     let where = where |> Result.error_to_failure in
     let asm_ext = find "ext_asm" fields in
     let dll_ext = find "ext_dll" fields in
@@ -219,7 +219,7 @@ module Conf = struct
 
   (* IO *)
 
-  let of_string ?(file = Fpath.dash) s =
+  let of_string ?(file = Filepath.dash) s =
     let parse_line _ acc l = match String.split_first ~sep:":" l with
     | None -> acc (* XXX report an error *)
     | Some (k, v) -> String.Map.add (String.trim k) (String.trim v) acc
@@ -230,7 +230,7 @@ module Conf = struct
         String.fold_ascii_lines ~drop_newlines parse_line String.Map.empty s
       in
       Ok (of_string_map fields |> Result.error_to_failure)
-    with Failure e -> Fpath.error file "OCaml config: %s" e
+    with Failure e -> Filepath.error file "OCaml config: %s" e
 
   let write m ~comp ~o =
     let comp = B0_memo.tool m comp in
@@ -250,7 +250,7 @@ module Conf = struct
     in
     let det s m =
       let* comp = conf_comp s m in
-      let file = Fpath.(B0_store.dir s / B0_memo.mark m) in
+      let file = Filepath.(B0_store.dir s / B0_memo.mark m) in
       write m ~comp ~o:file;
       read m file
     in
@@ -264,7 +264,7 @@ end
 module Modname = struct
   type t = string
   let of_path_filename f =
-    String.Ascii.capitalize (Fpath.basename ~drop_exts:true f)
+    String.Ascii.capitalize (Filepath.basename ~drop_exts:true f)
 
   let v n = String.Ascii.capitalize n
   let equal = String.equal
@@ -356,7 +356,7 @@ end
 
 module Modsrc = struct
   module Deps = struct
-    let of_string ?(file = Fpath.dash) ?src_root s =
+    let of_string ?(file = Filepath.dash) ?src_root s =
       (* Parse ocamldep's [-slash -modules], a bit annoying to parse.
          ocamldep shows its Makefile legacy. *)
       let parse_path n p = (* ocamldep escapes spaces as "\ ", a bit annoying *)
@@ -372,7 +372,7 @@ module Modsrc = struct
         match String.byte_unescaper char_len_at set_char p with
         | Error j -> Fmt.failwith_line n "%d: illegal escape" j
         | Ok p ->
-            match Fpath.of_string p with
+            match Filepath.of_string p with
             | Error e -> Fmt.failwith_line n " %s" e
             | Ok p -> p
       in
@@ -384,19 +384,19 @@ module Modsrc = struct
             let file = parse_path n file in
             let file = match src_root with
             | None -> file
-            | Some src_root -> Fpath.(src_root // file)
+            | Some src_root -> Filepath.(src_root // file)
             in
             let add_mod acc m = Modname.Set.add m acc in
             let mods = String.split_all ~drop:String.is_empty ~sep:" " mods in
             let start = Modname.Set.singleton "Stdlib" in
             let mods = List.fold_left add_mod start mods in
-            Fpath.Map.add file mods acc
+            Filepath.Map.add file mods acc
       in
       try
         let drop_newlines = true and parse = parse_line ~src_root in
-        Ok (String.fold_ascii_lines ~drop_newlines parse Fpath.Map.empty s)
+        Ok (String.fold_ascii_lines ~drop_newlines parse Filepath.Map.empty s)
       with
-      | Failure e -> Fpath.error file "%s" e
+      | Failure e -> Filepath.error file "%s" e
 
     let write ?src_root m ~srcs ~o =
       let ocamldep = B0_memo.tool m Tool.ocamldep in
@@ -407,7 +407,7 @@ module Modsrc = struct
              at the right place. So we don't do anything for now
              the output thus depends on the path location and can't
              be cached across machines.
-             let rem_prefix src = Fpath.rem_prefix root src |> Option.get in
+             let rem_prefix src = Filepath.rem_prefix root src |> Option.get in
              List.map rem_prefix srcs, Some root
           *)
           srcs, None
@@ -423,15 +423,15 @@ module Modsrc = struct
   type t =
     { modname : Modname.t;
       opaque : bool;
-      mli : Fpath.t option;
+      mli : Filepath.t option;
       mli_deps : Modname.Set.t;
-      ml : Fpath.t option;
+      ml : Filepath.t option;
       ml_deps : Modname.Set.t;
-      build_dir : Fpath.t;
-      build_base : Fpath.t }
+      build_dir : Filepath.t;
+      build_base : Filepath.t }
 
   let make ~modname ~opaque ~mli ~mli_deps ~ml ~ml_deps ~build_dir =
-    let build_base = Fpath.(build_dir / String.Ascii.uncapitalize modname) in
+    let build_base = Filepath.(build_dir / String.Ascii.uncapitalize modname) in
     { modname; opaque; mli; mli_deps; ml; ml_deps; build_dir; build_base }
 
   let modname m = m.modname
@@ -441,7 +441,7 @@ module Modsrc = struct
   let ml m = m.ml
   let ml_deps m = m.ml_deps
   let build_dir m = m.build_dir
-  let built_file m ~ext = Fpath.(m.build_base + ext)
+  let built_file m ~ext = Filepath.(m.build_base + ext)
   let cmi_file m = built_file m ~ext:".cmi"
   let cmo_file m = match ml m with
   | None -> None | Some _ -> Some (built_file m ~ext:".cmo")
@@ -450,7 +450,7 @@ module Modsrc = struct
   | None -> None | Some _ -> Some (built_file m ~ext:".cmx")
 
   let pp =
-    let path_option = Fmt.option ~none:Fmt.none Fpath.pp_unquoted in
+    let path_option = Fmt.option ~none:Fmt.none Filepath.pp_unquoted in
     let deps = Modname.Set.pp ~sep:Fmt.sp Fmt.string in
     Fmt.record Fmt.[
         field "modname" modname Modname.pp;
@@ -459,7 +459,7 @@ module Modsrc = struct
         field "mli-deps" mli_deps deps;
         field "ml" ml path_option;
         field "ml-deps" ml_deps deps;
-        field "build-dir" build_dir Fpath.pp_unquoted ]
+        field "build-dir" build_dir Filepath.pp_unquoted ]
 
   let impl_file ~code m = match code with
   | Code.Byte -> cmo_file m
@@ -485,7 +485,7 @@ module Modsrc = struct
       | Some f' ->
           B0_memo.notify m `Warn
             "@[<v>%a:@,File ignored. %a's module %s defined by file:@,%a:@]"
-            Fpath.pp f Modname.pp mname kind Fpath.pp f';
+            Filepath.pp f Modname.pp mname kind Filepath.pp f';
           acc
     in
     List.fold_left add Modname.Map.empty files
@@ -494,11 +494,11 @@ module Modsrc = struct
     let get_src_deps = function
     | None -> Modname.Set.empty
     | Some file ->
-        match Fpath.Map.find file src_deps with
+        match Filepath.Map.find file src_deps with
         | exception Not_found -> Modname.Set.empty
         | deps -> deps
     in
-    let mlis, mls = List.partition (Fpath.has_ext ".mli") srcs in
+    let mlis, mls = List.partition (Filepath.has_ext ".mli") srcs in
     let mlis = modname_map m ~kind:"interface" mlis in
     let mls = modname_map m ~kind:"implementation" mls in
     let mod' modname mli ml =
@@ -550,7 +550,7 @@ module Modsrc = struct
     let exts = ".mli" :: if only_mlis then [] else [".ml"] in
     let exts = B0_file_exts.make exts in
     let srcs = B0_file_exts.find_files exts srcs in
-    let o = Fpath.(build_dir / "ocaml-srcs.deps") in
+    let o = Filepath.(build_dir / "ocaml-srcs.deps") in
     Deps.write m ~src_root ~srcs ~o;
       let* src_deps = Deps.read m ~src_root o in
       Fut.return (map_of_srcs m ~build_dir ~srcs ~src_deps)
@@ -562,21 +562,21 @@ module Libname = struct
   open Result.Syntax
 
   (* Note. As it stands library name dots are represented by
-     [Fpath.dir_sep_char].  Not sure it makes sense it was done at
+     [Filepath.dir_sep_char].  Not sure it makes sense it was done at
      some point while seeking a simpler library model so that we could
      directly lookup in directories without having to
      convert. Review. *)
 
-  type t = { name : Fpath.t }
+  type t = { name : Filepath.t }
 
-  let fpath_to_name ?(sep = '.') s =
-    let b = Bytes.of_string (Fpath.to_string s) in
+  let filepath_to_name ?(sep = '.') s =
+    let b = Bytes.of_string (Filepath.to_string s) in
     for i = 0 to Bytes.length b - 1 do
-      if Bytes.get b i = Fpath.natural_dir_sep_char then Bytes.set b i sep;
+      if Bytes.get b i = Filepath.natural_dir_sep_char then Bytes.set b i sep;
     done;
     Bytes.unsafe_to_string b
 
-  let name_to_fpath s =
+  let name_to_filepath s =
     let err s exp = Fmt.error "%S: not a library name, %s" s exp in
     let err_start s = err s "expected a starting lowercase ASCII letter" in
     let b = Bytes.of_string s in
@@ -584,7 +584,7 @@ module Libname = struct
     let rec loop i ~id_start = match i > max with
     | true ->
         if id_start then err_start s else
-        Ok (Fpath.v (Bytes.unsafe_to_string b))
+        Ok (Filepath.v (Bytes.unsafe_to_string b))
     | false when id_start ->
         begin match Bytes.get b i with
         | 'a' .. 'z' -> loop (i + 1) ~id_start:false
@@ -595,7 +595,7 @@ module Libname = struct
         | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '-' ->
             loop (i + 1) ~id_start:false
         | '.' ->
-            Bytes.set b i Fpath.natural_dir_sep_char;
+            Bytes.set b i Filepath.natural_dir_sep_char;
             loop (i + 1) ~id_start:true
         | c -> err s (Fmt.str "illegal character %C" c)
         end
@@ -603,30 +603,30 @@ module Libname = struct
     loop 0 ~id_start:true
 
   let basename n =
-    let n = Fpath.to_string n.name in
-    match String.split_last ~sep:Fpath.natural_dir_sep n with
+    let n = Filepath.to_string n.name in
+    match String.split_last ~sep:Filepath.natural_dir_sep n with
     | None -> n | Some (_, n) -> n
 
-  let name n = fpath_to_name n.name
+  let name n = filepath_to_name n.name
 
   let root n =
-    let n = Fpath.to_string n.name in
-    match String.split_first ~sep:Fpath.natural_dir_sep n with
+    let n = Filepath.to_string n.name in
+    match String.split_first ~sep:Filepath.natural_dir_sep n with
     | None -> n | Some (n, _) -> n
 
-  let segments n = Fpath.to_segments n.name
-  let to_archive_name n = fpath_to_name ~sep:'_' n.name
-  let undot ~rep n = fpath_to_name ~sep:rep n.name
+  let segments n = Filepath.to_segments n.name
+  let to_archive_name n = filepath_to_name ~sep:'_' n.name
+  let undot ~rep n = filepath_to_name ~sep:rep n.name
 
   let of_string s =
-    let* name = name_to_fpath s in
+    let* name = name_to_filepath s in
     Ok { name }
 
-  let to_string n = fpath_to_name n.name
-  let to_fpath { name } = name
+  let to_string n = filepath_to_name n.name
+  let to_filepath { name } = name
   let v s = match of_string s with Ok n -> n | Error e -> invalid_arg e
-  let equal n0 n1 = Fpath.equal n0.name n1.name
-  let compare n0 n1 = Fpath.compare n0.name n1.name
+  let equal n0 n1 = Filepath.equal n0.name n1.name
+  let compare n0 n1 = Filepath.compare n0.name n1.name
   let pp = Fmt.using to_string Fmt.code
 
   module T = struct type nonrec t = t let compare = compare end
@@ -671,14 +671,14 @@ module Lib = struct
     { libname : Libname.t;
       requires : Libname.t list;
       exports : Libname.t list;
-      dir : Fpath.t;
-      cmis : Fpath.t list;
-      cmxs : Fpath.t list;
-      cma : Fpath.t option;
-      cmxa : Fpath.t option;
-      c_archive : Fpath.t option;
-      c_stubs : Fpath.t list;
-      js_stubs : Fpath.t list;
+      dir : Filepath.t;
+      cmis : Filepath.t list;
+      cmxs : Filepath.t list;
+      cma : Filepath.t option;
+      cmxa : Filepath.t option;
+      c_archive : Filepath.t option;
+      c_stubs : Filepath.t list;
+      js_stubs : Filepath.t list;
       warning : string option }
 
   let make
@@ -695,7 +695,7 @@ module Lib = struct
     Result.bind (Os.Dir.exists dir) @@ function
     | false ->
         B0_memo.notify m `Warn "Library %a: %a: no such directory"
-          Libname.pp libname Fpath.pp dir;
+          Libname.pp libname Filepath.pp dir;
         Ok (make ~libname ~requires ~exports ~dir ~cmis:[] ~cmxs:[]
               ~cma:None ~cmxa:None ~c_archive:None ~c_stubs:[] ~js_stubs:[]
               ~warning)
@@ -705,7 +705,7 @@ module Lib = struct
           (Os.Dir.fold_files ~dotfiles ~follow_symlinks ~recurse
              Os.Dir.path_list dir [])
         @@ fun fs ->
-        let js_stubs = List.map (fun f -> Fpath.(dir // f)) js_stubs in
+        let js_stubs = List.map (fun f -> Filepath.(dir // f)) js_stubs in
         let () = B0_memo.ready_files m js_stubs in
         let rec loop cmis cmxs cma cmxa c_archive c_stubs = function
         | [] ->
@@ -714,9 +714,9 @@ module Lib = struct
         | f :: fs ->
             let is_lib_archive f = match archive with
             | None -> false
-            | Some a -> String.equal (Fpath.basename ~drop_exts:true f) a
+            | Some a -> String.equal (Filepath.basename ~drop_exts:true f) a
             in
-            match Fpath.take_ext ~multi:false f with
+            match Filepath.take_ext ~multi:false f with
             | ".cmi" ->
                 B0_memo.ready_file m f;
                 loop (f :: cmis) cmxs cma cmxa c_archive c_stubs fs
@@ -852,9 +852,9 @@ module Libresolver = struct
           match String.split_last ~sep:"." a with
           | None -> Some a | Some (a, _ext) -> Some a
 
-      let parse_dir dir = parse_field "library directory" Fpath.of_string dir
+      let parse_dir dir = parse_field "library directory" Filepath.of_string dir
       let parse_js_stubs js_stubs =
-        let to_path s = parse_field "js stubs" Fpath.of_string s in
+        let to_path s = parse_field "js stubs" Filepath.of_string s in
         let stubs = String.split_all ~drop:String.is_empty ~sep:"," js_stubs in
         List.map to_path stubs
 
@@ -862,7 +862,7 @@ module Libresolver = struct
 
       let get_meta_file data = match String.split_first ~sep:":" data with
       | None -> None
-      | Some (m, _) -> Result.to_option (Fpath.of_string m)
+      | Some (m, _) -> Result.to_option (Filepath.of_string m)
 
       let lib_of_info m ~conf ~libname ~file info =
         let clib_ext = Conf.lib_ext conf in
@@ -879,7 +879,7 @@ module Libresolver = struct
               ~dir ~archive ~js_stubs ~warning
         | _ -> Fmt.failwith "could not parse %S" info
         with
-        | Failure e -> Fpath.error file "%s" e
+        | Failure e -> Filepath.error file "%s" e
 
       let query_result _o _set_res op = match B0_zero.Op.status op with
       | B0_zero.Op.Success ->
@@ -929,8 +929,8 @@ module Libresolver = struct
         | n -> n, n, "byte,native"
         in
         let fname = Fmt.str "ocamlfind.%s" fname in
-        let o = Fpath.(cache_dir / fname) in
-        let stdout = `Tee (* hack *) o and stderr = `File Fpath.null in
+        let o = Filepath.(cache_dir / fname) in
+        let stdout = `Tee (* hack *) o and stderr = `File Filepath.null in
         let res, set_res = Fut.make () in
         let post_exec = query_result o set_res in
         let success_exits = [0; 2 (* not found *) ] in
@@ -1014,7 +1014,7 @@ module Libresolver = struct
     let* b = B0_store.get store B0_build.self in
     let* ocaml_conf = B0_build.get b Conf.key in
     let build_scope = Scope.build b ocaml_conf in
-    let cache_dir = Fpath.(B0_build.shared_dir b / Scope.cache_dir_name)in
+    let cache_dir = Filepath.(B0_build.shared_dir b / Scope.cache_dir_name)in
     (*  let ocamlpath = Lib.Resolver.ocamlpath ~cache_dir in *)
     let ocamlfind = Scope.ocamlfind ~cache_dir in
     let scopes = [build_scope; (* ocamlpath; *) ocamlfind] in
@@ -1107,10 +1107,10 @@ module Compile = struct
   type code = [ `Byte | `Native ]
 
   let incs_of_files files =
-    Cmd.paths ~slip:"-I" @@ Fpath.distinct @@ List.map Fpath.parent files
+    Cmd.paths ~slip:"-I" @@ Filepath.distinct @@ List.map Filepath.parent files
 
   let c_to_o ?post_exec ?k m ~comp ~opts ~reads ~c ~o =
-    let cwd = Fpath.parent o
+    let cwd = Filepath.parent o
       (* We can't use `-c` and `-o` on C files see
          https://github.com/ocaml/ocaml/issues/7677 so we cwd to the
          output directory to perform the spawn. *)
@@ -1123,10 +1123,10 @@ module Compile = struct
     writes
 
   let mli_to_cmi ?post_exec ?k ~and_cmti m ~comp ~opts ~reads ~mli ~o =
-    let base = Fpath.drop_ext ~multi:false o in
-    let stamp = Fpath.basename base in
+    let base = Filepath.drop_ext ~multi:false o in
+    let stamp = Filepath.basename base in
     let reads = mli :: reads in
-    let writes = o :: if and_cmti then [Fpath.(base + ".cmti")] else [] in
+    let writes = o :: if and_cmti then [Filepath.(base + ".cmti")] else [] in
     let incs = incs_of_files reads in
     let bin_annot = Cmd.if' and_cmti (Cmd.arg "-bin-annot") in
     let io = Cmd.(unstamp (path o %% incs %% path mli)) in
@@ -1136,12 +1136,12 @@ module Compile = struct
 
   let ml_to_cmo ?post_exec ?k ~and_cmt m ~opts ~reads ~has_cmi ~ml ~o =
     let ocamlc = B0_memo.tool m Tool.ocamlc in
-    let base = Fpath.drop_ext ~multi:false o in
-    let stamp = Fpath.basename base (* output depends on mod name *) in
+    let base = Filepath.drop_ext ~multi:false o in
+    let stamp = Filepath.basename base (* output depends on mod name *) in
     let reads = ml :: reads in
     let writes =
-      o :: (List.cons_if and_cmt Fpath.(base + ".cmt") @@
-            List.cons_if (not has_cmi) Fpath.(base + ".cmi") [])
+      o :: (List.cons_if and_cmt Filepath.(base + ".cmt") @@
+            List.cons_if (not has_cmi) Filepath.(base + ".cmi") [])
     in
     let incs = incs_of_files reads in
     let bin_annot = Cmd.if' and_cmt (Cmd.arg "-bin-annot") in
@@ -1152,13 +1152,13 @@ module Compile = struct
 
   let ml_to_cmx ?post_exec ?k ~and_cmt m ~opts ~reads ~has_cmi ~ml ~o =
     let ocamlopt = B0_memo.tool m Tool.ocamlopt in
-    let base = Fpath.drop_ext ~multi:false o in
-    let stamp = Fpath.basename base (* output depends on mod name *) in
+    let base = Filepath.drop_ext ~multi:false o in
+    let stamp = Filepath.basename base (* output depends on mod name *) in
     let reads = ml :: reads in
     let writes =
-      o :: Fpath.(base + ".o") ::
-      (List.cons_if and_cmt Fpath.(base + ".cmt") @@
-       List.cons_if (not has_cmi) Fpath.(base + ".cmi") [])
+      o :: Filepath.(base + ".o") ::
+      (List.cons_if and_cmt Filepath.(base + ".cmt") @@
+       List.cons_if (not has_cmi) Filepath.(base + ".cmi") [])
     in
     let incs = incs_of_files reads in
     let bin_annot = Cmd.if' and_cmt (Cmd.arg "-bin-annot") in
@@ -1247,11 +1247,11 @@ module Archive = struct
     let lib_ext = Conf.lib_ext conf in
     let dll_ext = Conf.dll_ext conf in
     let ocamlmklib = B0_memo.tool m Tool.ocamlmklib in
-    let o = Fpath.(odir / cstubs_name oname) in
+    let o = Filepath.(odir / cstubs_name oname) in
     let writes =
-      Fpath.(odir / cstubs_clib oname lib_ext) ::
+      Filepath.(odir / cstubs_clib oname lib_ext) ::
       List.cons_if
-        (Conf.has_dynlink conf) Fpath.(odir / cstubs_dll oname dll_ext) []
+        (Conf.has_dynlink conf) Filepath.(odir / cstubs_dll oname dll_ext) []
     in
     B0_memo.spawn ?post_exec ?k m ~reads:c_objs ~writes @@
     ocamlmklib
@@ -1266,7 +1266,7 @@ module Archive = struct
       Cmd.(arg "-cclib" % lib %%
            if' (Conf.has_dynlink conf) (arg "-dllib" % lib))
     in
-    let cma = Fpath.(odir / Fmt.str "%s.cma" oname) in
+    let cma = Filepath.(odir / Fmt.str "%s.cma" oname) in
     let writes = [cma] in
     B0_memo.spawn m ~reads:cobjs ~writes @@
     ocamlc Cmd.(arg "-a" % "-o" %% unstamp (path cma) %% cstubs_opts %% opts %%
@@ -1284,11 +1284,11 @@ module Archive = struct
     let cmxa_clib =
       if cobjs = [] && Conf.version conf >= (4, 13, 0, None)
       then []
-      else [Fpath.(odir / Fmt.str "%s%s" oname lib_ext)]
+      else [Filepath.(odir / Fmt.str "%s%s" oname lib_ext)]
     in
-    let cmxa = Fpath.(odir / Fmt.str "%s.cmxa" oname) in
+    let cmxa = Filepath.(odir / Fmt.str "%s.cmxa" oname) in
     let writes = cmxa :: cmxa_clib in
-    let c_objs = List.rev_map (Fpath.with_ext ~multi:false obj_ext) cobjs in
+    let c_objs = List.rev_map (Filepath.with_ext ~multi:false obj_ext) cobjs in
     let reads = List.rev_append c_objs cobjs in
     B0_memo.spawn m ?post_exec ?k ~reads ~writes @@
     ocamlopt Cmd.(arg "-a" % "-o" %% unstamp (path cmxa) %% cstubs_opts %%
@@ -1304,13 +1304,13 @@ module Archive = struct
   let native_dynlink ?post_exec ?k m ~conf ~opts ~has_cstubs ~cmxa ~o =
     let lib_ext = Conf.lib_ext conf in
     let ocamlopt = B0_memo.tool m Tool.ocamlopt in
-    let cmxa_clib = Fpath.(cmxa -+ lib_ext) in
+    let cmxa_clib = Filepath.(cmxa -+ lib_ext) in
     let cstubs_opts, reads =
       if not has_cstubs then Cmd.empty, [cmxa; cmxa_clib] else
       (* Fixme do this on a cstubs path *)
-      let oname = Fpath.basename ~drop_exts:true cmxa in
-      let cstubs_dir = Fpath.(parent cmxa) in
-      let cstubs = Fpath.(cstubs_dir / cstubs_clib oname lib_ext) in
+      let oname = Filepath.basename ~drop_exts:true cmxa in
+      let cstubs_dir = Filepath.(parent cmxa) in
+      let cstubs = Filepath.(cstubs_dir / cstubs_clib oname lib_ext) in
       let inc = Cmd.(arg "-I" %% unstamp (path cstubs_dir)) in
       Cmd.(inc %% unstamp (path cstubs)), [cstubs; cmxa; cmxa_clib]
     in
@@ -1323,15 +1323,15 @@ end
 
 module Link = struct
   let cstubs_incs objs =
-    let add_inc acc obj = Fpath.Set.add (Fpath.parent obj) acc in
-    let incs = List.fold_left add_inc Fpath.Set.empty objs in
-    Cmd.paths ~slip:"-I" (Fpath.Set.elements incs)
+    let add_inc acc obj = Filepath.Set.add (Filepath.parent obj) acc in
+    let incs = List.fold_left add_inc Filepath.Set.empty objs in
+    Cmd.paths ~slip:"-I" (Filepath.Set.elements incs)
 
   let distinct_cobjs cobjs =
     (* Formally two ocamlfind package name can point to the same objects
        (we also have aliases hardcoded in the resolver to handle the thread
        package mess) so we might have the same archive twice. *)
-    Fpath.distinct cobjs
+    Filepath.distinct cobjs
 
   let byte ?post_exec ?k m ~conf ~opts ~c_objs ~cobjs ~o =
     let ocamlc = B0_memo.tool m Tool.ocamlc in
@@ -1342,10 +1342,10 @@ module Link = struct
           List.rev_append rcobjs (List.rev_append rsides c_objs),
           List.rev rcobjs
       | cobj :: cobjs ->
-          match Fpath.has_ext ".cmo" cobj with
+          match Filepath.has_ext ".cmo" cobj with
           | true -> loop rsides (cobj :: rcobjs) cobjs
           | false ->
-              match Fpath.has_ext ".cma" cobj with
+              match Filepath.has_ext ".cma" cobj with
               | true -> loop rsides (cobj :: rcobjs) cobjs
               | false ->
                   (* This should be the cma's dll archive *)
@@ -1370,13 +1370,13 @@ module Link = struct
           List.rev_append rcobjs (List.rev_append rsides c_objs),
           List.rev rcobjs
       | cobj :: cobjs ->
-          match Fpath.has_ext ".cmx" cobj with
+          match Filepath.has_ext ".cmx" cobj with
           | true ->
               (* Add the side `.o` C object to read files. *)
-              let rsides = Fpath.with_ext ~multi:false obj_ext cobj :: rsides in
+              let rsides = Filepath.with_ext ~multi:false obj_ext cobj :: rsides in
               loop rsides (cobj :: rcobjs) cobjs
           | false ->
-              match Fpath.has_ext ".cmxa" cobj with
+              match Filepath.has_ext ".cmxa" cobj with
               | true ->
                   loop rsides (cobj :: rcobjs) cobjs
               | false ->
@@ -1405,17 +1405,17 @@ let compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs =
   let rec loop os cunits hs = function
   | [] -> List.rev os
   | c :: cs ->
-      let cname = Fpath.basename ~drop_exts:true c in
+      let cname = Filepath.basename ~drop_exts:true c in
       match String.Map.find cname cunits with
       | exception Not_found ->
-          let o = Fpath.(build_dir / Fmt.str "%s%s" cname obj_ext) in
+          let o = Filepath.(build_dir / Fmt.str "%s%s" cname obj_ext) in
           ignore (Compile.c_to_o m ~comp ~opts ~reads:hs ~c ~o);
           loop (o :: os) (String.Map.add cname c cunits) hs cs
       | f ->
           B0_memo.notify m `Warn
             "@[<v>%a:@,File ignored. %s's compilation unit already defined \
              by file:@,%a:@]"
-            Fpath.pp c cname Fpath.pp f;
+            Filepath.pp c cname Filepath.pp f;
           loop os cunits hs cs
   in
   let hs = B0_file_exts.(find_files (ext ".h") srcs) in
@@ -1445,7 +1445,7 @@ let exe_proc set_exe_path set_modsrcs srcs b =
   let tool_name = B0_meta.get B0_unit.tool_name meta in
   let exe_ext = Conf.exe_ext conf in
   let opts = Cmd.(arg "-g") (* TODO *) in
-  let o = Fpath.(build_dir / (tool_name ^ exe_ext)) in
+  let o = Filepath.(build_dir / (tool_name ^ exe_ext)) in
   set_exe_path o;  (* FIXME introduce a general mecanism for that *)
   (* FIXME this can likely be streamlined  *)
   let code =
@@ -1472,13 +1472,13 @@ let exe_proc set_exe_path set_modsrcs srcs b =
         (* Note we only get something with Libraries from
            the build, the ocamlfind resolver doesn't give us the dlls here
            for now *)
-        List.find_all (Fpath.has_ext (Conf.dll_ext conf)) (Lib.c_stubs lib)
+        List.find_all (Filepath.has_ext (Conf.dll_ext conf)) (Lib.c_stubs lib)
       in
       (match Lib.cma lib with None -> c_stubs | Some cma -> cma :: c_stubs)
   | Code.Native ->
       let add v l = match v with None -> l | Some v -> v :: l in
       let c_stubs =
-        List.find_all (Fpath.has_ext (Conf.lib_ext conf)) (Lib.c_stubs lib)
+        List.find_all (Filepath.has_ext (Conf.lib_ext conf)) (Lib.c_stubs lib)
       in
       add (Lib.cmxa lib) (add (Lib.c_archive lib) c_stubs)
   | Code.Wasm ->
@@ -1492,7 +1492,7 @@ let exe_proc set_exe_path set_modsrcs srcs b =
   in
   Link.code m ~conf ~code ~opts ~c_objs ~cobjs:(lib_objs @ cobjs) ~o;
   if all_code then begin
-    let o = Fpath.(build_dir / (tool_name ^ ".byte" ^ exe_ext)) in
+    let o = Filepath.(build_dir / (tool_name ^ ".byte" ^ exe_ext)) in
     let lib_objs = List.concat_map (archive ~code:Byte) link_requires in
     let cobjs = List.filter_map (Modsrc.impl_file ~code:Byte) modsrcs in
     Link.code m ~conf ~code:Byte ~opts ~c_objs ~cobjs:(lib_objs @ cobjs) ~o
@@ -1502,12 +1502,12 @@ let exe_proc set_exe_path set_modsrcs srcs b =
 let script_proc set_exe_path file b =
   let m = B0_build.memo b in
   let scope_dir = B0_build.scope_dir b in
-  let exe_file = Fpath.(scope_dir // file) in
+  let exe_file = Filepath.(scope_dir // file) in
   B0_memo.ready_file m exe_file;
   set_exe_path exe_file;
   let ocaml = B0_memo.tool m Tool.ocaml in
-  let stdout_file = Fpath.(B0_build.current_dir b / "ocaml.stdout") in
-  let stdin = Fpath.null and stderr = `File Fpath.null in
+  let stdout_file = Filepath.(B0_build.current_dir b / "ocaml.stdout") in
+  let stdin = Filepath.null and stderr = `File Filepath.null in
   let stdout = `File stdout_file in
   let nocolor = "-color=never" (* If this changes [find_error] must too *) in
   let post_exec op = match Os.File.read stdout_file with
@@ -1589,12 +1589,12 @@ let lib_proc set_modsrcs set_lib srcs b =
   let lib =
     let exports = B0_meta.get exports meta in
     let warning = B0_meta.find B0_meta.warning meta in
-    let cma = List.find_opt (Fpath.has_ext ".cma") ars in
-    let cmxa = List.find_opt (Fpath.has_ext ".cmxa") ars in
-    let cmis = List.find_all (Fpath.has_ext ".cmi") intfs in
-    let cmxs = List.find_all (Fpath.has_ext ".cmx") impls in
+    let cma = List.find_opt (Filepath.has_ext ".cma") ars in
+    let cmxa = List.find_opt (Filepath.has_ext ".cmxa") ars in
+    let cmis = List.find_all (Filepath.has_ext ".cmi") intfs in
+    let cmxs = List.find_all (Filepath.has_ext ".cmx") impls in
     let js_stubs = B0_file_exts.(find_files js) srcs in
-    let c_archive = List.find_opt (Fpath.has_ext (Conf.lib_ext conf)) ars in
+    let c_archive = List.find_opt (Filepath.has_ext (Conf.lib_ext conf)) ars in
     Lib.make ~libname ~requires:librequires
       ~exports ~dir:build_dir ~cmis ~cmxs ~cma ~cmxa
       ~c_archive ~c_stubs ~js_stubs ~warning
@@ -1635,7 +1635,7 @@ let script
     ?(wrap = fun proc b -> proc b) ?doc ?(meta = B0_meta.empty)
     ?(public = false) ?name file
   =
-  let script_name = Fpath.basename file in
+  let script_name = Filepath.basename file in
   let basename = B0_unit.mangle_basename script_name in
   let name = Option.value ~default:basename name in
   let doc = match doc with
@@ -1661,7 +1661,7 @@ let test
     ?(long  = false) ?test_dir ?(srcs = []) src
   =
   let srcs = (`File src) :: srcs in
-  let test_dir = match test_dir with Some d -> d | None -> Fpath.parent src in
+  let test_dir = match test_dir with Some d -> d | None -> Filepath.parent src in
   let meta =
     B0_meta.override ~by:meta @@
     B0_meta.empty
@@ -1672,7 +1672,7 @@ let test
     |> B0_meta.add B0_meta.test_dir test_dir
   in
   let name = match name with
-  | None -> Fpath.basename ~drop_exts:true src
+  | None -> Filepath.basename ~drop_exts:true src
   | Some name -> name
   in
   exe ?wrap ?doc name ~srcs ?requires ~meta
@@ -1749,7 +1749,7 @@ let byte_code_build_load_args b ~x_units units =
                 in
                 Modname.Map.fold add (Fut.sync srcs) mods
             in
-            let inc_mods = Fpath.Set.add (B0_build.unit_dir b unit) inc_mods in
+            let inc_mods = Filepath.Set.add (B0_build.unit_dir b unit) inc_mods in
             libs_acc, inc_mods, mods
       in
       loop libs_acc inc_mods mods units
@@ -1771,7 +1771,7 @@ let byte_code_build_load_args b ~x_units units =
       Cmd.(cmd % "-I" %% path (Lib.dir lib) %% if_some cma)
     in
     let libs, inc_mods, mods =
-      loop (Libname.Set.empty, []) Fpath.Set.empty Modname.Map.empty units
+      loop (Libname.Set.empty, []) Filepath.Set.empty Modname.Map.empty units
     in
     let m = B0_build.memo b in
     let libs =
@@ -1784,7 +1784,7 @@ let byte_code_build_load_args b ~x_units units =
     let don't_load lib = Libname.Set.mem (Lib.libname lib) don't_load in
     let libs = List.filter (Fun.negate don't_load) libs in
     let lib_opts = List.fold_left add_lib_opts Cmd.empty libs in
-    let inc_mods = Cmd.paths ~slip:"-I" (Fpath.Set.elements inc_mods) in
+    let inc_mods = Cmd.paths ~slip:"-I" (Filepath.Set.elements inc_mods) in
     Ok Cmd.(lib_opts %% inc_mods %% paths mods)
   with
   | Failure e -> Error e
@@ -1917,7 +1917,7 @@ module Cobj = struct
   | Code.Byte -> ".cmo" | Code.Native -> ".cmx" | Code.Wasm -> assert false
 
   type t =
-    { file : Fpath.t;
+    { file : Filepath.t;
       defs : Modref.Set.t;
       deps : Modref.Set.t;
       link_deps : Modref.Set.t; (* deps whose name appear in required
@@ -1927,11 +1927,11 @@ module Cobj = struct
   let defs c = c.defs
   let deps c = c.deps
   let link_deps c = c.link_deps
-  let equal c0 c1 = Fpath.equal c0.file c1.file
-  let compare c0 c1 = Fpath.compare c0.file c1.file
+  let equal c0 c1 = Filepath.equal c0.file c1.file
+  let compare c0 c1 = Filepath.compare c0.file c1.file
   let pp =
     Fmt.record @@
-    [ Fmt.field "file" file Fpath.pp_quoted;
+    [ Fmt.field "file" file Filepath.pp_quoted;
       Fmt.field "defs" defs Modref.Set.dump;
       Fmt.field "deps" deps Modref.Set.dump;
       Fmt.field "link-deps" link_deps Modref.Set.dump; ]
@@ -1988,7 +1988,7 @@ module Cobj = struct
   let file_prefix = "File "
   let parse_file_path (n, line) =
     let len = String.length file_prefix in
-    match Fpath.of_string (String.drop_first len line) with
+    match Filepath.of_string (String.drop_first len line) with
     | Ok file -> file
     | Error e -> Fmt.failwith_line n " %s" e
 
@@ -2061,11 +2061,11 @@ module Cobj = struct
         acc file Modref.Set.empty Modref.Set.empty String.Set.empty ls
   | l :: ls -> parse_files acc ls
 
-  let of_string ?(file = Fpath.dash) data =
+  let of_string ?(file = Filepath.dash) data =
     let line num acc l = (num, l) :: acc in
     let rev_lines = String.fold_ascii_lines ~drop_newlines:true line [] data in
     try Ok (parse_files [] (List.rev rev_lines)) with
-    | Failure e -> Fpath.error file "%s" e
+    | Failure e -> Filepath.error file "%s" e
 
   let ocamlobjinfo_args = Cmd.(arg "-no-approx" % "-no-code")
 
@@ -2110,11 +2110,11 @@ let crunch id file =
   let* data = Os.File.read file in
   let id = match id with
   | Some id -> id
-  | None when Fpath.equal file Fpath.dash -> "stdin"
-  | None -> Crunch.id_of_filename (Fpath.basename file)
+  | None when Filepath.equal file Filepath.dash -> "stdin"
+  | None -> Crunch.id_of_filename (Filepath.basename file)
   in
   let crunch = Crunch.string_to_string ~id ~data in
-  let* () = Os.File.write ~force:false ~make_path:false Fpath.dash crunch in
+  let* () = Os.File.write ~force:false ~make_path:false Filepath.dash crunch in
   Ok Os.Exit.ok
 
 let list format pager_don't =
@@ -2275,7 +2275,7 @@ module Cobj_index = struct
     in
     let add_unit_cobjs u index =
       let add_unit_file _stat _fname file acc =
-        if not (Fpath.has_ext kind file) then acc else add_cobj_file acc file
+        if not (Filepath.has_ext kind file) then acc else add_cobj_file acc file
       in
       let dir = B0_build.unit_dir (B0_env.build env) u in
       let entity_cobjs, by_digest =
@@ -2650,7 +2650,7 @@ let unit =
     let exits = B0_std_cli.Exit.infos in
     let infile =
       let doc = "Input bytes from file $(docv). Use $(b,-) for $(b,stdin)." in
-      Arg.(value & pos 0 B0_std_cli.filepath Fpath.dash & info [] ~doc)
+      Arg.(value & pos 0 B0_std_cli.file Filepath.dash & info [] ~doc)
     in
     let id =
       let doc = "OCaml identifier to use for the crunch." in

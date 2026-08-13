@@ -15,11 +15,11 @@ let output_dirs ~units conf =
     B0_build.B0_dir.build_dir ~b0_dir ~variant:"user" (* FIXME *)
   in
   let unit_dir unit =
-    Fpath.drop_trailing_dir_sep @@
+    Filepath.drop_trailing_dir_sep @@
     B0_build.B0_dir.unit_build_dir ~build_dir ~name:(B0_unit.name unit)
   in
   let dirs = List.map unit_dir units in
-  Fmt.pr "@[<v>%a@]@." (Fmt.list Fpath.pp) dirs;
+  Fmt.pr "@[<v>%a@]@." (Fmt.list Filepath.pp) dirs;
   Ok Os.Exit.ok
 
 let edit ~units conf =

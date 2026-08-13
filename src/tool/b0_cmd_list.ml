@@ -27,7 +27,7 @@ let get_defs ~names ~with_lib_defs ~only_tests ~only_benchs =
 
 let edit ~names ~only_tests ~only_benchs conf =
   let rec find_files not_found fs = function
-  | [] -> not_found, Fpath.distinct fs
+  | [] -> not_found, Filepath.distinct fs
   | (B0_def.V ((module Def), def) as v) :: vs ->
       match B0_def.file (Def.def def) with
      | None -> find_files (v :: not_found) fs vs

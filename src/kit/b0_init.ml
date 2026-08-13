@@ -21,7 +21,7 @@ let default_root_markers =
 
 let find_project_name ?(root_markers = default_root_markers) ~cwd () =
   let has_file dir file =
-    Os.Path.exists Fpath.(dir / file) |> Log.if_error ~use:false
+    Os.Path.exists Filepath.(dir / file) |> Log.if_error ~use:false
   in
   try
     let vcs = B0_vcs_repo.find () |> Result.error_to_failure in
@@ -30,12 +30,12 @@ let find_project_name ?(root_markers = default_root_markers) ~cwd () =
     | None ->
         let rec loop dir =
           if List.exists (has_file dir) root_markers then dir else
-          if Fpath.is_root dir then raise Exit else
-          loop (Fpath.parent dir)
+          if Filepath.is_root dir then raise Exit else
+          loop (Filepath.parent dir)
         in
         loop cwd
     in
-    Ok (Some (Fpath.basename ~drop_exts:true project_dir))
+    Ok (Some (Filepath.basename ~drop_exts:true project_dir))
   with
   | Exit -> Ok None
   | Failure e -> Fmt.error "@[<v>While looking for a project name:@,%s@]" e

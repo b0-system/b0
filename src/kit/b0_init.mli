@@ -30,7 +30,7 @@ val default_root_markers : string list
     project's source tree. *)
 
 val find_project_name :
-  ?root_markers:string list -> cwd:Fpath.t -> unit ->
+  ?root_markers:string list -> cwd:Filepath.t -> unit ->
   (string option, string) result
 (** [find_project_name ~cwd ()] tries to determine a name for the project.
     This is either the basename of the VCS work directory or it loops
@@ -49,7 +49,7 @@ val get_copyright_years : string option -> string
 type changes = unit -> string
 (** The type for changes generators. *)
 
-val find_changes_generator : Fpath.t -> (changes, string) result
+val find_changes_generator : Filepath.t -> (changes, string) result
 (** [find_changes_generator f] is a changes generator for a file
     [file] (ignored for now). *)
 
@@ -94,7 +94,7 @@ type readme =
   project_name:string -> synopsis:string option -> B0_meta.t -> string
 (** The type for [README] generators. *)
 
-val find_readme_generator : Fpath.t -> (readme, string) result
+val find_readme_generator : Filepath.t -> (readme, string) result
 (** [find_readme_generator file] is a README generator for a file [file]
     (ignored for now). *)
 
@@ -119,7 +119,7 @@ val lang_to_id : lang -> string
 val lang_of_id : string -> (lang, string) result
 (** [lang_of_id s] is a language frmo the given identifier. *)
 
-val lang_of_file_ext : Fpath.ext -> lang option
+val lang_of_file_ext : Filepath.ext -> lang option
 (** [lang_of_file_ext] tries to guess a language from the given file
     extension. *)
 

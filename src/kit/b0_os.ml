@@ -50,7 +50,9 @@ let os_release =
           String.Map.add (String.trim k) (unquote (String.trim v)) acc
   in
   let det s m =
-    let files = [Fpath.v "/etc/os-release"; Fpath.v "/usr/lib/os-release"] in
+    let files =
+      [Filepath.v "/etc/os-release"; Filepath.v "/usr/lib/os-release"]
+    in
     match find_first_existing_file files with
     | None -> Fut.return String.Map.empty
     | Some file ->
@@ -60,7 +62,7 @@ let os_release =
           try
             Ok (String.fold_ascii_lines
                   ~drop_newlines:true parse_line String.Map.empty s)
-          with Failure e -> Fpath.error file "%s" e
+          with Failure e -> Filepath.error file "%s" e
         in
         let map = B0_memo.notify_if_error m `Warn ~use:String.Map.empty map in
         Fut.return map
@@ -74,7 +76,7 @@ let uname = (* gets system name, release version, machine arch *)
     match tool with
     | None -> Fut.return None
     | Some uname ->
-        let file = Fpath.(B0_store.dir s / mark) in
+        let file = Filepath.(B0_store.dir s / mark) in
         let uname = uname Cmd.(arg "-s" % "-r" % "-m") in
         let* s = read_spawn_stdout m file uname in
         match String.split_on_char ' ' s with
@@ -108,7 +110,7 @@ let name =
 (* version *)
 
 let freebsd_version s m file =
-  let file = Fpath.(B0_store.dir s / file) in
+  let file = Filepath.(B0_store.dir s / file) in
   let uname = (B0_memo.tool m Tool.uname) (Cmd.arg "-U") in
   read_spawn_stdout m file uname
 
@@ -117,7 +119,7 @@ let try_android_version s m file =
   match getprop with
   | None -> Fut.return None
   | Some getprop ->
-    let file = Fpath.(B0_store.dir s / file) in
+    let file = Filepath.(B0_store.dir s / file) in
     let getprop = getprop (Cmd.arg "ro.build.version.release") in
     Fut.map Option.some (read_spawn_stdout m file getprop)
 
@@ -131,14 +133,14 @@ let linux_version s m file =
       | Some v -> Fut.return v
 
 let macos_version s m file =
-  let file = Fpath.(B0_store.dir s / file) in
+  let file = Filepath.(B0_store.dir s / file) in
   let sw_vers =
     (B0_memo.tool m Tool.sw_vers) (Cmd.arg "-productVersion")
   in
   read_spawn_stdout m file sw_vers
 
 let windows_version s m file =
-  let file = Fpath.(B0_store.dir s / file) in
+  let file = Filepath.(B0_store.dir s / file) in
   let cmd_exe = (B0_memo.tool m Tool.cmd_exe) Cmd.(arg "/c" % "ver") in
   let* s = read_spawn_stdout m file cmd_exe in
   (* Format is 'Product [Version XXXX]', we parse the XXX *)

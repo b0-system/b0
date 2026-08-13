@@ -13,11 +13,11 @@ let stdin_file_url ~tname =
   | None -> let* tmp = Os.Path.tmp ~name:"show-url-%s" () in Ok (tmp, false)
   | Some n ->
       let file = Os.Dir.default_tmp () in
-      let* tmp = Fpath.append_segment file n in Ok (tmp, true)
+      let* tmp = Filepath.append_segment file n in Ok (tmp, true)
   in
-  let* data = Os.File.read Fpath.dash in
+  let* data = Os.File.read Filepath.dash in
   let* () = Os.File.write ~force ~make_path:false tmp data in
-  Ok (Fmt.str "file://%s" (Fpath.to_url_path tmp))
+  Ok (Fmt.str "file://%s" (Filepath.to_url_path tmp))
 
 let show_urls ~background ~prefix ~browser ~urls ~tname =
   let* browser = B0_web_browser.find ?cmd:browser () in
@@ -29,7 +29,7 @@ let show_urls ~background ~prefix ~browser ~urls ~tname =
       | "-" -> stdin_file_url ~tname
       | url ->
           let* cwd = Os.Dir.cwd () in
-          let root_path = Some (Fpath.to_url_path cwd) in
+          let root_path = Some (Filepath.to_url_path cwd) in
           Ok (Net.Url.to_absolute ~scheme:"file" ~root_path url)
       in
       let* () = B0_web_browser.show ~background ~prefix browser url in

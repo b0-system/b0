@@ -27,7 +27,7 @@ val find : ?search:Cmd.tool_search -> ?cmd:Cmd.t -> unit -> (t, string) result
        [Os.Cmd.find ?search].}
     {- [Error _] otherwise.}} *)
 
-val edit_files : t -> Fpath.t list -> (Os.Cmd.status, string) result
+val edit_files : t -> Filepath.t list -> (Os.Cmd.status, string) result
 (** [edit_files editor fs] uses [editor] to edit the files [fs]. If [editor] is:
     {ul
     {- [None], an error message is returned mentioning that no editor

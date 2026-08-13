@@ -9,12 +9,12 @@ open Fut.Syntax
 let read_path_writes m file =
   let parse s =
     let parse_line n acc l =
-      if l = "" then acc else match Fpath.of_string l with
+      if l = "" then acc else match Filepath.of_string l with
       | Error e -> Fmt.failwith_line n " %s" e
       | Ok p -> p :: acc
     in
     try Ok (String.fold_ascii_lines ~drop_newlines:true parse_line [] s)
-    with Failure e -> Fpath.error file "%s" e
+    with Failure e -> Filepath.error file "%s" e
   in
   let* lines = B0_memo.read m file in
   Fut.return (B0_memo.fail_if_error m (parse lines))
@@ -23,9 +23,9 @@ let tool = B0_memo.Tool.by_name "odoc" (* FIXME conf ! *)
 
 let files_to_includes fs =
   (* So sad https://github.com/ocaml/odoc/issues/81 *)
-  let add_dir acc f = Fpath.Set.add (Fpath.parent f) acc in
-  let dirs = List.fold_left add_dir Fpath.Set.empty fs in
-  Fpath.Set.fold (fun dir acc -> Cmd.(acc % "-I" %% path dir)) dirs Cmd.empty
+  let add_dir acc f = Filepath.Set.add (Filepath.parent f) acc in
+  let dirs = List.fold_left add_dir Filepath.Set.empty fs in
+  Filepath.Set.fold (fun dir acc -> Cmd.(acc % "-I" %% path dir)) dirs Cmd.empty
 
 module Compile = struct
   module Dep = struct
@@ -52,7 +52,7 @@ module Compile = struct
     let read m file =
       let parse lines =
         try Ok (String.fold_ascii_lines ~drop_newlines:true parse_dep [] lines)
-        with Failure e -> Fpath.error file "%s" e
+        with Failure e -> Filepath.error file "%s" e
       in
       let* lines = B0_memo.read m file in
       Fut.return (B0_memo.fail_if_error m (parse lines))
@@ -80,7 +80,7 @@ module Compile = struct
 
   let to_odoc m ?hidden ~pkg ~odoc_deps obj ~o:odoc =
     ignore @@ (* FIXME maybe remove that. *)
-    let writes = Fpath.(odoc + ".writes") in
+    let writes = Filepath.(odoc + ".writes") in
     Writes.write m obj ~to_odoc:odoc ~o:writes;
     let* writes = Writes.read m writes in
     cmd m ?hidden ~odoc_deps ~writes ~pkg obj ~o:odoc;
@@ -116,7 +116,7 @@ module Html = struct
     let read m file =
       let parse s =
         try Ok (String.fold_ascii_lines ~drop_newlines:true parse_dep [] s)
-        with Failure e -> Fpath.error file "%s" e
+        with Failure e -> Filepath.error file "%s" e
       in
       let* lines = B0_memo.read m file in
       Fut.return (B0_memo.fail_if_error m (parse lines))
@@ -147,7 +147,7 @@ module Html = struct
 
   let write m ?theme_uri ~html_dir ~odoc_deps odoc =
     ignore @@ (* FIXME maybe remove that *)
-    let writes = Fpath.(odoc -+ ".html.writes") in
+    let writes = Filepath.(odoc -+ ".html.writes") in
     let odoc_deps = match odoc_deps with
     | [] ->
         (* Hack to work around https://github.com/ocaml/odoc/issues/290.
@@ -193,7 +193,7 @@ module Support_files = struct
 
   let write m ~without_theme ~html_dir ~build_dir =
     ignore @@ (* FIXME maybe remove that *)
-    let o = Fpath.(build_dir / "odoc-support-files.writes") in
+    let o = Filepath.(build_dir / "odoc-support-files.writes") in
     let to_dir = html_dir in
     Writes.write m ~without_theme ~to_dir ~o;
     let* writes = Writes.read m o in
@@ -213,11 +213,11 @@ module Theme = struct
 
   (* User preference *)
 
-  let config_file = Fpath.v "odig/odoc-theme"
+  let config_file = Filepath.v "odig/odoc-theme"
   let set_user_preference name =
     try
       let config = Os.Dir.config () |> Result.error_to_failure in
-      let config_file = Fpath.(config // config_file) in
+      let config_file = Filepath.(config // config_file) in
       match name with
       | None ->
           Result.bind (Os.File.delete config_file) @@ fun _ -> Ok ()
@@ -228,7 +228,7 @@ module Theme = struct
   let get_user_preference () =
     try
       let config = Os.Dir.config () |> Result.error_to_failure in
-      let file = Fpath.(config // config_file) in
+      let file = Filepath.(config // config_file) in
       match Os.File.exists file |> Result.error_to_failure with
       | false -> Ok None
       | true ->
@@ -240,18 +240,18 @@ module Theme = struct
 
   (* Theme *)
 
-  type t = name * Fpath.t
+  type t = name * Filepath.t
   let name (n, _) = n
   let path (_, p) = p
   let pp ppf (n, p) =
-    Fmt.pf ppf "@[<h>%a %a@]" (Fmt.st [`Bold]) n Fpath.pp_unquoted p
+    Fmt.pf ppf "@[<h>%a %a@]" (Fmt.st [`Bold]) n Filepath.pp_unquoted p
 
   let pp_name ppf (n, _) = Fmt.string ppf n
   let of_dir dir =
-    Log.time (fun _ m -> m "theme list of %a" Fpath.pp_quoted dir) @@ fun () ->
+    Log.time (fun _ m -> m "theme list of %a" Filepath.pp_quoted dir) @@ fun () ->
     try
       let add_themes _ pkg dir acc =
-        let tdir = Fpath.(dir / "odoc-theme") in
+        let tdir = Filepath.(dir / "odoc-theme") in
         match Os.Dir.exists tdir |> Result.error_to_failure with
         | false -> acc
         | true ->
@@ -292,7 +292,7 @@ module Theme = struct
     (* XXX this is basically a copy dir we likely want to provide
        that in the API somewhere  *)
     let copy_file m ~src_root ~dst_root src =
-      let dst = Fpath.reroot ~src_root ~dst_root src in
+      let dst = Filepath.reroot ~src_root ~dst_root src in
       B0_memo.ready_file m src;
       B0_memo.copy m src ~dst
     in

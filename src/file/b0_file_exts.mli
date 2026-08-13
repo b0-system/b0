@@ -12,20 +12,20 @@ open B0_std
 type t = String.Set.t
 (** The type for sets of file extensions. *)
 
-type map = Fpath.t list String.Map.t
+type map = Filepath.t list String.Map.t
 (** The type for files mapped by their extension. *)
 
-val make : Fpath.ext list -> t
+val make : Filepath.ext list -> t
 (** [make exts] is a set for the given extensions. *)
 
-val ext : Fpath.ext -> t
+val ext : Filepath.ext -> t
 (** [ext e] is the set that containes only [e]. *)
 
-val find_files : t -> map -> Fpath.t list
+val find_files : t -> map -> Filepath.t list
 (** [find_files exts m] selects from [m] the files that have an
     extension in [exts]. *)
 
-val all_files : map -> Fpath.t list
+val all_files : map -> Filepath.t list
 (** [all_files m] is concatenation of the list of files in [m]
     in no particular order. *)
 

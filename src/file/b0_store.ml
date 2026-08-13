@@ -16,7 +16,7 @@ and binding = B : 'a key * 'a Fut.t -> binding
 and t =
   { memo : B0_memo.t;
     mutable map : binding M.t;
-    dir : Fpath.t }
+    dir : Filepath.t }
 
 let[@inline] key_uid k = Type.Id.uid k.id
 let key ?(mark = "") det = { det; id = Type.Id.make (); mark; }

@@ -376,8 +376,8 @@ module Diff = struct
   let run_diff_cmd ?env cmd ~fnd ~exp =
     Result.join @@ Os.Dir.with_tmp @@ fun dir ->
     let force = false and make_path = false in
-    let* () = Os.File.write ~force ~make_path Fpath.(dir / "expected") exp in
-    let* () = Os.File.write ~force ~make_path Fpath.(dir / "found") fnd in
+    let* () = Os.File.write ~force ~make_path Filepath.(dir / "expected") exp in
+    let* () = Os.File.write ~force ~make_path Filepath.(dir / "found") fnd in
     let diff = Cmd.(cmd % "expected" % "found") in
     match Os.Cmd.run_status_out ?env ~trim:false ~cwd:dir diff with
     | Error _ as e -> e
@@ -479,22 +479,22 @@ module Patch = struct
 
   (* Files to patch *)
 
-  let files : t option Fpath.Map.t ref = ref Fpath.Map.empty
+  let files : t option Filepath.Map.t ref = ref Filepath.Map.empty
 
-  let get file = match Fpath.Map.find_opt file !files with
+  let get file = match Filepath.Map.find_opt file !files with
   | Some v -> v
   | None ->
       let substs = match Os.File.read file with
       | Ok src -> Some { src; substs = [] }
       | Error e ->
-          Log.fail "Correction failure: %a: %s" Fpath.pp file e;
+          Log.fail "Correction failure: %a: %s" Filepath.pp file e;
           None
       in
-      files := Fpath.Map.add file substs !files;
+      files := Filepath.Map.add file substs !files;
       substs
 
   let update file patch =
-    files := Fpath.Map.add file (Some patch) !files
+    files := Filepath.Map.add file (Some patch) !files
 
   let write_files () =
     let write_file file = function
@@ -503,10 +503,10 @@ module Patch = struct
     | Some patch ->
         let force = true and make_path = false in
         match Os.File.write ~force ~make_path file (apply patch) with
-        | Error e -> Log.fail "Correction failure: %a: %s" Fpath.pp file e
+        | Error e -> Log.fail "Correction failure: %a: %s" Filepath.pp file e
         | Ok () -> ()
     in
-    Fpath.Map.iter write_file !files
+    Filepath.Map.iter write_file !files
 end
 
 module Test = struct
@@ -607,11 +607,11 @@ module Test = struct
 
   (* Test directory *)
 
-  let dir = ref Fpath.null
+  let dir = ref Filepath.null
   let set_dir d = dir := d
   let dir () =
     let d = !dir in
-    if not (Fpath.is_null d) then d else
+    if not (Filepath.is_null d) then d else
     failstop "@[The test directory is not set.@ \
               See option %a@]" Fmt.code "--test-dir"
 
@@ -746,14 +746,14 @@ module Test = struct
 
     type 'a t =
     | In_source : loc * 'a -> 'a t
-    | External : loc * Fpath.t -> string t (* a codec could generalize *)
+    | External : loc * Filepath.t -> string t (* a codec could generalize *)
 
     let src_loc : type a. a t -> loc = function
     | In_source (loc, _) | External (loc, _) -> loc
 
     let exp_loc : type a. a t -> loc = function
     | In_source (loc, _) -> loc
-    | External (_, f) -> (Fpath.to_string f, 1, 0, 0)
+    | External (_, f) -> (Filepath.to_string f, 1, 0, 0)
 
     type 'a subst = 'a T.t -> 'a t -> by:'a -> src:string -> Patch.subst
 
@@ -791,8 +791,8 @@ module Test = struct
           Os.File.write ~force ~make_path file fnd |> Result.error_to_failure
       | In_source _ ->
           let fname, _, _, _ = src_loc snap in
-          let file = Fpath.of_string fname |> Result.error_to_failure in
-          let file = Fpath.(dir () // file) in
+          let file = Filepath.of_string fname |> Result.error_to_failure in
+          let file = Filepath.(dir () // file) in
           match Patch.get file with
           | None -> ()
           | Some patch ->
@@ -829,7 +829,7 @@ module Test = struct
           then begin
             Fail.incr ();
             Log.fail ~__POS__:loc
-              "@[<v>Missing %a@]" (Fmt.code' Fpath.pp) file;
+              "@[<v>Missing %a@]" (Fmt.code' Filepath.pp) file;
             Log.raw_flush "%a" (T.pp t) fnd
           end else begin
             log_correcting ~loc:(exp_loc snap) "%a" (T.pp t) fnd;
@@ -849,7 +849,7 @@ module Test = struct
       | In_source (_, exp) -> snap_value ?subst t ?diff fnd exp snap
       | External (loc, file) ->
           let loc = match pos with None -> loc | Some pos -> pos in
-          let file = Fpath.(dir () // file) in
+          let file = Filepath.(dir () // file) in
           let snap = External (loc, file) in
           snap_external ?subst t ?diff fnd loc file snap
       with
@@ -1109,7 +1109,7 @@ module Test = struct
       Def.set_output_list output_list;
       Long.set_run long;
       Long.set_skip_exit long_skip_exit;
-      set_dir (match test_dir with Some dir -> dir | None -> Fpath.null);
+      set_dir (match test_dir with Some dir -> dir | None -> Filepath.null);
       Diff.set_cmd diff_cmd;
       Rand.set_seed seed;
       Snapshot.set_correct correct;
@@ -1223,7 +1223,7 @@ module Test = struct
          update reference snapshots."
       in
       let env = Cmd.Env.info "TEST_DIR" in
-      Arg.(value & opt (some B0_std_cli.dirpath) None &
+      Arg.(value & opt (some B0_std_cli.dir) None &
            info ["test-dir"] ~doc ~docs ~env)
 
     let seed =
@@ -1387,7 +1387,7 @@ module Snap = struct
 
   let snap_cmd_default cmd = match Cmd.find_tool cmd with
   | None -> cmd
-  | Some tool -> Cmd.set_tool (Fpath.basepath tool) cmd
+  | Some tool -> Cmd.set_tool (Filepath.basepath tool) cmd
 
   let run
       ?__POS__ ?(test = T.lines) ?diff ?env ?cwd ?stdin

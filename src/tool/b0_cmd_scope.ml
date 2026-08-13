@@ -7,11 +7,11 @@ open B0_std
 open Result.Syntax
 
 let pp_name = B0_scope.pp_name
-let pp_dir = Fmt.st' [`Fg `Blue] Fpath.pp
+let pp_dir = Fmt.st' [`Fg `Blue] Filepath.pp
 let pp_scope_dir ppf (_, dir) = pp_dir ppf dir
 let pp_scope_name ppf (name, _) = B0_scope.pp_name ppf name
 let pp_scope_all ppf (name, dir) =
-  Fmt.pf ppf "@[%a %a@]" B0_scope.pp_name name Fpath.pp dir
+  Fmt.pf ppf "@[%a %a@]" B0_scope.pp_name name Filepath.pp dir
 
 let warn_incl_excl n =
   Log.warn @@ fun m ->
@@ -20,7 +20,7 @@ let warn_incl_excl n =
 
 let get_scopes _conf ~topmost ~includes ~excludes =
   let scopes = List.sort compare (B0_scope.name_list ()) in
-  let scopes = List.map (fun (n, file) -> (n, Fpath.parent file)) scopes in
+  let scopes = List.map (fun (n, file) -> (n, Filepath.parent file)) scopes in
   let keep (name, _) =
     if topmost && (String.contains name '.') then false else match includes with
     | [] -> not (List.mem name excludes)
@@ -56,8 +56,8 @@ let exec_when
             | Error e when not keep_going -> err s e
             | Error _ -> loop ss
             | Ok out ->
-                let dir = Fpath.ensure_trailing_dir_sep dir in
-                let dir = Fmt.str "%a" Fpath.pp_unquoted dir in
+                let dir = Filepath.ensure_trailing_dir_sep dir in
+                let dir = Fmt.str "%a" Filepath.pp_unquoted dir in
                 let print_line _ () l =
                   if l = "" then
                     (* No line here according POSIX's text file convention. *)
@@ -95,7 +95,7 @@ let symlink ~topmost ~includes ~excludes ~dir ~rm conf =
     if scope = "" (* root scope *) then Ok () else
     let err e = Fmt.str "Could not symlink scope %s: %s" scope e in
     Result.map_error err @@
-    let symlink = Fpath.(dir / scope) in
+    let symlink = Filepath.(dir / scope) in
     let* exists = Os.Path.exists symlink in
     let force = true and make_path = true in
     if not exists then Os.Path.symlink ~force ~make_path ~src:path symlink else
@@ -104,7 +104,7 @@ let symlink ~topmost ~includes ~excludes ~dir ~rm conf =
     then Os.Path.symlink ~force ~make_path ~src:path symlink else
     begin
       (Log.warn @@ fun m ->
-       m "%a: exists and not a symlink, skipped." Fpath.pp symlink);
+       m "%a: exists and not a symlink, skipped." Filepath.pp symlink);
       Ok ()
     end
   in
@@ -112,13 +112,13 @@ let symlink ~topmost ~includes ~excludes ~dir ~rm conf =
     if scope = "" (* root scope *) then Ok () else
     let err e = Fmt.str "Could not remove symlink for scope %s: %s" scope e in
     Result.map_error err @@
-    let symlink = Fpath.(dir / scope) in
+    let symlink = Filepath.(dir / scope) in
     let* exists = Os.Path.exists symlink in
     if not exists then Ok () else
     let* stat = Os.Path.symlink_stat symlink in
     if stat.st_kind = Unix.S_LNK
     then Result.map ignore (Os.Path.delete ~recurse:false symlink) else
-    (Log.warn (fun m -> m "%a: not a symlink, skipped." Fpath.pp symlink);
+    (Log.warn (fun m -> m "%a: not a symlink, skipped." Filepath.pp symlink);
      Ok ())
   in
   let op = if rm then remove_scope_symlink else symlink_scope in
@@ -266,7 +266,7 @@ let symlink =
        created if it doesn't exist."
     in
     let docv = "DIR" in
-    Arg.(value & opt B0_std_cli.dirpath (Fpath.v ".") &
+    Arg.(value & opt B0_std_cli.dir (Filepath.v ".") &
          info ["d"; "in-dir"] ~doc ~docv)
   and+ rm =
     let doc =

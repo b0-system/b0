@@ -48,7 +48,7 @@ let derive_synopsis_and_description p m =
   match B0_meta.(mem synopsis m, mem description m) with
   | true, true -> m
   | has_syn, has_descr ->
-      let extracted = match in_scope_dir p (Fpath.v "README.md") with
+      let extracted = match in_scope_dir p (Filepath.v "README.md") with
       | None -> None
       | Some readme ->
           let exists = Os.File.exists readme |> Log.if_error ~use:false in

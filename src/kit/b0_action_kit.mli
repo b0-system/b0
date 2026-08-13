@@ -14,7 +14,7 @@ open B0_std
 val download_url :
   ?env:Os.Env.assignments -> ?stderr:Os.Cmd.stdo -> ?args:Cmd.t ->
   ?progress:bool -> B0_env.t -> ?mode:int -> force:bool -> make_path:bool ->
-  Net.Url.t -> dst:Fpath.t -> (unit, string) result
+  Net.Url.t -> dst:Filepath.t -> (unit, string) result
 (** [download_url env' url file] fetches the [url] (redirections are
     followed) using [curl] looked up in [env'] and the body to
     [file] with:

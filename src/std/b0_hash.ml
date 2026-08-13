@@ -33,12 +33,12 @@ module type T = sig
   val length : int
   val string : string -> t
   val fd : Unix.file_descr -> t
-  val file : Fpath.t -> (t, string) result
+  val file : Filepath.t -> (t, string) result
 end
 
 let rec file_with_hash_fd hash_fd f =
-  let err f e = Fmt.error "%a: %s" Fpath.pp f e in
-  match Unix.openfile (Fpath.to_string f) Unix.[O_RDONLY] 0 with
+  let err f e = Fmt.error "%a: %s" Filepath.pp f e in
+  match Unix.openfile (Filepath.to_string f) Unix.[O_RDONLY] 0 with
   | exception Unix.Unix_error (Unix.EINTR, _, _) ->
       file_with_hash_fd hash_fd f
   | exception Unix.Unix_error (e, _, _) -> err f (Unix.error_message e)

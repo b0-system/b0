@@ -21,10 +21,10 @@ module Op : sig
 
   (** {1:fmt Formatters} *)
 
-  val pp_file_read : Fpath.t Fmt.t
+  val pp_file_read : Filepath.t Fmt.t
   (** [pp_file_read] formats a read file. *)
 
-  val pp_file_write : Fpath.t Fmt.t
+  val pp_file_write : Filepath.t Fmt.t
   (** [pp_file_write] formats a written file. *)
 
   val pp_line : Op.t Fmt.t
@@ -49,8 +49,8 @@ module Op : sig
   (** {1:errors Errors} *)
 
   val pp_aggregate_error :
-    ?sep:unit Fmt.t -> ?read_howto:Fpath.t Fmt.t ->
-    ?write_howto:Fpath.t Fmt.t -> unit ->
+    ?sep:unit Fmt.t -> ?read_howto:Filepath.t Fmt.t ->
+    ?write_howto:Filepath.t Fmt.t -> unit ->
     B0_zero.Op.aggregate_error Fmt.t
     (** [pp_aggregate_error ~read_howto ~write_howto] formats a memo
         error followed by [sep] iff somethings is printed (defaults

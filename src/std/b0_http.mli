@@ -112,7 +112,7 @@ module Client : sig
       line tool. *)
 
   val curl_fetch_args :
-    ?args:Cmd.t -> progress:bool -> Net.Url.t -> Fpath.t -> Cmd.t
+    ?args:Cmd.t -> progress:bool -> Net.Url.t -> Filepath.t -> Cmd.t
   (** [curl_fetch_args url file] are curl arguments to fetch the URL
       [url] and write it to [file]. If progress is [true] it is reported.
       [args] are added to the result before the URL. Redirections

@@ -63,7 +63,7 @@ val family : string B0_store.key
 
 (** {1:exe_ext Executable file extension} *)
 
-val exe_ext : B0_std.Fpath.ext B0_store.key
+val exe_ext : B0_std.Filepath.ext B0_store.key
 (** [exe_ext] is operating system specific file extension for
     executable files. This is:
     {ul

@@ -16,7 +16,7 @@ val get : ?search:Cmd.tool_search -> ?cmd:Cmd.t -> unit -> (t, string) result
 
 val copy :
   t -> ?opts:Cmd.t -> ?stats:bool -> ?progress:bool -> delete:bool ->
-  ?src_host:string -> ?dst_host:string -> Fpath.t -> dst:Fpath.t ->
+  ?src_host:string -> ?dst_host:string -> Filepath.t -> dst:Filepath.t ->
   (unit, string) result
 (** [copy src ~dst] copies the contents of directory [src] to [dst]
     with [rsync]. As per [rsync] semantics, directoryness of [src] is

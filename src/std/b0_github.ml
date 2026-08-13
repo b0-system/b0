@@ -12,7 +12,7 @@ open B0_json
 module Auth = struct
   let conf_dir () =
     let* c = Os.Dir.config () in
-    Ok Fpath.(c / "b0" / "github")
+    Ok Filepath.(c / "b0" / "github")
 
   (* Token *)
 
@@ -22,10 +22,10 @@ module Auth = struct
     "https://docs.github.com/en/github/authenticating-to-github/\
      creating-a-personal-access-token"
 
-  type token_src = [ `Env | `File of Fpath.t ]
+  type token_src = [ `Env | `File of Filepath.t ]
   let pp_token_src ppf = function
   | `Env -> Fmt.pf ppf "environment variable %s" token_env
-  | `File file -> Fmt.pf ppf "file %a" Fpath.pp_quoted file
+  | `File file -> Fmt.pf ppf "file %a" Filepath.pp_quoted file
 
   let parse_token s = match String.trim s with
   | "" -> Error "Token can't be empty."
@@ -41,7 +41,7 @@ module Auth = struct
     match Os.Env.var ~empty_is_none:true token_env with
     | Some token -> Result.map (fun t -> t, `Env) (parse_token token)
     | None ->
-        let tokfile = Fpath.(conf_dir / Fmt.str "%s.token" user) in
+        let tokfile = Filepath.(conf_dir / Fmt.str "%s.token" user) in
         let* exists = Os.File.exists tokfile in
         match exists with
         | false ->
@@ -60,11 +60,11 @@ module Auth = struct
                \ \ cat - > %a@,@,\
                \ \ # Restrict access to yourself@,\
                \ \ chmod 600 %a@,"
-              user token_env Fpath.pp_quoted tokfile token_scope token_help_uri
-              Fpath.pp_quoted conf_dir Fpath.pp_quoted tokfile Fpath.pp_quoted
+              user token_env Filepath.pp_quoted tokfile token_scope token_help_uri
+              Filepath.pp_quoted conf_dir Filepath.pp_quoted tokfile Filepath.pp_quoted
               tokfile
         | true ->
-            Result.map_error (Fmt.str "%a: %s" Fpath.pp_quoted tokfile) @@
+            Result.map_error (Fmt.str "%a: %s" Filepath.pp_quoted tokfile) @@
             let* tok = Result.bind (Os.File.read tokfile) parse_token  in
             Ok (tok, `File tokfile)
 
@@ -79,17 +79,17 @@ module Auth = struct
   | s -> Ok s
 
   let user_of_default_file default_user_file =
-    Result.map_error (Fmt.str "%a: %s" Fpath.pp_quoted default_user_file) @@
+    Result.map_error (Fmt.str "%a: %s" Filepath.pp_quoted default_user_file) @@
     Result.bind (Os.File.read default_user_file) parse_user
 
   let user_of_token_file f =
-    Result.map_error (Fmt.str "%a: %s" Fpath.pp_quoted f) @@
-    parse_user (Fpath.basename ~drop_exts:true f)
+    Result.map_error (Fmt.str "%a: %s" Filepath.pp_quoted f) @@
+    parse_user (Filepath.basename ~drop_exts:true f)
 
   let get_user conf_dir ~user =
     let err default_file =
       Fmt.error "@[<v>Could not determine a default GitHub user.@,\
-                 Write the user to use in the file %a@]" Fpath.pp
+                 Write the user to use in the file %a@]" Filepath.pp
         default_file
     in
     match user with
@@ -98,7 +98,7 @@ module Auth = struct
         match Os.Env.var ~empty_is_none:true user_env with
         | Some user -> Ok user
         | None ->
-            let default_user_file = Fpath.(conf_dir / default_user_file) in
+            let default_user_file = Filepath.(conf_dir / default_user_file) in
             let* dir_exists = Os.Dir.exists conf_dir in
             let* file_exists = Os.File.exists default_user_file in
             if not dir_exists then err default_user_file else
@@ -340,12 +340,12 @@ module Pages = struct
   let header = "gh-pages" (* log header *)
 
   type update =
-    { dst : Fpath.t;
-      src : Fpath.t option;
+    { dst : Filepath.t;
+      src : Filepath.t option;
       follow_symlinks : bool }
 
   let update ?(follow_symlinks = true) src ~dst = { dst; src; follow_symlinks }
-  let nojekyll = update (Some Fpath.null) ~dst:(Fpath.v ".nojekyll")
+  let nojekyll = update (Some Filepath.null) ~dst:(Filepath.v ".nojekyll")
 
   let fetch_branch r ~log ~remote ~branch =
     let* exists = B0_vcs_repo.Git.remote_branch_exists r ~remote ~branch in
@@ -383,7 +383,7 @@ module Pages = struct
         ~ignore_unmatch:true [p]
     in
     let cp r ~follow_symlinks src dst =
-      let dst = Fpath.(B0_vcs_repo.(work_dir r) // dst) in
+      let dst = Filepath.(B0_vcs_repo.(work_dir r) // dst) in
       Os.Path.copy
         ~force:false ~follow_symlinks ~make_path:true ~recurse:true src ~dst
     in

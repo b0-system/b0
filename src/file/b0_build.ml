@@ -40,7 +40,7 @@ let current_meta b = B0_defs.Unit.meta (current b)
 (* Directories *)
 
 module B0_dir = struct
-  let build_dir ~b0_dir ~variant = Fpath.(b0_dir / "b" / variant)
+  let build_dir ~b0_dir ~variant = Filepath.(b0_dir / "b" / variant)
 
   let default_build_dir ~b0_dir =
     (* FIXME this is hardcoded. In the future we likely want to
@@ -48,12 +48,12 @@ module B0_dir = struct
     Ok (build_dir ~b0_dir ~variant:"user")
 
   let log_file ~build_dir =
-    Fpath.(build_dir / B0_memo_cli.Log.filename)
+    Filepath.(build_dir / B0_memo_cli.Log.filename)
 
-  let shared_build_dir ~build_dir = Fpath.(build_dir / "_shared")
-  let store_dir ~build_dir = Fpath.(build_dir / "_store")
-  let unit_build_dir ~build_dir ~name = Fpath.(build_dir / name)
-  let scratch_dir ~b0_dir = Fpath.(b0_dir / "_scratch")
+  let shared_build_dir ~build_dir = Filepath.(build_dir / "_shared")
+  let store_dir ~build_dir = Filepath.(build_dir / "_store")
+  let unit_build_dir ~build_dir ~name = Filepath.(build_dir / name)
+  let scratch_dir ~b0_dir = Filepath.(b0_dir / "_scratch")
 end
 
 let unit_dir b u =
@@ -67,11 +67,11 @@ let current_dir b = unit_dir b (current b)
 let scope_dir b = unit_scope_dir b (current b)
 let shared_dir b = b.b.shared_dir
 
-let in_unit_dir b u p = Fpath.(unit_dir b u // p)
-let in_unit_scope_dir b u p = Fpath.(unit_scope_dir b u // p)
-let in_current_dir b p = Fpath.(current_dir b // p)
-let in_scope_dir b p = Fpath.(scope_dir b // p)
-let in_shared_dir b p = Fpath.(b.b.shared_dir // p)
+let in_unit_dir b u p = Filepath.(unit_dir b u // p)
+let in_unit_scope_dir b u p = Filepath.(unit_scope_dir b u // p)
+let in_current_dir b p = Filepath.(current_dir b // p)
+let in_scope_dir b p = Filepath.(scope_dir b // p)
+let in_shared_dir b p = Filepath.(b.b.shared_dir // p)
 
 (* Store *)
 

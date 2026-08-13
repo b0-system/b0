@@ -268,6 +268,6 @@ let test_dir =
   let doc =
     "Test directory (scope relative). Defines TEST_DIR env in executions."
   in
-  Key.make "test-dir" ~doc ~pp_value:Fpath.pp
+  Key.make "test-dir" ~doc ~pp_value:Filepath.pp
 
 let () = B0_scope.close ()

@@ -46,7 +46,7 @@ let tool =
   and+ query = B0_memo_cli.Op.query_cli ()
   and+ log_file =
     let doc = "The log file to use." and docv = "LOG_FILE" in
-    Arg.(required & pos 0 (some B0_std_cli.filepath) None & info [] ~doc ~docv)
+    Arg.(required & pos 0 (some B0_std_cli.file) None & info [] ~doc ~docv)
   in
   log ~no_pager ~format ~output_details ~query ~log_file
 

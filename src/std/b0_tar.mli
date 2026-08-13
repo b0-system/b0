@@ -33,7 +33,7 @@ val empty : t
 (** [empty] is the empty ustar archive. *)
 
 val add :
-  t -> Fpath.t -> mode:int -> mtime:ptime -> member ->
+  t -> Filepath.t -> mode:int -> mtime:ptime -> member ->
   (t, string) result
 (** [add a path ~mode ~mtime member] adds [member] to archive [a]
     with file path [path], permission mode [mode] and modificaton
@@ -43,15 +43,15 @@ val to_string : t -> string
 (** [to_string a] is the byte serialization of the archive [a]. *)
 
 val of_dir :
-  dir:Fpath.t -> exclude_paths:Fpath.Set.t -> root:Fpath.t -> mtime:int ->
-  (string, string) result
+  dir:Filepath.t -> exclude_paths:Filepath.Set.t -> root:Filepath.t ->
+  mtime:int -> (string, string) result
 (** [of_dir ~dir ~exclude_paths ~root ~mtime] is a (us)tar archive that
     contains the file hierarchy [dir] except the relative
     hierarchies and files present in [exclude_paths]. Symbolic links are
     followed.
 
     In the archive, members of [dir] are rerooted at [root] and sorted
-    according to {!B0_std.Fpath.compare} (for determinism). They have their
+    according to {!B0_std.Filepath.compare} (for determinism). They have their
     modification time set to [mtime] and their file permissions are
     [0o775] for directories and files executable by the user and
     [0o664] for other files. No other file metadata is preserved. *)
@@ -60,7 +60,7 @@ val of_dir :
 
 val compress :
   ?search:Cmd.tool_search -> force:bool -> make_path:bool ->
-  Fpath.t -> archive:string -> (unit, string) result
+  Filepath.t -> archive:string -> (unit, string) result
 (** [compress ~force ~make_path file ~archive] compresses archive
     [archive] to [file]. For [force] and [make_path] see
     {!B0_std.Os.Cmd.out_file}.
@@ -78,8 +78,8 @@ val compress :
 (** {1:unarchive Unarchiving} *)
 
 val unarchive :
-  ?search:Cmd.tool_search -> make_path:bool -> verbose:bool -> src:Fpath.t ->
-  in_dir:Fpath.t -> unit -> (unit, string) result
+  ?search:Cmd.tool_search -> make_path:bool -> verbose:bool -> src:Filepath.t ->
+  in_dir:Filepath.t -> unit -> (unit, string) result
 (** [unarchive ~make_path ~src ~in_dir] unarchives [src] in directory
     [in_dir] which is created if it doesn't exist. For [make_path]
     see {!B0_std.Os.Dir.val-create}. If [verbose] is [true] [-v] is passed to

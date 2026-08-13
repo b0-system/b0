@@ -11,31 +11,31 @@ open Result.Syntax
 let url_of_path _env path =
   let* exists = Os.Path.exists path in (* FIXME remote build the build env *)
   if not exists
-  then Fmt.error "%a: Not such path" Fpath.pp path
-  else Ok (Fmt.str "file://%s" (Fpath.to_string path))
+  then Fmt.error "%a: Not such path" Filepath.pp path
+  else Ok (Fmt.str "file://%s" (Filepath.to_string path))
 
 (* URLs *)
 
 type url =
 [ `Url of Net.Url.t
-| `In of B0_env.dir * Fpath.t
+| `In of B0_env.dir * Filepath.t
 | `Fun of string * (B0_env.t -> B0_unit.t -> (Net.Url.t, string) result) ]
 
 let pp_url ppf = function
 | `Url u -> Fmt.pf ppf "URL %s" u
-| `In (dir, p) -> Fmt.pf ppf "%a in %a" Fpath.pp p B0_env.pp_dir dir
+| `In (dir, p) -> Fmt.pf ppf "%a in %a" Filepath.pp p B0_env.pp_dir dir
 | `Fun (doc, _) -> Fmt.pf ppf "<fun> %s" doc
 
 let url : url B0_meta.key =
   let doc = "The default URL to show." in
-  let default = `In (`Unit_dir, Fpath.v ".") in
+  let default = `In (`Unit_dir, Filepath.v ".") in
   B0_meta.Key.make "url" ~default ~doc ~pp_value:pp_url
 
 let get_url env unit = match B0_unit.find_meta_or_default url unit with
 | `Url url -> Ok url
 | `In (`Unit_dir, p) ->
     let dir = B0_env.unit_dir env unit in
-    let p = if Fpath.is_current_dir p then dir else Fpath.(dir // p) in
+    let p = if Filepath.is_current_dir p then dir else Filepath.(dir // p) in
     url_of_path env (B0_env.in_unit_dir env unit p)
 | `In (dir, p) -> url_of_path env (B0_env.in_dir env dir p)
 | `Fun (_, f) -> f env unit
@@ -165,7 +165,7 @@ let unit_mode env args =
     Result.map_error (fun e -> Fmt.str "%a: %s" Fmt.code arg e) @@
     let unit_dir = B0_build.unit_dir (B0_env.build env) unit in
     match p with
-    | Some p -> url_of_path env Fpath.(unit_dir // v p)
+    | Some p -> url_of_path env Filepath.(unit_dir // v p)
     | None -> get_url env unit
   in
   try Ok (`Show_unit_urls (List.map make_url specs)) with Failure e -> Error e

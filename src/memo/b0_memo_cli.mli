@@ -60,30 +60,31 @@ module File_cache : sig
       defaults to {!String.Set.empty}. *)
 
   val delete :
-    dir:Fpath.t -> used:keyset -> kind:key_kind ->
+    dir:Filepath.t -> used:keyset -> kind:key_kind ->
     [ `All | `Keys of B0_zero.File_cache.key list ] -> (bool, string) result
   (** [delete ~dir ~used ~kind keys] deletes [keys] in [dir] if an
       explicit key does not exist in [dir] or [unused] (depending on
       [kind]) a {!Log.warn} is issued. If [`All] and [`Any] is
       specified [dir] is deleted and recreated. *)
 
-  val gc : dry_run:bool -> dir:Fpath.t -> used:keyset -> (bool, string) result
+  val gc :
+    dry_run:bool -> dir:Filepath.t -> used:keyset -> (bool, string) result
   (** [gc ~dry_run ~dir ~used] deletes keys that are not in [used].
       If [dry_run] is [true] outputs deltions on [stdout] rather than
       performing them. *)
 
   val keys :
-    dir:Fpath.t -> used:keyset -> kind:key_kind -> (bool, string) result
+    dir:Filepath.t -> used:keyset -> kind:key_kind -> (bool, string) result
   (** [keys ~dir ~used ~kind] lists the file cache keys on [stdout] using
       keyed againt [used] in the [`Used] and [`Unused] case. The argument is
       ignored on [`All]. *)
 
-  val stats : dir:Fpath.t -> used:keyset -> (bool, string) result
+  val stats : dir:Filepath.t -> used:keyset -> (bool, string) result
   (** [status ~dir ~used] outputs statistics about the file cache on [stdout].
       [used] determines keys that are in use. *)
 
   val trim :
-    dry_run:bool -> dir:Fpath.t -> used:keyset -> max_byte_size:int ->
+    dry_run:bool -> dir:Filepath.t -> used:keyset -> max_byte_size:int ->
     pct:int -> (bool, string) result
   (** [trim dir ~used ~max_byte_size ~pct] trims the cache using
       {!B0_zero.File_cache.trim_size}. [used] determines keys that
@@ -97,7 +98,7 @@ module File_cache : sig
   val dir :
     ?opts:string list -> ?docs:Cmdliner.Manpage.section_name -> ?doc:string ->
     ?doc_absent:string -> ?env:Cmdliner.Cmd.Env.info -> unit ->
-    Fpath.t option Cmdliner.Term.t
+    Filepath.t option Cmdliner.Term.t
   (** [dir ~doc_none ~docs ~doc ~env] is a cli interface for specifying
       a file cache directory.
       {ul
@@ -152,7 +153,8 @@ module Op : sig
 
   val find_needs :
     ?acc:B0_zero.Op.Set.t -> recursive:bool ->
-    writes:B0_zero.Op.Set.t Fpath.Map.t -> B0_zero.Op.Set.t -> B0_zero.Op.Set.t
+    writes:B0_zero.Op.Set.t Filepath.Map.t -> B0_zero.Op.Set.t ->
+    B0_zero.Op.Set.t
   (** [find_needs ~recursive ~writes ~acc ops] add to [acc] (defaults
       to {!B0_zero.Op.Set.empty}) the set of operations in the write index
       [writes] that need to be executed for the set of operations
@@ -161,7 +163,8 @@ module Op : sig
 
   val find_enables :
     ?acc:B0_zero.Op.Set.t -> recursive:bool ->
-    reads:B0_zero.Op.Set.t Fpath.Map.t -> B0_zero.Op.Set.t -> B0_zero.Op.Set.t
+    reads:B0_zero.Op.Set.t Filepath.Map.t -> B0_zero.Op.Set.t ->
+    B0_zero.Op.Set.t
   (** [find_enables ~recursive ~writes ~acc ops] add to [acc]
       (defaults to {!B0_zero.Op.Set.empty}) the set of operations in the
       read index [reads] that are enabled by the set of operations
@@ -175,7 +178,7 @@ module Op : sig
       because of dependency selection. *)
 
   val select :
-    reads:Fpath.t list -> writes:Fpath.t list -> ids:B0_zero.Op.id list ->
+    reads:Filepath.t list -> writes:Filepath.t list -> ids:B0_zero.Op.id list ->
     hashes:B0_hash.t list -> marks:string list -> B0_zero.Op.t -> bool
   (** [select ~reads ~writes ~ids ~hashes ~marks o] is [true]
       iff [o] reads a file in [reads] or writes a file in [writes]
@@ -276,7 +279,7 @@ module Log : sig
   val pp :
     ?sep:unit B0_std.Fmt.t -> format:format ->
     output_details:B0_std_cli.output_details -> query:Op.query ->
-    path:Fpath.t -> unit -> B0_memo_log.t Fmt.t
+    path:Filepath.t -> unit -> B0_memo_log.t Fmt.t
   (** [pp ~format ~output_details quer ~path] formats a log as follows:
       {ul
       {- [format] specifies how the log is rendered.}
@@ -303,7 +306,7 @@ module Log : sig
 
   val file :
     ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_absent:string ->
-    ?env:Cmdliner.Cmd.Env.info -> unit -> Fpath.t option Cmdliner.Term.t
+    ?env:Cmdliner.Cmd.Env.info -> unit -> Filepath.t option Cmdliner.Term.t
   (** [file ~doc_none ~docs ~doc ~env] is a cli interface for
       specifing a memo log file.
       {ul

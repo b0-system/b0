@@ -56,27 +56,27 @@ let gather
     ~dest ~dirs ~force ~keep_symlinks ~keep_going ~relative ~symlink_scopes conf
   =
   let pp_inc_directive ppf (s, f) =
-    Fmt.pf ppf {|@[[@@@@@@B0.include "%s" "%a"]@]|} s Fpath.pp_unquoted f
+    Fmt.pf ppf {|@[[@@@@@@B0.include "%s" "%a"]@]|} s Filepath.pp_unquoted f
   in
   let gather_b0_file ~dest ~relative ~keep_symlinks ~keep_going ~seen dir =
     let* exists = Os.Dir.exists dir in
     if not exists && keep_going then Ok None else
     let* () = Os.Dir.must_exist dir in (* For the error message *)
-    let b0_file = Fpath.(dir / B0_driver.Conf.b0_file_name) in
+    let b0_file = Filepath.(dir / B0_driver.Conf.b0_file_name) in
     let* exists = Os.File.exists b0_file in
     if not exists && keep_going then Ok None else
     let* b0_file' = Os.Path.realpath b0_file in
     let b0_file = match keep_symlinks with
-    | true when relative -> Fpath.relative ~to_dir:dest b0_file
-    | true -> Fpath.(dest // b0_file)
-    | false when relative -> Fpath.relative ~to_dir:dest b0_file'
+    | true when relative -> Filepath.relative ~to_dir:dest b0_file
+    | true -> Filepath.(dest // b0_file)
+    | false when relative -> Filepath.relative ~to_dir:dest b0_file'
     | false -> b0_file'
     in
     let* scope =
-      if not keep_symlinks then Ok (Fpath.(basename @@ parent b0_file')) else
-      match Fpath.basename dir with
+      if not keep_symlinks then Ok (Filepath.(basename @@ parent b0_file')) else
+      match Filepath.basename dir with
       | ".." | "." ->
-          Fmt.error "Cannot determine a scope name for %a" Fpath.pp dir
+          Fmt.error "Cannot determine a scope name for %a" Filepath.pp dir
       | scope -> Ok scope
     in
     let scope = String.map (function '.' -> '_' | c -> c) scope in
@@ -99,9 +99,9 @@ let gather
       | Some (scope, b0_file, seen) when not symlink_scopes ->
           gather_dirs dest seen ((scope, b0_file) :: acc) dirs
       | Some (scope, b0_file, seen) ->
-          let src = Fpath.parent b0_file and dst = Fpath.(dest / scope) in
+          let src = Filepath.parent b0_file and dst = Filepath.(dest / scope) in
           let* () = Os.Path.symlink ~force ~make_path:false ~src dst in
-          let b0_file = Fpath.(v scope / B0_driver.Conf.b0_file_name) in
+          let b0_file = Filepath.(v scope / B0_driver.Conf.b0_file_name) in
           gather_dirs dest seen ((scope, b0_file) :: acc) dirs
       end
   | [] -> Ok (List.sort compare acc)
@@ -113,18 +113,18 @@ let gather
   | None -> Ok (B0_driver.Conf.cwd conf, None)
   | Some dest ->
       let* _exists = Os.Dir.create ~make_path:true dest in
-      let dest_b0_file = Fpath.(dest / B0_driver.Conf.b0_file_name) in
+      let dest_b0_file = Filepath.(dest / B0_driver.Conf.b0_file_name) in
       let* exists = Os.File.exists dest_b0_file in
       if exists && not force then
         Fmt.error "%a: file exists, use option %a to overwrite."
-          Fpath.pp dest_b0_file Fmt.code "--force"
+          Filepath.pp dest_b0_file Fmt.code "--force"
       else
       Ok (dest, Some dest_b0_file)
   in
   let* incs = gather_dirs dest String.Set.empty [] dirs in
   let incs = Fmt.str "@[<v>%a@]" (Fmt.list pp_inc_directive) incs in
   let b0_file = match dest_b0_file with
-  | None -> Fpath.dash | Some file -> file
+  | None -> Filepath.dash | Some file -> file
   in
   let force = true (* The force logic was handled above *) in
   let* () = Os.File.write ~force ~make_path:false b0_file incs in
@@ -132,10 +132,10 @@ let gather
 
 let includes ~root ~output_details conf =
   let pp_inc = match output_details with
-  | `Short -> fun ppf (_, (p, _)) -> Fpath.pp_unquoted ppf p
+  | `Short -> fun ppf (_, (p, _)) -> Filepath.pp_unquoted ppf p
   | `Normal | `Long ->
       fun ppf ((n, _), (p, _)) ->
-        Fmt.pf ppf "@[%a %a@]" Fmt.code n Fpath.pp_unquoted p
+        Fmt.pf ppf "@[%a %a@]" Fmt.code n Filepath.pp_unquoted p
   in
   get_b0_file_src conf @@ fun src ->
   let* incs =
@@ -162,7 +162,7 @@ let log ~format ~output_details ~query conf =
 let path conf =
   Log.if_error ~use:B0_driver.Exit.no_b0_file @@
   let* b0_file = B0_driver.Conf.get_b0_file conf in
-  Log.stdout (fun m -> m "%a" Fpath.pp_unquoted b0_file);
+  Log.stdout (fun m -> m "%a" Filepath.pp_unquoted b0_file);
   Ok Os.Exit.ok
 
 let requires ~root conf =
@@ -248,10 +248,10 @@ let gather =
     let doc = "Directory in which the $(b,B0.ml) is written. If unspecified \
                the file is written on $(b,stdout)."
     in
-    Arg.(value & opt (some B0_std_cli.dirpath) None & info ["d"; "dest"] ~doc)
+    Arg.(value & opt (some B0_std_cli.dir) None & info ["d"; "dest"] ~doc)
   and+ dirs =
     let doc = "Gather the $(docv)$(b,/B0.ml) file." in
-    Arg.(non_empty & pos_all B0_std_cli.dirpath [] & info [] ~doc)
+    Arg.(non_empty & pos_all B0_std_cli.dir [] & info [] ~doc)
   and+ force =
     let doc = "Write the $(b,B0.ml) file even if it exists in the \
                destination directory of $(b,--dest) and force symlinks \

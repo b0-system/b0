@@ -291,7 +291,7 @@ val exe : bool key
 val test : bool key
 (** [test] tags testing entities. Defaults to [false]. *)
 
-val test_dir : Fpath.t key
+val test_dir : Filepath.t key
 (** [test_dir] defines a testing directory. This should be a relative
     path expressed relative to the scope of the entity. See
     {!page-testing.test_dir}. This is resolved to an absolute

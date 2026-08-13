@@ -24,12 +24,12 @@ let loc_error m fmt = loc_err_fmt Fmt.error m fmt
 (* b0 files *)
 
 type b0_boot = (string * smeta) list
-type b0_include = (string * smeta) * (Fpath.t * smeta)
+type b0_include = (string * smeta) * (Filepath.t * smeta)
 type require = B0_ocaml.Libname.t * smeta
-type mod_use = Fpath.t * smeta
+type mod_use = Filepath.t * smeta
 type t =
-  { file : Fpath.t;
-    cwd : Fpath.t; (* Fpath.parent of [file] *)
+  { file : Filepath.t;
+    cwd : Filepath.t; (* Filepath.parent of [file] *)
     b0_boots : b0_boot list;
     b0_includes : b0_include list;
     requires : require list;
@@ -50,14 +50,14 @@ let pp_dump ppf s =
   let pp_boots = Fmt.vbox @@ Fmt.list (Fmt.box pp_strings) in
   let pp_includes =
     let pp_include ppf ((n, _), (p, _)) =
-      Fmt.pf ppf "@[%s %a@]" n Fpath.pp_quoted p
+      Fmt.pf ppf "@[%s %a@]" n Filepath.pp_quoted p
     in
     Fmt.(vbox @@ list pp_include)
   in
   let pp_reqs = Fmt.(list ~sep:sp (pp_fst B0_ocaml.Libname.pp)) in
-  let pp_mod_uses = Fmt.(list (pp_fst Fpath.pp_unquoted)) in
+  let pp_mod_uses = Fmt.(list (pp_fst Filepath.pp_unquoted)) in
   Fmt.record
-    [ Fmt.field "file" file Fpath.pp_quoted;
+    [ Fmt.field "file" file Filepath.pp_quoted;
       Fmt.field "b0-boots" b0_boots pp_boots;
       Fmt.field "b0-includes" b0_includes pp_includes;
       Fmt.field "requires" requires pp_reqs;
@@ -153,8 +153,6 @@ let parse_string d = match (skip_ws d; Textdec.current d) with
 let string_to parse (arg, smeta) =
   match parse arg with Ok v -> v, smeta | Error e -> err (loc smeta) e
 
-let parse_fpath d = string_to Fpath.of_string (parse_string d)
-
 let rec parse_directive_name d ~start =
   match Textdec.current d with
   | c when is_dir_letter c ->
@@ -182,12 +180,12 @@ let parse_include_directive d ~start =
   match skip_ws d; Textdec.current d with
   | 0x5D (* ] *) ->
       nextc d;
-      let (p, smeta as file) = string_to Fpath.of_string arg in
-      let scope = Fpath.(basename @@ parent p), smeta in
+      let (p, smeta as file) = string_to Filepath.of_string arg in
+      let scope = Filepath.(basename @@ parent p), smeta in
       parse_scope_name scope, file
   | 0x11_0001 -> err_eoi_dir d ~start
   | _ ->
-      let file = string_to Fpath.of_string (parse_string d) in
+      let file = string_to Filepath.of_string (parse_string d) in
       match skip_ws d; Textdec.current d with
       | 0x5D (* ] *) -> nextc d; (parse_scope_name arg, file)
       | 0x11_0001 -> err_eoi_dir d ~start
@@ -197,7 +195,7 @@ let parse_require_directive d ~start =
   string_to B0_ocaml.Libname.of_string (parse_string d)
 
 let parse_mod_use_directive d ~start =
-  string_to Fpath.of_string (parse_string d)
+  string_to Filepath.of_string (parse_string d)
 
 let parse_preamble d =
   let rec loop boots incs reqs mus d = match skip_ws d; Textdec.current d with
@@ -235,18 +233,18 @@ let parse_preamble d =
 
 let of_string ~file src =
   try
-    let d = Textdec.make ~file:(Fpath.to_string file) src in
+    let d = Textdec.make ~file:(Filepath.to_string file) src in
     let b0_boots, b0_includes, requires, mod_uses = parse_preamble d in
     let rest = String.subrange ~first:(Textdec.first_byte_pos d) src in
     let ocaml_unit = rest, smeta ~loc:(Textdec.textloc d) in
-    let cwd = Fpath.parent file in
+    let cwd = Filepath.parent file in
     Ok { file; cwd; b0_boots; b0_includes; requires; ocaml_unit; mod_uses }
   with Error (loc, e) -> loc_error loc "%a" (Fmt.vbox Fmt.lines) e
 
 (* Expansion *)
 
 type expanded =
-  { expanded_file_manifest : Fpath.t list;
+  { expanded_file_manifest : Filepath.t list;
     expanded_b0_boots : b0_boot list;
     expanded_b0_includes : b0_include list;
     expanded_requires : require list;
@@ -260,7 +258,7 @@ let expanded_src e = e.expanded_src
 
 let get_include_src b0_file (p, smeta) =
   let src =
-    let* file = Os.Path.realpath Fpath.((cwd b0_file) // p) in
+    let* file = Os.Path.realpath Filepath.((cwd b0_file) // p) in
     let* src = Os.File.read file in
     Ok (file, src)
   in
@@ -271,8 +269,8 @@ let get_include_src b0_file (p, smeta) =
       loc_err_fmt Fmt.failwith_notrace smeta "%s" e
 
 let get_mod_use_srcs b0_file manif (p, smeta) =
-  let file_impl = Fpath.((cwd b0_file) // p) in
-  let file_intf = Fpath.(file_impl -+ ".mli") in
+  let file_impl = Filepath.((cwd b0_file) // p) in
+  let file_intf = Filepath.(file_impl -+ ".mli") in
   let res =
     (* XXX maybe we should rather add non realpathed paths to files
         e.g. if people play with symlinks. Sort that out. *)
@@ -297,12 +295,12 @@ let lineno meta =
 let w acc l = l :: acc [@@ocaml.inline]
 
 let w_src b (file, src) =
-  let b = w b (Fmt.str "#1 %S" (Fpath.to_string file)) in
+  let b = w b (Fmt.str "#1 %S" (Filepath.to_string file)) in
   let b = w b src in b
 
 let w_mod_use b b0_file manif (p, _ as mod_use) =
   let manif, intf, impl = get_mod_use_srcs b0_file manif mod_use in
-  let mod_name = B0_ocaml.Modname.mangle_filename (Fpath.basename p) in
+  let mod_name = B0_ocaml.Modname.mangle_filename (Filepath.basename p) in
   let b = match intf with
   | None -> w b (Fmt.str "module %s = struct" mod_name)
   | Some intf ->
@@ -334,8 +332,8 @@ let rec w_include b b0_file id npre manif boots incs reqs ((n, nm), inc_file) =
   let b = w b nil_loc in
   let b = w b (Fmt.str "module Inc_%03d : sig end = struct" id) in
   let b =
-    let f = Fpath.to_string (file b0_file) in
-    w b (Fmt.str "let () = B0_scope.open_file %S (B0_std.Fpath.v %S)" n f)
+    let f = Filepath.to_string (file b0_file) in
+    w b (Fmt.str "let () = B0_scope.open_file %S (B0_std.Filepath.v %S)" n f)
   in
   let b, id, manif, boots, incs, reqs =
     let id = id + 1 in
@@ -378,9 +376,9 @@ and w_includes b b0_file id npre manif boots incs reqs =
 let expand b0_file =
   try
     let b = w [] nil_loc in
-    let r = Fpath.to_string (file b0_file) in
+    let r = Filepath.to_string (file b0_file) in
     let b = w b
-        (Fmt.str "let () = B0_scope.open_root (B0_std.Fpath.v %S)" r)
+        (Fmt.str "let () = B0_scope.open_root (B0_std.Filepath.v %S)" r)
     in
     let b, _, manif, boots, incs, reqs = w_includes b b0_file 0 "" [] [] [][] in
     let b, manif = w_mod_uses b b0_file manif in

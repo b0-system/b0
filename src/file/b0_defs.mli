@@ -15,10 +15,10 @@ module Build_def : sig
   type t = { u : build_ctx; b : build_state }
   and build_ctx = { current : b0_unit option; m : B0_memo.t; }
   and build_state =
-    { root_dir : Fpath.t;
-      b0_dir : Fpath.t;
-      build_dir : Fpath.t;
-      shared_dir : Fpath.t;
+    { root_dir : Filepath.t;
+      b0_dir : Filepath.t;
+      build_dir : Filepath.t;
+      shared_dir : Filepath.t;
       store : B0_store.t;
       must_build : b0_unit_set;
       may_build : b0_unit_set;
@@ -36,16 +36,16 @@ module Unit : B0_def.S
 val unit_build_proc : b0_unit -> build_proc
 
 type b0_env =
-  { b0_dir : Fpath.t;
+  { b0_dir : Filepath.t;
     build : b0_build;
     built_tools : b0_unit String.Map.t Lazy.t;
-    cwd : Fpath.t;
-    root_dir : Fpath.t;
-    scope_dir : Fpath.t;
+    cwd : Filepath.t;
+    root_dir : Filepath.t;
+    scope_dir : Filepath.t;
     build_env : Os.Env.t;
     driver_env : Os.Env.t; }
 
-val exe_file : Fpath.t Fut.t B0_meta.key
+val exe_file : Filepath.t Fut.t B0_meta.key
 val tool_name : string B0_meta.key
 val tool_name_map : Unit.Set.t -> Unit.t B0_std.String.Map.t
 val tool_name_index : Unit.t list B0_std.String.Map.t ref

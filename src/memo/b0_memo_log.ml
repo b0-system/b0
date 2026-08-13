@@ -14,7 +14,7 @@ open B0_std
 
 type t =
   { hash_fun : string;
-    file_hashes : B0_hash.t Fpath.Map.t;
+    file_hashes : B0_hash.t Filepath.Map.t;
     hash_dur : Mtime.Span.t;
     total_dur : Mtime.Span.t;
     cpu_dur : Os.Cpu.Time.Span.t;
@@ -44,21 +44,21 @@ let ops l = l.ops
 
 let enc_file_hashes b hs =
   let enc_file_hash b f h =
-    B0_bincode.enc_fpath b f; B0_bincode.enc_hash b h
+    B0_bincode.enc_filepath b f; B0_bincode.enc_hash b h
   in
-  let count = Fpath.Map.cardinal hs in
+  let count = Filepath.Map.cardinal hs in
   B0_bincode.enc_int b count;
-  Fpath.Map.iter (enc_file_hash b) hs
+  Filepath.Map.iter (enc_file_hash b) hs
 
 let dec_file_hashes s i =
   let rec loop acc count s i =
     if count = 0 then i, acc else
-    let i, file = B0_bincode.dec_fpath s i in
+    let i, file = B0_bincode.dec_filepath s i in
     let i, hash = B0_bincode.dec_hash s i in
-    loop (Fpath.Map.add file hash acc) (count - 1) s i
+    loop (Filepath.Map.add file hash acc) (count - 1) s i
   in
   let i, count = B0_bincode.dec_int s i in
-  loop Fpath.Map.empty count s i
+  loop Filepath.Map.empty count s i
 
 let magic = "b\x00\x00\x00log"
 
@@ -75,7 +75,7 @@ let enc b l =
 let dec s i =
   let i, () = B0_bincode.dec_magic magic s i in
   let i, hash_fun = B0_bincode.dec_string s i in
-  let i, file_hashes = i, Fpath.Map.empty in
+  let i, file_hashes = i, Filepath.Map.empty in
   let i, file_hashes = dec_file_hashes s i in
   let i, hash_dur = B0_bincode.dec_mtime_span s i in
   let i, total_dur = B0_bincode.dec_mtime_span s i in

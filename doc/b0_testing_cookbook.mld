@@ -123,9 +123,9 @@ provide a tester {!B0_testing.Test.module-T.t} for the value. Often you can
 using a type's module directly:
 
 {[
-let test_fpath =
-  Test.test "fpath" @@ fun () ->
-  Test.eq (module Fpath) Fpath.null Fpath.null ~__POS__;
+let test_filepath =
+  Test.test "filepath" @@ fun () ->
+  Test.eq (module Filepath) Filepath.null Filepath.null ~__POS__;
   ()
 ]}
 
@@ -165,7 +165,7 @@ directory}.
 {[
 let test_snap =
   Test.test "snap" @@ fun () ->
-  Snap.string "hey" !@ (Fpath.v "snapshots/hey.string");
+  Snap.string "hey" !@ (Filepath.v "snapshots/hey.string");
   ()
 ]}
 For now only snapshots of type [string] can be stored in files.
@@ -179,7 +179,7 @@ relative to the {{!test_dir}test directory}.
 {[
 let test_echo =
   Test.test "echo" @@ fun () ->
-  Snap.run Cmd.(tool "echo" % "Hey") !@ (Fpath.v "snapshots/echo-hey.run");
+  Snap.run Cmd.(tool "echo" % "Hey") !@ (Filepath.v "snapshots/echo-hey.run");
   Snap.run Cmd.(tool "echo" % "Hey!") @> __POS_OF__
 {|echo Hey!
 exited:0

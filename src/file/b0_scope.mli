@@ -45,10 +45,10 @@ type t
 val equal : t -> t -> bool
 (** [equal s0 s1] is [true] iff [s0] and [s1] are equal. *)
 
-val file : t -> Fpath.t option
+val file : t -> Filepath.t option
 (** [file s] is the file in which the scope is opened. *)
 
-val dir : t -> Fpath.t option
+val dir : t -> Filepath.t option
 (** [dir s] is the directory of [file s] (if any). *)
 
 val is_root : t -> bool
@@ -123,13 +123,13 @@ val open_lib : module':string -> name -> unit
     you are fiddling with this you are likely doing something
     wrong. *)
 
-val name_list : unit -> (qualified_name * Fpath.t) list
+val name_list : unit -> (qualified_name * Filepath.t) list
 (** [name_list ()] is the list of file scopes names tupled with the
     file that defines it. This function can only be called once
     definitions are {!seal}ed otherwise it raises
     [Invalid_argument]. *)
 
-val open_root : Fpath.t -> unit
+val open_root : Filepath.t -> unit
 (** [open_root file] initializes b0 file scoping and opens a root scope
     for the root b0 file at the {e absolute} file path [file].
 
@@ -140,7 +140,7 @@ val open_root : Fpath.t -> unit
     the error is logged and the program {!Stdlib.exit}s with
     {!B0_driver.Exit.b0_file_error}. *)
 
-val open_file : name -> Fpath.t -> unit
+val open_file : name -> Filepath.t -> unit
 (** [open' name] opens a scope named [name] (unqualified) to add the
     definitions of the {e absolute} file path [file].
 

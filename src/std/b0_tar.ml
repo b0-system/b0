@@ -16,8 +16,8 @@ let empty = []
            pax.html#tag_20_92_13_06  *)
 
 let to_unix_path_string =
-  if Fpath.natural_dir_sep = "/" then Fpath.to_string else
-  fun path -> String.concat "/" (Fpath.to_segments path)
+  if Filepath.natural_dir_sep = "/" then Filepath.to_string else
+  fun path -> String.concat "/" (Filepath.to_segments path)
 
 let set_filename h path =
   let s = to_unix_path_string path in
@@ -34,7 +34,7 @@ let set_filename h path =
           Bytes.blit_string name 0 h 0 (String.length name);
           Bytes.blit_string prefix 0 h 345 (String.length prefix);
       with
-      | Exit -> Fmt.failwith "%a: file name too long" Fpath.pp path
+      | Exit -> Fmt.failwith "%a: file name too long" Filepath.pp path
 
 let set_string off h s = Bytes.blit_string s 0 h off (String.length s)
 let set_octal field off len (* terminating NULL included *) h n =
@@ -97,18 +97,18 @@ let to_string t =
 
 let of_dir ~dir ~exclude_paths ~root ~mtime =
   let path_set_of_dir dir ~exclude_paths =
-    let excluded p = Fpath.Set.mem p exclude_paths in
+    let excluded p = Filepath.Set.mem p exclude_paths in
     let prune_dir _ _ p _ = excluded p in
-    let add _ _ p acc = if excluded p then acc else Fpath.Set.add p acc in
+    let add _ _ p acc = if excluded p then acc else Filepath.Set.add p acc in
     let rel = true and dotfiles = true and follow_symlinks = true in
-    let recurse = true and init = Fpath.Set.empty in
+    let recurse = true and init = Filepath.Set.empty in
     Os.Dir.fold ~rel ~dotfiles ~follow_symlinks ~prune_dir ~recurse add dir init
   in
   Result.map_error (fun e -> Fmt.str "Tar archive creation failed: %s" e) @@
   let tar_add path tar =
     Result.error_to_failure @@
-    let path_in_root = Fpath.(root // path) in
-    let path_in_dir = Fpath.(dir // path) in
+    let path_in_root = Filepath.(root // path) in
+    let path_in_dir = Filepath.(dir // path) in
     let* stat = Os.Path.stat path_in_dir in
     match stat.Unix.st_kind with
     | S_DIR -> add tar path_in_root ~mode:0o775 ~mtime `Dir
@@ -117,11 +117,11 @@ let of_dir ~dir ~exclude_paths ~root ~mtime =
         let mode = if 0o100 land mode > 0 then 0o775 else 0o664 in
         let* content = Os.File.read path_in_dir in
         add tar path_in_root ~mode ~mtime (`File content)
-    | _ -> Fmt.failwith "%a: not a file or directory" Fpath.pp path
+    | _ -> Fmt.failwith "%a: not a file or directory" Filepath.pp path
   in
   let* paths = path_set_of_dir dir ~exclude_paths in
   try
-    let tar = Fpath.Set.fold tar_add paths empty in
+    let tar = Filepath.Set.fold tar_add paths empty in
     Ok (to_string tar)
   with
   | Failure e -> Error e
@@ -129,14 +129,15 @@ let of_dir ~dir ~exclude_paths ~root ~mtime =
 (* Compressing and unarchiving *)
 
 let compress_tool_for_file_ext ?(de = "") file =
-  match Fpath.take_ext ~multi:false file with
+  match Filepath.take_ext ~multi:false file with
   | ".tar" -> Ok None
   | ".tgz" | ".gz" -> Ok (Some (Cmd.tool "gzip"))
   | ".tbz" | ".bzip2" -> Ok (Some (Cmd.tool "bzip2"))
   | ".xz" -> Ok (Some (Cmd.tool "lzma"))
   | ".zst" -> Ok (Some (Cmd.tool "zstd"))
   | ext ->
-      Fpath.error file "Unknown extension %a, cannot %scompress" Fmt.code ext de
+      Filepath.error file
+        "Unknown extension %a, cannot %scompress" Fmt.code ext de
 
 let compress ?search ~force ~make_path file ~archive =
   let* compress = compress_tool_for_file_ext file in

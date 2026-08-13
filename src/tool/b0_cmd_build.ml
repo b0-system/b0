@@ -172,7 +172,7 @@ let memo conf ~may_build ~must_build =
     let units = B0_unit.Set.union may_build must_build in
     let tool_map = B0_unit.tool_name_map units  in
     (* We first look into the build and then in [m]'s environment. *)
-    fun m t -> match String.Map.find_opt (Fpath.to_string t) tool_map with
+    fun m t -> match String.Map.find_opt (Filepath.to_string t) tool_map with
     | None -> lookup m t
     | Some u ->
         (* FIXME, not there yet we need to require that to build !
@@ -184,7 +184,7 @@ let memo conf ~may_build ~must_build =
   let cwd = B0_driver.Conf.cwd conf in
   let cache_dir = B0_driver.Conf.cache_dir conf in
   let b0_dir = B0_driver.Conf.b0_dir conf in
-  let trash_dir = Fpath.(b0_dir / B0_memo_cli.trash_dirname) in
+  let trash_dir = Filepath.(b0_dir / B0_memo_cli.trash_dirname) in
   let jobs = B0_driver.Conf.jobs conf in
   let feedback =
     let op_howto ppf o = Fmt.pf ppf "b0 log --id %d" (B0_zero.Op.id o) in
@@ -203,7 +203,7 @@ let make_build conf ~store ~may_build ~must_build =
   let build =
     let variant = "user" in
     let b0_file = Option.get (B0_driver.Conf.b0_file conf) in
-    let root_dir = Fpath.parent b0_file in
+    let root_dir = Filepath.parent b0_file in
     let b0_dir = B0_driver.Conf.b0_dir conf in
     B0_build.make ~root_dir ~b0_dir ~variant ~store m ~may_build ~must_build
   in
@@ -232,7 +232,7 @@ let do_output_path action_unit ~args =
 
 let env_for_unit conf build u =
   let cwd = B0_driver.Conf.cwd conf in
-  let root_dir = Fpath.parent @@ Option.get @@ B0_driver.Conf.b0_file conf in
+  let root_dir = Filepath.parent @@ Option.get @@ B0_driver.Conf.b0_file conf in
   let scope_dir = Option.value (B0_unit.scope_dir u) ~default:root_dir in
   let b0_dir = B0_driver.Conf.b0_dir conf in
   let driver_env = B0_driver.Conf.env conf in

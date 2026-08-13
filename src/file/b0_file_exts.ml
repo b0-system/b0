@@ -6,7 +6,7 @@
 open B0_std
 
 type t = String.Set.t
-type map = Fpath.t list String.Map.t
+type map = Filepath.t list String.Map.t
 
 let make = String.Set.of_list
 let ext = String.Set.singleton

@@ -26,7 +26,7 @@ let tool_name = B0_defs.tool_name
 
 let outcomes =
   let doc = "Unit build outcomes." in
-  let pp_value = Bval.pp (Fmt.vbox (Fmt.list Fpath.pp)) in
+  let pp_value = Bval.pp (Fmt.vbox (Fmt.list Filepath.pp)) in
   B0_meta.Key.make "outcomes" ~doc ~pp_value
 
 let copy_outcomes_to_dir memo unit ~dst_dir =
@@ -141,12 +141,12 @@ module Action = struct
 
   type cwd =
   [ B0_env.dir
-  | `In of B0_env.dir * Fpath.t
-  | `Fun of string * (B0_env.t -> b0_unit -> (Fpath.t, string) result) ]
+  | `In of B0_env.dir * Filepath.t
+  | `Fun of string * (B0_env.t -> b0_unit -> (Filepath.t, string) result) ]
 
   let pp_cwd ppf = function
   | #B0_env.dir as dir -> B0_env.pp_dir ppf dir
-  | `In (dir, p) -> Fmt.pf ppf "%a in %a" Fpath.pp p B0_env.pp_dir dir
+  | `In (dir, p) -> Fmt.pf ppf "%a in %a" Filepath.pp p B0_env.pp_dir dir
   | `Fun (doc, _) -> Fmt.pf ppf "<fun> %s" doc
 
   let cwd =
@@ -170,7 +170,7 @@ module Action = struct
     let scope_dir = B0_env.scope_dir env in
     let cwd = Option.value ~default:scope_dir cwd in
     let* file = Cmd.get_tool cmd in
-    let file = Fpath.(scope_dir // file) in
+    let file = Filepath.(scope_dir // file) in
     Ok (Os.Exit.execv ?env:e ~cwd Cmd.(set_tool file cmd %% args))
 
   let of_cmdliner_term
@@ -238,7 +238,7 @@ module Action = struct
     let env = match find_meta B0_meta.test_dir u with
     | None -> env | Some dir ->
         let dir = B0_env.in_scope_dir b0_env dir in
-        Os.Env.add "TEST_DIR" (Fpath.to_string dir) env
+        Os.Env.add "TEST_DIR" (Filepath.to_string dir) env
     in
     let env = Os.Env.to_assignments (envf env) in
     let* cwd = get_cwd b0_env u in

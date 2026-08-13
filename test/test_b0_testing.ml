@@ -113,9 +113,9 @@ let test_arg =
 
 let test_arg =
   Test.test "External snapshots" @@ fun () ->
-  let root = Fpath.v "snapshots" in
-  Snap.string "bla" !@ Fpath.(root / "bla.string") ~__POS__;
-  Snap.run Cmd.(tool "echo" % "Hey!") !@ Fpath.(root / "echo.run");
+  let root = Filepath.v "snapshots" in
+  Snap.string "bla" !@ Filepath.(root / "bla.string") ~__POS__;
+  Snap.run Cmd.(tool "echo" % "Hey!") !@ Filepath.(root / "echo.run");
   Snap.run Cmd.(tool "echo" % "Hey!") @> __POS_OF__
   {|echo Hey!
 exited:0

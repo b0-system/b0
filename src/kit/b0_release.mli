@@ -15,7 +15,7 @@ val tag : bool B0_meta.key
 (** {1:vcs_repo VCS repos and release versions} *)
 
 val vcs_repo_of_pack :
-  B0_pack.t -> (B0_std.Fpath.t * B0_vcs_repo.t, string) result
+  B0_pack.t -> (B0_std.Filepath.t * B0_vcs_repo.t, string) result
 (** [vcs_repo_of_pack pack] is [Ok (scope_dir, repo)] if [pack]
     has a VCS controlled scope directory. *)
 
@@ -32,7 +32,7 @@ val vcs_repo_version_of_pack :
 
 (** {2:name Extension and basename } *)
 
-val src_archive_ext : Fpath.ext B0_meta.key
+val src_archive_ext : Filepath.ext B0_meta.key
 (** [archive_ext] is the file extension of the source release's archive.
     Defaults to [".tbz"], this is used for creating archives so
     do not steer away from the extensions mentioned in {!B0_tar.compress}. *)
@@ -87,9 +87,9 @@ val src_archive_url_of_pack :
 
 val src_archive_for_pack :
   repo:B0_vcs_repo.t ->
-  checkout_dir:Fpath.t ->
+  checkout_dir:Filepath.t ->
   keep_checkout_dir:bool -> commit_ish:B0_vcs_repo.commit_ish ->
-  B0_pack.t -> (string * Fpath.t * string, string) result
+  B0_pack.t -> (string * Filepath.t * string, string) result
 (** [for_pack pack] is a directory basename and corresponding uncompresed
     tar archive for pack [pack]. The first string indicates the version
     string.
@@ -101,22 +101,22 @@ val src_archive_for_pack :
 
 (** {1:changes Changes file} *)
 
-val changes_file : Fpath.t B0_meta.key
+val changes_file : Filepath.t B0_meta.key
 (** [changes_file] is a metadata key to specify a changes file
     value. Relative paths are relative to the scope directory of the
-    definition. Defaults to [Fpath.v CHANGES.md]. *)
+    definition. Defaults to [Filepath.v CHANGES.md]. *)
 
-val changes_file_of_pack : B0_pack.t -> (Fpath.t option, string) result
+val changes_file_of_pack : B0_pack.t -> (Filepath.t option, string) result
 (** [find_changes_file_of_pack p] looks for the {!changes_file} of [p] in
     the scope directory of [p] and returns its absolute path if it
     exists. *)
 
-val get_changes_file_of_pack : B0_pack.t -> (Fpath.t, string) result
+val get_changes_file_of_pack : B0_pack.t -> (Filepath.t, string) result
 (** [get_changes_file_of_pack pack] looks for the {!changes_file} of [pack]
     and makes sure it exists or errors otherwise. *)
 
 val changes_latest_of_file :
-  Fpath.t -> ((string * string) option, string) result
+  Filepath.t -> ((string * string) option, string) result
 (** [changes_latest_of_file f] extracts the latest release notes as the
     {{!B0_adhoc.commonmark_first_section}first markdown section} of
     file [f]. *)

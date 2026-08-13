@@ -213,7 +213,8 @@ module Pages : sig
   type update
   (** The type for updates. *)
 
-  val update : ?follow_symlinks:bool -> Fpath.t option -> dst:Fpath.t -> update
+  val update :
+    ?follow_symlinks:bool -> Filepath.t option -> dst:Filepath.t -> update
   (** [update ~follow_symlinks src ~dst] is an update that given a relative
       path [dst] in the work tree that may not exist:
       {ul

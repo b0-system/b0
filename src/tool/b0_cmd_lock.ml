@@ -21,12 +21,12 @@ let lock conf =
   let env_b0_file = Os.Env.var ~empty_is_none:false B0_driver.Env.b0_file in
   let env_b0_dir = Os.Env.var ~empty_is_none:false B0_driver.Env.b0_dir in
   let () = match env_b0_file, env_b0_dir with
-  | Some f, _ when f = Fpath.to_string b0_file -> warn ()
-  | _, Some d when d = Fpath.to_string b0_dir -> warn ()
+  | Some f, _ when f = Filepath.to_string b0_file -> warn ()
+  | _, Some d when d = Filepath.to_string b0_dir -> warn ()
   | _, _ -> ()
   in
   let pp_binding ppf (var, path) =
-    Fmt.pf ppf "@[<h>%s=%a; export %s;@]" var Fpath.pp_quoted path var
+    Fmt.pf ppf "@[<h>%s=%a; export %s;@]" var Filepath.pp_quoted path var
   in
   Log.stdout (fun m -> m "@[<v>%a@]" Fmt.(list pp_binding) bindings);
   Ok Os.Exit.ok

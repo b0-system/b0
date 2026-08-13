@@ -30,10 +30,10 @@ let scope_dir env = env.B0_defs.scope_dir
 let scratch_dir env = B0_build.B0_dir.scratch_dir ~b0_dir:env.B0_defs.b0_dir
 let unit_dir env u = B0_build.unit_dir env.B0_defs.build u
 
-let in_root_dir env p = Fpath.(root_dir env // p)
-let in_scope_dir env p = Fpath.(scope_dir env // p)
-let in_scratch_dir env p = Fpath.(scratch_dir env // p)
-let in_unit_dir env u p = Fpath.(unit_dir env u // p)
+let in_root_dir env p = Filepath.(root_dir env // p)
+let in_scope_dir env p = Filepath.(scope_dir env // p)
+let in_scratch_dir env p = Filepath.(scratch_dir env // p)
+let in_unit_dir env u p = Filepath.(unit_dir env u // p)
 let build env = env.B0_defs.build
 
 type dir = [`Cwd | `Root_dir | `Scope_dir | `Unit_dir ]
@@ -50,7 +50,7 @@ let dir env = function
 | `Scope_dir -> scope_dir env
 | `Unit_dir -> invalid_arg "Cannot lookup `Unit_dir"
 
-let in_dir env d p = Fpath.(dir env d // p)
+let in_dir env d p = Filepath.(dir env d // p)
 
 (* Process environments. *)
 
@@ -73,7 +73,7 @@ let get_cmd ?(skip_build = false) env cmd =
   match Cmd.find_tool cmd with
   | None -> Fmt.error "No tool to lookup: the command is empty"
   | Some tool ->
-      match String.Map.find_opt (Fpath.to_string tool) tool_map with
+      match String.Map.find_opt (Filepath.to_string tool) tool_map with
       | None -> Os.Cmd.get cmd
       | Some u ->
           Result.map (fun v -> Cmd.set_tool (Fut.sync v) cmd)

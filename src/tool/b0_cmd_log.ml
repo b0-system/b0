@@ -12,7 +12,7 @@ let log ~format ~output_details ~query c =
   let b0_dir = B0_driver.Conf.b0_dir c in
   (* FIXME
      This should also be fixed in b0-cache / B0_cli.Memo.log_file *)
-  let log_file = Fpath.(b0_dir / "b" / "user" / "_log") in
+  let log_file = Filepath.(b0_dir / "b" / "user" / "_log") in
   let* pager = B0_pager.find ~no_pager () in
   let* () = B0_pager.page_stdout pager in
   let* log = B0_memo_log.read log_file in

@@ -207,7 +207,7 @@ module Test : sig
 
   (** {2:test_dir Test directory} *)
 
-  val dir : unit -> Fpath.t
+  val dir : unit -> Filepath.t
   (** [dir ()] is the test directory.
       See {{!page-b0_testing_cookbook.test_dir}the cookbook} for more
       information. *)
@@ -519,13 +519,13 @@ module Test : sig
 
     (** {1:files Patching files} *)
 
-    val get : Fpath.t -> t option
+    val get : Filepath.t -> t option
     (** [get file] is the patch for file [file]. This is [None] only
         if [file] does not exist in the file system, in which case an
         error messages has been logged. The first time you lookup
         [file] you get an {{!is_empty}empty patch}. *)
 
-    val update : Fpath.t -> t -> unit
+    val update : Filepath.t -> t -> unit
     (** [update file p] updates the patch of file [file] to [p]. *)
 
     val write_files : unit -> unit
@@ -833,7 +833,7 @@ end
     the compiler the combinators are expected to be used as follows:
     {[
     Snap.string ("a" ^ "b") @> __POS_OF__ "ab";
-    Snap.string ("a" ^ "b") !@ (Fpath.v "snapshots/ab.string") ~__POS__
+    Snap.string ("a" ^ "b") !@ (Filepath.v "snapshots/ab.string") ~__POS__
     ]} *)
 module Snap : sig
 
@@ -975,7 +975,7 @@ module Snap : sig
   val stdout :
     ?__POS__:Test.loc ->
     ?test:string T.t -> ?diff:string Test.Diff.t -> ?env:Os.Env.assignments ->
-    ?cwd:Fpath.t -> ?stdin:Os.Cmd.stdi ->
+    ?cwd:Filepath.t -> ?stdin:Os.Cmd.stdi ->
     ?stderr:[`Stdo of Os.Cmd.stdo | `Out] -> trim:bool -> Cmd.t ->
     string Test.Snapshot.t -> unit
   (** [stdout cmd] snapshots the standard output of the execution (see
@@ -984,7 +984,7 @@ module Snap : sig
 
   val run :
     ?__POS__:Test.loc -> ?test:string T.t -> ?diff:string Test.Diff.t ->
-    ?env:Os.Env.assignments -> ?cwd:Fpath.t -> ?stdin:Os.Cmd.stdi ->
+    ?env:Os.Env.assignments -> ?cwd:Filepath.t -> ?stdin:Os.Cmd.stdi ->
     ?snap_cmd:(Cmd.t -> Cmd.t) -> Cmd.t -> string Test.Snapshot.t -> unit
   (** [run cmd] snapshots the command, standard output, standard error and
       exit code of the execution (see {!B0_std.Os.Cmd.val-run}).
@@ -999,12 +999,12 @@ val ( !> ) : ?loc:Test.loc -> 'a -> 'a Test.Snapshot.t
 (** This doesn't work for now, but is what we would like to use
     in the future. Use {!(@>)} for now. *)
 
-val ( !@ ) : ?loc:Test.loc -> Fpath.t -> string Test.Snapshot.t
+val ( !@ ) : ?loc:Test.loc -> Filepath.t -> string Test.Snapshot.t
 (** [!@ file] indicates that the snapshot is stored in file [file] which
     is expressed relative to {!Test.dir}.
     For example:
     {[
-    Snap.string ("a" ^ "b") !@ (Fpath.v "snapshots/ab.string") ~__POS__
+    Snap.string ("a" ^ "b") !@ (Filepath.v "snapshots/ab.string") ~__POS__
     ]} *)
 
 val ( @> ) : ('a Test.Snapshot.t -> 'b) -> Test.loc * 'a -> 'b

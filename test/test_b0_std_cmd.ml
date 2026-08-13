@@ -26,20 +26,20 @@ let test_stamp =
   let test cl cmd wit =
     assert ((cmd, wit) = Cmd.to_list_and_stamp cl)
   in
-  test (ls (Fpath.v "/tmp/hey ha"))
+  test (ls (Filepath.v "/tmp/hey ha"))
     [ "ls"; "-a"; "/tmp/hey ha" ]
     [ "ls"; "-a"; "/tmp/hey ha" ];
-  test (tar (Fpath.v "p.tar") (Fpath.v "dir"))
+  test (tar (Filepath.v "p.tar") (Filepath.v "dir"))
     [ "tar"; "-cvf"; "p.tar"; "dir" ]
     [ "tar"; "-cvf"; "p.tar"; "dir" ];
   test (opam_install ["cmdliner"; "b0"; "odoc"])
     [ "opam"; "install"; "cmdliner"; "b0"; "odoc" ]
     [ "opam"; "install"; "cmdliner"; "b0"; "odoc" ];
-  test (ocamlc ~debug:false (Fpath.v "m.ml"))
+  test (ocamlc ~debug:false (Filepath.v "m.ml"))
     [ "ocamlc"; "-c"; "m.ml" ]
     [ "ocamlc"; "-c" ];
   test (ocamlopt ~profile:true ~debug:false
-          [Fpath.v "cmdliner"; Fpath.v "xmlm";] (Fpath.v "m.ml"))
+          [Filepath.v "cmdliner"; Filepath.v "xmlm";] (Filepath.v "m.ml"))
     [ "ocamlopt"; "-c"; "-p"; "-I"; "cmdliner"; "-I"; "xmlm"; "m.ml" ]
     [ "ocamlopt"; "-c"; "-p"; "m.ml" ];
   ()

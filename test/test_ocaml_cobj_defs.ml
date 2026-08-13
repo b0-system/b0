@@ -9,11 +9,11 @@ let () =
   Log.set_level Log.Info;
   if Array.length Sys.argv < 2
   then Fmt.epr "Specify a compilation object@." else
-  let to_fpath p = Fpath.of_string p |> Result.error_to_failure in
+  let to_filepath p = Filepath.of_string p |> Result.error_to_failure in
   let files = List.tl (Array.to_list Sys.argv) in
   try
     let objinfo = Cmd.(arg "ocamlobjinfo" % "-no-code" % "-no-approx") in
-    let files = List.map to_fpath files in
+    let files = List.map to_filepath files in
     Result.error_to_failure @@
     Result.bind (Os.Cmd.run_out ~trim:true
                    Cmd.(objinfo %% paths files)) @@ fun s ->

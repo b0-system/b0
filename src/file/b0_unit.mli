@@ -41,13 +41,13 @@ val tool_name : string B0_meta.key
 (** [tool_name] is an executable name without the platform specific
     executable extension. *)
 
-val exe_file : Fpath.t Fut.t B0_meta.key
+val exe_file : Filepath.t Fut.t B0_meta.key
 (** [exe_file] is an absolute file path to an executable build by the unit. *)
 
-val outcomes : Fpath.t list Bval.t B0_meta.key
+val outcomes : Filepath.t list Bval.t B0_meta.key
 (** [outcomes] is the set of public file outcomes. *)
 
-val copy_outcomes_to_dir : B0_memo.t -> t -> dst_dir:Fpath.t -> unit
+val copy_outcomes_to_dir : B0_memo.t -> t -> dst_dir:Filepath.t -> unit
 (** [copy_outcomes m u ~dst_dir] copies the outcome of [u] to destination
     directory [dst_dir]. *)
 
@@ -101,8 +101,8 @@ module Action : sig
   | `Root_dir (** The root b0 file directory. *)
   | `Scope_dir (** The directory of the scope where the entity is defined. *)
   | `Unit_dir (** The unit's build directory. *)
-  | `In of [ `Cwd | `Unit_dir | `Root_dir | `Scope_dir ] * Fpath.t
-  | `Fun of string * (B0_env.t -> b0_unit -> (Fpath.t, string) Result.t)
+  | `In of [ `Cwd | `Unit_dir | `Root_dir | `Scope_dir ] * Filepath.t
+  | `Fun of string * (B0_env.t -> b0_unit -> (Filepath.t, string) Result.t)
     (** Doc string and function. *) ]
   (** The type for action execution working directories. *)
 
@@ -110,7 +110,7 @@ module Action : sig
   (** [cwd] specifies the current working directory for executing a unit.
       If unspecified this is [`Cwd]. *)
 
-  val get_cwd : B0_env.t -> b0_unit -> (Fpath.t, string) result
+  val get_cwd : B0_env.t -> b0_unit -> (Filepath.t, string) result
   (** [get_cwd env u] performs the logic to get the cwd {!val-cwd}
       for unit [u] in environment [env]. *)
 
@@ -131,7 +131,7 @@ module Action : sig
   val func : ?doc:string -> func -> t
   (** [func ~doc f] is [`Fun (doc, f)]. *)
 
-  val scope_exec : ?env:Os.Env.assignments -> ?cwd:Fpath.t -> Cmd.t -> func
+  val scope_exec : ?env:Os.Env.assignments -> ?cwd:Filepath.t -> Cmd.t -> func
   (** [scope_exec env cmd] executes [cmd] using
       the {{!B0_env.scope_dir}scope directory} is used
       as the default [cwd] and to resolve the tool of [cmd] if

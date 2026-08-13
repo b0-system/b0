@@ -103,25 +103,26 @@ val required_metadata_key_pos0 : string Cmdliner.Term.t
     Structured access to [_b0] currently lives in [B0_build.B0_dir]. *)
 
 val get_b0_dir :
-  cwd:Fpath.t -> root:Fpath.t -> b0_dir:Fpath.t option -> Fpath.t
+  cwd:Filepath.t -> root:Filepath.t -> b0_dir:Filepath.t option -> Filepath.t
 (** [get_b0_dir ~cwd ~root ~b0_dir] determines a b0 directory. If
-    [b0_dir] is [Some d] then this is [Fpath.(cwd // d)]. If [None]
-    then this is [Fpath.(root / b0_dir_name)]. *)
+    [b0_dir] is [Some d] then this is [Filepath.(cwd // d)]. If [None]
+    then this is [Filepath.(root / b0_dir_name)]. *)
 
 val get_cache_dir :
-    cwd:Fpath.t -> b0_dir:Fpath.t -> cache_dir:Fpath.t option -> Fpath.t
+  cwd:Filepath.t -> b0_dir:Filepath.t -> cache_dir:Filepath.t option ->
+  Filepath.t
 (** [get_cache_dir ~cwd ~b0_dir ~cache_dir] determines a cache directory.
-    If [cache_dir] is [Some d] then this is [Fpath.(cwd // d)]. If [None]
-    then this is [Fpath.(b0_dir / cache_dir)]. *)
+    If [cache_dir] is [Some d] then this is [Filepath.(cwd // d)]. If [None]
+    then this is [Filepath.(b0_dir / cache_dir)]. *)
 
-val find_dir_with_b0_dir : start:Fpath.t -> Fpath.t option
+val find_dir_with_b0_dir : start:Filepath.t -> Filepath.t option
 (** [find_dir_with_b0_dir ~start] finds the first directory starting
     with [start] that has a {!b0_dir_name} directory. [None] is
     returned if none could found or if [start] is relative. *)
 
 val b0_dir :
   ?opts:string list -> ?docs:string -> ?doc:string -> ?doc_none:string ->
-  ?env:Cmd.Env.info -> unit -> Fpath.t option Term.t
+  ?env:Cmd.Env.info -> unit -> Filepath.t option Term.t
 (** [b0_dir ~doc_none ~docs ~doc ~env] is a cli interface for specifying
       a b0 directory.
       {ul

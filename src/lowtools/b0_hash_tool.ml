@@ -10,11 +10,11 @@ let pp_hash = function
 | `Short -> Fmt.using snd B0_hash.pp
 | `Normal | `Long ->
     fun ppf (f, h) ->
-      B0_hash.pp ppf h; Fmt.char ppf ' '; Fpath.pp_unquoted ppf f
+      B0_hash.pp ppf h; Fmt.char ppf ' '; Filepath.pp_unquoted ppf f
 
 let hash_file (module Hash : B0_hash.T) file  =
   let* hash =
-    if Fpath.is_dash file
+    if Filepath.is_dash file
     then Result.map Hash.string (Os.File.read file)
     else Hash.file file
   in
@@ -53,7 +53,7 @@ let tool =
     B0_memo_cli.Hash.hash_fun ~opts:["H"; "hash-fun"] ~docs:Manpage.s_options ()
   and+ files =
     let doc = "File to hash. Use $(b,-) for stdin." in
-    Arg.(value & pos_all B0_std_cli.filepath [] & info [] ~doc)
+    Arg.(value & pos_all B0_std_cli.file [] & info [] ~doc)
   in
   hash ~output_details ~hash_fun ~files
 
