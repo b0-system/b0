@@ -253,7 +253,9 @@ let vendor_more_modules =
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__char" "b0__char" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__cmd" "b0__cmd" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__fmt" "b0__fmt" in
-  let* () = copy_module ~substs ~src_dir ~dst_dir "more__fpath" "b0__fpath" in
+  let* () = copy_module ~substs ~src_dir ~dst_dir
+      "more__filepath" "b0__filepath"
+  in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__list" "b0__list" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__log" "b0__log" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__mtime" "b0__mtime" in
@@ -263,7 +265,7 @@ let vendor_more_modules =
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__result" "b0__result" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__string" "b0__string" in
   let* () = copy_module ~substs ~src_dir ~dst_dir "more__type" "b0__type" in
-  (* more.clit library *)
+  (* more.cli library *)
   let* () =
     let src_dir = Fpath.(src_dir / "cli") in
     copy_module ~substs ~src_dir ~dst_dir "more_cli" "b0_std_cli"

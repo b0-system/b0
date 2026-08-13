@@ -211,7 +211,7 @@ let to_absolute ~scheme ~root_path u = match kind u with
 (* Percent encoding *)
 
 let is_likely_percent_decoded s =
-  String.exists (Fun.negate B0__char.Ascii.is_graphic) s
+  String.exists (Fun.negate Char.Ascii.is_graphic) s
 
 module Percent = struct (* See https://tools.ietf.org/html/rfc3986 *)
   type kind = Uri_component | Uri
@@ -349,8 +349,8 @@ let list_of_text_scrape ?root s = (* See .mli to understand what it does *)
 
 (* Predicates and comparisons *)
 
-let equal = ( = )
-let compare = Stdlib.compare
+let equal = Repr.equal
+let compare = Repr.compare
 
 (* Formatting *)
 

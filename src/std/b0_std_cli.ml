@@ -27,17 +27,17 @@ end
 (* Argument converters *)
 
 let path =
-  let parser = Fpath.of_string and pp = Fpath.pp_unquoted in
+  let parser = Filepath.of_string and pp = Filepath.pp_unquoted in
   let completion = Arg.Completion.complete_paths in
   Arg.Conv.make ~docv:"PATH" ~parser ~pp ~completion ()
 
-let filepath =
-  let parser = Fpath.of_string and pp = Fpath.pp_unquoted in
+let file =
+  let parser = Filepath.of_string and pp = Filepath.pp_unquoted in
   let completion = Arg.Completion.complete_files in
   Arg.Conv.make ~docv:"FILE" ~parser ~pp ~completion ()
 
-let dirpath =
-  let parser = Fpath.of_string and pp = Fpath.pp_unquoted in
+let dir =
+  let parser = Filepath.of_string and pp = Filepath.pp_unquoted in
   let completion = Arg.Completion.complete_dirs in
   Arg.Conv.make ~docv:"DIR" ~parser ~pp ~completion ()
 

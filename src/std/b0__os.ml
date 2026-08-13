@@ -22,10 +22,10 @@ let rand_gen () = match Atomic.get rand_gen with
 let err_seg_not_dir = "A segment of the path is not a directory"
 
 let uerror = Unix.error_message
-let path_msg p e =  B0__fmt.str "%a: %s" B0__fpath.pp p e
+let path_msg p e =  B0__fmt.str "%a: %s" B0__filepath.pp p e
 let op_path_msg' op path e = B0__fmt.str "%s %a: %s" op B0__fmt.code path e
 let op_path_msg op path e =
-  B0__fmt.str "%s %a: %s" op (B0__fmt.code' B0__fpath.pp) path e
+  B0__fmt.str "%s %a: %s" op (B0__fmt.code' B0__filepath.pp) path e
 
 (* Monotonic time *)
 
@@ -517,12 +517,12 @@ module Fs_base = struct
 
   let dir_create ?(mode = 0o755) ~make_path dir =
     let create_op = "Create directory" in
-    let mkdir dir mode = Unix.mkdir (B0__fpath.to_string dir) mode in
+    let mkdir dir mode = Unix.mkdir (B0__filepath.to_string dir) mode in
     try
       let pmode = 0o755 in
       try Ok (mkdir dir mode; true) with
       | Unix.Unix_error (EEXIST, _, _) ->
-          if is_dir (B0__fpath.to_string dir) then Ok false else
+          if is_dir (B0__filepath.to_string dir) then Ok false else
           Error (op_path_msg create_op dir "Exists but not a directory")
       | Unix.Unix_error (ENOENT, _, _) when make_path ->
           let rec down = function
@@ -538,23 +538,23 @@ module Fs_base = struct
           let rec up todo p = match mkdir p pmode with
           | () -> down todo
           | exception Unix.Unix_error (ENOENT, _, _) ->
-              up (p :: todo) (B0__fpath.parent p)
+              up (p :: todo) (B0__filepath.parent p)
           in
-          up [dir] (B0__fpath.parent dir)
+          up [dir] (B0__filepath.parent dir)
     with
     | Unix.Unix_error (e, _, p) ->
-        if String.equal (B0__fpath.to_string dir) p
+        if String.equal (B0__filepath.to_string dir) p
         then Error (op_path_msg create_op dir (uerror e)) else
         let perr = B0__fmt.str "%s: %s" p (uerror e) in
         Error (op_path_msg create_op dir perr)
 
   let dir_delete ~recurse dir =
     let delete_op = "Delete directory" in
-    let fail e = B0__fmt.failwith_notrace "%a: %s" B0__fpath.pp dir e in
+    let fail e = B0__fmt.failwith_notrace "%a: %s" B0__filepath.pp dir e in
     let rec delete_symlink p =
       if is_symlink p then (unlink p; true) else false
     in
-    let try_unlink file = match Unix.unlink (B0__fpath.to_string file) with
+    let try_unlink file = match Unix.unlink (B0__filepath.to_string file) with
     | () -> true
     | exception Unix.Unix_error (e, _, _) ->
         match e with
@@ -569,12 +569,12 @@ module Fs_base = struct
     | exception End_of_file -> d :: todo
     | ".." | "." -> delete_contents d dh todo
     | file ->
-        let file = B0__fpath.(d / file) in
+        let file = B0__filepath.(d / file) in
         if try_unlink file then delete_contents d dh todo else
         file :: d :: todo (* file is a dir we'll come back later for [d] *)
     in
     let rec try_delete d todo =
-      match Unix.opendir (B0__fpath.to_string d) with
+      match Unix.opendir (B0__filepath.to_string d) with
       | dh ->
           let dirs = match delete_contents d dh todo with
           | dirs -> Unix.closedir dh; dirs
@@ -590,7 +590,7 @@ module Fs_base = struct
     and doit = function
     | [] -> ()
     | d :: ds ->
-        match Unix.rmdir (B0__fpath.to_string d) with
+        match Unix.rmdir (B0__filepath.to_string d) with
         | () -> doit ds
         | exception Unix.Unix_error (e, _, _) ->
             match e with
@@ -598,7 +598,7 @@ module Fs_base = struct
             | ENOENT | ENOTDIR -> doit ds
             | e -> fail (op_path_msg delete_op d (uerror e))
     in
-    try match Unix.rmdir (B0__fpath.to_string dir) with
+    try match Unix.rmdir (B0__filepath.to_string dir) with
     | () -> Ok true
     | exception Unix.Unix_error (e, _, _) ->
         match e with
@@ -606,7 +606,7 @@ module Fs_base = struct
         | ENOENT -> Ok false
         | ENOTDIR as e ->
             begin try
-              if delete_symlink (B0__fpath.to_string dir) then Ok true else
+              if delete_symlink (B0__filepath.to_string dir) then Ok true else
               fail (op_path_msg delete_op dir (uerror e))
             with
             | Unix.Unix_error (e, _, _) ->
@@ -624,7 +624,7 @@ module Fs_base = struct
   let rec handle_force ~force file =
     if force then Ok () else
     try
-      ignore (Unix.lstat (B0__fpath.to_string file));
+      ignore (Unix.lstat (B0__filepath.to_string file));
       Error (err_path_exists file)
     with
     | Unix.Unix_error (ENOENT, _, _) -> Ok ()
@@ -639,12 +639,12 @@ module Fs_base = struct
     ~force ~make_path ~mode file
     =
     let fls = if force then flags else Unix.O_EXCL :: flags in
-    match Unix.openfile (B0__fpath.to_string file) fls mode with
+    match Unix.openfile (B0__filepath.to_string file) fls mode with
     | fd -> Ok fd
     | exception Unix.Unix_error (EINTR, _, _) ->
         handle_force_open_fdout ~flags ~force ~make_path ~mode file
     | exception Unix.Unix_error (ENOENT as e, _, _) when make_path ->
-        begin match dir_create ~make_path (B0__fpath.parent file) with
+        begin match dir_create ~make_path (B0__filepath.parent file) with
         | Ok true (* created *) ->
             handle_force_open_fdout ~flags ~force ~make_path ~mode file
         | Ok false (* existed *) ->
@@ -660,20 +660,20 @@ module Fs_base = struct
   (* Path operations *)
 
   let rec path_exists p =
-    try (ignore (Unix.stat (B0__fpath.to_string p)); Ok true) with
+    try (ignore (Unix.stat (B0__filepath.to_string p)); Ok true) with
     | Unix.Unix_error ((ENOENT | ENOTDIR), _, _) -> Ok false
     | Unix.Unix_error (EINTR, _, _) -> path_exists p
     | Unix.Unix_error (e, op, _) -> Error (op_path_msg op p (uerror e))
 
   let rec path_exists_stat p =
-    try Ok (Some (Unix.stat (B0__fpath.to_string p))) with
+    try Ok (Some (Unix.stat (B0__filepath.to_string p))) with
     | Unix.Unix_error ((ENOTDIR|ENOENT), _, _) -> Ok None
     | Unix.Unix_error (EINTR, _, _) -> path_exists_stat p
     | Unix.Unix_error (e, op, _) -> Error (op_path_msg op p (uerror e))
 
   let rec path_get_mode p =
     let op_get_mode = "Get file mode" in
-    try Ok ((Unix.stat (B0__fpath.to_string p)).Unix.st_perm) with
+    try Ok ((Unix.stat (B0__filepath.to_string p)).Unix.st_perm) with
     | Unix.Unix_error (EINTR, _, _) -> path_get_mode p
     | Unix.Unix_error (ENOTDIR, _, _) ->
         Error (op_path_msg op_get_mode p err_seg_not_dir)
@@ -681,13 +681,13 @@ module Fs_base = struct
         Error (op_path_msg op_get_mode p (uerror e))
 
   let rec path_set_mode p m =
-    try Ok (Unix.chmod (B0__fpath.to_string p) m) with
+    try Ok (Unix.chmod (B0__filepath.to_string p) m) with
     | Unix.Unix_error (EINTR, _, _) -> path_set_mode p m
     | Unix.Unix_error (e, _, _) ->
         Error (op_path_msg "Set file mode" p (uerror e))
 
   let rec path_delete ~recurse p =
-    try Ok (Unix.unlink (B0__fpath.to_string p); true) with
+    try Ok (Unix.unlink (B0__filepath.to_string p); true) with
     | Unix.Unix_error (ENOENT, _, _) -> Ok false
     | Unix.Unix_error (EINTR, _, _) -> path_delete ~recurse p
     | Unix.Unix_error ((EPERM | EISDIR), _, _) ->
@@ -697,17 +697,17 @@ module Fs_base = struct
 
   let rec path_rename src ~force ~make_path ~dst:p =
     let err e =
-      B0__fmt.str "rename %a to %a: %s" B0__fpath.pp src B0__fpath.pp p e
+      B0__fmt.str "rename %a to %a: %s" B0__filepath.pp src B0__filepath.pp p e
     in
     match handle_force ~force p with
     | Error e -> Error (err e)
     | Ok () ->
         try
           Ok (Unix.rename
-                (B0__fpath.to_string src) (B0__fpath.to_string p))
+                (B0__filepath.to_string src) (B0__filepath.to_string p))
         with
         | Unix.Unix_error (ENOENT as e, _, _) when make_path ->
-            begin match dir_create ~make_path (B0__fpath.parent p) with
+            begin match dir_create ~make_path (B0__filepath.parent p) with
             | Ok true (* created *) -> path_rename ~force ~make_path src ~dst:p
             | Ok false (* existed *) -> Error (err (uerror e))
             | Error e -> Error (err e)
@@ -717,7 +717,7 @@ module Fs_base = struct
         | Unix.Unix_error (e, _, _) ->
             Error (err (uerror e))
 
-  let rec path_stat p = try Ok (Unix.stat (B0__fpath.to_string p)) with
+  let rec path_stat p = try Ok (Unix.stat (B0__filepath.to_string p)) with
   | Unix.Unix_error (EINTR, _, _) -> path_stat p
   | Unix.Unix_error (ENOTDIR, _, _) -> Error (path_msg p err_seg_not_dir)
   | Unix.Unix_error (e, op, _) -> Error (op_path_msg op p (uerror e))
@@ -726,13 +726,16 @@ module Fs_base = struct
 
   let rec symlink ~src ~force ~make_path p =
     let err e =
-      B0__fmt.str "symlink %a to %a: %s" B0__fpath.pp src B0__fpath.pp p e
+      B0__fmt.str "symlink %a to %a: %s"
+        B0__filepath.pp src B0__filepath.pp p e
     in
     try
-      Ok (Unix.symlink (B0__fpath.to_string src) (B0__fpath.to_string p))
+      Ok (Unix.symlink
+            (B0__filepath.to_string src)
+            (B0__filepath.to_string p))
     with
     | Unix.Unix_error (EEXIST, _, _) when force ->
-        begin match unlink (B0__fpath.to_string p) with
+        begin match unlink (B0__filepath.to_string p) with
         | exception Unix.Unix_error (ENOENT, _, _) ->
             symlink ~src ~force ~make_path p
         | () -> symlink ~src ~force ~make_path p
@@ -740,7 +743,7 @@ module Fs_base = struct
         end
     | Unix.Unix_error ((ENOENT | ENOTDIR as e), _, _)
       when make_path ->
-        begin match dir_create ~make_path (B0__fpath.parent p) with
+        begin match dir_create ~make_path (B0__filepath.parent p) with
         | Ok true (* created *) -> symlink ~src ~force ~make_path p
         | Ok false (* existed *) -> Error (err (uerror e))
         | Error e -> Error (op_path_msg "Creating path" p e)
@@ -750,8 +753,8 @@ module Fs_base = struct
 
   let rec symlink_link p =
     try
-      let l = Unix.readlink (B0__fpath.to_string p) in
-      match B0__fpath.of_string l with
+      let l = Unix.readlink (B0__filepath.to_string p) in
+      match B0__filepath.of_string l with
       | Ok _ as v -> v
       | Error e -> Error (op_path_msg "Reading symlink" p e)
     with
@@ -761,7 +764,7 @@ module Fs_base = struct
     | Unix.Unix_error (e, op, _) ->
         Error (op_path_msg op p (uerror e))
 
-  let rec symlink_stat p = try Ok (Unix.lstat (B0__fpath.to_string p)) with
+  let rec symlink_stat p = try Ok (Unix.lstat (B0__filepath.to_string p)) with
   | Unix.Unix_error (EINTR, _, _) -> symlink_stat p
   | Unix.Unix_error (ENOTDIR, op, _) -> Error (op_path_msg op p err_seg_not_dir)
   | Unix.Unix_error (e, op, _) -> Error (op_path_msg op p (uerror e))
@@ -774,29 +777,29 @@ end
 module Tmp = struct
   let rec atomic_add set el =
     let seen = Atomic.get set in
-    if Atomic.compare_and_set set seen (B0__fpath.Set.add el seen)
+    if Atomic.compare_and_set set seen (B0__filepath.Set.add el seen)
     then () else atomic_add set el
 
   let rec atomic_remove set el =
     let seen = Atomic.get set in
-    if Atomic.compare_and_set set seen (B0__fpath.Set.remove el seen)
+    if Atomic.compare_and_set set seen (B0__filepath.Set.remove el seen)
     then () else atomic_remove set el
 
-  let delete_file file = try Fs_base.unlink (B0__fpath.to_string file) with
+  let delete_file file = try Fs_base.unlink (B0__filepath.to_string file) with
   | Unix.Unix_error (e, _, _) -> ()
 
-  let files = Atomic.make B0__fpath.Set.empty
+  let files = Atomic.make B0__filepath.Set.empty
   let add_file file = atomic_add files file
   let rem_file file = delete_file file; atomic_remove files file
 
   let delete_dir dir = ignore (Fs_base.dir_delete ~recurse:true dir)
-  let dirs = Atomic.make B0__fpath.Set.empty
+  let dirs = Atomic.make B0__filepath.Set.empty
   let add_dir dir = atomic_add dirs dir
   let rem_dir dir = delete_dir dir; atomic_remove dirs dir
 
   let cleanup () =
-    B0__fpath.Set.iter delete_file (Atomic.get files);
-    B0__fpath.Set.iter delete_dir (Atomic.get dirs)
+    B0__filepath.Set.iter delete_file (Atomic.get files);
+    B0__filepath.Set.iter delete_dir (Atomic.get dirs)
 
   let () = at_exit cleanup
 
@@ -809,7 +812,7 @@ module Tmp = struct
       then tmp_from_env "TEMP" ~default:"./"
       else tmp_from_env "TMPDIR" ~default:"/tmp/"
     in
-    ref (B0__fpath.ensure_trailing_dir_sep (B0__fpath.v dir))
+    ref (B0__filepath.ensure_trailing_dir_sep (B0__filepath.v dir))
 
   type name = (string -> string, unit, string) format
   let default_name = format_of_string "tmp-%s"
@@ -817,12 +820,12 @@ module Tmp = struct
   let rand_num () = Random.State.bits (rand_gen ()) land 0xFFFFFF
   let rand_str () = Printf.sprintf "%06x" (rand_num ())
   let tmp_path dir name rand =
-    let dir = B0__fpath.to_string dir in
-    match dir.[String.length dir - 1] = B0__fpath.natural_dir_sep_char with
+    let dir = B0__filepath.to_string dir in
+    match dir.[String.length dir - 1] = B0__filepath.natural_dir_sep_char with
     | true -> Printf.sprintf ("%s" ^^ name) dir rand
     | false ->
         Printf.sprintf ("%s%c" ^^ name)
-          dir B0__fpath.natural_dir_sep_char rand
+          dir B0__filepath.natural_dir_sep_char rand
 
   let err dir name rand e =
     B0__fmt.error "tmp file %s: %s" (tmp_path dir name rand) e
@@ -836,7 +839,7 @@ module Tmp = struct
       ?(mode = 0o600) ?(make_path = true) ?dir ?(name = default_name) ()
     =
     let dir = match dir with None -> !default_dir | Some d -> d in
-    let dir = B0__fpath.ensure_trailing_dir_sep dir in
+    let dir = B0__filepath.ensure_trailing_dir_sep dir in
     let rec loop n = match n with
     | 0 -> err_too_many dir name
     | n ->
@@ -844,7 +847,7 @@ module Tmp = struct
         try
           let file = tmp_path dir name rand in
           let fd = Unix.openfile file flags mode in
-          let file = B0__fpath.v file in
+          let file = B0__filepath.v file in
           (add_file file; Ok (file, fd))
         with
         | Unix.Unix_error (EEXIST, _, _) -> loop (n - 1)
@@ -870,7 +873,7 @@ module Tmp = struct
         try
           let tdir = tmp_path dir name rand in
           let () = Unix.mkdir tdir mode in
-          let tdir = B0__fpath.v tdir in
+          let tdir = B0__filepath.v tdir in
           (add_dir tdir; Ok tdir)
         with
         | Unix.Unix_error (EEXIST, _, _) -> loop (n - 1)
@@ -893,7 +896,7 @@ module Tmp = struct
         let rand = rand_str () in
         let file = tmp_path dir name rand in
         match Unix.access file [Unix.F_OK] with
-        | exception Unix.Unix_error (ENOENT, _, _) -> Ok (B0__fpath.v file)
+        | exception Unix.Unix_error (ENOENT, _, _) -> Ok (B0__filepath.v file)
         | exception Unix.Unix_error (e, _, _) -> err dir name rand (uerror e)
         | _ -> loop (n - 1)
     in
@@ -910,7 +913,7 @@ module File = struct
   (* Existence *)
 
   let rec exists file =
-    match (Unix.stat (B0__fpath.to_string file)).Unix.st_kind with
+    match (Unix.stat (B0__filepath.to_string file)).Unix.st_kind with
     | Unix.S_REG -> Ok true
     | _ -> Ok false
     | exception Unix.Unix_error ((ENOENT|ENOTDIR), _, _) -> Ok false
@@ -919,7 +922,7 @@ module File = struct
         Error (op_path_msg op file (uerror e))
 
   let rec must_exist file =
-    match (Unix.stat (B0__fpath.to_string file)).Unix.st_kind with
+    match (Unix.stat (B0__filepath.to_string file)).Unix.st_kind with
     | Unix.S_REG -> Ok ()
     | exception Unix.Unix_error (EINTR, _, _) -> must_exist file
     | _ ->
@@ -935,7 +938,7 @@ module File = struct
   | () -> true
   | exception Unix.Unix_error _ -> false
 
-  let is_executable file = is_executable' (B0__fpath.to_string file)
+  let is_executable file = is_executable' (B0__filepath.to_string file)
 
   (* Deleting and truncating *)
 
@@ -948,7 +951,7 @@ module File = struct
     | exception Unix.Unix_error (e, _, _) ->
         Error (op_path_msg' op p (uerror e))
     in
-    let p = B0__fpath.to_string path in
+    let p = B0__filepath.to_string path in
     match (Unix.lstat p).Unix.st_kind with
     | Unix.S_REG -> (* file *) unlink p
     | Unix.S_LNK ->
@@ -967,7 +970,7 @@ module File = struct
         Error (op_path_msg' op p (uerror e))
 
   let rec truncate file size =
-    try Ok (Unix.truncate (B0__fpath.to_string file) size) with
+    try Ok (Unix.truncate (B0__filepath.to_string file) size) with
     | Unix.Unix_error (EINTR, _, _) -> truncate file size
     | Unix.Unix_error (e, op, _) -> Error (op_path_msg op file (uerror e))
 
@@ -976,13 +979,15 @@ module File = struct
   let rec link ~src ~force ~make_path file =
     let err e =
       B0__fmt.error "link %a to %a: %s"
-        B0__fpath.pp src B0__fpath.pp file e
+        B0__filepath.pp src B0__filepath.pp file e
     in
     try
-      Ok (Unix.link (B0__fpath.to_string src) (B0__fpath.to_string file))
+      Ok (Unix.link
+            (B0__filepath.to_string src)
+            (B0__filepath.to_string file))
     with
     | Unix.Unix_error (EEXIST, _, _) when force ->
-        begin match Fs_base.unlink (B0__fpath.to_string file) with
+        begin match Fs_base.unlink (B0__filepath.to_string file) with
         | exception Unix.Unix_error (ENOENT, _, _) ->
             link ~src ~force ~make_path file
         | () -> link ~src ~force ~make_path file
@@ -990,10 +995,11 @@ module File = struct
         end
     | Unix.Unix_error ((ENOENT | ENOTDIR as e), _, _)
       when make_path ->
-        begin match Fs_base.dir_create ~make_path (B0__fpath.parent file) with
-        | Ok true (* created *) -> link ~src ~force ~make_path file
-        | Ok false (* existed *) -> err (uerror e)
-        | Error e -> Error (op_path_msg "Creating path" file e)
+        begin
+          match Fs_base.dir_create ~make_path (B0__filepath.parent file) with
+          | Ok true (* created *) -> link ~src ~force ~make_path file
+          | Ok false (* existed *) -> err (uerror e)
+          | Error e -> Error (op_path_msg "Creating path" file e)
         end
     | Unix.Unix_error (EINTR, _, _) -> link ~src ~force ~make_path file
     | Unix.Unix_error (e, _, _) -> err (uerror e)
@@ -1003,9 +1009,9 @@ module File = struct
   let read_with_ic file f =
     try
       let ic =
-        if B0__fpath.is_dash file
+        if B0__filepath.is_dash file
         then (In_channel.set_binary_mode In_channel.stdin true; stdin)
-        else open_in_bin (B0__fpath.to_string file)
+        else open_in_bin (B0__filepath.to_string file)
       in
       let finally () = if ic = stdin then () else close_in_noerr ic in
       Ok (Fun.protect ~finally (fun () -> f ic))
@@ -1017,8 +1023,8 @@ module File = struct
     =
     try
       let fd =
-        if B0__fpath.is_dash file then Unix.stdin else
-        Fd.openfile (B0__fpath.to_string file) flags 0
+        if B0__filepath.is_dash file then Unix.stdin else
+        Fd.openfile (B0__filepath.to_string file) flags 0
       in
       let finally () = if fd = Unix.stdin then () else Fd.close_noerr fd in
       Ok (Fun.protect ~finally (fun () -> f fd))
@@ -1071,13 +1077,15 @@ module File = struct
 
   let rec rename_tmp src dst =
     try
-      Ok (Unix.rename (B0__fpath.to_string src) (B0__fpath.to_string dst))
+      Ok (Unix.rename
+            (B0__filepath.to_string src)
+            (B0__filepath.to_string dst))
     with
     | Unix.Unix_error (EINTR, _, _) -> rename_tmp src dst
     | Unix.Unix_error (e, _, _) ->
         Error
           (B0__fmt.str "renaming %a to %a: %s"
-            B0__fpath.pp src B0__fpath.pp dst (uerror e))
+            B0__filepath.pp src B0__filepath.pp dst (uerror e))
 
   let write_op = "Writing"
 
@@ -1087,7 +1095,7 @@ module File = struct
     | Error _ as v -> Ok v
     | Ok _ as v -> Result.map (fun () -> v) (rename_tmp tmp file)
     in
-    let dir = B0__fpath.parent file in
+    let dir = B0__filepath.parent file in
     match with_tmp_fd ?flags ~mode ~make_path ~dir do_write with
     | Ok v -> v
     | Error e -> Error (op_path_msg write_op file e)
@@ -1095,7 +1103,7 @@ module File = struct
   let write_with_fd
       ?flags ?(atomic = true) ?(mode = 0o644) ~force ~make_path file f
     =
-    if B0__fpath.is_dash file then Ok (f Unix.stdout) else
+    if B0__filepath.is_dash file then Ok (f Unix.stdout) else
     if atomic
     then write_with_fd_atomic ?flags ~mode ~force ~make_path ~file f else
     let* fd =
@@ -1112,7 +1120,7 @@ module File = struct
     | Error _ as v -> Ok v
     | Ok _ as v -> Result.map (fun () -> v) (rename_tmp tmp file)
     in
-    let dir = (B0__fpath.parent file) in
+    let dir = (B0__filepath.parent file) in
     match with_tmp_oc ?flags ~mode ~make_path ~dir do_write with
     | Ok v -> v
     | Error e -> Error (op_path_msg write_op file e)
@@ -1121,7 +1129,7 @@ module File = struct
       ?flags ?(atomic = true) ?(mode = 0o644) ~force ~make_path file f
     =
     try
-      if B0__fpath.is_dash file
+      if B0__filepath.is_dash file
       then (Out_channel.set_binary_mode stdout true; Ok (f stdout)) else
       if atomic
       then write_with_oc_atomic ?flags ~mode ~force ~make_path ~file f else
@@ -1144,14 +1152,15 @@ module File = struct
 
   let copy ?atomic ?mode src ~force ~make_path ~dst =
     let error e =
-      B0__fmt.str "copy %a to %a: %s" B0__fpath.pp src B0__fpath.pp dst e
+      B0__fmt.str "copy %a to %a: %s"
+        B0__filepath.pp src B0__filepath.pp dst e
     in
     Result.map_error error @@ Result.join @@ read_with_fd src @@ fun fdi ->
     try
       let mode = match mode with
       | Some _ as mode -> mode
       | None when fdi = Unix.stdin -> None
-      | None -> Some (Unix.stat (B0__fpath.to_string src)).Unix.st_perm
+      | None -> Some (Unix.stat (B0__filepath.to_string src)).Unix.st_perm
       in
       Result.join @@ write_with_fd ?atomic ?mode ~force ~make_path dst @@
       fun fdo -> Ok (Fd.copy fdi ~dst:fdo)
@@ -1170,12 +1179,12 @@ module Dir = struct
     | exception End_of_file -> acc
     | ".." | "." -> loop ~dotfiles dir dh acc
     | n when is_dot_file n && not dotfiles -> loop ~dotfiles dir dh acc
-    | n when B0__fpath.is_segment n -> loop ~dotfiles dir dh (n :: acc)
+    | n when B0__filepath.is_segment n -> loop ~dotfiles dir dh (n :: acc)
     | n ->
         B0__fmt.failwith "%a: Invalid filename %a"
-          B0__fpath.pp dir B0__fmt.OCaml.string n
+          B0__filepath.pp dir B0__fmt.OCaml.string n
     in
-    let dh = Unix.opendir (B0__fpath.to_string dir) in
+    let dh = Unix.opendir (B0__filepath.to_string dir) in
     match loop ~dotfiles dir dh [] with
     | fs -> Unix.closedir dh; fs
     | exception exn ->
@@ -1186,7 +1195,7 @@ module Dir = struct
   (* Existence *)
 
   let rec exists dir =
-    match (Unix.stat @@ B0__fpath.to_string dir).Unix.st_kind with
+    match (Unix.stat @@ B0__filepath.to_string dir).Unix.st_kind with
     | Unix.S_DIR -> Ok true
     | _ -> Ok false
     | exception Unix.Unix_error ((ENOENT|ENOTDIR), _, _) -> Ok false
@@ -1195,7 +1204,7 @@ module Dir = struct
         Error (op_path_msg op dir (uerror e))
 
   let rec must_exist dir =
-    match (Unix.stat @@ B0__fpath.to_string dir).Unix.st_kind with
+    match (Unix.stat @@ B0__filepath.to_string dir).Unix.st_kind with
     | Unix.S_DIR -> Ok ()
     | _ -> Error (path_msg dir err_not_dir)
     | exception Unix.Unix_error (EINTR, _, _) -> must_exist dir
@@ -1221,7 +1230,7 @@ module Dir = struct
     | exception Unix.Unix_error (e, _, _) ->
         Error (op_path_msg' op p (uerror e))
     in
-    let p = B0__fpath.to_string dir in
+    let p = B0__filepath.to_string dir in
     match (Unix.lstat p).Unix.st_kind with
     | Unix.S_DIR -> (* dir *) Fs_base.dir_delete ~recurse dir
     | Unix.S_LNK ->
@@ -1241,10 +1250,10 @@ module Dir = struct
 
   (* Contents *)
 
-  let rec stat p = try (Unix.stat @@ B0__fpath.to_string p) with
+  let rec stat p = try (Unix.stat @@ B0__filepath.to_string p) with
   | Unix.Unix_error (EINTR, _, _) -> stat p
 
-  let rec lstat p = try (Unix.lstat @@ B0__fpath.to_string p) with
+  let rec lstat p = try (Unix.lstat @@ B0__filepath.to_string p) with
   | Unix.Unix_error (EINTR, _, _) -> lstat p
 
   let fold_no_rec
@@ -1253,23 +1262,23 @@ module Dir = struct
     let rec loop stat_error stat f acc adir = function
     | [] -> Ok acc
     | n :: ns ->
-        let full = B0__fpath.(adir / n) in
+        let full = B0__filepath.(adir / n) in
         match stat full with
         | st ->
             begin match st.Unix.st_kind with
             | Unix.S_DIR ->
                 if filter = `Non_dir
                 then loop stat_error stat f acc adir ns else
-                let p = if rel then B0__fpath.v n else full in
+                let p = if rel then B0__filepath.v n else full in
                 loop stat_error stat f (f st n p acc) adir ns
             | _ when filter <> `Dir ->
-                let p = if rel then B0__fpath.v n else full in
+                let p = if rel then B0__filepath.v n else full in
                 loop stat_error stat f (f st n p acc) adir ns
             | _ ->
                 loop stat_error stat f acc adir ns
             end
         | exception Unix.Unix_error (e, _, _) ->
-            stat_error (if not rel then full else B0__fpath.v n) e;
+            stat_error (if not rel then full else B0__filepath.v n) e;
             loop stat_error stat f acc adir ns
     in
     let stat = if follow_symlinks then stat else lstat in
@@ -1285,13 +1294,14 @@ module Dir = struct
         | [] -> Ok acc
         end
     | n :: ns ->
-        let full = B0__fpath.(adir / n) in
+        let full = B0__filepath.(adir / n) in
         begin match stat full with
         | st ->
             begin match st.Unix.st_kind with
             | Unix.S_DIR ->
                 let rp = match rdir with
-                | None -> B0__fpath.v n | Some rdir -> B0__fpath.(rdir / n)
+                | None -> B0__filepath.v n
+                | Some rdir -> B0__filepath.(rdir / n)
                 in
                 let p = if not rel then full else rp in
                 if prune_dir st n p acc
@@ -1302,7 +1312,8 @@ module Dir = struct
                 loop stat_error stat todo full (Some rp) f acc ns
             | _ when filter <> `Dir ->
                 let p = if not rel then full else match rdir with
-                | None -> B0__fpath.v n | Some rdir -> B0__fpath.(rdir / n)
+                  | None -> B0__filepath.v n
+                  | Some rdir -> B0__filepath.(rdir / n)
                 in
                 loop stat_error stat todo adir rdir f (f st n p acc) ns
             | _ ->
@@ -1311,7 +1322,8 @@ module Dir = struct
         | exception Unix.Unix_error (e, _, _) ->
             let p =
               if not rel then full else match rdir with
-              | None -> B0__fpath.v n | Some rdir -> B0__fpath.(rdir /n)
+              | None -> B0__filepath.v n
+              | Some rdir -> B0__filepath.(rdir /n)
             in
             stat_error p e;
             loop stat_error stat todo adir rdir f acc ns
@@ -1321,14 +1333,15 @@ module Dir = struct
     loop stat_error stat [] dir None f acc (readdir ~dotfiles dir)
 
   let warn_and_prune_denied ~dir ~rel _ _ p _ =
-    let ap = if rel then B0__fpath.(dir // p) else p in
-    try (Unix.access (B0__fpath.to_string ap) Unix.[R_OK; X_OK]; false) with
+    let ap = if rel then B0__filepath.(dir // p) else p in
+    try (Unix.access (B0__filepath.to_string ap) Unix.[R_OK; X_OK]; false)
+    with
     | Unix.Unix_error ((EACCES | EPERM (* may happen *)), _, _) ->
-        B0__log.warn (fun m -> m "%a: Permission denied" B0__fpath.pp p);
+        B0__log.warn (fun m -> m "%a: Permission denied" B0__filepath.pp p);
         true
 
   let warn_stat_error p e =
-    B0__log.warn (fun m -> m "%a: %s" B0__fpath.pp p (uerror e))
+    B0__log.warn (fun m -> m "%a: %s" B0__filepath.pp p (uerror e))
 
   let _fold
       ~(filter : [`Any | `Non_dir | `Dir]) ?(rel = false)
@@ -1347,7 +1360,7 @@ module Dir = struct
     | Unix.Unix_error (e, _, ep) ->
         let err = uerror e in
         let err =
-          if String.equal (B0__fpath.to_string dir) ep then err else
+          if String.equal (B0__filepath.to_string dir) ep then err else
           B0__fmt.str "%s: %s" ep err
         in
         Error (op_path_msg listing_op dir err)
@@ -1371,7 +1384,7 @@ module Dir = struct
       ~recurse f dir acc
 
   let path_list stat _ f acc = match stat.Unix.st_kind with
-  | Unix.S_DIR -> B0__fpath.ensure_trailing_dir_sep f :: acc
+  | Unix.S_DIR -> B0__filepath.ensure_trailing_dir_sep f :: acc
   | _ -> f :: acc
 
   let contents
@@ -1393,16 +1406,16 @@ module Dir = struct
     =
     let err e =
       B0__fmt.str "copy %a to %a: %s"
-        (B0__fmt.code' B0__fpath.pp) src
-        (B0__fmt.code' B0__fpath.pp) dst e
+        (B0__fmt.code' B0__filepath.pp) src
+        (B0__fmt.code' B0__filepath.pp) dst e
     in
     let prune = match rel with (* we invoke [_fold] with [rel:true] *)
     | true -> fun st name p _ -> prune st name p
-    | false -> fun st name p _ -> prune st name (B0__fpath.(src // p))
+    | false -> fun st name p _ -> prune st name (B0__filepath.(src // p))
     in
     let copy dst st name p (chmods as acc) = match st.Unix.st_kind with
     | Unix.S_DIR (* prune was already called on it *) ->
-        let dst = B0__fpath.(dst // p) in
+        let dst = B0__filepath.(dst // p) in
         let mode = st.Unix.st_perm in
         let writeable = (mode land 0o200 <> 0) in
         let mode, acc =
@@ -1423,13 +1436,13 @@ module Dir = struct
         in
         if prune st name p () then acc else
         let mode = st.Unix.st_perm in
-        let src = B0__fpath.(src // p) in
-        let dst = B0__fpath.(dst // p) in
+        let src = B0__filepath.(src // p) in
+        let dst = B0__filepath.(dst // p) in
         (cp ~mode src dst |> B0__result.error_to_failure); acc
     | Unix.S_LNK ->
         if prune st name p () then acc else
-        let dst = B0__fpath.(dst // p) in
-        let src = B0__fpath.(src // p) in
+        let dst = B0__filepath.(dst // p) in
+        let src = B0__filepath.(src // p) in
         let force = false and make_path = false in
         Fs_base.copy_symlink src ~force ~make_path ~dst
         |> B0__result.error_to_failure;
@@ -1437,7 +1450,7 @@ module Dir = struct
     | _ when prune st name p () (* why not *) -> acc
     | _ ->
         B0__fmt.failwith "%a: Not a regular file, directory or symlink"
-          B0__fpath.pp B0__fpath.(src // p)
+          B0__filepath.pp B0__filepath.(src // p)
     in
     let rec chmod_dirs = function
     | [] -> ()
@@ -1450,7 +1463,7 @@ module Dir = struct
     if exists then Error "Destination path already exists" else
     let* tdst =
       if atomic
-      then Tmp.mkdir ~make_path ~dir:(B0__fpath.parent dst) ()
+      then Tmp.mkdir ~make_path ~dir:(B0__filepath.parent dst) ()
       else Result.bind (Fs_base.dir_create ~make_path dst) (fun _ -> Ok dst)
     in
     try
@@ -1476,7 +1489,7 @@ module Dir = struct
   (* Default temporary directory *)
 
   let set_default_tmp p =
-    Tmp.default_dir := B0__fpath.ensure_trailing_dir_sep p
+    Tmp.default_dir := B0__filepath.ensure_trailing_dir_sep p
 
   let default_tmp () = !Tmp.default_dir
 
@@ -1493,16 +1506,16 @@ module Dir = struct
 
   let rec cwd () =
     let err e = B0__fmt.error "get cwd: %s" e in
-    match B0__fpath.of_string (Unix.getcwd ()) with
-    | Ok dir when B0__fpath.is_absolute dir -> Ok dir
-    | Ok dir -> err (B0__fmt.str "%a is relative" B0__fpath.pp dir)
+    match B0__filepath.of_string (Unix.getcwd ()) with
+    | Ok dir when B0__filepath.is_absolute dir -> Ok dir
+    | Ok dir -> err (B0__fmt.str "%a is relative" B0__filepath.pp dir)
     | Error e -> err e
     | exception Unix.Unix_error (EINTR, _, _) -> cwd ()
     | exception Unix.Unix_error (e, _, _) -> err (uerror e)
 
   let rec set_cwd dir =
-    let err e = B0__fmt.error "set cwd to %a: %s" B0__fpath.pp dir e in
-    try Ok (Unix.chdir (B0__fpath.to_string dir)) with
+    let err e = B0__fmt.error "set cwd to %a: %s" B0__filepath.pp dir e in
+    try Ok (Unix.chdir (B0__filepath.to_string dir)) with
     | Unix.Unix_error (EINTR, _, _) -> set_cwd dir
     | Unix.Unix_error (e, _, _) -> err (uerror e)
 
@@ -1518,24 +1531,24 @@ module Dir = struct
   (* Base directories *)
 
   let err_dir dir fmt = B0__fmt.error ("%s directory: " ^^ fmt) dir
-  let fpath_of_env_var dir var = match Env.var ~empty_is_none:true var with
+  let filepath_of_env_var dir var = match Env.var ~empty_is_none:true var with
   | None -> None
   | Some p ->
-      match B0__fpath.of_string p with
+      match B0__filepath.of_string p with
       | Error e -> Some (err_dir dir "%s environment variable: %s" var e)
       | Ok _ as v -> Some v
 
-  let base_dir dir var var_alt fallback = match fpath_of_env_var dir var with
+  let base_dir dir var var_alt fallback = match filepath_of_env_var dir var with
   | Some r -> r
   | None ->
-      match Option.bind var_alt (fpath_of_env_var dir) with
+      match Option.bind var_alt (filepath_of_env_var dir) with
       | Some r -> r
       | None -> fallback ()
 
   let home_dir = "user"
   let home_var = "HOME"
   let user () =
-    let home_env home_var = match fpath_of_env_var home_dir home_var with
+    let home_env home_var = match filepath_of_env_var home_dir home_var with
     | Some r -> r
     | None -> err_dir home_dir "%s environment variable is undefined" home_var
     in
@@ -1550,7 +1563,7 @@ module Dir = struct
           | None -> Unix.getuid ()
           | Some id -> id
       in
-      B0__fpath.of_string (Unix.getpwuid uid).Unix.pw_dir
+      B0__filepath.of_string (Unix.getpwuid uid).Unix.pw_dir
     with
     | Ok _ as v -> v
     | Error _ -> home_env home_var
@@ -1559,26 +1572,27 @@ module Dir = struct
 
   let home_fallback dir sub = match user () with
   | Error e -> err_dir dir "%s" e
-  | Ok home -> Ok B0__fpath.(home // sub)
+  | Ok home -> Ok B0__filepath.(home // sub)
 
   let config_dir = "configuration"
   let config_var = "XDG_CONFIG_HOME"
   let config_var_alt = if Sys.win32 then Some "%APPDATA%" else None
-  let config_fallback () = home_fallback config_dir (B0__fpath.v ".config")
+  let config_fallback () = home_fallback config_dir (B0__filepath.v ".config")
   let config () =
     base_dir config_dir config_var config_var_alt config_fallback
 
   let data_dir = "data"
   let data_var = "XDG_DATA_HOME"
   let data_var_alt = if Sys.win32 then Some "%APPDATA%" else None
-  let data_fallback () = home_fallback data_dir (B0__fpath.v ".local/share")
+  let data_fallback () =
+    home_fallback data_dir (B0__filepath.v ".local/share")
   let data () =
     base_dir data_dir data_var data_var_alt data_fallback
 
   let cache_dir = "cache"
   let cache_var = "XDG_CACHE_HOME"
   let cache_var_alt = if Sys.win32 then Some "%TEMP%" else None
-  let cache_fallback () = home_fallback cache_dir (B0__fpath.v ".cache")
+  let cache_fallback () = home_fallback cache_dir (B0__filepath.v ".cache")
   let cache () =
     base_dir cache_dir cache_var cache_var_alt cache_fallback
 
@@ -1592,7 +1606,8 @@ module Dir = struct
   let state_dir = "state"
   let state_var = "XDG_STATE_DIR"
   let state_var_alt = None
-  let state_fallback () = home_fallback state_dir (B0__fpath.v ".local/state")
+  let state_fallback () =
+    home_fallback state_dir (B0__filepath.v ".local/state")
   let state () =
     base_dir state_dir state_var state_var_alt state_fallback
 end
@@ -1603,7 +1618,7 @@ module Path = struct
 
   let exists = Fs_base.path_exists
   let rec must_exist p =
-    try Ok (ignore (Unix.stat (B0__fpath.to_string p))) with
+    try Ok (ignore (Unix.stat (B0__filepath.to_string p))) with
     | Unix.Unix_error (EINTR, _, _) -> must_exist p
     | Unix.Unix_error (ENOENT, op, _) ->
         Error (op_path_msg op p "No such path")
@@ -1620,7 +1635,8 @@ module Path = struct
   (* Resolving *)
 
   let rec realpath p =
-    try B0__fpath.of_string (Unix.realpath (B0__fpath.to_string p)) with
+    try B0__filepath.of_string (Unix.realpath (B0__filepath.to_string p))
+    with
     | Unix.Unix_error (EINTR, _, _) -> realpath p
     | Unix.Unix_error (ENOTDIR, _, _) -> Error (path_msg p err_seg_not_dir)
     | Unix.Unix_error (e, _, _) -> Error (path_msg p (uerror e))
@@ -1628,7 +1644,7 @@ module Path = struct
   let rec exists_realpath p =
     try
       Result.map Option.some @@
-      B0__fpath.of_string (Unix.realpath (B0__fpath.to_string p))
+      B0__filepath.of_string (Unix.realpath (B0__filepath.to_string p))
     with
     | Unix.Unix_error (EINTR, _, _) -> exists_realpath p
     | Unix.Unix_error ((ENOENT|ENOTDIR), _, _) -> Ok None
@@ -1641,19 +1657,20 @@ module Path = struct
       ~force ~make_path ~dst
     =
     let err e =
-      B0__fmt.str "copy %a to %a: %s" B0__fpath.pp src B0__fpath.pp dst e
+      B0__fmt.str "copy %a to %a: %s"
+        B0__filepath.pp src B0__filepath.pp dst e
     in
     let* src_stat =
-      if B0__fpath.is_dash src then Ok None else
+      if B0__filepath.is_dash src then Ok None else
       match Fs_base.path_stat src with
       | Ok stat -> Ok (Some stat)
       | Error e -> Error (err e)
     in
     let* dst =
-      if B0__fpath.is_dash dst then Ok dst else
+      if B0__filepath.is_dash dst then Ok dst else
       match Fs_base.path_exists_stat dst with
       | Error e -> Error (err e)
-      | Ok Some { st_kind = S_DIR } -> Ok B0__fpath.(dst / basename src)
+      | Ok Some { st_kind = S_DIR } -> Ok B0__filepath.(dst / basename src)
       | Ok _ -> Ok dst
     in
     match src_stat with
@@ -1677,7 +1694,7 @@ module Path = struct
     match Fs_base.path_stat p with
     | Error e -> Error (err e)
     | Ok stat ->
-        match Fs_base.path_stat B0__fpath.(p / "..") with
+        match Fs_base.path_stat B0__filepath.(p / "..") with
         | Error e -> Error (err ("parent: " ^ e))
         | Ok pstat -> Ok (stat.Unix.st_dev <> pstat.Unix.st_dev)
 
@@ -1699,10 +1716,10 @@ module Cmd = struct
 
   (* Tool search in PATH *)
 
-  let tool_is_path t = String.exists B0__fpath.is_dir_sep_char t
+  let tool_is_path t = String.exists B0__filepath.is_dir_sep_char t
   let tool_file ~dir tool = match dir.[String.length dir - 1] with
-  | c when B0__fpath.is_dir_sep_char c -> dir ^ tool
-  | _ -> String.concat B0__fpath.natural_dir_sep [dir; tool]
+  | c when B0__filepath.is_dir_sep_char c -> dir ^ tool
+  | _ -> String.concat B0__filepath.natural_dir_sep [dir; tool]
 
   let search_in_path_env_var tool = match Unix.getenv "PATH" with
   | exception Not_found ->
@@ -1710,10 +1727,11 @@ module Cmd = struct
   | p ->
       let rec loop tool = function
       | "" ->
-          Error (`Dirs (String.split_on_char B0__fpath.search_path_sep.[0] p))
+          Error (`Dirs
+                   (String.split_on_char B0__filepath.search_path_sep.[0] p))
       | p ->
           let dir, p =
-            let sep = B0__fpath.search_path_sep in
+            let sep = B0__filepath.search_path_sep in
             match B0__string.split_first ~sep p with
             | None -> p, ""
             | Some (dir, p) -> dir, p
@@ -1722,18 +1740,18 @@ module Cmd = struct
           let tool_file = tool_file ~dir tool in
           match File.is_executable' tool_file with
           | false -> loop tool p
-          | true -> Ok (B0__fpath.v tool_file)
+          | true -> Ok (B0__filepath.v tool_file)
       in
       loop tool p
 
   let search_in_dirs ~dirs tool =
     let rec loop tool = function
-    | [] -> Error (`Dirs (List.map B0__fpath.to_string dirs))
+    | [] -> Error (`Dirs (List.map B0__filepath.to_string dirs))
     | d :: dirs ->
-        let tool_file = tool_file ~dir:(B0__fpath.to_string d) tool in
+        let tool_file = tool_file ~dir:(B0__filepath.to_string d) tool in
         match File.is_executable' tool_file with
         | false -> loop tool dirs
-        | true -> Ok (B0__fpath.v tool_file)
+        | true -> Ok (B0__filepath.v tool_file)
     in
     loop tool dirs
 
@@ -1742,14 +1760,14 @@ module Cmd = struct
     | None -> B0__fmt.error "No tool to lookup: the command is empty"
     | Some tool ->
         let tool =
-          let tool = B0__fpath.to_string tool and suffix = ".exe" in
+          let tool = B0__filepath.to_string tool and suffix = ".exe" in
           if not win_exe || String.ends_with ~suffix tool then tool else
           (tool ^ suffix)
         in
         match tool_is_path tool with
         | true ->
             if File.is_executable' tool
-            then Ok (B0__cmd.set_tool (B0__fpath.v tool) cmd)
+            then Ok (B0__cmd.set_tool (B0__filepath.v tool) cmd)
             else B0__fmt.error "%s: No such executable file" tool
         | false ->
             let file = match path with
@@ -1805,14 +1823,14 @@ module Cmd = struct
 
   type stdi =
   | In_string of string
-  | In_file of B0__fpath.t
+  | In_file of B0__filepath.t
   | In_fd of { fd : Unix.file_descr; close : bool }
 
   let in_string s = In_string s
   let in_file f = In_file f
   let in_fd ~close fd = In_fd { fd; close }
   let in_stdin = In_fd { fd = Unix.stdin; close = false }
-  let in_null = In_file B0__fpath.null
+  let in_null = In_file B0__filepath.null
   let stdi_to_fd fds = function
   | In_fd { fd; close } -> if close then Fd.Set.add fd fds; fd
   | In_string s ->
@@ -1831,19 +1849,19 @@ module Cmd = struct
       end
   | In_file f ->
       try
-        let f = B0__fpath.to_string f in
+        let f = B0__filepath.to_string f in
         let fd = Fd.openfile f Unix.[O_RDONLY] 0o644 in
         Fd.Set.add fd fds; fd
       with Unix.Unix_error (e, _, _) ->
         B0__fmt.failwith_notrace "open file %a for stdin: %s"
-          B0__fpath.pp f (uerror e)
+          B0__filepath.pp f (uerror e)
 
   (* Process standard outputs *)
 
   type stdo =
   | Out_fd of { fd : Unix.file_descr; close : bool }
   | Out_file of
-      { mode : int; force : bool; make_path : bool; file : B0__fpath.t }
+      { mode : int; force : bool; make_path : bool; file : B0__filepath.t }
 
   let out_file ?(mode = 0o644) ~force ~make_path file =
     Out_file { mode; force; make_path; file }
@@ -1851,7 +1869,7 @@ module Cmd = struct
   let out_fd ~close fd = Out_fd { fd; close }
   let out_stdout = Out_fd { fd = Unix.stdout; close = false }
   let out_stderr = Out_fd { fd = Unix.stderr; close = false }
-  let out_null = out_file ~force:true ~make_path:false B0__fpath.null
+  let out_null = out_file ~force:true ~make_path:false B0__filepath.null
 
   let stdo_to_fd fds = function
   | Out_fd { fd; close } -> if close then Fd.Set.add fd fds; fd
@@ -1867,7 +1885,7 @@ module Cmd = struct
 
   type pid = { pid : int; cmd : B0__cmd.t }
   type spawn_tracer =
-    pid option -> Env.assignments option -> cwd:B0__fpath.t option ->
+    pid option -> Env.assignments option -> cwd:B0__filepath.t option ->
     B0__cmd.t -> unit
 
   let spawn_tracer_nop _ _ ~cwd:_ _ = ()
@@ -1903,7 +1921,10 @@ module Cmd = struct
     if B0__cmd.is_empty cmd then Error e else
     B0__fmt.error "cmd %s: %s" (B0__cmd.to_string cmd) e
 
-  let spawn_cwd = function None -> getcwd () | Some d -> B0__fpath.to_string d
+  let spawn_cwd = function
+  | None -> getcwd ()
+  | Some d -> B0__filepath.to_string d
+
   let spawn_env = function
   | None -> Unix.environment ()
   | Some e -> Array.of_list e
@@ -1972,7 +1993,7 @@ module Cmd = struct
       let stderr = match stderr with `Out -> stdout | `Stdo o -> o in
       let pid = _spawn fds ?env ?cwd ~stdin ~stdout ~stderr cmd in
       let status = run_collect pid in
-      let out = Fd.read_file (B0__fpath.to_string tmpf) fd in
+      let out = Fd.read_file (B0__filepath.to_string tmpf) fd in
       Fd.close_noerr fd; Tmp.rem_file tmpf;
       Ok (status, if trim then String.trim out else out)
     with
@@ -2073,7 +2094,7 @@ module Cmd = struct
           | None -> Fun.id
           | Some cwd ->
             let old_cwd = getcwd () in
-            chdir (B0__fpath.to_string cwd);
+            chdir (B0__filepath.to_string cwd);
             fun () -> try chdir old_cwd with Failure _ -> ()
           in
           Fun.protect ~finally:reset_cwd @@ fun () ->
@@ -2092,7 +2113,7 @@ module Exit = struct
   type code = int
   type execv =
     { env : Env.assignments option;
-      cwd : B0__fpath.t option;
+      cwd : B0__filepath.t option;
       argv0 : string option;
       cmd : B0__cmd.t }
 
@@ -2438,7 +2459,7 @@ module Name = struct
     in
     let plist = "/System/Library/CoreServices/SystemVersion.plist" in
     let default = uname_sysname, id_unknown in
-    match File.read (B0__fpath.v plist) with
+    match File.read (B0__filepath.v plist) with
     | Error e -> (* iOS will end up here, let's not link more stuff for now *)
         B0__log.debug (fun m -> m "%s" e); default
     | Ok plist_xml ->
@@ -2458,7 +2479,7 @@ module Name = struct
       else s
     in
     let info = "/etc/os-release" in
-    match File.read (B0__fpath.v info) with
+    match File.read (B0__filepath.v info) with
     | Error e ->
         B0__log.debug (fun m -> m "%s" e);
         uname_sysname, uname_sysname, id_unknown

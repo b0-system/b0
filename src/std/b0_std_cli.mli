@@ -43,15 +43,17 @@ end
 
 (** {1:conv Miscellaneous argument converters} *)
 
-val path : Fpath.t Cmdliner.Arg.conv
+val path : Filepath.t Cmdliner.Arg.conv
 (** [path] is a converter for file system paths. No existence checks
-    are performed on the path. Completes files and directories. *)
+    are performed on the path. Completes files and directories.
 
-val filepath : Fpath.t Cmdliner.Arg.conv
+    {b TODO.} In a second pass rename to filepath. *)
+
+val file : Filepath.t Cmdliner.Arg.conv
 (** [filepath] is a converter for file paths. No existence checks are
     performed on the path. Completes files. *)
 
-val dirpath : Fpath.t Cmdliner.Arg.conv
+val dir : Filepath.t Cmdliner.Arg.conv
 (** [dirpath] is a converter for directory paths. No existence checks
     are performed on the path. Completes directories. *)
 

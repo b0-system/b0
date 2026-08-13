@@ -18,13 +18,13 @@ module Path : sig
 
   (** {1:existence Existence} *)
 
-  val exists : B0__fpath.t -> (bool, string) result
+  val exists : B0__filepath.t -> (bool, string) result
   (** [exists p] is [Ok true] if [p] exists in the file system
       and [Ok false] otherwise. Symbolic links are followed.
 
       See also {!exists_stat}, {!File.exists}, {!Dir.exists}. *)
 
-  val must_exist : B0__fpath.t -> (unit, string) result
+  val must_exist : B0__filepath.t -> (unit, string) result
   (** [must_exist p] is [Ok ()] if [p] exists in the file system and
       an error that mentions [p] otherwise. Symbolic links are
       followed.
@@ -33,7 +33,7 @@ module Path : sig
 
   (** {1:renaming Deleting and renaming} *)
 
-  val delete : recurse:bool -> B0__fpath.t -> (bool, string) result
+  val delete : recurse:bool -> B0__filepath.t -> (bool, string) result
   (** [delete ~recurse p] deletes path [p] from the file system. If:
       {ul
       {- [p] does not exist on the file system, nothing happens.}
@@ -53,7 +53,7 @@ module Path : sig
       See also {!File.val-delete}, {!Dir.val-delete}. *)
 
   val rename :
-    B0__fpath.t -> force:bool -> make_path:bool -> dst:B0__fpath.t ->
+    B0__filepath.t -> force:bool -> make_path:bool -> dst:B0__filepath.t ->
     (unit, string) result
   (** [rename src ~force ~make_path ~dst] renames [src] to [dst].
       {ul
@@ -67,13 +67,14 @@ module Path : sig
 
   (** {1:resolving Resolving} *)
 
-  val realpath : B0__fpath.t -> (B0__fpath.t, string) result
+  val realpath : B0__filepath.t -> (B0__filepath.t, string) result
   (** [realpath p] expands all symbolic links, resolves all references
       to [.] and [..] segments and returns an absolute path on the
       file system that corresponds to [p]. The function errors with
       an error message that mentions [p] if [p] does not exist. *)
 
-  val exists_realpath : B0__fpath.t -> (B0__fpath.t option, string) result
+  val exists_realpath :
+    B0__filepath.t -> (B0__filepath.t option, string) result
   (** [exists_realpath] is like {!realpath} but returns [None] if
       the path does not exist. *)
 
@@ -81,10 +82,11 @@ module Path : sig
 
   val copy :
     ?rel:bool -> ?atomic:bool ->
-    ?stat_error:(B0__fpath.t -> Unix.error -> unit) ->
-    ?prune:(Unix.stats -> string -> B0__fpath.t -> bool) ->
-    follow_symlinks:bool -> recurse:bool -> B0__fpath.t ->
-    force:bool -> make_path:bool -> dst:B0__fpath.t -> (unit, string) result
+    ?stat_error:(B0__filepath.t -> Unix.error -> unit) ->
+    ?prune:(Unix.stats -> string -> B0__filepath.t -> bool) ->
+    follow_symlinks:bool -> recurse:bool -> B0__filepath.t ->
+    force:bool -> make_path:bool ->
+    dst:B0__filepath.t -> (unit, string) result
   (** [copy ~follow_symlinks ~recurse src ~force ~make_path ~dst] copies
       the file or file hierarchy rooted at [src] to [dst]. If:
       {ul
@@ -112,27 +114,27 @@ module Path : sig
 
       See also {!File.is_executable}. *)
 
-  val get_mode : B0__fpath.t -> (int, string) result
+  val get_mode : B0__filepath.t -> (int, string) result
   (** [get_mode p] is the file mode of [p]. Symbolic links are followed. *)
 
-  val set_mode : B0__fpath.t -> int -> (unit, string) result
+  val set_mode : B0__filepath.t -> int -> (unit, string) result
   (** [set_mode file p] sets the file mode of [file] to [p]. Symbolic
       links are followed. *)
 
-  val stat : B0__fpath.t -> (Unix.stats, string) result
+  val stat : B0__filepath.t -> (Unix.stats, string) result
   (** [stat p] is [p]'s file information if [p] exists in the file
       system and error the mentions [p] otherwise. Symbolic links are
       followed.
 
       See also {!exists_stat} and {!symlink_stat}. *)
 
-  val exists_stat : B0__fpath.t -> (Unix.stats option, string) result
+  val exists_stat : B0__filepath.t -> (Unix.stats option, string) result
   (** [exist_stat p] is [p]'s file information or [None] if [p] does
       not exist. Symbolic links are followed.
 
       See also {!stat} and {!symlink_stat}. *)
 
-  val is_mount_point : B0__fpath.t -> (bool, string) result
+  val is_mount_point : B0__filepath.t -> (bool, string) result
   (** [is_mount_point p] is [true] if [p] looks like a mount point. The
       criterion is if [p] and [p/..]'s {!stat} have a differing
       {!Unix.stat.std_dev} field. Symbolic links are followed. *)
@@ -142,7 +144,7 @@ module Path : sig
       For hard links see {!File.hard_links}. *)
 
   val symlink :
-    src:B0__fpath.t -> force:bool -> make_path:bool -> B0__fpath.t ->
+    src:B0__filepath.t -> force:bool -> make_path:bool -> B0__filepath.t ->
     (unit, string) result
   (** [symlink ~src ~force ~make_path p] symbolically links [src] to [p].
       {ul
@@ -154,10 +156,10 @@ module Path : sig
          with permission [0o755] (readable and traversable by everyone,
          writable by the user).}} *)
 
-  val symlink_link : B0__fpath.t -> (B0__fpath.t, string) result
+  val symlink_link : B0__filepath.t -> (B0__filepath.t, string) result
   (** [symlink_link p] is [Ok l] if [p] is a symbolic link to [l]. *)
 
-  val symlink_stat : B0__fpath.t -> (Unix.stats, string) result
+  val symlink_stat : B0__filepath.t -> (Unix.stats, string) result
   (** [symlink_stat p] is like {!stat} but if [p] is a symlink returns
       information about the link itself. If [p] is not a symlink then
       this is {!stat}. *)
@@ -175,8 +177,8 @@ module Path : sig
        ["image-%s.png"], ["docs-%s"], etc. *)
 
   val tmp :
-    ?make_path:bool -> ?dir:B0__fpath.t -> ?name:tmp_name -> unit ->
-    (B0__fpath.t, string) result
+    ?make_path:bool -> ?dir:B0__filepath.t -> ?name:tmp_name -> unit ->
+    (B0__filepath.t, string) result
   (** [tmp ~make_path ~dir ~name ()] is a file system path in [dir]
       that did not exist when the name was devised. However it may
       exist by the time the function returns. In general prefer temporary
@@ -200,21 +202,21 @@ module File : sig
 
   (** {1:existence Existence} *)
 
-  val exists : B0__fpath.t -> (bool, string) result
+  val exists : B0__filepath.t -> (bool, string) result
   (** [exists file] is [Ok true] if [file] is a regular file in the
       file system and [Ok false] otherwise. Symbolic links are
       followed.
 
       See also {!Path.exists}, {!Dir.exists}. *)
 
-  val must_exist : B0__fpath.t -> (unit, string) result
+  val must_exist : B0__filepath.t -> (unit, string) result
   (** [must_exist file] is [Ok ()] if [file] is a regular file in
       the file system and an error that mentions [file] otherwise.
       Symbolic links are followed.
 
       See also {!Path.must_exist}, {!Dir.must_exist}. *)
 
-  val is_executable : B0__fpath.t -> bool
+  val is_executable : B0__filepath.t -> bool
   (** [is_executable file] is [true] iff [file] exists and is executable. *)
 
   (** {1:hard_links Hard links}
@@ -222,7 +224,7 @@ module File : sig
       For symbolic links see {!Path.symlinks}. *)
 
   val link :
-    src:B0__fpath.t -> force:bool -> make_path:bool -> B0__fpath.t ->
+    src:B0__filepath.t -> force:bool -> make_path:bool -> B0__filepath.t ->
     (unit, string) result
   (** [link ~src ~force ~make_path p] hard links file path [p] to the file
       [src].
@@ -237,7 +239,7 @@ module File : sig
 
   (** {1:delete_truncate Deleting and truncating} *)
 
-  val delete : B0__fpath.t -> (bool, string) result
+  val delete : B0__filepath.t -> (bool, string) result
   (** [delete file] deletes file [file] from the file system. If
       {ul
       {- [file] does not exist on the file system, nothing happens.}
@@ -253,12 +255,12 @@ module File : sig
       {- [Error _] in case of error. In particular if [file] is a directory.}}
       See also {!Path.val-delete}, {!Dir.val-delete}. *)
 
-  val truncate : B0__fpath.t -> int -> (unit, string) result
+  val truncate : B0__filepath.t -> int -> (unit, string) result
   (** [truncate file size] truncates [file] to [size]. *)
 
   (** {1:reads Reading} *)
 
-  val read : B0__fpath.t -> (string, string) result
+  val read : B0__filepath.t -> (string, string) result
   (** [read file] is [file]'s content as a string. If [file] is
       {!Fpath.dash} the contents of {!stdin} is read.
 
@@ -269,7 +271,7 @@ module File : sig
       this is {b only around [16MB]}. *)
 
   val read_with_fd :
-    ?flags:Unix.open_flag list -> B0__fpath.t ->
+    ?flags:Unix.open_flag list -> B0__filepath.t ->
     (Unix.file_descr -> 'b) -> ('b, string) result
   (** [read_with_fd ~flags file f] opens a file descriptor [fdi] for reading
       [file] and returns [Ok (f fdi)]. If [file] is {!Fpath.dash}, [fdi] is
@@ -281,7 +283,8 @@ module File : sig
       The function errors if opening [file] fails. Errors have the
       form [Fmt.str "%s: %s" file err]. *)
 
-  val read_with_ic : B0__fpath.t -> (in_channel -> 'b) -> ('b, string) result
+  val read_with_ic :
+    B0__filepath.t -> (in_channel -> 'b) -> ('b, string) result
   (** [read_with_ic file f] is exactly like {!read_with_fd} but
       opens an OCaml input channel in binary mode. *)
 
@@ -289,13 +292,13 @@ module File : sig
 
   val write :
     ?atomic:bool -> ?mode:int -> force:bool -> make_path:bool ->
-    B0__fpath.t -> string -> (unit, string) result
+    B0__filepath.t -> string -> (unit, string) result
   (** [write ~atomic ~mode ~force ~make_path file s] operates like
       {!write_with_fd} but directly writes [s] to [file]. *)
 
   val write_with_fd :
     ?flags:Unix.open_flag list -> ?atomic:bool -> ?mode:int -> force:bool ->
-    make_path:bool -> B0__fpath.t -> (Unix.file_descr -> ('a, 'b) result) ->
+    make_path:bool -> B0__filepath.t -> (Unix.file_descr -> ('a, 'b) result) ->
     (('a, 'b) result, string) result
   (** [write_with_fd ~force ~make_path file f] opens a file descriptor
       [fdo] for writing [file] and returns [Ok (f fdo)]. If [file] is
@@ -329,7 +332,7 @@ module File : sig
 
   val write_with_oc :
     ?flags:Unix.open_flag list -> ?atomic:bool -> ?mode:int -> force:bool ->
-    make_path:bool -> B0__fpath.t -> (out_channel -> ('a, 'b) result) ->
+    make_path:bool -> B0__filepath.t -> (out_channel -> ('a, 'b) result) ->
     (('a, 'b) result, string) result
   (** [write_with_oc ~force ~make_path file f] operates like
       {!write_with_fd} but opens an OCaml channel in binary mode. *)
@@ -337,8 +340,8 @@ module File : sig
   (** {1:copying Copying} *)
 
   val copy :
-    ?atomic:bool -> ?mode:int -> B0__fpath.t ->
-    force:bool -> make_path:bool -> dst:B0__fpath.t -> (unit, string) result
+    ?atomic:bool -> ?mode:int -> B0__filepath.t ->
+    force:bool -> make_path:bool -> dst:B0__filepath.t -> (unit, string) result
   (** [copy ~atomic ~mode src ~force ~make_path ~dst] copies
       [src] to [dst]. If:
 
@@ -375,7 +378,7 @@ module File : sig
 
   val with_tmp :
     ?flags:Unix.open_flag list -> ?mode:int -> ?make_path:bool ->
-    ?dir:B0__fpath.t -> ?name:Path.tmp_name -> (B0__fpath.t -> 'a) ->
+    ?dir:B0__filepath.t -> ?name:Path.tmp_name -> (B0__filepath.t -> 'a) ->
     ('a, string) result
   (** [with_tmp f] is like {!with_tmp_fd} but before [f] is called it
       closes the file descriptor which allows other tools to operate
@@ -383,8 +386,8 @@ module File : sig
 
   val with_tmp_fd :
     ?flags:Unix.open_flag list -> ?mode:int -> ?make_path:bool ->
-    ?dir:B0__fpath.t -> ?name:Path.tmp_name ->
-    (B0__fpath.t -> Unix.file_descr -> 'a) -> ('a, string) result
+    ?dir:B0__filepath.t -> ?name:Path.tmp_name ->
+    (B0__filepath.t -> Unix.file_descr -> 'a) -> ('a, string) result
   (** [with_tmp_fd ~flags ~mode ~make_path ~dir ~name f] opens an output file
       descriptor [fdo] to a temporary file and returns [Ok (f fdo)].
       After the function returns (normally or via an exception) [fdo] is
@@ -405,15 +408,15 @@ module File : sig
 
   val with_tmp_oc :
     ?flags:Unix.open_flag list -> ?mode:int -> ?make_path:bool ->
-    ?dir:B0__fpath.t -> ?name:Path.tmp_name ->
-    (B0__fpath.t -> out_channel -> 'a) -> ('a, string) result
+    ?dir:B0__filepath.t -> ?name:Path.tmp_name ->
+    (B0__filepath.t -> out_channel -> 'a) -> ('a, string) result
   (** [with_tmp_oc] is like {!with_tmp_fd} but uses an OCaml output channel
       instead of a file decriptor. *)
 
   val open_tmp_fd :
     ?flags:Unix.open_flag list -> ?mode:int -> ?make_path:bool ->
-    ?dir:B0__fpath.t -> ?name:Path.tmp_name -> unit ->
-    (B0__fpath.t * Unix.file_descr, string) result
+    ?dir:B0__filepath.t -> ?name:Path.tmp_name -> unit ->
+    (B0__filepath.t * Unix.file_descr, string) result
   (** [open_tmp_fd] is like {!with_tmp_fd} except it is the client's
       duty to close the file descriptor and delete the file (if the
       file is not deleted it will be when the program exits). *)
@@ -427,11 +430,11 @@ module Dir : sig
 
   (** {1:existence Existence} *)
 
-  val exists : B0__fpath.t -> (bool, string) result
+  val exists : B0__filepath.t -> (bool, string) result
   (** [exists dir] is [Ok true] if [dir] is a directory in the file system
       and [Ok false] otherwise. Symbolic links are followed. *)
 
-  val must_exist : B0__fpath.t -> (unit, string) result
+  val must_exist : B0__filepath.t -> (unit, string) result
   (** [must_exist dir] is [Ok ()] if [dir] is a directory in the file system
       and an error that mentions [dir] otherwise. Symbolic links are
       followed. *)
@@ -439,7 +442,7 @@ module Dir : sig
   (** {1:create Creating} *)
 
   val create :
-    ?mode:int -> make_path:bool -> B0__fpath.t -> (bool, string) result
+    ?mode:int -> make_path:bool -> B0__filepath.t -> (bool, string) result
   (** [create ~mode ~make_path dir] creates the directory [dir].
       {ul
       {- [mode] are the file permission of [dir]. They default to
@@ -460,7 +463,7 @@ module Dir : sig
 
   (** {1:deleting Deleting} *)
 
-  val delete : recurse:bool -> B0__fpath.t -> (bool, string) result
+  val delete : recurse:bool -> B0__filepath.t -> (bool, string) result
   (** [delete ~recurse dir] delete the directory [dir] from the file
        system. If:
       {ul
@@ -486,11 +489,11 @@ module Dir : sig
 
   val fold :
     ?rel:bool ->
-    ?stat_error:(B0__fpath.t -> Unix.error -> unit) ->
-    ?prune_dir:(Unix.stats -> string -> B0__fpath.t -> 'a -> bool) ->
+    ?stat_error:(B0__filepath.t -> Unix.error -> unit) ->
+    ?prune_dir:(Unix.stats -> string -> B0__filepath.t -> 'a -> bool) ->
     dotfiles:bool -> follow_symlinks:bool -> recurse:bool ->
-    (Unix.stats -> string -> B0__fpath.t -> 'a -> 'a) ->
-    B0__fpath.t -> 'a -> ('a, string) result
+    (Unix.stats -> string -> B0__filepath.t -> 'a -> 'a) ->
+    B0__filepath.t -> 'a -> ('a, string) result
   (** [fold ~recurse f dir acc] folds [f] over the contents of [dir] starting
       with [acc]. If [dir] does not exist as (possibly a symlink to) a
       directory, the function errors. Paths given to [f], [prune_dir] and
@@ -528,30 +531,30 @@ module Dir : sig
 
   val fold_files :
     ?rel:bool ->
-    ?stat_error:(B0__fpath.t -> Unix.error -> unit) ->
-    ?prune_dir:(Unix.stats -> string -> B0__fpath.t -> 'a -> bool) ->
+    ?stat_error:(B0__filepath.t -> Unix.error -> unit) ->
+    ?prune_dir:(Unix.stats -> string -> B0__filepath.t -> 'a -> bool) ->
     dotfiles:bool -> follow_symlinks:bool ->
-    recurse:bool -> (Unix.stats -> string -> B0__fpath.t -> 'a -> 'a) ->
-    B0__fpath.t -> 'a -> ('a, string) result
+    recurse:bool -> (Unix.stats -> string -> B0__filepath.t -> 'a -> 'a) ->
+    B0__filepath.t -> 'a -> ('a, string) result
   (** [fold_files] is like {!fold} but [f] is only applied to
       non-directory files. *)
 
   val fold_dirs :
-    ?rel:bool -> ?stat_error:(B0__fpath.t -> Unix.error -> unit) ->
-    ?prune_dir:(Unix.stats -> string -> B0__fpath.t -> 'a -> bool) ->
+    ?rel:bool -> ?stat_error:(B0__filepath.t -> Unix.error -> unit) ->
+    ?prune_dir:(Unix.stats -> string -> B0__filepath.t -> 'a -> bool) ->
     dotfiles:bool -> follow_symlinks:bool ->
-    recurse:bool -> (Unix.stats -> string -> B0__fpath.t -> 'a -> 'a) ->
-    B0__fpath.t -> 'a -> ('a, string) result
+    recurse:bool -> (Unix.stats -> string -> B0__filepath.t -> 'a -> 'a) ->
+    B0__filepath.t -> 'a -> ('a, string) result
   (** [fold_dirs] is like {!fold} but [f] is only applied to directory files. *)
 
   val contents :
     ?kind:[`All | `Dirs | `Files ] ->
     ?rel:bool ->
-    ?stat_error:(B0__fpath.t -> Unix.error -> unit) ->
-    ?prune_dir:(Unix.stats -> string -> B0__fpath.t -> B0__fpath.t list ->
-                bool) ->
+    ?stat_error:(B0__filepath.t -> Unix.error -> unit) ->
+    ?prune_dir:(Unix.stats -> string -> B0__filepath.t ->
+                B0__filepath.t list -> bool) ->
     dotfiles:bool -> follow_symlinks:bool ->
-    recurse:bool -> B0__fpath.t -> (B0__fpath.t list, string) result
+    recurse:bool -> B0__filepath.t -> (B0__filepath.t list, string) result
   (** [contents] uses {!path_list} with:
       {ul
       {- {!fold} if [kind] is [`All] (default)}
@@ -559,21 +562,21 @@ module Dir : sig
       {- {!fold_dirs} if [kind] is [`Dirs]}} *)
 
   val path_list :
-    Unix.stats -> string -> B0__fpath.t -> B0__fpath.t list ->
-    B0__fpath.t list
+    Unix.stats -> string -> B0__filepath.t -> B0__filepath.t list ->
+    B0__filepath.t list
   (** [path_list] is a {{!fold}folding} function to get a (reverse w.r.t.
       list of paths). Paths in the result that correspond to directories
       satisfy {!Fpath.is_syntactic_dir}. *)
 
   val warn_and_prune_denied :
-    dir:B0__fpath.t -> rel:bool ->
-    (Unix.stats -> string -> B0__fpath.t -> 'a -> bool)
+    dir:B0__filepath.t -> rel:bool ->
+    (Unix.stats -> string -> B0__filepath.t -> 'a -> bool)
   (** [warn_and_prune_denied ~dir n rel root] is a [prune_dir] function for
       {!fold} to {{!Log.warn}warn} about and skip directories for which the
       user has no [R_OK] and [X_OK] permissions. [dir] is the directory given
       to [fold] and [rel] the argument given to [fold]. *)
 
-  val warn_stat_error : B0__fpath.t -> Unix.error -> unit
+  val warn_stat_error : B0__filepath.t -> Unix.error -> unit
   (** [warn_stat_error] is a function that {{!Log.warn}warns} about stat
       errors. *)
 
@@ -581,10 +584,10 @@ module Dir : sig
 
   val copy :
     ?rel:bool -> ?atomic:bool ->
-    ?stat_error:(B0__fpath.t -> Unix.error -> unit) ->
-    ?prune:(Unix.stats -> string -> B0__fpath.t -> bool) ->
-    follow_symlinks:bool -> make_path:bool -> B0__fpath.t ->
-    dst:B0__fpath.t -> (unit, string) result
+    ?stat_error:(B0__filepath.t -> Unix.error -> unit) ->
+    ?prune:(Unix.stats -> string -> B0__filepath.t -> bool) ->
+    follow_symlinks:bool -> make_path:bool -> B0__filepath.t ->
+    dst:B0__filepath.t -> (unit, string) result
   (** [copy ~make_path src ~dst] copies the directory [src] to [dst]. If:
       {ul
       {- [src] is a symbolic link it is resolved and (conceptually)
@@ -630,21 +633,21 @@ module Dir : sig
 
   (** {1:cwd Current working directory (cwd)} *)
 
-  val cwd : unit -> (B0__fpath.t, string) result
+  val cwd : unit -> (B0__filepath.t, string) result
   (** [cwd ()] is the current working directory. The resulting path
       is guaranteed to be absolute. *)
 
-  val set_cwd : B0__fpath.t -> (unit, string) result
+  val set_cwd : B0__filepath.t -> (unit, string) result
   (** [set_cwd dir] sets the current working directory to [dir]. *)
 
-  val with_cwd : B0__fpath.t -> (unit -> 'a) -> ('a, string) result
+  val with_cwd : B0__filepath.t -> (unit -> 'a) -> ('a, string) result
   (** [with_cwd dir f] is [f ()] with the current working directory
       bound to [dir]. After the function returns the current working
       directory is back to its initial value. *)
 
   (** {1:tmp_default Default temporary directory} *)
 
-  val default_tmp : unit -> B0__fpath.t
+  val default_tmp : unit -> B0__filepath.t
   (** [default_tmp ()] is a default directory that can be used
       as a default directory for
       creating {{!File.tmpfiles}temporary files} and
@@ -656,7 +659,7 @@ module Dir : sig
       {- On Windows, the value of the [TEMP] environment variable or
          [Fpath.v "."] if it is not set or empty.}} *)
 
-  val set_default_tmp : B0__fpath.t -> unit
+  val set_default_tmp : B0__filepath.t -> unit
   (** [set_default_tmp p] sets the value returned by {!default_tmp} to
       [p]. *)
 
@@ -666,8 +669,8 @@ module Dir : sig
       or {{!B0_std.Os.Path.tmppaths}paths}. *)
 
   val with_tmp :
-    ?mode:int -> ?make_path:bool -> ?dir:B0__fpath.t -> ?name:Path.tmp_name ->
-    (B0__fpath.t -> 'a) -> ('a, string) result
+    ?mode:int -> ?make_path:bool -> ?dir:B0__filepath.t ->
+    ?name:Path.tmp_name -> (B0__filepath.t -> 'a) -> ('a, string) result
   (** [with_tmp ~mode ~make_path ~dir ~name f] creates a temporary empty
       directory [t] and returns [Ok (f t)]. After the function returns
       (normally or via an exception) [t] and its content are deleted.
@@ -685,8 +688,8 @@ module Dir : sig
          by the user}} *)
 
   val tmp :
-    ?mode:int -> ?make_path:bool -> ?dir:B0__fpath.t -> ?name:Path.tmp_name ->
-    unit -> (B0__fpath.t, string) result
+    ?mode:int -> ?make_path:bool -> ?dir:B0__filepath.t ->
+    ?name:Path.tmp_name -> unit -> (B0__filepath.t, string) result
   (** [tmp] is like {!with_tmp} except the directory and its content
       is only deleted at the end of program execution if the client
       doesn't do it before. *)
@@ -696,14 +699,14 @@ module Dir : sig
       The directories returned by these functions are not guaranteed
       to exist. *)
 
-  val user : unit -> (B0__fpath.t, string) result
+  val user : unit -> (B0__filepath.t, string) result
   (** [user ()] is the home directory of the user executing the
       process. Determined by consulting [passwd] database with the
       user id of the [SUDO_UID] env var or of the process. If this
       fails falls back to parse a path from the [HOME] environment
       variables. On Windows no special fallback is implemented. *)
 
-  val config : unit -> (B0__fpath.t, string) result
+  val config : unit -> (B0__filepath.t, string) result
   (** [config ()] is the directory used to store user-specific program
       configurations. This is in order:
       {ol
@@ -711,7 +714,7 @@ module Dir : sig
       {- If set and on Windows® the value of [APPDATA].}
       {- If [user ()] is [Ok home], [Fpath.(home / ".config")].}} *)
 
-  val data : unit -> (B0__fpath.t, string) result
+  val data : unit -> (B0__filepath.t, string) result
   (** [data ()] is the directory used to store user-specific program
       data. This is in order:
       {ol
@@ -719,7 +722,7 @@ module Dir : sig
       {- If set and on Windows® the value of [APPDATA].}
       {- If [user ()] is [Ok home], [Fpath.(home / ".local" / "share")].}} *)
 
-  val cache : unit -> (B0__fpath.t, string) result
+  val cache : unit -> (B0__filepath.t, string) result
   (** [cache ()] is the directory used to store user-specific
       non-essential data. This is in order:
       {ol
@@ -727,14 +730,14 @@ module Dir : sig
       {- If set and on Windows® the value of [%TEMP%]}
       {- If [user ()] is [Ok home], [Fpath.(home / ".cache")]}} *)
 
-  val runtime : unit -> (B0__fpath.t, string) result
+  val runtime : unit -> (B0__filepath.t, string) result
   (** [runtime ()] is the directory used to store user-specific runtime
       files. This is in order:
       {ol
       {- If set the value of [XDG_RUNTIME_DIR].}
       {- The value of {!default_tmp}.}} *)
 
-  val state : unit -> (B0__fpath.t, string) result
+  val state : unit -> (B0__filepath.t, string) result
   (** [state ()] is the directory used to store user-specific state data
       files. This is in order:
       {ol
@@ -1048,7 +1051,7 @@ module Cmd : sig
   (** {1:tool_search Tool search}  *)
 
   val path_search :
-    ?win_exe:bool -> ?path:B0__fpath.t list -> unit -> B0__cmd.tool_search
+    ?win_exe:bool -> ?path:B0__filepath.t list -> unit -> B0__cmd.tool_search
   (** [path_search ~win_exe ~path () cmd] searches the
       {{!B0_std.Cmd.type-tool}tool} of [cmd] in the [path]
       directories. If the tool:
@@ -1113,7 +1116,7 @@ module Cmd : sig
   val in_string : string -> stdi
   (** [in_string s] is a standard input that reads the string [s]. *)
 
-  val in_file : B0__fpath.t -> stdi
+  val in_file : B0__filepath.t -> stdi
   (** [in_file f] is a standard input that reads from file [f]. *)
 
   val in_fd : close:bool -> Unix.file_descr -> stdi
@@ -1134,7 +1137,7 @@ module Cmd : sig
   (** The type for representing the standard output of a process. *)
 
   val out_file :
-    ?mode:int -> force:bool -> make_path:bool -> B0__fpath.t -> stdo
+    ?mode:int -> force:bool -> make_path:bool -> B0__filepath.t -> stdo
   (** [out_file ~force ~make_path file] is a standard output that writes
       to file [file].
       {ul
@@ -1170,8 +1173,8 @@ module Cmd : sig
       proceeding. *)
 
   val run_status :
-    ?env:Env.assignments -> ?cwd:B0__fpath.t -> ?stdin:stdi -> ?stdout:stdo ->
-    ?stderr:stdo -> B0__cmd.t -> (status, string) result
+    ?env:Env.assignments -> ?cwd:B0__filepath.t -> ?stdin:stdi ->
+    ?stdout:stdo -> ?stderr:stdo -> B0__cmd.t -> (status, string) result
   (** [run_status ~env ~cwd ~stdin ~stdout ~stderr cmd] runs and
       waits for the completion of [cmd] in environment [env] with
       current directory [cwd] and standard IO connections [stdin],
@@ -1184,7 +1187,7 @@ module Cmd : sig
       {- [stderr] defaults to {!out_stderr}}} *)
 
   val run_status_out :
-    ?env:Env.assignments -> ?cwd:B0__fpath.t -> ?stdin:stdi ->
+    ?env:Env.assignments -> ?cwd:B0__filepath.t -> ?stdin:stdi ->
     ?stderr:[`Stdo of stdo | `Out] -> trim:bool -> B0__cmd.t ->
     (status * string, string) result
   (** [run_status_out] is like {!run_status} except [stdout] is read
@@ -1194,13 +1197,13 @@ module Cmd : sig
       in the string aswell. *)
 
   val run :
-    ?env:Env.assignments -> ?cwd:B0__fpath.t -> ?stdin:stdi ->
+    ?env:Env.assignments -> ?cwd:B0__filepath.t -> ?stdin:stdi ->
     ?stdout:stdo -> ?stderr:stdo -> B0__cmd.t -> (unit, string) result
   (** [run] is {!run_status} with non-[`Exited 0] statuses turned
       into errors via {!pp_cmd_status}. *)
 
   val run_out :
-    ?env:Env.assignments -> ?cwd:B0__fpath.t -> ?stdin:stdi ->
+    ?env:Env.assignments -> ?cwd:B0__filepath.t -> ?stdin:stdi ->
     ?stderr:[`Stdo of stdo | `Out] -> trim:bool -> B0__cmd.t ->
     (string, string) result
   (** [run_out] is {!run_status_out} with non-[`Exited 0] statuses
@@ -1225,7 +1228,7 @@ module Cmd : sig
       identifier [pid]. *)
 
   val spawn :
-    ?env:Env.assignments -> ?cwd:B0__fpath.t -> ?stdin:stdi -> ?stdout:stdo ->
+    ?env:Env.assignments -> ?cwd:B0__filepath.t -> ?stdin:stdi -> ?stdout:stdo ->
     ?stderr:stdo -> B0__cmd.t -> (pid, string) result
   (** [spawn ~env ~cwd ~stdin ~stdout ~stderr cmd] spawns command
       [cmd] in environment [env] with current directory [cwd] and
@@ -1257,7 +1260,7 @@ module Cmd : sig
   (** {2:tracing Tracing} *)
 
   type spawn_tracer =
-    pid option -> Env.assignments option -> cwd:B0__fpath.t option ->
+    pid option -> Env.assignments option -> cwd:B0__filepath.t option ->
     B0__cmd.t -> unit
   (** The type for spawn tracers. Called with each blocking and
       non-blocking spawned command aswell as {!execv}. The function
@@ -1293,7 +1296,7 @@ module Cmd : sig
       status of the child. *)
 
   val execv :
-    ?env:Env.assignments -> ?cwd:B0__fpath.t -> ?argv0:string ->
+    ?env:Env.assignments -> ?cwd:B0__filepath.t -> ?argv0:string ->
     B0__cmd.t -> ('a, string) result
   (** [execv ~env ~cwd cmd] executes the realpath pointed by
       {!B0_std.Cmd.val-tool}[ cmd] as a new process in environment with [cmd] as
@@ -1383,7 +1386,7 @@ module Exit : sig
   (** {1:exit_with_execv Exit by [execv]} *)
 
   val execv :
-    ?env:Env.assignments -> ?cwd:B0__fpath.t -> ?argv0:string ->
+    ?env:Env.assignments -> ?cwd:B0__filepath.t -> ?argv0:string ->
     B0__cmd.t -> t
   (** [exec ?env ?cwd ?argv0 cmd] is an [Exec _]. That has a call to
       {!Os.Cmd.execv} with the corresponding arguments. *)
@@ -1391,7 +1394,7 @@ module Exit : sig
   val execv_env : execv -> Env.assignments option
   (** [execv_env exec] is the environment of [exec]. *)
 
-  val execv_cwd : execv -> B0__fpath.t option
+  val execv_cwd : execv -> B0__filepath.t option
   (** [execv_env exec] is the environment of [exec]. *)
 
   val execv_argv0 : execv -> string option
@@ -1460,7 +1463,7 @@ module Pty : sig
 *)
 
   val open_with_spawn :
-    ?env:Env.assignments -> ?cwd:B0__fpath.t -> ?stdin:Cmd.stdi ->
+    ?env:Env.assignments -> ?cwd:B0__filepath.t -> ?stdin:Cmd.stdi ->
     ?stdout:Cmd.stdo -> ?stderr:Cmd.stdo -> B0__cmd.t ->
     (t, string) result
   (** [open_with_spawn cmd] is like {!Cmd.val-spawn}, except it
@@ -1478,7 +1481,7 @@ module Pty : sig
       {b FIXME} Should it kill and reap the process ? *)
 
   val with_spawn :
-    ?env:Env.assignments -> ?cwd:B0__fpath.t -> ?stdin:Cmd.stdi ->
+    ?env:Env.assignments -> ?cwd:B0__filepath.t -> ?stdin:Cmd.stdi ->
     ?stdout:Cmd.stdo -> ?stderr:Cmd.stdo -> B0__cmd.t -> (t -> 'a) ->
     ('a, string) result
   (** [with_spawn cmd f] does {!open_with_spawn}[ cmd] to get a [pty]

@@ -55,7 +55,7 @@ val int : int -> t
 val float : float -> t
 (** [float f] is [arg (float_of_int f)]. *)
 
-val path : B0__fpath.t -> t
+val path : B0__filepath.t -> t
 (** [path p] is [arg (Fpath.to_string p)]. *)
 
 val list : ?slip:string -> string list -> t
@@ -63,7 +63,7 @@ val list : ?slip:string -> string list -> t
     If [slip] is specified it is added on the command line before
     each element of [l]. *)
 
-val paths : ?slip:string -> B0__fpath.t list -> t
+val paths : ?slip:string -> B0__filepath.t list -> t
 (** [paths ?slip ps] is {!of_list}[ ?slip Fpath.to_string ps]. *)
 
 val of_list : ?slip:string -> ('a -> string) -> 'a list -> t
@@ -73,7 +73,7 @@ val of_list : ?slip:string -> ('a -> string) -> 'a list -> t
 
     Tools are the first argument of commands. *)
 
-type tool = B0__fpath.t
+type tool = B0__filepath.t
 (** The type for command line tools.
 
     A command line tool is represented by a file path according to

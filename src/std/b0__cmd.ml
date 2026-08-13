@@ -28,7 +28,7 @@ let ( %% ) = append
 
 let if' cond l = if cond then l else empty
 let if_some o = match o with Some cmd -> cmd | None -> empty
-let path p = A (B0__fpath.to_string p)
+let path p = A (B0__filepath.to_string p)
 let int i = A (string_of_int i)
 let float f = A (string_of_float f)
 let list ?slip l = match slip with
@@ -41,7 +41,7 @@ let of_list ?slip conv l = match slip with
     let add acc v = A (conv v) :: A slip :: acc in
     Rseq (List.fold_left add [] l)
 
-let paths ?slip ps = of_list ?slip B0__fpath.to_string ps
+let paths ?slip ps = of_list ?slip B0__filepath.to_string ps
 
 (* Converting *)
 
@@ -208,11 +208,11 @@ let rec iter_enc ~arg ~unstamp ~append ~empty e = function
 
 (* Tools *)
 
-type tool = B0__fpath.t
+type tool = B0__filepath.t
 
 let tool = arg
 let rec find_tool = function
-| A a -> Result.to_option (B0__fpath.of_string a)
+| A a -> Result.to_option (B0__filepath.of_string a)
 | Unstamp l -> find_tool l
 | Rseq ls ->
     let rec loop = function
@@ -231,7 +231,7 @@ let rec set_tool tool = function
 | Rseq [] -> path tool
 | l ->
     let rec loop = function
-    | A a -> A (B0__fpath.to_string tool)
+    | A a -> A (B0__filepath.to_string tool)
     | Unstamp l -> Unstamp (loop l)
     | Rseq ls ->
         match List.rev ls with
