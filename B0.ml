@@ -216,12 +216,8 @@ let copy_file ?substs ~src_dir ~dst_dir src dst =
   | None -> Os.File.copy ~force ~make_path src ~dst:dst
   | Some substs ->
       let* src = Os.File.read src in
-      let src =
-        let replace src (src_tok, dst_tok) =
-          String.replace_all ~sub:src_tok ~by:dst_tok src
-        in
-        List.fold_left replace src substs
-      in
+      let replace src (sub, by) = String.replace_all ~sub ~by src in
+      let src = List.fold_left replace src substs in
       Os.File.write ~force ~make_path dst src
 
 let copy_module ?substs ~src_dir ~dst_dir src dst =
