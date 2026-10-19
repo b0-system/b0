@@ -666,6 +666,11 @@ let exports =
   let pp_value = pp_libname_list in
   B0_meta.Key.make "exports" ~default:[] ~doc ~pp_value
 
+let c_opts =
+  let doc = "Options added with -ccopt when compiling c stubs" in
+  let pp_value = Cmd.pp in
+  B0_meta.Key.make "c-opts" ~default:Cmd.empty ~doc ~pp_value
+
 module Lib = struct
   type t =
     { libname : Libname.t;
@@ -1109,17 +1114,18 @@ module Compile = struct
   let incs_of_files files =
     Cmd.paths ~slip:"-I" @@ Filepath.distinct @@ List.map Filepath.parent files
 
-  let c_to_o ?post_exec ?k m ~comp ~opts ~reads ~c ~o =
+  let c_to_o ?post_exec ?k m ~comp ~opts ~c_opts ~reads ~c ~o =
     let cwd = Filepath.parent o
       (* We can't use `-c` and `-o` on C files see
          https://github.com/ocaml/ocaml/issues/7677 so we cwd to the
          output directory to perform the spawn. *)
     in
     let incs = incs_of_files reads in
+    let c_opts = Cmd.list ~slip:"-ccopt" (Cmd.to_list c_opts) in
     let writes = [o] in
     B0_memo.spawn m ?post_exec ?k ~reads:(c :: reads) ~writes ~cwd @@
     (B0_memo.tool m comp)
-      Cmd.(arg "-c" %% opts %% unstamp (incs %% path c));
+      Cmd.(arg "-c" %% opts %% c_opts %% unstamp (incs %% path c));
     writes
 
   let mli_to_cmi ?post_exec ?k ~and_cmti m ~comp ~opts ~reads ~mli ~o =
@@ -1399,7 +1405,7 @@ end
 
 (* Build units. *)
 
-let compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs =
+let compile_c_srcs m ~conf ~comp ~opts ~c_opts ~build_dir ~srcs =
   (* XXX Maybe better things could be done here once we have a good C domain. *)
   let obj_ext = Conf.obj_ext conf in
   let rec loop os cunits hs = function
@@ -1409,7 +1415,7 @@ let compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs =
       match String.Map.find cname cunits with
       | exception Not_found ->
           let o = Filepath.(build_dir / Fmt.str "%s%s" cname obj_ext) in
-          ignore (Compile.c_to_o m ~comp ~opts ~reads:hs ~c ~o);
+          ignore (Compile.c_to_o m ~comp ~opts ~c_opts ~reads:hs ~c ~o);
           loop (o :: os) (String.Map.add cname c cunits) hs cs
       | f ->
           B0_memo.notify m `Warn
@@ -1461,7 +1467,10 @@ let exe_proc set_exe_path set_modsrcs srcs b =
     ignore @@ Compile.impls
       ~and_cmt:false m ~code:Byte ~opts ~requires:comp_requires ~modsrcs;
   end;
-  let* c_objs = compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs in
+  let* c_objs =
+    let c_opts = B0_meta.find_or_default c_opts meta in
+    compile_c_srcs m ~conf ~comp ~opts ~c_opts ~build_dir ~srcs
+  in
   let modsrcs =
     Modsrc.sort (* for link *) ~deps:Modsrc.ml_deps modsrcs
   in
@@ -1561,7 +1570,8 @@ let lib_proc set_modsrcs set_lib srcs b =
   in
   let* c_objs =
     let comp = Tool.ocamlc (* https://github.com/ocaml/ocaml/issues/13798 *) in
-    compile_c_srcs m ~conf ~comp ~opts ~build_dir ~srcs
+    let c_opts = B0_meta.find_or_default c_opts meta in
+    compile_c_srcs m ~conf ~comp ~opts ~c_opts ~build_dir ~srcs
   in
   let modsrcs = Modsrc.sort (* for link *) ~deps:Modsrc.ml_deps modsrcs in
   let cobjs = List.filter_map (Modsrc.impl_file ~code) modsrcs  in

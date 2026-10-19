@@ -1049,6 +1049,10 @@ val c_requires : Cmd.t B0_meta.key
 (** [c_requires] hack for now this simply passes these options as
     [-cclib] options. *)
 
+val c_opts : Cmd.t B0_meta.key
+(** [c_opts] hack for now this simply passes these options as [-ccopt]
+    when compiling C files. *)
+
 val library : Libname.t B0_meta.key
 (** [library] on a unit specifies that the unit defines the library with
     the given name. *)
@@ -1077,11 +1081,12 @@ module Compile : sig
 
   val c_to_o :
     ?post_exec:(B0_zero.Op.t -> unit) -> ?k:(B0_zero.Op.t -> int -> unit) ->
-    B0_memo.t -> comp:B0_memo.Tool.t -> opts:Cmd.t -> reads:Filepath.t list ->
-    c:Filepath.t -> o:Filepath.t -> Filepath.t list
+    B0_memo.t -> comp:B0_memo.Tool.t -> opts:Cmd.t -> c_opts:Cmd.t ->
+    reads:Filepath.t list -> c:Filepath.t -> o:Filepath.t -> Filepath.t list
   (** [c_to_o m ~comp ~opts ~reads ~c ~o] compiles the C file [c] to
       the object file [o] with options [opts] and using compiler
-      [comp].  It assumes the compilation depends on C include header
+      [comp], [c_opts] are options for the C compiler.
+      It assumes the compilation depends on C include header
       files [reads] whose parent directories are added as [-I]
       options. Returns the written files. *)
 
