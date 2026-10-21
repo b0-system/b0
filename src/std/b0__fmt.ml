@@ -387,6 +387,7 @@ module OCaml = struct
 
   let char ppf = function
   | '\'' -> string ppf {|'\''|}
+  | '\\' -> string ppf {|'\\'|}
   | ' ' .. '~' as c -> raw_char ppf '\''; raw_char ppf c; raw_char ppf '\''
   | '\n' -> string ppf {|'\n'|}
   | '\r' -> string ppf {|'\r'|}

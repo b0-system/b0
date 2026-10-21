@@ -33,7 +33,7 @@
     {b Platform dependence.} When the documentation talks about POSIX
     it means every platform out there but Windows.
 
-    @canonical B0_std.Fpath *)
+    @canonical B0_std.Filepath *)
 
 (** {1:seps Directory separators} *)
 
