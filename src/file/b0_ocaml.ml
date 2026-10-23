@@ -1552,7 +1552,16 @@ let lib_proc set_modsrcs set_lib srcs b =
   let* unit_code = unit_code b m meta in
   let* conf = B0_build.get b Conf.key in
   let* resolver = B0_build.get b Libresolver.key in
-  let* requires = Libresolver.get_list_and_exports m resolver librequires in
+  let* requires =
+    let () =
+      (* We should do something more subtle larger recursive deps.
+         But this avoids direct puzzling hangs for now. *)
+      if not (List.exists (Libname.equal libname) librequires) then () else
+      B0_memo.fail m "@[<v1>Library %a requires itself:@,@[%a@]@]"
+        Libname.pp libname Fmt.(list ~sep:sp Libname.pp) librequires
+    in
+    Libresolver.get_list_and_exports m resolver librequires
+  in
   (* FIXME this can likely be streamlined  *)
   let code =
     if Code.Set.mem Native unit_code then Code.Native else Code.Byte
