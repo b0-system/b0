@@ -13,7 +13,8 @@ let read_path_writes m file =
       | Error e -> Fmt.failwith_line n " %s" e
       | Ok p -> p :: acc
     in
-    try Ok (String.fold_ascii_lines ~drop_newlines:true parse_line [] s)
+    let els = String.endlines Lf_crlf in
+    try Ok (String.fold_lines els ~drop_endlines:true parse_line [] s)
     with Failure e -> Filepath.error file "%s" e
   in
   let* lines = B0_memo.read m file in
@@ -51,7 +52,8 @@ module Compile = struct
 
     let read m file =
       let parse lines =
-        try Ok (String.fold_ascii_lines ~drop_newlines:true parse_dep [] lines)
+        let els = String.endlines Lf_crlf in
+        try Ok (String.fold_lines els ~drop_endlines:true parse_dep [] lines)
         with Failure e -> Filepath.error file "%s" e
       in
       let* lines = B0_memo.read m file in
@@ -115,7 +117,8 @@ module Html = struct
 
     let read m file =
       let parse s =
-        try Ok (String.fold_ascii_lines ~drop_newlines:true parse_dep [] s)
+        let els = String.endlines Lf_crlf in
+        try Ok (String.fold_lines els ~drop_endlines:true parse_dep [] s)
         with Failure e -> Filepath.error file "%s" e
       in
       let* lines = B0_memo.read m file in

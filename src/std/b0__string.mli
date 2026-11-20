@@ -272,36 +272,110 @@ val rsplit_all : sep:string -> ?drop:(string -> bool) -> string -> string list
 
     The invariant [concat sep (rsplit_all ~sep s) = s] holds. *)
 
-(** {2:split_lines Splitting lines} *)
+(** {2:split_text_lines Splitting text lines}
 
-val fold_ascii_lines :
-  drop_newlines:bool -> (int -> 'a -> string -> 'a) -> 'a -> string -> 'a
-(** [fold_ascii_lines ~drop_newlines f acc s] folds over the lines of
-    [s] by calling [f linenum acc' line] with [linenum] the one-based
-    line number count, [acc'] the result of accumulating [acc] with
-    [f] so far and [line] the data of the line (without the newline
-    found in the data if [strip_newlines] is [true]).
-
-    Lines are delimited by newline sequences which are either one of
-    ["\n"], ["\r\n"] or ["\r"]. More precisely the function determines
-    lines and line data as follows:
+    These functions make use of these definitions:
 
     {ul
-    {- If [s = ""], the function considers there are no lines in [s] and
-       [acc] is returned without [f] being called.}
-    {- If [s <> ""], [s] is repeteadly split on the first newline sequences
-       ["\n"], ["\r\n"] or ["\r"] into [(left, newline, right)], [left]
-       (or [left ^ newline] when [strip_newlines = false]) is given to [f]
-       and the process is repeated with [right] until a split can no longer
-       be found. At that point this final string is given to [f] and the
-       process stops.}} *)
+    {- A {e line} is a sequence of bytes not containing an endline followed
+       by an endline that belongs to the chosen {{!endline_convention}
+       endline convention}.}
+    {- The {e last line} is either a line followed by the end of string or a
+       non-empty sequence of bytes not containing an endline followed
+       by the end of string.}}
 
-val cut_ascii_newline : string -> string * string
-(** [cut_ascii_newline s] is [(data, endline)] with:
+    Read more {{!about_text_lines}about text lines}. *)
+
+type endline =
+| Crlf (** The sequence <U+000D,U+000A> *)
+| Uchar of Uchar.t (** The given Unicode character. *)
+(** The type for endlines. *)
+
+type endline_convention =
+| Lf (** U+000A *)
+| Crlf (** <U+000D,U+000A> *)
+| Lf_crlf (** [Lf] and [Crlf] *)
+| Cr_lf_crlf (** U+000D and [Lf] and [Crlf] *)
+| Nlf (** [Cr_lf_crlf] and U+0085.
+          The Unicode {{:https://www.unicode.org/versions/Unicode18.0.0/core-spec/chapter-5/#G27861}newline function}. *)
+| Readline (** [Nlf] and U+000C, U+2028 and U+2029.
+                The Unicode
+                {{:https://www.unicode.org/versions/Unicode18.0.0/core-spec/chapter-5/#G21162}readline recommendation}.
+            *)
+| Endlines of endline list (** Custom endlines (must be non empty). *)
+(** The type for representing endline conventions.
+
+    The semantics is such that if CR (U+000D) or LF (U+000A) and the
+    sequence CRLF (<U+000D,U+000A>) are in the convention only [CRLF]
+    must match on data CRLF sequences. *)
+
+type endlines
+(** The type for matching sets of endlines encoded as UTF-8. *)
+
+val endlines : endline_convention -> endlines
+(** [endlines c] are the UTF-8 endlines of convention [c]. *)
+
+val detach_endline : endlines -> string -> string * string
+(** [detach_endline es s] is [(contents, endline)] with:
     {ul
-    {- [endline] either the suffix ["\n"], ["\r\n"] or ["\r"] of [s] or [""]
-       if [s] has no such suffix.}
-    {- [data] the bytes before [endline] such that [data ^ newline = s]}} *)
+    {- [contents] the bytes before [endline] such that
+       [contents ^ endline = s].}
+    {- [endline] an endline of [es] that ends [s] or [""] if none is found.}}
+
+    Note that this function ignores endlines present in the middle of the
+    string. *)
+
+val split_first_line :
+  endlines -> drop_endline:bool -> string -> string * string
+(** [split_first_line es ~drop_endline s] is [(line, rest)] with [line]
+    the first line in [s] ended by an endline of [es] and [rest] the
+    remaining lines or [""] if none. If [s] is [""] this is [("", "")],
+    even if by definition there is no line. If [drop_endline] is
+    [false] the endline is included in the line data. *)
+
+val split_lines :
+  endlines -> drop_endlines:bool -> string -> string list
+(** [split_lines es ~drop_endlines s] are the lines of [s] ended by
+    endlines in [es]. If [s] is [""] this is [[]]. If [drop_endline] is
+    [false] the endlines are in included in the line data. *)
+
+val fold_lines :
+  endlines -> drop_endlines:bool -> (int -> 'a -> string -> 'a) ->
+  'a -> string -> 'a
+(** [fold_lines es ~drop_endlines f acc s] folds [f] over the lines
+    of [s] ended endlines in [es]. The first argument of [f] is the one-based
+    line number. If [s] is [""], [f] is never called and this is [acc].
+    If [drop_endline] is [false] the endlines are included in the line data. *)
+
+(** {3:about_text_lines About text lines}
+
+    For POSIX and related tooling
+    {{:https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap03.html#tag_03_185}
+    a line} is zero or more non-endline characters followed by an
+    endline character and
+    {{:https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap03.html#tag_03_387}
+    a text file} is zero or more lines. However in practice you often find
+    text files which lack a final endline. Also there are line based
+    text file formats like
+    {{:https://www.rfc-editor.org/rfc/rfc4180}CSV} that allow the
+    ultimate endline to be omitted. For a tool invocation like [wc -l]
+    this last line without an endline does not exist: only LF (U+000A)
+    characters are counted. Yet your eyes and your editor see a line
+    there. Adding more confusion, if your file ends with an endline
+    your editor may allow you to navigate to an ultimate empty line
+    which POSIX tells you doesn't exist.
+
+    Your eyes, your editor and {!String.split_on_char} on an endline
+    character are not POSIX: they think of lines as being {e
+    separated} by endlines rather than being {e ended} by them. The
+    interpretation to use is rarely made explicit but for processing
+    data line by line it is generally better to follow POSIX (if only
+    for [cat]): a byte sequence ending with an endline does not define
+    an additional empty line. But it's also better to ignore POSIX for
+    the last line: if a byte sequence is not ended by an endline you
+    should still count it as a line. In order to reinforce the POSIX
+    view on the matter we use "endline" in our terminology instead of
+    "newline". *)
 
 (** {2:tokenize Tokenize} *)
 

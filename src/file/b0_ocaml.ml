@@ -225,9 +225,9 @@ module Conf = struct
     | Some (k, v) -> String.Map.add (String.trim k) (String.trim v) acc
     in
     try
-      let s = String.trim s and drop_newlines = true in
+      let s = String.trim s and els = String.endlines Lf_crlf in
       let fields =
-        String.fold_ascii_lines ~drop_newlines parse_line String.Map.empty s
+        String.fold_lines els ~drop_endlines:true parse_line String.Map.empty s
       in
       Ok (of_string_map fields |> Result.error_to_failure)
     with Failure e -> Filepath.error file "OCaml config: %s" e
@@ -393,8 +393,9 @@ module Modsrc = struct
             Filepath.Map.add file mods acc
       in
       try
-        let drop_newlines = true and parse = parse_line ~src_root in
-        Ok (String.fold_ascii_lines ~drop_newlines parse Filepath.Map.empty s)
+        let parse = parse_line ~src_root in
+        let els = String.endlines Lf_crlf and drop_endlines = true in
+        Ok (String.fold_lines els ~drop_endlines parse Filepath.Map.empty s)
       with
       | Failure e -> Filepath.error file "%s" e
 
@@ -1525,7 +1526,8 @@ let script_proc set_exe_path file b =
       let find_error _ () s =
         if String.starts_with ~prefix:"Error:" s then raise Exit else ()
       in
-      try String.fold_ascii_lines ~drop_newlines:false find_error () log
+      let els = String.endlines Lf_crlf in
+      try String.fold_lines els ~drop_endlines:false find_error () log
       with Exit -> B0_zero.Op.set_status op (Failed (Exec (Some log)))
   in
   let reads = [exe_file] and writes = [stdout_file] in
@@ -2082,7 +2084,8 @@ module Cobj = struct
 
   let of_string ?(file = Filepath.dash) data =
     let line num acc l = (num, l) :: acc in
-    let rev_lines = String.fold_ascii_lines ~drop_newlines:true line [] data in
+    let els = String.endlines Lf_crlf in
+    let rev_lines = String.fold_lines els ~drop_endlines:true line [] data in
     try Ok (parse_files [] (List.rev rev_lines)) with
     | Failure e -> Filepath.error file "%s" e
 

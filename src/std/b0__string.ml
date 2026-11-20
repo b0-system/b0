@@ -380,43 +380,228 @@ let rsplit_all ~sep =
 
 (* Splitting lines *)
 
-let fold_ascii_lines ~drop_newlines:strip f acc s =
-  let rec loop ~strip linenum s start i max f acc =
-    if i > max then
-        f linenum acc (if start = 0 then s else sub s start (i - start))
-    else
-    let next_start =
-      let next = i + 1 in
-      if unsafe_get s i = '\n' then next else
-      if unsafe_get s i = '\r' then
-        if next > max then next else
-        if unsafe_get s next = '\n' then next + 1 else next
-      else start
-    in
-    if next_start = start
-    then loop ~strip linenum s start (i + 1) max f acc else
-    let after_line_data = if strip then i else next_start in
-    let line = sub s start (after_line_data - start) in
-    let acc = f linenum acc line in
-    loop ~strip (linenum + 1) s next_start next_start max f acc
-  in
-  if s = "" then acc else loop ~strip 1 s 0 0 (length s - 1) f acc
 
-let cut_ascii_newline s =
-  if s = "" then ("", "") else
-  let len = length s in
-  let last = len - 1 in
-  let newline_start =
-    if unsafe_get s last = '\n' then
-      let prev = last - 1 in
-      if prev < 0 then last else
-      (if unsafe_get s prev = '\r' then prev else last)
-    else
-    if unsafe_get s last = '\r' then last else len
+module Bytes_matcher (* with a trie *) : sig
+  type t
+  val make : string list -> t
+  val is_fail : t -> bool
+  val accept : t -> string (* "" if no match *)
+  val add_byte : t -> Char.t -> t
+end = struct
+  type t = { accept : string; next : (char * t) array }
+  let empty = { accept = ""; next = [||] }
+  let fail = { accept = ""; next = [||] }
+  let[@inline] is_fail n = n == fail
+  let[@inline] accept n = n.accept
+
+  let add_byte { next } byte = match Array.length next with
+  | 0 -> fail
+  | 1 ->
+      let b, n = Array.get next 0 in
+      if Char.equal byte b then n else fail
+  | 2 ->
+      let b, n = Array.get next 0 in
+      if Char.equal byte b then n else
+      let b, n = Array.get next 1 in
+      if Char.equal byte b then n else fail
+  | 3 ->
+      let b, n = Array.get next 0 in
+      if Char.equal byte b then n else
+      let b, n = Array.get next 1 in
+      if Char.equal byte b then n else
+      let b, n = Array.get next 2 in
+      if Char.equal byte b then n else fail
+  | 4 ->
+      let b, n = Array.get next 0 in
+      if Char.equal byte b then n else
+      let b, n = Array.get next 1 in
+      if Char.equal byte b then n else
+      let b, n = Array.get next 2 in
+      if Char.equal byte b then n else
+      let b, n = Array.get next 3 in
+      if Char.equal byte b then n else fail
+  | 5 -> (* This is the out-degree of the initial node of readline *)
+      let b, n = Array.get next 0 in
+      if Char.equal byte b then n else
+      let b, n = Array.get next 1 in
+      if Char.equal byte b then n else
+      let b, n = Array.get next 2 in
+      if Char.equal byte b then n else
+      let b, n = Array.get next 3 in
+      if Char.equal byte b then n else
+      let b, n = Array.get next 4 in
+      if Char.equal byte b then n else fail
+  | len ->
+      (* Binary search *)
+      let left = ref 0 and right = ref (len - 1) and result = ref (-1) in
+      while !left <= !right && !result == -1 do
+        let mid = !left + (!right - !left) / 2 in
+        let b, n = Array.get next mid in
+        let cmp = Char.compare byte b in
+        if cmp = 0 then result := mid else
+        if cmp < 0 then right := mid - 1 else left := mid + 1
+      done;
+      if !result = -1 then fail else snd (Array.get next !result)
+
+  let make pats =
+    let append_edge next edge =
+      let len = Array.length next in
+      let init i = if i < len then Array.get next i else edge in
+      let a = Array.init (len + 1) init in
+      Array.sort Stdlib.compare a; a
+    in
+    let rec add_pat ({accept; next} as here) s i =
+      if i = length s then { accept = s; next } else
+      let byte = get s i in
+      let n = match Array.find_index (fun (b, _) -> Char.equal byte b) next with
+      | None -> -1 | Some i -> i
+      in
+      let node = if n = -1 then empty else snd (Array.get next n) in
+      let edge = byte, add_pat node s (i + 1) in
+      if n = -1
+      then { accept; next = append_edge next edge }
+      else (Array.set next n edge; here)
+    in
+    List.fold_left (fun acc s -> add_pat acc s 0) empty pats
+end
+
+let utf_8_of_uchar u =
+  let bytes = Bytes.create (Uchar.utf_8_byte_length u) in
+  ignore (Bytes.set_utf_8_uchar bytes 0 u);
+  Bytes.unsafe_to_string bytes
+
+type endline = Crlf | Uchar of Uchar.t
+type endline_convention =
+| Lf | Crlf | Lf_crlf | Cr_lf_crlf | Nlf | Readline | Endlines of endline list
+
+type endlines = One of string | Many of Bytes_matcher.t
+
+let lf = "\n"
+let crlf = "\r\n"
+let lf_crlf = [lf; crlf]
+let cr_lf_crlf = "\r" :: lf_crlf
+let nlf = "\u{0085}" :: cr_lf_crlf
+let readline = "\u{000C}" :: "\u{2028}" :: "\u{2029}" :: nlf
+
+let lf = One lf
+(* let lf = Many (Bytes_matcher.make ["\n"]) *)
+let crlf' = One crlf
+let lf_crlf = Many (Bytes_matcher.make lf_crlf)
+let cr_lf_crlf = Many (Bytes_matcher.make cr_lf_crlf)
+let nlf = Many (Bytes_matcher.make nlf)
+let readline = Many (Bytes_matcher.make readline)
+
+let endlines = function
+| Lf -> lf | Crlf -> crlf' | Lf_crlf -> lf_crlf | Cr_lf_crlf -> cr_lf_crlf
+| Nlf -> nlf | Readline -> readline
+| Endlines [] -> invalid_arg "Invalid endline list: []"
+| Endlines [Crlf] -> crlf'
+| Endlines [Uchar u] -> One (utf_8_of_uchar u)
+| Endlines es ->
+    let pat = function Uchar u -> utf_8_of_uchar u | Crlf -> crlf in
+    Many (Bytes_matcher.make (List.map pat es))
+
+(* Primitive endline search functions.
+
+   We are searching for the encodings of single UTF-8 characters or
+   the sequence CRLF. UTF-8 encodings are prefix-free and the first
+   byte of an encoding cannot occur later in the same encoding. This
+   means that on mismatches we don't need to backtrack to earlier
+   positions except when we have both CR and CRLF. The latter is
+   handled in an ad-hoc manner in [find_endline_many] *)
+
+let find_endline_one el s ~start =
+  let slen = length s in
+  if start >= slen then slen, "" else
+  let elen = length el in
+  let i = ref start and k = ref 0  in
+  while !i < slen && !k < elen do
+    if unsafe_get s !i = unsafe_get el !k
+    then (incr i; incr k)
+    else (if !k = 0 then incr i else k := 0)
+  done;
+  if !k = elen then !i - elen, el else slen, ""
+
+let find_endline_many m s ~start =
+  let slen = length s in
+  if start >= slen then slen, "" else
+  let i = ref start and el = ref "" and state = ref m in
+  while (!i < slen && is_empty !el) do
+    let next = Bytes_matcher.add_byte !state (unsafe_get s !i) in
+    if Bytes_matcher.is_fail next
+    then (if !state == m then incr i else state := m) else
+    match Bytes_matcher.accept next with
+    | "" -> incr i; state := next
+    | "\r" as endline when !i + 1 < slen ->
+        (* Handle a possible CRLF *)
+        let next' = Bytes_matcher.add_byte next (unsafe_get s (!i + 1)) in
+        let accept = Bytes_matcher.accept next' in
+        if is_empty accept
+        then (incr i; el := endline)
+        else (i := !i + 2; el := accept) (* can only be CRLF *)
+    | endline -> incr i; el := endline
+  done;
+  if is_empty !el then slen, "" else (!i - (length !el)), !el
+
+(* Detaching newlines *)
+
+let detach_endline els =
+  let detach_endline_one el s =
+    if ends_with ~suffix:el s then sub s 0 (length s - length el), el else s, ""
   in
-  if newline_start > last then (s, "") else
-  sub s 0 newline_start,
-  sub s newline_start (len - newline_start)
+  let detach_endline_many m s =
+    let rec loop m s i slen =
+      let el_first, el = find_endline_many m s ~start:i in
+      if el_first >= slen then s, "" else
+      let next = el_first + length el in
+      if next = slen then sub s 0 (length s - length el), el else
+      loop m s next slen
+    in
+    loop m s 0 (length s)
+  in
+  match els with
+  | One el -> detach_endline_one el
+  | Many m -> detach_endline_many m
+
+let split_first_line es ~drop_endline s =
+  let split_first_line find_endline ~drop_endline s =
+    let el_first, el = find_endline s ~start:0 in
+    let slen = length s in
+    if el_first >= slen then s, "" else
+    let rest_first = el_first + length el in
+    let rest =
+      if rest_first = slen then "" else sub s rest_first (slen - rest_first)
+    in
+    let after_line_last = if drop_endline then el_first else rest_first in
+    if after_line_last = slen then s, "" else sub s 0 after_line_last, rest
+  in
+  match es with
+  | One el -> split_first_line (find_endline_one el) ~drop_endline s
+  | Many m -> split_first_line (find_endline_many m) ~drop_endline s
+
+let fold_lines es ~drop_endlines f acc s =
+  let fold_lines find_endline ~drop_endlines f acc s =
+    if s = "" then acc else
+    let lineno = ref 1 and acc = ref acc and i = ref 0 in
+    let slen = length s in
+    while (!i < slen) do
+      let el_first, el = find_endline s ~start:!i in
+      let rest_first =
+        if el_first >= slen then slen else el_first + length el
+      in
+      let after_line_last = if drop_endlines then el_first else rest_first in
+      acc := f !lineno !acc (sub s !i (after_line_last - !i));
+      i := rest_first;
+      incr lineno;
+    done;
+    !acc
+  in
+  match es with
+  | One el -> fold_lines (find_endline_one el) ~drop_endlines f acc s
+  | Many m -> fold_lines (find_endline_many m) ~drop_endlines f acc s
+
+let split_lines es ~drop_endlines s =
+  List.rev (fold_lines es ~drop_endlines (fun _ acc l -> l :: acc) [] s)
 
 (* Tokenize *)
 

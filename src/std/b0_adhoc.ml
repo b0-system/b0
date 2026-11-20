@@ -53,5 +53,6 @@ let commonmark_first_section ~preamble md =
               find_content num title [] ls
   in
   let add_line _ ls l = l :: ls in
-  let rev_lines = String.fold_ascii_lines ~drop_newlines:true add_line [] md in
+  let els = String.endlines Cr_lf_crlf in
+  let rev_lines = String.fold_lines els ~drop_endlines:true add_line [] md in
   find_heading [] (List.rev rev_lines)
